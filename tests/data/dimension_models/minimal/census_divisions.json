@@ -1,0 +1,38 @@
+[
+  {
+    "id": "pacific",
+    "name": "pacific"
+  },
+  {
+    "id": "east_south_central",
+    "name": "east_south_central"
+  },
+  {
+    "id": "west_south_central",
+    "name": "west_south_central"
+  },
+  {
+    "id": "mountain",
+    "name": "mountain"
+  },
+  {
+    "id": "new_england",
+    "name": "new_england"
+  },
+  {
+    "id": "south_atlantic",
+    "name": "south_atlantic"
+  },
+  {
+    "id": "west_north_central",
+    "name": "west_north_central"
+  },
+  {
+    "id": "east_north_central",
+    "name": "east_north_central"
+  },
+  {
+    "id": "mid_atlantic",
+    "name": "mid_atlantic"
+  }
+]

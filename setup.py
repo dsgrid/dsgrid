@@ -26,12 +26,12 @@ here = os.path.abspath(os.path.dirname(__file__))
 with open("README.md", encoding="utf-8") as readme_file:
     readme = convert_text(readme_file.read(), "rst", format="md")
 
-with open(os.path.join(here, "dsgrid", "version.py"), encoding="utf-8") as f:
+with open(os.path.join(here, "dsgrid", "_version.py"), encoding="utf-8") as f:
     version = f.read()
 
 version = version.split()[2].strip('"').strip("'")
 
-test_requires = ["pytest"]
+test_requires = ["pytest", "pytest-cov"]
 
 setup(
     name="dsgrid",
@@ -61,4 +61,7 @@ setup(
     ],
     test_suite="tests",
     install_requires=read_lines("requirements.txt"),
+    extras_require={
+        "dev": test_requires,
+    },
 )

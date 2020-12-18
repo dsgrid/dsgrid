@@ -1,12 +1,35 @@
 # dsgrid
-Here are the steps to install dsgrid after cloning the repository. While not
-required we recommend that you use the conda environment defined here.
+Here are the steps to install dsgrid after cloning the repository.
+
+## Users
 
 ```
-# Change to the root directory of the repository.
+pip install -e .
+```
+
+## Developers
+
+```
+pip install -e '.[dev]'
+```
+
+## Conda environment
+A conda environment is available for your convenience.
+
+```
 conda env create -f environment.yml
+
 pip install -e .
 
-# List the available commands.
+# or
+
+pip install -e '.[dev]'
+```
+
+## Usage
+
+### List the available commands.
+
+```
 dsgrid --help
 ```

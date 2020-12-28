@@ -1,0 +1,12 @@
+name: dsgrid
+channels:
+  - defaults
+dependencies:
+  - click
+  - ipython
+  - numpy
+  - pandas
+  - pip
+  - pyspark
+  - python=3.8
+  - toml

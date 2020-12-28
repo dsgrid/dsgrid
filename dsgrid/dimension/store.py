@@ -19,7 +19,7 @@ class DimensionStore:
     REQUIRED_FIELDS = ("id", "name")
 
     def __init__(self):
-        # Two-level dict: {EnumerateType: {id: Record}}
+        # Two-level dict: {DimensionType: {id: Record}}
         # Example
         #     {State: {'TX': {'id': 'TX', 'name', 'Texas'}}}
         self._store = defaultdict(dict)

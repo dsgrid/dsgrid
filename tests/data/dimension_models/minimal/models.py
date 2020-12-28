@@ -11,54 +11,46 @@ from dsgrid.time_conversions import convert_datetime_to_day_type, convert_dateti
 
 @dataclass(frozen=True)
 class CensusDivision(GeographicDimension):
-    id: str
-    name: str
+    """Census Region attributes"""
 
 
 @dataclass(frozen=True)
 class CensusRegion(GeographicDimension):
-    id: str
-    name: str
+    """Census Region attributes"""
 
 
 @dataclass(frozen=True)
 class County(GeographicDimension):
-    id: str
-    name: str
+    """County attributes"""
     state: str
     timezone: str = "Unknown"
 
 
 @dataclass(frozen=True)
 class DayType(TimeDimension):
-    id: str
-    name: str
+    """Day Type attributes"""
 
 
 @dataclass(frozen=True)
 class Enduse(EndUseDimension):
-    id: str
-    name: str
+    """Enduse attributes"""
     sector: str
 
 
 @dataclass(frozen=True)
 class Season(TimeDimension):
-    id: str
-    name: str
+    """Season attributes"""
 
 
 @dataclass(frozen=True)
 class Sector(SectorDimension):
-    id: str
-    name: str
+    """Sector attributes"""
     category: str
 
 
 @dataclass(frozen=True)
 class State(GeographicDimension):
-    id: str
-    name: str
+    """State attributes"""
     is_conus: bool
     census_division: str = ""
     census_region: str = ""
@@ -66,8 +58,7 @@ class State(GeographicDimension):
 
 @dataclass(frozen=True)
 class Timezone(GeographicDimension):
-    id: str
-    name: str
+    """Timezone attributes"""
 
 
 _LOCAL = os.path.abspath(os.path.dirname(__file__))

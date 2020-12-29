@@ -1,18 +1,18 @@
 [
 {
 "id": "west",
-"name": "west"
+"name": "West"
 },
 {
 "id": "south",
-"name": "south"
+"name": "South"
 },
 {
 "id": "northeast",
-"name": "northeast"
+"name": "Northeast"
 },
 {
 "id": "midwest",
-"name": "midwest"
+"name": "Midwest"
 }
 ]

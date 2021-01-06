@@ -5,7 +5,6 @@ import os
 
 
 from dsgrid.dimension.base import EndUseDimension, GeographicDimension, SectorDimension, TimeDimension
-from dsgrid.transform.types import OneToMany, OneToOne, ProgrammaticOneToOne
 from dsgrid.time_conversions import convert_datetime_to_day_type, convert_datetime_to_season
 
 
@@ -75,24 +74,29 @@ MODEL_MAPPINGS = {
     Timezone: f"{_LOCAL}/timezones.json",
 }
 
-ONE_TO_MANY = [
-    OneToMany(CensusDivision, "id", State, "census_division"),
-    OneToMany(CensusRegion, "id", State, "census_region"),
-    OneToMany(State, "id", County, "state"),
+DIMENSION_MAPPINGS = [
+    {
+        "from": County,
+        "to": State,
+        "key": "state",
+    },
+    {
+        "from": County,
+        "to": Timezone,
+        "key": "timezone",
+    },
+    {
+        "from": State,
+        "to": CensusDivision,
+        "key": "census_division",
+    },
+    {
+        "from": State,
+        "to": CensusRegion,
+        "key": "census_region",
+    },
 ]
 
-# TODO: consider better term
-ONE_TO_ONE = [
-    OneToOne(County, "timezone", Timezone, "id"),
-    OneToOne(County, "state", State, "id"),
-    OneToOne(State, "census_division", CensusDivision, "id"),
-    OneToOne(State, "census_region", CensusRegion, "id"),
-]
-
-PROGRAMMATIC_ONE_TO_ONE = [
-    ProgrammaticOneToOne(datetime.datetime, convert_datetime_to_season, Season, "id"),
-    ProgrammaticOneToOne(datetime.datetime, convert_datetime_to_day_type, DayType, "id"),
-]
 
 # TODO
 # Filter records by field? Such as reduce all states to states that are CONUS

@@ -1,4 +1,4 @@
-"""Utility functions for the jade package."""
+"""File utility functions"""
 
 import logging
 import os

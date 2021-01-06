@@ -1,7 +1,6 @@
 
 from dataclasses import fields
 import logging
-import sqlite3
 
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StringType

@@ -2,11 +2,11 @@ import abc
 import os
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from pydantic.fields import Field
-from pydantic.class_validators import root_validator
+from pydantic.class_validators import root_validator, validator
 
 
 class DimensionType(Enum):
@@ -20,10 +20,10 @@ class DimensionType(Enum):
 
 class TimezoneType(Enum):
     """Dimension types"""
-    PST = "Pacific Standard Time"
-    MST = "Mountain Standard Time"
-    CST = "Central Standard Time"
-    EST = "Eastern Standard Time"
+    PST = "PST"
+    MST = "MST"
+    CST = "CST"
+    EST = "EST"
     NONE = "None"
 
 
@@ -35,45 +35,50 @@ class DSGBaseModel(BaseModel, abc.ABC):
         anystr_strip_whitespace = True
         validate_assignment = True
         validate_all = True
-        extra = "forbid"
+        extra = "forbid"  # TODO: consider changing this after we get this working
         use_enum_values = True
 
 
-class Dimension(DSGBaseModel):
-    """Defines a dimension"""
-    dimension_type: DimensionType = Field(
-        title="dimension_type",
-        alias="type",
-        description="type of the dimension",
+class DimensionBase(DSGBaseModel, abc.ABC):
+    """Common attributes for all dimensions"""
+    name: str = Field(
+        title="name",
+        description="dimension name",
     )
+    # We don't need this if all dimensions are keyed by the name.
+    #dimension_type: DimensionType = Field(
+    #    title="dimension_type",
+    #    alias="type",
+    #    description="type of the dimension",
+    #)
+
+
+class Dimension(DimensionBase):
+    """Defines a dimension"""
     filename: str = Field(
         title="filename",
         alias="file",
         description="filename containing dimension records",
     )
-    name: str = Field(
-        title="name",
-        description="dimension name",
-    )
 
-    @root_validator(pre=True)
-    def validate_dimension(cls, values: dict) -> dict:
-        if not os.path.isfile(values["file"]):
-            raise FileNotFoundError(f"{values['file']} does not exist")
-        return values
+    @validator("filename")
+    def validate_file(cls, val):
+        assert os.path.isfile(val), f"{val} does not exist"
+        return val
 
 
-class TimeDimension(Dimension):
+class TimeDimension(DimensionBase):
     """Defines a time dimension"""
     start: datetime = Field(
         title="start",
         description="first timestamp in the data",
     )
     # TODO: We have start and interval. Do we need this?
-    #end: datetime = Field(
-    #    title="end",
-    #    description="last timestamp in the data",
-    #)
+    # TODO: If we keep it, is it inclusive or exclusive?
+    end: datetime = Field(
+        title="end",
+        description="last timestamp in the data",
+    )
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y-%m-%d %H:%M:%s-%z",
@@ -92,19 +97,22 @@ class TimeDimension(Dimension):
         description="includes daylight savings time",
     )
     # TODO: do we need this? We can determine it programmatically.
-    #includes_leap_day: bool = Field
-    #    title="includes_leap_day",
-    #    description="includes a leap day",
-    #)
+    includes_leap_day: Optional[bool] = Field(
+        title="includes_leap_day",
+        default=False,
+        description="includes a leap day",
+    )
     leap_day_adjustment: Optional[str] = Field(
         title="leap_day_adjustment",
+        default="",
         description="TODO",
     )
     # TODO: do we need this? We already have start + interval
-    #model_years: List[int] = Field(
-    #    title="model_years",
-    #    description="",
-    #)
+    model_years: Optional[List[int]] = Field(
+        title="model_years",
+        default=[],
+        description="",
+    )
     period: str = Field(
         title="period",
         description="TODO",
@@ -122,9 +130,9 @@ class TimeDimension(Dimension):
 
     @root_validator(pre=True)
     def validate_time_dimension(cls, values: dict) -> dict:
-        values = super(self).validate_dimension(values)
-        start = datetime.strptime(valus["start"], values["str_format"])
-        end = datetime.strptime(valus["end"], values["str_format"])
+        # Just make sure these parse.
+        datetime.strptime(values["start"], values["str_format"])
+        datetime.strptime(values["end"], values["str_format"])
         # TODO: validate consistency between start, end, frequency
         return values
 

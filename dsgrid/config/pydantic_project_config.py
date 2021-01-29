@@ -2,7 +2,7 @@ import abc
 import os
 from datetime import datetime
 from enum import Enum
-from typing import List, Optional
+from typing import List, Optional, Union
 
 from pydantic import BaseModel, Field, ValidationError
 from pydantic.fields import Field
@@ -45,12 +45,11 @@ class DimensionBase(DSGBaseModel, abc.ABC):
         title="name",
         description="dimension name",
     )
-    # We don't need this if all dimensions are keyed by the name.
-    #dimension_type: DimensionType = Field(
-    #    title="dimension_type",
-    #    alias="type",
-    #    description="type of the dimension",
-    #)
+    dimension_type: DimensionType = Field(
+        title="dimension_type",
+        alias="type",
+        description="type of the dimension",
+    )
 
 
 class Dimension(DimensionBase):
@@ -73,8 +72,7 @@ class TimeDimension(DimensionBase):
         title="start",
         description="first timestamp in the data",
     )
-    # TODO: We have start and interval. Do we need this?
-    # TODO: If we keep it, is it inclusive or exclusive?
+    # TODO: Is this inclusive or exclusive?
     end: datetime = Field(
         title="end",
         description="last timestamp in the data",
@@ -87,10 +85,6 @@ class TimeDimension(DimensionBase):
     frequency: str = Field(
         title="frequency",
         description="resolution of the timestamps",
-    )
-    interval: str = Field(
-        title="interval",
-        description="total duration",
     )
     includes_dst: bool = Field(
         title="includes_dst",
@@ -107,7 +101,6 @@ class TimeDimension(DimensionBase):
         default="",
         description="TODO",
     )
-    # TODO: do we need this? We already have start + interval
     model_years: Optional[List[int]] = Field(
         title="model_years",
         default=[],
@@ -117,7 +110,6 @@ class TimeDimension(DimensionBase):
         title="period",
         description="TODO",
     )
-    # TODO: can't the data have more than one timezone?
     timezone: TimezoneType = Field(
         title="timezone",
         description="timezone of data",
@@ -138,35 +130,6 @@ class TimeDimension(DimensionBase):
 
 
 class Dimensions(DSGBaseModel):
-    """Defines all dimensions for a dataset"""
-    end_use: Optional[List[Dimension]] = Field(
-        title="end_use",
-        default = [],
-        description="end use dimension",
-    )
-    geography: Optional[List[Dimension]] = Field(
-        title="geography",
-        default = [],
-        description="geographic dimension",
-    )
-    sector: Optional[List[Dimension]] = Field(
-        title="sector",
-        default = [],
-        description="sector dimension",
-    )
-    subsector: Optional[List[Dimension]] = Field(
-        title="subsector",
-        default = [],
-        description="subsector dimension",
-    )
-    time_dimension: Optional[List[TimeDimension]] = Field(
-        title="time",
-        alias="time",
-        default = [],
-        description="time dimension",
-    )
-
-class DimensionsContainer(DSGBaseModel):
     """Contains dimensions defined by a dataset"""
     model_sectors: List[str] = Field(
         title="model_sectors",
@@ -180,13 +143,14 @@ class DimensionsContainer(DSGBaseModel):
         title="sectors",
         description="sectors used in the project",
     )
-    project: Dimensions = Field(
-        title="project",
+    project_dimensions: List[Union[Dimension, TimeDimension]] = Field(
+        title="project_dimensions",
         description="dimensions defined by the project",
     )
-    supplemental: Dimensions = Field(
-        title="supplemental",
+    supplemental_dimensions: Optional[List[Union[Dimension, TimeDimension]]] = Field(
+        title="supplemental_dimensions",
         description="supplemental dimensions",
+        default=[],
     )
 
 
@@ -266,7 +230,7 @@ class ProjectConfig(DSGBaseModel):
         title="input_datasets",
         description="input datasets for the project",
     )
-    dimensions: DimensionsContainer = Field(
+    dimensions: Dimensions = Field(
         title="dimensions",
         description="dimensions",
     )

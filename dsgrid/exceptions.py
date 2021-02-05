@@ -17,11 +17,15 @@ class DSGInvalidDimensionMapping(DSGBaseException):
     """Raised if a mapping is not stored or is invalid."""
 
 
-class ConfigError(Exception):
+class DSGProjectConfigError(Exception):
     """
-    Error for bad configuration inputs
+    Error for bad project configuration inputs
     """
 
+class DSGDatasetConfigError(Exception):
+    """
+    Error for bad dataset configuration inputs
+    """
 
 class ConfigWarning(Warning):
     """
@@ -40,8 +44,7 @@ class FileInputWarning(Warning):
     Warning during input file checks.
     """
 
-
 class JSONError(Exception):
     """
-    Error reading json file.
+    Error with JSON file
     """

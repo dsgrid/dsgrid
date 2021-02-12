@@ -252,7 +252,7 @@ class DimensionStore:
 
 
 def deserialize_row(dimension_type, row):
-    """Return an instance of the dimension_type deserialized from a tuple.
+    """Return an instance of the dimension_type deserialized from a Row.
 
     Parameters
     ----------

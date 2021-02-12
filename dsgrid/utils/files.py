@@ -44,7 +44,11 @@ def load_data(filename, **kwargs):
     """
     mod = _get_module_from_extension(filename, **kwargs)
     with open(filename) as f_in:
-        data = mod.load(f_in)
+        try:
+            data = mod.load(f_in)
+        except Exception:
+            logger.exception("Failed to load data from %s", filename)
+            raise
 
     logger.debug("Loaded data from %s", filename)
     return data

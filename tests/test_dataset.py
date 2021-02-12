@@ -2,7 +2,7 @@
 import os
 from pathlib import Path
 
-from dsgrid.analysis.sector_dataset import SectorDataset
+from dsgrid.analysis.dataset import Dataset
 from dsgrid.dimension.store import DimensionStore
 from .data.dimension_models.minimal.models import *
 
@@ -13,13 +13,14 @@ store = DimensionStore.load(
 )
 
 # TODO: need to make a small dataset for use in tests
-DATA_DIR = os.path.join(str(Path.home()), "dsgrid-data/output/industrial")
+DATA_DIR = os.path.join(str(Path.home()), "dsgrid-data/output/commercial")
 
 
 def test_aggregate_load_by_state():
-    dataset = SectorDataset.load(DATA_DIR, store)
+    dataset = Dataset.load(DATA_DIR, store)
     df = dataset.aggregate_sector_sums_by_dimension(County, State)
+    breakpoint()
     assert "state" in df.columns
-    assert "sum((sum(conventional_boiler_use) * scale_factor))" in df.columns
+    assert "sum((sum(fans) * scale_factor))" in df.columns
     # For now just ensure this doesn't fail.
     df.count()

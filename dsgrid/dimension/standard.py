@@ -1,35 +1,36 @@
 """Standard dimension classes for dsgrid"""
 
-from pydantic.dataclasses import dataclass
+from typing import List, Optional, Union
+
+from pydantic import Field
+from pydantic.class_validators import root_validator, validator
 
 from dsgrid.dimension.base import (
-    EndUseDimensionType, GeographicDimensionType, ModelDimensionType, ModelYearDimensionType,
-    ScenarioDimensionType, SectorDimensionType, SubSectorDimensionType, TimeDimensionType,
-    WeatherDimensionType)
+    EndUseDimensionModel, GeographicDimensionModel, ModelDimensionModel,
+    ModelYearDimensionModel, ScenarioDimensionModel, SectorDimensionModel,
+    SubSectorDimensionModel, TimeDimensionModel, WeatherDimensionModel
+)
 
 
 # ---------------------------
 # GEOGRAPHIC DIMENSIONS
 # ---------------------------
-@dataclass(frozen=True)
-class CensusDivision(GeographicDimensionType):
+class CensusDivision(GeographicDimensionModel):
     """Census Region attributes"""
 
 
-@dataclass(frozen=True)
-class CensusRegion(GeographicDimensionType):
+class CensusRegion(GeographicDimensionModel):
     """Census Region attributes"""
 
 
-@dataclass(frozen=True)
-class County(GeographicDimensionType):
+class County(GeographicDimensionModel):
     """County attributes"""
     state: str
-    timezone: str = "Unknown"
+    timezone: Optional[str] = Field(
+        default="Unknown",
+    )
 
-
-@dataclass(frozen=True)
-class State(GeographicDimensionType):
+class State(GeographicDimensionModel):
     """State attributes"""
     is_conus: bool
     census_division: str = ""
@@ -39,8 +40,7 @@ class State(GeographicDimensionType):
 # ---------------------------
 # SECTOR DIMENSIONS
 # ---------------------------
-@dataclass(frozen=True)
-class Sector(SectorDimensionType):
+class Sector(SectorDimensionModel):
     """Sector attributes"""
     category: str
 
@@ -48,61 +48,61 @@ class Sector(SectorDimensionType):
 # ---------------------------
 # SUBSECTOR DIMENSIONS
 # ---------------------------
-@dataclass(frozen=True)
-class SubSector(SubSectorDimensionType):
+class SubSector(SubSectorDimensionModel):
     """Subsector attributes"""
-    category: str
+    sector: str
+    abbr: Optional[str] = Field(
+        default="",
+    )
+
+    @validator('abbr', pre=True)
+    def validate_abbr(cls, value: Union[str, None]) -> str:
+        return value or ""
 
 
 # ---------------------------
 # ENDUSE DIMENSIONS
 # ---------------------------
-@dataclass(frozen=True)
-class EndUse(EndUseDimensionType):
+class EndUse(EndUseDimensionModel):
     """End use attributes"""
-    sector: str
+    #sector: str  # TODO: the raw data doesn't have this field
+    fuel_id: str
+    units: str
 
 
 # ---------------------------
 # TIME DIMENSIONS
 # ---------------------------
-class Time(TimeDimensionType):
+class Time(TimeDimensionModel):
     """Time attributes"""
 
 
-@dataclass(frozen=True)     # TODO: is this a "dimension" technically?
-class Timezone(TimeDimensionType):
+class Timezone(TimeDimensionModel):
     """Timezone attributes"""
 
 
-@dataclass(frozen=True)
-class DayType(TimeDimensionType):
+class DayType(TimeDimensionModel):
     """Day Type attributes"""
 
 
-@dataclass(frozen=True)
-class Season(TimeDimensionType):
+class Season(TimeDimensionModel):
     """Season attributes"""
 
 
 # ---------------------------
 # OTHER DIMENSIONS
 # ---------------------------
-@dataclass(frozen=True)
-class Weather(WeatherDimensionType):
+class Weather(WeatherDimensionModel):
     """ attributes"""
 
 
-@dataclass(frozen=True)
-class ModelYear(ModelYearDimensionType):
+class ModelYear(ModelYearDimensionModel):
     """ attributes"""
 
 
-@dataclass(frozen=True)
-class Model(ModelDimensionType):
+class Model(ModelDimensionModel):
     """Model attributes"""
 
 
-@dataclass(frozen=True)
-class Scenario(ScenarioDimensionType):
+class Scenario(ScenarioDimensionModel):
     """Scenario attributes"""

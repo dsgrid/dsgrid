@@ -1,15 +1,17 @@
 
 from dataclasses import fields
+import itertools
 import logging
+import os
 
-from pyspark.sql import SparkSession
-from pyspark.sql.types import StringType
-from pyspark.sql import functions as F
 
-from dsgrid.dimension.base import DSGBaseDimension
+from dsgrid.dimension.base import DSGBaseDimensionModel
+from dsgrid.dimension.dimension_records import DimensionRecords
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension, DSGInvalidDimensionMapping
+from dsgrid.config.project_config import (
+    ProjectConfig, load_project_config, DimensionDirectMapping,
+)
 from dsgrid.utils.files import load_data
-from dsgrid.utils.spark import init_spark
 from dsgrid.utils.timing import timed_debug, timed_info
 
 
@@ -21,110 +23,108 @@ class DimensionStore:
 
     REQUIRED_FIELDS = ("id", "name")
 
-    def __init__(self, spark, dimension_mappings):
-        self._store = {}  # {DimensionType: pyspark.sql.dataframe.DataFrame}
-        self._spark = spark  # SparkSession
-        self._dimension_mappings = {
-            (x["from"], x["to"]): x["key"] for x in dimension_mappings
-        }
+    def __init__(self, project_config, record_store):
+        self._record_store = record_store
+        self._store = {}  # {class type: DSGBaseDimensionModel}
+        self._project_config = project_config
+        self._dimension_direct_mappings = {}
 
     @classmethod
     @timed_debug
-    def load(cls, model_mappings, dimension_mappings=None, spark=None):
+    def load(cls, project_config_file, spark=None):
         """Load a project's dimension dataset records.
 
         Parameters
         ----------
-        model_mappings : dict
-            Maps a dataclass to a JSON file defining records for that dataclass
+        project_config_file : str
 
         Returns
         -------
         DimensionStore
 
         """
-        if spark is None:
-            spark = init_spark("store")
-
-        # TODO: develop data structure to accept all inputs
-        store = cls(spark, dimension_mappings)
-
-        for dimension_type, filename in model_mappings.items():
-            if not issubclass(dimension_type, DSGBaseDimension):
-                raise DSGInvalidDimension(
-                    f"{dimension_type.__name__} is not derived from DSGBaseDimension"
-                )
-
-            # Consider handling multiLine
-            df = spark.read.json(filename)
-            # This should not overwhelm memory and should speed-up queries.
-            df.cache()
-            store.check_dataframe(dimension_type, df)
-            store.add_dataframe(dimension_type, df)
-
+        project_config = load_project_config(project_config_file)
+        records = DimensionRecords(spark=spark)
+        store = cls(project_config, records)
+        for dimension in itertools.chain(
+            store.project_dimensions,
+            store.supplemental_dimensions
+        ):
+            # TODO: do we need to store project and supplemental in different
+            # containers? We already have the info in project_config.
+            store.add_dimension(dimension)
         return store
 
-    @staticmethod
-    @timed_debug
-    def check_dataframe(dimension_type, df):
-        """Validates the dataframe.
+    @property
+    def project_config(self):
+        return self._project_config
 
-        Raises
-        ------
-        DSGInvalidField
-            Raised if a field is invalid.
+    @property
+    def project_dimensions(self):
+        return self._project_config.dimensions.project_dimensions
 
-        """
-        cls_fields = sorted(list(dimension_type.__dataclass_fields__.keys()))
-        columns = sorted(df.columns)
-        if cls_fields != columns:
-            raise DSGInvalidField(f"columns don't match: {cls_fields} {columns}")
-        for field in DimensionStore.REQUIRED_FIELDS:
-            if field not in columns:
-                raise DSGInvalidField(f"{dimension_type} must define {field}")
-        for field in df.schema.fields:
-            if field.name == "id" and not isinstance(field.dataType, StringType):
-                raise DSGInvalidField(f"id must be a string: {dimension_type}")
+    @property
+    def supplemental_dimensions(self):
+        return self._project_config.dimensions.supplemental_dimensions
 
-        rows = df.collect()
-        num_unique_ids = len(set((x.id for x in rows)))
-        if num_unique_ids != len(rows):
-            raise DSGInvalidField(f"{dimension_type} does not have unique 'id' values")
-
-    def add_dataframe(self, dimension_type, df):
-        """Add a dataframe to the store.
+    def add_dimension(self, dimension):
+        """Add a dimension to the store.
 
         Parameters
         ----------
-        dimension_type : class
-        df : pyspark.sql.dataframe.DataFrame
+        dimension : DSGBaseDimensionModel
 
         """
-        assert dimension_type not in self._store
-        self._store[dimension_type] = df
+        assert dimension.cls not in self._store
+        self._store[dimension.cls] = dimension
 
-    def get_dataframe(self, dimension_type):
-        """Return a dataframe from the store.
+        if getattr(dimension, "mappings", None):
+            for mapping in dimension.mappings:
+                self.add_dimension_mapping(dimension, mapping)
+
+        if getattr(dimension, "records", None):
+            self._record_store.add_dataframe(dimension)
+
+    def add_dimension_mapping(self, dimension, mapping):
+        """Add a dimension mapping to the store.
 
         Parameters
         ----------
-        dimension_type : class
+        dimension : DSGBaseDimensionModel
+        mapping : DimensionDirectMapping
+
+        """
+        # TODO: other mapping types
+        assert isinstance(mapping, DimensionDirectMapping), mapping.__name__
+        key = (dimension.cls, mapping.to_dimension)
+        assert key not in self._dimension_direct_mappings
+        self._dimension_direct_mappings[key] = mapping
+        logger.debug("Added dimension mapping %s-%s", dimension.cls, mapping)
+
+    def get_dimension(self, dimension_class):
+        """Return a dimension from the store.
+
+        Parameters
+        ----------
+        dimension_class : type
+            subclass of DSGBaseDimensionModel
 
         Returns
         -------
-        pyspark.sql.dataframe.DataFrame
+        DSGBaseDimensionModel
+            instance of DSGBaseDimensionModel
 
         """
-        self._raise_if_table_not_stored(dimension_type)
-        return self._store[dimension_type]
+        self._raise_if_dimension_not_stored(dimension_class)
+        return self._store[dimension_class]
 
-    def get_dimension_mapping_key(self, from_type, to_type):
-        """Return the key to perform a join from `from_type` to `to_type`.
+    def get_dimension_direct_mapping(self, from_dimension, to_dimension):
+        """Return the mapping to perform a join.
 
         Parameters
         ----------
-        from_type : class
-        to_type : class
+        from_dimension : type
+        to_dimension : type
 
         Returns
         -------
@@ -136,133 +136,75 @@ class DimensionStore:
             Raised if the mapping is not stored.
 
         """
-        key = (from_type, to_type)
+        key = (from_dimension, to_dimension)
         self._raise_if_mapping_not_stored(key)
-        return self._dimension_mappings[key]
+        return self._dimension_direct_mappings[key]
 
-    def get_record(self, dimension_type, record_id):
-        """Get a record from the store.
-
-        Parameters
-        ----------
-        dimension_type : class
-        record_id : id
-
-        """
-        self._raise_if_table_not_stored(dimension_type)
-        df = self._get_record_by_id(dimension_type, record_id)
-        if df.rdd.isEmpty():
-            raise DSGInvalidDimension(f"{dimension_type.__name__} {record_id} is not stored")
-
-        # TODO: consider whether the user wants Spark record or dataclass.
-        # Both have the same dot access.
-        return df.first()
-
-    def has_record(self, dimension_type, record_id):
-        """Return true if the record is stored.
+    def iter_dimension_classes(self, base_class=None):
+        """Return an iterator over the stored dimension classes.
 
         Parameters
         ----------
-        dimension_type : class
-        record_id : id
-
-        """
-        if dimension_type not in self._store:
-            return False
-
-        return not self._get_record_by_id(dimension_type, record_id).rdd.isEmpty()
-
-    def iter_dimension_types(self, base_class=None):
-        """Return an iterator over the stored dimension types.
-
-        Parameters
-        ----------
-        base_class : class | None
+        base_class : type | None
             If set, return subclasses of this abstract dimension class
 
         Returns
         -------
         iterator
-            dataclasses representing each dimension type
+            model classes representing each dimension
 
         """
         if base_class is None:
             return self._store.keys()
         return (x for x in self._store if issubclass(x, base_class))
 
-    def iter_records(self, dimension_type):
-        """Return an iterator over the records for dimension_type.
+    def list_dimension_classes(self, base_class=None):
+        """Return the stored dimension classes.
 
         Parameters
         ----------
-        dimension_type : class
-            dataclass
-
-        Returns
-        -------
-        iterator
-
-        """
-        self._raise_if_table_not_stored(dimension_type)
-        return self._store[dimension_type].rdd.toLocalIterator()
-
-    def list_dimension_types(self, base_class=None):
-        """Return the stored dimension types.
-
-        Parameters
-        ----------
-        base_class : class | None
+        base_class : type | None
             If set, return subclasses of this abstract dimension class
 
         Returns
         -------
         list
-            list of dataclasses representing each dimension type
+            list of classes representing each dimension type
 
         """
-        return sorted(list(self.iter_dimension_types(base_class=base_class)),
+        return sorted(list(self.iter_dimension_classes(base_class=base_class)),
                       key=lambda x: x.__name__)
 
-    def list_records(self, dimension_type):
-        """Return the records for the dimension_type.
-
-        Returns
-        -------
-        list
-            list of dataclass instances
-
-        """
-        return sorted(list(self.iter_records(dimension_type)), key=lambda x: x.id)
+    @property
+    def record_store(self):
+        """Return the DimensionRecords."""
+        return self._record_store
 
     @property
     def spark(self):
         """Return the SparkSession instance."""
-        return self._spark
+        return self._record_store.spark
 
-    def _get_record_by_id(self, dimension_type, record_id):
-        return self._store[dimension_type].filter(F.col("id") == record_id)
+    def get_dataset(self, dataset_id):
+        """Return a dataset by ID."""
+        for dataset in self._project_config.input_datasets.datasets:
+            if dataset.dataset_id == dataset_id:
+                return dataset
 
-    def _raise_if_table_not_stored(self, dimension_type):
-        if dimension_type not in self._store:
-            raise DSGInvalidDimension(f"{dimension_type} is not stored")
+        raise DSGInvalidField(f"no dataset with dataset_id={dataset_id}")
+
+    def iter_datasets(self):
+        for dataset in self._project_config.input_datasets.datasets:
+            yield dataset
+
+    def iter_dataset_ids(self):
+        for dataset in self._project_config.input_datasets.datasets:
+            yield dataset.dataset_id
+
+    def _raise_if_dimension_not_stored(self, dimension_class):
+        if dimension_class not in self._store:
+            raise DSGInvalidDimension(f"{dimension_class} is not stored")
 
     def _raise_if_mapping_not_stored(self, key):
-        if key not in self._dimension_mappings:
+        if key not in self._dimension_direct_mappings:
             raise DSGInvalidDimensionMapping(f"{key} is not stored")
-
-
-def deserialize_row(dimension_type, row):
-    """Return an instance of the dimension_type deserialized from a Row.
-
-    Parameters
-    ----------
-    dimension_type : class
-    row : pyspark.sql.types.Row
-        row read from spark DataFrame
-
-    Returns
-    -------
-    dataclass
-
-    """
-    return dimension_type(**row.asDict())

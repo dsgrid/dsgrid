@@ -1,67 +1,104 @@
 """Dimension types for dsgrid"""
 
-import abc
 import enum
-from dataclasses import dataclass
+
+from pydantic import BaseModel, Field
+
+from dsgrid.exceptions import DSGInvalidDimension
 
 
-@dataclass(frozen=True)
-class DSGBaseDimension(abc.ABC):    # TODO: Add Type here?
-    """Base class for all dsgrid dimensions"""
-    id: str
-    name: str
+class DSGBaseModel(BaseModel):
+    """Base model for all dsgrid models"""
+
+    class Config:
+        title = "DSGBaseModel"
+        anystr_strip_whitespace = True
+        validate_assignment = True
+        validate_all = True
+        extra = "forbid"  # TODO: consider changing this after we get this working -->????
+        use_enum_values = False
 
 
-@dataclass(frozen=True)
-class EndUseDimensionType(DSGBaseDimension, abc.ABC):
+class DSGBaseDimensionModel(DSGBaseModel):
+    """Base class for all dsgrid dimension models"""
+    id: str = Field(
+        title="ID",
+        description="unique identifier within a dimension",
+    )
+    name: str = Field(
+        title="name",
+        description="user-defined name",
+    )
+
+
+class EndUseDimensionModel(DSGBaseDimensionModel):
     """Base class for all end use dimensions"""
 
 
-@dataclass(frozen=True)
-class GeographicDimensionType(DSGBaseDimension, abc.ABC):
+class GeographicDimensionModel(DSGBaseDimensionModel):
     """Base class for all geography dimensions"""
 
 
-@dataclass(frozen=True)
-class ModelDimensionType(DSGBaseDimension, abc.ABC):
-    """Base class for all load model dimenions"""
+class ModelDimensionModel(DSGBaseDimensionModel):
+    """Base class for all load model dimensions"""
 
 
-@dataclass(frozen=True)
-class ModelYearDimensionType(DSGBaseDimension, abc.ABC):
+class ModelYearDimensionModel(DSGBaseDimensionModel):
     """Base class for all model year dimensions"""
 
 
-@dataclass(frozen=True)
-class ScenarioDimensionType(DSGBaseDimension, abc.ABC):
+class ScenarioDimensionModel(DSGBaseDimensionModel):
     """Base class for all scenario dimensions"""
 
 
-@dataclass(frozen=True)
-class SectorDimensionType(DSGBaseDimension, abc.ABC):
+class SectorDimensionModel(DSGBaseDimensionModel):
+    """Base class for all subsector dimensions"""
 
 
-@dataclass(frozen=True)
-class SubSectorDimensionType(DSGBaseDimension, abc.ABC):
-    """Base class for all subsector dimenions"""
+class SubSectorDimensionModel(DSGBaseDimensionModel):
+    """Base class for all subsector dimensions"""
 
 
-@dataclass(frozen=True)
-class TimeDimensionType(DSGBaseDimension, abc.ABC):
+class TimeDimensionModel(DSGBaseDimensionModel):
     """Base class for all time dimensions"""
 
 
-@dataclass(frozen=True)
-class WeatherDimensionType(DSGBaseDimension, abc.ABC):
-    """ attributes"""
+class WeatherDimensionModel(DSGBaseDimensionModel):
+    """Base class for weather dimensions"""
 
 
+class DimensionType(enum.Enum):
+    """Dimension types"""
+    END_USE = "end_use"
+    GEOGRAPHY = "geography"
+    SECTOR = "sector"
+    SUBSECTOR = "subsector"
+    TIME = "time"
+    WEATHER = "weather"
+    MODEL_YEAR = "model_year"
+    SCENARIO = "scenario"
+    MODEL = "model"
 
 
+_DIMENSION_TO_MODEL = {
+    DimensionType.END_USE: EndUseDimensionModel,
+    DimensionType.GEOGRAPHY: GeographicDimensionModel,
+    DimensionType.SECTOR: SectorDimensionModel,
+    DimensionType.SUBSECTOR: SubSectorDimensionModel,
+    DimensionType.TIME: TimeDimensionModel,
+    DimensionType.WEATHER: WeatherDimensionModel,
+    DimensionType.MODEL_YEAR: ModelYearDimensionModel,
+    DimensionType.SCENARIO: ScenarioDimensionModel,
+    DimensionType.MODEL: ModelDimensionModel,
+}
 
 
-
-
+def get_dimension_model(type_enum):
+    """Return the dimension model class for a DimensionType."""
+    dim_model = _DIMENSION_TO_MODEL.get(type_enum)
+    if dim_model is None:
+        raise DSGInvalidDimension(f"no mapping for {type_enum}")
+    return dim_model
 
 
 class DayType(enum.Enum):

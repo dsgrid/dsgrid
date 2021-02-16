@@ -268,7 +268,7 @@ class Dimension(DimensionBase):
 
         filename = values["filename"]
         dim_class = values["cls"]
-        assert not filename.startswith('S3://')  # TODO: see above
+        assert not filename.startswith('s3://')  # TODO: see above
 
         if records:
             raise ValueError("records should not be defined in the project config")
@@ -530,6 +530,59 @@ class InputDatasets(DSGBaseModel):
         description="project input datasets",
     )
 
+class PROJECT_VERSION_UPDATE_TYPES(Enum):
+    # TODO: we need to find general version update types that can be mapped to major, minor and patch.
+    # i.e., replace input_dataset, fix project_config, 
+    MAJOR = 'minor'
+    MINOR = 'major'
+    PATCH = 'patch'
+
+
+class ProjectConfigRegistrationDetails(DSGBaseModel):
+    """Registration fields required by the ProjectConfig"""
+    update: bool = Field(
+        title="update",
+        description="update boolean for project registration updates",
+        default=False
+    )
+    update_type: Optional[List[PROJECT_VERSION_UPDATE_TYPES]] = Field(
+        title="update_type",
+        description="list of project update types"
+    )
+    log_message: Optional[str] = Field(
+        title="log_message",
+        description="registration version log message"
+    )
+
+    @validator('update_type')
+    def check_registration_update_type(cls, update_type, values):
+        """Check registration update_type against update field"""
+        if not values['update']:
+            if 'update_type' in values:
+                raise ValueError(
+                    'If registration.update = False then '
+                    'registration.update_type must be empty or None'
+                    )
+        if values['update']:
+            if 'update_type' not in values:
+                raise ValueError(
+                    'If registration.update = True then '
+                    'registration.update_type is required.'
+                    )
+        return update_type
+
+    @validator('log_message')
+    def check_registration_log_message(cls, log_message, values):
+        """Check registration log message against update field"""
+        if not values['update']:
+            log_message = 'Initial project registration.'
+        if values['update']:
+            if 'log_message' not in values:
+                raise ValueError(
+                    'If registration.update = True then '
+                    'registration.log_message must be declaired.')
+        return log_message
+
 
 class ProjectConfig(DSGBaseModel):
     """Represents project configurations"""
@@ -542,6 +595,10 @@ class ProjectConfig(DSGBaseModel):
         title="name",
         description="project name",
     )
+    registration: ProjectConfigRegistrationDetails = Field(
+        title="registration",
+        description="project registration details"
+    )
     input_datasets: InputDatasets = Field(
         title="input_datasets",
         description="input datasets for the project",
@@ -550,6 +607,17 @@ class ProjectConfig(DSGBaseModel):
         title="dimensions",
         description="dimensions",
     )
+
+    @validator('project_id')
+    def check_project_id_handle(project_id):
+        """Check for valid characteris in project id"""
+        # TODO: any other invalid character for the project_id?
+        # TODO: may want to check for pre-existing project_id
+        #       (e.g., LA100 Run 1 vs. LA100 Run 0 kind of thing)
+        if '-' in project_id:
+            raise ValueError(
+                'invalid character "-" in project id')
+        return project_id
 
 
 def load_project_config(filename):

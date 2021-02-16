@@ -1,11 +1,17 @@
 """
 Helpful utility functions for dsgrid
 """
+import logging
+import subprocess
+import shlex
+import sys
 import inspect
 import json
 import os
 
 from dsgrid.exceptions import JSONError
+
+logger = logging.getLogger(__name__)
 
 
 def safe_json_load(fpath):
@@ -62,3 +68,47 @@ def get_class_properties(cls):
                   if isinstance(attr_obj, property)]
 
     return properties
+
+
+def run_command(cmd, output=None, cwd=None):
+    """Runs a command as a subprocess.
+    Parameters
+    ----------
+    cmd : str
+        command to run
+    output : None | dict
+        If a dict is passed then return stdout and stderr as keys.
+    cwd: str, default None
+        Change the working directory to cwd before executing the process.
+    Returns
+    -------
+    int
+        return code from system; usually zero is good, non-zero is error
+    Caution: Capturing stdout and stderr in memory can be hazardous with
+    long-running processes that output lots of text. In those cases consider
+    running subprocess.Popen with stdout and/or stderr set to a pre-configured
+    file descriptor.
+    """
+    logger.debug(cmd)
+    # Disable posix if on Windows.
+    command = shlex.split(cmd, posix="win" not in sys.platform)
+
+    if output is not None:
+        pipe = subprocess.Popen(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            cwd=cwd)
+        out, err = pipe.communicate()
+        output["stdout"] = out.decode("utf-8")
+        output["stderr"] = err.decode("utf-8")
+        ret = pipe.returncode
+    else:
+        ret = subprocess.call(command, cwd=cwd)
+
+    if ret != 0:
+        logger.debug("Command [%s] failed: %s", cmd, ret)
+        if output:
+            logger.debug(output["stderr"])
+
+    return ret

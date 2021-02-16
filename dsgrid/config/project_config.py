@@ -20,6 +20,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 import importlib
+from pathlib import Path
 
 from pydantic.dataclasses import dataclass
 from pydantic import BaseModel, Field, ValidationError
@@ -244,9 +245,12 @@ class Dimension(DimensionBase):
     @validator("filename")
     def check_file(cls, filename):
         """Validate that dimension file exists and has no errors"""
-        # TODO: need validation for S3 paths
-        if filename.startswith('S3://'):
-            raise ValueError('dsgrid currently does not support S3 files')
+        # validation for S3 paths (sync locally)
+        if filename.startswith('s3://'):
+            home = str(Path.home())
+            path = f"{home}/.dsgrid-data/{filename}".replace("s3://", "")
+            sync_command = f"aws s3 sync {filename} {path}"
+            run_command(sync_command)
 
         # Validate that filename exists
         if not os.path.isfile(filename):
@@ -484,7 +488,8 @@ class InputDataset(DSGBaseModel):
     def check_path(cls, path):
         if path.startswith('s3://'):
             s3path = path
-            path = f"$HOME/.dsgrid-data/{s3path}".replace("s3://", "")
+            home = str(Path.home())
+            path = f"{home}/.dsgrid-data/{s3path}".replace("s3://", "")
             sync_command = f"aws s3 sync {s3path} {path}"
             run_command(sync_command)
         

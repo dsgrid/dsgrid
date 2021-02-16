@@ -1,0 +1,90 @@
+{"id":"11","name":"Agriculture, Forestry, Fishing and Hunting","category":"Industry"}
+{"id":"21","name":"Mining, Quarrying, and Oil and Gas Extraction","category":"Industry"}
+{"id":"22","name":"Utilities","category":"Industry"}
+{"id":"23","name":"Construction","category":"Industry"}
+{"id":"3111","name":"Animal Food Manufacturing","category":"Industry"}
+{"id":"3112","name":"Grain and Oilseed Milling","category":"Industry"}
+{"id":"3113","name":"Sugar and Confectionery Product Manufacturing","category":"Industry"}
+{"id":"3114","name":"Fruit and Vegetable Preserving and Specialty Food Manufacturing","category":"Industry"}
+{"id":"3115","name":"Dairy Product Manufacturing","category":"Industry"}
+{"id":"3116","name":"Animal Slaughtering and Processing","category":"Industry"}
+{"id":"3117","name":"Seafood Product Preparation and Packaging","category":"Industry"}
+{"id":"3118","name":"Bakeries and Tortilla Manufacturing","category":"Industry"}
+{"id":"3119","name":"Other Food Manufacturing","category":"Industry"}
+{"id":"3121","name":"Beverage Manufacturing","category":"Industry"}
+{"id":"3122","name":"Tobacco Manufacturing","category":"Industry"}
+{"id":"3131","name":"Fiber, Yarn, and Thread Mills","category":"Industry"}
+{"id":"3132","name":"Fabric Mills","category":"Industry"}
+{"id":"3133","name":"Textile and Fabric Finishing and Fabric Coating Mills","category":"Industry"}
+{"id":"3141","name":"Textile Furnishings Mills","category":"Industry"}
+{"id":"3149","name":"Other Textile Product Mills","category":"Industry"}
+{"id":"3151","name":"Apparel Knitting Mills","category":"Industry"}
+{"id":"3152","name":"Cut and Sew Apparel Manufacturing","category":"Industry"}
+{"id":"3159","name":"Apparel Accessories and Other Apparel Manufacturing","category":"Industry"}
+{"id":"3161","name":"Leather and Hide Tanning and Finishing","category":"Industry"}
+{"id":"3162","name":"Footwear Manufacturing","category":"Industry"}
+{"id":"3169","name":"Other Leather and Allied Product Manufacturing","category":"Industry"}
+{"id":"3211","name":"Sawmills and Wood Preservation","category":"Industry"}
+{"id":"3212","name":"Veneer, Plywood, and Engineered Wood Product Manufacturing","category":"Industry"}
+{"id":"3219","name":"Other Wood Product Manufacturing","category":"Industry"}
+{"id":"3221","name":"Pulp, Paper, and Paperboard Mills","category":"Industry"}
+{"id":"3222","name":"Converted Paper Product Manufacturing","category":"Industry"}
+{"id":"3231","name":"Printing and Related Support Activities","category":"Industry"}
+{"id":"3241","name":"Petroleum and Coal Products Manufacturing","category":"Industry"}
+{"id":"3251","name":"Basic Chemical Manufacturing","category":"Industry"}
+{"id":"3252","name":"Resin, Synthetic Rubber, and Artificial and Synthetic Fibers and Filaments Manufacturing","category":"Industry"}
+{"id":"3253","name":"Pesticide, Fertilizer, and Other Agricultural Chemical Manufacturing","category":"Industry"}
+{"id":"3254","name":"Pharmaceutical and Medicine Manufacturing","category":"Industry"}
+{"id":"3255","name":"Paint, Coating, and Adhesive Manufacturing","category":"Industry"}
+{"id":"3256","name":"Soap, Cleaning Compound, and Toilet Preparation Manufacturing","category":"Industry"}
+{"id":"3259","name":"Other Chemical Product and Preparation Manufacturing","category":"Industry"}
+{"id":"3261","name":"Plastics Product Manufacturing","category":"Industry"}
+{"id":"3262","name":"Rubber Product Manufacturing","category":"Industry"}
+{"id":"3271","name":"Clay Product and Refractory Manufacturing","category":"Industry"}
+{"id":"3272","name":"Glass and Glass Product Manufacturing","category":"Industry"}
+{"id":"3273","name":"Cement and Concrete Product Manufacturing","category":"Industry"}
+{"id":"3274","name":"Lime and Gypsum Product Manufacturing","category":"Industry"}
+{"id":"3279","name":"Other Nonmetallic Mineral Product Manufacturing","category":"Industry"}
+{"id":"3311","name":"Iron and Steel Mills and Ferroalloy Manufacturing","category":"Industry"}
+{"id":"3312","name":"Steel Product Manufacturing from Purchased Steel","category":"Industry"}
+{"id":"3313","name":"Alumina and Aluminum Production and Processing","category":"Industry"}
+{"id":"3314","name":"Nonferrous Metal (except Aluminum) Production and Processing","category":"Industry"}
+{"id":"3315","name":"Foundries","category":"Industry"}
+{"id":"3321","name":"Forging and Stamping","category":"Industry"}
+{"id":"3322","name":"Cutlery and Handtool Manufacturing","category":"Industry"}
+{"id":"3323","name":"Architectural and Structural Metals Manufacturing","category":"Industry"}
+{"id":"3324","name":"Boiler, Tank, and Shipping Container Manufacturing","category":"Industry"}
+{"id":"3325","name":"Hardware Manufacturing","category":"Industry"}
+{"id":"3326","name":"Spring and Wire Product Manufacturing","category":"Industry"}
+{"id":"3327","name":"Machine Shops; Turned Product; and Screw, Nut, and Bolt Manufacturing","category":"Industry"}
+{"id":"3328","name":"Coating, Engraving, Heat Treating, and Allied Activities","category":"Industry"}
+{"id":"3329","name":"Other Fabricated Metal Product Manufacturing","category":"Industry"}
+{"id":"3331","name":"Agriculture, Construction, and Mining Machinery Manufacturing","category":"Industry"}
+{"id":"3332","name":"Industrial Machinery Manufacturing","category":"Industry"}
+{"id":"3333","name":"Commercial and Service Industry Machinery Manufacturing","category":"Industry"}
+{"id":"3334","name":"Ventilation, Heating, Air-Conditioning, and Commercial Refrigeration Equipment Manufacturing","category":"Industry"}
+{"id":"3335","name":"Metalworking Machinery Manufacturing","category":"Industry"}
+{"id":"3336","name":"Engine, Turbine, and Power Transmission Equipment Manufacturing","category":"Industry"}
+{"id":"3339","name":"Other General Purpose Machinery Manufacturing","category":"Industry"}
+{"id":"3341","name":"Computer and Peripheral Equipment Manufacturing","category":"Industry"}
+{"id":"3342","name":"Communications Equipment Manufacturing","category":"Industry"}
+{"id":"3343","name":"Audio and Video Equipment Manufacturing","category":"Industry"}
+{"id":"3344","name":"Semiconductor and Other Electronic Component Manufacturing","category":"Industry"}
+{"id":"3345","name":"Navigational, Measuring, Electromedical, and Control Instruments Manufacturing","category":"Industry"}
+{"id":"3346","name":"Manufacturing and Reproducing Magnetic and Optical Media","category":"Industry"}
+{"id":"3351","name":"Electric Lighting Equipment Manufacturing","category":"Industry"}
+{"id":"3352","name":"Household Appliance Manufacturing","category":"Industry"}
+{"id":"3353","name":"Electrical Equipment Manufacturing","category":"Industry"}
+{"id":"3359","name":"Other Electrical Equipment and Component Manufacturing","category":"Industry"}
+{"id":"3361","name":"Motor Vehicle Manufacturing","category":"Industry"}
+{"id":"3362","name":"Motor Vehicle Body and Trailer Manufacturing","category":"Industry"}
+{"id":"3363","name":"Motor Vehicle Parts Manufacturing","category":"Industry"}
+{"id":"3364","name":"Aerospace Product and Parts Manufacturing","category":"Industry"}
+{"id":"3365","name":"Railroad Rolling Stock Manufacturing","category":"Industry"}
+{"id":"3366","name":"Ship and Boat Building","category":"Industry"}
+{"id":"3369","name":"Other Transportation Equipment Manufacturing","category":"Industry"}
+{"id":"3371","name":"Household and Institutional Furniture and Kitchen Cabinet Manufacturing","category":"Industry"}
+{"id":"3372","name":"Office Furniture (including Fixtures) Manufacturing","category":"Industry"}
+{"id":"3379","name":"Other Furniture Related Product Manufacturing","category":"Industry"}
+{"id":"3391","name":"Medical Equipment and Supplies Manufacturing","category":"Industry"}
+{"id":"3399","name":"Other Miscellaneous Manufacturing","category":"Industry"}

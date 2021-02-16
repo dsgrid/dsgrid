@@ -1,0 +1,69 @@
+
+import datetime
+
+import pytest
+from pydantic import BaseModel
+
+from dsgrid.dimension.base import DayType, Season, TimeDimensionModel
+from .data.dimension_models.minimal.models import *
+from dsgrid.dimension.standard import (
+    County, State, EndUse, CensusDivision, CensusRegion, Time
+)
+from dsgrid.dimension.store import DimensionStore
+from dsgrid.exceptions import *
+from dsgrid.config.project_config import InputDataset
+from dsgrid.utils.files import load_data
+
+
+# Use one store for all tests. It won't be mutated after load.
+store = DimensionStore.load(PROJECT_CONFIG_FILE)
+
+
+def test_dimension_store():
+    assert store.list_dimension_classes()[:2] == [CensusDivision, CensusRegion]
+    assert store.list_dimension_classes(base_class=TimeDimensionModel) == [Time]
+    dataset_ids = list(store.iter_dataset_ids())
+    dataset_id = "comstock"
+    assert dataset_ids == [dataset_id]
+    dataset = store.get_dataset(dataset_id)
+    assert isinstance(dataset, InputDataset)
+
+
+def test_dimension_records():
+    record_store = store.record_store
+    states = record_store.list_records(State)
+    assert len(states) == 56
+    assert states[0].name == "Alaska"
+    record = record_store.get_record(State, "AK")
+    assert record == states[0]
+    assert record_store.has_record(State, "AK")
+    assert record_store.list_records(State)[0].name == "Alaska"
+    assert not record_store.has_record(State, "ZZ")
+
+
+def test_dimension_store_invalid_types():
+    class Unknown(BaseModel):
+        a: str
+
+    record_store = store.record_store
+    assert not record_store.has_record(Unknown, "ZZ")
+    with pytest.raises(DSGInvalidDimension):
+        assert not record_store.get_record(Unknown, "ZZ")
+    with pytest.raises(DSGInvalidDimension):
+        assert not record_store.get_record(State, "ZZ")
+
+
+#def test_dimension_mapping():
+#    key = store.get_dimension_mapping_key(County, State)
+#    assert key == "state"
+#    from_df = store.get_dataframe(County)
+#    assert len(from_df.collect()) == len(from_df.select(key).collect())
+#    to_df = store.get_dataframe(State).withColumnRenamed("name", "state_name") \
+#        .withColumnRenamed("id", "state_id")
+#    df = from_df.join(to_df, from_df.state == to_df.state_id) \
+#        .filter("state_id = 'CO'") \
+#        .filter("name = 'Adams County'")
+#    assert df.count() == 1
+#
+#    with pytest.raises(DSGInvalidDimensionMapping):
+#        store.get_dimension_mapping_key(Season, State)

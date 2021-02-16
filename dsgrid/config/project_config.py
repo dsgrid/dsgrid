@@ -14,6 +14,7 @@
 - need to generate input data config
 
 """
+from dsgrid.utils.utilities import run_command
 import os
 from datetime import datetime
 from enum import Enum
@@ -481,8 +482,15 @@ class InputDataset(DSGBaseModel):
 
     @validator("path")
     def check_path(cls, path):
-        if not os.path.isdir(path):
-            raise ValueError(f"{path} does not exist for InputDataset")
+        if path.startswith('s3://'):
+            s3path = path
+            path = f"$HOME/.dsgrid-data/{s3path}".replace("s3://", "")
+            sync_command = f"aws s3 sync {s3path} {path}"
+            run_command(sync_command)
+        
+        else:
+            if not os.path.isdir(path):
+                raise ValueError(f"{path} does not exist for InputDataset")
 
         load_data_path = os.path.join(path, LOAD_DATA_FILENAME)
         if not os.path.exists(load_data_path):
@@ -491,7 +499,10 @@ class InputDataset(DSGBaseModel):
         load_data_lookup_path = os.path.join(path, LOAD_DATA_LOOKUP_FILENAME)
         if not os.path.exists(load_data_lookup_path):
             raise ValueError(f"{path} does not contain {LOAD_DATA_LOOKUP_FILENAME}")
-
+        
+        if s3path is not None:
+            path = s3path
+            
         return path
 
 

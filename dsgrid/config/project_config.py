@@ -542,10 +542,6 @@ class ProjectConfig(DSGBaseModel):
         title="name",
         description="project name",
     )
-    version: str = Field(
-        title="version",
-        description="project version",
-    )
     input_datasets: InputDatasets = Field(
         title="input_datasets",
         description="input datasets for the project",

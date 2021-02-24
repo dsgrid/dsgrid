@@ -3,15 +3,12 @@ from pyspark.sql import SparkSession, Row
 from pyspark.sql import functions as F
 
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.utils.spark import init_spark
 
 
 class DimensionRecords:
     """Stores dimension records by type."""
-    def __init__(self, spark=None):
+    def __init__(self, spark):
         self._store = {}  # {type of DSGBaseDimensionModel: pyspark.sql.dataframe.DataFrame}
-        if spark is None:
-            spark = init_spark("store")
         self._spark = spark  # SparkSession
 
     def add_dataframe(self, dimension):

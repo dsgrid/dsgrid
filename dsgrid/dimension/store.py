@@ -31,7 +31,7 @@ class DimensionStore:
 
     @classmethod
     @timed_debug
-    def load(cls, project_config_file, spark=None):
+    def load(cls, project_config, spark):
         """Load a project's dimension dataset records.
 
         Parameters
@@ -43,8 +43,7 @@ class DimensionStore:
         DimensionStore
 
         """
-        project_config = load_project_config(project_config_file)
-        records = DimensionRecords(spark=spark)
+        records = DimensionRecords(spark)
         store = cls(project_config, records)
         for dimension in itertools.chain(
             store.project_dimensions,

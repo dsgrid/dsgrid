@@ -2,4 +2,5 @@ click
 numpy
 pandas
 pyspark
+sqlalchemy
 toml

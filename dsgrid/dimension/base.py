@@ -101,6 +101,12 @@ def get_dimension_model(type_enum):
     return dim_model
 
 
+class MappingType(enum.Enum):
+    ONE_TO_MANY = "one_to_many_mappings"
+    MANY_TO_ONE = "many_to_one_mappings"
+    MANY_TO_MANY = "many_to_many_mappings"
+
+
 class DayType(enum.Enum):
     """Day types"""
     WEEKEND = "weekend"

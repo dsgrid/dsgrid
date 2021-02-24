@@ -70,6 +70,23 @@ def get_class_properties(cls):
     return properties
 
 
+def check_uniqueness(iterable, tag):
+    """Raises ValueError if iterable has duplicate entries.
+
+    Parameters
+    ----------
+    iterable : list | generator
+    tag : str
+        tag to add to the exception string
+
+    """
+    values = set()
+    for item in iterable:
+        if item in values:
+            raise ValueError(f"duplicate {tag}: {item}")
+        values.add(item)
+
+        
 def run_command(cmd, output=None, cwd=None):
     """Runs a command as a subprocess.
     Parameters

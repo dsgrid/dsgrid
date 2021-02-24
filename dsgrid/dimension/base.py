@@ -15,7 +15,7 @@ class DSGBaseModel(BaseModel):
         anystr_strip_whitespace = True
         validate_assignment = True
         validate_all = True
-        extra = "forbid"  # TODO: consider changing this after we get this working -->????
+        extra = "forbid"  # TODO: consider changing this after we get this working
         use_enum_values = False
 
 

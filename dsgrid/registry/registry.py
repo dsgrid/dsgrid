@@ -3,13 +3,14 @@ from enum import Enum
 from typing import List, Optional
 import toml
 
-from pydantic import Field
-from pydantic.fields import Field # TODO: which Field are we using?
+from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 
 from dsgrid.dimension.base import DSGBaseModel
 from dsgrid.config.project_config import ProjectConfig
-
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.registry.dataset_registry import (DatasetRegistryStatus,
+                                              DatasetRegistryBase)
 
 """
 RUNNING LIST OF TODOS
@@ -48,48 +49,84 @@ class ProjectRegistryStatus(Enum):
     INITIAL_REGISTRATION = 'Initial Registration'
     IN_PROGRESS = 'In Progress'
     COMPLETE = 'Complete'
-    DEPRICATED = 'Depreciated'
+    DEPRICATED = 'Deprecated'
 
+
+# class DatasetRegistryStatus(Enum):
+#     # TODO: is this complete?
+#     UNREGISTERED = 'Unregistered'
+#     REGISTERED = 'Registered'
+
+
+# class DatasetRegistryBase(DSGBaseModel):
+#     """Dataset registration base class"""
+#     dataset_id: str = Field(
+#         title='dataset_id',
+#         description="dataset identifier"
+#     )
+#     status: DatasetRegistryStatus = Field(
+#         title='status',
+#         description='dataset registry status',
+#     )
+#     dataset_version: Optional[str] = Field(  # TODO: this needs to be generated
+#         title='dataset_version',
+#         description="full dataset version (dataset id + version)",
+#         alias="version",
+#     )
+#     dataset_config: Optional[dict] = Field(
+#         title='dataset_config',
+#         description="dataset configuration",  # TODO: do we save config details?
+#     )
 
 class DatasetRegistryStatus(Enum):
     # TODO: is this complete?
-    UNREGISTERED = 'unregistered'
-    REGISTERED = 'registered'
+    UNREGISTERED = 'Unregistered'
+    REGISTERED = 'Registered'
 
 
 class DatasetRegistryBase(DSGBaseModel):
     """Dataset registration base class"""
     dataset_id: str = Field(
-        title="dataset identifier"
+        title='dataset_id',
+        description="dataset identifier"
     )
     status: DatasetRegistryStatus = Field(
-        title='dataset registry status',
+        title='status',
+        description='dataset registry status',
     )
     dataset_version: Optional[str] = Field(  # TODO: this needs to be generated
-        title="full dataset version (dataset id + version)",
+        title='dataset_version',
+        description="full dataset version (dataset id + version)",
         alias="version",
     )
     dataset_config: Optional[dict] = Field(
-        title="dataset configuration",  # TODO: do we save config details?
+        title='dataset_config',
+        description="dataset configuration",  # TODO: do we save config details?
+    )
+
+class DatasetRegistry(DatasetRegistryBase):
+    # TODO: these need to be required when we register a dataset,
+    # but NOT when we register a project
+    dataset_version: str = Field(  # TODO: this needs to be generated
+        title='dataset_version',
+        description="full dataset version (dataset id + version)",
+        alias="version",
+    )
+    # TODO maybe this doesn't need to be saved in the project config version?
+    dataset_config: DatasetConfig = Field(
+        title='dataset_config',
+        description="dataset configuration class as dict",
     )
 
 
 class ProjectDatasetRegistry(DatasetRegistryBase):
+    dataset_id: str = Field(
+        title="dataset_id"
+    )
     status: DatasetRegistryStatus = Field(
-        default=DatasetRegistryStatus.UNREGISTERED.value
+        title="status"
     )
 
-
-class DatasetRegistry(DatasetRegistryBase):
-    # TODO: these needs to be required when we register a dataset,
-    # but NOT when we register a project
-    dataset_version: str = Field(  # TODO: this needs to be generated
-        title="full dataset version (dataset id + version)",
-        alias="version",
-    )
-    dataset_config: dict = Field(
-        title="dataset configuration class as dict",
-    )
 
 
 class ProjectRegistry(DSGBaseModel):
@@ -98,26 +135,36 @@ class ProjectRegistry(DSGBaseModel):
     #   has a different field ordering than the validation field order
     #   presented here. For example, project_id, project_version, and status
     #   are preffered to be at the top
-    project_config: dict = Field(
-        title="project configuration dictonary"
+    project_config: ProjectConfig = Field(
+        tile="proejct_config",
+        description="project configuration dictonary"
     )
     # TODO: this is a duplicate of the project_id found in the project_config.
     #   Is this needed? I think there is some value in having the project ID
     #   at the top of the registry and level=1 accessbility
     project_id: str = Field(
-        title="project identifier",
+        tile="project_id",
+        description="project identifier",
         default=""
     )
     project_version: str = Field(
-        title="project version",
+        tile="title",
+        description="project version",
     )
     status: ProjectRegistryStatus = Field(
-        title="project registry status"
+        tile="status",
+        description="project registry status"
     )
-    dataset_registries:  List[ProjectDatasetRegistry] = Field(
-        title="list of dataset registry",
+    dataset_registries:  List[ProjectDatasetRegistry] = Field( #DatasetRegistryBase, ProjectDatasetRegistry
+        title="dataset_registries",
+        description="list of dataset registry",
         default=[]
     )
+
+    # @validator('project_config', pre=True)
+    # def test(cls, project_config, values):
+    #     print(values['project_config'])
+    #     print(type(values['project_config']))
 
     # TODO: validate that the project config is valid before registering it
 
@@ -125,19 +172,19 @@ class ProjectRegistry(DSGBaseModel):
     def set_project_id(cls, project_id, values):
         """Set Project ID given Project Config."""
         if project_id == "":
-            project_id = values['project_config']['id']
+            project_id = values['project_config'].project_id
         return project_id
 
-    @validator('dataset_registries', always=True)
-    def set_dataset_registries(cls, dataset_registries, values) -> dict:
+    @validator('dataset_registries')
+    def set_dataset_registries(cls, dataset_registries, values):
         """Set Dataset Registries given Project Config."""
-        if 'dataset_registries' not in values:
+        if dataset_registries == []:
             dataset_registries = []
-            datasets = values['project_config']['input_datasets']['datasets']
+            datasets = values['project_config'].input_datasets.datasets
             for dataset in datasets:
                 dataset_registries.append(
-                    {'dataset_id': dataset['id'],
-                     'status': 'unregistered'}
+                    {'dataset_id': dataset.dataset_id,
+                     'status': 'Unregistered'} # TODO
                      )
         return dataset_registries
 
@@ -145,14 +192,27 @@ class ProjectRegistry(DSGBaseModel):
         """Create Project Registration TOML file."""
         # TODO: ATM this is just a local registration; need a central
         #       cloud-version next
+        
+        # TODO: I can't figure out how to get project_config (type=ProjectConfig) to parse properly
+        cls_dict = cls.dict()
+        del cls_dict['project_config']
+        cls_dict['project_config'] = toml.load('./project.toml')
+        # with open(registry_path.replace('.toml', '.txt'), 'w') as j:
+        #     j.write(str(cls_dict['project_config']))
+        # TODO: figure out a way to save status enum as value not enum. Dan help!
+        for key in cls_dict:
+            if key == 'status':
+                cls_dict[key] = cls_dict[key].value
+            # if key == 'project_config':
+            #     cls_dict[key] = cls_dict[key].dict()
         with open(registry_path, 'w') as j:
-            toml.dump(cls.dict(), j)
+            toml.dump(cls_dict, j)
 
     def get_registered_datasets(cls):
         """Get registered datasets associated with project registry."""
         registered = []
         for i in cls.dataset_registries:
-            if i.status == DatasetRegistryStatus.REGISTERED.value:
+            if i.status == 'Registered':
                 registered.append(i.dataset_id)
         return registered
 
@@ -160,7 +220,7 @@ class ProjectRegistry(DSGBaseModel):
         """Get unregistered datasets associated with project registry."""
         unregistered = []
         for i in cls.dataset_registries:
-            if i.status != DatasetRegistryStatus.REGISTERED.value:
+            if i.status != 'Registered':
                 unregistered.append(i.dataset_id)
         return unregistered
 
@@ -181,9 +241,7 @@ def RegisterProject(config_toml):
     # validate project config
     config_dict = toml.load(config_toml)
     project_config = ProjectConfig(**config_dict)
-    print('project_config registered')
     project_id = project_config.project_id
-    print(project_id)
     registry_path = './registry/projects'
 
     # if update is false, then assume version is v1.0.0
@@ -196,7 +254,7 @@ def RegisterProject(config_toml):
             project_registry = ProjectRegistry(
                 # TODO: consider setting project version in configuration
                 project_version=project_version,
-                status='Initial Registration',
+                status='Initial Registration', 
                 project_config=config_dict
                 )
             project_registry.register(registry_file)
@@ -232,7 +290,7 @@ def RegisterProject(config_toml):
 
         # depricate old registry
         t = toml.load(old_registry_file)
-        t['status'] = 'Depreciated'
+        t['status'] = 'Deprecated'
         with open(old_registry_file.format(**locals()), 'w') as f:
             toml.dump(t, f)
         # TODO: unlink dataset registries tied to this latest version
@@ -253,15 +311,3 @@ def RegisterProject(config_toml):
                 )
         project_registry.register(registry_file)
         return project_registry
-
-
-# def RegisterDataset(config_toml):
-#     """
-#     Register a dataset with a registered dsgrid project
-#      given datast configuration toml.
-#     """
-#     # validate dataset config
-#     dataset_config = DatasetConfig(**toml.load(config_toml))
-#     print("Dataset Config Validated")  # TODO: log message
-
-#     # check that a project config exists

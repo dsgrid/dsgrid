@@ -26,9 +26,6 @@ class CensusRegion(GeographicDimensionModel):
 class County(GeographicDimensionModel):
     """County attributes"""
     state: str
-    timezone: Optional[str] = Field(
-        default="Unknown",
-    )
 
 class State(GeographicDimensionModel):
     """State attributes"""
@@ -42,7 +39,7 @@ class State(GeographicDimensionModel):
 # ---------------------------
 class Sector(SectorDimensionModel):
     """Sector attributes"""
-    category: str
+    category: Optional[str]
 
 
 # ---------------------------
@@ -50,7 +47,8 @@ class Sector(SectorDimensionModel):
 # ---------------------------
 class SubSector(SubSectorDimensionModel):
     """Subsector attributes"""
-    sector: str
+    # NOTE: making optional for now, we may remove because it should be handled in the association tables
+    sector: Optional[str]
     abbr: Optional[str] = Field(
         default="",
     )

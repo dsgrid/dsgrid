@@ -134,18 +134,49 @@ class DimensionDirectMapping(DSGBaseModel):
         description="key in to_dimension",
     )
 
-class AssociativeTable(DSGBaseModel):
-    name: str
-    dimension1: str
-    dimension1_foreign_key: str
-    dimension2: str
-    dimension2_foreign_key: str
+
+class MappingBaseModel(DSGBaseModel):
+    from_dimension: str = Field(
+        title="from_dimension",
+        description="ORM class name that defines the from dimension",
+    )
+    to_dimension: str = Field(
+        title="to_dimension",
+        description="ORM class name that defines the to dimension",
+    )
+    from_dimension_cls: Optional[type] = Field(
+        title="from_dimension_cls",
+        description="ORM class that defines the from dimension",
+    )
+    to_dimension_cls: Optional[type] = Field(
+        title="to_dimension_cls",
+        description="ORM class that defines the to dimension",
+    )
 
 
-class DimensionManyToManyMapping(DSGBaseModel):
-    field: str
-    to_dimension: str
-    associative_table: str
+class OneToManyMapping(MappingBaseModel):
+    """Defines mapping of one to many."""
+
+
+class ManyToOneMapping(MappingBaseModel):
+    """Defines mapping of many to one."""
+
+
+class ManyToManyMapping(MappingBaseModel):
+    """Defines mapping of many to many."""
+    filename: str = Field(
+        title="file",
+        alias="file",
+        description="file that defines the associations",
+    )
+
+    @validator("filename")
+    def check_file(cls, filename):
+        """Check that association file exists."""
+        if not os.path.isfile(filename):
+            raise ValueError(f"file {filename} does not exist")
+
+        return filename
 
 
 class DimensionBase(DSGBaseModel):
@@ -205,9 +236,9 @@ class DimensionBase(DSGBaseModel):
     @validator("cls", always=True)
     def get_dimension_class(cls, dim_class, values):
         if "name" not in values or values.get("class_name") is None:
+            # An error occurred with name. Ignore everything else.
             return None
 
-            # An error occurred with name. Ignore everything else.
         if dim_class is not None:
             raise ValueError("cls={dim_class} should not be set")
 
@@ -224,15 +255,21 @@ class Dimension(DimensionBase):
         alias="file",
         description="filename containing dimension records",
     )
-    # TODO: some of the dimnsions with enforce dimension mappings while others may not
-    mappings: Optional[List[DimensionDirectMapping]] = Field(
-        title="dimension maps",
-        description="TODO",
+    # TODO: some of the dimensions will enforce dimension mappings while others may not
+    one_to_many_mappings: Optional[List[OneToManyMapping]] = Field(
+        title="one_to_many_mappings",
+        description="Defines one-to-many mappings for this dimension",
         default=[],
     )
-    association_table: Optional[str] = Field(
-        title="association_table",
-        description="optional table that provides mappings of foreign keys"
+    many_to_one_mappings: Optional[List[ManyToOneMapping]] = Field(
+        title="many_to_one_mappings",
+        description="Defines many-to-one mappings for this dimension",
+        default=[],
+    )
+    many_to_many_mappings: Optional[List[ManyToManyMapping]] = Field(
+        title="many_to_many_mappings",
+        description="Defines many-to-many mappings for this dimension",
+        default=[],
     )
     records: Optional[List[Dict]] = Field(
         title="records",
@@ -252,6 +289,25 @@ class Dimension(DimensionBase):
             raise ValueError(f"file {filename} does not exist")
 
         return filename
+
+    @validator(
+        "one_to_many_mappings",
+        "many_to_one_mappings",
+        "many_to_many_mappings",
+        each_item=True,
+    )
+    def add_mapping_dimension_types(cls, val, values):
+        """Find the dimension mappings types and add them."""
+        module = importlib.import_module(values["module"])
+        val.from_dimension_cls = getattr(module, val.from_dimension, None)
+        if val.from_dimension_cls is None:
+            raise ValueError(f"{module} does not define {val.from_dimension}")
+
+        val.to_dimension_cls = getattr(module, val.to_dimension, None)
+        if val.to_dimension_cls is None:
+            raise ValueError(f"{module} does not define {val.to_dimension}")
+
+        return val
 
     @validator("records", always=True)
     def add_records(cls, records, values):

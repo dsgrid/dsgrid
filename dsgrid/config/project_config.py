@@ -3,14 +3,14 @@
 # RUNNING LIST OF PROJECT CONFIG TODOS
 # ******************************************
 
-- jsons(or other dim files) should not have any unique IDs
 - we need to establish relationships across project-dimensions (to/from or some kind of mapper)
-- need to link dsgrid.dimension types to the files provided in config to see if they align (expected columns, duplicates, nullables)
 - need to establish dsgrid types standard relationship mappers
 - need to use said mapper to run compatibility checks
 - need to better establish expected fields/types in the dimension dataclasses in dsgrid.dimension.standard 
-- enforce supplemental dimensions to have a from/to mapping to the project dimension of the same type
+- enforce supplemental dimensions to have a from/to mapping to the project dimension of the same type?
+- I think we need to add the association table to dimensions.associations.project_dimensions in the config
 
+- Add registry details
 - need to generate input data config
 
 """
@@ -21,6 +21,7 @@ from enum import Enum
 from typing import Any, Dict, List, Optional, Union
 import importlib
 from pathlib import Path
+import csv
 
 from pydantic.dataclasses import dataclass
 from pydantic import BaseModel, Field, ValidationError
@@ -109,6 +110,7 @@ TIME_ZONE_MAPPING = {
 }
 
 
+# TODO: Remove?
 @dataclass
 class DimensionMap():
     # TODO: this needs QAQC checks
@@ -121,7 +123,7 @@ class DimensionMap():
 # TODO: Do we want to support direct mappings as well as mappings through
 # association tables or only the latter?
 
-
+# TODO: Remove?
 class DimensionDirectMapping(DSGBaseModel):
     field: str = Field(
         title="field",
@@ -211,7 +213,7 @@ class DimensionBase(DSGBaseModel):
 
             # An error occurred with name. Ignore everything else.
         if dim_class is not None:
-            raise ValueError("cls={dim_class} should not be set")
+            raise ValueError(f"cls={dim_class} should not be set")
 
         return getattr(
             importlib.import_module(values["module"]),
@@ -226,12 +228,14 @@ class Dimension(DimensionBase):
         alias="file",
         description="filename containing dimension records",
     )
-    # TODO: some of the dimnsions with enforce dimension mappings while others may not
-    mappings: Optional[List[DimensionDirectMapping]] = Field(
-        title="dimension maps",
-        description="TODO",
-        default=[],
-    )
+    # TODO: I think we may remove mappings altogether in favor of associations
+    # # TODO: some of the dimnsions with enforce dimension mappings while others may not
+    # mappings: Optional[List[DimensionDirectMapping]] = Field(
+    #     title="dimension maps",
+    #     description="TODO",
+    #     default=[],
+    # )
+    # TODO: I think we need to add the association table to dimensions.associations.project_dimensions in the config
     association_table: Optional[str] = Field(
         title="association_table",
         description="optional table that provides mappings of foreign keys"
@@ -276,8 +280,14 @@ class Dimension(DimensionBase):
         # Deserialize the model, validate, add default values, ensure id
         # uniqueness, and then store as dict that can be loaded into
         # Spark later.
+        # TODO: Do we want to make sure name is unique too?
         ids = set()
-        for record in load_data(values["filename"]):
+        # TODO: Dan - we want to add better support for csv
+        if values["filename"].endswith('.csv'):
+            filerecords = csv.DictReader(open(values["filename"]))
+        else:
+            filerecords = load_data(values["filename"])
+        for record in filerecords:
             actual = dim_class(**record)
             if actual.id in ids:
                 raise ValueError(
@@ -369,7 +379,7 @@ class Dimensions(DSGBaseModel):
         Validate dimension type work around for pydantic Union bug
         related to: https://github.com/samuelcolvin/pydantic/issues/619
         """
-        # Note: Errors inside Dimension or TimeDimension will be duplicated
+        # NOTE: Errors inside Dimension or TimeDimension will be duplicated
         # by Pydantic
         if value['type'] == DimensionType.TIME.value:
             val = TimeDimension(**value)
@@ -442,8 +452,6 @@ class Dimensions(DSGBaseModel):
         return values
 
 
-# TODO: how do we want this to interact with the project config and the dataset config?
-#       i am assuming this class is for how the project defines the input dataset
 class InputDataset(DSGBaseModel):
     """Defines an input dataset"""
     dataset_id: str = Field(
@@ -451,22 +459,10 @@ class InputDataset(DSGBaseModel):
         alias="id",
         description="dataset ID",
     )
-    #dataset_type: str = Field(
-    #    title=,
-    #    description=,
-    #)
-    #version: str = Field(
-    #    title=,
-    #    description=,
-    #)
-    #dimensions: List[Dimension] = Field(
-    #    title=,
-    #    description=,
-    #)
-    #metadata: Optional[Dict] = Field(
-    #    title=,
-    #    description=,
-    #)
+    dataset_type: str = Field( # TODO this needs to be ENUM
+       title="dataset_type",
+       description="Dataset Type"
+    )
     model_name: str = Field(
         title="model_name",
         description="model name",
@@ -479,36 +475,6 @@ class InputDataset(DSGBaseModel):
         title="sectors",
         description="sectors used in the project",
     )
-    path: str = Field(
-        title="path",
-        description="path containing data",
-    )
-
-    @validator("path")
-    def check_path(cls, path):
-        if path.startswith('s3://'):
-            s3path = path
-            home = str(Path.home())
-            path = f"{home}/.dsgrid-data/{s3path}".replace("s3://", "")
-            sync_command = f"aws s3 sync {s3path} {path}"
-            run_command(sync_command)
-        
-        else:
-            if not os.path.isdir(path):
-                raise ValueError(f"{path} does not exist for InputDataset")
-
-        load_data_path = os.path.join(path, LOAD_DATA_FILENAME)
-        if not os.path.exists(load_data_path):
-            raise ValueError(f"{path} does not contain {LOAD_DATA_FILENAME}")
-
-        load_data_lookup_path = os.path.join(path, LOAD_DATA_LOOKUP_FILENAME)
-        if not os.path.exists(load_data_lookup_path):
-            raise ValueError(f"{path} does not contain {LOAD_DATA_LOOKUP_FILENAME}")
-        
-        if s3path is not None:
-            path = s3path
-            
-        return path
 
 
 class InputDatasets(DSGBaseModel):
@@ -530,6 +496,14 @@ class InputDatasets(DSGBaseModel):
         description="project input datasets",
     )
 
+    # @validator(datasets) # TODO: unclear if this needs to be root validator or not
+    # def check_dataset_ids(cls, datasets, values):
+    #     # TODO: Check for unique dataset IDs
+    #     return datasets
+
+    # TODO: check model_name, model_sector, sectors are all expected and align with the dimension records
+
+
 class PROJECT_VERSION_UPDATE_TYPES(Enum):
     # TODO: we need to find general version update types that can be mapped to major, minor and patch.
     # i.e., replace input_dataset, fix project_config, 
@@ -545,7 +519,7 @@ class ProjectConfigRegistrationDetails(DSGBaseModel):
         description="update boolean for project registration updates",
         default=False
     )
-    update_type: Optional[List[PROJECT_VERSION_UPDATE_TYPES]] = Field(
+    update_type: Optional[PROJECT_VERSION_UPDATE_TYPES] = Field(
         title="update_type",
         description="list of project update types"
     )
@@ -558,13 +532,13 @@ class ProjectConfigRegistrationDetails(DSGBaseModel):
     def check_registration_update_type(cls, update_type, values):
         """Check registration update_type against update field"""
         if not values['update']:
-            if 'update_type' in values:
+            if not update_type:
                 raise ValueError(
                     'If registration.update = False then '
                     'registration.update_type must be empty or None'
                     )
         if values['update']:
-            if 'update_type' not in values:
+            if not update_type:
                 raise ValueError(
                     'If registration.update = True then '
                     'registration.update_type is required.'
@@ -577,7 +551,7 @@ class ProjectConfigRegistrationDetails(DSGBaseModel):
         if not values['update']:
             log_message = 'Initial project registration.'
         if values['update']:
-            if 'log_message' not in values:
+            if not log_message:
                 raise ValueError(
                     'If registration.update = True then '
                     'registration.log_message must be declaired.')

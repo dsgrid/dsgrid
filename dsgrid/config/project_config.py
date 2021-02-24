@@ -3,12 +3,16 @@
 # RUNNING LIST OF PROJECT CONFIG TODOS
 # ******************************************
 
-- we need to establish relationships across project-dimensions (to/from or some kind of mapper)
+- we need to establish relationships across project-dimensions (to/from or
+    some kind of mapper)
 - need to establish dsgrid types standard relationship mappers
 - need to use said mapper to run compatibility checks
-- need to better establish expected fields/types in the dimension dataclasses in dsgrid.dimension.standard 
-- enforce supplemental dimensions to have a from/to mapping to the project dimension of the same type?
-- I think we need to add the association table to dimensions.associations.project_dimensions in the config
+- need to better establish expected fields/types in the dimension dataclasses
+    in dsgrid.dimension.standard
+- enforce supplemental dimensions to have a from/to mapping to the project
+    dimension of the same type?
+- I think we need to add the association table to
+    dimensions.associations.project_dimensions in the config
 
 - Add registry details
 - need to generate input data config
@@ -18,96 +22,24 @@ from dsgrid.utils.utilities import run_command
 import os
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional, Union
+from typing import Dict, List, Optional, Union
 import importlib
 from pathlib import Path
 import csv
 
 from pydantic.dataclasses import dataclass
-from pydantic import BaseModel, Field, ValidationError
 from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 
-from dsgrid.dimension.base import DimensionType, DSGBaseModel, DSGBaseDimensionModel
+from dsgrid.dimension.base import DimensionType, DSGBaseModel
 from dsgrid.utils.files import load_data
-
+from dsgrid.dimension.time import (
+    LeapDayAdjustmentType, Period, TimeValueMeasurement, TimeFrequency,
+    TimezoneType
+    )
 
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
-
-
-# TODO: do all these time enums belong in dsgrid.timeseries.time_enums ?
-
-class LeapDayAdjustmentType(Enum):
-    """Timezone enum types"""
-    # TODO: need some kind of mapping from this enum to leap day
-    #       adjustment methods
-    DROP_DEC31 = "drop_dec31"
-    DROP_FEB29 = "drop_feb29"
-    DROP_JAN1 = "drop_jan1"
-
-
-class Period(Enum):
-    """Time period enum types"""
-    # TODO: R2PD uses a different set; do we want to align?
-    # https://github.com/Smart-DS/R2PD/blob/master/R2PD/tshelpers.py#L15
-    PERIOD_ENDING = "period_ending"
-    PERIOD_BEGINNING = "period_beginning"
-    INSTANTANEOUS = "instantaneous"
-
-
-class TimeValueMeasurement(Enum):
-    """Time value measurement enum types"""
-    # TODO: any kind of mappings/conversions for this?
-    # TODO: may want a way to alarm if input data != project data measurement
-    MEAN = "mean"
-    MIN = "min"
-    MAX = "max"
-    MEASURED = "measured"
-
-
-class TimeFrequency(Enum):
-    # TODO: this is incomplete; good enough for first pass
-    # TODO: it would be nice if this could be 
-    # TODO: do we want to support common frequency aliases, e.g.:
-    # https://pandas.pydata.org/docs/user_guide/timeseries.html#timeseries-offset-aliases
-    _15_MIN = "15 min"
-    _1_HOUR = "1 hour"
-    _1_DAY = "1 day"
-    _1_WEEK = "1 week"
-    _1_MONTH = "1 month"
-    _1_YEAR = "1 year"
-
-
-class TimezoneType(Enum):
-    """Timezone enum types"""
-    # TODO: TimezoneType enum is likely incomplete
-    UTC = "UTC"
-    PST = "PST"
-    MST = "MST"
-    CST = "CST"
-    EST = "EST"
-
-
-@dataclass
-class Timezone():
-    # TODO: Timezone class  is likely incomplete
-    id: str
-    utc_offset: int
-    includes_dst: bool
-    tz: str
-
-
-# TODO: move this to some kind of time module
-# TODO: TIME_ZONE_MAPPING is incomplete
-# EXAMPLE of applying time zone attributes to TimezoneType enum
-TIME_ZONE_MAPPING = {
-    TimezoneType.UTC: Timezone(id="UTC", utc_offset=0, includes_dst=False, tz="Etc/GMT+0"),
-    TimezoneType.PST: Timezone(id="PST", utc_offset=-8, includes_dst=False, tz="Etc/GMT+8"),
-    TimezoneType.MST: Timezone(id="MST", utc_offset=-7, includes_dst=False, tz="Etc/GMT+7"),
-    TimezoneType.CST: Timezone(id="CST", utc_offset=-6, includes_dst=False, tz="Etc/GMT+6"),
-    TimezoneType.EST: Timezone(id="EST", utc_offset=-5, includes_dst=False, tz="Etc/GMT+5"),
-}
 
 
 # TODO: Remove?
@@ -260,28 +192,31 @@ class Dimension(DimensionBase):
         description="filename containing dimension records",
     )
     # TODO: I think we may remove mappings altogether in favor of associations
-    # TODO: I think we need to add the association table to dimensions.associations.project_dimensions in the config
+    # TODO: I think we need to add the association table to
+    #   dimensions.associations.project_dimensions in the config
     association_table: Optional[str] = Field(
         title="association_table",
         description="optional table that provides mappings of foreign keys"
     )
-    # TODO: some of the dimensions will enforce dimension mappings while others may not
-    # TODO: I really don't think we need these mappings at this stage. I think association tables are fine.
-    one_to_many_mappings: Optional[List[OneToManyMapping]] = Field(
-        title="one_to_many_mappings",
-        description="Defines one-to-many mappings for this dimension",
-        default=[],
-    )
-    many_to_one_mappings: Optional[List[ManyToOneMapping]] = Field(
-        title="many_to_one_mappings",
-        description="Defines many-to-one mappings for this dimension",
-        default=[],
-    )
-    many_to_many_mappings: Optional[List[ManyToManyMapping]] = Field(
-        title="many_to_many_mappings",
-        description="Defines many-to-many mappings for this dimension",
-        default=[],
-    )
+    # TODO: some of the dimensions will enforce dimension mappings while
+    #   others may not
+    # TODO: I really don't think we need these mappings at this stage.
+    #   I think association tables are fine.
+    # one_to_many_mappings: Optional[List[OneToManyMapping]] = Field(
+    #     title="one_to_many_mappings",
+    #     description="Defines one-to-many mappings for this dimension",
+    #     default=[],
+    # )
+    # many_to_one_mappings: Optional[List[ManyToOneMapping]] = Field(
+    #     title="many_to_one_mappings",
+    #     description="Defines many-to-one mappings for this dimension",
+    #     default=[],
+    # )
+    # many_to_many_mappings: Optional[List[ManyToManyMapping]] = Field(
+    #     title="many_to_many_mappings",
+    #     description="Defines many-to-many mappings for this dimension",
+    #     default=[],
+    # )
     records: Optional[List[Dict]] = Field(
         title="records",
         description="dimension records in filename that get loaded at runtime",
@@ -336,7 +271,8 @@ class Dimension(DimensionBase):
         assert not filename.startswith('s3://')  # TODO: see above
 
         if records:
-            raise ValueError("records should not be defined in the project config")
+            raise ValueError(
+                "records should not be defined in the project config")
 
         # Deserialize the model, validate, add default values, ensure id
         # uniqueness, and then store as dict that can be loaded into
@@ -352,7 +288,8 @@ class Dimension(DimensionBase):
             actual = dim_class(**record)
             if actual.id in ids:
                 raise ValueError(
-                    f"{actual.id} is stored multiple times for {dim_class.__name__}"
+                    f"{actual.id} is stored multiple times for "
+                    f"{dim_class.__name__}"
                 )
             ids.add(actual.id)
             records.append(actual.dict())
@@ -362,9 +299,9 @@ class Dimension(DimensionBase):
 
 class TimeDimension(DimensionBase):
     """Defines a time dimension"""
-    # TODO: what is this intended purpose? 
+    # TODO: what is this intended purpose?
     #       originally i thought it was to interpret start/end, but
-    #       the year here is unimportant because it will be based on 
+    #       the year here is unimportant because it will be based on
     #       the weather_year
     str_format: Optional[str] = Field(
         title="str_format",
@@ -383,7 +320,7 @@ class TimeDimension(DimensionBase):
         title="end",
         description="last timestamp in the data",
     )
-    # TODO: it would be nice to have this be a function that splits number from unit
+    # TODO: it would be nice to have this be a func that splits nmbr from unit
     frequency: TimeFrequency = Field(
         title="frequency",
         description="resolution of the timestamps",
@@ -427,7 +364,8 @@ class Dimensions(DSGBaseModel):
         title="project_dimensions",
         description="dimensions defined by the project",
     )
-    supplemental_dimensions: Optional[List[Union[Dimension, TimeDimension]]] = Field(
+    supplemental_dimensions: Optional[List[Union[Dimension, TimeDimension]]] \
+        = Field(
         title="supplemental_dimensions",
         description="supplemental dimensions",
         default=[],
@@ -484,7 +422,8 @@ class Dimensions(DSGBaseModel):
     def check_files(cls, values: dict) -> dict:
         """Validate dimension files across all dimensions"""
         check_uniqueness(
-            (ii.filename for i in values for ii in values[i] if isinstance(ii, Dimension)),
+            (ii.filename for i in values for ii in values[i] if isinstance(
+                ii, Dimension)),
             "dimension record filename",
         )
         return values
@@ -496,17 +435,21 @@ class Dimensions(DSGBaseModel):
         check that all from_keys have a match in the to_keys json
 
         """
-        #supplemental_mapping = {x.name: x.cls for x in values["supplemental_dimensions"]}
-        ## Should already have been checked.
-        #assert len(supplemental_mapping) == len(values["supplemental_dimensions"])
-        #for dim in values["project_dimensions"]:
+        # supplemental_mapping = {
+        #   x.name: x.cls for x in values["supplemental_dimensions"]}
+        # Should already have been checked.
+        # assert len(supplemental_mapping) == \
+        #   len(values["supplemental_dimensions"])
+        # for dim in values["project_dimensions"]:
         #    mappings = getattr(dim, "mappings", [])
         #    # TODO: other mapping types
-        #    for mapping in (x for x in mappings if isinstance(x, DimensionDirectMapping)):
+        #    for mapping in (
+        #       x for x in mappings if isinstance(x, DimensionDirectMapping)):
         #        to_dim = supplemental_mapping.get(mapping.to_dimension)
         #        if to_dim is None:
         #            raise ValueError(
-        #               f"dimension {mapping.to_dimension} is not stored in supplemental_dimensions"
+        #               f"dimension {mapping.to_dimension} is not stored in"
+        #               f"supplemental_dimensions"
         #            )
         #        mapping.to_dimension = to_dim
 
@@ -520,7 +463,7 @@ class InputDataset(DSGBaseModel):
         alias="id",
         description="dataset ID",
     )
-    dataset_type: str = Field( # TODO this needs to be ENUM
+    dataset_type: str = Field(  # TODO this needs to be ENUM
        title="dataset_type",
        description="Dataset Type"
     )
@@ -557,17 +500,20 @@ class InputDatasets(DSGBaseModel):
         description="project input datasets",
     )
 
-    # @validator(datasets) # TODO: unclear if this needs to be root validator or not
+    # @validator(datasets) # TODO: unclear if this needs to be root validator
+    #   or not
     # def check_dataset_ids(cls, datasets, values):
     #     # TODO: Check for unique dataset IDs
     #     return datasets
 
-    # TODO: check model_name, model_sector, sectors are all expected and align with the dimension records
+    # TODO: check model_name, model_sector, sectors are all expected and align
+    #   with the dimension records
 
 
 class PROJECT_VERSION_UPDATE_TYPES(Enum):
-    # TODO: we need to find general version update types that can be mapped to major, minor and patch.
-    # i.e., replace input_dataset, fix project_config, 
+    # TODO: we need to find general version update types that can be mapped to
+    #   major, minor and patch.
+    # i.e., replace input_dataset, fix project_config,
     MAJOR = 'minor'
     MINOR = 'major'
     PATCH = 'patch'

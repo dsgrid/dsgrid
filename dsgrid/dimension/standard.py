@@ -3,10 +3,10 @@
 from typing import List, Optional, Union
 
 from pydantic import Field
-from pydantic.class_validators import root_validator, validator
+from pydantic.class_validators import validator
 from sqlalchemy import (
-    Column, Boolean, Integer, String, ForeignKey, Table, Text, DateTime,
-    select, text,
+    Column, Boolean, String, ForeignKey, Table, 
+    select, text,  # Integer, Text, DateTime,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base

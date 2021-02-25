@@ -16,7 +16,7 @@ class DSGBaseModel(BaseModel):
         validate_assignment = True
         validate_all = True
         extra = "forbid"  # TODO: consider changing this after we get this working
-        use_enum_values = False
+        use_enum_values = True
 
 
 class DSGBaseDimensionModel(DSGBaseModel):

@@ -16,16 +16,18 @@ import csv
 from pydantic.dataclasses import dataclass
 from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
+from semver import VersionInfo
 
 
+from dsgrid.common import LOCAL_REGISTRY
 from dsgrid.dimension.base import DimensionType, DSGBaseModel
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType, Period, TimeValueMeasurement, TimeFrequency,
     TimezoneType
     )
-
+from dsgrid.utils.aws import sync
 from dsgrid.utils.files import load_data
-from dsgrid.utils.utilities import run_command, check_uniqueness
+from dsgrid.utils.utilities import check_uniqueness
 
 
 class DimensionBase(DSGBaseModel):
@@ -141,10 +143,9 @@ class Dimension(DimensionBase):
         """Validate that dimension file exists and has no errors"""
         # validation for S3 paths (sync locally)
         if filename.startswith('s3://'):
-            home = str(Path.home())
-            path = f"{home}/.dsgrid-data/{filename}".replace("s3://", "")
-            sync_command = f"aws s3 sync {filename} {path}"
-            run_command(sync_command)
+            path = LOCAL_REGISTRY / filename.replace("s3://", "")
+            breakpoint() # TODO DT: this doesn't look right for AWS
+            #sync(filename, path)
 
         # Validate that filename exists
         if not os.path.isfile(filename):
@@ -272,7 +273,7 @@ class TimeDimension(DimensionBase):
         return val
 
 
-class VERSION_UPDATE_TYPES(Enum):
+class VersionUpdateType(Enum):
     # TODO: we need to find general version update types that can be mapped to
     #   major, minor and patch.
     # i.e., replace input_dataset, fix project_config,
@@ -281,51 +282,24 @@ class VERSION_UPDATE_TYPES(Enum):
     PATCH = 'patch'
 
 
-class ConfigRegistrationDetails(DSGBaseModel):
+class ConfigRegistrationModel(DSGBaseModel):
     """Registration fields required by the ProjectConfig and DatasetConfig"""
-    update: bool = Field(
-        title="update",
-        description="update boolean for project registration updates",
-        default=False
+    version: Union[str, VersionInfo] = Field(
+        title='version',
+        description="version resulting from the registration",
     )
-    update_type: Optional[VERSION_UPDATE_TYPES] = Field(
-        title="update_type",
-        description="list of project update types",
+    submitter: str = Field(
+        title="submitter",
+        description="person that submitted the registration"
+    )
+    date: datetime = Field(
+        title="date",
+        description="registration date"
     )
     log_message: Optional[str] = Field(
         title="log_message",
-        description="registration version log message"
+        description="reason for the update"
     )
-
-    @validator('update_type')
-    def check_registration_update_type(cls, update_type, values):
-        """Check registration update_type against update field"""
-        # breakpoint()
-        if not values['update']:
-            if update_type:
-                raise ValueError(
-                    'If registration.update = False then '
-                    'registration.update_type must be empty or None'
-                    )
-        if values['update']:
-            if not update_type:
-                raise ValueError(
-                    'If registration.update = True then '
-                    'registration.update_type is required.'
-                    )
-        return update_type
-
-    @validator('log_message')
-    def check_registration_log_message(cls, log_message, values):
-        """Check registration log message against update field"""
-        if not values['update']:
-            log_message = 'Initial project registration.'
-        if values['update']:
-            if not log_message:
-                raise ValueError(
-                    'If registration.update = True then '
-                    'registration.log_message must be declaired.')
-        return log_message
 
 
 # ------------------------------------------------------------------------------------

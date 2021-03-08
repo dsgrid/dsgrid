@@ -21,7 +21,6 @@ from pydantic.fields import Field
 from pydantic.class_validators import validator, root_validator
 
 from dsgrid.dimension.base import DimensionType, DSGBaseModel
-from dsgrid.utils.utilities import run_command
 from dsgrid.exceptions import DSGBaseException
 
 from dsgrid.dimension.base import DSGBaseModel

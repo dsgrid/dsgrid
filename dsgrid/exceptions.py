@@ -17,6 +17,10 @@ class DSGInvalidDimensionMapping(DSGBaseException):
     """Raised if a mapping is not stored or is invalid."""
 
 
+class DSGRuntimeError(Exception):
+    """Raised if there was a generic runtime error."""
+
+
 class DSGProjectConfigError(Exception):
     """
     Error for bad project configuration inputs
@@ -26,6 +30,10 @@ class DSGDatasetConfigError(Exception):
     """
     Error for bad dataset configuration inputs
     """
+
+class DSGValueNotStored(DSGBaseException):
+    """Raised if a value is not stored."""
+
 
 class ConfigWarning(Warning):
     """

@@ -111,7 +111,11 @@ class CountyOrm(BaseOrm):
 # ---------------------------
 class Sector(SectorDimensionModel):
     """Sector attributes"""
-    category: Optional[str]
+    category: Optional[str] = Field(
+        title="sector",
+        description="sector dimension",
+        default="",
+    )
 
 
 class SectorOrm(BaseOrm):
@@ -134,7 +138,9 @@ class SubSector(SubSectorDimensionModel):
     """Subsector attributes"""
     # NOTE: making sector optional for now, we may remove because it should be
     #   handled in the association tables
-    sector: Optional[str]
+    sector: Optional[str] = Field(
+        default="",
+    )
     abbr: Optional[str] = Field(
         default="",
     )

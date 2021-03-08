@@ -1,8 +1,12 @@
 """Spark helper functions"""
 
+import logging
 import multiprocessing
 
 from pyspark.sql import SparkSession
+
+
+logger = logging.getLogger(__name__)
 
 
 def init_spark(name, mem="5gb", num_cpus=None):
@@ -45,4 +49,5 @@ def sql_from_sqlalchemy(query):
     pyspark.sql.DataFrame
 
     """
+    logger.debug("sqlchemy query = %s", query)
     return sql(str(query).replace("\"", ""))

@@ -1,4 +1,4 @@
-from dsgrid.utils.utilities import run_command, check_uniqueness
+from dsgrid.utils.utilities import check_uniqueness
 import os
 from datetime import datetime
 from enum import Enum

@@ -7,9 +7,9 @@ from dsgrid.exceptions import DSGInvalidDimension
 
 class DimensionRecords:
     """Stores dimension records by type."""
-    def __init__(self, spark):
+    def __init__(self):
         self._store = {}  # {type of DSGBaseDimensionModel: pyspark.sql.dataframe.DataFrame}
-        self._spark = spark  # SparkSession
+        self._spark = SparkSession.getActiveSession()
 
     def add_dataframe(self, dimension):
         """Add a dataframe to the store.
@@ -119,11 +119,6 @@ class DimensionRecords:
 
         """
         return sorted(list(self.iter_records(dimension_class)), key=lambda x: x.id)
-
-    @property
-    def spark(self):
-        """Return the SparkSession instance."""
-        return self._spark
 
     def _get_record_by_id(self, dimension_class, record_id):
         return self._store[dimension_class].filter(F.col("id") == record_id)

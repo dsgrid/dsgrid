@@ -2,5 +2,7 @@ click
 numpy
 pandas
 pyspark
+semver
 sqlalchemy
 toml
+boto3

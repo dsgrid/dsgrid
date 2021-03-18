@@ -6,4 +6,3 @@ API
 
    api/modules
    api/dsgrid
-   api/dsgrid.cli

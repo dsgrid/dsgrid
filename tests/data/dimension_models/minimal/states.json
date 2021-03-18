@@ -1,0 +1,56 @@
+{"id":"AK","name":"Alaska","is_conus":false,"census_division":"pacific","census_region":"west"}
+{"id":"AL","name":"Alabama","is_conus":true,"census_division":"east_south_central","census_region":"south"}
+{"id":"AR","name":"Arkansas","is_conus":true,"census_division":"west_south_central","census_region":"south"}
+{"id":"AZ","name":"Arizona","is_conus":true,"census_division":"mountain","census_region":"west"}
+{"id":"CA","name":"California","is_conus":true,"census_division":"pacific","census_region":"west"}
+{"id":"CO","name":"Colorado","is_conus":true,"census_division":"mountain","census_region":"west"}
+{"id":"CT","name":"Connecticut","is_conus":true,"census_division":"new_england","census_region":"northeast"}
+{"id":"DC","name":"District of Columbia","is_conus":true,"census_division":"south_atlantic","census_region":"south"}
+{"id":"DE","name":"Delaware","is_conus":true,"census_division":"south_atlantic","census_region":"south"}
+{"id":"FL","name":"Florida","is_conus":true,"census_division":"south_atlantic","census_region":"south"}
+{"id":"GA","name":"Georgia","is_conus":true,"census_division":"south_atlantic","census_region":"south"}
+{"id":"HI","name":"Hawaii","is_conus":false,"census_division":"pacific","census_region":"west"}
+{"id":"IA","name":"Iowa","is_conus":true,"census_division":"west_north_central","census_region":"midwest"}
+{"id":"ID","name":"Idaho","is_conus":true,"census_division":"mountain","census_region":"west"}
+{"id":"IL","name":"Illinois","is_conus":true,"census_division":"east_north_central","census_region":"midwest"}
+{"id":"IN","name":"Indiana","is_conus":true,"census_division":"east_north_central","census_region":"midwest"}
+{"id":"KS","name":"Kansas","is_conus":true,"census_division":"west_north_central","census_region":"midwest"}
+{"id":"KY","name":"Kentucky","is_conus":true,"census_division":"east_south_central","census_region":"south"}
+{"id":"LA","name":"Louisiana","is_conus":true,"census_division":"west_south_central","census_region":"south"}
+{"id":"MA","name":"Massachusetts","is_conus":true,"census_division":"new_england","census_region":"northeast"}
+{"id":"MD","name":"Maryland","is_conus":true,"census_division":"south_atlantic","census_region":"south"}
+{"id":"ME","name":"Maine","is_conus":true,"census_division":"new_england","census_region":"northeast"}
+{"id":"MI","name":"Michigan","is_conus":true,"census_division":"east_north_central","census_region":"midwest"}
+{"id":"MN","name":"Minnesota","is_conus":true,"census_division":"west_north_central","census_region":"midwest"}
+{"id":"MO","name":"Missouri","is_conus":true,"census_division":"west_north_central","census_region":"midwest"}
+{"id":"MS","name":"Mississippi","is_conus":true,"census_division":"east_south_central","census_region":"south"}
+{"id":"MT","name":"Montana","is_conus":true,"census_division":"mountain","census_region":"west"}
+{"id":"NC","name":"North Carolina","is_conus":true,"census_division":"south_atlantic","census_region":"south"}
+{"id":"ND","name":"North Dakota","is_conus":true,"census_division":"west_north_central","census_region":"midwest"}
+{"id":"NE","name":"Nebraska","is_conus":true,"census_division":"west_north_central","census_region":"midwest"}
+{"id":"NH","name":"New Hampshire","is_conus":true,"census_division":"new_england","census_region":"northeast"}
+{"id":"NJ","name":"New Jersey","is_conus":true,"census_division":"mid_atlantic","census_region":"northeast"}
+{"id":"NM","name":"New Mexico","is_conus":true,"census_division":"mountain","census_region":"west"}
+{"id":"NV","name":"Nevada","is_conus":true,"census_division":"mountain","census_region":"west"}
+{"id":"NY","name":"New York","is_conus":true,"census_division":"mid_atlantic","census_region":"northeast"}
+{"id":"OH","name":"Ohio","is_conus":true,"census_division":"east_north_central","census_region":"midwest"}
+{"id":"OK","name":"Oklahoma","is_conus":true,"census_division":"west_south_central","census_region":"south"}
+{"id":"OR","name":"Oregon","is_conus":true,"census_division":"pacific","census_region":"west"}
+{"id":"PA","name":"Pennsylvania","is_conus":true,"census_division":"mid_atlantic","census_region":"northeast"}
+{"id":"RI","name":"Rhode Island","is_conus":true,"census_division":"new_england","census_region":"northeast"}
+{"id":"SC","name":"South Carolina","is_conus":true,"census_division":"south_atlantic","census_region":"south"}
+{"id":"SD","name":"South Dakota","is_conus":true,"census_division":"west_north_central","census_region":"midwest"}
+{"id":"TN","name":"Tennessee","is_conus":true,"census_division":"east_south_central","census_region":"south"}
+{"id":"TX","name":"Texas","is_conus":true,"census_division":"west_south_central","census_region":"south"}
+{"id":"UT","name":"Utah","is_conus":true,"census_division":"mountain","census_region":"west"}
+{"id":"VA","name":"Virginia","is_conus":true,"census_division":"south_atlantic","census_region":"south"}
+{"id":"VT","name":"Vermont","is_conus":true,"census_division":"new_england","census_region":"northeast"}
+{"id":"WA","name":"Washington","is_conus":true,"census_division":"pacific","census_region":"west"}
+{"id":"WI","name":"Wisconsin","is_conus":true,"census_division":"east_north_central","census_region":"midwest"}
+{"id":"WV","name":"West Virginia","is_conus":true,"census_division":"south_atlantic","census_region":"south"}
+{"id":"WY","name":"Wyoming","is_conus":true,"census_division":"mountain","census_region":"west"}
+{"id":"AS","name":"American Samoa","is_conus":false}
+{"id":"GU","name":"Guam","is_conus":false}
+{"id":"MP","name":"Northern Mariana Islands","is_conus":false}
+{"id":"PR","name":"Puerto Rico","is_conus":false}
+{"id":"VI","name":"U.S. Virgin Islands","is_conus":false}

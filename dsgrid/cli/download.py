@@ -1,3 +1,5 @@
+"""Download a dataset."""
+
 import sys
 
 import click

@@ -1,0 +1,110 @@
+{"id":"1001","name":"Autauga County","state":"AL","timezone":"CST"}
+{"id":"1003","name":"Baldwin County","state":"AL","timezone":"CST"}
+{"id":"2013","name":"Aleutians East Borough","state":"AK","timezone":"AKST"}
+{"id":"2016","name":"Aleutians West Census Area","state":"AK","timezone":"AKST"}
+{"id":"4001","name":"Apache County","state":"AZ","timezone":"MST-AZ"}
+{"id":"4003","name":"Cochise County","state":"AZ","timezone":"MST-AZ"}
+{"id":"5001","name":"Arkansas County","state":"AR","timezone":"CST"}
+{"id":"5003","name":"Ashley County","state":"AR","timezone":"CST"}
+{"id":"6001","name":"Alameda County","state":"CA","timezone":"PST"}
+{"id":"6003","name":"Alpine County","state":"CA","timezone":"PST"}
+{"id":"8001","name":"Adams County","state":"CO","timezone":"MST"}
+{"id":"8003","name":"Alamosa County","state":"CO","timezone":"MST"}
+{"id":"9001","name":"Fairfield County","state":"CT","timezone":"EST"}
+{"id":"9003","name":"Hartford County","state":"CT","timezone":"EST"}
+{"id":"10001","name":"Kent County","state":"DE","timezone":"EST"}
+{"id":"10003","name":"New Castle County","state":"DE","timezone":"EST"}
+{"id":"11001","name":"District of Columbia","state":"DC","timezone":"EST"}
+{"id":"12001","name":"Alachua County","state":"FL","timezone":"EST"}
+{"id":"12003","name":"Baker County","state":"FL","timezone":"EST"}
+{"id":"13001","name":"Appling County","state":"GA","timezone":"EST"}
+{"id":"13003","name":"Atkinson County","state":"GA","timezone":"EST"}
+{"id":"15001","name":"Hawaii County","state":"HI","timezone":"HST"}
+{"id":"15003","name":"Honolulu County","state":"HI","timezone":"HST"}
+{"id":"16001","name":"Ada County","state":"ID","timezone":"MST"}
+{"id":"16003","name":"Adams County","state":"ID","timezone":"MST"}
+{"id":"17001","name":"Adams County","state":"IL","timezone":"CST"}
+{"id":"17003","name":"Alexander County","state":"IL","timezone":"CST"}
+{"id":"18001","name":"Adams County","state":"IN","timezone":"EST"}
+{"id":"18003","name":"Allen County","state":"IN","timezone":"EST"}
+{"id":"19001","name":"Adair County","state":"IA","timezone":"CST"}
+{"id":"19003","name":"Adams County","state":"IA","timezone":"CST"}
+{"id":"20001","name":"Allen County","state":"KS","timezone":"CST"}
+{"id":"20003","name":"Anderson County","state":"KS","timezone":"CST"}
+{"id":"21001","name":"Adair County","state":"KY","timezone":"CST"}
+{"id":"21003","name":"Allen County","state":"KY","timezone":"CST"}
+{"id":"22001","name":"Acadia Parish","state":"LA","timezone":"CST"}
+{"id":"22003","name":"Allen Parish","state":"LA","timezone":"CST"}
+{"id":"23001","name":"Androscoggin County","state":"ME","timezone":"EST"}
+{"id":"23003","name":"Aroostook County","state":"ME","timezone":"EST"}
+{"id":"24001","name":"Allegany County","state":"MD","timezone":"EST"}
+{"id":"24003","name":"Anne Arundel County","state":"MD","timezone":"EST"}
+{"id":"25001","name":"Barnstable County","state":"MA","timezone":"EST"}
+{"id":"25003","name":"Berkshire County","state":"MA","timezone":"EST"}
+{"id":"26001","name":"Alcona County","state":"MI","timezone":"EST"}
+{"id":"26003","name":"Alger County","state":"MI","timezone":"EST"}
+{"id":"27001","name":"Aitkin County","state":"MN","timezone":"CST"}
+{"id":"27003","name":"Anoka County","state":"MN","timezone":"CST"}
+{"id":"28001","name":"Adams County","state":"MS","timezone":"CST"}
+{"id":"28003","name":"Alcorn County","state":"MS","timezone":"CST"}
+{"id":"29001","name":"Adair County","state":"MO","timezone":"CST"}
+{"id":"29003","name":"Andrew County","state":"MO","timezone":"CST"}
+{"id":"30001","name":"Beaverhead County","state":"MT","timezone":"MST"}
+{"id":"30003","name":"Big Horn County","state":"MT","timezone":"MST"}
+{"id":"31001","name":"Adams County","state":"NE","timezone":"CST"}
+{"id":"31003","name":"Antelope County","state":"NE","timezone":"CST"}
+{"id":"32001","name":"Churchill County","state":"NV","timezone":"PST"}
+{"id":"32003","name":"Clark County","state":"NV","timezone":"PST"}
+{"id":"33001","name":"Belknap County","state":"NH","timezone":"EST"}
+{"id":"33003","name":"Carroll County","state":"NH","timezone":"EST"}
+{"id":"34001","name":"Atlantic County","state":"NJ","timezone":"EST"}
+{"id":"34003","name":"Bergen County","state":"NJ","timezone":"EST"}
+{"id":"35001","name":"Bernalillo County","state":"NM","timezone":"MST"}
+{"id":"35003","name":"Catron County","state":"NM","timezone":"MST"}
+{"id":"36001","name":"Albany County","state":"NY","timezone":"EST"}
+{"id":"36003","name":"Allegany County","state":"NY","timezone":"EST"}
+{"id":"37001","name":"Alamance County","state":"NC","timezone":"EST"}
+{"id":"37003","name":"Alexander County","state":"NC","timezone":"EST"}
+{"id":"38001","name":"Adams County","state":"ND","timezone":"MST"}
+{"id":"38003","name":"Barnes County","state":"ND","timezone":"CST"}
+{"id":"39001","name":"Adams County","state":"OH","timezone":"EST"}
+{"id":"39003","name":"Allen County","state":"OH","timezone":"EST"}
+{"id":"40001","name":"Adair County","state":"OK","timezone":"CST"}
+{"id":"40003","name":"Alfalfa County","state":"OK","timezone":"CST"}
+{"id":"41001","name":"Baker County","state":"OR","timezone":"PST"}
+{"id":"41003","name":"Benton County","state":"OR","timezone":"PST"}
+{"id":"42001","name":"Adams County","state":"PA","timezone":"EST"}
+{"id":"42003","name":"Allegheny County","state":"PA","timezone":"EST"}
+{"id":"44001","name":"Bristol County","state":"RI","timezone":"EST"}
+{"id":"44003","name":"Kent County","state":"RI","timezone":"EST"}
+{"id":"45001","name":"Abbeville County","state":"SC","timezone":"EST"}
+{"id":"45003","name":"Aiken County","state":"SC","timezone":"EST"}
+{"id":"46003","name":"Aurora County","state":"SD","timezone":"CST"}
+{"id":"46005","name":"Beadle County","state":"SD","timezone":"CST"}
+{"id":"47001","name":"Anderson County","state":"TN","timezone":"EST"}
+{"id":"47003","name":"Bedford County","state":"TN","timezone":"CST"}
+{"id":"48001","name":"Anderson County","state":"TX","timezone":"CST"}
+{"id":"48141","name":"El Paso County","state":"TX","timezone":"MST"}
+{"id":"49001","name":"Beaver County","state":"UT","timezone":"MST"}
+{"id":"49003","name":"Box Elder County","state":"UT","timezone":"MST"}
+{"id":"50001","name":"Addison County","state":"VT","timezone":"EST"}
+{"id":"50003","name":"Bennington County","state":"VT","timezone":"EST"}
+{"id":"51001","name":"Accomack County","state":"VA","timezone":"EST"}
+{"id":"51003","name":"Albemarle County","state":"VA","timezone":"EST"}
+{"id":"53001","name":"Adams County","state":"WA","timezone":"PST"}
+{"id":"53003","name":"Asotin County","state":"WA","timezone":"PST"}
+{"id":"54001","name":"Barbour County","state":"WV","timezone":"EST"}
+{"id":"54003","name":"Berkeley County","state":"WV","timezone":"EST"}
+{"id":"55001","name":"Adams County","state":"WI","timezone":"CST"}
+{"id":"55003","name":"Ashland County","state":"WI","timezone":"CST"}
+{"id":"56001","name":"Albany County","state":"WY","timezone":"MST"}
+{"id":"56003","name":"Big Horn County","state":"WY","timezone":"MST"}
+{"id":"60010","name":"Eastern District","state":"AS"}
+{"id":"60020","name":"Manu'a District","state":"AS"}
+{"id":"66010","name":"Guam","state":"GU"}
+{"id":"69085","name":"Northern Islands Municipality","state":"MP"}
+{"id":"69100","name":"Rota Municipality","state":"MP"}
+{"id":"72001","name":"Adjuntas Municipio","state":"PR"}
+{"id":"72003","name":"Aguada Municipio","state":"PR"}
+{"id":"78010","name":"St. Croix Island","state":"VI"}
+{"id":"78020","name":"St. John Island","state":"VI"}

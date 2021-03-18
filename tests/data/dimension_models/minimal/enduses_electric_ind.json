@@ -1,0 +1,12 @@
+{"id":"conventional_boiler","name":"Conventional Boiler Use","sector":"industrial"}
+{"id":"process_heating","name":"Process Heating","sector":"industrial"}
+{"id":"process_cooling","name":"Process Cooling and Refrigeration","sector":"industrial"}
+{"id":"machine_drive","name":"Machine Drive","sector":"industrial"}
+{"id":"electrochemical_processes","name":"Electrochemical Processes","sector":"industrial"}
+{"id":"other_process_use","name":"Other Process Use","sector":"industrial"}
+{"id":"facility_hvac","name":"Facility HVAC","sector":"industrial"}
+{"id":"facility_lighting","name":"Facility Lighting","sector":"industrial"}
+{"id":"other_facility_support","name":"Other Facility Support","sector":"industrial"}
+{"id":"onsite_transportation","name":"Transportation","sector":"industrial"}
+{"id":"other_nonprocess_use","name":"Other Nonprocess Use","sector":"industrial"}
+{"id":"end_use_not_reported","name":"End-use not reported","sector":"industrial"}

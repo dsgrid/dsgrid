@@ -1,3 +1,5 @@
+"""Submit a dataset for upload to the repository."""
+
 import sys
 
 import click

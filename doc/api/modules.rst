@@ -5,3 +5,4 @@ dsgrid
    :maxdepth: 4
 
    dsgrid
+   tests

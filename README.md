@@ -10,9 +10,11 @@ Python API for accessing demand-side grid model (dsgrid) datasets.
 [Dependencies](#dependencies) | [from PIPY/pip](#from-pipypip) | [from pip+git](#from-pipgit) | [from cloned repository](#from-cloned-repository)
 
 ### Dependencies
-dsgrid uses Spark. To be fully functional, you will also need to point to a dsgrid project.
+dsgrid uses [Apache Spark](#https://spark.apache.org/) to manage big data. 
 
 #### Windows
+
+To install Apache Spark on Windows, follow [these instructions](https://sparkbyexamples.com/pyspark-tutorial/#pyspark-installation).
 
 #### Mac
 

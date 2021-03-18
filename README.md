@@ -1,4 +1,5 @@
 # dsgrid
+[![Documentation](https://img.shields.io/badge/docs-ready-blue.svg)](https://dsgrid.github.io/dsgrid)
 
 Python API for accessing demand-side grid model (dsgrid) datasets. 
 

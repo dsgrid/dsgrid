@@ -13,46 +13,31 @@ metadata = {}
 with open(here / "dsgrid" / "_version.py", encoding="utf-8") as f:
     exec(f.read(), metadata)
 
-with open(here / 'README.md', encoding='utf-8') as f:
+with open(here / "README.md", encoding="utf-8") as f:
     readme = f.read()
 
-test_requires = [
-    "pytest",
-    "pytest-cov"]
+dev_requires = ["black", "pre-commit"]
 
-dev_requires = [
-    "black"]
+test_requires = ["pytest", "pytest-cov"]
 
-doc_requires = [
-    "ghp-import",
-    "numpydoc",
-    "pandoc",
-    "sphinx",
-    "sphinx_rtd_theme"]
+doc_requires = ["ghp-import", "numpydoc", "pandoc", "sphinx", "sphinx_rtd_theme"]
 
-release_requires = [
-    "twine", 
-    "setuptools", 
-    "wheel"]
+release_requires = ["twine", "setuptools", "wheel"]
 
 setup(
-    name=metadata['__title__'],
-    version=metadata['__version__'],
-    description=metadata['__description__'],
+    name=metadata["__title__"],
+    version=metadata["__version__"],
+    description=metadata["__description__"],
     long_description=readme,
-    long_description_content_type='text/markdown',
-    author=metadata['__author__'],
-    maintainer_email=metadata['__maintainer_email__'],
-    url=metadata['__url__'],
+    long_description_content_type="text/markdown",
+    author=metadata["__author__"],
+    maintainer_email=metadata["__maintainer_email__"],
+    url=metadata["__url__"],
     packages=find_packages(),
     package_dir={"dsgrid": "dsgrid"},
-    entry_points={
-        "console_scripts": [
-            "dsgrid=dsgrid.cli.dsgrid:cli",
-        ],
-    },
+    entry_points={"console_scripts": ["dsgrid=dsgrid.cli.dsgrid:cli",],},
     include_package_data=True,
-    license=metadata['__license__'],
+    license=metadata["__license__"],
     zip_safe=False,
     keywords="dsgrid",
     classifiers=[

@@ -1,284 +1,179 @@
-import datetime
-from typing import List
-from pydantic.dataclasses import dataclass
-import logging
-import os
+"""
+Running List of TODO's:
 
-from dsgrid.config.base_config import BaseConfig
-from dsgrid.config.project_config import ProjectConfig
-from dsgrid.exceptions import ConfigError
+
+Questions:
+- Do diemsnion names need to be distinct from project's? What if the dataset
+is using the same dimension as the project?
+"""
+from enum import Enum
+from pathlib import Path
+from typing import List, Optional, Union, Dict
+import os
+import logging
+
+import toml
+
+from pydantic.fields import Field
+from pydantic.class_validators import root_validator, validator
+
+from dsgrid.common import LOCAL_REGISTRY_DATA
+from dsgrid.exceptions import DSGBaseException
+from dsgrid.dimension.base import DimensionType, DSGBaseModel
+from dsgrid.utils.aws import sync
+
+
+from dsgrid.config._config import TimeDimension, Dimension, ConfigRegistrationModel
+
+
+# TODO: likely needs refinement (missing mappings)
+LOAD_DATA_FILENAME = "load_data.parquet"
+LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 
 logger = logging.getLogger(__name__)
-PROJECTDIR = os.path.dirname(os.path.dirname(
-    os.path.realpath(__file__)))  # TODO: check proper usage
 
 
-class DatasetConfig(BaseConfig):
-    """Dataset configuration class
-    """
+class InputDatasetType(Enum):
+    SECTOR_MODEL = "sector_model"
+    HISTORICAL = "historical"
+    BENCHMARK = "benchmark"
 
-    # TODO: if dataset is not sector model, we may not require all these dims
-    PROJECT_REQUIREMENTS = ('id', 'model_name', 'model_sector', 'sectors')
-    REQUIRED_DIMENSIONS = (
-        'geography', 'sector', 'subsector', 'enduse', 'time')
 
-    def __init__(self, config):
-        super().__init__(config)
+class DSGDatasetParquetType(Enum):
+    LOAD_DATA = "load_data"  # required
+    LOAD_DATA_LOOKUP = "load_data_lookup"  # required
+    DATASET_DIMENSION_MAPPING = "dataset_dimension_mapping"  # optional
+    PROJECT_DIMENSION_MAPPING = "project_dimension_mapping"  # optional
 
-        # get project config
-        self._project_config_toml = self.init_project_config_toml()
 
-        self._dataset_id = self.get("dataset_id")
-        self._dataset_type = self.get("dataset_type")
-        self._model_name = self.get("model_name")
-        self._model_sector = self.get("model_sector")
-        self._sectors = self.get("sectors")
-        self._version = self.get("version")
-        self._dimensions = self.init_dimensions()
-        self._metadata = self.get("metadata")
+# TODO will need to rename this as it really should be more generic inputs
+#   and not just sector inputs. "InputSectorDataset" is already taken in
+#   project_config.py
+# TODO: this already assumes that the data is formatted for DSG, however,
+#       we may want the dataset config to be "before" any DSG parquets get
+#       formatted.
+class InputSectorDataset(DSGBaseModel):
+    """Input dataset configuration class"""
 
-        # run preflight checks
-        self.dataset_preflight_checks()
+    data_type: DSGDatasetParquetType = Field(
+        title="data_type", alias="type", description="DSG parquet input dataset type"
+    )
+    directory: str = Field(title="directory", description="directory with parquet files")
 
-    def init_project_config_toml(self):
-        """Init the project config toml file from the dataset's config_dir.
+    # TODO:
+    #   1. validate data matches dimensions specified in dataset config;
+    #   2. check that all required dimensions exist in the data or partitioning
+    #   3. check expected counts of things
+    #   4. check for required tables accounted for;
+    #   5. any specific scaling factor checks?
 
-        Assumes relative path of /dsgrid_project/project/project.toml
+
+class DatasetConfigModel(DSGBaseModel):
+    """Represents model dataset configurations"""
+
+    dataset_id: str = Field(
+        title="dataset_id",
+        description="dataset identifier",
+    )
+    dataset_type: InputDatasetType = Field(
+        title="dataset_type", description="DSG defined input dataset type"
+    )
+    # TODO: is this necessary?
+    model_name: str = Field(
+        title="model_name",
+        description="model name",
+    )
+    # TODO: This must be validated against the same field in ProjectConfigModel at registration.
+    model_sector: str = Field(
+        title="model_sector",
+        description="model sector",
+    )
+    path: str = Field(
+        title="path",
+        description="path containing data",
+    )
+    dimensions: List[Union[Dimension, TimeDimension]] = Field(
+        title="dimensions",
+        description="dimensions defined by the dataset",
+    )
+    # TODO: Metdata is TBD
+    metadata: Optional[Dict] = Field(
+        title="metdata",
+        description="Dataset Metadata",
+    )
+
+    # TODO: can we reuse this validator? Its taken from the
+    #   project_config Diemnsions model
+    def handle_dimension_union(cls, value):
         """
-        relpath = "dsgrid_project/project/project.toml"
-        return self.config_dir.split("dsgrid_project")[0]+relpath
-
-    @property
-    # TODO: make the ID from the version, filename, sector_model, dataset_type;
-    #       set this at the baseconfig level?
-    def dataset_id(self):
-        self._dataset_id = self.get("dataset_id")
-        return self._dataset_id
-
-    @property
-    def dataset_type(self):
-        self._dataset_type = self.get("dataset_type")
-        return self._dataset_type
-
-    @property
-    def model_name(self):
-        self._model_name = self.get("model_name")
-        return self._model_name
-
-    @property
-    def model_sector(self):
-        self._model_sector = self.get("model_sector")
-        return self._model_sector
-
-    @property
-    def sectors(self):
-        self._sectors = self.get("sectors")
-        return self._sectors
-
-    @property
-    def version(self):
-        # TODO: enforce versioning standards
-        self._version = self.get("version")
-        return self._version
-
-    @property
-    def dimensions(self):
+        Validate dimension type work around for pydantic Union bug
+        related to: https://github.com/samuelcolvin/pydantic/issues/619
         """
-        Get the dataset dimensions and return as a dictionary of datatset
-        dimension data classes.
-        """
-        return self._dimensions
+        # NOTE: Errors inside Dimension or TimeDimension will be duplicated
+        # by Pydantic
+        if value["type"] == DimensionType.TIME.value:
+            val = TimeDimension(**value)
+        else:
+            val = Dimension(**value)
+        return val
+
+    # TODO: if local path provided, we want to upload to S3 and set the path
+    #   here to S3 path
+
+    @validator("path")
+    def check_path(cls, path):
+        """Check dataset parquet path"""
+        # TODO S3: This requires downloading data to the local system.
+        # Can we perform all validation on S3 with an EC2 instance?
+        if path.startswith("s3://"):
+            # For unit test purposes this always uses the defaul local registry instead of
+            # whatever the user created with RegistryManager.
+            local_path = LOCAL_REGISTRY_DATA / path.replace("s3://", "")
+            sync(path, local_path)
+            #logger.warning("skipping AWS sync")  # TODO DT
+        else:
+            local_path = Path(path)
+            if not local_path.exists():
+                raise ValueError(f"{local_path} does not exist for InputDataset")
+
+        load_data_path = local_path / LOAD_DATA_FILENAME
+        if not load_data_path.exists():
+            raise ValueError(f"{local_path} does not contain {LOAD_DATA_FILENAME}")
+
+        load_data_lookup_path = local_path / LOAD_DATA_LOOKUP_FILENAME
+        if not os.path.exists(load_data_lookup_path):
+            raise ValueError(f"{local_path} does not contain {LOAD_DATA_LOOKUP_FILENAME}")
+
+        # TODO: check dataset_dimension_mapping (optional) if exists
+        # TODO: check project_dimension_mapping (optional) if exists
+
+        # TODO AWS
+        return local_path
+
+
+class DatasetConfig:
+    """Provides an interface to a DatasetConfigModel."""
+
+    def __init__(self, model):
+        self._model = model
+
+    @classmethod
+    def load(cls, config_file):
+        model = DatasetConfigModel.load(config_file)
+        return cls(model)
 
     @property
-    def metadata(self):
-        """
-        Get dataset metadata and return as user-defined dict.
-        """
-        self._metadata = self.get("metadata")
-        return self._metadata
+    def model(self):
+        return self._model
 
-    def init_dimensions(self):
-        project_config_dim = ProjectConfig(
-            self._project_config_toml)['dimensions']['project']
-        dimension = {}
-        for dim, dim_dict in self.get("dimensions").items():
-            # init all non-time dimensions
-            if dim != 'time':
-                # check that dataset dimension name != project's
-                if dim_dict['use_project_dimension'] is False:
-                    if dim_dict['name'] == project_config_dim[dim]['name']:
-                        raise ConfigError(
-                            f"dataset dimension name {dim_dict['name']}",
-                            "cannot be the same as project dimension name",
-                            f"{project_config_dim[dim]['name']}")
-                # if use_project_dimension, set dim name and file to project's
-                if dim_dict['use_project_dimension']:
-                    dim_dict['name'] = project_config_dim[dim]['name']
-                    dim_dict['file'] = project_config_dim[dim]['file']
-                    dim_dict['project_dimension_mapping'] = {
-                        'from_key': "id",
-                        'to_key': "id"
-                        }
-                # add dimension names to mapping
-                dim_dict['project_dimension_mapping'] = {
-                    'From': dim_dict['name'],
-                    'From_key': dim_dict['project_dimension_mapping']
-                                    ['from_key'],
-                    'To': project_config_dim[dim]['name'],
-                    'To_key': dim_dict['project_dimension_mapping']['to_key']
-                    }
-                # set dimclass to dataclass
-                dimclass = DatasetGeneralDimensionConfig(**dim_dict)
-
-            # init time dimension
-            else:
-                dimclass = TimeDimensionConfig(**dim_dict)
-            dimension[dim] = dimclass
-        return dimension
-
-    def dataset_preflight_checks(self):
-        """Run dataset-specific preflight checks on Dataset Config"""
-
-        PROJECT_CONFIG = ProjectConfig(self._project_config_toml)
-
-        # check that dataset_id is expected by the project
-        for i in PROJECT_CONFIG.input_datasets[self.dataset_type]:
-            if i["id"] == self.dataset_id:
-                project_dataset_id = i
-        if project_dataset_id is None:
-            raise ConfigError(
-                f"Dataset_id {self.dataset_id} is not defined in Project ",
-                "dataset config")
-
-        # check that dataset has all other project requirements
-        for i in PROJECT_CONFIG.input_datasets[self.dataset_type]:
-            if i["id"] == self.dataset_id:
-                for req in self.PROJECT_REQUIREMENTS:
-                    if req != 'id':
-                        if i[req] != self[req]:
-                            raise ConfigError(
-                                f"Dataset {req} config is {i[req]} but ",
-                                f"project expects it to be {self[req]}")
-
-        # check all required dimensions exist
-        for required_dimension in self.REQUIRED_DIMENSIONS:
-            if required_dimension not in self.get("dimensions").keys():
-                raise ConfigError(
-                    f"Required dimension {required_dimension} not in Dataset ",
-                    "dimension config")
-
-        # TODO: check filter clauses
-
-
-# TODO: dthom to figure out how to enforce data types (including special types)
-#       with python standard lib instead of pydantic
-@dataclass
-class FromToDimensionMappingConfig:
-    """A dataclass to handle the from dataset to project dimension mapping
-       configuration.
-    """
-    From: str  # TODO: lowercase from not valid
-    From_key: str
-    To: str
-    To_key: str
-
-
-@dataclass
-class DatasetGeneralDimensionConfig:
-    """A datacass to handle the Dataset configurations for general dimensions.
-    """
-    use_project_dimension: bool = True
-    name: str = ""
-    filter_project_dimension: bool = False
-    filter_where_clause: str = ""
-    file: str = ""
-    project_dimension_mapping: FromToDimensionMappingConfig = \
-        FromToDimensionMappingConfig(
-            From="", To="", From_key="id", To_key="id")
-
-    def __post_init__(self):
-        # file str replacement
-        if self.file is not None:
-            self.file = self.file.replace('PROJECTDIR', PROJECTDIR)
-
-        self._run_checks()
-
-    def _run_checks(self):
-        # check config specs against logic
-        if self.use_project_dimension is False:
-            if self.file == "":
-                raise ConfigError(
-                    "file must be specified if use_project_dimension is False")
-            if self.name == "":
-                raise ConfigError(
-                    "must name dataset dimension if use_project_dimension is",
-                    "False")
-        if self.filter_project_dimension is True:
-            if self.filter_where_clause == "":
-                raise ConfigError(
-                    "filter_where_clause must be specified if ",
-                    "filter_project_dimension is True")
-
-        # check that file exists
-        if not os.path.exists(self.file):
-            raise ConfigError(f"Dataset {self.file} does not exist")
-
-
-# TODO: where does this go? in a seperate file?
-@dataclass
-class TimeDimensionConfig:
-    """A datacass to handle the Dataset configurations for time dimensions."""
-    start: datetime.datetime
-    end: datetime.datetime
-    frequency_unit: str
-    frequency_number: int
-    includes_dst: bool
-    includes_leap_day: bool
-    interval_unit: str
-    interval_number: int
-    leap_day_adjustment: str
-    model_years: List[int]
-    period: str
-    str_format: str
-    timezone: str
-    value_representation: str
-
-    def __post_init__(self):
-        # check leap day configs
-        if self.includes_leap_day is False:
-            if self.leap_day_adjustment == "":
-                raise ConfigError(
-                    "leap_day_adjustment should be defined if ",
-                    "includes_leap_day is False")
-
-        # check config settings against available options
-        run_check_dict = {
-            self.period: TimeConfigOptions.PERIODS,
-            self.timezone: TimeConfigOptions.TIMEZONES,
-            self.interval_unit: TimeConfigOptions.INTERVAL_UNITS,
-            self.frequency_unit: TimeConfigOptions.FREQUENCY_UNITS,
-            self.leap_day_adjustment: TimeConfigOptions.LEAP_DAY_ADJUSTMENTS,
-            self.value_representation: TimeConfigOptions.VALUE_REPRESENTATION
-            }
-        self._run_checks(run_check_dict)
-
-        # TODO: Check that there is no tz of datetime or that tz == timezone
-        # TODO check model year is appropriate year
-        # TODO check str_format
-
-    def _run_checks(self, run_check_dict):
-        for key, value in run_check_dict.items():
-            # TODO: make this config msg clearer by specifying the attribute
-            if key not in value:
-                raise ConfigError(
-                    f"config {key} is not in possible values of{value}")
-
-
-# TODO: where does this go? in a new file?
-class TimeConfigOptions():
-    FREQUENCY_UNITS = ['min', 'hour', 'year']
-    INTERVAL_UNITS = ['year']
-    LEAP_DAY_ADJUSTMENTS = ["", "drop_dec31", "drop_feb29", "drop_jan1"]
-    PERIODS = ['period-ending', 'period-beginning', 'instantaneous']
-    TIMEZONES = ['EST', 'UTC']  # TODO: this should come from some master class
-    VALUE_REPRESENTATION = ['mean', 'min', 'max', 'measured']
+    # TODO:
+    #   - check binning/partitioning / file size requirements?
+    #   - check unique names
+    #   - check unique files
+    #   - add similar validators as project_config Dimensions
+    # NOTE: project_config.Dimensions has a lot of the
+    #       validators we want here however, its unclear to me how we can
+    #       apply them in both classes because they are root valitors and
+    #       also because Dimensions includes project_dimension and
+    #       supplemental_dimensions which are not required at the dataset
+    #       level.

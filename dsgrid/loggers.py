@@ -4,8 +4,9 @@ import logging
 import logging.config
 
 
-def setup_logging(name, filename, console_level=logging.INFO,
-                  file_level=logging.INFO, packages=None):
+def setup_logging(
+    name, filename, console_level=logging.INFO, file_level=logging.INFO, packages=None
+):
     """Configures logging to file and console.
 
     Parameters
@@ -26,16 +27,14 @@ def setup_logging(name, filename, console_level=logging.INFO,
         "version": 1,
         "disable_existing_loggers": False,
         "formatters": {
-            "basic": {
-                "format": "%(message)s"
-            },
+            "basic": {"format": "%(message)s"},
             "short": {
                 "format": "%(asctime)s - %(levelname)s [%(name)s "
-                          "%(filename)s:%(lineno)d] : %(message)s",
+                "%(filename)s:%(lineno)d] : %(message)s",
             },
             "detailed": {
                 "format": "%(asctime)s - %(levelname)s [%(name)s "
-                          "%(filename)s:%(lineno)d] : %(message)s",
+                "%(filename)s:%(lineno)d] : %(message)s",
             },
         },
         "handlers": {
@@ -53,11 +52,7 @@ def setup_logging(name, filename, console_level=logging.INFO,
             },
         },
         "loggers": {
-            name: {
-                "handlers": ["console", "file"],
-                "level": "DEBUG",
-                "propagate": False
-            },
+            name: {"handlers": ["console", "file"], "level": "DEBUG", "propagate": False},
         },
     }
 
@@ -74,8 +69,6 @@ def setup_logging(name, filename, console_level=logging.INFO,
     if filename is None:
         log_config["handlers"].pop("file")
         log_config["loggers"][name]["handlers"].remove("file")
-        for package in packages:
-            log_config["loggers"][package]["handlers"].remove("file")
 
     logging.config.dictConfig(log_config)
     logger = logging.getLogger(name)

@@ -1,4 +1,3 @@
-
 import datetime
 
 import pytest
@@ -6,27 +5,22 @@ from pydantic import BaseModel
 
 from dsgrid.dimension.base import DayType, Season, TimeDimensionModel
 from .data.dimension_models.minimal.models import *
-from dsgrid.dimension.standard import (
-    County, State, EndUse, CensusDivision, CensusRegion, Time
-)
+from dsgrid.dimension.standard import County, State, EndUse, CensusDivision, CensusRegion, Time
 from dsgrid.dimension.store import DimensionStore
 from dsgrid.exceptions import *
+from dsgrid.config.project import Project
 from dsgrid.config.project_config import InputDataset
 from dsgrid.utils.files import load_data
 
 
 # Use one store for all tests. It won't be mutated after load.
-store = DimensionStore.load(PROJECT_CONFIG_FILE)
+project = Project.load("test")
+store = project.project_dimension_store
 
 
 def test_dimension_store():
     assert store.list_dimension_classes()[:2] == [CensusDivision, CensusRegion]
     assert store.list_dimension_classes(base_class=TimeDimensionModel) == [Time]
-    dataset_ids = list(store.iter_dataset_ids())
-    dataset_id = "comstock"
-    assert dataset_ids == [dataset_id]
-    dataset = store.get_dataset(dataset_id)
-    assert isinstance(dataset, InputDataset)
 
 
 def test_dimension_records():
@@ -53,7 +47,7 @@ def test_dimension_store_invalid_types():
         assert not record_store.get_record(State, "ZZ")
 
 
-#def test_dimension_mapping():
+# def test_dimension_mapping():
 #    key = store.get_dimension_mapping_key(County, State)
 #    assert key == "state"
 #    from_df = store.get_dataframe(County)

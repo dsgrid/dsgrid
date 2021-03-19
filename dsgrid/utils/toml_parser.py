@@ -6,7 +6,7 @@ import collections
 import toml
 
 
-def flatten_dict(d, parent_key='', sep='/'):
+def flatten_dict(d, parent_key="", sep="/"):
     """
     Flattent nested dictionary.
     Combine keys using given seperator sep
@@ -71,9 +71,9 @@ class TOMLParser:
         'object'
             decoded config entry using eval
         """
-        key = '/'.join(keys)
+        key = "/".join(keys)
         val = self._flat_dict[key]
-        if val in ['None', 'none', 'NONE', 'Null', 'null', 'NULL', '']:
+        if val in ["None", "none", "NONE", "Null", "null", "NULL", ""]:
             val = None
 
         return val

@@ -3,10 +3,15 @@
 from typing import List, Optional, Union
 
 from pydantic import Field
-from pydantic.class_validators import root_validator, validator
+from pydantic.class_validators import validator
 from sqlalchemy import (
-    Column, Boolean, Integer, String, ForeignKey, Table, Text, DateTime,
-    select, text,
+    Column,
+    Boolean,
+    String,
+    ForeignKey,
+    Table,
+    select,
+    text,  # Integer, Text, DateTime,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
@@ -14,29 +19,41 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from dsgrid.dimension.base import (
-    EndUseDimensionModel, GeographicDimensionModel, ModelDimensionModel,
-    ModelYearDimensionModel, ScenarioDimensionModel, SectorDimensionModel,
-    SubSectorDimensionModel, TimeDimensionModel, WeatherDimensionModel
+    EndUseDimensionModel,
+    GeographicDimensionModel,
+    ModelDimensionModel,
+    ModelYearDimensionModel,
+    ScenarioDimensionModel,
+    SectorDimensionModel,
+    SubSectorDimensionModel,
+    TimeDimensionModel,
+    WeatherDimensionModel,
 )
 
 BaseOrm = declarative_base()
 
 
-enduse_model_association = Table('enduse_model', BaseOrm.metadata,
-    Column('enduse', String(255), ForeignKey('EndUse.id')),
-    Column('model', String(255), ForeignKey('Model.id'))
+enduse_model_association = Table(
+    "enduse_model",
+    BaseOrm.metadata,
+    Column("enduse", String(255), ForeignKey("EndUse.id")),
+    Column("model", String(255), ForeignKey("Model.id")),
 )
 
 
-model_subsector_association = Table('model_subsector', BaseOrm.metadata,
-    Column('model', String(255), ForeignKey('Model.id')),
-    Column('subsector', String(255), ForeignKey('SubSector.id')),
+model_subsector_association = Table(
+    "model_subsector",
+    BaseOrm.metadata,
+    Column("model", String(255), ForeignKey("Model.id")),
+    Column("subsector", String(255), ForeignKey("SubSector.id")),
 )
 
 
-subsector_sector_association = Table('subsector_sector', BaseOrm.metadata,
-    Column('subsector', String(255), ForeignKey('SubSector.id')),
-    Column('sector', String(255), ForeignKey('Sector.id')),
+subsector_sector_association = Table(
+    "subsector_sector",
+    BaseOrm.metadata,
+    Column("subsector", String(255), ForeignKey("SubSector.id")),
+    Column("sector", String(255), ForeignKey("Sector.id")),
 )
 
 
@@ -67,6 +84,7 @@ class CensusRegionOrm(BaseOrm):
 
 class State(GeographicDimensionModel):
     """State attributes"""
+
     is_conus: bool
     census_division: str = ""
     census_region: str = ""
@@ -86,10 +104,8 @@ class StateOrm(BaseOrm):
 
 class County(GeographicDimensionModel):
     """County attributes"""
+
     state: str
-    timezone: Optional[str] = Field(
-        default="Unknown",
-    )
 
 
 class CountyOrm(BaseOrm):
@@ -108,7 +124,12 @@ class CountyOrm(BaseOrm):
 # ---------------------------
 class Sector(SectorDimensionModel):
     """Sector attributes"""
-    category: str
+
+    category: Optional[str] = Field(
+        title="sector",
+        description="sector dimension",
+        default="",
+    )
 
 
 class SectorOrm(BaseOrm):
@@ -128,13 +149,18 @@ class SectorOrm(BaseOrm):
 # SUBSECTOR DIMENSIONS
 # ---------------------------
 class SubSector(SubSectorDimensionModel):
-    """SubSector attributes"""
-    sector: str
+    """Subsector attributes"""
+
+    # NOTE: making sector optional for now, we may remove because it should be
+    #   handled in the association tables
+    sector: Optional[str] = Field(
+        default="",
+    )
     abbr: Optional[str] = Field(
         default="",
     )
 
-    @validator('abbr', pre=True)
+    @validator("abbr", pre=True)
     def validate_abbr(cls, value: Union[str, None]) -> str:
         return value or ""
 
@@ -164,7 +190,8 @@ class SubSectorOrm(BaseOrm):
 # ---------------------------
 class EndUse(EndUseDimensionModel):
     """End use attributes"""
-    #sector: str  # TODO: the raw data doesn't have this field
+
+    # sector: str  # TODO: the raw data doesn't have this field
     fuel_id: str
     units: str
 

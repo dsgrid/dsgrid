@@ -2,12 +2,13 @@
 
 import logging
 import os
+from pathlib import Path
 
 import pyspark
 from pyspark.sql import functions as F
+from pyspark.sql import SparkSession
 
 from dsgrid.utils.files import load_data
-from dsgrid.utils.spark import init_spark
 
 
 logger = logging.getLogger(__name__)
@@ -18,61 +19,56 @@ class Dataset:
 
     DATA_FILENAME = "load_data.parquet"
     LOOKUP_FILENAME = "load_data_lookup.parquet"
+    VIEW_NAMES = ("load_data_lookup", "load_data")
 
-    def __init__(self, input_dataset, load_data_lookup, data, store):
-        self._spark = store.spark  # SparkSession
+    def __init__(self, config, load_data_lookup, data):
+        self._spark = SparkSession.getActiveSession()
         self._load_data_lookup = load_data_lookup  # DataFrame of dimension elements
         self._load_data = data  # DataFrame containing load data
-        self._store = store  # DimensionStore: contains dimension mappings
-        self._record_store = store.record_store  # DimensionRecords
-        self._input_dataset = input_dataset  # Pydantic model
-        self._id = input_dataset.dataset_id
+        self._id = config.model.dataset_id
+        # TODO: do we need a DimensionStore here?
 
     @classmethod
-    def load(cls, input_dataset, store):
+    def load(cls, config):
         """Load a dataset from a store.
 
         Parameters
         ----------
-        path : str
+        config : DatasetConfig
 
         Returns
         -------
         Dataset
 
         """
-        spark = store.spark
-        path = input_dataset.path
-
-        load_data_lookup = spark.read.parquet(os.path.join(path, cls.LOOKUP_FILENAME))
-        data = spark.read.parquet(os.path.join(path, cls.DATA_FILENAME))
+        spark = SparkSession.getActiveSession()
+        path = Path(config.model.path)
+        load_data_lookup = spark.read.parquet(str(path / cls.LOOKUP_FILENAME))
+        data = spark.read.parquet(str(path / cls.DATA_FILENAME))
         logger.debug("Loaded Dataset from %s", path)
-        dataset = cls(input_dataset, load_data_lookup, data, store)
-        dataset.make_tables()
+        dataset = cls(config, load_data_lookup, data)
         return dataset
 
-    @staticmethod
-    def make_table_name(dataset_id, name):
-        """Make a table name specific to the dataset ID"""
-        return f"{dataset_id}__{name}"
+    def _make_view_name(self, name):
+        return f"{self._id}__{name}"
 
-    def make_tables(self):
+    def _make_view_names(self):
+        return (f"{self._id}__{name}" for name in self.VIEW_NAMES)
+
+    def create_views(self):
+        """Create views for each of the tables in this dataset."""
         # TODO: should we create these in a separate database?
-        self._load_data_lookup.createOrReplaceTempView(
-            self.make_table_name(self._id, "load_data_lookup")
-        )
-        self._load_data.createOrReplaceTempView(
-            self.make_table_name(self._id, "load_data")
-        )
+        self._load_data_lookup.createOrReplaceTempView(self._make_view_name("load_data_lookup"))
+        self._load_data.createOrReplaceTempView(self._make_view_name("load_data"))
 
-    @property
-    def spark(self):
-        """Return the SparkSession instance."""
-        return self._spark
+    def delete_views(self):
+        """Delete views of the tables in this dataset."""
+        for view in self._make_view_names():
+            self._spark.catalog.dropTempView(view)
 
     # TODO: this is likely throwaway code
 
-    #def compute_sum_by_sector_id(self):
+    # def compute_sum_by_sector_id(self):
     #    """Compute the sum for each sector.
 
     #    Returns
@@ -88,7 +84,7 @@ class Dataset:
     #    expr += ["id", "sector_id"]
     #    return self._load_data_lookup.join(sums, "data_id").select(expr)
 
-    #def aggregate_sector_sums_by_dimension(self, from_dimension, to_dimension):
+    # def aggregate_sector_sums_by_dimension(self, from_dimension, to_dimension):
     #    """Aggregate the sums for each sector for a dimension.
 
     #    Parameters

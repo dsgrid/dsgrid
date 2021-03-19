@@ -14,12 +14,13 @@ def init_spark(name, mem="5gb", num_cpus=None):
     if num_cpus is None:
         num_cpus = multiprocessing.cpu_count()
 
-    return SparkSession.builder \
-        .master('local') \
-        .appName(name) \
-        .config('spark.executor.memory', mem) \
-        .config("spark.cores.max", str(num_cpus)) \
+    return (
+        SparkSession.builder.master("local")
+        .appName(name)
+        .config("spark.executor.memory", mem)
+        .config("spark.cores.max", str(num_cpus))
         .getOrCreate()
+    )
 
 
 def sql(query):
@@ -50,4 +51,4 @@ def sql_from_sqlalchemy(query):
 
     """
     logger.debug("sqlchemy query = %s", query)
-    return sql(str(query).replace("\"", ""))
+    return sql(str(query).replace('"', ""))

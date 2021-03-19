@@ -17,6 +17,7 @@ from pydantic.dataclasses import dataclass
 
 class LeapDayAdjustmentType(Enum):
     """Timezone enum types"""
+
     # TODO: need some kind of mapping from this enum to leap day
     #       adjustment methods
     DROP_DEC31 = "drop_dec31"
@@ -26,6 +27,7 @@ class LeapDayAdjustmentType(Enum):
 
 class Period(Enum):
     """Time period enum types"""
+
     # TODO: R2PD uses a different set; do we want to align?
     # https://github.com/Smart-DS/R2PD/blob/master/R2PD/tshelpers.py#L15
     PERIOD_ENDING = "period_ending"
@@ -35,6 +37,7 @@ class Period(Enum):
 
 class TimeValueMeasurement(Enum):
     """Time value measurement enum types"""
+
     # TODO: any kind of mappings/conversions for this?
     # TODO: may want a way to alarm if input data != project data measurement
     MEAN = "mean"
@@ -45,7 +48,7 @@ class TimeValueMeasurement(Enum):
 
 class TimeFrequency(Enum):
     # TODO: this is incomplete; good enough for first pass
-    # TODO: it would be nice if this could be 
+    # TODO: it would be nice if this could be
     # TODO: do we want to support common frequency aliases, e.g.:
     # https://pandas.pydata.org/docs/user_guide/timeseries.html#timeseries-offset-aliases
     _15_MIN = "15 min"
@@ -58,6 +61,7 @@ class TimeFrequency(Enum):
 
 class TimezoneType(Enum):
     """Timezone enum types"""
+
     # TODO: TimezoneType enum is likely incomplete
     UTC = "UTC"
     PST = "PST"
@@ -67,7 +71,7 @@ class TimezoneType(Enum):
 
 
 @dataclass
-class Timezone():
+class Timezone:
     # TODO: Timezone class  is likely incomplete
     id: str
     utc_offset: int

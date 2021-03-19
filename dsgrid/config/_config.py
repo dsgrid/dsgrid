@@ -1,9 +1,9 @@
-'''
+"""
 Shared configuration models and enums shared between ProjectConfig and
 DatasetConfig.
 
 TODO: @Dthom reanme or move this where ever it makes sense.
-'''
+"""
 
 import os
 from datetime import datetime
@@ -22,9 +22,12 @@ from semver import VersionInfo
 from dsgrid.common import LOCAL_REGISTRY
 from dsgrid.dimension.base import DimensionType, DSGBaseModel
 from dsgrid.dimension.time import (
-    LeapDayAdjustmentType, Period, TimeValueMeasurement, TimeFrequency,
-    TimezoneType
-    )
+    LeapDayAdjustmentType,
+    Period,
+    TimeValueMeasurement,
+    TimeFrequency,
+    TimezoneType,
+)
 from dsgrid.utils.aws import sync
 from dsgrid.utils.files import load_data
 from dsgrid.utils.utilities import check_uniqueness
@@ -32,6 +35,7 @@ from dsgrid.utils.utilities import check_uniqueness
 
 class DimensionBase(DSGBaseModel):
     """Common attributes for all dimensions"""
+
     name: str = Field(
         title="name",
         description="dimension name",
@@ -42,9 +46,9 @@ class DimensionBase(DSGBaseModel):
         description="type of the dimension",
     )
     module: Optional[str] = Field(
-        title='module',
-        description='dimension module',
-        default='dsgrid.dimension.standard',
+        title="module",
+        description="dimension module",
+        default="dsgrid.dimension.standard",
     )
     class_name: Optional[str] = Field(
         title="class_name",
@@ -74,12 +78,14 @@ class DimensionBase(DSGBaseModel):
         cls_name = class_name or values["name"]
         if not hasattr(mod, cls_name):
             if class_name is None:
-                msg = 'Setting class based on name failed. ' \
-                    f'There is no class "{cls_name}" in module: {mod}.' \
-                    '\nIf you are using a unique dimension name, you must ' \
-                    'specify the dimension class.'
+                msg = (
+                    "Setting class based on name failed. "
+                    f'There is no class "{cls_name}" in module: {mod}.'
+                    "\nIf you are using a unique dimension name, you must "
+                    "specify the dimension class."
+                )
             else:
-                msg = f'dimension class {class_name} not in {mod}'
+                msg = f"dimension class {class_name} not in {mod}"
             raise ValueError(msg)
 
         return cls_name
@@ -101,6 +107,7 @@ class DimensionBase(DSGBaseModel):
 
 class Dimension(DimensionBase):
     """Defines a non-time dimension"""
+
     filename: str = Field(
         title="filename",
         alias="file",
@@ -111,7 +118,7 @@ class Dimension(DimensionBase):
     #   dimensions.associations.project_dimensions in the config
     association_table: Optional[str] = Field(
         title="association_table",
-        description="optional table that provides mappings of foreign keys"
+        description="optional table that provides mappings of foreign keys",
     )
     # TODO: some of the dimensions will enforce dimension mappings while
     #   others may not
@@ -142,10 +149,10 @@ class Dimension(DimensionBase):
     def check_file(cls, filename):
         """Validate that dimension file exists and has no errors"""
         # validation for S3 paths (sync locally)
-        if filename.startswith('s3://'):
+        if filename.startswith("s3://"):
             path = LOCAL_REGISTRY / filename.replace("s3://", "")
-            breakpoint() # TODO DT: this doesn't look right for AWS
-            #sync(filename, path)
+            breakpoint()  # TODO DT: this doesn't look right for AWS
+            # sync(filename, path)
 
         # Validate that filename exists
         if not os.path.isfile(filename):
@@ -183,11 +190,10 @@ class Dimension(DimensionBase):
 
         filename = values["filename"]
         dim_class = values["cls"]
-        assert not filename.startswith('s3://')  # TODO: see above
+        assert not filename.startswith("s3://")  # TODO: see above
 
         if records:
-            raise ValueError(
-                "records should not be defined in the project config")
+            raise ValueError("records should not be defined in the project config")
 
         # Deserialize the model, validate, add default values, ensure id
         # uniqueness, and then store as dict that can be loaded into
@@ -195,7 +201,7 @@ class Dimension(DimensionBase):
         # TODO: Do we want to make sure name is unique too?
         ids = set()
         # TODO: Dan - we want to add better support for csv
-        if values["filename"].endswith('.csv'):
+        if values["filename"].endswith(".csv"):
             filerecords = csv.DictReader(open(values["filename"]))
         else:
             filerecords = load_data(values["filename"])
@@ -203,8 +209,7 @@ class Dimension(DimensionBase):
             actual = dim_class(**record)
             if actual.id in ids:
                 raise ValueError(
-                    f"{actual.id} is stored multiple times for "
-                    f"{dim_class.__name__}"
+                    f"{actual.id} is stored multiple times for " f"{dim_class.__name__}"
                 )
             ids.add(actual.id)
             records.append(actual.dict())
@@ -214,6 +219,7 @@ class Dimension(DimensionBase):
 
 class TimeDimension(DimensionBase):
     """Defines a time dimension"""
+
     # TODO: what is this intended purpose?
     #       originally i thought it was to interpret start/end, but
     #       the year here is unimportant because it will be based on
@@ -277,29 +283,21 @@ class VersionUpdateType(Enum):
     # TODO: we need to find general version update types that can be mapped to
     #   major, minor and patch.
     # i.e., replace input_dataset, fix project_config,
-    MAJOR = 'minor'
-    MINOR = 'major'
-    PATCH = 'patch'
+    MAJOR = "minor"
+    MINOR = "major"
+    PATCH = "patch"
 
 
 class ConfigRegistrationModel(DSGBaseModel):
     """Registration fields required by the ProjectConfig and DatasetConfig"""
+
     version: Union[str, VersionInfo] = Field(
-        title='version',
+        title="version",
         description="version resulting from the registration",
     )
-    submitter: str = Field(
-        title="submitter",
-        description="person that submitted the registration"
-    )
-    date: datetime = Field(
-        title="date",
-        description="registration date"
-    )
-    log_message: Optional[str] = Field(
-        title="log_message",
-        description="reason for the update"
-    )
+    submitter: str = Field(title="submitter", description="person that submitted the registration")
+    date: datetime = Field(title="date", description="registration date")
+    log_message: Optional[str] = Field(title="log_message", description="reason for the update")
 
 
 # ------------------------------------------------------------------------------------
@@ -308,7 +306,7 @@ class ConfigRegistrationModel(DSGBaseModel):
 
 
 @dataclass
-class DimensionMap():
+class DimensionMap:
     # TODO: this needs QAQC checks
     from_dimension: str
     to_dimension: str
@@ -360,6 +358,7 @@ class ManyToOneMapping(MappingBaseModel):
 
 class ManyToManyMapping(MappingBaseModel):
     """Defines mapping of many to many."""
+
     filename: str = Field(
         title="file",
         alias="file",

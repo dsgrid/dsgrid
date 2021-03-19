@@ -9,7 +9,8 @@ import click
 @click.argument("dataset")
 @click.argument("query_string")
 @click.option(
-    "-o", "--output",
+    "-o",
+    "--output",
     default="output",
     show_default=True,
     help="output directory for query results",

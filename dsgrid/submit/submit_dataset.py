@@ -1,4 +1,4 @@
-'''
+"""
 Submit dataset to a project
 
 There is a ton of clean up that still needs to happen on this file. 
@@ -10,7 +10,7 @@ This is where we validate the dataset config to the project config
     #   Else: we need some way to verify the expected project dim mappings
 
 This is also where we update the project registry with the dataset_version??
-'''
+"""
 from enum import Enum
 from typing import List, Optional, Union, Dict
 from pathlib import Path
@@ -33,7 +33,7 @@ from dsgrid.registry.dataset_registry import DatasetRegistry
 
 from dsgrid.registry.versioning import PROJECT_REGISTRY_PATH, DATASET_REGISTRY_PATH
 
-'''
+"""
 # TODO:
     - lot of validation checks remain to be written
     - need to think through the association/mapping files part here.
@@ -55,23 +55,25 @@ from dsgrid.registry.versioning import PROJECT_REGISTRY_PATH, DATASET_REGISTRY_P
             separate file that gets added on when registering the project?
 
 unless otherwise specified, we assume 1:1 mapping
-'''
+"""
+
 
 class SubmitDataset(DSGBaseModel):
     """Submit-dataset to config class"""
+
     project_version: str = Field(
         title="project_version",
         description="project version",
     )
     dataset_version: str = Field(
         title="dataset_version",
-        description="dataset version",  
+        description="dataset version",
     )
     # TODO: we may call this a dataset_to_project_dimension_mapping?
     # TODO make type pydantic model
     association_tables: Optional[List[Dict]] = Field(
         title="association_tables",
-        description="association tables that map from dataset to project"
+        description="association tables that map from dataset to project",
     )
 
     # TODO: do these 2 get functions live here or in a wrapper?
@@ -80,23 +82,24 @@ class SubmitDataset(DSGBaseModel):
         """Get the project registry associated with a project_version"""
         # TODO: this needs to pull from S3 or some other central store
         #   at some point
-        if registry_type == 'project':
-            pr_path = f'{PROJECT_REGISTRY_PATH}/{version}.toml'
+        if registry_type == "project":
+            pr_path = f"{PROJECT_REGISTRY_PATH}/{version}.toml"
             registry = ProjectRegistry(**toml.load(pr_path))
-        if registry_type == 'dataset':
-            pr_path = f'{DATASET_REGISTRY_PATH}/{version}.toml'
+        if registry_type == "dataset":
+            pr_path = f"{DATASET_REGISTRY_PATH}/{version}.toml"
             registry = DatasetRegistry(**toml.load(pr_path))
         return registry
 
     @classmethod
     def get_config(cls, config_type, version):
         registry = cls.get_registry(config_type, version)
-        if config_type == 'project':
+        if config_type == "project":
             return ProjectConfig(**registry.project_config)
-        if config_type == 'dataset':
+        if config_type == "dataset":
             return DatasetConfig(**registry.dataset_config)
 
         # TODO: Need help here. Issues relate to enumeration not being stored as
+
     #   value. Also, I don't know how to loop through these 3 fields properly.
     #   I originally tried a validator for ('dataset_type', 'model_name',
     #   'model_sector')
@@ -109,12 +112,12 @@ class SubmitDataset(DSGBaseModel):
         # TODO: Need help here. I tried to make this a validator function but
         #   I was hitting issues with field names and the enumeration classes
         #   not storing the values. This is the best I could do ATM.
-        project_config = cls.get_config('project', values['project_version'])
-        dataset_config = cls.get_config('dataset', values['dataset_version'])
+        project_config = cls.get_config("project", values["project_version"])
+        dataset_config = cls.get_config("dataset", values["dataset_version"])
 
         for dataset in project_config.input_datasets.datasets:
             if dataset.dataset_id == dataset_config.dataset_id:
-                fields = ['dataset_type', 'model_name', 'model_sector']
+                fields = ["dataset_type", "model_name", "model_sector"]
                 for field in fields:
                     data_val = getattr(dataset_config, field)
                     pc_val = getattr(dataset, field)
@@ -123,50 +126,47 @@ class SubmitDataset(DSGBaseModel):
                     if pc_val != data_val:
                         raise ValueError(
                             f'Dataset {field}="{data_val}" but the project '
-                            f'config expects "{pc_val}".')
+                            f'config expects "{pc_val}".'
+                        )
         return values
 
-    @validator('project_version')
+    @validator("project_version")
     def check_active_project_registration(cls, project_version):
         """
         Validate that the project registration exists and that it
         is not deprecated.
         """
-        pr = cls.get_registry(registry_type='project', version=project_version)
+        pr = cls.get_registry(registry_type="project", version=project_version)
         # TODO: this does not work unless we use exception; ValueError results
         #   in error w/ next validator on dataset_id"
-        if pr.status == 'Deprecated':
-            raise DSGBaseException(
-                'Project registration for project handle is deprecated')
+        if pr.status == "Deprecated":
+            raise DSGBaseException("Project registration for project handle is deprecated")
         return project_version
 
     @root_validator()
     def check_project_registry_for_dataset_id(cls, values):
         """Check that dataset has not already been registered to project"""
-        project_version = values['project_version']
-        pr = cls.get_registry(
-            registry_type='project', version=project_version)
+        project_version = values["project_version"]
+        pr = cls.get_registry(registry_type="project", version=project_version)
         dataset_ids = []
         for dataset in pr.dataset_registries:
             dataset_ids.append(dataset.dataset_id)
-        data_config = cls.get_config(
-            config_type='dataset', version=values['dataset_version'])
+        data_config = cls.get_config(config_type="dataset", version=values["dataset_version"])
         dataset_id = data_config.dataset_id
         # check that dataset is expected by project
         if dataset_id not in dataset_ids:
-            raise ValueError(
-                f'Dataset ID "{dataset_id}" is not expected by project')
+            raise ValueError(f'Dataset ID "{dataset_id}" is not expected by project')
         # check that dataset has not already been registered to project
         for dataset in pr.dataset_registries:
             if dataset.dataset_id == dataset_id:
-                if dataset.status == 'Registered':
+                if dataset.status == "Registered":
                     raise ValueError(
                         f'Dataset ID "{dataset_id}" is already registered to '
-                        f'project version "{project_version}"')
+                        f'project version "{project_version}"'
+                    )
         return values
 
-    
-    @validator('association_tables')
+    @validator("association_tables")
     def assign_dimension_mappings(cls, association_tables, values):
         # TODO if dimension mappings are not set, we assume a 1:1 mapping based on dimenstion type
         #   example: from=dataset.geography, to=project.
@@ -174,12 +174,9 @@ class SubmitDataset(DSGBaseModel):
         # print(project_registry)
         # assume a 1:1 mapping if association tables are not assigned
         if not association_tables:
-            project_config = cls.get_config(
-                'project', values['project_version'])
-            dataset_config = cls.get_config(
-                'dataset', values['dataset_version'])
-            project_dimensions = [
-                p for p in project_config.dimensions.project_dimensions]
+            project_config = cls.get_config("project", values["project_version"])
+            dataset_config = cls.get_config("dataset", values["dataset_version"])
+            project_dimensions = [p for p in project_config.dimensions.project_dimensions]
             mappings = []
             for dimension in dataset_config.dimensions:
                 data_dim_type = dimension.dimension_type
@@ -188,22 +185,25 @@ class SubmitDataset(DSGBaseModel):
                 for i, pdimension in enumerate(project_dimensions):
                     if pdimension.dimension_type == data_dim_type:
                         mappings.append(
-                            {'from_dimension': dimension.name,
-                             'to_dimension': pdimension.name,
-                             'from_key': 'id',
-                             'to_key': 'id'}
+                            {
+                                "from_dimension": dimension.name,
+                                "to_dimension": pdimension.name,
+                                "from_key": "id",
+                                "to_key": "id",
+                            }
                         )
             association_tables = mappings
         else:
             # TODO: temporary error for association tables until we build out
             #   how these are handled
             raise Exception(
-                'DSG has not yet developed a methodlogy to take in custom '
-                'dataset-to-project dimension associations')
-            
+                "DSG has not yet developed a methodlogy to take in custom "
+                "dataset-to-project dimension associations"
+            )
+
         return association_tables
-    
-    
+
+
 def submit_dataset(project_version, dataset_version, association_tables=[]):
     """Submit a dataset to a project.
 
@@ -215,8 +215,8 @@ def submit_dataset(project_version, dataset_version, association_tables=[]):
         project_version=project_version,
         dataset_version=dataset_version,
         association_tables=association_tables,
-        )
-    
+    )
+
     # TODO modify project-registry .toml for that dataset id
     #   - set status = 'Registered'
     #   - add new field for dataset version

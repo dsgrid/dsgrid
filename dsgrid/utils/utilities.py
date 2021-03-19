@@ -31,21 +31,19 @@ def safe_json_load(fpath):
     """
 
     if not isinstance(fpath, str):
-        raise TypeError('Filepath must be str to load json: {}'.format(fpath))
+        raise TypeError("Filepath must be str to load json: {}".format(fpath))
 
-    if not fpath.endswith('.json'):
-        raise JSONError('Filepath must end in .json to load json: {}'
-                        .format(fpath))
+    if not fpath.endswith(".json"):
+        raise JSONError("Filepath must end in .json to load json: {}".format(fpath))
 
     if not os.path.isfile(fpath):
-        raise JSONError('Could not find json file to load: {}'.format(fpath))
+        raise JSONError("Could not find json file to load: {}".format(fpath))
 
     try:
-        with open(fpath, 'r') as f:
+        with open(fpath, "r") as f:
             j = json.load(f)
     except json.decoder.JSONDecodeError as e:
-        emsg = ('JSON Error:\n{}\nCannot read json file: '
-                '"{}"'.format(e, fpath))
+        emsg = "JSON Error:\n{}\nCannot read json file: " '"{}"'.format(e, fpath)
         raise JSONError(emsg)
 
     return j
@@ -61,9 +59,9 @@ def get_class_properties(cls):
         List of class properties, each of which should represent a valid
         config key/entry
     """
-    properties = [attr for attr, attr_obj
-                  in inspect.getmembers(cls)
-                  if isinstance(attr_obj, property)]
+    properties = [
+        attr for attr, attr_obj in inspect.getmembers(cls) if isinstance(attr_obj, property)
+    ]
 
     return properties
 

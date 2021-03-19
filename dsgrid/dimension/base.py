@@ -45,6 +45,7 @@ class DSGBaseModel(BaseModel):
 
 class DSGBaseDimensionModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
+
     id: str = Field(
         title="ID",
         description="unique identifier within a dimension",
@@ -93,6 +94,7 @@ class WeatherDimensionModel(DSGBaseDimensionModel):
 
 class DimensionType(enum.Enum):
     """Dimension types"""
+
     END_USE = "end_use"
     GEOGRAPHY = "geography"
     SECTOR = "sector"
@@ -127,12 +129,14 @@ def get_dimension_model(type_enum):
 
 class DayType(enum.Enum):
     """Day types"""
+
     WEEKEND = "weekend"
     WEEKDAY = "weekday"
 
 
 class Season(enum.Enum):
     """Seasons"""
+
     WINTER = "winter"
     SPRING = "spring"
     SUMMER = "summer"
@@ -144,10 +148,12 @@ def serialize_model(model):
     """Serialize a model to a dict, converting values as needed."""
     return _serialize_model_data(model.dict())
 
+
 def _serialize_model_data(data):
     for key, val in data.items():
         data[key] = _serialize_model_item(val)
     return data
+
 
 def _serialize_model_item(val):
     if isinstance(val, enum.Enum):

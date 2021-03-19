@@ -26,10 +26,12 @@ class DSGProjectConfigError(Exception):
     Error for bad project configuration inputs
     """
 
+
 class DSGDatasetConfigError(Exception):
     """
     Error for bad dataset configuration inputs
     """
+
 
 class DSGValueNotStored(DSGBaseException):
     """Raised if a value is not stored."""
@@ -51,6 +53,7 @@ class FileInputWarning(Warning):
     """
     Warning during input file checks.
     """
+
 
 class JSONError(Exception):
     """

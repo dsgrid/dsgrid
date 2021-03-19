@@ -9,11 +9,11 @@ from dsgrid.dimension.dimension_records import DimensionRecords
 from dsgrid.exceptions import (
     DSGInvalidField,
     DSGInvalidDimension,
-    #DSGInvalidDimensionMapping,
+    # DSGInvalidDimensionMapping,
 )
 from dsgrid.config.project_config import (
     ProjectConfig,
-    #DimensionDirectMapping,
+    # DimensionDirectMapping,
 )
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import timed_debug, timed_info
@@ -141,7 +141,7 @@ class DimensionStore:
         if dimension_class not in self._store:
             raise DSGInvalidDimension(f"{dimension_class} is not stored")
 
-    #def add_dimension_mapping(self, dimension, mapping):
+    # def add_dimension_mapping(self, dimension, mapping):
     #    """Add a dimension mapping to the store.
 
     #    Parameters
@@ -157,7 +157,7 @@ class DimensionStore:
     #    self._dimension_direct_mappings[key] = mapping
     #    logger.debug("Added dimension mapping %s-%s", dimension.cls, mapping)
 
-    #def get_dimension_direct_mapping(self, from_dimension, to_dimension):
+    # def get_dimension_direct_mapping(self, from_dimension, to_dimension):
     #    """Return the mapping to perform a join.
 
     #    Parameters
@@ -179,6 +179,6 @@ class DimensionStore:
     #    self._raise_if_mapping_not_stored(key)
     #    return self._dimension_direct_mappings[key]
 
-    #def _raise_if_mapping_not_stored(self, key):
+    # def _raise_if_mapping_not_stored(self, key):
     #    if key not in self._dimension_direct_mappings:
     #        raise DSGInvalidDimensionMapping(f"{key} is not stored")

@@ -1,4 +1,3 @@
-
 from pyspark.sql import SparkSession, Row
 from pyspark.sql import functions as F
 
@@ -7,6 +6,7 @@ from dsgrid.exceptions import DSGInvalidDimension
 
 class DimensionRecords:
     """Stores dimension records by type."""
+
     def __init__(self):
         self._store = {}  # {type of DSGBaseDimensionModel: pyspark.sql.dataframe.DataFrame}
         self._spark = SparkSession.getActiveSession()
@@ -54,9 +54,7 @@ class DimensionRecords:
         self._raise_if_df_not_stored(dimension_class)
         df = self._get_record_by_id(dimension_class, record_id)
         if df.rdd.isEmpty():
-            raise DSGInvalidDimension(
-                f"{dimension_class.__name__} {record_id} is not stored"
-            )
+            raise DSGInvalidDimension(f"{dimension_class.__name__} {record_id} is not stored")
 
         return deserialize_row(dimension_class, df.first())
 

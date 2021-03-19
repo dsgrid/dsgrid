@@ -1,8 +1,8 @@
 import os
 import toml
 
-DATASET_REGISTRY_PATH = 'registry/datasets/'
-PROJECT_REGISTRY_PATH = 'registry/projects/'
+DATASET_REGISTRY_PATH = "registry/datasets/"
+PROJECT_REGISTRY_PATH = "registry/projects/"
 
 
 def versioning(registry_type, id_handle, update):
@@ -23,63 +23,64 @@ def versioning(registry_type, id_handle, update):
     """
 
     # get registry path
-    if registry_type == 'dataset':
+    if registry_type == "dataset":
         registry_path = DATASET_REGISTRY_PATH
-    if registry_type == 'project':
+    if registry_type == "project":
         registry_path = PROJECT_REGISTRY_PATH
 
     # TODO: remove when done. project path should be set somewhere else
     if not os.path.exists(registry_path):
-        raise ValueError(f'Path does not exist: {registry_path}')
+        raise ValueError(f"Path does not exist: {registry_path}")
 
     # if config.update is False, then assume major=1, minor=0, patch=0
     if not update:
-        version = f'{id_handle}-v1.0.0'
-        registry_file = f'{registry_path}/{version}.toml'
+        version = f"{id_handle}-v1.0.0"
+        registry_file = f"{registry_path}/{version}.toml"
         # Raise error if v1.0.0 registry exists for project_id
         if os.path.exists(registry_file):
             raise ValueError(
                 f'{registry_type} registry for "{registry_file}" already '
-                f'exists. If you want to update the project registration'
-                f' with a new {registry_type} version, then you will need to'
-                f' set update=True in {registry_type} config. Alternatively, '
-                f'if you want to initiate a new dsgrid {registry_type}, you '
-                'will need to specify a new version handle in the '
-                f'{registry_type} config.'
-                )
+                f"exists. If you want to update the project registration"
+                f" with a new {registry_type} version, then you will need to"
+                f" set update=True in {registry_type} config. Alternatively, "
+                f"if you want to initiate a new dsgrid {registry_type}, you "
+                "will need to specify a new version handle in the "
+                f"{registry_type} config."
+            )
     # if update is true...
     else:
         # list existing project registries
         existing_versions = []
         for f in os.listdir(registry_path):
             if f.startswith(id_handle):
-                existing_versions.append(int(f.split('-v')[1].split('.')[0]))
+                existing_versions.append(int(f.split("-v")[1].split(".")[0]))
         # check for existing project registries
         if len(existing_versions) == 0:
             raise ValueError(
-                'Registration.update=True, however, no updates can be made '
-                f'because there are no existing registries for {registry_type}'
-                f' ID = {id_handle}. Check project_id or set '
-                f'Registration.update=True in the {registry_type} Config.')
+                "Registration.update=True, however, no updates can be made "
+                f"because there are no existing registries for {registry_type}"
+                f" ID = {id_handle}. Check project_id or set "
+                f"Registration.update=True in the {registry_type} Config."
+            )
         # find the latest registry version
         # NOTE: this is currently based on major verison only
         last_vmajor_nbr = sorted(existing_versions)[-1]
-        old_project_version = f'{id_handle}-v{last_vmajor_nbr}.0.0'
-        old_registry_file = f'{registry_path}/{old_project_version}.toml'
+        old_project_version = f"{id_handle}-v{last_vmajor_nbr}.0.0"
+        old_registry_file = f"{registry_path}/{old_project_version}.toml"
 
         # depricate old project registry
         t = toml.load(old_registry_file)
-        t['status'] = 'Deprecated'
-        with open(old_registry_file.format(**locals()), 'w') as f:
+        t["status"] = "Deprecated"
+        with open(old_registry_file.format(**locals()), "w") as f:
             toml.dump(t, f)
 
         # update version
         # TODO NEED REAL LOGIC FOR THIS!
         #   - Currently assuming only major version is being updated
-        major = int(last_vmajor_nbr)+1
+        major = int(last_vmajor_nbr) + 1
         minor = 0  # TODO: assume 0 for now
         patch = 0  # TODO: assume 0 for now
 
-        version = f'{id_handle}-v{major}.{minor}.{patch}'
+        version = f"{id_handle}-v{major}.{minor}.{patch}"
 
     return version

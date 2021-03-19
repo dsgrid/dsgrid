@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 def timed_info(func):
     """Decorator to measure and logger.info a function's execution time."""
+
     @functools.wraps(func)
     def timed_(*args, **kwargs):
         return _timed(func, logger.info, *args, **kwargs)
@@ -19,6 +20,7 @@ def timed_info(func):
 
 def timed_debug(func):
     """Decorator to measure and logger.debug a function's execution time."""
+
     @functools.wraps(func)
     def timed_(*args, **kwargs):
         return _timed(func, logger.debug, *args, **kwargs)
@@ -30,8 +32,7 @@ def _timed(func, log_func, *args, **kwargs):
     start = time.time()
     result = func(*args, **kwargs)
     total = time.time() - start
-    log_func("execution-time=%s func=%s", get_time_duration_string(total),
-             func.__name__)
+    log_func("execution-time=%s func=%s", get_time_duration_string(total), func.__name__)
     return result
 
 
@@ -39,9 +40,9 @@ def get_time_duration_string(seconds):
     """Returns a string with the time converted to reasonable units."""
     if seconds >= 1:
         val = "{:.3f} s".format(seconds)
-    elif seconds >= .001:
+    elif seconds >= 0.001:
         val = "{:.3f} ms".format(seconds * 1000)
-    elif seconds >= .000001:
+    elif seconds >= 0.000001:
         val = "{:.3f} us".format(seconds * 1000000)
     elif seconds == 0:
         val = "0 s"
@@ -49,5 +50,3 @@ def get_time_duration_string(seconds):
         val = "{:.3f} ns".format(seconds * 1000000000)
 
     return val
-
-

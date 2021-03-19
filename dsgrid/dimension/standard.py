@@ -5,8 +5,13 @@ from typing import List, Optional, Union
 from pydantic import Field
 from pydantic.class_validators import validator
 from sqlalchemy import (
-    Column, Boolean, String, ForeignKey, Table, 
-    select, text,  # Integer, Text, DateTime,
+    Column,
+    Boolean,
+    String,
+    ForeignKey,
+    Table,
+    select,
+    text,  # Integer, Text, DateTime,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.ext.declarative import declarative_base
@@ -14,35 +19,41 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from dsgrid.dimension.base import (
-    EndUseDimensionModel, GeographicDimensionModel, ModelDimensionModel,
-    ModelYearDimensionModel, ScenarioDimensionModel, SectorDimensionModel,
-    SubSectorDimensionModel, TimeDimensionModel, WeatherDimensionModel
+    EndUseDimensionModel,
+    GeographicDimensionModel,
+    ModelDimensionModel,
+    ModelYearDimensionModel,
+    ScenarioDimensionModel,
+    SectorDimensionModel,
+    SubSectorDimensionModel,
+    TimeDimensionModel,
+    WeatherDimensionModel,
 )
 
 BaseOrm = declarative_base()
 
 
 enduse_model_association = Table(
-    'enduse_model',
+    "enduse_model",
     BaseOrm.metadata,
-    Column('enduse', String(255), ForeignKey('EndUse.id')),
-    Column('model', String(255), ForeignKey('Model.id'))
+    Column("enduse", String(255), ForeignKey("EndUse.id")),
+    Column("model", String(255), ForeignKey("Model.id")),
 )
 
 
 model_subsector_association = Table(
-    'model_subsector',
+    "model_subsector",
     BaseOrm.metadata,
-    Column('model', String(255), ForeignKey('Model.id')),
-    Column('subsector', String(255), ForeignKey('SubSector.id')),
+    Column("model", String(255), ForeignKey("Model.id")),
+    Column("subsector", String(255), ForeignKey("SubSector.id")),
 )
 
 
 subsector_sector_association = Table(
-    'subsector_sector',
+    "subsector_sector",
     BaseOrm.metadata,
-    Column('subsector', String(255), ForeignKey('SubSector.id')),
-    Column('sector', String(255), ForeignKey('Sector.id')),
+    Column("subsector", String(255), ForeignKey("SubSector.id")),
+    Column("sector", String(255), ForeignKey("Sector.id")),
 )
 
 
@@ -73,6 +84,7 @@ class CensusRegionOrm(BaseOrm):
 
 class State(GeographicDimensionModel):
     """State attributes"""
+
     is_conus: bool
     census_division: str = ""
     census_region: str = ""
@@ -92,6 +104,7 @@ class StateOrm(BaseOrm):
 
 class County(GeographicDimensionModel):
     """County attributes"""
+
     state: str
 
 
@@ -111,6 +124,7 @@ class CountyOrm(BaseOrm):
 # ---------------------------
 class Sector(SectorDimensionModel):
     """Sector attributes"""
+
     category: Optional[str] = Field(
         title="sector",
         description="sector dimension",
@@ -136,6 +150,7 @@ class SectorOrm(BaseOrm):
 # ---------------------------
 class SubSector(SubSectorDimensionModel):
     """Subsector attributes"""
+
     # NOTE: making sector optional for now, we may remove because it should be
     #   handled in the association tables
     sector: Optional[str] = Field(
@@ -145,7 +160,7 @@ class SubSector(SubSectorDimensionModel):
         default="",
     )
 
-    @validator('abbr', pre=True)
+    @validator("abbr", pre=True)
     def validate_abbr(cls, value: Union[str, None]) -> str:
         return value or ""
 
@@ -175,6 +190,7 @@ class SubSectorOrm(BaseOrm):
 # ---------------------------
 class EndUse(EndUseDimensionModel):
     """End use attributes"""
+
     # sector: str  # TODO: the raw data doesn't have this field
     fuel_id: str
     units: str

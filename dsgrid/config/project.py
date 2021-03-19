@@ -38,7 +38,7 @@ class Project:
         if spark is None:
             spark = init_spark("project")
 
-        registry = RegistryManager.load(get_registry_path(registry_path = registry_path))
+        registry = RegistryManager.load(get_registry_path(registry_path=registry_path))
         project_registry = registry.load_project_registry(project_id)
         registered_datasets = project_registry.list_registered_datasets()
         config = registry.load_project_config(project_id)

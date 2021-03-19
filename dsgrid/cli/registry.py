@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # This exists for test & dev. May go away.
 @click.option(
     "--path",
-    default=LOCAL_REGISTRY, # TEMPORARY: S3_REGISTRY is not yet supported
+    default=LOCAL_REGISTRY,  # TEMPORARY: S3_REGISTRY is not yet supported
     show_default=True,
     envvar="DSGRID_REGISTRY_PATH",
     help="INTERNAL-ONLY: path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",

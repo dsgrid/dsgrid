@@ -5,7 +5,7 @@ import logging
 
 import click
 
-from dsgrid.common import S3_REGISTRY
+from dsgrid.common import S3_REGISTRY, LOCAL_REGISTRY
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # This exists for test & dev. May go away.
 @click.option(
     "--path",
-    default=S3_REGISTRY,
+    default=LOCAL_REGISTRY, # TEMPORARY: S3_REGISTRY is not yet supported
     show_default=True,
     envvar="DSGRID_REGISTRY_PATH",
     help="INTERNAL-ONLY: path to dsgrid registry",

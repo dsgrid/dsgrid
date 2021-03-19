@@ -72,7 +72,7 @@ class RegistryManager:
 
         """
         # TODO S3
-        if path.startswith("s3"):
+        if str(path).startswith("s3"):
             raise Exception(f"s3 is not currently supported: {path}")
 
         path = Path(path)
@@ -96,7 +96,7 @@ class RegistryManager:
 
         """
         # TODO S3
-        if path.startswith("s3"):
+        if str(path).startswith("s3"):
             raise Exception(f"S3 is not yet supported: {path}")
         for dir_name in (
             path,
@@ -545,23 +545,23 @@ class RegistryManager:
 def get_registry_path(registry_path = None):
     """
     Returns the registry_path, defaulting to the DSGRID_REGISTRY_PATH environment
-    variable, S3_REGISTRY = {S3_REGISTRY}, or LOCAL_REGISTRY = Path.home() / ".dsgrid-registry"
+    variable or dsgrid.common.LOCAL_REGISTRY = Path.home() / ".dsgrid-registry" 
+    if registry_path is None.
     """
     if registry_path is None:
         registry_path = os.environ.get("DSGRID_REGISTRY_PATH", None)            
     if registry_path is None:
-        registry_path = LOCAL_REGISTRY
-    # TODO: Figure out defaulting to S3 versus local
+        registry_path = LOCAL_REGISTRY # TEMPORARY: Replace with S3_REGISTRY when that is supported
     if not registry_path.exists():
         raise ValueError(f"Registry path {registry_path} does not exist. To create the registry, "
-            "create the directory and then run the following commands from that location:\n"
+            "run the following commands:\n"
             "  dsgrid registry create\n"
-            "  dsgrid registry register-project $DATA_REPO/dsgrid_project/project.toml\n"
+            "  dsgrid registry register-project $US_DATA_REPO/dsgrid_project/project.toml\n"
             "  dsgrid registry submit-dataset "
-            "$DATA_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "
+            "$US_DATA_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "
             "-p test -l initial_submission\n"
-            "where $DATA_REPO points to the location of the dsgrid-data-UnitedStates "
+            "where $US_DATA_REPO points to the location of the dsgrid-data-UnitedStates "
             "repository on your system. If you would prefer a different location, "
-            "please set the DSGRID_REGISTRY_PATH environment variable.")
+            "set the DSGRID_REGISTRY_PATH environment variable before running the commands.")
     return registry_path
     

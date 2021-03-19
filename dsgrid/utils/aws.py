@@ -35,8 +35,13 @@ def sync(src, dst):
     start = time.time()
     sync_command = f"aws s3 sync {src} {dst}"
     logger.info("Running %s", sync_command)
-    check_run_command(sync_command)
-    logger.info("Command took %s seconds", time.time() - start)
+    try:
+        check_run_command(sync_command)
+        logger.info("Command took %s seconds", time.time() - start)
+    except:
+        logger.error("Syncing with AWS failed. You may need to run 'aws configure' "
+            "to point to nrel-aws-dsgrid, or you may need increased permissions.")
+        raise
 
 
 def list_dir(path):

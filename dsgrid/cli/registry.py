@@ -54,7 +54,7 @@ def list_(ctx):
 @click.argument("project-id")
 @click.pass_context
 def remove_project(ctx, project_id):
-    """Submit a new project to the dsgrid repository."""
+    """Remove a project from the dsgrid repository."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     manager.remove_project(project_id)
@@ -96,7 +96,7 @@ def register_project(ctx, project_config_file, log_message):
 )
 @click.pass_context
 def update_project(ctx, project_config_file, log_message, update_type):
-    """Create a new registry."""
+    """Update an existing project registry."""
     registry_path = ctx.parent.params["path"]
     RegistryManager.load(registry_path)
     # TODO
@@ -136,7 +136,7 @@ def submit_dataset(ctx, dataset_config_file, project_id, log_message):
 @click.argument("dataset-id")
 @click.pass_context
 def remove_dataset(ctx, dataset_id):
-    """Submit a new project to the dsgrid repository."""
+    """Remove a dataset from the dsgrid repository."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     manager.remove_dataset(dataset_id)

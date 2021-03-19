@@ -129,8 +129,8 @@ class DatasetConfigModel(DSGBaseModel):
             # For unit test purposes this always uses the defaul local registry instead of
             # whatever the user created with RegistryManager.
             local_path = LOCAL_REGISTRY_DATA / path.replace("s3://", "")
-            # sync(path, local_path)
-            logger.warning("skipping AWS sync")  # TODO DT
+            sync(path, local_path)
+            #logger.warning("skipping AWS sync")  # TODO DT
         else:
             local_path = Path(path)
             if not local_path.exists():

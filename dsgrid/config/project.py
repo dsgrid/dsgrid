@@ -14,7 +14,7 @@ from dsgrid.analysis.dataset import Dataset
 from dsgrid.dimension.base import DimensionType  # , MappingType
 from dsgrid.dimension.store import DimensionStore
 from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
-from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
 from dsgrid.utils.spark import init_spark
 
 
@@ -35,12 +35,10 @@ class Project:
     @classmethod
     def load(cls, project_id, registry_path=None, spark=None):
         """Load a project from the registry."""
-        if registry_path is None:
-            registry_path = os.environ.get("DSGRID_REGISTRY_PATH", S3_REGISTRY)
         if spark is None:
             spark = init_spark("project")
 
-        registry = RegistryManager.load(registry_path)
+        registry = RegistryManager.load(get_registry_path(registry_path = registry_path))
         project_registry = registry.load_project_registry(project_id)
         registered_datasets = project_registry.list_registered_datasets()
         config = registry.load_project_config(project_id)

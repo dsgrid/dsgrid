@@ -20,6 +20,9 @@ test_requires = [
     "pytest",
     "pytest-cov"]
 
+dev_requires = [
+    "black"]
+
 doc_requires = [
     "ghp-import",
     "numpydoc",
@@ -65,11 +68,12 @@ setup(
         "numpy",
         "pandas",
         "pyspark",
+        "semver",
         "toml"
     ],
     extras_require={
         "test": test_requires,
-        "dev": test_requires + doc_requires,
-        "admin": test_requires + doc_requires + release_requires
+        "dev": test_requires + dev_requires,
+        "admin": test_requires + dev_requires + doc_requires + release_requires
     },
 )

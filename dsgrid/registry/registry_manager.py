@@ -10,7 +10,8 @@ from pathlib import Path
 from semver import VersionInfo
 
 import dsgrid.utils.aws as aws
-from dsgrid.common import PROJECT_FILENAME, REGISTRY_FILENAME, DATASET_FILENAME
+from dsgrid.common import (PROJECT_FILENAME, REGISTRY_FILENAME, DATASET_FILENAME, 
+    LOCAL_REGISTRY, S3_REGISTRY)
 from dsgrid.dimension.base import serialize_model
 from dsgrid.config._config import VersionUpdateType, ConfigRegistrationModel
 from dsgrid.config.dataset_config import DatasetConfig
@@ -539,3 +540,28 @@ class RegistryManager:
             config_id,
             registry_config.version,
         )
+
+
+def get_registry_path(registry_path = None):
+    """
+    Returns the registry_path, defaulting to the DSGRID_REGISTRY_PATH environment
+    variable, S3_REGISTRY = {S3_REGISTRY}, or LOCAL_REGISTRY = Path.home() / ".dsgrid-registry"
+    """
+    if registry_path is None:
+        registry_path = os.environ.get("DSGRID_REGISTRY_PATH", None)            
+    if registry_path is None:
+        registry_path = LOCAL_REGISTRY
+    # TODO: Figure out defaulting to S3 versus local
+    if not registry_path.exists():
+        raise ValueError(f"Registry path {registry_path} does not exist. To create the registry, "
+            "create the directory and then run the following commands from that location:\n"
+            "  dsgrid registry create\n"
+            "  dsgrid registry register-project $DATA_REPO/dsgrid_project/project.toml\n"
+            "  dsgrid registry submit-dataset "
+            "$DATA_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "
+            "-p test -l initial_submission\n"
+            "where $DATA_REPO points to the location of the dsgrid-data-UnitedStates "
+            "repository on your system. If you would prefer a different location, "
+            "please set the DSGRID_REGISTRY_PATH environment variable.")
+    return registry_path
+    

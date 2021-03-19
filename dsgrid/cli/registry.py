@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
     default=S3_REGISTRY,
     show_default=True,
     envvar="DSGRID_REGISTRY_PATH",
-    help="INTERNAL-ONLY: path to dsgrid registry",
+    help="INTERNAL-ONLY: path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
 )
 @click.pass_context
 def registry(ctx, path):
@@ -81,18 +81,10 @@ def register_project(ctx, project_config_file, log_message):
 @click.command()
 @click.argument("project-config-file")
 @click.option(
-    "-l",
-    "--log-message",
-    required=True,
-    type=str,
-    help="reason for submission",
+    "-l", "--log-message", required=True, type=str, help="reason for submission",
 )
 @click.option(
-    "-t",
-    "--update-type",
-    required=True,
-    type=str,
-    help="reason for submission",
+    "-t", "--update-type", required=True, type=str, help="reason for submission",
 )
 @click.pass_context
 def update_project(ctx, project_config_file, log_message, update_type):
@@ -105,18 +97,10 @@ def update_project(ctx, project_config_file, log_message, update_type):
 @click.command()
 @click.argument("dataset-config-file")
 @click.option(
-    "-p",
-    "--project-id",
-    required=True,
-    type=str,
-    help="project identifier",
+    "-p", "--project-id", required=True, type=str, help="project identifier",
 )
 @click.option(
-    "-l",
-    "--log-message",
-    required=True,
-    type=str,
-    help="reason for submission",
+    "-l", "--log-message", required=True, type=str, help="reason for submission",
 )
 @click.pass_context
 def submit_dataset(ctx, dataset_config_file, project_id, log_message):

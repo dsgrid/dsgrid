@@ -7,21 +7,24 @@ import inspect
 import json
 import os
 
-from dsgrid.exceptions import JSONError
+from dsgrid.exceptions import DSGJSONError
 
 logger = logging.getLogger(__name__)
 
 
 def safe_json_load(fpath):
     """Perform a json file load with better exception handling.
+    
     Parameters
     ----------
     fpath : str
         Filepath to .json file.
+
     Returns
     -------
     j : dict
         Loaded json dictionary.
+    
     Examples
     --------
     >>> json_path = "./path_to_json.json"
@@ -34,25 +37,26 @@ def safe_json_load(fpath):
         raise TypeError("Filepath must be str to load json: {}".format(fpath))
 
     if not fpath.endswith(".json"):
-        raise JSONError("Filepath must end in .json to load json: {}".format(fpath))
+        raise DSGJSONError("Filepath must end in .json to load json: {}".format(fpath))
 
     if not os.path.isfile(fpath):
-        raise JSONError("Could not find json file to load: {}".format(fpath))
+        raise DSGJSONError("Could not find json file to load: {}".format(fpath))
 
     try:
         with open(fpath, "r") as f:
             j = json.load(f)
     except json.decoder.JSONDecodeError as e:
         emsg = "JSON Error:\n{}\nCannot read json file: " '"{}"'.format(e, fpath)
-        raise JSONError(emsg)
+        raise DSGJSONError(emsg)
 
     return j
 
 
 def get_class_properties(cls):
-    """
-    Get all class properties
+    """Get all class properties
+
     Used to check against config keys
+
     Returns
     -------
     properties : list

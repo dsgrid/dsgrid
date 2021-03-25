@@ -41,7 +41,7 @@ class DSGConfigWarning(DSGBaseWarning):
     """Warning for unclear or default configuration inputs"""
 
 
-class DSGFileInputError(DGSBaseException):
+class DSGFileInputError(DSGBaseException):
     """Error during input file checks."""
 
 

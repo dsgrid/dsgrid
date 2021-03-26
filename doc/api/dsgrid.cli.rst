@@ -28,6 +28,14 @@ dsgrid.cli.query module
    :undoc-members:
    :show-inheritance:
 
+dsgrid.cli.registry module
+--------------------------
+
+.. automodule:: dsgrid.cli.registry
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 dsgrid.cli.submit module
 ------------------------
 
@@ -35,7 +43,6 @@ dsgrid.cli.submit module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 Module contents
 ---------------

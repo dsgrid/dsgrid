@@ -11,6 +11,7 @@ from dsgrid.utils.files import dump_data, load_data
 class RegistryType(Enum):
     DATASET = "dataset"
     PROJECT = "project"
+    DIMENSION = "dimension"
 
 
 class DatasetRegistryStatus(Enum):

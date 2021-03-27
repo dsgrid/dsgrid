@@ -76,7 +76,8 @@ class DatasetConfigModel(DSGBaseModel):
         description="dataset identifier",
     )
     dataset_type: InputDatasetType = Field(
-        title="dataset_type", description="DSG defined input dataset type"
+        title="dataset_type", 
+        description="DSG defined input dataset type",
     )
     # TODO: is this necessary?
     model_name: str = Field(

@@ -3,7 +3,7 @@ import toml
 
 DATASET_REGISTRY_PATH = "registry/datasets/"
 PROJECT_REGISTRY_PATH = "registry/projects/"
-
+DIMENSION_REGISTRY_PATH = "registry/dimensions/"
 
 def versioning(registry_type, id_handle, update):
     """Determine registration or project version for registration.
@@ -27,6 +27,8 @@ def versioning(registry_type, id_handle, update):
         registry_path = DATASET_REGISTRY_PATH
     if registry_type == "project":
         registry_path = PROJECT_REGISTRY_PATH
+    if registry_type == "dimension":
+        registry_path = DIMENSION_REGISTRY_PATH
 
     # TODO: remove when done. project path should be set somewhere else
     if not os.path.exists(registry_path):

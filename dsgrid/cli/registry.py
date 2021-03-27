@@ -44,10 +44,13 @@ def list_(ctx):
     print(f"Registry: {registry_path}")
     print("Projects:")
     for project in manager.list_projects():
-        print(project)
+        print(f'  - {project}')
     print("\nDatasets:")
     for dataset in manager.list_datasets():
-        print(dataset)
+        print(f'  - {dataset}')
+    print("\nDimensions:")
+    for dimension in manager.list_dimensions():
+        print(f'  - {dimension}')
 
 
 @click.command()
@@ -76,6 +79,24 @@ def register_project(ctx, project_config_file, log_message):
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
     manager.register_project(project_config_file, submitter, log_message)
+
+
+@click.command()
+@click.argument("dimension-config-file")
+@click.option(
+    "-l",
+    "--log-message",
+    default="Initial submission",
+    show_default=True,
+    help="reason for submission",
+)
+@click.pass_context
+def register_dimension(ctx, dimension_config_file, log_message):
+    """Register a new project with the dsgrid repository."""
+    registry_path = ctx.parent.params["path"]
+    manager = RegistryManager.load(registry_path)
+    submitter = getpass.getuser()
+    manager.register_dimension(dimension_config_file, submitter, log_message)
 
 
 @click.command()
@@ -127,6 +148,7 @@ def submit_dataset(ctx, dataset_config_file, project_id, log_message):
     manager.submit_dataset(dataset_config_file, project_id, submitter, log_message)
 
 
+
 # TODO: When resubmitting an existing dataset to a project, is that a new command or an extension
 # of submit_dataset?
 # TODO: update_dataset
@@ -147,5 +169,6 @@ registry.add_command(list_)
 registry.add_command(remove_dataset)
 registry.add_command(remove_project)
 registry.add_command(register_project)
+registry.add_command(register_dimension)
 registry.add_command(submit_dataset)
 registry.add_command(update_project)

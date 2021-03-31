@@ -84,10 +84,12 @@ class DatasetRegistryModel(DSGBaseModel):
     """Dataset registration class"""
 
     dataset_id: str = Field(
-        title="dataset_id", description="dataset identifier",
+        title="dataset_id",
+        description="dataset identifier",
     )
     version: Union[str, VersionInfo] = Field(
-        title="version", description="dataset version",
+        title="version",
+        description="dataset version",
     )
     registration_history: Optional[List[ConfigRegistrationModel]] = Field(
         title="registration_history",

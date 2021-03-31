@@ -62,10 +62,12 @@ class SubmitDataset(DSGBaseModel):
     """Submit-dataset to config class"""
 
     project_version: str = Field(
-        title="project_version", description="project version",
+        title="project_version",
+        description="project version",
     )
     dataset_version: str = Field(
-        title="dataset_version", description="dataset version",
+        title="dataset_version",
+        description="dataset version",
     )
     # TODO: we may call this a dataset_to_project_dimension_mapping?
     # TODO make type pydantic model

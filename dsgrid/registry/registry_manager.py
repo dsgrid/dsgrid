@@ -460,12 +460,17 @@ class RegistryManager:
         version = VersionInfo(major=1)
 
         registration = ConfigRegistrationModel(
-            version=version, submitter=submitter, date=datetime.now(), log_message=log_message,
+            version=version,
+            submitter=submitter,
+            date=datetime.now(),
+            log_message=log_message,
         )
 
         if registry_type == RegistryType.DATASET:
             registry_config = DatasetRegistryModel(
-                dataset_id=config_id, version=version, registration_history=[registration],
+                dataset_id=config_id,
+                version=version,
+                registration_history=[registration],
             )
             config_dir = self._get_dataset_directory(config_id)
             data_dir = config_dir / str(version)
@@ -476,7 +481,8 @@ class RegistryManager:
                 status=ProjectRegistryStatus.INITIAL_REGISTRATION,
                 dataset_registries=[
                     ProjectDatasetRegistryModel(
-                        dataset_id=dataset_id, status=DatasetRegistryStatus.UNREGISTERED,
+                        dataset_id=dataset_id,
+                        status=DatasetRegistryStatus.UNREGISTERED,
                     )
                     for dataset_id in config.iter_dataset_ids()
                 ],

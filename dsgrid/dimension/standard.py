@@ -126,7 +126,9 @@ class Sector(SectorDimensionModel):
     """Sector attributes"""
 
     category: Optional[str] = Field(
-        title="sector", description="sector dimension", default="",
+        title="sector",
+        description="sector dimension",
+        default="",
     )
 
 
@@ -137,7 +139,9 @@ class SectorOrm(BaseOrm):
     name = Column(String(255), nullable=False)
 
     subsector = relationship(
-        "SubSectorOrm", secondary=subsector_sector_association, back_populates="sector",
+        "SubSectorOrm",
+        secondary=subsector_sector_association,
+        back_populates="sector",
     )
 
 
@@ -149,8 +153,12 @@ class SubSector(SubSectorDimensionModel):
 
     # NOTE: making sector optional for now, we may remove because it should be
     #   handled in the association tables
-    sector: Optional[str] = Field(default="",)
-    abbr: Optional[str] = Field(default="",)
+    sector: Optional[str] = Field(
+        default="",
+    )
+    abbr: Optional[str] = Field(
+        default="",
+    )
 
     @validator("abbr", pre=True)
     def validate_abbr(cls, value: Union[str, None]) -> str:
@@ -166,10 +174,14 @@ class SubSectorOrm(BaseOrm):
     abbr = Column(String(255), nullable=False)
 
     model = relationship(
-        "ModelOrm", secondary=model_subsector_association, back_populates="subsector",
+        "ModelOrm",
+        secondary=model_subsector_association,
+        back_populates="subsector",
     )
     sector = relationship(
-        "SectorOrm", secondary=subsector_sector_association, back_populates="subsector",
+        "SectorOrm",
+        secondary=subsector_sector_association,
+        back_populates="subsector",
     )
 
 
@@ -192,7 +204,11 @@ class EndUseOrm(BaseOrm):
     fuel_id = Column(String(255), nullable=False)
     units = Column(String(255), nullable=False)
 
-    model = relationship("ModelOrm", secondary=enduse_model_association, back_populates="enduse",)
+    model = relationship(
+        "ModelOrm",
+        secondary=enduse_model_association,
+        back_populates="enduse",
+    )
 
 
 # ---------------------------
@@ -235,9 +251,15 @@ class ModelOrm(BaseOrm):
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
 
-    enduse = relationship("EndUseOrm", secondary=enduse_model_association, back_populates="model",)
+    enduse = relationship(
+        "EndUseOrm",
+        secondary=enduse_model_association,
+        back_populates="model",
+    )
     subsector = relationship(
-        "SubSectorOrm", secondary=model_subsector_association, back_populates="model",
+        "SubSectorOrm",
+        secondary=model_subsector_association,
+        back_populates="model",
     )
 
 

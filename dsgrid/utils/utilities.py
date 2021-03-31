@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def safe_json_load(fpath):
     """Perform a json file load with better exception handling.
-    
+
     Parameters
     ----------
     fpath : str
@@ -24,7 +24,7 @@ def safe_json_load(fpath):
     -------
     j : dict
         Loaded json dictionary.
-    
+
     Examples
     --------
     >>> json_path = "./path_to_json.json"

@@ -49,13 +49,10 @@ class Dimensions(DSGBaseModel):
     """Contains dimensions defined by a dataset"""
 
     project_dimensions: List[Union[Dimension, TimeDimension]] = Field(
-        title="project_dimensions",
-        description="dimensions defined by the project",
+        title="project_dimensions", description="dimensions defined by the project",
     )
     supplemental_dimensions: Optional[List[Union[Dimension, TimeDimension]]] = Field(
-        title="supplemental_dimensions",
-        description="supplemental dimensions",
-        default=[],
+        title="supplemental_dimensions", description="supplemental dimensions", default=[],
     )
 
     @validator(
@@ -93,8 +90,7 @@ class Dimensions(DSGBaseModel):
     def check_dimension_names(cls, values: dict) -> dict:
         """Validate dimension names"""
         check_uniqueness(
-            (ii.name for i in values for ii in values[i]),
-            "dimension name",
+            (ii.name for i in values for ii in values[i]), "dimension name",
         )
         return values
 
@@ -102,8 +98,7 @@ class Dimensions(DSGBaseModel):
     def check_unique_classes(cls, values: dict) -> dict:
         """Validate dimension classes are unique"""
         check_uniqueness(
-            (getattr(ii, "cls") for i in values for ii in values[i]),
-            "dimension cls",
+            (getattr(ii, "cls") for i in values for ii in values[i]), "dimension cls",
         )
         return values
 
@@ -148,16 +143,14 @@ class InputDataset(DSGBaseModel):
     """Defines an input dataset"""
 
     dataset_id: str = Field(
-        title="dataset_id",
-        description="dataset ID",
+        title="dataset_id", description="dataset ID",
     )
     dataset_type: str = Field(  # TODO this needs to be ENUM
         title="dataset_type", description="Dataset Type"
     )
     # TODO this model_sector must be validated in the dataset_config
     model_sector: str = Field(
-        title="model_sector",
-        description="model sector",
+        title="model_sector", description="model sector",
     )
     # TODO: is this needed?
     # sectors: List[str] = Field(
@@ -171,19 +164,14 @@ class InputDatasets(DSGBaseModel):
 
     # TODO: incorrect
     benchmark: List[str] = Field(
-        title="benchmark",
-        default=[],
-        description="benchmark",
+        title="benchmark", default=[], description="benchmark",
     )
     # TODO: incorrect
     historical: List[str] = Field(
-        title="historical",
-        default=[],
-        description="historical",
+        title="historical", default=[], description="historical",
     )
     datasets: List[InputDataset] = Field(
-        title="datasets",
-        description="project input datasets",
+        title="datasets", description="project input datasets",
     )
 
     # TODO:
@@ -196,24 +184,19 @@ class ProjectConfigModel(DSGBaseModel):
     """Represents project configurations"""
 
     project_id: str = Field(
-        title="project_id",
-        description="project identifier",
+        title="project_id", description="project identifier",
     )
     name: str = Field(
-        title="name",
-        description="project name",
+        title="name", description="project name",
     )
     input_datasets: InputDatasets = Field(
-        title="input_datasets",
-        description="input datasets for the project",
+        title="input_datasets", description="input datasets for the project",
     )
     dimensions: Dimensions = Field(
-        title="dimensions",
-        description="dimensions",
+        title="dimensions", description="dimensions",
     )
     registration: Optional[Dict] = Field(
-        title="registration",
-        description="registration information",
+        title="registration", description="registration information",
     )
 
     @validator("project_id")

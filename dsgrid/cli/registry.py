@@ -27,10 +27,9 @@ def registry(ctx, path):
 
 
 @click.command()
-@click.pass_context
-def create(ctx):
+@click.argument("registry_path")
+def create(registry_path):
     """Create a new registry."""
-    registry_path = ctx.parent.params["path"]
     RegistryManager.create(registry_path)
 
 

@@ -37,28 +37,19 @@ class DimensionBase(DSGBaseModel):
     """Common attributes for all dimensions"""
 
     name: str = Field(
-        title="name",
-        description="dimension name",
+        title="name", description="dimension name",
     )
     dimension_type: DimensionType = Field(
-        title="dimension_type",
-        alias="type",
-        description="type of the dimension",
+        title="dimension_type", alias="type", description="type of the dimension",
     )
     module: Optional[str] = Field(
-        title="module",
-        description="dimension module",
-        default="dsgrid.dimension.standard",
+        title="module", description="dimension module", default="dsgrid.dimension.standard",
     )
     class_name: Optional[str] = Field(
-        title="class_name",
-        description="dimension model class name",
-        alias="class",
+        title="class_name", description="dimension model class name", alias="class",
     )
     cls: Optional[type] = Field(
-        title="cls",
-        description="dimension model class",
-        alias="dimension_class",
+        title="cls", description="dimension model class", alias="dimension_class",
     )
 
     @validator("name")
@@ -99,19 +90,14 @@ class DimensionBase(DSGBaseModel):
         if dim_class is not None:
             raise ValueError(f"cls={dim_class} should not be set")
 
-        return getattr(
-            importlib.import_module(values["module"]),
-            values["class_name"],
-        )
+        return getattr(importlib.import_module(values["module"]), values["class_name"],)
 
 
 class Dimension(DimensionBase):
     """Defines a non-time dimension"""
 
     filename: str = Field(
-        title="filename",
-        alias="file",
-        description="filename containing dimension records",
+        title="filename", alias="file", description="filename containing dimension records",
     )
     # TODO: I think we may remove mappings altogether in favor of associations
     # TODO: I think we need to add the association table to
@@ -225,49 +211,37 @@ class TimeDimension(DimensionBase):
     #       the year here is unimportant because it will be based on
     #       the weather_year
     str_format: Optional[str] = Field(
-        title="str_format",
-        default="%Y-%m-%d %H:%M:%s-%z",
-        description="timestamp format",
+        title="str_format", default="%Y-%m-%d %H:%M:%s-%z", description="timestamp format",
     )
     # TODO: we may want a list of start and end times;
     #       can this be string or list of strings?
     start: datetime = Field(
-        title="start",
-        description="first timestamp in the data",
+        title="start", description="first timestamp in the data",
     )
     # TODO: Is this inclusive or exclusive? --> mm:I don't know what this means
     # TODO: we may want to support a list of start and end times
     end: datetime = Field(
-        title="end",
-        description="last timestamp in the data",
+        title="end", description="last timestamp in the data",
     )
     # TODO: it would be nice to have this be a func that splits nmbr from unit
     frequency: TimeFrequency = Field(
-        title="frequency",
-        description="resolution of the timestamps",
+        title="frequency", description="resolution of the timestamps",
     )
     includes_dst: bool = Field(
-        title="includes_dst",
-        description="includes daylight savings time",
+        title="includes_dst", description="includes daylight savings time",
     )
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
-        title="leap_day_adjustment",
-        default=None,
-        description="TODO",
+        title="leap_day_adjustment", default=None, description="TODO",
     )
     period: Period = Field(
-        title="period",
-        description="TODO",
+        title="period", description="TODO",
     )
     timezone: TimezoneType = Field(
-        title="timezone",
-        description="timezone of data",
+        title="timezone", description="timezone of data",
     )
     # TODO: is this a project-level time dimension config?
     value_representation: TimeValueMeasurement = Field(
-        title="value_representation",
-        default="mean",
-        description="TODO",
+        title="value_representation", default="mean", description="TODO",
     )
 
     @validator("start", "end", pre=True)
@@ -292,8 +266,7 @@ class ConfigRegistrationModel(DSGBaseModel):
     """Registration fields required by the ProjectConfig and DatasetConfig"""
 
     version: Union[str, VersionInfo] = Field(
-        title="version",
-        description="version resulting from the registration",
+        title="version", description="version resulting from the registration",
     )
     submitter: str = Field(title="submitter", description="person that submitted the registration")
     date: datetime = Field(title="date", description="registration date")
@@ -316,35 +289,28 @@ class DimensionMap:
 
 class DimensionDirectMapping(DSGBaseModel):
     field: str = Field(
-        title="field",
-        description="field in from_dimension containing foreign_key",
+        title="field", description="field in from_dimension containing foreign_key",
     )
     to_dimension: Union[str, type] = Field(
-        title="to_dimension",
-        description="target Dimension for mapping, initially a str",
+        title="to_dimension", description="target Dimension for mapping, initially a str",
     )
     foreign_key: str = Field(
-        title="foreign_key",
-        description="key in to_dimension",
+        title="foreign_key", description="key in to_dimension",
     )
 
 
 class MappingBaseModel(DSGBaseModel):
     from_dimension: str = Field(
-        title="from_dimension",
-        description="ORM class name that defines the from dimension",
+        title="from_dimension", description="ORM class name that defines the from dimension",
     )
     to_dimension: str = Field(
-        title="to_dimension",
-        description="ORM class name that defines the to dimension",
+        title="to_dimension", description="ORM class name that defines the to dimension",
     )
     from_dimension_cls: Optional[type] = Field(
-        title="from_dimension_cls",
-        description="ORM class that defines the from dimension",
+        title="from_dimension_cls", description="ORM class that defines the from dimension",
     )
     to_dimension_cls: Optional[type] = Field(
-        title="to_dimension_cls",
-        description="ORM class that defines the to dimension",
+        title="to_dimension_cls", description="ORM class that defines the to dimension",
     )
 
 
@@ -360,9 +326,7 @@ class ManyToManyMapping(MappingBaseModel):
     """Defines mapping of many to many."""
 
     filename: str = Field(
-        title="file",
-        alias="file",
-        description="file that defines the associations",
+        title="file", alias="file", description="file that defines the associations",
     )
 
     @validator("filename")

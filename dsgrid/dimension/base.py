@@ -47,12 +47,10 @@ class DSGBaseDimensionModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 
     id: str = Field(
-        title="ID",
-        description="unique identifier within a dimension",
+        title="ID", description="unique identifier within a dimension",
     )
     name: str = Field(
-        title="name",
-        description="user-defined name",
+        title="name", description="user-defined name",
     )
 
 

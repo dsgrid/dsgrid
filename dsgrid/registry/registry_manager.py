@@ -553,11 +553,11 @@ def get_registry_path(registry_path=None):
         registry_path = (
             LOCAL_REGISTRY  # TEMPORARY: Replace with S3_REGISTRY when that is supported
         )
-    if not registry_path.exists():
+    if not os.path.exists(registry_path):
         raise ValueError(
             f"Registry path {registry_path} does not exist. To create the registry, "
             "run the following commands:\n"
-            "  dsgrid registry create\n"
+            "  dsgrid registry create $DSGRID_REGISTRY_PATH\n"
             "  dsgrid registry register-project $US_DATA_REPO/dsgrid_project/project.toml\n"
             "  dsgrid registry submit-dataset "
             "$US_DATA_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "

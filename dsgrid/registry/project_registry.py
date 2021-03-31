@@ -48,16 +48,14 @@ class ProjectDatasetRegistryModel(DSGBaseModel):
     """Project registration details for datasets"""
 
     dataset_id: str = Field(
-        title="dataset_id",
-        description="dataset identifier",
+        title="dataset_id", description="dataset identifier",
     )
     version: Optional[Union[None, str, VersionInfo]] = Field(
         title="dataset_version",
         description="full dataset version to be used to find dataset registry",
     )
     status: DatasetRegistryStatus = Field(
-        title="status",
-        description="dataset status within the project",
+        title="status", description="dataset status within the project",
     )
 
     @validator("version")
@@ -71,19 +69,16 @@ class ProjectRegistryModel(DSGBaseModel):
     """Defines project registry"""
 
     project_id: str = Field(
-        tile="project_id",
-        description="unique project identifier",
+        tile="project_id", description="unique project identifier",
     )
     version: Union[str, VersionInfo] = Field(
-        tile="title",
-        description="project version",
+        tile="title", description="project version",
     )
     status: ProjectRegistryStatus = Field(
         tile="status", description="project registry status", default="Initial Registration"
     )
     dataset_registries: Optional[List[ProjectDatasetRegistryModel]] = Field(
-        title="dataset_registries",
-        description="list of dataset registry",
+        title="dataset_registries", description="list of dataset registry",
     )
     registration_history: Optional[List[ConfigRegistrationModel]] = Field(
         title="registration_history",

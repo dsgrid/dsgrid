@@ -123,8 +123,7 @@ class DimensionStore:
 
         """
         return sorted(
-            list(self.iter_dimension_classes(base_class=base_class)),
-            key=lambda x: x.__name__,
+            list(self.iter_dimension_classes(base_class=base_class)), key=lambda x: x.__name__,
         )
 
     @property

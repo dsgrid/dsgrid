@@ -33,8 +33,9 @@ class Project:
         self._datasets = {}
 
     @classmethod
-    def load(cls, project_id, registry_path=None, spark=None):
+    def load(cls, project_id, registry_path=None):
         """Load a project from the registry."""
+        spark = SparkSession.getActiveSession()
         if spark is None:
             spark = init_spark("project")
 

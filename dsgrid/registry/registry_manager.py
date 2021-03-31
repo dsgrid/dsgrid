@@ -457,12 +457,21 @@ class RegistryManager:
             Raised if the config_file is invalid.
 
         """
-        assert False, "not tested and probably not correct"
+        # assert False, "not tested and probably not correct"
         if project_id not in self._project_ids:
             raise ValueError(f"{project_id} is not already stored")
 
         registry_file = self._get_registry_filename(RegistryType.PROJECT, project_id)
         registry_config = ProjectRegistryModel(**load_data(registry_file))
+        if update_type in ['major','MAJOR']:
+            update_type = VersionUpdateType.MAJOR
+        elif update_type in ['minor','MINOR']:
+            update_type = VersionUpdateType.MINOR
+        elif update_type in ['patch','PATCH']:
+            update_type = VersionUpdateType.PATCH
+        else:
+            raise ValueError(" invalid 'update_type', options: major | minor | patch")
+
         self._update_config(
             project_id, registry_config, config_file, submitter, update_type, log_message
         )
@@ -686,11 +695,11 @@ class RegistryManager:
         self._load_config(config_file, registry_type)
 
         if update_type == VersionUpdateType.MAJOR:
-            registry_config.version.bump_major()
+            registry_config.version = registry_config.version.bump_major()
         elif update_type == VersionUpdateType.MINOR:
-            registry_config.version.bump_minor()
+            registry_config.version = registry_config.version.bump_minor()
         elif update_type == VersionUpdateType.PATCH:
-            registry_config.version.bump_patch()
+            registry_config.version = registry_config.version.bump_patch()
         else:
             assert False
 

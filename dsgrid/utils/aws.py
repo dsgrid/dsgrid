@@ -39,8 +39,9 @@ def sync(src, dst):
         check_run_command(sync_command)
         logger.info("Command took %s seconds", time.time() - start)
     except:
-        logger.error("Syncing with AWS failed. You may need to run 'aws configure' "
-            "to point to nrel-aws-dsgrid, or you may need increased permissions.")
+        logger.error(
+            "Syncing with AWS failed. You may need to run 'aws configure' " "to point to sdi."
+        )
         raise
 
 

@@ -72,34 +72,28 @@ class DatasetConfigModel(DSGBaseModel):
     """Represents model dataset configurations"""
 
     dataset_id: str = Field(
-        title="dataset_id",
-        description="dataset identifier",
+        title="dataset_id", description="dataset identifier",
     )
     dataset_type: InputDatasetType = Field(
         title="dataset_type", description="DSG defined input dataset type"
     )
     # TODO: is this necessary?
     model_name: str = Field(
-        title="model_name",
-        description="model name",
+        title="model_name", description="model name",
     )
     # TODO: This must be validated against the same field in ProjectConfigModel at registration.
     model_sector: str = Field(
-        title="model_sector",
-        description="model sector",
+        title="model_sector", description="model sector",
     )
     path: str = Field(
-        title="path",
-        description="path containing data",
+        title="path", description="path containing data",
     )
     dimensions: List[Union[Dimension, TimeDimension]] = Field(
-        title="dimensions",
-        description="dimensions defined by the dataset",
+        title="dimensions", description="dimensions defined by the dataset",
     )
     # TODO: Metdata is TBD
     metadata: Optional[Dict] = Field(
-        title="metdata",
-        description="Dataset Metadata",
+        title="metdata", description="Dataset Metadata",
     )
 
     # TODO: can we reuse this validator? Its taken from the
@@ -129,8 +123,8 @@ class DatasetConfigModel(DSGBaseModel):
             # For unit test purposes this always uses the defaul local registry instead of
             # whatever the user created with RegistryManager.
             local_path = LOCAL_REGISTRY_DATA / path.replace("s3://", "")
-            sync(path, local_path)
-            #logger.warning("skipping AWS sync")  # TODO DT
+            # sync(path, local_path)
+            logger.warning("skipping AWS sync")  # TODO DT
         else:
             local_path = Path(path)
             if not local_path.exists():

@@ -1,5 +1,6 @@
 from pathlib import Path
 
+AWS_PROFILE_NAME = "sdi"
 S3_REGISTRY = "s3://nrel-dsgrid-scratch/dsgrid_v2.0.0/registry"
 LOCAL_REGISTRY = Path.home() / ".dsgrid-registry"
 LOCAL_REGISTRY_DATA = Path.home() / ".dsgrid-registry" / "data"

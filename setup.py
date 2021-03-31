@@ -48,17 +48,21 @@ setup(
         "Programming Language :: Python :: 3.8",
     ],
     test_suite="tests",
-    install_requires = [
+    install_requires=[
+        "boto3",
         "click",
+        "findspark",
         "numpy",
         "pandas",
+        "pydantic",
         "pyspark",
         "semver",
-        "toml"
+        "sqlalchemy",
+        "toml",
     ],
     extras_require={
         "test": test_requires,
         "dev": test_requires + dev_requires,
-        "admin": test_requires + dev_requires + doc_requires + release_requires
+        "admin": test_requires + dev_requires + doc_requires + release_requires,
     },
 )

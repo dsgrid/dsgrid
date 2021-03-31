@@ -3,14 +3,18 @@
 import logging
 import multiprocessing
 
+import findspark
 from pyspark.sql import SparkSession
 
 
 logger = logging.getLogger(__name__)
 
 
-def init_spark(name, mem="5gb", num_cpus=None):
+def init_spark(name, mem="5gb", num_cpus=None, find_spark=True):
     """Initialize a SparkSession."""
+    if find_spark:
+        findspark.init()
+
     if num_cpus is None:
         num_cpus = multiprocessing.cpu_count()
 

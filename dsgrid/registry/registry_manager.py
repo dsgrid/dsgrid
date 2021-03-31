@@ -10,8 +10,13 @@ from pathlib import Path
 from semver import VersionInfo
 
 import dsgrid.utils.aws as aws
-from dsgrid.common import (PROJECT_FILENAME, REGISTRY_FILENAME, DATASET_FILENAME, 
-    LOCAL_REGISTRY, S3_REGISTRY)
+from dsgrid.common import (
+    PROJECT_FILENAME,
+    REGISTRY_FILENAME,
+    DATASET_FILENAME,
+    LOCAL_REGISTRY,
+    S3_REGISTRY,
+)
 from dsgrid.dimension.base import serialize_model
 from dsgrid.config._config import VersionUpdateType, ConfigRegistrationModel
 from dsgrid.config.dataset_config import DatasetConfig
@@ -455,17 +460,12 @@ class RegistryManager:
         version = VersionInfo(major=1)
 
         registration = ConfigRegistrationModel(
-            version=version,
-            submitter=submitter,
-            date=datetime.now(),
-            log_message=log_message,
+            version=version, submitter=submitter, date=datetime.now(), log_message=log_message,
         )
 
         if registry_type == RegistryType.DATASET:
             registry_config = DatasetRegistryModel(
-                dataset_id=config_id,
-                version=version,
-                registration_history=[registration],
+                dataset_id=config_id, version=version, registration_history=[registration],
             )
             config_dir = self._get_dataset_directory(config_id)
             data_dir = config_dir / str(version)
@@ -476,8 +476,7 @@ class RegistryManager:
                 status=ProjectRegistryStatus.INITIAL_REGISTRATION,
                 dataset_registries=[
                     ProjectDatasetRegistryModel(
-                        dataset_id=dataset_id,
-                        status=DatasetRegistryStatus.UNREGISTERED,
+                        dataset_id=dataset_id, status=DatasetRegistryStatus.UNREGISTERED,
                     )
                     for dataset_id in config.iter_dataset_ids()
                 ],
@@ -542,18 +541,21 @@ class RegistryManager:
         )
 
 
-def get_registry_path(registry_path = None):
+def get_registry_path(registry_path=None):
     """
     Returns the registry_path, defaulting to the DSGRID_REGISTRY_PATH environment
-    variable or dsgrid.common.LOCAL_REGISTRY = Path.home() / ".dsgrid-registry" 
+    variable or dsgrid.common.LOCAL_REGISTRY = Path.home() / ".dsgrid-registry"
     if registry_path is None.
     """
     if registry_path is None:
-        registry_path = os.environ.get("DSGRID_REGISTRY_PATH", None)            
+        registry_path = os.environ.get("DSGRID_REGISTRY_PATH", None)
     if registry_path is None:
-        registry_path = LOCAL_REGISTRY # TEMPORARY: Replace with S3_REGISTRY when that is supported
+        registry_path = (
+            LOCAL_REGISTRY  # TEMPORARY: Replace with S3_REGISTRY when that is supported
+        )
     if not registry_path.exists():
-        raise ValueError(f"Registry path {registry_path} does not exist. To create the registry, "
+        raise ValueError(
+            f"Registry path {registry_path} does not exist. To create the registry, "
             "run the following commands:\n"
             "  dsgrid registry create\n"
             "  dsgrid registry register-project $US_DATA_REPO/dsgrid_project/project.toml\n"
@@ -562,6 +564,6 @@ def get_registry_path(registry_path = None):
             "-p test -l initial_submission\n"
             "where $US_DATA_REPO points to the location of the dsgrid-data-UnitedStates "
             "repository on your system. If you would prefer a different location, "
-            "set the DSGRID_REGISTRY_PATH environment variable before running the commands.")
+            "set the DSGRID_REGISTRY_PATH environment variable before running the commands."
+        )
     return registry_path
-    

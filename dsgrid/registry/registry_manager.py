@@ -7,7 +7,6 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-## added packages # <---
 import uuid
 import toml
 
@@ -199,7 +198,6 @@ class RegistryManager:
 
         registry = self.load_project_registry(project_id)
         config_file = self._get_project_config_file(project_id, registry.version)
-        print(f'\n>>> config file: {config_file}') # <---
         project_config = ProjectConfig.load(config_file)
         self._projects[project_id] = project_config
         logger.info("Loaded ProjectConfig for project_id=%s", project_id)
@@ -284,19 +282,22 @@ class RegistryManager:
         """Assign dimension_id only to those with a dimension record (e.g. csv)"""
 
         # TODO: check that id does not already exist in .dsgrid-registry
-        # TODO: need regular expression check on name and char limit overall
-        # config file to live under type folder
+        # TODO: need regular expression check on name and/or limit number of chars in dim id
+        # TODO: currently a dimension record can be registered indefinitely,
+        # each time with a different UUID. Need to enforce that it is registered only once.
+        #   Potential solution: use hash() to check records on file and records to be submitted;
+        #   Can use this function to check whether a record exists and suggest the data_submitter
+        #   to use that record id that is already on file
+
 
         dim_data = data['dimensions']
         logger.info("Dimension record ID assignment:")
         for i in range(len(dim_data)):
             logger.info(" - type: %s, name: %s", dim_data[i]['type'], dim_data[i]['name'])
-            # print(f" - type: {dim_data[i]['type']}, name: {dim_data[i]['name']}")
             if "file" in dim_data[i].keys():
                 dim_data[i]['id'] = dim_data[i]['name'].lower().replace(" ","_")\
                     +"_"+str(uuid.uuid1())
                 logger.info("   id: %s", dim_data[i]['id'])
-                # print(f"   id: {dim_data[i]['id']}")
             else:
                 logger.info(f"   no record found.")
         
@@ -314,27 +315,30 @@ class RegistryManager:
         version = VersionInfo(major=1)
 
         registration = ConfigRegistrationModel(
-            version=version,
-            submitter=submitter,
-            date=datetime.now(),
-            log_message=log_message,
-        )
+                    version=version,
+                    submitter=submitter,
+                    date=datetime.now(),
+                    log_message=log_message,
+                )
 
-        registry_config = DimensionRegistryModel(
-            # dimension_id=config_id,
-            version=version,
-            registration_history=[registration],
-        )
-        config_dir = self._get_dimension_directory()
+        config_file_name = "dimension" + os.path.splitext(config_file)[1]
 
         dim_data = config_data['dimensions']
+        n_registered_dims = 0
         for i in range(len(dim_data)):
             if "file" in dim_data[i].keys():
+    
+                registry_config = DimensionRegistryModel(
+                    version=version,
+                    description=dim_data[i]['description'],
+                    registration_history=[registration],
+                )
+                config_dir = self._get_dimension_directory()
+
                 data_type_dir = config_dir / dim_data[i]['type']
                 os.makedirs(data_type_dir, exist_ok=True) 
 
                 data_dir = data_type_dir / dim_data[i]['id'] / str(version)
-                print(f'> datadir created: {data_dir}') # <---
                 if self._on_aws:
                     pass  # TODO S3
                 else:
@@ -351,7 +355,7 @@ class RegistryManager:
                     dump_data(data, filename) # export registry.toml
 
                     # export individual dimension_record.toml
-                    config_file_i = data_dir / os.path.basename(config_file)
+                    config_file_i = data_dir / config_file_name
                     with open(config_file_i, "w") as toml_file:
                         toml.dump(dim_data[i], toml_file)
 
@@ -359,7 +363,9 @@ class RegistryManager:
                     dimension_record = Path(os.path.dirname(config_file)) / dim_data[i]['file']
                     shutil.copyfile(dimension_record, data_dir / os.path.basename(dim_data[i]['file']))
 
-        logger.info("Registered %s with version=%s", registry_type.value, version)
+                    n_registered_dims += 1
+
+        logger.info("Registered %s %s(s) with version=%s", n_registered_dims, registry_type.value, version)
         return version
 
     def _config_file_extend_name(self, config_file, name_extension):
@@ -389,20 +395,15 @@ class RegistryManager:
 
         """
         data = load_data(config_file)
-        print(f'\n>>>config_file: {config_file}\n')
-
-        # to be removed begins
-        # dimension_id = data["dimension_id"]
-        # if dimension_id in self._dimension_ids:
-        #     raise ValueError(f"{dimension_id} is already stored")
-        # to be removed ends
-
         data = self.assign_dimension_id(data)
 
         # save a copy to
         config_file_updated = self._config_file_extend_name(config_file, "with assigned id")
         with open(config_file_updated, "w") as toml_file:
             toml.dump(data, toml_file)
+
+        logger.info("--> New config file containing the dimension ID assignment exported: \n%s",
+            config_file_updated)
 
         self._register_dimension_config(
             RegistryType.DIMENSION, config_file, submitter, log_message, data
@@ -433,7 +434,7 @@ class RegistryManager:
             raise ValueError(f"{project_id} is already stored")
 
         self._register_config(
-            RegistryType.PROJECT, project_id, config_file, submitter, log_message
+            RegistryType.PROJECT, project_id, config_file, submitter, log_message,
         )
 
     def update_project(self, project_id, config_file, submitter, update_type, log_message):
@@ -508,7 +509,7 @@ class RegistryManager:
             raise ValueError(f"{dataset_id} is not defined in project={project_id}")
 
         version = self._register_config(
-            RegistryType.DATASET, dataset_id, config_file, submitter, log_message
+            RegistryType.DATASET, dataset_id, config_file, submitter, log_message,
         )
 
         project_registry.set_dataset_status(dataset_id, DatasetRegistryStatus.REGISTERED)
@@ -628,6 +629,7 @@ class RegistryManager:
         """This validates that the configuration meets all requirements."""
 
         config = self._load_config(config_file, registry_type)
+        description = load_data(config_file)['description']
         version = VersionInfo(major=1)
 
         registration = ConfigRegistrationModel(
@@ -641,6 +643,7 @@ class RegistryManager:
             registry_config = DatasetRegistryModel(
                 dataset_id=config_id,
                 version=version,
+                description=description,
                 registration_history=[registration],
             )
             config_dir = self._get_dataset_directory(config_id)
@@ -650,6 +653,7 @@ class RegistryManager:
                 project_id=config_id,
                 version=version,
                 status=ProjectRegistryStatus.INITIAL_REGISTRATION,
+                description=description,
                 dataset_registries=[
                     ProjectDatasetRegistryModel(
                         dataset_id=dataset_id,
@@ -671,12 +675,18 @@ class RegistryManager:
             os.makedirs(data_dir) 
         filename = config_dir / REGISTRY_FILENAME
         data = serialize_model(registry_config)
+
+        if registry_type == RegistryType.DATASET:
+            config_file_name = 'dataset'
+        elif registry_type == RegistryType.PROJECT:
+            config_file_name = 'project'
+        config_file_name = config_file_name + os.path.splitext(config_file)[1]
         if self._on_aws:
             # TODO S3: not handled
             assert False
         else:
             dump_data(data, filename)
-            shutil.copyfile(config_file, data_dir / os.path.basename(config_file))
+            shutil.copyfile(config_file, data_dir / config_file_name)
             dimensions_dir = Path(os.path.dirname(config_file)) / "dimensions"
             shutil.copytree(dimensions_dir, data_dir / "dimensions")
 
@@ -686,13 +696,17 @@ class RegistryManager:
     def _update_config(
         self, config_id, registry_config, config_file, submitter, update_type, log_message
     ):
+    # TODO: need to check that there are indeed changes to the config
+    # TODO: if a new version is created but is deleted in .dsgrid-registry, version number should be reset
+    #   accordingly, currently it does not.
         if isinstance(registry_config, DatasetRegistryModel):
             registry_type = RegistryType.DATASET
         else:
             registry_type = RegistryType.PROJECT
 
         # This validates that all data.
-        self._load_config(config_file, registry_type)
+        config = self._load_config(config_file, registry_type) # is this needed?
+        registry_config.description = load_data(config_file)['description'] # always copy the latest from config
 
         if update_type == VersionUpdateType.MAJOR:
             registry_config.version = registry_config.version.bump_major()
@@ -711,8 +725,24 @@ class RegistryManager:
         )
         registry_config.registration_history.append(registration)
         filename = self._get_registry_filename(registry_type, config_id)
+        config_dir = self._get_project_directory(config_id)
+        data_dir = config_dir / str(registry_config.version)
+        if self._on_aws:
+            pass  # TODO S3
+        else:
+            if os.path.exists(data_dir): # <--- temp, to be deleted
+                shutil.rmtree(data_dir) # <--- temp, to be deleted
+            os.makedirs(data_dir) 
+
+        if registry_type == RegistryType.DATASET:
+            config_file_name = 'dataset'
+        elif registry_type == RegistryType.PROJECT:
+            config_file_name = 'project'
+        config_file_name = config_file_name + os.path.splitext(config_file)[1]
+
         # TODO: account for S3
         dump_data(serialize_model(registry_config), filename)
+        shutil.copyfile(config_file, data_dir / config_file_name) # copy new config file
         logger.info(
             "Updated %s %s with version=%s",
             registry_type.value,

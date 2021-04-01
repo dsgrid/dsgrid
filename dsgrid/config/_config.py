@@ -60,6 +60,11 @@ class DimensionBase(DSGBaseModel):
         description="dimension model class",
         alias="dimension_class",
     )
+    description: Optional[str] = Field(
+        title="description of dimension record",
+        description="description of dimension record, this gets stored in both dimension config file and dimension registry",
+        alias="description",
+    )
 
     @validator("name")
     def check_name(cls, name):

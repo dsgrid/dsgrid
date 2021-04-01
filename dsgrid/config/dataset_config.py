@@ -93,6 +93,10 @@ class DatasetConfigModel(DSGBaseModel):
         title="path",
         description="path containing data",
     )
+    description: str = Field(
+        title="description",
+        description="describe dataset in details",
+    )
     dimensions: List[Union[Dimension, TimeDimension]] = Field(
         title="dimensions",
         description="dimensions defined by the dataset",

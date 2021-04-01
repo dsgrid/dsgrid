@@ -86,6 +86,10 @@ class DimensionRegistryModel(DSGBaseModel):
         title="version",
         description="dimension version",
     )
+    description: str = Field(
+        title="description", 
+        description="detail on dimension record"
+    )
     registration_history: Optional[List[ConfigRegistrationModel]] = Field(
         title="registration_history",
         description="history of all registration updates",

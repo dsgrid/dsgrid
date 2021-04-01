@@ -91,6 +91,10 @@ class DatasetRegistryModel(DSGBaseModel):
         title="version",
         description="dataset version",
     )
+    description: str = Field(
+        title="description", 
+        description="detail on the project or dataset"
+    )
     registration_history: Optional[List[ConfigRegistrationModel]] = Field(
         title="registration_history",
         description="history of all registration updates",

@@ -18,7 +18,7 @@ if DATA_REPO is None:
 
 def create_registry(tmpdir):
     path = Path(tmpdir) / "dsgrid-registry"
-    check_run_command(f"dsgrid registry --path {path} create")
+    check_run_command(f"dsgrid registry create {path}")
     assert path.exists()
     assert (path / "projects").exists()
     assert (path / "datasets").exists()

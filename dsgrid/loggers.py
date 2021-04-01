@@ -4,6 +4,13 @@ import logging
 import logging.config
 
 
+# ETH@20210325 - What if you want to set up logging for all loggers, or for all
+# dsgrid loggers? What name should be provided? Should that be the default?
+# Should filename default to None?
+
+# ETH@20210325 - name and packages seems like two different functions? That is,
+# you're either setting up logger name, or you want to set up a bunch of loggers
+# for the different packages?
 def setup_logging(
     name, filename, console_level=logging.INFO, file_level=logging.INFO, packages=None
 ):
@@ -16,12 +23,11 @@ def setup_logging(
     filename : str | None
         log filename
     console_level : int, optional
-        console log level
+        console log level. defaults to logging.INFO
     file_level : int, optional
-        file log level
+        file log level. defaults to logging.INFO
     packages : list, optional
         enable logging for these package names
-
     """
     log_config = {
         "version": 1,
@@ -66,6 +72,9 @@ def setup_logging(
             "propagate": False,
         }
 
+    # ETH@20210325 - This logic should be applied to packages as well? This makes
+    # me think that this should really be two functions--one for setting up a
+    # logger by name and the other for setting up loggers for a list of packages.
     if filename is None:
         log_config["handlers"].pop("file")
         log_config["loggers"][name]["handlers"].remove("file")

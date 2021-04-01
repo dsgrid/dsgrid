@@ -9,11 +9,11 @@ pip install -e .[tests]
 
 # or
 
-pip install -e .[dev] # includes what is needed for tests and documentation
+pip install -e .[dev] # includes what is needed for tests and code development
 
 # or 
 
-pip install -e .[admin] # dev plus what is needed for releasing packages
+pip install -e .[admin] # dev plus what is needed for creating documentation and releasing packages
 ```
 
 **Additional software required for publishing documentation:**
@@ -22,6 +22,16 @@ pip install -e .[admin] # dev plus what is needed for releasing packages
 
 ## Run Tests
 
+```
+cd dsgrid
+pytest tests
+```
+
+pytest options that may be helpful:
+
+option flag           | effect
+--------------------- | ------
+--log-cli-level=DEBUG | emits log messages to the console. level can be set to DEBUG, INFO, WARN, ERROR
 
 ## Publish Documentation
 

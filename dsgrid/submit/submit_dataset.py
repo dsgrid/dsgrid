@@ -99,10 +99,10 @@ class SubmitDataset(DSGBaseModel):
             return DatasetConfig(**registry.dataset_config)
 
         # TODO: Need help here. Issues relate to enumeration not being stored as
+        #   value. Also, I don't know how to loop through these 3 fields properly.
+        #   I originally tried a validator for ('dataset_type', 'model_name',
+        #   'model_sector')
 
-    #   value. Also, I don't know how to loop through these 3 fields properly.
-    #   I originally tried a validator for ('dataset_type', 'model_name',
-    #   'model_sector')
     @root_validator(pre=True)
     def check_for_project_config_expectations(cls, values):
         """

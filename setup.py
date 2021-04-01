@@ -35,7 +35,11 @@ setup(
     url=metadata["__url__"],
     packages=find_packages(),
     package_dir={"dsgrid": "dsgrid"},
-    entry_points={"console_scripts": ["dsgrid=dsgrid.cli.dsgrid:cli",],},
+    entry_points={
+        "console_scripts": [
+            "dsgrid=dsgrid.cli.dsgrid:cli",
+        ],
+    },
     include_package_data=True,
     license=metadata["__license__"],
     zip_safe=False,
@@ -48,10 +52,21 @@ setup(
         "Programming Language :: Python :: 3.8",
     ],
     test_suite="tests",
-    install_requires=["click", "numpy", "pandas", "pyspark", "toml"],
+    install_requires=[
+        "boto3",
+        "click",
+        "findspark",
+        "numpy",
+        "pandas",
+        "pydantic",
+        "pyspark",
+        "semver",
+        "sqlalchemy",
+        "toml",
+    ],
     extras_require={
         "test": test_requires,
-        "dev": dev_requires + test_requires + doc_requires,
-        "admin": test_requires + doc_requires + release_requires,
+        "dev": test_requires + dev_requires,
+        "admin": test_requires + dev_requires + doc_requires + release_requires,
     },
 )

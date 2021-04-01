@@ -5,7 +5,7 @@ import logging
 
 import click
 
-from dsgrid.common import S3_REGISTRY
+from dsgrid.common import S3_REGISTRY, LOCAL_REGISTRY
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -16,10 +16,10 @@ logger = logging.getLogger(__name__)
 # This exists for test & dev. May go away.
 @click.option(
     "--path",
-    default=S3_REGISTRY,
+    default=LOCAL_REGISTRY,  # TEMPORARY: S3_REGISTRY is not yet supported
     show_default=True,
     envvar="DSGRID_REGISTRY_PATH",
-    help="INTERNAL-ONLY: path to dsgrid registry",
+    help="INTERNAL-ONLY: path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
 )
 @click.pass_context
 def registry(ctx, path):
@@ -27,10 +27,9 @@ def registry(ctx, path):
 
 
 @click.command()
-@click.pass_context
-def create(ctx):
+@click.argument("registry_path")
+def create(registry_path):
     """Create a new registry."""
-    registry_path = ctx.parent.params["path"]
     RegistryManager.create(registry_path)
 
 
@@ -44,13 +43,13 @@ def list_(ctx):
     print(f"Registry: {registry_path}")
     print("Projects:")
     for project in manager.list_projects():
-        print(f'  - {project}')
+        print(f"  - {project}")
     print("\nDatasets:")
     for dataset in manager.list_datasets():
-        print(f'  - {dataset}')
+        print(f"  - {dataset}")
     print("\nDimensions:")
     for dimension in manager.list_dimensions():
-        print(f'  - {dimension}')
+        print(f"  - {dimension}")
 
 
 @click.command()
@@ -156,7 +155,6 @@ def submit_dataset(ctx, dataset_config_file, project_id, log_message):
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
     manager.submit_dataset(dataset_config_file, project_id, submitter, log_message)
-
 
 
 # TODO: When resubmitting an existing dataset to a project, is that a new command or an extension

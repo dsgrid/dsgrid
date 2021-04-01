@@ -1,8 +1,12 @@
-"""DSGrid exceptions"""
+"""dsgrid exceptions and warnings"""
 
 
 class DSGBaseException(Exception):
     """Base class for all dsgrid exceptions."""
+
+
+class DSGBaseWarning(Warning):
+    """Base class for all dsgrid warnings."""
 
 
 class DSGInvalidField(DSGBaseException):
@@ -17,45 +21,33 @@ class DSGInvalidDimensionMapping(DSGBaseException):
     """Raised if a mapping is not stored or is invalid."""
 
 
-class DSGRuntimeError(Exception):
+class DSGRuntimeError(DSGBaseException):
     """Raised if there was a generic runtime error."""
 
 
-class DSGProjectConfigError(Exception):
-    """
-    Error for bad project configuration inputs
-    """
+class DSGProjectConfigError(DSGBaseException):
+    """Error for bad project configuration inputs"""
 
 
-class DSGDatasetConfigError(Exception):
-    """
-    Error for bad dataset configuration inputs
-    """
+class DSGDatasetConfigError(DSGBaseException):
+    """Error for bad dataset configuration inputs"""
 
 
 class DSGValueNotStored(DSGBaseException):
     """Raised if a value is not stored."""
 
 
-class ConfigWarning(Warning):
-    """
-    Warning for unclear or default configuration inputs
-    """
+class DSGConfigWarning(DSGBaseWarning):
+    """Warning for unclear or default configuration inputs"""
 
 
-class FileInputError(Exception):
-    """
-    Error during input file checks.
-    """
+class DSGFileInputError(DSGBaseException):
+    """Error during input file checks."""
 
 
-class FileInputWarning(Warning):
-    """
-    Warning during input file checks.
-    """
+class DSGFileInputWarning(DSGBaseWarning):
+    """Warning during input file checks."""
 
 
-class JSONError(Exception):
-    """
-    Error with JSON file
-    """
+class DSGJSONError(DSGBaseException):
+    """Error with JSON file"""

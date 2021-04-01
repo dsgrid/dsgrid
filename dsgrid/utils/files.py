@@ -82,7 +82,7 @@ def exists(path):
     bool
 
     """
-    if path.startswith("s3"):
+    if str(path).startswith("s3"):
         return aws.exists(path)
     return os.path.exists(path)
 

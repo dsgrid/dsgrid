@@ -4,18 +4,10 @@ tests package
 Submodules
 ----------
 
-tests.test\_dataset module
---------------------------
+tests.conftest module
+---------------------
 
-.. automodule:: tests.test_dataset
-   :members:
-   :undoc-members:
-   :show-inheritance:
-
-tests.test\_datasets module
----------------------------
-
-.. automodule:: tests.test_datasets
+.. automodule:: tests.conftest
    :members:
    :undoc-members:
    :show-inheritance:
@@ -36,10 +28,26 @@ tests.test\_files\_utils module
    :undoc-members:
    :show-inheritance:
 
+tests.test\_project module
+--------------------------
+
+.. automodule:: tests.test_project
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 tests.test\_project\_config module
 ----------------------------------
 
 .. automodule:: tests.test_project_config
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+tests.test\_run\_command module
+-------------------------------
+
+.. automodule:: tests.test_run_command
    :members:
    :undoc-members:
    :show-inheritance:
@@ -51,7 +59,6 @@ tests.test\_time\_conversions module
    :members:
    :undoc-members:
    :show-inheritance:
-
 
 Module contents
 ---------------

@@ -35,7 +35,11 @@ setup(
     url=metadata["__url__"],
     packages=find_packages(),
     package_dir={"dsgrid": "dsgrid"},
-    entry_points={"console_scripts": ["dsgrid=dsgrid.cli.dsgrid:cli",],},
+    entry_points={
+        "console_scripts": [
+            "dsgrid=dsgrid.cli.dsgrid:cli",
+        ],
+    },
     include_package_data=True,
     license=metadata["__license__"],
     zip_safe=False,

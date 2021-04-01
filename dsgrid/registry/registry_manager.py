@@ -460,12 +460,17 @@ class RegistryManager:
         version = VersionInfo(major=1)
 
         registration = ConfigRegistrationModel(
-            version=version, submitter=submitter, date=datetime.now(), log_message=log_message,
+            version=version,
+            submitter=submitter,
+            date=datetime.now(),
+            log_message=log_message,
         )
 
         if registry_type == RegistryType.DATASET:
             registry_config = DatasetRegistryModel(
-                dataset_id=config_id, version=version, registration_history=[registration],
+                dataset_id=config_id,
+                version=version,
+                registration_history=[registration],
             )
             config_dir = self._get_dataset_directory(config_id)
             data_dir = config_dir / str(version)
@@ -476,7 +481,8 @@ class RegistryManager:
                 status=ProjectRegistryStatus.INITIAL_REGISTRATION,
                 dataset_registries=[
                     ProjectDatasetRegistryModel(
-                        dataset_id=dataset_id, status=DatasetRegistryStatus.UNREGISTERED,
+                        dataset_id=dataset_id,
+                        status=DatasetRegistryStatus.UNREGISTERED,
                     )
                     for dataset_id in config.iter_dataset_ids()
                 ],
@@ -553,11 +559,11 @@ def get_registry_path(registry_path=None):
         registry_path = (
             LOCAL_REGISTRY  # TEMPORARY: Replace with S3_REGISTRY when that is supported
         )
-    if not registry_path.exists():
+    if not os.path.exists(registry_path):
         raise ValueError(
             f"Registry path {registry_path} does not exist. To create the registry, "
             "run the following commands:\n"
-            "  dsgrid registry create\n"
+            "  dsgrid registry create $DSGRID_REGISTRY_PATH\n"
             "  dsgrid registry register-project $US_DATA_REPO/dsgrid_project/project.toml\n"
             "  dsgrid registry submit-dataset "
             "$US_DATA_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "

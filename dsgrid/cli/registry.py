@@ -101,13 +101,6 @@ def register_dimension(ctx, dimension_config_file, log_message):
 @click.command()
 @click.argument("project-config-file")
 @click.option(
-    "-p",
-    "--project-id",
-    required=True,
-    type=str,
-    help="project id",
-)
-@click.option(
     "-l",
     "--log-message",
     required=True,
@@ -122,13 +115,12 @@ def register_dimension(ctx, dimension_config_file, log_message):
     help="type of update, options: major | minor | patch",
 )
 @click.pass_context
-def update_project(ctx, project_id, project_config_file, log_message, update_type):
+def update_project(ctx, project_config_file, log_message, update_type):
     """Update an existing project registry."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
-    print(manager)
-    manager.update_project(project_id, project_config_file, submitter, update_type, log_message)
+    manager.update_project(project_config_file, submitter, update_type, log_message)
     # TODO
 
 

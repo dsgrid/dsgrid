@@ -31,16 +31,13 @@ logger = logging.getLogger(__name__)
 """
 VALIDATE:
 1. 8 unique types of dimensions (all except time) but each type can have more than one entry.
-2. The dimensions that are called in `dataset` and `project` are available.
-3. dimension `id` are not duplicated.
+2. dimension `ids' and records are all unique.
 """
+
 
 class DimensionConfigModel(DSGBaseModel):
     """Represents model dataset configurations"""
-    # dimension_id: str = Field(
-    #     title="dimension_id",
-    #     description="dimension record identifier",
-    # )
+
     dimensions: List[Union[Dimension, TimeDimension]] = Field(
         title="dimensions",
         description="dimensions shared between project and dataset",
@@ -63,6 +60,7 @@ class DimensionConfigModel(DSGBaseModel):
         else:
             val = Dimension(**value)
         return val
+
 
 class DimensionConfig:
     """Provides an interface to a DatasetConfigModel."""

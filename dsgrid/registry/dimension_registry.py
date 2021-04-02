@@ -25,7 +25,6 @@ from dsgrid.utils.files import load_data, dump_data
 logger = logging.getLogger(__name__)
 
 
-
 class DimensionRegistry:
 
     DIMENSION_REGISTRY_PATH = Path("registry/dimensions")
@@ -53,14 +52,10 @@ class DimensionRegistry:
 
         Returns
         -------
-        DimensionRecordRegistry
+        DimensionRegistry
 
         """
         return cls(DimensionRegistryModel(**load_data(config_file)))
-
-    # @property
-    # def dimension_id(self):
-    #     return self._model.dimension_id
 
     @property
     def registration(self):
@@ -78,18 +73,11 @@ class DimensionRegistry:
 class DimensionRegistryModel(DSGBaseModel):
     """dimension (record) registration class"""
 
-    # dimension_id: str = Field(
-    #     title="dimension_id",
-    #     description="dimension identifier",
-    # )
     version: Union[str, VersionInfo] = Field(
         title="version",
         description="dimension version",
     )
-    description: str = Field(
-        title="description", 
-        description="detail on dimension record"
-    )
+    description: str = Field(title="description", description="detail on dimension record")
     registration_history: Optional[List[ConfigRegistrationModel]] = Field(
         title="registration_history",
         description="history of all registration updates",

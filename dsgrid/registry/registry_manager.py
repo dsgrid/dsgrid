@@ -6,9 +6,7 @@ import re
 import shutil
 from datetime import datetime
 from pathlib import Path
-
 import uuid
-import toml
 
 from semver import VersionInfo
 
@@ -282,7 +280,10 @@ class RegistryManager:
         return ProjectRegistry.load(filename)
 
     def assign_dimension_id(self, data: dict):
-        """Assign dimension_id only to those with a dimension record (e.g. csv)"""
+        """
+        Assign dimension_id only to those with a dimension record,
+        print and add assigned IDs to config file
+        """
 
         # TODO: check that id does not already exist in .dsgrid-registry
         # TODO: need regular expression check on name and/or limit number of chars in dim id
@@ -290,21 +291,21 @@ class RegistryManager:
         # each time with a different UUID. Need to enforce that it is registered only once.
         #   Potential solution: use hash() to check records on file and records to be submitted;
         #   Can use this function to check whether a record exists and suggest the data_submitter
-        #   to use that record id that is already on file
+        #   to use that record id if available
 
         dim_data = data["dimensions"]
         logger.info("Dimension record ID assignment:")
-        for i in range(len(dim_data)):
-            logger.info(" - type: %s, name: %s", dim_data[i]["type"], dim_data[i]["name"])
-            if "file" in dim_data[i].keys():
-                dim_data[i]["id"] = (
-                    dim_data[i]["name"].lower().replace(" ", "_") + "_" + str(uuid.uuid1())
+        for item in range(len(dim_data)):
+            logger.info(" - type: %s, name: %s", dim_data[item]["type"], dim_data[item]["name"])
+            if (dim_data[item]["type"] != "time") & ("file" in dim_data[item]):
+                # assign id, made from dimension.name and a UUID4
+                dim_data[item]["id"] = (
+                    dim_data[item]["name"].lower().replace(" ", "_") + "_" + str(uuid.uuid4())
                 )
-                logger.info("   id: %s", dim_data[i]["id"])
+                logger.info("   id: %s", dim_data[item]["id"])
             else:
                 logger.info(f"   no record found.")
 
-        data["dimensions"] = dim_data
         return data
 
     def _register_dimension_config(
@@ -315,6 +316,8 @@ class RegistryManager:
         - It validates that the configuration meets all requirements.
         - It files dimension records by dimension type in output registry folder.
         """
+
+        # TODO: search also from dataset/../dimensions folder for records and find a union record set
 
         config = self._load_config(config_file, registry_type)
         version = VersionInfo(major=1)
@@ -330,47 +333,44 @@ class RegistryManager:
 
         dim_data = config_data["dimensions"]
         n_registered_dims = 0
-        for i in range(len(dim_data)):
-            if "file" in dim_data[i].keys():
+        for item in range(len(dim_data)):
+            if (dim_data[item]["type"] == "time") & ("file" not in dim_data[item]):
+                continue
 
-                registry_config = DimensionRegistryModel(
-                    version=version,
-                    description=dim_data[i]["description"],
-                    registration_history=[registration],
-                )
-                config_dir = self._get_dimension_directory()
+            registry_config = DimensionRegistryModel(
+                version=version,
+                description=dim_data[item]["description"],
+                registration_history=[registration],
+            )
+            config_dir = self._get_dimension_directory()
 
-                data_type_dir = config_dir / dim_data[i]["type"]
+            data_type_dir = config_dir / dim_data[item]["type"]
+            data_dir = data_type_dir / dim_data[item]["id"] / str(version)
+            if self._on_aws:
+                pass  # TODO S3
+            else:
                 os.makedirs(data_type_dir, exist_ok=True)
+                os.makedirs(data_dir)
 
-                data_dir = data_type_dir / dim_data[i]["id"] / str(version)
-                if self._on_aws:
-                    pass  # TODO S3
-                else:
-                    if os.path.exists(data_dir):  # <--- temp, to be deleted
-                        shutil.rmtree(data_dir)  # <--- temp, to be deleted
-                    os.makedirs(data_dir)
+            filename = Path(os.path.dirname(data_dir)) / REGISTRY_FILENAME
+            data = serialize_model(registry_config)
+            if self._on_aws:
+                # TODO S3: not handled
+                assert False
+            else:
+                # export registry.toml
+                dump_data(data, filename)
 
-                filename = Path(os.path.dirname(data_dir)) / REGISTRY_FILENAME
-                data = serialize_model(registry_config)
-                if self._on_aws:
-                    # TODO S3: not handled
-                    assert False
-                else:
-                    dump_data(data, filename)  # export registry.toml
+                # export individual dimension_config.toml
+                dump_data(dim_data[item], data_dir / config_file_name)
 
-                    # export individual dimension_record.toml
-                    config_file_i = data_dir / config_file_name
-                    with open(config_file_i, "w") as toml_file:
-                        toml.dump(dim_data[i], toml_file)
+                # export dimension record file
+                dimension_record = Path(os.path.dirname(config_file)) / dim_data[item]["file"]
+                shutil.copyfile(
+                    dimension_record, data_dir / os.path.basename(dim_data[item]["file"])
+                )
 
-                    # export/copy dimension record
-                    dimension_record = Path(os.path.dirname(config_file)) / dim_data[i]["file"]
-                    shutil.copyfile(
-                        dimension_record, data_dir / os.path.basename(dim_data[i]["file"])
-                    )
-
-                    n_registered_dims += 1
+                n_registered_dims += 1
 
         logger.info(
             "Registered %s %s(s) with version=%s", n_registered_dims, registry_type.value, version
@@ -411,8 +411,7 @@ class RegistryManager:
 
         # save a copy to
         config_file_updated = self._config_file_extend_name(config_file, "with assigned id")
-        with open(config_file_updated, "w") as toml_file:
-            toml.dump(data, toml_file)
+        dump_data(data, config_file_updated)
 
         logger.info(
             "--> New config file containing the dimension ID assignment exported: \n%s",
@@ -455,7 +454,7 @@ class RegistryManager:
             log_message,
         )
 
-    def update_project(self, project_id, config_file, submitter, update_type, log_message):
+    def update_project(self, config_file, submitter, update_type, log_message):
         """Updates an existing project with new parameters or data.
 
         Parameters
@@ -476,7 +475,9 @@ class RegistryManager:
             Raised if the config_file is invalid.
 
         """
-        # assert False, "not tested and probably not correct"
+        data = load_data(config_file)
+        project_id = data["project_id"]
+
         if project_id not in self._project_ids:
             raise ValueError(f"{project_id} is not already stored")
 
@@ -690,8 +691,6 @@ class RegistryManager:
         if self._on_aws:
             pass  # TODO S3
         else:
-            if os.path.exists(data_dir):  # <--- temp, to be deleted
-                shutil.rmtree(data_dir)  # <--- temp, to be deleted
             os.makedirs(data_dir)
         filename = config_dir / REGISTRY_FILENAME
         data = serialize_model(registry_config)
@@ -719,6 +718,8 @@ class RegistryManager:
         # TODO: need to check that there are indeed changes to the config
         # TODO: if a new version is created but is deleted in .dsgrid-registry, version number should be reset
         #   accordingly, currently it does not.
+        # desired feature: undo a revision
+
         if isinstance(registry_config, DatasetRegistryModel):
             registry_type = RegistryType.DATASET
         else:
@@ -752,8 +753,6 @@ class RegistryManager:
         if self._on_aws:
             pass  # TODO S3
         else:
-            if os.path.exists(data_dir):  # <--- temp, to be deleted
-                shutil.rmtree(data_dir)  # <--- temp, to be deleted
             os.makedirs(data_dir)
 
         if registry_type == RegistryType.DATASET:
@@ -765,6 +764,10 @@ class RegistryManager:
         # TODO: account for S3
         dump_data(serialize_model(registry_config), filename)
         shutil.copyfile(config_file, data_dir / config_file_name)  # copy new config file
+        dimensions_dir = Path(os.path.dirname(config_file)) / "dimensions"
+        shutil.copytree(
+            dimensions_dir, data_dir / "dimensions"
+        )  # copy new dimensions, to be removed with dimension id mapping
         logger.info(
             "Updated %s %s with version=%s",
             registry_type.value,

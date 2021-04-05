@@ -12,7 +12,6 @@ from semver import VersionInfo
 
 from dsgrid.dimension.base import DSGBaseModel, serialize_model
 
-from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config._config import ConfigRegistrationModel
 from dsgrid.registry.common import (
     make_filename_from_version,
@@ -26,23 +25,18 @@ from dsgrid.utils.files import load_data, dump_data
 logger = logging.getLogger(__name__)
 
 
-# TODO: I think we need to also register the pydantic models associated with
-#   the configuration OR we need to set the dataset_config type to
-#   DatasetCOnfig instead of dict of the loaded toml (not the cls.dict()).
+class DimensionRegistry:
 
+    DIMENSION_REGISTRY_PATH = Path("registry/dimensions")
 
-class DatasetRegistry:
-
-    DATASET_REGISTRY_PATH = Path("registry/datasets")
-
-    """Controls dataset registration"""
+    """Controls dimension (record) registration from datasets and projects"""
 
     def __init__(self, model):
-        """Construct DatasetRegistry
+        """Construct DimensionRegistry
 
         Parameters
         ----------
-        model : DatasetRegistryModel
+        model : DimensionRegistryModel
 
         """
         self._model = model
@@ -58,14 +52,10 @@ class DatasetRegistry:
 
         Returns
         -------
-        DatasetRegistry
+        DimensionRegistry
 
         """
-        return cls(DatasetRegistryModel(**load_data(config_file)))
-
-    @property
-    def dataset_id(self):
-        return self._model.dataset_id
+        return cls(DimensionRegistryModel(**load_data(config_file)))
 
     @property
     def registration(self):
@@ -77,24 +67,17 @@ class DatasetRegistry:
 
     @version.setter
     def version(self, val):
-        self._model.dataset_version = val
+        self._model.dimension_version = val
 
 
-class DatasetRegistryModel(DSGBaseModel):
-    """Dataset registration class"""
+class DimensionRegistryModel(DSGBaseModel):
+    """dimension (record) registration class"""
 
-    dataset_id: str = Field(
-        title="dataset_id",
-        description="dataset identifier",
-    )
     version: Union[str, VersionInfo] = Field(
         title="version",
-        description="dataset version",
+        description="dimension version",
     )
-    description: str = Field(
-        title="description", 
-        description="detail on the project or dataset"
-    )
+    description: str = Field(title="description", description="detail on dimension record")
     registration_history: Optional[List[ConfigRegistrationModel]] = Field(
         title="registration_history",
         description="history of all registration updates",

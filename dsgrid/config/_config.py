@@ -60,6 +60,11 @@ class DimensionBase(DSGBaseModel):
         description="dimension model class",
         alias="dimension_class",
     )
+    description: Optional[str] = Field(
+        title="description of dimension record",
+        description="description of dimension record, this gets stored in both dimension config file and dimension registry",
+        alias="description",
+    )
 
     @validator("name")
     def check_name(cls, name):
@@ -283,8 +288,8 @@ class VersionUpdateType(Enum):
     # TODO: we need to find general version update types that can be mapped to
     #   major, minor and patch.
     # i.e., replace input_dataset, fix project_config,
-    MAJOR = "minor"
-    MINOR = "major"
+    MAJOR = "major"
+    MINOR = "minor"
     PATCH = "patch"
 
 

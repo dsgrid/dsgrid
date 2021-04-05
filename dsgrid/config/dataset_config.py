@@ -76,7 +76,8 @@ class DatasetConfigModel(DSGBaseModel):
         description="dataset identifier",
     )
     dataset_type: InputDatasetType = Field(
-        title="dataset_type", description="DSG defined input dataset type"
+        title="dataset_type",
+        description="DSG defined input dataset type",
     )
     # TODO: is this necessary?
     model_name: str = Field(
@@ -91,6 +92,10 @@ class DatasetConfigModel(DSGBaseModel):
     path: str = Field(
         title="path",
         description="path containing data",
+    )
+    description: str = Field(
+        title="description",
+        description="describe dataset in details",
     )
     dimensions: List[Union[Dimension, TimeDimension]] = Field(
         title="dimensions",

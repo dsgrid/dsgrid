@@ -81,6 +81,10 @@ class ProjectRegistryModel(DSGBaseModel):
     status: ProjectRegistryStatus = Field(
         tile="status", description="project registry status", default="Initial Registration"
     )
+    description: str = Field(
+        title="description", 
+        description="detail on the project or dataset"
+    )
     dataset_registries: Optional[List[ProjectDatasetRegistryModel]] = Field(
         title="dataset_registries",
         description="list of dataset registry",

@@ -43,10 +43,13 @@ def list_(ctx):
     print(f"Registry: {registry_path}")
     print("Projects:")
     for project in manager.list_projects():
-        print(project)
+        print(f"  - {project}")
     print("\nDatasets:")
     for dataset in manager.list_datasets():
-        print(dataset)
+        print(f"  - {dataset}")
+    print("\nDimensions:")
+    for dimension in manager.list_dimensions():
+        print(f"  - {dimension}")
 
 
 @click.command()
@@ -78,6 +81,24 @@ def register_project(ctx, project_config_file, log_message):
 
 
 @click.command()
+@click.argument("dimension-config-file")
+@click.option(
+    "-l",
+    "--log-message",
+    default="Initial submission",
+    show_default=True,
+    help="reason for submission",
+)
+@click.pass_context
+def register_dimension(ctx, dimension_config_file, log_message):
+    """Register a new project with the dsgrid repository."""
+    registry_path = ctx.parent.params["path"]
+    manager = RegistryManager.load(registry_path)
+    submitter = getpass.getuser()
+    manager.register_dimension(dimension_config_file, submitter, log_message)
+
+
+@click.command()
 @click.argument("project-config-file")
 @click.option(
     "-l",
@@ -91,13 +112,15 @@ def register_project(ctx, project_config_file, log_message):
     "--update-type",
     required=True,
     type=str,
-    help="reason for submission",
+    help="type of update, options: major | minor | patch",
 )
 @click.pass_context
 def update_project(ctx, project_config_file, log_message, update_type):
     """Update an existing project registry."""
     registry_path = ctx.parent.params["path"]
-    RegistryManager.load(registry_path)
+    manager = RegistryManager.load(registry_path)
+    submitter = getpass.getuser()
+    manager.update_project(project_config_file, submitter, update_type, log_message)
     # TODO
 
 
@@ -146,5 +169,6 @@ registry.add_command(list_)
 registry.add_command(remove_dataset)
 registry.add_command(remove_project)
 registry.add_command(register_project)
+registry.add_command(register_dimension)
 registry.add_command(submit_dataset)
 registry.add_command(update_project)

@@ -22,6 +22,7 @@ def create_registry(tmpdir):
     assert path.exists()
     assert (path / "projects").exists()
     assert (path / "datasets").exists()
+    assert (path / "dimensions").exists()
     return path
 
 
@@ -46,3 +47,12 @@ def test_register_project_and_dataset():
         output = {}
         check_run_command(f"dsgrid registry --path={path} list", output)
         assert regex_dataset.search(output["stdout"]) is not None
+
+
+def test_register_dimension():
+    with TemporaryDirectory() as tmpdir:
+        path = create_registry(tmpdir)
+        dimension_config = Path(DATA_REPO) / "dsgrid_project" / "dimension.toml"
+        check_run_command(f"dsgrid registry --path={path} register-dimension {dimension_config}")
+        output = {}
+        check_run_command(f"dsgrid registry --path={path} list", output)

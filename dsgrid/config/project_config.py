@@ -215,6 +215,10 @@ class ProjectConfigModel(DSGBaseModel):
         title="registration",
         description="registration information",
     )
+    description: str = Field(
+        title="description",
+        description="describe project in details",
+    )
 
     @validator("project_id")
     def check_project_id_handle(cls, project_id):

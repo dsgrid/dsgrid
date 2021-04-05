@@ -297,11 +297,9 @@ class RegistryManager:
         logger.info("Dimension record ID assignment:")
         for item in dim_data:
             logger.info(" - type: %s, name: %s", item["type"], item["name"])
-            if item["type"] != "time" && "file" in item:
+            if item["type"] != "time" and "file" in item:
                 # assign id, made from dimension.name and a UUID4
-                item["id"] = (
-                   item["name"].lower().replace(" ", "_") + "_" + str(uuid.uuid4())
-                )
+                item["id"] = item["name"].lower().replace(" ", "_") + "_" + str(uuid.uuid4())
                 logger.info("   id: %s", item["id"])
             else:
                 logger.info(f"   no record found.")
@@ -333,19 +331,19 @@ class RegistryManager:
 
         dim_data = config_data["dimensions"]
         n_registered_dims = 0
-        for item in range(len(dim_data)):
-            if (dim_data[item]["type"] == "time") & ("file" not in dim_data[item]):
+        for item in dim_data:
+            if item["type"] == "time" and "file" not in item:
                 continue
 
             registry_config = DimensionRegistryModel(
                 version=version,
-                description=dim_data[item]["description"],
+                description=item["description"],
                 registration_history=[registration],
             )
             config_dir = self._get_dimension_directory()
 
-            data_type_dir = config_dir / dim_data[item]["type"]
-            data_dir = data_type_dir / dim_data[item]["id"] / str(version)
+            data_type_dir = config_dir / item["type"]
+            data_dir = data_type_dir / item["id"] / str(version)
             if self._on_aws:
                 pass  # TODO S3
             else:
@@ -362,13 +360,11 @@ class RegistryManager:
                 dump_data(data, filename)
 
                 # export individual dimension_config.toml
-                dump_data(dim_data[item], data_dir / config_file_name)
+                dump_data(item, data_dir / config_file_name)
 
                 # export dimension record file
-                dimension_record = Path(os.path.dirname(config_file)) / dim_data[item]["file"]
-                shutil.copyfile(
-                    dimension_record, data_dir / os.path.basename(dim_data[item]["file"])
-                )
+                dimension_record = Path(os.path.dirname(config_file)) / item["file"]
+                shutil.copyfile(dimension_record, data_dir / os.path.basename(item["file"]))
 
                 n_registered_dims += 1
 
@@ -483,13 +479,9 @@ class RegistryManager:
 
         registry_file = self._get_registry_filename(RegistryType.PROJECT, project_id)
         registry_config = ProjectRegistryModel(**load_data(registry_file))
-        if update_type in ["major", "MAJOR"]:
-            update_type = VersionUpdateType.MAJOR
-        elif update_type in ["minor", "MINOR"]:
-            update_type = VersionUpdateType.MINOR
-        elif update_type in ["patch", "PATCH"]:
-            update_type = VersionUpdateType.PATCH
-        else:
+        try:
+            update_type = VersionUpdateType(update_type.lower())
+        except:
             raise ValueError(" invalid 'update_type', options: major | minor | patch")
 
         self._update_config(

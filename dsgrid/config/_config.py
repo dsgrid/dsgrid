@@ -288,8 +288,8 @@ class VersionUpdateType(Enum):
     # TODO: we need to find general version update types that can be mapped to
     #   major, minor and patch.
     # i.e., replace input_dataset, fix project_config,
-    MAJOR = "minor"
-    MINOR = "major"
+    MAJOR = "major"
+    MINOR = "minor"
     PATCH = "patch"
 
 

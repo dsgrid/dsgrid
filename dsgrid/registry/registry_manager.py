@@ -295,14 +295,14 @@ class RegistryManager:
 
         dim_data = data["dimensions"]
         logger.info("Dimension record ID assignment:")
-        for item in range(len(dim_data)):
-            logger.info(" - type: %s, name: %s", dim_data[item]["type"], dim_data[item]["name"])
-            if (dim_data[item]["type"] != "time") & ("file" in dim_data[item]):
+        for item in dim_data:
+            logger.info(" - type: %s, name: %s", item["type"], item["name"])
+            if item["type"] != "time" && "file" in item:
                 # assign id, made from dimension.name and a UUID4
-                dim_data[item]["id"] = (
-                    dim_data[item]["name"].lower().replace(" ", "_") + "_" + str(uuid.uuid4())
+                item["id"] = (
+                   item["name"].lower().replace(" ", "_") + "_" + str(uuid.uuid4())
                 )
-                logger.info("   id: %s", dim_data[item]["id"])
+                logger.info("   id: %s", item["id"])
             else:
                 logger.info(f"   no record found.")
 

@@ -10,7 +10,7 @@ from pydantic.fields import Field, Required
 from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.dimension.base import DSGBaseModel, serialize_model
+from dsgrid.models import DSGBaseModel, serialize_model
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config._config import ConfigRegistrationModel
@@ -91,10 +91,7 @@ class DatasetRegistryModel(DSGBaseModel):
         title="version",
         description="dataset version",
     )
-    description: str = Field(
-        title="description", 
-        description="detail on the project or dataset"
-    )
+    description: str = Field(title="description", description="detail on the project or dataset")
     registration_history: Optional[List[ConfigRegistrationModel]] = Field(
         title="registration_history",
         description="history of all registration updates",

@@ -18,12 +18,17 @@ from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
+from dsgrid.config._config import ConfigRegistrationModel
+from dsgrid.dimension.base import DimensionType
+from dsgrid.dimension.models import (
+    TimeDimensionModel,
+    DimensionReferenceModel,
+    DimensionUnionModel,
+    handle_dimension_union,
+)
 from dsgrid.exceptions import DSGBaseException
-from dsgrid.dimension.base import DimensionType, DSGBaseModel
+from dsgrid.models import DSGBaseModel
 from dsgrid.utils.aws import sync
-
-
-from dsgrid.config._config import TimeDimension, Dimension, ConfigRegistrationModel
 
 
 # TODO: likely needs refinement (missing mappings)
@@ -97,7 +102,7 @@ class DatasetConfigModel(DSGBaseModel):
         title="description",
         description="describe dataset in details",
     )
-    dimensions: List[Union[Dimension, TimeDimension]] = Field(
+    dimensions: DimensionUnionModel = Field(
         title="dimensions",
         description="dimensions defined by the dataset",
     )
@@ -107,20 +112,9 @@ class DatasetConfigModel(DSGBaseModel):
         description="Dataset Metadata",
     )
 
-    # TODO: can we reuse this validator? Its taken from the
-    #   project_config Diemnsions model
+    @validator("dimensions", pre=True, each_item=True, always=True)
     def handle_dimension_union(cls, value):
-        """
-        Validate dimension type work around for pydantic Union bug
-        related to: https://github.com/samuelcolvin/pydantic/issues/619
-        """
-        # NOTE: Errors inside Dimension or TimeDimension will be duplicated
-        # by Pydantic
-        if value["type"] == DimensionType.TIME.value:
-            val = TimeDimension(**value)
-        else:
-            val = Dimension(**value)
-        return val
+        return handle_dimension_union(value)
 
     # TODO: if local path provided, we want to upload to S3 and set the path
     #   here to S3 path
@@ -163,9 +157,11 @@ class DatasetConfig:
         self._model = model
 
     @classmethod
-    def load(cls, config_file):
+    def load(cls, config_file, dimension_manager):
         model = DatasetConfigModel.load(config_file)
-        return cls(model)
+        config = cls(model)
+        dimension_manager.replace_dimension_references(model.dimensions)
+        return config
 
     @property
     def model(self):

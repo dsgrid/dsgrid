@@ -5,6 +5,7 @@ DATASET_REGISTRY_PATH = "registry/datasets/"
 PROJECT_REGISTRY_PATH = "registry/projects/"
 DIMENSION_REGISTRY_PATH = "registry/dimensions/"
 
+
 def versioning(registry_type, id_handle, update):
     """Determine registration or project version for registration.
 

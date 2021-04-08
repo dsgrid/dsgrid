@@ -3,13 +3,13 @@ import datetime
 import pytest
 from pydantic import BaseModel
 
-from dsgrid.dimension.base import DayType, Season, TimeDimensionModel
+from dsgrid.dimension.base import DayType, Season
+from dsgrid.dimension.models import TimeDimensionModel
 from .data.dimension_models.minimal.models import *
 from dsgrid.dimension.standard import County, State, EndUse, CensusDivision, CensusRegion, Time
 from dsgrid.dimension.store import DimensionStore
 from dsgrid.exceptions import *
 from dsgrid.config.project import Project
-from dsgrid.config.project_config import InputDataset
 from dsgrid.utils.files import load_data
 
 

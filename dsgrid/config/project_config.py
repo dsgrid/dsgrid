@@ -30,29 +30,36 @@ from pydantic.dataclasses import dataclass
 from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 
-from dsgrid.dimension.base import DimensionType, DSGBaseModel
+from dsgrid.config._config import ConfigRegistrationModel
+from dsgrid.dimension.base import DimensionType
 from dsgrid.exceptions import DSGInvalidField
-from dsgrid.utils.files import load_data
+from dsgrid.models import DSGBaseModel
+from dsgrid.dimension.models import (
+    DimensionReferenceModel,
+    DimensionModel,
+    TimeDimensionModel,
+    handle_dimension_union,
+    DimensionUnionModel,
+)
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 
 # from dsgrid.dimension.time import (
 #     LeapDayAdjustmentType, Period, TimeValueMeasurement, TimeFrequency,
 #     TimezoneType
 #     )
-from dsgrid.config._config import Dimension, TimeDimension, ConfigRegistrationModel
 
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 
 
-# TODO: Does this belong in config.dimension with the other related classes?
-class Dimensions(DSGBaseModel):
+class DimensionsModel(DSGBaseModel):
     """Contains dimensions defined by a dataset"""
 
-    project_dimensions: List[Union[Dimension, TimeDimension]] = Field(
+    project_dimensions: DimensionUnionModel = Field(
         title="project_dimensions",
         description="dimensions defined by the project",
     )
-    supplemental_dimensions: Optional[List[Union[Dimension, TimeDimension]]] = Field(
+    supplemental_dimensions: Optional[DimensionUnionModel] = Field(
         title="supplemental_dimensions",
         description="supplemental dimensions",
         default=[],
@@ -62,23 +69,13 @@ class Dimensions(DSGBaseModel):
         "project_dimensions", "supplemental_dimensions", pre=True, each_item=True, always=True
     )
     def handle_dimension_union(cls, value):
-        """
-        Validate dimension type work around for pydantic Union bug
-        related to: https://github.com/samuelcolvin/pydantic/issues/619
-        """
-        # NOTE: Errors inside Dimension or TimeDimension will be duplicated
-        # by Pydantic
-        if value["type"] == DimensionType.TIME.value:
-            val = TimeDimension(**value)
-        else:
-            val = Dimension(**value)
-        return val
+        return handle_dimension_union(value)
 
     @validator("project_dimensions")
     def check_project_dimension(cls, val):
         """Validate project_dimensions types"""
         dimension_types = [i.dimension_type for i in val]
-        required_dim_types = [i for i in DimensionType]
+        required_dim_types = list(DimensionType)
         # validate required dimensions for project_dimensions
         for i in required_dim_types:
             if i not in dimension_types:
@@ -89,32 +86,32 @@ class Dimensions(DSGBaseModel):
         check_uniqueness(dimension_types, "project_dimension")
         return val
 
-    @root_validator
-    def check_dimension_names(cls, values: dict) -> dict:
-        """Validate dimension names"""
-        check_uniqueness(
-            (ii.name for i in values for ii in values[i]),
-            "dimension name",
-        )
-        return values
+    # @root_validator
+    # def check_dimension_names(cls, values: dict) -> dict:
+    #    """Validate dimension names"""
+    #    check_uniqueness(
+    #        (ii.name for i in values for ii in values[i]),
+    #        "dimension name",
+    #    )
+    #    return values
 
-    @root_validator
-    def check_unique_classes(cls, values: dict) -> dict:
-        """Validate dimension classes are unique"""
-        check_uniqueness(
-            (getattr(ii, "cls") for i in values for ii in values[i]),
-            "dimension cls",
-        )
-        return values
+    # @root_validator
+    # def check_unique_classes(cls, values: dict) -> dict:
+    #    """Validate dimension classes are unique"""
+    #    check_uniqueness(
+    #        (getattr(ii, "cls") for i in values for ii in values[i]),
+    #        "dimension cls",
+    #    )
+    #    return values
 
-    @root_validator
-    def check_files(cls, values: dict) -> dict:
-        """Validate dimension files across all dimensions"""
-        check_uniqueness(
-            (ii.filename for i in values for ii in values[i] if isinstance(ii, Dimension)),
-            "dimension record filename",
-        )
-        return values
+    # @root_validator
+    # def check_files(cls, values: dict) -> dict:
+    #    """Validate dimension files across all dimensions"""
+    #    check_uniqueness(
+    #        (ii.filename for i in values for ii in values[i] if isinstance(ii, Dimension)),
+    #        "dimension record filename",
+    #    )
+    #    return values
 
     @root_validator
     def check_dimension_mappings(cls, values: dict) -> dict:
@@ -144,7 +141,7 @@ class Dimensions(DSGBaseModel):
         return values
 
 
-class InputDataset(DSGBaseModel):
+class InputDatasetModel(DSGBaseModel):
     """Defines an input dataset"""
 
     dataset_id: str = Field(
@@ -166,7 +163,7 @@ class InputDataset(DSGBaseModel):
     # )
 
 
-class InputDatasets(DSGBaseModel):
+class InputDatasetsModel(DSGBaseModel):
     """Defines all input datasets for a project"""
 
     # TODO: incorrect
@@ -181,7 +178,7 @@ class InputDatasets(DSGBaseModel):
         default=[],
         description="historical",
     )
-    datasets: List[InputDataset] = Field(
+    datasets: List[InputDatasetModel] = Field(
         title="datasets",
         description="project input datasets",
     )
@@ -203,11 +200,11 @@ class ProjectConfigModel(DSGBaseModel):
         title="name",
         description="project name",
     )
-    input_datasets: InputDatasets = Field(
+    input_datasets: InputDatasetsModel = Field(
         title="input_datasets",
         description="input datasets for the project",
     )
-    dimensions: Dimensions = Field(
+    dimensions: DimensionsModel = Field(
         title="dimensions",
         description="dimensions",
     )
@@ -238,9 +235,12 @@ class ProjectConfig:
         self._model = model
 
     @classmethod
-    def load(cls, config_file):
+    def load(cls, config_file, dimension_manager):
         model = ProjectConfigModel.load(config_file)
-        return cls(model)
+        config = cls(model)
+        dimension_manager.replace_dimension_references(config.project_dimensions)
+        dimension_manager.replace_dimension_references(config.supplemental_dimensions)
+        return config
 
     def get_dataset(self, dataset_id):
         """Return a dataset by ID."""

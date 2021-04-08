@@ -4,7 +4,7 @@ import logging
 import os
 
 
-from dsgrid.dimension.base import DSGBaseDimensionModel
+from dsgrid.dimension.models import DSGBaseDimensionModel
 from dsgrid.dimension.dimension_records import DimensionRecords
 from dsgrid.exceptions import (
     DSGInvalidField,

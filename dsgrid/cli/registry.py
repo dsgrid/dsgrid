@@ -6,6 +6,7 @@ import logging
 import click
 
 from dsgrid.common import S3_REGISTRY, LOCAL_REGISTRY
+from dsgrid.config._config import VersionUpdateType
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -48,8 +49,11 @@ def list_(ctx):
     for dataset in manager.list_datasets():
         print(f"  - {dataset}")
     print("\nDimensions:")
-    for dimension in manager.list_dimensions():
-        print(f"  - {dimension}")
+    dim_mgr = manager.dimension_manager
+    for dimension_type in dim_mgr.list_dimension_types():
+        print(f"  - {dimension_type.value}")
+        for dimension_id in dim_mgr.list_dimension_ids(dimension_type):
+            print(f"    - {dimension_id}")
 
 
 @click.command()
@@ -91,7 +95,7 @@ def register_project(ctx, project_config_file, log_message):
 )
 @click.pass_context
 def register_dimension(ctx, dimension_config_file, log_message):
-    """Register a new project with the dsgrid repository."""
+    """Register new dimensions with the dsgrid repository."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
@@ -111,8 +115,8 @@ def register_dimension(ctx, dimension_config_file, log_message):
     "-t",
     "--update-type",
     required=True,
-    type=str,
-    help="type of update, options: major | minor | patch",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=lambda ctx, x: VersionUpdateType(x),
 )
 @click.pass_context
 def update_project(ctx, project_config_file, log_message, update_type):
@@ -121,7 +125,6 @@ def update_project(ctx, project_config_file, log_message, update_type):
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
     manager.update_project(project_config_file, submitter, update_type, log_message)
-    # TODO
 
 
 @click.command()

@@ -8,7 +8,7 @@ from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.dimension.base import DSGBaseModel, serialize_model
+from dsgrid.models import DSGBaseModel, serialize_model
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config._config import ConfigRegistrationModel
 from dsgrid.registry.common import (
@@ -81,10 +81,7 @@ class ProjectRegistryModel(DSGBaseModel):
     status: ProjectRegistryStatus = Field(
         tile="status", description="project registry status", default="Initial Registration"
     )
-    description: str = Field(
-        title="description", 
-        description="detail on the project or dataset"
-    )
+    description: str = Field(title="description", description="detail on the project or dataset")
     dataset_registries: Optional[List[ProjectDatasetRegistryModel]] = Field(
         title="dataset_registries",
         description="list of dataset registry",

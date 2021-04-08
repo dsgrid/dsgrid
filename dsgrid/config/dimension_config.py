@@ -18,12 +18,11 @@ from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
+from dsgrid.config._config import ConfigRegistrationModel
 from dsgrid.exceptions import DSGBaseException
-from dsgrid.dimension.base import DimensionType, DSGBaseModel
-from dsgrid.utils.aws import sync
-
-
-from dsgrid.config._config import TimeDimension, Dimension, ConfigRegistrationModel
+from dsgrid.dimension.base import DimensionType
+from dsgrid.dimension.models import TimeDimensionModel, DimensionModel, handle_dimension_union
+from dsgrid.models import DSGBaseModel
 
 
 logger = logging.getLogger(__name__)
@@ -38,7 +37,7 @@ VALIDATE:
 class DimensionConfigModel(DSGBaseModel):
     """Represents model dataset configurations"""
 
-    dimensions: List[Union[Dimension, TimeDimension]] = Field(
+    dimensions: List[Union[DimensionModel, TimeDimensionModel]] = Field(
         title="dimensions",
         description="dimensions shared between project and dataset",
     )
@@ -46,20 +45,10 @@ class DimensionConfigModel(DSGBaseModel):
         title="registration",
         description="registration information",
     )
-    # TODO: can we reuse this validator? Its taken from the
-    #   project_config Diemnsions model
+
+    @validator("dimensions", pre=True, each_item=True, always=True)
     def handle_dimension_union(cls, value):
-        """
-        Validate dimension type work around for pydantic Union bug
-        related to: https://github.com/samuelcolvin/pydantic/issues/619
-        """
-        # NOTE: Errors inside Dimension or TimeDimension will be duplicated
-        # by Pydantic
-        if value["type"] == DimensionType.TIME.value:
-            val = TimeDimension(**value)
-        else:
-            val = Dimension(**value)
-        return val
+        return handle_dimension_union(value)
 
 
 class DimensionConfig:

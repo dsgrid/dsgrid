@@ -264,10 +264,7 @@ class RegistryManager(RegistryManagerBase):
         return ProjectRegistry.load(filename)
 
     def assign_dimension_id(self, data: dict):
-        """
-        Assign dimension_id only to those with a dimension record,
-        print and add assigned IDs to config file
-        """
+        """Assign dimension_id to each dimension. Print the assigned IDs."""
 
         # TODO: check that id does not already exist in .dsgrid-registry
         # TODO: need regular expression check on name and/or limit number of chars in dim id
@@ -281,12 +278,9 @@ class RegistryManager(RegistryManagerBase):
         logger.info("Dimension record ID assignment:")
         for item in dim_data:
             logger.info(" - type: %s, name: %s", item["type"], item["name"])
-            if item["type"] != "time" and "file" in item:
-                # assign id, made from dimension.name and a UUID4
-                item["id"] = item["name"].lower().replace(" ", "_") + "_" + str(uuid.uuid4())
-                logger.info("   id: %s", item["id"])
-            else:
-                logger.info("   no record found.")
+            # assign id, made from dimension.name and a UUID4
+            item["id"] = item["name"].lower().replace(" ", "_") + "_" + str(uuid.uuid4())
+            logger.info("   id: %s", item["id"])
 
     def _register_dimension_config(
         self, registry_type, config_file, submitter, log_message, config_data
@@ -314,12 +308,11 @@ class RegistryManager(RegistryManagerBase):
         dim_data = config_data["dimensions"]
         n_registered_dims = 0
         for item in dim_data:
-            if item["type"] == "time" and "file" not in item:
-                continue
-
             # Leading directories from the original are not relevant in the registry.
-            orig_file = item["file"]
-            item["file"] = os.path.basename(orig_file)
+            orig_file = item.get("file")
+            if orig_file is not None:
+                # Time dimensions do not have a record file.
+                item["file"] = os.path.basename(orig_file)
 
             registry_config = DimensionRegistryModel(
                 version=version,
@@ -349,8 +342,9 @@ class RegistryManager(RegistryManagerBase):
                 dump_data(item, data_dir / config_file_name)
 
                 # export dimension record file
-                dimension_record = Path(os.path.dirname(config_file)) / orig_file
-                shutil.copyfile(dimension_record, data_dir / os.path.basename(item["file"]))
+                if orig_file is not None:
+                    dimension_record = Path(os.path.dirname(config_file)) / orig_file
+                    shutil.copyfile(dimension_record, data_dir / os.path.basename(item["file"]))
 
                 n_registered_dims += 1
 

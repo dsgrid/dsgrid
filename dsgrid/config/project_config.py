@@ -55,21 +55,15 @@ LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 class DimensionsModel(DSGBaseModel):
     """Contains dimensions defined by a dataset"""
 
-    project_dimensions: DimensionUnionModel = Field(
+    project_dimensions: List[DimensionReferenceModel] = Field(
         title="project_dimensions",
         description="dimensions defined by the project",
     )
-    supplemental_dimensions: Optional[DimensionUnionModel] = Field(
+    supplemental_dimensions: Optional[List[DimensionReferenceModel]] = Field(
         title="supplemental_dimensions",
         description="supplemental dimensions",
         default=[],
     )
-
-    @validator(
-        "project_dimensions", "supplemental_dimensions", pre=True, each_item=True, always=True
-    )
-    def handle_dimension_union(cls, value):
-        return handle_dimension_union(value)
 
     @validator("project_dimensions")
     def check_project_dimension(cls, val):

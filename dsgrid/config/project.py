@@ -9,7 +9,6 @@ from pathlib import Path
 from pyspark.sql import SparkSession
 
 from dsgrid.common import S3_REGISTRY
-from dsgrid.config.project_config import ProjectConfig
 from dsgrid.analysis.dataset import Dataset
 from dsgrid.dimension.base import DimensionType  # , MappingType
 from dsgrid.dimension.store import DimensionStore

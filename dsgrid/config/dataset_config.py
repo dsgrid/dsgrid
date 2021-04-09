@@ -23,7 +23,6 @@ from dsgrid.dimension.base import DimensionType
 from dsgrid.dimension.models import (
     TimeDimensionModel,
     DimensionReferenceModel,
-    DimensionUnionModel,
     handle_dimension_union,
 )
 from dsgrid.exceptions import DSGBaseException
@@ -102,7 +101,7 @@ class DatasetConfigModel(DSGBaseModel):
         title="description",
         description="describe dataset in details",
     )
-    dimensions: DimensionUnionModel = Field(
+    dimensions: List[DimensionReferenceModel] = Field(
         title="dimensions",
         description="dimensions defined by the dataset",
     )
@@ -111,10 +110,6 @@ class DatasetConfigModel(DSGBaseModel):
         title="metdata",
         description="Dataset Metadata",
     )
-
-    @validator("dimensions", pre=True, each_item=True, always=True)
-    def handle_dimension_union(cls, value):
-        return handle_dimension_union(value)
 
     # TODO: if local path provided, we want to upload to S3 and set the path
     #   here to S3 path

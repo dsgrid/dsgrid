@@ -1,8 +1,8 @@
 from pyspark.sql import SparkSession
 
-from dsgrid.config.project import Project
+from dsgrid.project import Project
 from dsgrid.config.project_config import ProjectConfig
-from dsgrid.analysis.dataset import Dataset
+from dsgrid.dataset import Dataset
 
 
 def test_project_load():

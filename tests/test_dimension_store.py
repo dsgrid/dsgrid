@@ -9,7 +9,7 @@ from .data.dimension_models.minimal.models import *
 from dsgrid.dimension.standard import County, State, EndUse, CensusDivision, CensusRegion, Time
 from dsgrid.dimension.store import DimensionStore
 from dsgrid.exceptions import *
-from dsgrid.config.project import Project
+from dsgrid.project import Project
 from dsgrid.utils.files import load_data
 
 

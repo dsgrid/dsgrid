@@ -8,7 +8,7 @@ from dsgrid.utils.files import load_data
 
 
 class DSGBaseModel(BaseModel):
-    """Base model for all dsgrid models"""
+    """Base data model for all dsgrid data models"""
 
     class Config:
         title = "DSGBaseModel"

@@ -22,27 +22,6 @@ from semver import VersionInfo
 from dsgrid.models import DSGBaseModel
 
 
-class VersionUpdateType(Enum):
-    # TODO: we need to find general version update types that can be mapped to
-    #   major, minor and patch.
-    # i.e., replace input_dataset, fix project_config,
-    MAJOR = "major"
-    MINOR = "minor"
-    PATCH = "patch"
-
-
-class ConfigRegistrationModel(DSGBaseModel):
-    """Registration fields required by the ProjectConfig and DatasetConfig"""
-
-    version: Union[str, VersionInfo] = Field(
-        title="version",
-        description="version resulting from the registration",
-    )
-    submitter: str = Field(title="submitter", description="person that submitted the registration")
-    date: datetime = Field(title="date", description="registration date")
-    log_message: Optional[str] = Field(title="log_message", description="reason for the update")
-
-
 # ------------------------------------------------------------------------------------
 # TODO: I don't have a good sense of what we are doing with all these mappings
 #   at the moment

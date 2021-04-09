@@ -10,15 +10,15 @@ from semver import VersionInfo
 
 from dsgrid.models import DSGBaseModel, serialize_model
 from dsgrid.config.project_config import ProjectConfig
-from dsgrid.config._config import ConfigRegistrationModel
 from dsgrid.registry.common import (
+    ConfigRegistrationModel,
     RegistryType,
     DatasetRegistryStatus,
     ProjectRegistryStatus,
-    make_version,
 )
 from dsgrid.registry.versioning import versioning, PROJECT_REGISTRY_PATH
 from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.versioning import make_version
 
 
 logger = logging.getLogger(__name__)

@@ -18,13 +18,18 @@ from dsgrid.common import (
     S3_REGISTRY,
 )
 from dsgrid.models import serialize_model
-from dsgrid.config._config import VersionUpdateType, ConfigRegistrationModel
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.dimension_config import DimensionConfig
-from dsgrid.dimension.base import DimensionType
+from dsgrid.dimension.models import DimensionType
 from dsgrid.filesytem.factory import make_filesystem_interface
-from dsgrid.registry.common import RegistryType, DatasetRegistryStatus, ProjectRegistryStatus
+from dsgrid.registry.common import (
+    RegistryType,
+    DatasetRegistryStatus,
+    ProjectRegistryStatus,
+    VersionUpdateType,
+    ConfigRegistrationModel,
+)
 from dsgrid.registry.dataset_registry import DatasetRegistry, DatasetRegistryModel
 from dsgrid.registry.project_registry import (
     ProjectRegistry,

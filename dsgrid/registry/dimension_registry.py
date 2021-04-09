@@ -11,14 +11,14 @@ from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
 from dsgrid.models import DSGBaseModel, serialize_model
-from dsgrid.config._config import ConfigRegistrationModel
 from dsgrid.registry.common import (
+    ConfigRegistrationModel,
     make_filename_from_version,
-    make_version,
     get_version_from_filename,
     RegistryType,
 )
 from dsgrid.utils.files import load_data, dump_data
+from dsgrid.utils.versioning import make_version
 
 
 logger = logging.getLogger(__name__)

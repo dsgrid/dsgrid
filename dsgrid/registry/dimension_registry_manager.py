@@ -11,19 +11,23 @@ from pydantic.fields import Field, Required
 from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.dimension.base import DimensionType
-from dsgrid.dimension.models import DimensionModel, TimeDimensionModel, DimensionReferenceModel
+from dsgrid.dimension.models import (
+    DimensionType,
+    DimensionModel,
+    TimeDimensionModel,
+    DimensionReferenceModel,
+)
 from dsgrid.exceptions import DSGValueNotStored
 from dsgrid.models import DSGBaseModel, serialize_model
-from dsgrid.config._config import ConfigRegistrationModel
 from dsgrid.registry.common import (
+    ConfigRegistrationModel,
     make_filename_from_version,
-    make_version,
     get_version_from_filename,
     RegistryType,
 )
 from dsgrid.registry.registry_manager_base import RegistryManagerBase
 from dsgrid.utils.files import load_data, dump_data
+from dsgrid.utils.versioning import make_version
 
 
 logger = logging.getLogger(__name__)

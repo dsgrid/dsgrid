@@ -18,10 +18,13 @@ from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
-from dsgrid.config._config import ConfigRegistrationModel
 from dsgrid.exceptions import DSGBaseException
-from dsgrid.dimension.base import DimensionType
-from dsgrid.dimension.models import TimeDimensionModel, DimensionModel, handle_dimension_union
+from dsgrid.dimension.models import (
+    TimeDimensionModel,
+    DimensionModel,
+    DimensionType,
+    handle_dimension_union,
+)
 from dsgrid.models import DSGBaseModel
 
 

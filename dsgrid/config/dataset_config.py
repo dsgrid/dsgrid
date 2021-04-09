@@ -18,9 +18,8 @@ from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
-from dsgrid.config._config import ConfigRegistrationModel
-from dsgrid.dimension.base import DimensionType
 from dsgrid.dimension.models import (
+    DimensionType,
     TimeDimensionModel,
     DimensionReferenceModel,
     handle_dimension_union,

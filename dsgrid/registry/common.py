@@ -1,10 +1,16 @@
-from enum import Enum
-import os
-from pathlib import Path
-import re
+"""Common definitions for registry components"""
 
+import os
+import re
+from datetime import datetime
+from enum import Enum
+from pathlib import Path
+from typing import Optional, Union
+
+from pydantic.fields import Field
 from semver import VersionInfo
 
+from dsgrid.models import DSGBaseModel
 from dsgrid.utils.files import dump_data, load_data
 
 
@@ -28,6 +34,27 @@ class ProjectRegistryStatus(Enum):
     DEPRECATED = "Deprecated"
 
 
+class VersionUpdateType(Enum):
+    # TODO: we need to find general version update types that can be mapped to
+    #   major, minor and patch.
+    # i.e., replace input_dataset, fix project_config,
+    MAJOR = "major"
+    MINOR = "minor"
+    PATCH = "patch"
+
+
+class ConfigRegistrationModel(DSGBaseModel):
+    """Registration fields required by the ProjectConfig and DatasetConfig"""
+
+    version: Union[str, VersionInfo] = Field(
+        title="version",
+        description="version resulting from the registration",
+    )
+    submitter: str = Field(title="submitter", description="person that submitted the registration")
+    date: datetime = Field(title="date", description="registration date")
+    log_message: Optional[str] = Field(title="log_message", description="reason for the update")
+
+
 def get_version_from_filename(filename):
     """Return the handle and version from a registry file."""
     regex = re.compile(r"(?P<handle>\w+)-v(?P<version>[\d\.]+).toml")
@@ -39,31 +66,6 @@ def get_version_from_filename(filename):
 def make_filename_from_version(handle, version):
     """Make a filename with the handle and version."""
     return f"{handle}-v{version}.toml"
-
-
-def make_version(version):
-    """Convert the string version to a VersionInfo object.
-
-    Parameters
-    ----------
-    version : str
-
-    Returns
-    -------
-    VersionInfo
-
-    Raises
-    ------
-    ValueError
-        Raised if parsing fails.
-
-    """
-    try:
-        version = VersionInfo.parse(version)
-    except Exception as exc:
-        raise ValueError(f"Failed to create VersionInfo: {exc}") from exc
-
-    return version
 
 
 def update_version(id_handle, update, registry_path):

@@ -1,6 +1,7 @@
 """Defines dimension models"""
 
 import csv
+from enum import Enum
 import importlib
 import os
 from datetime import datetime
@@ -13,7 +14,6 @@ from pydantic.fields import Field
 from semver import VersionInfo
 
 from dsgrid.common import LOCAL_REGISTRY
-from dsgrid.dimension.base import DimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     Period,
@@ -23,15 +23,29 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.models import DSGBaseModel
-from dsgrid.registry.common import make_version
+from dsgrid.utils.versioning import make_version
 from dsgrid.filesytem.aws import sync
 from dsgrid.utils.files import load_data
+
+
+class DimensionType(Enum):
+    """Dimension types"""
+
+    END_USE = "end_use"
+    GEOGRAPHY = "geography"
+    SECTOR = "sector"
+    SUBSECTOR = "subsector"
+    TIME = "time"
+    WEATHER = "weather"
+    MODEL_YEAR = "model_year"
+    SCENARIO = "scenario"
+    MODEL = "model"
 
 
 # TODO: BaseDimensionRecordModel? This name is too close to DimensionBaseModel.
 
 
-class DSGBaseDimensionModel(DSGBaseModel):
+class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 
     id: str = Field(
@@ -44,39 +58,39 @@ class DSGBaseDimensionModel(DSGBaseModel):
     )
 
 
-class EndUseDimensionModel(DSGBaseDimensionModel):
+class EndUseDimensionModel(DimensionRecordBaseModel):
     """Base class for all end use dimensions"""
 
 
-class GeographicDimensionModel(DSGBaseDimensionModel):
+class GeographicDimensionModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
 
-class ModelDimensionModel(DSGBaseDimensionModel):
+class ModelDimensionModel(DimensionRecordBaseModel):
     """Base class for all load model dimensions"""
 
 
-class ModelYearDimensionModel(DSGBaseDimensionModel):
+class ModelYearDimensionModel(DimensionRecordBaseModel):
     """Base class for all model year dimensions"""
 
 
-class ScenarioDimensionModel(DSGBaseDimensionModel):
+class ScenarioDimensionModel(DimensionRecordBaseModel):
     """Base class for all scenario dimensions"""
 
 
-class SectorDimensionModel(DSGBaseDimensionModel):
+class SectorDimensionModel(DimensionRecordBaseModel):
     """Base class for all subsector dimensions"""
 
 
-class SubSectorDimensionModel(DSGBaseDimensionModel):
+class SubSectorDimensionModel(DimensionRecordBaseModel):
     """Base class for all subsector dimensions"""
 
 
-class BaseTimeDimensionModel(DSGBaseDimensionModel):
+class BaseTimeDimensionModel(DimensionRecordBaseModel):
     """Base class for all time dimensions"""
 
 
-class WeatherDimensionModel(DSGBaseDimensionModel):
+class WeatherDimensionModel(DimensionRecordBaseModel):
     """Base class for weather dimensions"""
 
 
@@ -93,7 +107,7 @@ _DIMENSION_TO_MODEL = {
 }
 
 
-def get_dimension_model(type_enum):
+def get_record_base_model(type_enum):
     """Return the dimension model class for a DimensionType."""
     dim_model = _DIMENSION_TO_MODEL.get(type_enum)
     if dim_model is None:

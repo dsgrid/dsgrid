@@ -6,7 +6,7 @@ import logging
 import click
 
 from dsgrid.common import S3_REGISTRY, LOCAL_REGISTRY
-from dsgrid.config._config import VersionUpdateType
+from dsgrid.registry.common import VersionUpdateType
 from dsgrid.filesytem import aws
 from dsgrid.registry.registry_manager import RegistryManager
 

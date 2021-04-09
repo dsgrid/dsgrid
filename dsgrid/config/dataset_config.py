@@ -27,7 +27,7 @@ from dsgrid.dimension.models import (
 )
 from dsgrid.exceptions import DSGBaseException
 from dsgrid.models import DSGBaseModel
-from dsgrid.utils.aws import sync
+from dsgrid.filesytem.aws import sync
 
 
 # TODO: likely needs refinement (missing mappings)

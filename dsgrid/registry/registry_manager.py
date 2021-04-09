@@ -3,14 +3,12 @@
 import logging
 import os
 import re
-import shutil
 from datetime import datetime
 from pathlib import Path
 import uuid
 
 from semver import VersionInfo
 
-import dsgrid.utils.aws as aws
 from dsgrid.common import (
     PROJECT_FILENAME,
     REGISTRY_FILENAME,
@@ -25,6 +23,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.dimension.base import DimensionType
+from dsgrid.filesytem.factory import make_filesystem_interface
 from dsgrid.registry.common import RegistryType, DatasetRegistryStatus, ProjectRegistryStatus
 from dsgrid.registry.dataset_registry import DatasetRegistry, DatasetRegistryModel
 from dsgrid.registry.project_registry import (
@@ -35,30 +34,33 @@ from dsgrid.registry.project_registry import (
 from dsgrid.registry.dimension_registry import DimensionRegistry, DimensionRegistryModel
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.registry_manager_base import RegistryManagerBase
-from dsgrid.utils.files import dump_data, load_data, make_dirs, exists
+from dsgrid.utils.files import dump_data, load_data
 
 
 logger = logging.getLogger(__name__)
 
 
 class RegistryManager(RegistryManagerBase):
-    """Manages registration of all projects and datasets."""
+    """Manages registration of all projects and datasets.
 
-    def __init__(self, path):
-        super().__init__(path)
+    Whichever module loads this class will sync the official registry to the local
+    system and run from there. This uses a FilesystemInterface object to allow
+    remote operations as well.
+
+    """
+
+    def __init__(self, path, fs_interface):
+        super().__init__(path, fs_interface)
         self._projects = {}  # project_id to ProjectConfig. Loaded on demand.
         self._project_registries = {}  # project_id to ProjectRegistry. Loaded on demand.
         self._datasets = {}  # dataset_id to DatasetConfig. Loaded on demand.
         self._dataset_registries = {}  # dataset_id to DatasetRegistry. Loaded on demand.
-        self._dimension_mgr = DimensionRegistryManager(Path(path) / self.DIMENSION_REGISTRY_PATH)
+        self._dimension_mgr = DimensionRegistryManager(
+            Path(path) / self.DIMENSION_REGISTRY_PATH, fs_interface
+        )
 
-        if self._on_aws:
-            project_ids = aws.list_dir_in_bucket(self._bucket, self.PROJECT_REGISTRY_PATH)
-            dataset_ids = aws.list_dir_in_bucket(self._bucket, self.DATASET_REGISTRY_PATH)
-        else:
-            self._path = path
-            project_ids = os.listdir(self._path / self.PROJECT_REGISTRY_PATH)
-            dataset_ids = os.listdir(self._path / self.DATASET_REGISTRY_PATH)
+        project_ids = self._fs_intf.listdir(self._path / self.PROJECT_REGISTRY_PATH)
+        dataset_ids = self._fs_intf.listdir(self._path / self.DATASET_REGISTRY_PATH)
         self._project_ids = set(project_ids)
         self._dataset_ids = set(dataset_ids)
 
@@ -79,13 +81,13 @@ class RegistryManager(RegistryManagerBase):
         if str(path).startswith("s3"):
             raise Exception(f"s3 is not currently supported: {path}")
 
-        path = Path(path)
-        make_dirs(path, exist_ok=True)
-        make_dirs(path / RegistryManager.DATASET_REGISTRY_PATH, exist_ok=True)
-        make_dirs(path / RegistryManager.PROJECT_REGISTRY_PATH, exist_ok=True)
-        make_dirs(path / RegistryManager.DIMENSION_REGISTRY_PATH, exist_ok=True)
+        fs_interface = make_filesystem_interface(path)
+        fs_interface.mkdir(path)
+        fs_interface.mkdir(path / RegistryManager.DATASET_REGISTRY_PATH)
+        fs_interface.mkdir(path / RegistryManager.PROJECT_REGISTRY_PATH)
+        fs_interface.mkdir(path / RegistryManager.DIMENSION_REGISTRY_PATH)
         logger.info("Created registry at %s", path)
-        return cls(path)
+        return cls(path, fs_interface)
 
     @property
     def dimension_manager(self):
@@ -107,16 +109,17 @@ class RegistryManager(RegistryManagerBase):
         # TODO S3
         if str(path).startswith("s3"):
             raise Exception(f"S3 is not yet supported: {path}")
+        fs_interface = make_filesystem_interface(path)
         for dir_name in (
             path,
             os.path.join(path, RegistryManager.DATASET_REGISTRY_PATH),
             os.path.join(path, RegistryManager.PROJECT_REGISTRY_PATH),
             os.path.join(path, RegistryManager.DIMENSION_REGISTRY_PATH),
         ):
-            if not exists(dir_name):
+            if not fs_interface.exists(dir_name):
                 raise FileNotFoundError(f"{dir_name} does not exist")
 
-        return cls(Path(path))
+        return cls(Path(path), fs_interface)
 
     def list_datasets(self):
         """Return the datasets in the registry.
@@ -154,11 +157,7 @@ class RegistryManager(RegistryManagerBase):
         if project_id not in self._project_ids:
             raise ValueError(f"{project_id} is not stored")
 
-        if self._on_aws:
-            assert False  # TODO S3
-        else:
-            shutil.rmtree(self._get_project_directory(project_id))
-
+        self._fs_intf.rmtree(self._get_project_directory(project_id))
         logger.info("Removed %s from the registry.", project_id)
 
     def load_project_config(self, project_id):
@@ -323,30 +322,28 @@ class RegistryManager(RegistryManagerBase):
 
             data_type_dir = config_dir / item["type"]
             data_dir = data_type_dir / item["id"] / str(version)
-            if self._on_aws:
-                pass  # TODO S3
-            else:
-                os.makedirs(data_type_dir, exist_ok=True)
-                os.makedirs(data_dir)
+            self._fs_intf.mkdir(data_type_dir)
+            self._fs_intf.mkdir(data_dir)
 
             filename = Path(os.path.dirname(data_dir)) / REGISTRY_FILENAME
             data = serialize_model(registry_config)
-            if self._on_aws:
-                # TODO S3: not handled
-                assert False
-            else:
-                # export registry.toml
-                dump_data(data, filename)
 
-                # export individual dimension_config.toml
-                dump_data(item, data_dir / config_file_name)
+            # TODO: if we want to update AWS directly, this needs to change.
 
-                # export dimension record file
-                if orig_file is not None:
-                    dimension_record = Path(os.path.dirname(config_file)) / orig_file
-                    shutil.copyfile(dimension_record, data_dir / os.path.basename(item["file"]))
+            # export registry.toml
+            dump_data(data, filename)
 
-                n_registered_dims += 1
+            # export individual dimension_config.toml
+            dump_data(item, data_dir / config_file_name)
+
+            # export dimension record file
+            if orig_file is not None:
+                dimension_record = Path(os.path.dirname(config_file)) / orig_file
+                self._fs_intf.copy_file(
+                    dimension_record, data_dir / os.path.basename(item["file"])
+                )
+
+            n_registered_dims += 1
 
         logger.info(
             "Registered %s %s(s) with version=%s", n_registered_dims, registry_type.value, version
@@ -446,20 +443,12 @@ class RegistryManager(RegistryManagerBase):
         config_dir = self._get_project_directory(config.model.project_id)
         data_dir = config_dir / str(version)
 
-        if self._on_aws:
-            # TODO S3: not handled
-            assert False
-        else:
-            os.makedirs(data_dir)
+        self._fs_intf.mkdir(data_dir)
         filename = config_dir / REGISTRY_FILENAME
         data = serialize_model(registry_config)
         config_filename = "project" + os.path.splitext(config_file)[1]
-        if self._on_aws:
-            # TODO S3: not handled
-            assert False
-        else:
-            dump_data(data, filename)
-            shutil.copyfile(config_file, data_dir / config_filename)
+        dump_data(data, filename)
+        self._fs_intf.copy_file(config_file, data_dir / config_filename)
 
         logger.info("Registered project %s with version=%s", config.model.project_id, version)
         return version
@@ -542,20 +531,12 @@ class RegistryManager(RegistryManagerBase):
         config_dir = self._get_dataset_directory(config.model.dataset_id)
         data_dir = config_dir / str(version)
 
-        if self._on_aws:
-            # TODO S3: not handled
-            assert False
-        else:
-            os.makedirs(data_dir)
+        self._fs_intf.mkdir(data_dir)
         filename = config_dir / REGISTRY_FILENAME
         data = serialize_model(registry_config)
         config_filename = "dataset" + os.path.splitext(config_file)[1]
-        if self._on_aws:
-            # TODO S3: not handled
-            assert False
-        else:
-            dump_data(data, filename)
-            shutil.copyfile(config_file, data_dir / config_filename)
+        dump_data(data, filename)
+        self._fs_intf.copy_file(config_file, data_dir / config_filename)
 
         logger.info(
             "Registered dataset %s with version=%s in project %s",
@@ -617,10 +598,7 @@ class RegistryManager(RegistryManagerBase):
         if dataset_id not in self._dataset_ids:
             raise ValueError(f"{dataset_id} is not stored")
 
-        if self._on_aws:
-            assert False  # TODO S3
-        else:
-            shutil.rmtree(self._get_dataset_directory(dataset_id))
+        self._fs_intf.rmtree(self._get_dataset_directory(dataset_id))
 
         for project_registry in self._project_registries.values():
             if project_registry.has_dataset(dataset_id, DatasetRegistryStatus.REGISTERED):
@@ -665,7 +643,7 @@ class RegistryManager(RegistryManagerBase):
         return self._path / self.DIMENSION_REGISTRY_PATH
 
     def _load_config(self, config_file, registry_type):
-        if not os.path.exists(config_file):
+        if not self._fs_intf.exists(config_file):
             raise ValueError(f"config file {config_file} does not exist")
 
         if registry_type == RegistryType.DATASET:
@@ -715,10 +693,7 @@ class RegistryManager(RegistryManagerBase):
         filename = self._get_registry_filename(registry_type, config_id)
         config_dir = self._get_project_directory(config_id)
         data_dir = config_dir / str(registry_config.version)
-        if self._on_aws:
-            pass  # TODO S3
-        else:
-            os.makedirs(data_dir)
+        self._fs_intf.mkdir(data_dir)
 
         if registry_type == RegistryType.DATASET:
             config_file_name = "dataset"
@@ -726,13 +701,11 @@ class RegistryManager(RegistryManagerBase):
             config_file_name = "project"
         config_file_name = config_file_name + os.path.splitext(config_file)[1]
 
-        # TODO: account for S3
         dump_data(serialize_model(registry_config), filename)
-        shutil.copyfile(config_file, data_dir / config_file_name)  # copy new config file
+        self._fs_intf.copy_file(config_file, data_dir / config_file_name)
         dimensions_dir = Path(os.path.dirname(config_file)) / "dimensions"
-        shutil.copytree(
-            dimensions_dir, data_dir / "dimensions"
-        )  # copy new dimensions, to be removed with dimension id mapping
+        # copy new dimensions, to be removed with dimension id mapping
+        self._fs_intf.copy_tree(dimensions_dir, data_dir / "dimensions")
         logger.info(
             "Updated %s %s with version=%s",
             registry_type.value,

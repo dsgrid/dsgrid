@@ -24,7 +24,6 @@ from dsgrid.registry.common import (
 )
 from dsgrid.registry.registry_manager_base import RegistryManagerBase
 from dsgrid.utils.files import load_data, dump_data
-import dsgrid.utils.aws as aws
 
 
 logger = logging.getLogger(__name__)
@@ -35,30 +34,22 @@ DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 class DimensionRegistryManager(RegistryManagerBase):
     """Manages registered dimensions."""
 
-    def __init__(self, path):
-        super().__init__(path)
+    def __init__(self, path, fs_interface):
+        super().__init__(path, fs_interface)
         self._dimensions = {}  # key = (dimension_type, dimension_id, version)
         # value = DimensionBaseModel
         self._dimension_versions = defaultdict(dict)
         self._dimensions = {}  # key = DimensionKey, value = Dimension
-        if self._on_aws:
-            assert False
-            # for dim_type in aws.list_dir_in_bucket(self._bucket, self._path):
-            #    _type = DimensionType(dim_type)
-            #    path = Path(self._path) / self.DIMENSION_REGISTRY_PATH / dim_type
-            #    self._dimension_ids_by_type[_type] = set(aws.list_dir_in_bucket(self._bucket, path))
-        else:
-            for dim_type in os.listdir(self._path):
-                _type = DimensionType(dim_type)
-                type_path = Path(self._path) / dim_type
-                ids = os.listdir(type_path)
-                for dim_id in ids:
-                    dim_path = type_path / dim_id
-                    self._dimension_versions[_type][dim_id] = {
-                        VersionInfo.parse(x)
-                        for x in os.listdir(dim_path)
-                        if os.path.isdir(dim_path / x)
-                    }
+        for dim_type in self._fs_intf.listdir(self._path):
+            _type = DimensionType(dim_type)
+            type_path = Path(self._path) / dim_type
+            ids = self._fs_intf.listdir(type_path)
+            for dim_id in ids:
+                dim_path = type_path / dim_id
+                self._dimension_versions[_type][dim_id] = {
+                    VersionInfo.parse(x)
+                    for x in self._fs_intf.listdir(dim_path, directories_only=True)
+                }
 
     def get_dimension(self, dimension_type, dimension_id, version):
         """Get the dimension matching the parameters. Returns from cache if already loaded.

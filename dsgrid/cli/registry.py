@@ -7,6 +7,7 @@ import click
 
 from dsgrid.common import S3_REGISTRY, LOCAL_REGISTRY
 from dsgrid.config._config import VersionUpdateType
+from dsgrid.filesytem import aws
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -14,13 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 @click.group()
-# This exists for test & dev. May go away.
 @click.option(
     "--path",
     default=LOCAL_REGISTRY,  # TEMPORARY: S3_REGISTRY is not yet supported
     show_default=True,
     envvar="DSGRID_REGISTRY_PATH",
-    help="INTERNAL-ONLY: path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
+    help="path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
 )
 @click.pass_context
 def registry(ctx, path):
@@ -167,6 +167,14 @@ def remove_dataset(ctx, dataset_id):
     manager.remove_dataset(dataset_id)
 
 
+@click.command()
+@click.pass_context
+def sync(ctx):
+    """Sync the official dsgrid registry to the local system."""
+    registry_path = ctx.parent.params["path"]
+    aws.sync(S3_REGISTRY, registry_path)
+
+
 registry.add_command(create)
 registry.add_command(list_)
 registry.add_command(remove_dataset)
@@ -174,4 +182,5 @@ registry.add_command(remove_project)
 registry.add_command(register_project)
 registry.add_command(register_dimension)
 registry.add_command(submit_dataset)
+registry.add_command(sync)
 registry.add_command(update_project)

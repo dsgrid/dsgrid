@@ -24,7 +24,7 @@ from dsgrid.dimension.time import (
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.models import DSGBaseModel
 from dsgrid.registry.common import make_version
-from dsgrid.utils.aws import sync
+from dsgrid.filesytem.aws import sync
 from dsgrid.utils.files import load_data
 
 

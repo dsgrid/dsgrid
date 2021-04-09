@@ -6,8 +6,6 @@ import json
 
 import toml
 
-import dsgrid.utils.aws as aws
-
 
 logger = logging.getLogger(__name__)
 
@@ -68,51 +66,3 @@ def _get_module_from_extension(filename, **kwargs):
         raise Exception(f"Unsupported extension {filename}")
 
     return mod
-
-
-def exists(path):
-    """Returns True if the path exists. Accounts for local or AWS S3.
-
-    Parameters
-    ----------
-    path : str | Path
-
-    Returns
-    -------
-    bool
-
-    """
-    if str(path).startswith("s3"):
-        return aws.exists(path)
-    return os.path.exists(path)
-
-
-def list_dir(dir_name):
-    """Returns the contents of a directory. Accounts for local or AWS S3.
-
-    Parameters
-    ----------
-    path : str | Path
-
-    Returns
-    -------
-    list
-
-    """
-    if dir_name.startswith("s3"):
-        return aws.list_dir(dir_name)
-    return os.listdir(dir_name)
-
-
-def make_dirs(path, exist_ok=True):
-    """Makes all directories for path. Accounts for local or AWS S3.
-
-    Parameters
-    ----------
-    path : str
-
-    """
-    if path.name.startswith("s3"):
-        aws.make_dirs(path, exist_ok=exist_ok)
-    else:
-        os.makedirs(path, exist_ok=exist_ok)

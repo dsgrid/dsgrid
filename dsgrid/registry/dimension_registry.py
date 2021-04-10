@@ -10,7 +10,7 @@ from pydantic.fields import Field, Required
 from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.models import DSGBaseModel, serialize_model
+from dsgrid.data_models import DSGBaseModel, serialize_model
 from dsgrid.registry.common import (
     ConfigRegistrationModel,
     make_filename_from_version,

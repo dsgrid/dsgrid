@@ -22,7 +22,7 @@ from dsgrid.dimension.time import (
     TimezoneType,
 )
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.versioning import make_version
 from dsgrid.filesytem.aws import sync
 from dsgrid.utils.files import load_data

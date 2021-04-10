@@ -25,7 +25,7 @@ from dsgrid.dimension.models import (
     handle_dimension_union,
 )
 from dsgrid.exceptions import DSGBaseException
-from dsgrid.models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.filesytem.aws import sync
 
 

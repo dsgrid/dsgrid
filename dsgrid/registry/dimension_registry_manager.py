@@ -18,7 +18,7 @@ from dsgrid.dimension.models import (
     DimensionReferenceModel,
 )
 from dsgrid.exceptions import DSGValueNotStored
-from dsgrid.models import DSGBaseModel, serialize_model
+from dsgrid.data_models import DSGBaseModel, serialize_model
 from dsgrid.registry.common import (
     ConfigRegistrationModel,
     make_filename_from_version,

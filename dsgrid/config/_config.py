@@ -19,7 +19,7 @@ from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
 
-from dsgrid.models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel
 
 
 # ------------------------------------------------------------------------------------

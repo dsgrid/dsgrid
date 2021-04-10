@@ -10,7 +10,7 @@ from typing import Optional, Union
 from pydantic.fields import Field
 from semver import VersionInfo
 
-from dsgrid.models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.files import dump_data, load_data
 
 

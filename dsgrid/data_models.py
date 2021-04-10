@@ -1,3 +1,5 @@
+"""Base functionality for all Pydantic data models used in dsgrid"""
+
 import enum
 import os
 
@@ -21,7 +23,7 @@ class DSGBaseModel(BaseModel):
 
     @classmethod
     def load(cls, filename):
-        """Load a configuration from a file containing file paths
+        """Load a data model from a file containing file paths
         relative to filename.
 
         Parameters

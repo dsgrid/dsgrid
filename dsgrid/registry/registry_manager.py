@@ -17,7 +17,7 @@ from dsgrid.common import (
     LOCAL_REGISTRY,
     S3_REGISTRY,
 )
-from dsgrid.models import serialize_model
+from dsgrid.data_models import serialize_model
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.dimension_config import DimensionConfig

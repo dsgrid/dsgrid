@@ -25,7 +25,7 @@ from dsgrid.dimension.models import (
     DimensionType,
     handle_dimension_union,
 )
-from dsgrid.models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel
 
 
 logger = logging.getLogger(__name__)

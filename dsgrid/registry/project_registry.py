@@ -8,7 +8,7 @@ from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.models import DSGBaseModel, serialize_model
+from dsgrid.data_models import DSGBaseModel, serialize_model
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.registry.common import (
     ConfigRegistrationModel,

@@ -29,7 +29,7 @@ class Dataset:
         # TODO: do we need a DimensionStore here?
 
     @classmethod
-    def load(cls, config):
+    def load(cls, config, version=None):
         """Load a dataset from a store.
 
         Parameters

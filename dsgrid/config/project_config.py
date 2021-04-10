@@ -30,7 +30,7 @@ from pydantic.dataclasses import dataclass
 from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 
-from dsgrid.exceptions import DSGInvalidField
+from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.models import (
     DimensionReferenceModel,
@@ -229,6 +229,8 @@ class ProjectConfig:
 
     @classmethod
     def load(cls, config_file, dimension_manager):
+        if not os.path.exists(config_file):
+            raise DSGValueNotStored(f"{config_file} does not exist. Check the version.")
         model = ProjectConfigModel.load(config_file)
         config = cls(model)
         dimension_manager.replace_dimension_references(config.project_dimensions)

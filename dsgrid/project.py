@@ -11,6 +11,7 @@ from dsgrid.dimension.store import DimensionStore
 from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
 from dsgrid.utils.spark import init_spark
+from dsgrid.utils.versioning import make_version
 
 
 logger = logging.getLogger(__name__)
@@ -28,8 +29,17 @@ class Project:
         self._datasets = {}
 
     @classmethod
-    def load(cls, project_id, registry_path=None):
-        """Load a project from the registry."""
+    def load(cls, project_id, registry_path=None, version=None):
+        """Load a project from the registry.
+
+        Parameters
+        ----------
+        project_id : str
+        registry_path : str | None
+        version : str | None
+            Use the latest if not specified.
+
+        """
         spark = SparkSession.getActiveSession()
         if spark is None:
             spark = init_spark("project")
@@ -37,7 +47,9 @@ class Project:
         registry = RegistryManager.load(get_registry_path(registry_path=registry_path))
         project_registry = registry.load_project_registry(project_id)
         registered_datasets = project_registry.list_registered_datasets()
-        config = registry.load_project_config(project_id)
+        if version is None:
+            version = make_version("1.0.0")
+        config = registry.load_project_config(project_id, version=version)
 
         project_dimension_store = DimensionStore.load(
             itertools.chain(config.project_dimensions, config.supplemental_dimensions),

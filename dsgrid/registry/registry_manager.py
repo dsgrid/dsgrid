@@ -2,10 +2,10 @@
 
 import logging
 import os
-import re
+import uuid
 from datetime import datetime
 from pathlib import Path
-import uuid
+from collections import namedtuple
 
 from semver import VersionInfo
 
@@ -36,13 +36,16 @@ from dsgrid.registry.project_registry import (
     ProjectRegistryModel,
     ProjectDatasetRegistryModel,
 )
-from dsgrid.registry.dimension_registry import DimensionRegistry, DimensionRegistryModel
+from dsgrid.registry.dimension_registry import DimensionRegistryModel
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.registry_manager_base import RegistryManagerBase
 from dsgrid.utils.files import dump_data, load_data
 
 
 logger = logging.getLogger(__name__)
+
+
+CacheKey = namedtuple("CacheKey", ["id", "version"])
 
 
 class RegistryManager(RegistryManagerBase):
@@ -56,9 +59,10 @@ class RegistryManager(RegistryManagerBase):
 
     def __init__(self, path, fs_interface):
         super().__init__(path, fs_interface)
-        self._projects = {}  # project_id to ProjectConfig. Loaded on demand.
+        self._projects = {}  # (project_id, version) to ProjectConfig. Loaded on demand.
         self._project_registries = {}  # project_id to ProjectRegistry. Loaded on demand.
         self._datasets = {}  # dataset_id to DatasetConfig. Loaded on demand.
+        # TODO: use CacheKey as soon as projects store dataset version
         self._dataset_registries = {}  # dataset_id to DatasetRegistry. Loaded on demand.
         self._dimension_mgr = DimensionRegistryManager(
             Path(path) / self.DIMENSION_REGISTRY_PATH, fs_interface
@@ -165,12 +169,14 @@ class RegistryManager(RegistryManagerBase):
         self._fs_intf.rmtree(self._get_project_directory(project_id))
         logger.info("Removed %s from the registry.", project_id)
 
-    def load_project_config(self, project_id):
+    def load_project_config(self, project_id, version=None):
         """Return the ProjectConfig for a project_id. Returns from cache if already loaded.
 
         Parameters
         ----------
         project_id : str
+        version : VersionInfo | None
+            Use the latest if not specified.
 
         Returns
         -------
@@ -180,16 +186,20 @@ class RegistryManager(RegistryManagerBase):
         if project_id not in self._project_ids:
             raise ValueError(f"project={project_id} is not stored")
 
-        project_config = self._projects.get(project_id)
+        if version is None:
+            registry = self.load_project_registry(project_id)
+            version = registry.version
+
+        key = CacheKey(project_id, version)
+        project_config = self._projects.get(key)
         if project_config is not None:
-            logger.debug("Loaded ProjectConfig for project_id=%s from cache", project_id)
+            logger.debug("Loaded ProjectConfig for project_id=%s from cache", key)
             return project_config
 
-        registry = self.load_project_registry(project_id)
-        config_file = self._get_project_config_file(project_id, registry.version)
+        config_file = self._get_project_config_file(project_id, version)
         project_config = ProjectConfig.load(config_file, self._dimension_mgr)
-        self._projects[project_id] = project_config
-        logger.info("Loaded ProjectConfig for project_id=%s", project_id)
+        self._projects[key] = project_config
+        logger.info("Loaded ProjectConfig for project_id=%s", key)
         return project_config
 
     def load_dataset_config(self, dataset_id):

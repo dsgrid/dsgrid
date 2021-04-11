@@ -290,7 +290,7 @@ class RegistryManager(RegistryManagerBase):
         for item in dim_data:
             logger.info(" - type: %s, name: %s", item["type"], item["name"])
             # assign id, made from dimension.name and a UUID4
-            item["id"] = item["name"].lower().replace(" ", "_") + "_" + str(uuid.uuid4())
+            item["id"] = item["name"].lower().replace(" ", "_") + "__" + str(uuid.uuid4())
             logger.info("   id: %s", item["id"])
 
     def _register_dimension_config(

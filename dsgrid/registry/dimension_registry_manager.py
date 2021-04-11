@@ -11,7 +11,7 @@ from pydantic.fields import Field, Required
 from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.dimension.models import (
+from dsgrid.config.dimensions import (
     DimensionType,
     DimensionModel,
     TimeDimensionModel,

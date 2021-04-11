@@ -31,9 +31,7 @@ from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
-from dsgrid.data_models import DSGBaseModel
-from dsgrid.dimension.models import (
+from dsgrid.config.dimensions import (
     DimensionReferenceModel,
     DimensionModel,
     DimensionType,
@@ -41,6 +39,8 @@ from dsgrid.dimension.models import (
     handle_dimension_union,
     DimensionUnionModel,
 )
+from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import DatasetRegistryStatus
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str

@@ -18,7 +18,8 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from dsgrid.dimension.models import (
+from dsgrid.config.dimensions import TimeDimensionModel
+from dsgrid.dimension.base import (
     EndUseDimensionModel,
     GeographicDimensionModel,
     ModelDimensionModel,
@@ -26,7 +27,6 @@ from dsgrid.dimension.models import (
     ScenarioDimensionModel,
     SectorDimensionModel,
     SubSectorDimensionModel,
-    TimeDimensionModel,
     WeatherDimensionModel,
 )
 

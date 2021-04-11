@@ -20,7 +20,6 @@ from dsgrid.data_models import serialize_model
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.dimension_config import DimensionConfig
-from dsgrid.dimension.models import DimensionType
 from dsgrid.filesytem.factory import make_filesystem_interface
 from dsgrid.registry.common import (
     RegistryType,

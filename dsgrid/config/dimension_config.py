@@ -19,7 +19,7 @@ from pydantic.class_validators import root_validator, validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
 from dsgrid.exceptions import DSGBaseException
-from dsgrid.dimension.models import (
+from dsgrid.config.dimensions import (
     TimeDimensionModel,
     DimensionModel,
     DimensionType,
@@ -39,7 +39,7 @@ VALIDATE:
 
 
 class DimensionConfigModel(DSGBaseModel):
-    """Represents model dataset configurations"""
+    """Represents dimension model configurations"""
 
     dimensions: List[Union[DimensionModel, TimeDimensionModel]] = Field(
         title="dimensions",
@@ -65,7 +65,7 @@ class DimensionConfigModel(DSGBaseModel):
 
 
 class DimensionConfig:
-    """Provides an interface to a DatasetConfigModel."""
+    """Provides an interface to a DimensionConfigModel."""
 
     def __init__(self, model):
         self._model = model

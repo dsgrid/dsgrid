@@ -5,7 +5,6 @@ import os
 import uuid
 from datetime import datetime
 from pathlib import Path
-from collections import namedtuple
 
 from semver import VersionInfo
 
@@ -29,6 +28,7 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
     VersionUpdateType,
     ConfigRegistrationModel,
+    ConfigKey,
 )
 from dsgrid.registry.dataset_registry import DatasetRegistry, DatasetRegistryModel
 from dsgrid.registry.project_registry import (
@@ -43,9 +43,6 @@ from dsgrid.utils.files import dump_data, load_data
 
 
 logger = logging.getLogger(__name__)
-
-
-CacheKey = namedtuple("CacheKey", ["id", "version"])
 
 
 class RegistryManager(RegistryManagerBase):
@@ -169,7 +166,7 @@ class RegistryManager(RegistryManagerBase):
         self._fs_intf.rmtree(self._get_project_directory(project_id))
         logger.info("Removed %s from the registry.", project_id)
 
-    def load_project_config(self, project_id, version=None):
+    def load_project_config(self, project_id, version=None, registry=None):
         """Return the ProjectConfig for a project_id. Returns from cache if already loaded.
 
         Parameters
@@ -187,10 +184,11 @@ class RegistryManager(RegistryManagerBase):
             raise ValueError(f"project={project_id} is not stored")
 
         if version is None:
-            registry = self.load_project_registry(project_id)
+            if registry is None:
+                registry = self.load_project_registry(project_id)
             version = registry.version
 
-        key = CacheKey(project_id, version)
+        key = ConfigKey(project_id, version)
         project_config = self._projects.get(key)
         if project_config is not None:
             logger.debug("Loaded ProjectConfig for project_id=%s from cache", key)
@@ -441,29 +439,38 @@ class RegistryManager(RegistryManagerBase):
             log_message=log_message,
         )
 
-        registry_config = ProjectRegistryModel(
+        dataset_registries = []
+        for dataset in config.iter_datasets():
+            status = DatasetRegistryStatus.UNREGISTERED
+            dataset.status = status
+            dataset_registries.append(
+                ProjectDatasetRegistryModel(
+                    dataset_id=dataset.dataset_id,
+                    status=status,
+                )
+            )
+        registry_model = ProjectRegistryModel(
             project_id=config.model.project_id,
             version=version,
             status=ProjectRegistryStatus.INITIAL_REGISTRATION,
             description=config.model.description,
-            dataset_registries=[
-                ProjectDatasetRegistryModel(
-                    dataset_id=dataset_id,
-                    status=DatasetRegistryStatus.UNREGISTERED,
-                )
-                for dataset_id in config.iter_dataset_ids()
-            ],
+            dataset_registries=dataset_registries,
             registration_history=[registration],
         )
         config_dir = self._get_project_directory(config.model.project_id)
         data_dir = config_dir / str(version)
 
+        # Serialize the registry file as well as the updated ProjectConfig to the registry.
+        # TODO: Both the registry.toml and project.toml contain dataset status, which is
+        # redundant. It needs to be in project.toml so that we can load older versions of a
+        # project. It may be convenient to be in the registry.toml for quick searches but
+        # should not be required.
         self._fs_intf.mkdir(data_dir)
-        filename = config_dir / REGISTRY_FILENAME
-        data = serialize_model(registry_config)
-        config_filename = "project" + os.path.splitext(config_file)[1]
-        dump_data(data, filename)
-        self._fs_intf.copy_file(config_file, data_dir / config_filename)
+        registry_filename = config_dir / REGISTRY_FILENAME
+        dump_data(serialize_model(registry_model), registry_filename)
+
+        config_filename = data_dir / ("project" + os.path.splitext(config_file)[1])
+        dump_data(serialize_model(config.model), config_filename)
 
         logger.info("Registered project %s with version=%s", config.model.project_id, version)
         return version
@@ -501,7 +508,8 @@ class RegistryManager(RegistryManagerBase):
         )
 
     def submit_dataset(self, config_file, project_id, submitter, log_message):
-        """Registers a new dataset with a dsgrid project.
+        """Registers a new dataset with a dsgrid project. This can only be performed on the
+        latest version of the project.
 
         Parameters
         ----------
@@ -526,7 +534,7 @@ class RegistryManager(RegistryManagerBase):
         if project_registry.has_dataset(config.model.dataset_id, DatasetRegistryStatus.REGISTERED):
             raise ValueError(f"{config.model.dataset_id} is already stored")
 
-        project_config = self.load_project_config(project_id)
+        project_config = self.load_project_config(project_id, registry=project_registry)
         if not project_config.has_dataset(config.model.dataset_id):
             raise ValueError(f"{config.model.dataset_id} is not defined in project={project_id}")
 
@@ -560,11 +568,16 @@ class RegistryManager(RegistryManagerBase):
             project_id,
         )
 
-        project_registry.set_dataset_status(
-            config.model.dataset_id, DatasetRegistryStatus.REGISTERED
-        )
+        status = DatasetRegistryStatus.REGISTERED
+        project_registry.set_dataset_status(config.model.dataset_id, status)
         filename = self._get_registry_filename(RegistryType.PROJECT, project_id)
         project_registry.serialize(filename)
+
+        project_config.get_dataset(config.model.dataset_id).status = status
+        project_file = self._get_project_config_file(
+            project_config.model.project_id, project_registry.version
+        )
+        dump_data(serialize_model(project_config.model), project_file)
 
     def update_dataset(self, dataset_id, config_file, submitter, update_type, log_message):
         """Updates an existing dataset with new parameters or data.

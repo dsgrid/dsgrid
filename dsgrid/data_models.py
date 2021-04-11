@@ -44,7 +44,7 @@ class DSGBaseModel(BaseModel):
 
 def serialize_model(model):
     """Serialize a model to a dict, converting values as needed."""
-    return _serialize_model_data(model.dict())
+    return _serialize_model_data(model.dict(by_alias=True))
 
 
 def _serialize_model_data(data):

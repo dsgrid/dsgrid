@@ -1,6 +1,6 @@
 import logging
 import os
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Union
@@ -21,6 +21,7 @@ from dsgrid.exceptions import DSGValueNotStored
 from dsgrid.data_models import DSGBaseModel, serialize_model
 from dsgrid.registry.common import (
     ConfigRegistrationModel,
+    DimensionKey,
     make_filename_from_version,
     get_version_from_filename,
     RegistryType,
@@ -31,8 +32,6 @@ from dsgrid.utils.versioning import make_version
 
 
 logger = logging.getLogger(__name__)
-
-DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 
 
 class DimensionRegistryManager(RegistryManagerBase):
@@ -71,20 +70,21 @@ class DimensionRegistryManager(RegistryManagerBase):
         Raises
         ------
         DSGValueNotStored
-            Raised if the dimension is not store.
+            Raised if the dimension is not stored.
 
         """
         key = DimensionKey(dimension_type, dimension_id, version)
+        return self.get_dimension_by_key(key)
+
+    def get_dimension_by_key(self, key):
         if not self.has_dimension_id(key):
             raise DSGValueNotStored(f"dimension not stored: {key}")
 
-        if dimension_type == DimensionType.TIME:
+        if key.type == DimensionType.TIME:
             cls = TimeDimensionModel
         else:
             cls = DimensionModel
-        filename = (
-            self._path / dimension_type.value / dimension_id / str(version) / "dimension.toml"
-        )
+        filename = self._path / key.type.value / key.id / str(key.version) / "dimension.toml"
         dimension = cls.load(filename)
         self._dimensions[key] = dimension
         return dimension
@@ -103,6 +103,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         """
         if (
             key.type in self._dimension_versions
+            and key.id in self._dimension_versions[key.type]
             and key.version in self._dimension_versions[key.type][key.id]
         ):
             return True
@@ -126,17 +127,18 @@ class DimensionRegistryManager(RegistryManagerBase):
         """
         return sorted(list(self._dimension_versions[dimension_type]))
 
-    def replace_dimension_references(self, dimensions):
-        """Replace any dimension references with actual dimension objects read from disk.
+    def load_dimensions(self, dimension_references):
+        """Load dimensions from files.
 
         Parameters
         ----------
-        dimensions : list
-            list of DSGBaseModel instances to be modified in place
+        dimension_references : list
+            iterable of DimensionReferenceModel instances
 
         """
-        for i, dim in enumerate(dimensions):
-            if isinstance(dim, DimensionReferenceModel):
-                dimensions[i] = self.get_dimension(
-                    dim.dimension_type, dim.dimension_id, dim.version
-                )
+        dimensions = {}
+        for dim in dimension_references:
+            key = DimensionKey(dim.dimension_type, dim.dimension_id, dim.version)
+            dimensions[key] = self.get_dimension_by_key(key)
+
+        return dimensions

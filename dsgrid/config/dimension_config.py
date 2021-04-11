@@ -26,6 +26,7 @@ from dsgrid.dimension.models import (
     handle_dimension_union,
 )
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.utils.utilities import check_uniqueness
 
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,15 @@ class DimensionConfigModel(DSGBaseModel):
         title="registration",
         description="registration information",
     )
+
+    @validator("dimensions")
+    def check_files(cls, values: dict) -> dict:
+        """Validate dimension files across all dimensions"""
+        check_uniqueness(
+            (x.filename for x in values if isinstance(x, DimensionModel)),
+            "dimension record filename",
+        )
+        return values
 
     @validator("dimensions", pre=True, each_item=True, always=True)
     def handle_dimension_union(cls, value):

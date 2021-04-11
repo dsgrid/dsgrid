@@ -147,15 +147,19 @@ class DatasetConfigModel(DSGBaseModel):
 class DatasetConfig:
     """Provides an interface to a DatasetConfigModel."""
 
-    def __init__(self, model):
+    def __init__(self, model, dimensions):
         self._model = model
+        self._dimensions = dimensions
 
     @classmethod
     def load(cls, config_file, dimension_manager):
         model = DatasetConfigModel.load(config_file)
-        config = cls(model)
-        dimension_manager.replace_dimension_references(model.dimensions)
-        return config
+        dimensions = dimension_manager.load_dimensions(model.dimensions)
+        return cls(model, dimensions)
+
+    @property
+    def dimensions(self):
+        return self._dimensions
 
     @property
     def model(self):

@@ -2,6 +2,7 @@
 
 import os
 import re
+from collections import namedtuple
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -11,22 +12,28 @@ from pydantic.fields import Field
 from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.versioning import make_version
 
 
 class RegistryType(Enum):
+    """Registry types"""
+
     DATASET = "dataset"
     PROJECT = "project"
     DIMENSION = "dimension"
 
 
 class DatasetRegistryStatus(Enum):
+    """Statuses for a dataset within a project"""
+
     # TODO: is this complete?
     UNREGISTERED = "Unregistered"
     REGISTERED = "Registered"
 
 
 class ProjectRegistryStatus(Enum):
+    """Statuses for a project within the DSGRID registry"""
+
     # TODO: is this complete?
     INITIAL_REGISTRATION = "Initial Registration"
     IN_PROGRESS = "In Progress"
@@ -35,12 +42,22 @@ class ProjectRegistryStatus(Enum):
 
 
 class VersionUpdateType(Enum):
+    """Types of updates that can be made to projects, datasets, and dimensions"""
+
     # TODO: we need to find general version update types that can be mapped to
     #   major, minor and patch.
     # i.e., replace input_dataset, fix project_config,
     MAJOR = "major"
     MINOR = "minor"
     PATCH = "patch"
+
+
+# These keys are used to store references to project/dataset configs and dimensions
+# in dictionaries.
+# The DimensionKey is useful for comparing whether a project and dataset have the same
+# dimension.
+ConfigKey = namedtuple("ConfigKey", ["id", "version"])
+DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 
 
 class ConfigRegistrationModel(DSGBaseModel):

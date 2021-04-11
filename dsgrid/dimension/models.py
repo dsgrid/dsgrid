@@ -23,7 +23,7 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.utils.versioning import make_version
+from dsgrid.utils.versioning import handle_version_or_str
 from dsgrid.filesytem.aws import sync
 from dsgrid.utils.files import load_data
 
@@ -390,9 +390,7 @@ class DimensionReferenceModel(DSGBaseModel):
 
     @validator("version")
     def check_version(cls, version):
-        if isinstance(version, str):
-            return make_version(version)
-        return version
+        return handle_version_or_str(version)
 
 
 DimensionUnionModel = List[Union[DimensionModel, DimensionReferenceModel, TimeDimensionModel]]

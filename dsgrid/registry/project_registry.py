@@ -18,7 +18,7 @@ from dsgrid.registry.common import (
 )
 from dsgrid.registry.versioning import versioning, PROJECT_REGISTRY_PATH
 from dsgrid.utils.files import dump_data, load_data
-from dsgrid.utils.versioning import make_version
+from dsgrid.utils.versioning import make_version, handle_version_or_str
 
 
 logger = logging.getLogger(__name__)
@@ -94,9 +94,7 @@ class ProjectRegistryModel(DSGBaseModel):
 
     @validator("version")
     def check_version(cls, version):
-        if isinstance(version, str):
-            return make_version(version)
-        return version
+        return handle_version_or_str(version)
 
 
 class ProjectRegistry:

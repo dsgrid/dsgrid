@@ -18,17 +18,18 @@
 - need to generate input data config
 
 """
-from dsgrid.utils.utilities import check_uniqueness
+import importlib
+import itertools
 import os
 from datetime import datetime
-from enum import Enum
 from typing import Dict, List, Optional, Union
-import importlib
 from pathlib import Path
+from enum import Enum
 
 from pydantic.dataclasses import dataclass
 from pydantic.fields import Field
 from pydantic.class_validators import root_validator, validator
+from semver import VersionInfo
 
 from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
 from dsgrid.data_models import DSGBaseModel
@@ -40,7 +41,9 @@ from dsgrid.dimension.models import (
     handle_dimension_union,
     DimensionUnionModel,
 )
-from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
+from dsgrid.registry.common import DatasetRegistryStatus
+from dsgrid.utils.utilities import check_uniqueness
+from dsgrid.utils.versioning import handle_version_or_str
 
 # from dsgrid.dimension.time import (
 #     LeapDayAdjustmentType, Period, TimeValueMeasurement, TimeFrequency,
@@ -78,33 +81,6 @@ class DimensionsModel(DSGBaseModel):
                 )
         check_uniqueness(dimension_types, "project_dimension")
         return val
-
-    # @root_validator
-    # def check_dimension_names(cls, values: dict) -> dict:
-    #    """Validate dimension names"""
-    #    check_uniqueness(
-    #        (ii.name for i in values for ii in values[i]),
-    #        "dimension name",
-    #    )
-    #    return values
-
-    # @root_validator
-    # def check_unique_classes(cls, values: dict) -> dict:
-    #    """Validate dimension classes are unique"""
-    #    check_uniqueness(
-    #        (getattr(ii, "cls") for i in values for ii in values[i]),
-    #        "dimension cls",
-    #    )
-    #    return values
-
-    # @root_validator
-    # def check_files(cls, values: dict) -> dict:
-    #    """Validate dimension files across all dimensions"""
-    #    check_uniqueness(
-    #        (ii.filename for i in values for ii in values[i] if isinstance(ii, Dimension)),
-    #        "dimension record filename",
-    #    )
-    #    return values
 
     @root_validator
     def check_dimension_mappings(cls, values: dict) -> dict:
@@ -144,6 +120,15 @@ class InputDatasetModel(DSGBaseModel):
     dataset_type: str = Field(  # TODO this needs to be ENUM
         title="dataset_type", description="Dataset Type"
     )
+    version: Union[str, VersionInfo] = Field(
+        title="version",
+        description="version of the dataset",
+    )
+    status: Optional[DatasetRegistryStatus] = Field(
+        title="status",
+        description="registration status of the dataset",
+        default=DatasetRegistryStatus.REGISTERED,
+    )
     # TODO this model_sector must be validated in the dataset_config
     model_sector: str = Field(
         title="model_sector",
@@ -154,6 +139,10 @@ class InputDatasetModel(DSGBaseModel):
     #    title="sectors",
     #    description="sectors used in the project",
     # )
+
+    @validator("version")
+    def check_version(cls, version):
+        return handle_version_or_str(version)
 
 
 class InputDatasetsModel(DSGBaseModel):
@@ -224,18 +213,29 @@ class ProjectConfigModel(DSGBaseModel):
 class ProjectConfig:
     """Provides an interface to a ProjectConfigModel."""
 
-    def __init__(self, model):
+    def __init__(self, model, project_dimensions, supplemental_dimensions):
         self._model = model
+        self._project_dimensions = project_dimensions
+        self._supplemental_dimensions = supplemental_dimensions
+        self._check_dimensions()
 
     @classmethod
     def load(cls, config_file, dimension_manager):
         if not os.path.exists(config_file):
             raise DSGValueNotStored(f"{config_file} does not exist. Check the version.")
         model = ProjectConfigModel.load(config_file)
-        config = cls(model)
-        dimension_manager.replace_dimension_references(config.project_dimensions)
-        dimension_manager.replace_dimension_references(config.supplemental_dimensions)
-        return config
+        project_dimensions = dimension_manager.load_dimensions(model.dimensions.project_dimensions)
+        supplemental_dimensions = dimension_manager.load_dimensions(
+            model.dimensions.supplemental_dimensions
+        )
+        return cls(model, project_dimensions, supplemental_dimensions)
+
+    def _check_dimensions(self):
+        dims = itertools.chain(
+            self._project_dimensions.values(), self._supplemental_dimensions.values()
+        )
+        check_uniqueness((x.name for x in dims), "dimension name")
+        check_uniqueness((getattr(x, "cls") for x in dims), "dimension cls")
 
     def get_dataset(self, dataset_id):
         """Return a dataset by ID."""
@@ -268,8 +268,8 @@ class ProjectConfig:
 
     @property
     def project_dimensions(self):
-        return self._model.dimensions.project_dimensions
+        return self._project_dimensions
 
     @property
     def supplemental_dimensions(self):
-        return self._model.dimensions.supplemental_dimensions
+        return self._supplemental_dimensions

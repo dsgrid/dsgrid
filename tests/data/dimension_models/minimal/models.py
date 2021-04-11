@@ -11,3 +11,4 @@ if data_repo is None:
 
 
 PROJECT_CONFIG_FILE = os.path.join(data_repo, "dsgrid_project", "project.toml")
+DIMENSION_CONFIG_FILE = os.path.join(data_repo, "dsgrid_project", "dimension.toml")

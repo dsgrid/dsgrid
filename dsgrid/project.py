@@ -48,18 +48,22 @@ class Project:
         project_registry = registry.load_project_registry(project_id)
         registered_datasets = project_registry.list_registered_datasets()
         if version is None:
-            version = make_version("1.0.0")
+            version = project_registry.version
         config = registry.load_project_config(project_id, version=version)
 
         project_dimension_store = DimensionStore.load(
-            itertools.chain(config.project_dimensions, config.supplemental_dimensions),
+            itertools.chain(
+                config.project_dimensions.values(), config.supplemental_dimensions.values()
+            ),
         )
         dataset_dim_stores = {}
         dataset_configs = {}
         for dataset_id in registered_datasets:
             dataset_config = registry.load_dataset_config(dataset_id)
             dataset_configs[dataset_id] = dataset_config
-            dataset_dim_stores[dataset_id] = DimensionStore.load(dataset_config.model.dimensions)
+            dataset_dim_stores[dataset_id] = DimensionStore.load(
+                dataset_config.dimensions.values()
+            )
 
         return cls(config, project_dimension_store, dataset_configs, dataset_dim_stores)
 

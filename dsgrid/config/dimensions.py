@@ -10,7 +10,7 @@ from semver import VersionInfo
 
 from dsgrid.common import LOCAL_REGISTRY
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.dimension.base import DimensionType
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     Period,

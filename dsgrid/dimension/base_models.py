@@ -35,52 +35,52 @@ class DimensionRecordBaseModel(DSGBaseModel):
     )
 
 
-class EndUseDimensionModel(DimensionRecordBaseModel):
+class EndUseDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all end use dimensions"""
 
 
-class GeographicDimensionModel(DimensionRecordBaseModel):
+class GeographicDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
 
-class ModelDimensionModel(DimensionRecordBaseModel):
+class ModelDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all load model dimensions"""
 
 
-class ModelYearDimensionModel(DimensionRecordBaseModel):
+class ModelYearDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all model year dimensions"""
 
 
-class ScenarioDimensionModel(DimensionRecordBaseModel):
+class ScenarioDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all scenario dimensions"""
 
 
-class SectorDimensionModel(DimensionRecordBaseModel):
+class SectorDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all subsector dimensions"""
 
 
-class SubSectorDimensionModel(DimensionRecordBaseModel):
+class SubSectorDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all subsector dimensions"""
 
 
-class BaseTimeDimensionModel(DimensionRecordBaseModel):
+class TimeDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all time dimensions"""
 
 
-class WeatherDimensionModel(DimensionRecordBaseModel):
+class WeatherDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for weather dimensions"""
 
 
 _DIMENSION_TO_MODEL = {
-    DimensionType.END_USE: EndUseDimensionModel,
-    DimensionType.GEOGRAPHY: GeographicDimensionModel,
-    DimensionType.SECTOR: SectorDimensionModel,
-    DimensionType.SUBSECTOR: SubSectorDimensionModel,
-    DimensionType.TIME: BaseTimeDimensionModel,
-    DimensionType.WEATHER: WeatherDimensionModel,
-    DimensionType.MODEL_YEAR: ModelYearDimensionModel,
-    DimensionType.SCENARIO: ScenarioDimensionModel,
-    DimensionType.MODEL: ModelDimensionModel,
+    DimensionType.END_USE: EndUseDimensionBaseModel,
+    DimensionType.GEOGRAPHY: GeographicDimensionBaseModel,
+    DimensionType.SECTOR: SectorDimensionBaseModel,
+    DimensionType.SUBSECTOR: SubSectorDimensionBaseModel,
+    DimensionType.TIME: TimeDimensionBaseModel,
+    DimensionType.WEATHER: WeatherDimensionBaseModel,
+    DimensionType.MODEL_YEAR: ModelYearDimensionBaseModel,
+    DimensionType.SCENARIO: ScenarioDimensionBaseModel,
+    DimensionType.MODEL: ModelDimensionBaseModel,
 }
 
 

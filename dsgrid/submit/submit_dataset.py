@@ -20,7 +20,7 @@ from pydantic import validator, root_validator
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
-from dsgrid.dimension.base import DSGBaseModel
+from dsgrid.dimension.base_models import DSGBaseModel
 from dsgrid.exceptions import DSGBaseException
 from dsgrid.registry.dataset_registry import DatasetRegistry
 from dsgrid.registry.project_registry import ProjectRegistry

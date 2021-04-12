@@ -19,15 +19,15 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from dsgrid.config.dimensions import TimeDimensionModel
-from dsgrid.dimension.base import (
-    EndUseDimensionModel,
-    GeographicDimensionModel,
-    ModelDimensionModel,
-    ModelYearDimensionModel,
-    ScenarioDimensionModel,
-    SectorDimensionModel,
-    SubSectorDimensionModel,
-    WeatherDimensionModel,
+from dsgrid.dimension.base_models import (
+    EndUseDimensionBaseModel,
+    GeographicDimensionBaseModel,
+    ModelDimensionBaseModel,
+    ModelYearDimensionBaseModel,
+    ScenarioDimensionBaseModel,
+    SectorDimensionBaseModel,
+    SubSectorDimensionBaseModel,
+    WeatherDimensionBaseModel,
 )
 
 BaseOrm = declarative_base()
@@ -60,7 +60,7 @@ subsector_sector_association = Table(
 # ---------------------------
 # GEOGRAPHIC DIMENSIONS
 # ---------------------------
-class CensusDivision(GeographicDimensionModel):
+class CensusDivision(GeographicDimensionBaseModel):
     """Census Region attributes"""
 
 
@@ -71,7 +71,7 @@ class CensusDivisionOrm(BaseOrm):
     name = Column(String(255), nullable=False)
 
 
-class CensusRegion(GeographicDimensionModel):
+class CensusRegion(GeographicDimensionBaseModel):
     """Census Region attributes"""
 
 
@@ -82,7 +82,7 @@ class CensusRegionOrm(BaseOrm):
     name = Column(String(255), nullable=False)
 
 
-class State(GeographicDimensionModel):
+class State(GeographicDimensionBaseModel):
     """State attributes"""
 
     is_conus: bool
@@ -102,7 +102,7 @@ class StateOrm(BaseOrm):
     counties = relationship("CountyOrm", back_populates="state_rel")
 
 
-class County(GeographicDimensionModel):
+class County(GeographicDimensionBaseModel):
     """County attributes"""
 
     state: str
@@ -122,7 +122,7 @@ class CountyOrm(BaseOrm):
 # ---------------------------
 # SECTOR DIMENSIONS
 # ---------------------------
-class Sector(SectorDimensionModel):
+class Sector(SectorDimensionBaseModel):
     """Sector attributes"""
 
     category: Optional[str] = Field(
@@ -148,7 +148,7 @@ class SectorOrm(BaseOrm):
 # ---------------------------
 # SUBSECTOR DIMENSIONS
 # ---------------------------
-class SubSector(SubSectorDimensionModel):
+class SubSector(SubSectorDimensionBaseModel):
     """Subsector attributes"""
 
     # NOTE: making sector optional for now, we may remove because it should be
@@ -188,7 +188,7 @@ class SubSectorOrm(BaseOrm):
 # ---------------------------
 # ENDUSE DIMENSIONS
 # ---------------------------
-class EndUse(EndUseDimensionModel):
+class EndUse(EndUseDimensionBaseModel):
     """End use attributes"""
 
     # sector: str  # TODO: the raw data doesn't have this field
@@ -233,15 +233,15 @@ class Season(TimeDimensionModel):
 # ---------------------------
 # OTHER DIMENSIONS
 # ---------------------------
-class Weather(WeatherDimensionModel):
+class Weather(WeatherDimensionBaseModel):
     """ attributes"""
 
 
-class ModelYear(ModelYearDimensionModel):
+class ModelYear(ModelYearDimensionBaseModel):
     """ attributes"""
 
 
-class Model(ModelDimensionModel):
+class Model(ModelDimensionBaseModel):
     """Model attributes"""
 
 
@@ -263,7 +263,7 @@ class ModelOrm(BaseOrm):
     )
 
 
-class Scenario(ScenarioDimensionModel):
+class Scenario(ScenarioDimensionBaseModel):
     """Scenario attributes"""
 
 

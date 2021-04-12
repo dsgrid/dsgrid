@@ -1,34 +1,21 @@
+"""Manages the registry for dimensions"""
+
 import logging
-import os
 from collections import defaultdict
-from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union
 
-
-import toml
-from pydantic.fields import Field, Required
-from pydantic.class_validators import root_validator, validator
 from semver import VersionInfo
 
 from dsgrid.config.dimensions import (
     DimensionType,
     DimensionModel,
     TimeDimensionModel,
-    DimensionReferenceModel,
 )
 from dsgrid.exceptions import DSGValueNotStored
-from dsgrid.data_models import DSGBaseModel, serialize_model
 from dsgrid.registry.common import (
-    ConfigRegistrationModel,
     DimensionKey,
-    make_filename_from_version,
-    get_version_from_filename,
-    RegistryType,
 )
 from dsgrid.registry.registry_manager_base import RegistryManagerBase
-from dsgrid.utils.files import load_data, dump_data
-from dsgrid.utils.versioning import make_version
 
 
 logger = logging.getLogger(__name__)
@@ -77,6 +64,13 @@ class DimensionRegistryManager(RegistryManagerBase):
         return self.get_dimension_by_key(key)
 
     def get_dimension_by_key(self, key):
+        """Get the dimension matching key. Returns from cache if already loaded.
+
+        Parameters
+        ----------
+        key : Dimension Key
+
+        """
         if not self.has_dimension_id(key):
             raise DSGValueNotStored(f"dimension not stored: {key}")
 

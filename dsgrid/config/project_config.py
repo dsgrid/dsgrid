@@ -18,26 +18,17 @@
 - need to generate input data config
 
 """
-import importlib
 import itertools
 import os
-from datetime import datetime
 from typing import Dict, List, Optional, Union
-from pathlib import Path
-from enum import Enum
 
-from pydantic.dataclasses import dataclass
-from pydantic.fields import Field
-from pydantic.class_validators import root_validator, validator
+from pydantic import Field
+from pydantic import root_validator, validator
 from semver import VersionInfo
 
 from dsgrid.config.dimensions import (
     DimensionReferenceModel,
-    DimensionModel,
     DimensionType,
-    TimeDimensionModel,
-    handle_dimension_union,
-    DimensionUnionModel,
 )
 from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
 from dsgrid.data_models import DSGBaseModel
@@ -221,6 +212,18 @@ class ProjectConfig:
 
     @classmethod
     def load(cls, config_file, dimension_manager):
+        """Load a ProjectConfig from a config file.
+
+        Parameters
+        ----------
+        config_file : str
+        dimension_manager : DimesionRegistryManager
+
+        Returns
+        -------
+        ProjectConfig
+
+        """
         if not os.path.exists(config_file):
             raise DSGValueNotStored(f"{config_file} does not exist. Check the version.")
         model = ProjectConfigModel.load(config_file)
@@ -268,8 +271,24 @@ class ProjectConfig:
 
     @property
     def project_dimensions(self):
+        """Return the project dimensions.
+
+        Returns
+        -------
+        list
+            list of DimensionBaseModel
+
+        """
         return self._project_dimensions
 
     @property
     def supplemental_dimensions(self):
+        """Return the supplemental dimensions.
+
+        Returns
+        -------
+        list
+            list of DimensionBaseModel
+
+        """
         return self._supplemental_dimensions

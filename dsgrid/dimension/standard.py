@@ -1,9 +1,9 @@
 """Standard dimension classes for dsgrid"""
 
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import Field
-from pydantic.class_validators import validator
+from pydantic import validator
 from sqlalchemy import (
     Column,
     Boolean,

@@ -1,23 +1,19 @@
-import os
-from enum import Enum
-import logging
-from typing import Dict, List, Optional, Union
-import toml
+"""Manages the registry for a project."""
 
-from pydantic.fields import Field
-from pydantic.class_validators import root_validator, validator
+import logging
+from typing import List, Optional, Union
+
+from pydantic import Field
+from pydantic import validator
 from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel, serialize_model
-from dsgrid.config.project_config import ProjectConfig
 from dsgrid.registry.common import (
-    ConfigRegistrationModel,
-    RegistryType,
     DatasetRegistryStatus,
     ProjectRegistryStatus,
+    ConfigRegistrationModel,
 )
-from dsgrid.registry.versioning import versioning, PROJECT_REGISTRY_PATH
-from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.files import dump_data
 from dsgrid.utils.versioning import make_version, handle_version_or_str
 
 

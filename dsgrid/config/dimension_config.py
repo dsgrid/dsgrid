@@ -6,23 +6,15 @@ Questions:
 - Do diemsnion names need to be distinct from project's? What if the dataset
 is using the same dimension as the project?
 """
-from enum import Enum
-from pathlib import Path
 from typing import List, Optional, Union, Dict
-import os
 import logging
 
-import toml
+from pydantic import Field
+from pydantic import validator
 
-from pydantic.fields import Field
-from pydantic.class_validators import root_validator, validator
-
-from dsgrid.common import LOCAL_REGISTRY_DATA
-from dsgrid.exceptions import DSGBaseException
 from dsgrid.config.dimensions import (
     TimeDimensionModel,
     DimensionModel,
-    DimensionType,
     handle_dimension_union,
 )
 from dsgrid.data_models import DSGBaseModel

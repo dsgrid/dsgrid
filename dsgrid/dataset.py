@@ -1,14 +1,9 @@
 """TBD"""
 
 import logging
-import os
 from pathlib import Path
 
-import pyspark
-from pyspark.sql import functions as F
 from pyspark.sql import SparkSession
-
-from dsgrid.utils.files import load_data
 
 
 logger = logging.getLogger(__name__)
@@ -29,7 +24,7 @@ class Dataset:
         # TODO: do we need a DimensionStore here?
 
     @classmethod
-    def load(cls, config, version=None):
+    def load(cls, config):
         """Load a dataset from a store.
 
         Parameters

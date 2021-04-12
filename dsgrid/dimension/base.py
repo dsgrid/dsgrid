@@ -2,7 +2,7 @@
 
 from enum import Enum
 
-from pydantic.fields import Field
+from pydantic import Field
 
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.data_models import DSGBaseModel

@@ -4,8 +4,8 @@ import os
 from datetime import datetime
 from typing import Dict, List, Optional, Union
 
-from pydantic.class_validators import validator
-from pydantic.fields import Field
+from pydantic import validator
+from pydantic import Field
 from semver import VersionInfo
 
 from dsgrid.common import LOCAL_REGISTRY

@@ -8,23 +8,17 @@ is using the same dimension as the project?
 """
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union, Dict
+from typing import List, Optional, Dict
 import os
 import logging
 
-import toml
-
-from pydantic.fields import Field
-from pydantic.class_validators import root_validator, validator
+from pydantic import Field
+from pydantic import validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
 from dsgrid.config.dimensions import (
-    DimensionType,
-    TimeDimensionModel,
     DimensionReferenceModel,
-    handle_dimension_union,
 )
-from dsgrid.exceptions import DSGBaseException
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.filesytem.aws import sync
 

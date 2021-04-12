@@ -1,40 +1,27 @@
-import os
-from enum import Enum
+"""Manages registry for a dataset"""
+
 import logging
 from pathlib import Path
 from typing import List, Optional, Union
 
 
-import toml
-from pydantic.fields import Field, Required
-from pydantic.class_validators import root_validator, validator
+from pydantic import Field
+from pydantic import validator
 from semver import VersionInfo
 
-from dsgrid.data_models import DSGBaseModel, serialize_model
-from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.registry.common import (
-    ConfigRegistrationModel,
-    make_filename_from_version,
-    get_version_from_filename,
-    RegistryType,
-)
-from dsgrid.utils.files import load_data, dump_data
+from dsgrid.data_models import DSGBaseModel
+from dsgrid.registry.common import ConfigRegistrationModel
+from dsgrid.utils.files import load_data
 from dsgrid.utils.versioning import handle_version_or_str
 
 
 logger = logging.getLogger(__name__)
 
 
-# TODO: I think we need to also register the pydantic models associated with
-#   the configuration OR we need to set the dataset_config type to
-#   DatasetCOnfig instead of dict of the loaded toml (not the cls.dict()).
-
-
 class DatasetRegistry:
+    """Controls dataset registration"""
 
     DATASET_REGISTRY_PATH = Path("registry/datasets")
-
-    """Controls dataset registration"""
 
     def __init__(self, model):
         """Construct DatasetRegistry

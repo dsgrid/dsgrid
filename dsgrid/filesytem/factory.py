@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from dsgrid.filesytem.aws import AwsS3Bucket
-from dsgrid.filesytem.local_filesystem import LocalFilesystem
+from .aws import AwsS3Bucket
+from .local_filesystem import LocalFilesystem
 
 
 def make_filesystem_interface(path):

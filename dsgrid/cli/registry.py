@@ -137,6 +137,14 @@ def update_project(ctx, project_config_file, log_message, update_type):
     help="project identifier",
 )
 @click.option(
+    "-m",
+    "--dimension-mappings",
+    type=click.Path(exists=True),
+    multiple=True,
+    show_default=True,
+    help="dimension mapping file(s)",
+)
+@click.option(
     "-l",
     "--log-message",
     required=True,
@@ -144,12 +152,14 @@ def update_project(ctx, project_config_file, log_message, update_type):
     help="reason for submission",
 )
 @click.pass_context
-def submit_dataset(ctx, dataset_config_file, project_id, log_message):
+def submit_dataset(ctx, dataset_config_file, project_id, dimension_mappings, log_message):
     """Submit a new dataset to a dsgrid project."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
-    manager.submit_dataset(dataset_config_file, project_id, submitter, log_message)
+    manager.submit_dataset(
+        dataset_config_file, project_id, dimension_mappings, submitter, log_message
+    )
 
 
 # TODO: When resubmitting an existing dataset to a project, is that a new command or an extension

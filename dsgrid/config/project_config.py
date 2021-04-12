@@ -30,7 +30,7 @@ from dsgrid.config.dimensions import (
     DimensionReferenceModel,
     DimensionType,
 )
-from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
+from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored, DSGInvalidDimensionMapping
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import DatasetRegistryStatus
 from dsgrid.utils.utilities import check_uniqueness
@@ -208,7 +208,7 @@ class ProjectConfig:
         self._model = model
         self._project_dimensions = project_dimensions
         self._supplemental_dimensions = supplemental_dimensions
-        self._check_dimensions()
+        self._check_project_dimensions()
 
     @classmethod
     def load(cls, config_file, dimension_manager):
@@ -233,12 +233,38 @@ class ProjectConfig:
         )
         return cls(model, project_dimensions, supplemental_dimensions)
 
-    def _check_dimensions(self):
+    def _check_project_dimensions(self):
         dims = itertools.chain(
             self._project_dimensions.values(), self._supplemental_dimensions.values()
         )
         check_uniqueness((x.name for x in dims), "dimension name")
         check_uniqueness((getattr(x, "cls") for x in dims), "dimension cls")
+
+    def check_dataset_dimension_mappings(self, dataset_config, dimension_mappings):
+        """Check that a dataset provides required mappings to the project.
+
+        Parameters
+        ----------
+        dataset_config : DatasetConfig
+        dimension_mappings : list
+            list of DimensionMapByAssocationTableModel
+
+        Raises
+        ------
+        DSGInvalidDimensionMapping
+            Raised if a requirement is violated.
+
+        """
+        # The dataset has to have each project dimension or provide a mapping.
+        project_keys = set(self.project_dimensions.keys())
+        dataset_keys = set(dataset_config.dimensions)
+        requires_mapping = project_keys.difference(dataset_keys)
+        if requires_mapping:
+            raise DSGInvalidDimensionMapping(
+                f"dataset {dataset_config.model.dataset_id} has missing dimension mappings: {requires_mapping}"
+            )
+
+        # TODO: handle dimension_mappings
 
     def get_dataset(self, dataset_id):
         """Return a dataset by ID."""

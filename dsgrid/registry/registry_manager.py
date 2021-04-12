@@ -20,6 +20,7 @@ from dsgrid.data_models import serialize_model
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_mapping import DimensionMappingsModel
 from dsgrid.filesytem.factory import make_filesystem_interface
 from dsgrid.registry.common import (
     RegistryType,
@@ -506,7 +507,9 @@ class RegistryManager(RegistryManagerBase):
             project_id, registry_config, config_file, submitter, update_type, log_message
         )
 
-    def submit_dataset(self, config_file, project_id, submitter, log_message):
+    def submit_dataset(
+        self, config_file, project_id, dimension_mapping_files, submitter, log_message
+    ):
         """Registers a new dataset with a dsgrid project. This can only be performed on the
         latest version of the project.
 
@@ -514,6 +517,9 @@ class RegistryManager(RegistryManagerBase):
         ----------
         config_file : str
             Path to dataset config file
+        project_id : str
+        dimension_mapping_files : tuple
+            dimension mapping association table filenames
         submitter : str
             Submitter name
         log_message : str
@@ -536,6 +542,12 @@ class RegistryManager(RegistryManagerBase):
         project_config = self.load_project_config(project_id, registry=project_registry)
         if not project_config.has_dataset(config.model.dataset_id):
             raise ValueError(f"{config.model.dataset_id} is not defined in project={project_id}")
+
+        mappings = []
+        for filename in dimension_mapping_files:
+            mappings += DimensionMappingsModel(**load_data(filename)).mappings
+
+        project_config.check_dataset_dimension_mappings(config, mappings)
 
         version = VersionInfo(major=1)
         registration = ConfigRegistrationModel(

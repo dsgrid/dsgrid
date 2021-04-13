@@ -23,8 +23,9 @@ class DSGBaseModel(BaseModel):
 
     @classmethod
     def load(cls, filename):
-        """Load a data model from a file containing file paths
-        relative to filename.
+        """Load a data model from a file.
+        Temporarily changes to the file's parent directory so that Pydantic
+        validators can load relative file paths within the file.
 
         Parameters
         ----------

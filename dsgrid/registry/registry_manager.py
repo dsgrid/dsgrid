@@ -161,7 +161,7 @@ class RegistryManager(RegistryManagerBase):
 
         """
         if project_id not in self._project_ids:
-            raise ValueError(f"{project_id} is not stored")
+            raise ValueError(f"project={project_id} is not registered")
 
         self._fs_intf.rmtree(self._get_project_directory(project_id))
         logger.info("Removed %s from the registry.", project_id)
@@ -181,7 +181,7 @@ class RegistryManager(RegistryManagerBase):
 
         """
         if project_id not in self._project_ids:
-            raise ValueError(f"project={project_id} is not stored")
+            raise ValueError(f"project={project_id} is not registered")
 
         if version is None:
             if registry is None:
@@ -213,7 +213,7 @@ class RegistryManager(RegistryManagerBase):
 
         """
         if dataset_id not in self._dataset_ids:
-            raise ValueError(f"dataset={dataset_id} is not stored")
+            raise ValueError(f"dataset={dataset_id} is not registered")
 
         dataset_config = self._datasets.get(dataset_id)
         if dataset_config is not None:
@@ -240,7 +240,7 @@ class RegistryManager(RegistryManagerBase):
 
         """
         if dataset_id not in self._dataset_ids:
-            raise ValueError(f"dataset={dataset_id} is not stored")
+            raise ValueError(f"dataset={dataset_id} is not registered")
 
         registry = self._dataset_registries.get(dataset_id)
         if registry is not None:
@@ -264,7 +264,7 @@ class RegistryManager(RegistryManagerBase):
 
         """
         if project_id not in self._project_ids:
-            raise ValueError(f"project={project_id} is not stored")
+            raise ValueError(f"project={project_id} is not registered")
 
         registry = self._project_registries.get(project_id)
         if registry is not None:
@@ -429,7 +429,7 @@ class RegistryManager(RegistryManagerBase):
         """
         config = ProjectConfig.load(config_file, self._dimension_mgr)
         if config.model.project_id in self._project_ids:
-            raise ValueError(f"{config.model.project_id} is already stored")
+            raise ValueError(f"{config.model.project_id} is already registered")
 
         version = VersionInfo(major=1)
         registration = ConfigRegistrationModel(
@@ -532,16 +532,20 @@ class RegistryManager(RegistryManagerBase):
 
         """
         config = DatasetConfig.load(config_file, self._dimension_mgr)
-        if config.model.dataset_id in self._dataset_ids:
-            raise ValueError(f"{config.model.dataset_id} is already stored")
-
         project_registry = self.load_project_registry(project_id)
+
         if project_registry.has_dataset(config.model.dataset_id, DatasetRegistryStatus.REGISTERED):
-            raise ValueError(f"{config.model.dataset_id} is already stored")
+            raise ValueError(
+                f"dataset={config.model.dataset_id} has already been submitted to project={project_id}"
+            )
 
         project_config = self.load_project_config(project_id, registry=project_registry)
         if not project_config.has_dataset(config.model.dataset_id):
-            raise ValueError(f"{config.model.dataset_id} is not defined in project={project_id}")
+            raise ValueError(
+                f"dataset={config.model.dataset_id} is not defined in project={project_id}"
+            )
+
+        assert config.model.dataset_id not in self._dataset_ids, config.model.dataset_id
 
         mappings = []
         for filename in dimension_mapping_files:
@@ -590,6 +594,8 @@ class RegistryManager(RegistryManagerBase):
         )
         dump_data(serialize_model(project_config.model), project_file)
 
+        self._dataset_ids.add(config.model.dataset_id)
+
     def update_dataset(self, dataset_id, config_file, submitter, update_type, log_message):
         """Updates an existing dataset with new parameters or data.
 
@@ -631,11 +637,11 @@ class RegistryManager(RegistryManagerBase):
         Raises
         ------
         ValueError
-            Raised if the dataset_id is not stored.
+            Raised if the dataset_id is not registered.
 
         """
         if dataset_id not in self._dataset_ids:
-            raise ValueError(f"{dataset_id} is not stored")
+            raise ValueError(f"dataset={dataset_id} is not registered")
 
         self._fs_intf.rmtree(self._get_dataset_directory(dataset_id))
 

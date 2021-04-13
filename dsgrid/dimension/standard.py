@@ -21,7 +21,7 @@ from sqlalchemy.orm import sessionmaker
 from dsgrid.config.dimensions import TimeDimensionModel
 from dsgrid.dimension.base_models import (
     EndUseDimensionBaseModel,
-    GeographicDimensionBaseModel,
+    GeographyDimensionBaseModel,
     ModelDimensionBaseModel,
     ModelYearDimensionBaseModel,
     ScenarioDimensionBaseModel,
@@ -60,7 +60,7 @@ subsector_sector_association = Table(
 # ---------------------------
 # GEOGRAPHIC DIMENSIONS
 # ---------------------------
-class CensusDivision(GeographicDimensionBaseModel):
+class CensusDivision(GeographyDimensionBaseModel):
     """Census Region attributes"""
 
 
@@ -71,7 +71,7 @@ class CensusDivisionOrm(BaseOrm):
     name = Column(String(255), nullable=False)
 
 
-class CensusRegion(GeographicDimensionBaseModel):
+class CensusRegion(GeographyDimensionBaseModel):
     """Census Region attributes"""
 
 
@@ -82,7 +82,7 @@ class CensusRegionOrm(BaseOrm):
     name = Column(String(255), nullable=False)
 
 
-class State(GeographicDimensionBaseModel):
+class State(GeographyDimensionBaseModel):
     """State attributes"""
 
     is_conus: bool
@@ -102,7 +102,7 @@ class StateOrm(BaseOrm):
     counties = relationship("CountyOrm", back_populates="state_rel")
 
 
-class County(GeographicDimensionBaseModel):
+class County(GeographyDimensionBaseModel):
     """County attributes"""
 
     state: str

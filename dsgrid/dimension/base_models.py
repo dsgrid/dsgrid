@@ -39,7 +39,7 @@ class EndUseDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all end use dimensions"""
 
 
-class GeographicDimensionBaseModel(DimensionRecordBaseModel):
+class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
 
@@ -73,7 +73,7 @@ class WeatherDimensionBaseModel(DimensionRecordBaseModel):
 
 _DIMENSION_TO_MODEL = {
     DimensionType.END_USE: EndUseDimensionBaseModel,
-    DimensionType.GEOGRAPHY: GeographicDimensionBaseModel,
+    DimensionType.GEOGRAPHY: GeographyDimensionBaseModel,
     DimensionType.SECTOR: SectorDimensionBaseModel,
     DimensionType.SUBSECTOR: SubSectorDimensionBaseModel,
     DimensionType.TIME: TimeDimensionBaseModel,

@@ -6,24 +6,19 @@ Questions:
 - Do diemsnion names need to be distinct from project's? What if the dataset
 is using the same dimension as the project?
 """
-from enum import Enum
-from pathlib import Path
 from typing import List, Optional, Union, Dict
-import os
 import logging
 
-import toml
+from pydantic import Field
+from pydantic import validator
 
-from pydantic.fields import Field
-from pydantic.class_validators import root_validator, validator
-
-from dsgrid.common import LOCAL_REGISTRY_DATA
-from dsgrid.exceptions import DSGBaseException
-from dsgrid.dimension.base import DimensionType, DSGBaseModel
-from dsgrid.utils.aws import sync
-
-
-from dsgrid.config._config import TimeDimension, Dimension, ConfigRegistrationModel
+from dsgrid.config.dimensions import (
+    TimeDimensionModel,
+    DimensionModel,
+    handle_dimension_union,
+)
+from dsgrid.data_models import DSGBaseModel
+from dsgrid.utils.utilities import check_uniqueness
 
 
 logger = logging.getLogger(__name__)
@@ -36,9 +31,9 @@ VALIDATE:
 
 
 class DimensionConfigModel(DSGBaseModel):
-    """Represents model dataset configurations"""
+    """Represents dimension model configurations"""
 
-    dimensions: List[Union[Dimension, TimeDimension]] = Field(
+    dimensions: List[Union[DimensionModel, TimeDimensionModel]] = Field(
         title="dimensions",
         description="dimensions shared between project and dataset",
     )
@@ -46,24 +41,23 @@ class DimensionConfigModel(DSGBaseModel):
         title="registration",
         description="registration information",
     )
-    # TODO: can we reuse this validator? Its taken from the
-    #   project_config Diemnsions model
+
+    @validator("dimensions")
+    def check_files(cls, values: dict) -> dict:
+        """Validate dimension files across all dimensions"""
+        check_uniqueness(
+            (x.filename for x in values if isinstance(x, DimensionModel)),
+            "dimension record filename",
+        )
+        return values
+
+    @validator("dimensions", pre=True, each_item=True, always=True)
     def handle_dimension_union(cls, value):
-        """
-        Validate dimension type work around for pydantic Union bug
-        related to: https://github.com/samuelcolvin/pydantic/issues/619
-        """
-        # NOTE: Errors inside Dimension or TimeDimension will be duplicated
-        # by Pydantic
-        if value["type"] == DimensionType.TIME.value:
-            val = TimeDimension(**value)
-        else:
-            val = Dimension(**value)
-        return val
+        return handle_dimension_union(value)
 
 
 class DimensionConfig:
-    """Provides an interface to a DatasetConfigModel."""
+    """Provides an interface to a DimensionConfigModel."""
 
     def __init__(self, model):
         self._model = model

@@ -1,35 +1,27 @@
-import os
-from enum import Enum
 import logging
 from pathlib import Path
 from typing import List, Optional, Union
 
 
-import toml
-from pydantic.fields import Field, Required
-from pydantic.class_validators import root_validator, validator
+from pydantic import Field
+from pydantic import validator
 from semver import VersionInfo
 
-from dsgrid.dimension.base import DSGBaseModel, serialize_model
-
-from dsgrid.config._config import ConfigRegistrationModel
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import (
-    make_filename_from_version,
-    make_version,
-    get_version_from_filename,
-    RegistryType,
+    ConfigRegistrationModel,
 )
-from dsgrid.utils.files import load_data, dump_data
+from dsgrid.utils.files import load_data
+from dsgrid.utils.versioning import handle_version_or_str
 
 
 logger = logging.getLogger(__name__)
 
 
 class DimensionRegistry:
+    """Controls dimension (record) registration from datasets and projects"""
 
     DIMENSION_REGISTRY_PATH = Path("registry/dimensions")
-
-    """Controls dimension (record) registration from datasets and projects"""
 
     def __init__(self, model):
         """Construct DimensionRegistry
@@ -86,6 +78,4 @@ class DimensionRegistryModel(DSGBaseModel):
 
     @validator("version")
     def check_version(cls, version):
-        if isinstance(version, str):
-            return make_version(version)
-        return version
+        return handle_version_or_str(version)

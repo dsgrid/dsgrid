@@ -1,22 +1,12 @@
-from dataclasses import fields
-import itertools
 import logging
-import os
 
 
-from dsgrid.dimension.base import DSGBaseDimensionModel
 from dsgrid.dimension.dimension_records import DimensionRecords
 from dsgrid.exceptions import (
-    DSGInvalidField,
     DSGInvalidDimension,
     # DSGInvalidDimensionMapping,
 )
-from dsgrid.config.project_config import (
-    ProjectConfig,
-    # DimensionDirectMapping,
-)
-from dsgrid.utils.files import load_data
-from dsgrid.utils.timing import timed_debug, timed_info
+from dsgrid.utils.timing import timed_debug
 
 
 logger = logging.getLogger(__name__)
@@ -29,7 +19,7 @@ class DimensionStore:
 
     def __init__(self, record_store):
         self._record_store = record_store
-        self._store = {}  # {class type: DSGBaseDimensionModel}
+        self._store = {}  # {class type: DimensionRecordBaseModel}
         self._dimension_direct_mappings = {}
 
     @classmethod
@@ -40,7 +30,7 @@ class DimensionStore:
         Parameters
         ----------
         dimensions : sequence
-            list or iterable of subtype of DSGBaseDimensionModel
+            list or iterable of subtype of DimensionRecordBaseModel
 
         spark : SparkSession
 
@@ -60,7 +50,7 @@ class DimensionStore:
 
         Parameters
         ----------
-        dimension : DSGBaseDimensionModel
+        dimension : DimensionRecordBaseModel
 
         """
         assert dimension.cls not in self._store
@@ -79,12 +69,12 @@ class DimensionStore:
         Parameters
         ----------
         dimension_class : type
-            subclass of DSGBaseDimensionModel
+            subclass of DimensionRecordBaseModel
 
         Returns
         -------
-        DSGBaseDimensionModel
-            instance of DSGBaseDimensionModel
+        DimensionRecordBaseModel
+            instance of DimensionRecordBaseModel
 
         """
         self._raise_if_dimension_not_stored(dimension_class)
@@ -146,7 +136,7 @@ class DimensionStore:
 
     #    Parameters
     #    ----------
-    #    dimension : DSGBaseDimensionModel
+    #    dimension : DimensionRecordBaseModel
     #    mapping : DimensionDirectMapping
 
     #    """

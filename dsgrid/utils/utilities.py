@@ -2,7 +2,6 @@
 Helpful utility functions for dsgrid
 """
 import logging
-import sys
 import inspect
 import json
 import os

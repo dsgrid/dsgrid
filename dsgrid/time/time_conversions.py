@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from dsgrid.dimension.base import DayType, Season
+from dsgrid.time.types import DayType, Season
 
 
 def convert_datetime_to_day_type(timestamp):

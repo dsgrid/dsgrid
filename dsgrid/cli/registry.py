@@ -6,6 +6,8 @@ import logging
 import click
 
 from dsgrid.common import S3_REGISTRY, LOCAL_REGISTRY
+from dsgrid.registry.common import VersionUpdateType
+from dsgrid.filesytem import aws
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -13,13 +15,12 @@ logger = logging.getLogger(__name__)
 
 
 @click.group()
-# This exists for test & dev. May go away.
 @click.option(
     "--path",
     default=LOCAL_REGISTRY,  # TEMPORARY: S3_REGISTRY is not yet supported
     show_default=True,
     envvar="DSGRID_REGISTRY_PATH",
-    help="INTERNAL-ONLY: path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
+    help="path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
 )
 @click.pass_context
 def registry(ctx, path):
@@ -48,8 +49,11 @@ def list_(ctx):
     for dataset in manager.list_datasets():
         print(f"  - {dataset}")
     print("\nDimensions:")
-    for dimension in manager.list_dimensions():
-        print(f"  - {dimension}")
+    dim_mgr = manager.dimension_manager
+    for dimension_type in dim_mgr.list_dimension_types():
+        print(f"  - {dimension_type.value}")
+        for dimension_id in dim_mgr.list_dimension_ids(dimension_type):
+            print(f"    - {dimension_id}")
 
 
 @click.command()
@@ -91,7 +95,7 @@ def register_project(ctx, project_config_file, log_message):
 )
 @click.pass_context
 def register_dimension(ctx, dimension_config_file, log_message):
-    """Register a new project with the dsgrid repository."""
+    """Register new dimensions with the dsgrid repository."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
@@ -111,8 +115,8 @@ def register_dimension(ctx, dimension_config_file, log_message):
     "-t",
     "--update-type",
     required=True,
-    type=str,
-    help="type of update, options: major | minor | patch",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=lambda ctx, x: VersionUpdateType(x),
 )
 @click.pass_context
 def update_project(ctx, project_config_file, log_message, update_type):
@@ -121,7 +125,6 @@ def update_project(ctx, project_config_file, log_message, update_type):
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
     manager.update_project(project_config_file, submitter, update_type, log_message)
-    # TODO
 
 
 @click.command()
@@ -134,6 +137,14 @@ def update_project(ctx, project_config_file, log_message, update_type):
     help="project identifier",
 )
 @click.option(
+    "-m",
+    "--dimension-mappings",
+    type=click.Path(exists=True),
+    multiple=True,
+    show_default=True,
+    help="dimension mapping file(s)",
+)
+@click.option(
     "-l",
     "--log-message",
     required=True,
@@ -141,12 +152,14 @@ def update_project(ctx, project_config_file, log_message, update_type):
     help="reason for submission",
 )
 @click.pass_context
-def submit_dataset(ctx, dataset_config_file, project_id, log_message):
+def submit_dataset(ctx, dataset_config_file, project_id, dimension_mappings, log_message):
     """Submit a new dataset to a dsgrid project."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
-    manager.submit_dataset(dataset_config_file, project_id, submitter, log_message)
+    manager.submit_dataset(
+        dataset_config_file, project_id, dimension_mappings, submitter, log_message
+    )
 
 
 # TODO: When resubmitting an existing dataset to a project, is that a new command or an extension
@@ -164,6 +177,14 @@ def remove_dataset(ctx, dataset_id):
     manager.remove_dataset(dataset_id)
 
 
+@click.command()
+@click.pass_context
+def sync(ctx):
+    """Sync the official dsgrid registry to the local system."""
+    registry_path = ctx.parent.params["path"]
+    aws.sync(S3_REGISTRY, registry_path)
+
+
 registry.add_command(create)
 registry.add_command(list_)
 registry.add_command(remove_dataset)
@@ -171,4 +192,5 @@ registry.add_command(remove_project)
 registry.add_command(register_project)
 registry.add_command(register_dimension)
 registry.add_command(submit_dataset)
+registry.add_command(sync)
 registry.add_command(update_project)

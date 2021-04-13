@@ -1,13 +1,20 @@
+import pytest
 from pyspark.sql import SparkSession
 
-from dsgrid.config.project import Project
+from dsgrid.project import Project
 from dsgrid.config.project_config import ProjectConfig
-from dsgrid.analysis.dataset import Dataset
+from dsgrid.dataset import Dataset
+from dsgrid.exceptions import DSGValueNotStored
 
 
 def test_project_load():
     project = Project.load("test")
     assert isinstance(project, Project)
+    project = Project.load("test", version="1.0.0")
+    assert isinstance(project, Project)
+    with pytest.raises(DSGValueNotStored):
+        project = Project.load("test", version="0.0.0")
+        assert isinstance(project, Project)
 
 
 def test_dataset_load():

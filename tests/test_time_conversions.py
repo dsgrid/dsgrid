@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from dsgrid.time_conversions import (
+from dsgrid.time.time_conversions import (
     convert_datetime_to_day_type,
     convert_datetime_to_season,
     interpret_datetime,

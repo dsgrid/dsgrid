@@ -1,21 +1,17 @@
 """Interface to a dsgrid project."""
 
-import functools
 import itertools
 import logging
-import os
-from pathlib import Path
 
 from pyspark.sql import SparkSession
 
-from dsgrid.common import S3_REGISTRY
-from dsgrid.config.project_config import ProjectConfig
-from dsgrid.analysis.dataset import Dataset
-from dsgrid.dimension.base import DimensionType  # , MappingType
+from dsgrid.dataset import Dataset
+from dsgrid.dimension.base_models import DimensionType  # , MappingType
 from dsgrid.dimension.store import DimensionStore
 from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
 from dsgrid.utils.spark import init_spark
+from dsgrid.utils.versioning import make_version
 
 
 logger = logging.getLogger(__name__)
@@ -33,8 +29,17 @@ class Project:
         self._datasets = {}
 
     @classmethod
-    def load(cls, project_id, registry_path=None):
-        """Load a project from the registry."""
+    def load(cls, project_id, registry_path=None, version=None):
+        """Load a project from the registry.
+
+        Parameters
+        ----------
+        project_id : str
+        registry_path : str | None
+        version : str | None
+            Use the latest if not specified.
+
+        """
         spark = SparkSession.getActiveSession()
         if spark is None:
             spark = init_spark("project")
@@ -42,17 +47,23 @@ class Project:
         registry = RegistryManager.load(get_registry_path(registry_path=registry_path))
         project_registry = registry.load_project_registry(project_id)
         registered_datasets = project_registry.list_registered_datasets()
-        config = registry.load_project_config(project_id)
+        if version is None:
+            version = project_registry.version
+        config = registry.load_project_config(project_id, version=version)
 
         project_dimension_store = DimensionStore.load(
-            itertools.chain(config.project_dimensions, config.supplemental_dimensions),
+            itertools.chain(
+                config.project_dimensions.values(), config.supplemental_dimensions.values()
+            ),
         )
         dataset_dim_stores = {}
         dataset_configs = {}
         for dataset_id in registered_datasets:
             dataset_config = registry.load_dataset_config(dataset_id)
             dataset_configs[dataset_id] = dataset_config
-            dataset_dim_stores[dataset_id] = DimensionStore.load(dataset_config.model.dimensions)
+            dataset_dim_stores[dataset_id] = DimensionStore.load(
+                dataset_config.dimensions.values()
+            )
 
         return cls(config, project_dimension_store, dataset_configs, dataset_dim_stores)
 

@@ -1,24 +1,20 @@
-import os
-from enum import Enum
-import logging
-from typing import Dict, List, Optional, Union
-import toml
+"""Manages the registry for a project."""
 
-from pydantic.fields import Field
-from pydantic.class_validators import root_validator, validator
+import logging
+from typing import List, Optional, Union
+
+from pydantic import Field
+from pydantic import validator
 from semver import VersionInfo
 
-from dsgrid.dimension.base import DSGBaseModel, serialize_model
-from dsgrid.config.project_config import ProjectConfig
-from dsgrid.config._config import ConfigRegistrationModel
+from dsgrid.data_models import DSGBaseModel, serialize_model
 from dsgrid.registry.common import (
-    RegistryType,
     DatasetRegistryStatus,
     ProjectRegistryStatus,
-    make_version,
+    ConfigRegistrationModel,
 )
-from dsgrid.registry.versioning import versioning, PROJECT_REGISTRY_PATH
-from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.files import dump_data
+from dsgrid.utils.versioning import make_version, handle_version_or_str
 
 
 logger = logging.getLogger(__name__)
@@ -81,10 +77,7 @@ class ProjectRegistryModel(DSGBaseModel):
     status: ProjectRegistryStatus = Field(
         tile="status", description="project registry status", default="Initial Registration"
     )
-    description: str = Field(
-        title="description", 
-        description="detail on the project or dataset"
-    )
+    description: str = Field(title="description", description="detail on the project or dataset")
     dataset_registries: Optional[List[ProjectDatasetRegistryModel]] = Field(
         title="dataset_registries",
         description="list of dataset registry",
@@ -97,9 +90,7 @@ class ProjectRegistryModel(DSGBaseModel):
 
     @validator("version")
     def check_version(cls, version):
-        if isinstance(version, str):
-            return make_version(version)
-        return version
+        return handle_version_or_str(version)
 
 
 class ProjectRegistry:

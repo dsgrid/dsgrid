@@ -8,22 +8,19 @@ is using the same dimension as the project?
 """
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Union, Dict
+from typing import List, Optional, Dict
 import os
 import logging
 
-import toml
-
-from pydantic.fields import Field
-from pydantic.class_validators import root_validator, validator
+from pydantic import Field
+from pydantic import validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
-from dsgrid.exceptions import DSGBaseException
-from dsgrid.dimension.base import DimensionType, DSGBaseModel
-from dsgrid.utils.aws import sync
-
-
-from dsgrid.config._config import TimeDimension, Dimension, ConfigRegistrationModel
+from dsgrid.config.dimensions import (
+    DimensionReferenceModel,
+)
+from dsgrid.data_models import DSGBaseModel
+from dsgrid.filesytem.aws import sync
 
 
 # TODO: likely needs refinement (missing mappings)
@@ -97,7 +94,7 @@ class DatasetConfigModel(DSGBaseModel):
         title="description",
         description="describe dataset in details",
     )
-    dimensions: List[Union[Dimension, TimeDimension]] = Field(
+    dimensions: List[DimensionReferenceModel] = Field(
         title="dimensions",
         description="dimensions defined by the dataset",
     )
@@ -106,21 +103,6 @@ class DatasetConfigModel(DSGBaseModel):
         title="metdata",
         description="Dataset Metadata",
     )
-
-    # TODO: can we reuse this validator? Its taken from the
-    #   project_config Diemnsions model
-    def handle_dimension_union(cls, value):
-        """
-        Validate dimension type work around for pydantic Union bug
-        related to: https://github.com/samuelcolvin/pydantic/issues/619
-        """
-        # NOTE: Errors inside Dimension or TimeDimension will be duplicated
-        # by Pydantic
-        if value["type"] == DimensionType.TIME.value:
-            val = TimeDimension(**value)
-        else:
-            val = Dimension(**value)
-        return val
 
     # TODO: if local path provided, we want to upload to S3 and set the path
     #   here to S3 path
@@ -159,13 +141,19 @@ class DatasetConfigModel(DSGBaseModel):
 class DatasetConfig:
     """Provides an interface to a DatasetConfigModel."""
 
-    def __init__(self, model):
+    def __init__(self, model, dimensions):
         self._model = model
+        self._dimensions = dimensions
 
     @classmethod
-    def load(cls, config_file):
+    def load(cls, config_file, dimension_manager):
         model = DatasetConfigModel.load(config_file)
-        return cls(model)
+        dimensions = dimension_manager.load_dimensions(model.dimensions)
+        return cls(model, dimensions)
+
+    @property
+    def dimensions(self):
+        return self._dimensions
 
     @property
     def model(self):

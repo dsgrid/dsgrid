@@ -8,7 +8,7 @@ class DimensionRecords:
     """Stores dimension records by type."""
 
     def __init__(self):
-        self._store = {}  # {type of DSGBaseDimensionModel: pyspark.sql.dataframe.DataFrame}
+        self._store = {}  # {type of DimensionRecordBaseModel: pyspark.sql.dataframe.DataFrame}
         self._spark = SparkSession.getActiveSession()
 
     def add_dataframe(self, dimension):
@@ -16,7 +16,7 @@ class DimensionRecords:
 
         Parameters
         ----------
-        dimension : DSGBaseDimensionModel
+        dimension : DimensionRecordBaseModel
 
         """
         df = self._spark.createDataFrame((Row(**x) for x in dimension.records))
@@ -32,7 +32,7 @@ class DimensionRecords:
 
         Parameters
         ----------
-        dimension_class : DSGBaseDimensionModel
+        dimension_class : DimensionRecordBaseModel
 
         Returns
         -------
@@ -47,7 +47,7 @@ class DimensionRecords:
 
         Parameters
         ----------
-        dimension_class : DSGBaseDimensionModel
+        dimension_class : DimensionRecordBaseModel
         record_id : id
 
         """
@@ -63,7 +63,7 @@ class DimensionRecords:
 
         Parameters
         ----------
-        dimension_class : DSGBaseDimensionModel
+        dimension_class : DimensionRecordBaseModel
         record_id : id
 
         """
@@ -95,7 +95,7 @@ class DimensionRecords:
 
         Parameters
         ----------
-        dimension_class : DSGBaseDimensionModel
+        dimension_class : DimensionRecordBaseModel
             dataclass
 
         Returns
@@ -131,7 +131,7 @@ def deserialize_row(dimension_class, row):
 
     Parameters
     ----------
-    dimension_class : DSGBaseDimensionModel
+    dimension_class : DimensionRecordBaseModel
     row : pyspark.sql.types.Row
         row read from spark DataFrame
 

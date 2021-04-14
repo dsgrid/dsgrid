@@ -19,7 +19,7 @@ class DimensionType(Enum):
     WEATHER = "weather"
     MODEL_YEAR = "model_year"
     SCENARIO = "scenario"
-    MODEL = "model"
+    DATA_SOURCE = "data_source"
 
 
 class DimensionRecordBaseModel(DSGBaseModel):
@@ -43,8 +43,8 @@ class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
 
-class ModelDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all load model dimensions"""
+class DataSourceDimensionBaseModel(DimensionRecordBaseModel):
+    """Base class for all data source dimensions"""
 
 
 class ModelYearDimensionBaseModel(DimensionRecordBaseModel):
@@ -80,7 +80,7 @@ _DIMENSION_TO_MODEL = {
     DimensionType.WEATHER: WeatherDimensionBaseModel,
     DimensionType.MODEL_YEAR: ModelYearDimensionBaseModel,
     DimensionType.SCENARIO: ScenarioDimensionBaseModel,
-    DimensionType.MODEL: ModelDimensionBaseModel,
+    DimensionType.DATA_SOURCE: DataSourceDimensionBaseModel,
 }
 
 

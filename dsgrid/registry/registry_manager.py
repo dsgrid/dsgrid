@@ -399,7 +399,7 @@ class RegistryManager(RegistryManagerBase):
             + os.path.splitext(config_file)[1]
         )
 
-    def register_dimension(self, config_file, submitter, log_message):
+    def register_dimensions(self, config_file, submitter, log_message):
         """Registers dimensions for projects and datasets.
 
         Parameters

@@ -94,12 +94,12 @@ def register_project(ctx, project_config_file, log_message):
     help="reason for submission",
 )
 @click.pass_context
-def register_dimension(ctx, dimension_config_file, log_message):
+def register_dimensions(ctx, dimension_config_file, log_message):
     """Register new dimensions with the dsgrid repository."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
-    manager.register_dimension(dimension_config_file, submitter, log_message)
+    manager.register_dimensions(dimension_config_file, submitter, log_message)
 
 
 @click.command()
@@ -217,7 +217,7 @@ registry.add_command(list_)
 registry.add_command(remove_dataset)
 registry.add_command(remove_project)
 registry.add_command(register_project)
-registry.add_command(register_dimension)
+registry.add_command(register_dimensions)
 registry.add_command(register_association_tables)
 registry.add_command(submit_dataset)
 registry.add_command(sync)

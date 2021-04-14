@@ -65,7 +65,7 @@ def test_register_project_and_dataset(test_data_dir):
             test_data_dir / dataset_dir / "dimension.toml",
         ):
             check_run_command(
-                f"dsgrid registry --path={path} register-dimension {dim_config_file}"
+                f"dsgrid registry --path={path} register-dimensions {dim_config_file}"
             )
 
         cmd = (

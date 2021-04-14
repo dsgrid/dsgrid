@@ -20,6 +20,7 @@ from dsgrid.config.association_tables import AssociationTableReferenceListModel
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.exceptions import DSGValueNotStored
 from dsgrid.filesytem.factory import make_filesystem_interface
 from .common import (
     RegistryType,
@@ -209,6 +210,11 @@ class RegistryManager(RegistryManagerBase):
             return project_config
 
         config_file = self._get_project_config_file(project_id, version)
+        if not self._fs_intf.exists(config_file):
+            raise DSGValueNotStored(
+                f"config file for project={project_id} {version} does not exist"
+            )
+
         project_config = ProjectConfig.load(config_file)
         project_config.load_dimensions(self._dimension_mgr)
         self._projects[key] = project_config

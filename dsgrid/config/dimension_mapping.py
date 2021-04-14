@@ -13,7 +13,7 @@ from dsgrid.data_models import DSGBaseModel
 logger = logging.getLogger(__name__)
 
 
-class DimensionMapByAssocationTableModel(DSGBaseModel):
+class DimensionMapByAssociationTableModel(DSGBaseModel):
     """Provides mapping within a dimension type."""
 
     from_dimension: DimensionReferenceModel
@@ -35,7 +35,7 @@ class DimensionMapByAssocationTableModel(DSGBaseModel):
 
 class DimensionMappingsModel(DSGBaseModel):
     # This could change to a List[Union] if we have different mapping types.
-    mappings: List[DimensionMapByAssocationTableModel] = Field(
+    mappings: List[DimensionMapByAssociationTableModel] = Field(
         title="mappings",
         description="list of dimension mappings",
     )

@@ -26,7 +26,8 @@ from pydantic import Field
 from pydantic import root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.config.dimensions import (
+from .config_base import ConfigBase
+from .dimensions import (
     DimensionReferenceModel,
     DimensionType,
 )
@@ -201,44 +202,38 @@ class ProjectConfigModel(DSGBaseModel):
         return project_id
 
 
-class ProjectConfig:
+class ProjectConfig(ConfigBase):
     """Provides an interface to a ProjectConfigModel."""
 
-    def __init__(self, model, project_dimensions, supplemental_dimensions):
-        self._model = model
-        self._project_dimensions = project_dimensions
-        self._supplemental_dimensions = supplemental_dimensions
-        self._check_project_dimensions()
+    def __init__(self, model):
+        super().__init__(model)
+        self._project_dimensions = {}
+        self._supplemental_dimensions = {}
 
-    @classmethod
-    def load(cls, config_file, dimension_manager):
-        """Load a ProjectConfig from a config file.
+    @staticmethod
+    def model_class():
+        return ProjectConfigModel
+
+    def load_dimensions(self, dimension_manager):
+        """Load all project dimensions.
 
         Parameters
         ----------
-        config_file : str
-        dimension_manager : DimesionRegistryManager
-
-        Returns
-        -------
-        ProjectConfig
+        dimension_manager : DimensionRegistryManager
 
         """
-        if not os.path.exists(config_file):
-            raise DSGValueNotStored(f"{config_file} does not exist. Check the version.")
-        model = ProjectConfigModel.load(config_file)
-        project_dimensions = dimension_manager.load_dimensions(model.dimensions.project_dimensions)
+        project_dimensions = dimension_manager.load_dimensions(
+            self.model.dimensions.project_dimensions
+        )
         supplemental_dimensions = dimension_manager.load_dimensions(
-            model.dimensions.supplemental_dimensions
+            self.model.dimensions.supplemental_dimensions
         )
-        return cls(model, project_dimensions, supplemental_dimensions)
-
-    def _check_project_dimensions(self):
-        dims = itertools.chain(
-            self._project_dimensions.values(), self._supplemental_dimensions.values()
-        )
+        dims = itertools.chain(project_dimensions.values(), supplemental_dimensions.values())
         check_uniqueness((x.name for x in dims), "dimension name")
         check_uniqueness((getattr(x, "cls") for x in dims), "dimension cls")
+
+        self._project_dimensions.update(project_dimensions)
+        self._supplemental_dimensions.update(supplemental_dimensions)
 
     def check_dataset_dimension_mappings(self, dataset_config, dimension_mappings):
         """Check that a dataset provides required mappings to the project.
@@ -268,7 +263,7 @@ class ProjectConfig:
 
     def get_dataset(self, dataset_id):
         """Return a dataset by ID."""
-        for dataset in self._model.input_datasets.datasets:
+        for dataset in self.model.input_datasets.datasets:
             if dataset.dataset_id == dataset_id:
                 return dataset
 
@@ -284,16 +279,12 @@ class ProjectConfig:
         return False
 
     def iter_datasets(self):
-        for dataset in self._model.input_datasets.datasets:
+        for dataset in self.model.input_datasets.datasets:
             yield dataset
 
     def iter_dataset_ids(self):
-        for dataset in self._model.input_datasets.datasets:
+        for dataset in self.model.input_datasets.datasets:
             yield dataset.dataset_id
-
-    @property
-    def model(self):
-        return self._model
 
     @property
     def project_dimensions(self):

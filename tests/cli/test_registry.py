@@ -50,6 +50,8 @@ def test_register_project_and_dataset(test_data_dir):
 
         path = create_registry(base_dir)
         dimension_config = test_data_dir / "dimension.toml"
+        # TODO DT
+        # dimension_config_comstock = test_data_dir / "datasets/input/sector_models/comstock/dimension.toml"
         check_run_command(f"dsgrid registry --path={path} register-dimension {dimension_config}")
 
         project_config = test_data_dir / "project.toml"

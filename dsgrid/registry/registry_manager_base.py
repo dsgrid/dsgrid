@@ -9,10 +9,6 @@ from dsgrid.filesytem.local_filesystem import LocalFilesystem
 class RegistryManagerBase:
     """Base class for all registry managers."""
 
-    DATASET_REGISTRY_PATH = Path("datasets")
-    PROJECT_REGISTRY_PATH = Path("projects")
-    DIMENSION_REGISTRY_PATH = Path("dimensions")
-
     def __init__(self, path, fs_interface):
         if isinstance(fs_interface, AwsS3Bucket):
             self._path = fs_interface.path

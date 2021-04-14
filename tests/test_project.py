@@ -12,7 +12,7 @@ def test_project_load():
     assert isinstance(project, Project)
     project = Project.load("test", version="1.0.0")
     assert isinstance(project, Project)
-    with pytest.raises(DSGValueNotStored):
+    with pytest.raises(FileNotFoundError):
         project = Project.load("test", version="0.0.0")
         assert isinstance(project, Project)
 

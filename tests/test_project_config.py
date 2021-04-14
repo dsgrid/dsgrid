@@ -19,7 +19,8 @@ def dimension_manager():
 
 
 def test_good_project_config(dimension_manager):
-    config = ProjectConfig.load(PROJECT_CONFIG_FILE, dimension_manager)
+    config = ProjectConfig.load(PROJECT_CONFIG_FILE)
+    config.load_dimensions(dimension_manager)
     assert isinstance(config, ProjectConfig)
 
 

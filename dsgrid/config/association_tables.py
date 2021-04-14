@@ -1,4 +1,7 @@
+import hashlib
+import logging
 import os
+from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from pydantic import Field, validator
@@ -8,7 +11,12 @@ from .config_base import ConfigBase
 from .dimensions import DimensionReferenceModel
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.registry.common import make_registry_id
+from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.versioning import handle_version_or_str
+
+
+logger = logging.getLogger(__name__)
 
 
 class AssociationTableModel(DSGBaseModel):
@@ -27,6 +35,13 @@ class AssociationTableModel(DSGBaseModel):
         alias="file",
         description="filename containing association table records",
     )
+    file_hash: Optional[str] = Field(
+        title="file_hash", description="hash of the contents of the file"
+    )
+    description: str = Field(
+        title="description",
+        description="description of association table",
+    )
     association_table_id: Optional[str] = Field(
         title="association_table_id",
         alias="id",
@@ -39,6 +54,11 @@ class AssociationTableModel(DSGBaseModel):
         if not os.path.exists(filename):
             raise ValueError(f"{filename} does not exist")
         return filename
+
+    @validator("file_hash")
+    def compute_file_hash(cls, file_hash, values):
+        """Validate record file"""
+        return file_hash or compute_file_hash(values["filename"])
 
 
 class AssociationTableConfigModel(DSGBaseModel):
@@ -59,7 +79,15 @@ class AssociationTableConfig(ConfigBase):
 
     @staticmethod
     def model_class():
-        return AssociationTableConfig
+        return AssociationTableConfigModel
+
+    def assign_ids(self):
+        """Assign unique IDs to each table in the config"""
+        for table in self.model.association_tables:
+            from_type = table.from_dimension.dimension_type
+            to_type = table.to_dimension.dimension_type
+            table.association_table_id = make_registry_id((from_type.value, to_type.value))
+            logger.info("Created association table ID %s", table.association_table_id)
 
 
 class AssociationTableReferenceModel(DSGBaseModel):
@@ -67,12 +95,10 @@ class AssociationTableReferenceModel(DSGBaseModel):
 
     from_dimension_type: DimensionType = Field(
         title="from_dimension_type",
-        alias="type",
         description="type of the dimension",
     )
     to_dimension_type: DimensionType = Field(
         title="to_dimension_type",
-        alias="type",
         description="type of the dimension",
     )
     association_table_id: str = Field(
@@ -87,3 +113,12 @@ class AssociationTableReferenceModel(DSGBaseModel):
     @validator("version")
     def check_version(cls, version):
         return handle_version_or_str(version)
+
+
+class AssociationTableReferenceListModel(DSGBaseModel):
+    """List of association table references"""
+
+    references: List[AssociationTableReferenceModel] = Field(
+        title="references",
+        description="list of association table references",
+    )

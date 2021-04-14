@@ -19,7 +19,7 @@
 
 """
 import itertools
-import os
+import logging
 from typing import Dict, List, Optional, Union
 
 from pydantic import Field
@@ -27,6 +27,7 @@ from pydantic import root_validator, validator
 from semver import VersionInfo
 
 from .config_base import ConfigBase
+from .association_tables import AssociationTableReferenceListModel
 from .dimensions import (
     DimensionReferenceModel,
     DimensionType,
@@ -44,6 +45,8 @@ from dsgrid.utils.versioning import handle_version_or_str
 
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
+
+logger = logging.getLogger(__name__)
 
 
 class DimensionsModel(DSGBaseModel):
@@ -163,6 +166,21 @@ class InputDatasetsModel(DSGBaseModel):
     #   with the dimension records
 
 
+class DimensionMappingsModel(DSGBaseModel):
+    """Defines intra-project and dataset-to-project dimension mappings."""
+
+    project: Optional[List[AssociationTableReferenceListModel]] = Field(
+        title="project",
+        description="intra-project mappings",
+        default=[],
+    )
+    datasets: Optional[Dict[str, AssociationTableReferenceListModel]] = Field(
+        title="datasets",
+        description="dataset-to-project mappings for each registered dataset",
+        default={},
+    )
+
+
 class ProjectConfigModel(DSGBaseModel):
     """Represents project configurations"""
 
@@ -182,6 +200,11 @@ class ProjectConfigModel(DSGBaseModel):
         title="dimensions",
         description="dimensions",
     )
+    dimension_mappings: Optional[DimensionMappingsModel] = Field(
+        title="dimension_mappings",
+        description="intra-project and dataset-to-project dimension mappings",
+        default=DimensionMappingsModel(),
+    )
     registration: Optional[Dict] = Field(
         title="registration",
         description="registration information",
@@ -193,7 +216,7 @@ class ProjectConfigModel(DSGBaseModel):
 
     @validator("project_id")
     def check_project_id_handle(cls, project_id):
-        """Check for valid characteris in project id"""
+        """Check for valid characters in project id"""
         # TODO: any other invalid character for the project_id?
         # TODO: may want to check for pre-existing project_id
         #       (e.g., LA100 Run 1 vs. LA100 Run 0 kind of thing)
@@ -235,14 +258,46 @@ class ProjectConfig(ConfigBase):
         self._project_dimensions.update(project_dimensions)
         self._supplemental_dimensions.update(supplemental_dimensions)
 
-    def check_dataset_dimension_mappings(self, dataset_config, dimension_mappings):
+    def add_dataset_dimension_mappings(self, dataset_config, references):
+        """Add a dataset's dimension mappings to the project.
+
+        Parameters
+        ----------
+        dataset_config : DatasetConfig
+        references : list
+            list of AssociationTableReferenceModel
+
+        Raises
+        ------
+        DSGInvalidDimensionMapping
+            Raised if a requirement is violated.
+
+        """
+        self.check_dataset_dimension_mappings(dataset_config, references)
+        if dataset_config.model.dataset_id not in self.model.dimension_mappings:
+            self.model.dimension_mappings.datasets[
+                dataset_config.model.dataset_id
+            ] = AssociationTableReferenceListModel(references=[])
+        mappings = self.model.dimension_mappings.datasets[dataset_config.model.dataset_id]
+        existing_ids = set((x.association_table_id for x in mappings.references))
+        for reference in references:
+            if reference.association_table_id not in existing_ids:
+                mappings.references.append(reference)
+                logger.info(
+                    "Added dimension mapping for dataset=%s: %s",
+                    dataset_config.model.dataset_id,
+                    reference.association_table_id,
+                )
+
+    def check_dataset_dimension_mappings(
+        self, dataset_config, references: AssociationTableReferenceListModel
+    ):
         """Check that a dataset provides required mappings to the project.
 
         Parameters
         ----------
         dataset_config : DatasetConfig
-        dimension_mappings : list
-            list of DimensionMapByAssocationTableModel
+        references : AssociationTableReferenceListModel
 
         Raises
         ------

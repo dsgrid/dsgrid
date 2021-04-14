@@ -74,6 +74,10 @@ class DimensionRegistryManager(RegistryManagerBase):
         if not self.has_dimension_id(key):
             raise DSGValueNotStored(f"dimension not stored: {key}")
 
+        dimension = self._dimensions.get(key)
+        if dimension is not None:
+            return dimension
+
         if key.type == DimensionType.TIME:
             cls = TimeDimensionModel
         else:
@@ -95,13 +99,11 @@ class DimensionRegistryManager(RegistryManagerBase):
         bool
 
         """
-        if (
+        return (
             key.type in self._dimension_versions
             and key.id in self._dimension_versions[key.type]
             and key.version in self._dimension_versions[key.type][key.id]
-        ):
-            return True
-        return False
+        )
 
     def list_dimension_types(self):
         """Return the dimension types present in the registry."""
@@ -119,7 +121,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         list
 
         """
-        return sorted(list(self._dimension_versions[dimension_type]))
+        return sorted(list(self._dimension_versions[dimension_type].keys()))
 
     def load_dimensions(self, dimension_references):
         """Load dimensions from files.

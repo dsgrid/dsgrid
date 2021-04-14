@@ -297,7 +297,8 @@ class ProjectConfig(ConfigBase):
         Parameters
         ----------
         dataset_config : DatasetConfig
-        references : AssociationTableReferenceListModel
+        references : list
+            list of AssociationTableReferenceModel
 
         Raises
         ------

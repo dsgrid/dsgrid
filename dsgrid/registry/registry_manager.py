@@ -569,9 +569,7 @@ class RegistryManager(RegistryManagerBase):
 
         table_references = []
         for filename in dimension_mapping_files:
-            print(f"************** {filename}")
             contents = Path(filename).read_text()
-            print(f"{contents}")
             for ref in AssociationTableReferenceListModel.load(filename).references:
                 key = ConfigKey(ref.association_table_id, ref.version)
                 if not self.association_table_dimension_manager.has_association_table_id(key):

@@ -34,7 +34,6 @@ def replace_association_table_uuids(filename, uuids):
     regex = re.compile(
         r"association_table_id = \"(?P<from_dimension>\w+)__(?P<to_dimension>\w+)__(?P<uuid>[-0-9a-f]+)\""
     )
-    tmp = []
     with fileinput.input(files=[filename], inplace=True) as f:
         for line in f:
             match = regex.search(line)
@@ -44,7 +43,6 @@ def replace_association_table_uuids(filename, uuids):
                 from_dimension = match.groupdict()["from_dimension"]
                 to_dimension = match.groupdict()["to_dimension"]
                 new_uuid = uuids[(from_dimension, to_dimension)]
-                tmp.append(new_uuid)
                 print(f'association_table_id = "{from_dimension}__{to_dimension}__{new_uuid}"')
 
 

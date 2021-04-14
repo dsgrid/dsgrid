@@ -33,7 +33,7 @@ class AssociationTableRegistryManager(RegistryManagerBase):
         self._associations = {}  # key = (association_table_id, version)
         # value = AssociationTableBaseModel
         self._association_versions = {}
-        self._associations = {}  # key = AssociationTableKey, value = AssociationTableModel
+        self._associations = {}  # key = ConfigKey, value = AssociationTableModel
 
         for table_id in self._fs_intf.listdir(self._path, directories_only=True):
             id_path = Path(self._path) / table_id
@@ -210,6 +210,9 @@ class AssociationTableRegistryManager(RegistryManagerBase):
             self._fs_intf.copy_file(config_dir / table.filename, dest_record_file)
 
             model_data = serialize_model(table)
+            # We have to make this change in the serialized dict instead of
+            # model because Pydantic will fail the assignment due to not being
+            # able to find the path.
             model_data["file"] = os.path.basename(table.filename)
             dump_data(model_data, dest_dir / dest_config_filename)
 

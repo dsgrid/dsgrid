@@ -57,7 +57,7 @@ class AssociationTableModel(DSGBaseModel):
 
     @validator("file_hash")
     def compute_file_hash(cls, file_hash, values):
-        """Validate record file"""
+        """Compute file hash"""
         return file_hash or compute_file_hash(values["filename"])
 
 

@@ -348,8 +348,8 @@ class ProjectConfig(ConfigBase):
 
         Returns
         -------
-        list
-            list of DimensionBaseModel
+        dict
+            dict of DimensionBaseModel keyed by DimensionKey
 
         """
         return self._project_dimensions
@@ -360,8 +360,8 @@ class ProjectConfig(ConfigBase):
 
         Returns
         -------
-        list
-            list of DimensionBaseModel
+        dict
+            dict of DimensionBaseModel keyed by DimensionKey
 
         """
         return self._supplemental_dimensions

@@ -57,10 +57,9 @@ class AssociationTableRegistryManager(RegistryManagerBase):
 
         """
         hashes = set()
-        for table_id, versions in self._association_versions.items():
-            for version in versions:
-                table = self.get_association_table(table_id, version)
-                hashes.add(table.file_hash)
+        for table_id in self._association_versions:
+            table = self.get_association_table(table_id)
+            hashes.add(table.file_hash)
 
         duplicates = [
             x.association_table_id
@@ -73,13 +72,14 @@ class AssociationTableRegistryManager(RegistryManagerBase):
             else:
                 raise DSGDuplicateRecords(f"duplicate association table records: {duplicates}")
 
-    def get_association_table(self, association_table_id, version):
+    def get_association_table(self, association_table_id, version=None):
         """Get the association_table matching the parameters. Returns from cache if already loaded.
 
         Parameters
         ----------
         association_table_id : str
         version : VersionInfo
+            If None, return the lastest version.
 
         Returns
         -------
@@ -91,6 +91,8 @@ class AssociationTableRegistryManager(RegistryManagerBase):
             Raised if the association_table is not stored.
 
         """
+        if version is None:
+            version = sorted(list(self._association_versions[association_table_id]))[-1]
         key = ConfigKey(association_table_id, version)
         return self.get_association_table_by_key(key)
 

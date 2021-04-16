@@ -222,8 +222,7 @@ class RegistryManager(RegistryManagerBase):
                 f"config file for project={project_id} {version} does not exist"
             )
 
-        project_config = ProjectConfig.load(config_file)
-        project_config.load_dimensions(self._dimension_mgr)
+        project_config = ProjectConfig.load(config_file, self._dimension_mgr)
         self._projects[key] = project_config
         logger.info("Loaded ProjectConfig for project_id=%s", key)
         return project_config
@@ -250,8 +249,7 @@ class RegistryManager(RegistryManagerBase):
 
         registry = self.load_dataset_registry(dataset_id)
         config_file = self._get_dataset_config_file(dataset_id, registry.version)
-        dataset_config = DatasetConfig.load(config_file)
-        dataset_config.load_dimensions(self._dimension_mgr)
+        dataset_config = DatasetConfig.load(config_file, self._dimension_mgr)
         self._datasets[dataset_id] = dataset_config
         logger.info("Loaded DatasetConfig for dataset_id=%s", dataset_id)
         return dataset_config
@@ -458,8 +456,7 @@ class RegistryManager(RegistryManagerBase):
             Raised if the config_file is invalid.
 
         """
-        config = ProjectConfig.load(config_file)
-        config.load_dimensions(self._dimension_mgr)
+        config = ProjectConfig.load(config_file, self._dimension_mgr)
         if config.model.project_id in self._project_ids:
             raise ValueError(f"{config.model.project_id} is already registered")
 
@@ -563,8 +560,7 @@ class RegistryManager(RegistryManagerBase):
             Raised if the project does not contain this dataset.
 
         """
-        config = DatasetConfig.load(config_file)
-        config.load_dimensions(self._dimension_mgr)
+        config = DatasetConfig.load(config_file, self._dimension_mgr)
         project_registry = self.load_project_registry(project_id)
 
         if project_registry.has_dataset(config.model.dataset_id, DatasetRegistryStatus.REGISTERED):

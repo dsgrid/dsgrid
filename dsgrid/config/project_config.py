@@ -237,6 +237,12 @@ class ProjectConfig(ConfigBase):
     def model_class():
         return ProjectConfigModel
 
+    @classmethod
+    def load(cls, config_file, dimension_manager):
+        config = cls._load(config_file)
+        config.load_dimensions(dimension_manager)
+        return config
+
     def load_dimensions(self, dimension_manager):
         """Load all project dimensions.
 

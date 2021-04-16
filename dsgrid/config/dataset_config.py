@@ -77,15 +77,10 @@ class DatasetConfigModel(DSGBaseModel):
         title="dataset_type",
         description="DSG defined input dataset type",
     )
-    # TODO: is this necessary?
-    model_name: str = Field(
-        title="model_name",
-        description="model name",
-    )
-    # TODO: This must be validated against the same field in ProjectConfigModel at registration.
-    model_sector: str = Field(
-        title="model_sector",
-        description="model sector",
+    # TODO: This must be validated against the project's dimension records for data_source
+    data_source: str = Field(
+        title="data_source",
+        description="data source name, e.g. 'ComStock'",
     )
     path: str = Field(
         title="path",
@@ -135,7 +130,6 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: check dataset_dimension_mapping (optional) if exists
         # TODO: check project_dimension_mapping (optional) if exists
 
-        # TODO AWS
         return local_path
 
 

@@ -20,7 +20,7 @@ class AssociationTableModel(DimensionMappingBaseModel):
         description="filename containing association table records",
     )
     file_hash: Optional[str] = Field(
-        title="file_hash", description="hash of the contents of the file"
+        title="file_hash", description="hash of the contents of the file, computed by dsgrid"
     )
 
     @validator("filename")

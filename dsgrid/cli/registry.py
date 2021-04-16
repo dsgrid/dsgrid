@@ -107,7 +107,7 @@ def register_dimensions(ctx, dimension_config_file, log_message):
     default=False,
     is_flag=True,
     show_default=True,
-    help="Register the dimension mappings even if they are duplicate",
+    help="Register the dimension mappings even if there are duplicates",
 )
 @click.option(
     "-l",

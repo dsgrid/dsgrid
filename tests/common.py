@@ -1,3 +1,5 @@
+"""Common functions used across tests"""
+
 import fileinput
 import os
 import re

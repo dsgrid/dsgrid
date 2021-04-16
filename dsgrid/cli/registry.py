@@ -1,5 +1,7 @@
 """Manages a dsgrid registry."""
 
+# TODO: need to support a dataset registry CLI seperate from submit-dataset
+
 import getpass
 import logging
 

@@ -71,8 +71,7 @@ def remove_project(ctx, project_id):
 @click.option(
     "-l",
     "--log-message",
-    default="Initial submission",
-    show_default=True,
+    required=True,
     help="reason for submission",
 )
 @click.pass_context
@@ -89,8 +88,7 @@ def register_project(ctx, project_config_file, log_message):
 @click.option(
     "-l",
     "--log-message",
-    default="Initial submission",
-    show_default=True,
+    required=True,
     help="reason for submission",
 )
 @click.pass_context
@@ -114,8 +112,7 @@ def register_dimensions(ctx, dimension_config_file, log_message):
 @click.option(
     "-l",
     "--log-message",
-    default="Initial submission",
-    show_default=True,
+    required=True,
     help="reason for submission",
 )
 @click.pass_context

@@ -134,6 +134,7 @@ class RegistryManager(RegistryManagerBase):
             path / DatasetRegistry.registry_path(),
             path / ProjectRegistry.registry_path(),
             path / DimensionRegistry.registry_path(),
+            path / DimensionMappingRegistry.registry_path(),
         ):
             if not fs_interface.exists(str(dir_name)):
                 raise FileNotFoundError(f"{dir_name} does not exist")

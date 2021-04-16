@@ -9,6 +9,10 @@ class DSGBaseWarning(Warning):
     """Base class for all dsgrid warnings."""
 
 
+class DSGDuplicateRecords(Warning):
+    """Raised if the user attempts to store duplicate records."""
+
+
 class DSGInvalidField(DSGBaseException):
     """Raised if a field is missing or invalid."""
 

@@ -19,14 +19,16 @@
 
 """
 import itertools
-import os
+import logging
 from typing import Dict, List, Optional, Union
 
 from pydantic import Field
 from pydantic import root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.config.dimensions import (
+from .config_base import ConfigBase
+from .dimension_mapping_base import DimensionMappingReferenceListModel
+from .dimensions import (
     DimensionReferenceModel,
     DimensionType,
 )
@@ -43,6 +45,8 @@ from dsgrid.utils.versioning import handle_version_or_str
 
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
+
+logger = logging.getLogger(__name__)
 
 
 class DimensionsModel(DSGBaseModel):
@@ -162,6 +166,21 @@ class InputDatasetsModel(DSGBaseModel):
     #   with the dimension records
 
 
+class DimensionMappingsModel(DSGBaseModel):
+    """Defines intra-project and dataset-to-project dimension mappings."""
+
+    project: Optional[List[DimensionMappingReferenceListModel]] = Field(
+        title="project",
+        description="intra-project mappings",
+        default=[],
+    )
+    datasets: Optional[Dict[str, DimensionMappingReferenceListModel]] = Field(
+        title="datasets",
+        description="dataset-to-project mappings for each registered dataset",
+        default={},
+    )
+
+
 class ProjectConfigModel(DSGBaseModel):
     """Represents project configurations"""
 
@@ -181,6 +200,11 @@ class ProjectConfigModel(DSGBaseModel):
         title="dimensions",
         description="dimensions",
     )
+    dimension_mappings: Optional[DimensionMappingsModel] = Field(
+        title="dimension_mappings",
+        description="intra-project and dataset-to-project dimension mappings",
+        default=DimensionMappingsModel(),
+    )
     registration: Optional[Dict] = Field(
         title="registration",
         description="registration information",
@@ -192,7 +216,7 @@ class ProjectConfigModel(DSGBaseModel):
 
     @validator("project_id")
     def check_project_id_handle(cls, project_id):
-        """Check for valid characteris in project id"""
+        """Check for valid characters in project id"""
         # TODO: any other invalid character for the project_id?
         # TODO: may want to check for pre-existing project_id
         #       (e.g., LA100 Run 1 vs. LA100 Run 0 kind of thing)
@@ -201,53 +225,86 @@ class ProjectConfigModel(DSGBaseModel):
         return project_id
 
 
-class ProjectConfig:
+class ProjectConfig(ConfigBase):
     """Provides an interface to a ProjectConfigModel."""
 
-    def __init__(self, model, project_dimensions, supplemental_dimensions):
-        self._model = model
-        self._project_dimensions = project_dimensions
-        self._supplemental_dimensions = supplemental_dimensions
-        self._check_project_dimensions()
+    def __init__(self, model):
+        super().__init__(model)
+        self._project_dimensions = {}
+        self._supplemental_dimensions = {}
+
+    @staticmethod
+    def model_class():
+        return ProjectConfigModel
 
     @classmethod
     def load(cls, config_file, dimension_manager):
-        """Load a ProjectConfig from a config file.
+        config = cls._load(config_file)
+        config.load_dimensions(dimension_manager)
+        return config
+
+    def load_dimensions(self, dimension_manager):
+        """Load all project dimensions.
 
         Parameters
         ----------
-        config_file : str
-        dimension_manager : DimesionRegistryManager
-
-        Returns
-        -------
-        ProjectConfig
+        dimension_manager : DimensionRegistryManager
 
         """
-        if not os.path.exists(config_file):
-            raise DSGValueNotStored(f"{config_file} does not exist. Check the version.")
-        model = ProjectConfigModel.load(config_file)
-        project_dimensions = dimension_manager.load_dimensions(model.dimensions.project_dimensions)
+        project_dimensions = dimension_manager.load_dimensions(
+            self.model.dimensions.project_dimensions
+        )
         supplemental_dimensions = dimension_manager.load_dimensions(
-            model.dimensions.supplemental_dimensions
+            self.model.dimensions.supplemental_dimensions
         )
-        return cls(model, project_dimensions, supplemental_dimensions)
-
-    def _check_project_dimensions(self):
-        dims = itertools.chain(
-            self._project_dimensions.values(), self._supplemental_dimensions.values()
-        )
+        dims = itertools.chain(project_dimensions.values(), supplemental_dimensions.values())
         check_uniqueness((x.name for x in dims), "dimension name")
         check_uniqueness((getattr(x, "cls") for x in dims), "dimension cls")
 
-    def check_dataset_dimension_mappings(self, dataset_config, dimension_mappings):
+        self._project_dimensions.update(project_dimensions)
+        self._supplemental_dimensions.update(supplemental_dimensions)
+
+    def add_dataset_dimension_mappings(self, dataset_config, references):
+        """Add a dataset's dimension mappings to the project.
+
+        Parameters
+        ----------
+        dataset_config : DatasetConfig
+        references : list
+            list of DimensionMappingReferenceModel
+
+        Raises
+        ------
+        DSGInvalidDimensionMapping
+            Raised if a requirement is violated.
+
+        """
+        self.check_dataset_dimension_mappings(dataset_config, references)
+        if dataset_config.model.dataset_id not in self.model.dimension_mappings:
+            self.model.dimension_mappings.datasets[
+                dataset_config.model.dataset_id
+            ] = DimensionMappingReferenceListModel(references=[])
+        mappings = self.model.dimension_mappings.datasets[dataset_config.model.dataset_id]
+        existing_ids = set((x.mapping_id for x in mappings.references))
+        for reference in references:
+            if reference.mapping_id not in existing_ids:
+                mappings.references.append(reference)
+                logger.info(
+                    "Added dimension mapping for dataset=%s: %s",
+                    dataset_config.model.dataset_id,
+                    reference.mapping_id,
+                )
+
+    def check_dataset_dimension_mappings(
+        self, dataset_config, references: DimensionMappingReferenceListModel
+    ):
         """Check that a dataset provides required mappings to the project.
 
         Parameters
         ----------
         dataset_config : DatasetConfig
-        dimension_mappings : list
-            list of DimensionMapByAssocationTableModel
+        references : list
+            list of DimensionMappingReferenceModel
 
         Raises
         ------
@@ -268,7 +325,7 @@ class ProjectConfig:
 
     def get_dataset(self, dataset_id):
         """Return a dataset by ID."""
-        for dataset in self._model.input_datasets.datasets:
+        for dataset in self.model.input_datasets.datasets:
             if dataset.dataset_id == dataset_id:
                 return dataset
 
@@ -284,16 +341,12 @@ class ProjectConfig:
         return False
 
     def iter_datasets(self):
-        for dataset in self._model.input_datasets.datasets:
+        for dataset in self.model.input_datasets.datasets:
             yield dataset
 
     def iter_dataset_ids(self):
-        for dataset in self._model.input_datasets.datasets:
+        for dataset in self.model.input_datasets.datasets:
             yield dataset.dataset_id
-
-    @property
-    def model(self):
-        return self._model
 
     @property
     def project_dimensions(self):
@@ -301,8 +354,8 @@ class ProjectConfig:
 
         Returns
         -------
-        list
-            list of DimensionBaseModel
+        dict
+            dict of DimensionBaseModel keyed by DimensionKey
 
         """
         return self._project_dimensions
@@ -313,8 +366,8 @@ class ProjectConfig:
 
         Returns
         -------
-        list
-            list of DimensionBaseModel
+        dict
+            dict of DimensionBaseModel keyed by DimensionKey
 
         """
         return self._supplemental_dimensions

@@ -16,7 +16,8 @@ from pydantic import Field
 from pydantic import validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
-from dsgrid.config.dimensions import (
+from .config_base import ConfigBase
+from .dimensions import (
     DimensionReferenceModel,
 )
 from dsgrid.data_models import DSGBaseModel
@@ -138,26 +139,36 @@ class DatasetConfigModel(DSGBaseModel):
         return local_path
 
 
-class DatasetConfig:
+class DatasetConfig(ConfigBase):
     """Provides an interface to a DatasetConfigModel."""
 
-    def __init__(self, model, dimensions):
-        self._model = model
-        self._dimensions = dimensions
+    def __init__(self, model):
+        super().__init__(model)
+        self._dimensions = {}
+
+    @staticmethod
+    def model_class():
+        return DatasetConfigModel
 
     @classmethod
     def load(cls, config_file, dimension_manager):
-        model = DatasetConfigModel.load(config_file)
-        dimensions = dimension_manager.load_dimensions(model.dimensions)
-        return cls(model, dimensions)
+        config = cls._load(config_file)
+        config.load_dimensions(dimension_manager)
+        return config
+
+    def load_dimensions(self, dimension_manager):
+        """Load all dataset dimensions.
+
+        Parameters
+        ----------
+        dimension_manager : DimensionRegistryManager
+
+        """
+        self._dimensions.update(dimension_manager.load_dimensions(self.model.dimensions))
 
     @property
     def dimensions(self):
         return self._dimensions
-
-    @property
-    def model(self):
-        return self._model
 
     # TODO:
     #   - check binning/partitioning / file size requirements?

@@ -30,15 +30,19 @@ class DimensionRegistryManager(RegistryManagerBase):
         # value = DimensionBaseModel
         self._dimension_versions = defaultdict(dict)
         self._dimensions = {}  # key = DimensionKey, value = Dimension
-        for dim_type in self._fs_intf.listdir(self._path):
+        for dim_type in self._fs_intf.listdir(
+            self._path, directories_only=True, exclude_hidden=True
+        ):
             _type = DimensionType(dim_type)
             type_path = Path(self._path) / dim_type
-            ids = self._fs_intf.listdir(type_path)
+            ids = self._fs_intf.listdir(type_path, directories_only=True, exclude_hidden=True)
             for dim_id in ids:
                 dim_path = type_path / dim_id
                 self._dimension_versions[_type][dim_id] = {
                     VersionInfo.parse(x)
-                    for x in self._fs_intf.listdir(dim_path, directories_only=True)
+                    for x in self._fs_intf.listdir(
+                        dim_path, directories_only=True, exclude_hidden=True
+                    )
                 }
 
     def get_dimension(self, dimension_type, dimension_id, version):
@@ -74,6 +78,10 @@ class DimensionRegistryManager(RegistryManagerBase):
         if not self.has_dimension_id(key):
             raise DSGValueNotStored(f"dimension not stored: {key}")
 
+        dimension = self._dimensions.get(key)
+        if dimension is not None:
+            return dimension
+
         if key.type == DimensionType.TIME:
             cls = TimeDimensionModel
         else:
@@ -95,13 +103,11 @@ class DimensionRegistryManager(RegistryManagerBase):
         bool
 
         """
-        if (
+        return (
             key.type in self._dimension_versions
             and key.id in self._dimension_versions[key.type]
             and key.version in self._dimension_versions[key.type][key.id]
-        ):
-            return True
-        return False
+        )
 
     def list_dimension_types(self):
         """Return the dimension types present in the registry."""
@@ -119,7 +125,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         list
 
         """
-        return sorted(list(self._dimension_versions[dimension_type]))
+        return sorted(list(self._dimension_versions[dimension_type].keys()))
 
     def load_dimensions(self, dimension_references):
         """Load dimensions from files.

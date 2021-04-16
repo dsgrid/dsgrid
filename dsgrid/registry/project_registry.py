@@ -1,19 +1,19 @@
 """Manages the registry for a project."""
 
 import logging
+from pathlib import Path
 from typing import List, Optional, Union
 
 from pydantic import Field
 from pydantic import validator
 from semver import VersionInfo
 
+from .registry_base import RegistryBaseModel, RegistryBase
 from dsgrid.data_models import DSGBaseModel, serialize_model
 from dsgrid.registry.common import (
     DatasetRegistryStatus,
     ProjectRegistryStatus,
-    ConfigRegistrationModel,
 )
-from dsgrid.utils.files import dump_data
 from dsgrid.utils.versioning import make_version, handle_version_or_str
 
 
@@ -36,8 +36,6 @@ RUNNING LIST OF TODOS
 # TODO: when a registry gets updated, we need some change_log logic that gets captured what changes; also need logic that affects the versioning (major, minor, patch)
 # TODO: would be nice to have a status message like "1 more dataset to load"
 """
-
-# association_tables: Optional[List[str]] = Field(title="association_tabls", default=[])
 
 
 class ProjectDatasetRegistryModel(DSGBaseModel):
@@ -63,63 +61,34 @@ class ProjectDatasetRegistryModel(DSGBaseModel):
         return make_version(version)
 
 
-class ProjectRegistryModel(DSGBaseModel):
+class ProjectRegistryModel(RegistryBaseModel):
     """Defines project registry"""
 
     project_id: str = Field(
         tile="project_id",
         description="unique project identifier",
     )
-    version: Union[str, VersionInfo] = Field(
-        tile="title",
-        description="project version",
-    )
     status: ProjectRegistryStatus = Field(
         tile="status", description="project registry status", default="Initial Registration"
     )
-    description: str = Field(title="description", description="detail on the project or dataset")
     dataset_registries: Optional[List[ProjectDatasetRegistryModel]] = Field(
         title="dataset_registries",
         description="list of dataset registry",
     )
-    registration_history: Optional[List[ConfigRegistrationModel]] = Field(
-        title="registration_history",
-        description="history of all registration updates",
-        default=[],
-    )
-
-    @validator("version")
-    def check_version(cls, version):
-        return handle_version_or_str(version)
 
 
-class ProjectRegistry:
+class ProjectRegistry(RegistryBase):
     """Controls a project registry."""
 
-    def __init__(self, model):
-        """Constructs ProjectRegistry.
+    PROJECT_REGISTRY_PATH = Path("projects")
 
-        Parameters
-        ----------
-        model : ProjectRegistryModel
+    @staticmethod
+    def model_class():
+        return ProjectRegistryModel
 
-        """
-        self._model = model
-
-    @classmethod
-    def load(cls, filename):
-        """Loads a project registry from a file.
-
-        Parameters
-        ----------
-        filename : str
-
-        Returns
-        -------
-        ProjectRegistry
-
-        """
-        return cls(ProjectRegistryModel.load(filename))
+    @staticmethod
+    def registry_path():
+        return ProjectRegistry.PROJECT_REGISTRY_PATH
 
     def has_dataset(self, dataset_id, status):
         """Return True if the dataset_id is stored with status."""
@@ -158,21 +127,6 @@ class ProjectRegistry:
     @property
     def project_id(self):
         return self._model.project_id
-
-    @property
-    def version(self):
-        return self._model.version
-
-    @version.setter
-    def version(self, val):
-        self._model.version = val
-
-    @property
-    def registration(self):
-        return self._model.registration
-
-    def serialize(self, filename):
-        dump_data(serialize_model(self._model), filename)
 
     def list_registered_datasets(self):
         """Get registered datasets associated with project registry.

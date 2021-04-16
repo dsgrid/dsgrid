@@ -2,7 +2,6 @@
 
 import logging
 import os
-import uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -17,28 +16,34 @@ from dsgrid.common import (
     S3_REGISTRY,
 )
 from dsgrid.data_models import serialize_model
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.dimension_config import DimensionConfig
-from dsgrid.config.dimension_mapping import DimensionMappingsModel
+from dsgrid.exceptions import DSGValueNotStored
 from dsgrid.filesytem.factory import make_filesystem_interface
-from dsgrid.registry.common import (
+from .common import (
     RegistryType,
     DatasetRegistryStatus,
     ProjectRegistryStatus,
     VersionUpdateType,
     ConfigRegistrationModel,
     ConfigKey,
+    make_initial_config_registration,
+    make_registry_id,
 )
-from dsgrid.registry.dataset_registry import DatasetRegistry, DatasetRegistryModel
-from dsgrid.registry.project_registry import (
+from .dimension_mapping_registry import DimensionMappingRegistry
+from .dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from .dataset_registry import DatasetRegistry, DatasetRegistryModel
+from .dimension_registry import DimensionRegistry
+from .dimension_registry_manager import DimensionRegistryManager
+from .project_registry import (
     ProjectRegistry,
     ProjectRegistryModel,
     ProjectDatasetRegistryModel,
 )
-from dsgrid.registry.dimension_registry import DimensionRegistryModel
-from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
-from dsgrid.registry.registry_manager_base import RegistryManagerBase
+from .registry_base import RegistryBaseModel
+from .registry_manager_base import RegistryManagerBase
 from dsgrid.utils.files import dump_data, load_data
 
 
@@ -59,14 +64,24 @@ class RegistryManager(RegistryManagerBase):
         self._projects = {}  # (project_id, version) to ProjectConfig. Loaded on demand.
         self._project_registries = {}  # project_id to ProjectRegistry. Loaded on demand.
         self._datasets = {}  # dataset_id to DatasetConfig. Loaded on demand.
-        # TODO: use CacheKey as soon as projects store dataset version
         self._dataset_registries = {}  # dataset_id to DatasetRegistry. Loaded on demand.
         self._dimension_mgr = DimensionRegistryManager(
-            Path(path) / self.DIMENSION_REGISTRY_PATH, fs_interface
+            Path(path) / DimensionRegistry.registry_path(), fs_interface
+        )
+        self._dimension_mapping_dimension_mgr = DimensionMappingRegistryManager(
+            Path(path) / DimensionMappingRegistry.registry_path(), fs_interface
         )
 
-        project_ids = self._fs_intf.listdir(self._path / self.PROJECT_REGISTRY_PATH)
-        dataset_ids = self._fs_intf.listdir(self._path / self.DATASET_REGISTRY_PATH)
+        project_ids = self._fs_intf.listdir(
+            self._path / ProjectRegistry.registry_path(),
+            directories_only=True,
+            exclude_hidden=True,
+        )
+        dataset_ids = self._fs_intf.listdir(
+            self._path / DatasetRegistry.registry_path(),
+            directories_only=True,
+            exclude_hidden=True,
+        )
         self._project_ids = set(project_ids)
         self._dataset_ids = set(dataset_ids)
 
@@ -89,11 +104,16 @@ class RegistryManager(RegistryManagerBase):
 
         fs_interface = make_filesystem_interface(path)
         fs_interface.mkdir(path)
-        fs_interface.mkdir(path / RegistryManager.DATASET_REGISTRY_PATH)
-        fs_interface.mkdir(path / RegistryManager.PROJECT_REGISTRY_PATH)
-        fs_interface.mkdir(path / RegistryManager.DIMENSION_REGISTRY_PATH)
+        fs_interface.mkdir(path / DatasetRegistry.registry_path())
+        fs_interface.mkdir(path / ProjectRegistry.registry_path())
+        fs_interface.mkdir(path / DimensionRegistry.registry_path())
+        fs_interface.mkdir(path / DimensionMappingRegistry.registry_path())
         logger.info("Created registry at %s", path)
         return cls(path, fs_interface)
+
+    @property
+    def dimension_mapping_manager(self):
+        return self._dimension_mapping_dimension_mgr
 
     @property
     def dimension_manager(self):
@@ -116,16 +136,18 @@ class RegistryManager(RegistryManagerBase):
         if str(path).startswith("s3"):
             raise Exception(f"S3 is not yet supported: {path}")
         fs_interface = make_filesystem_interface(path)
+        path = Path(path)
         for dir_name in (
             path,
-            os.path.join(path, RegistryManager.DATASET_REGISTRY_PATH),
-            os.path.join(path, RegistryManager.PROJECT_REGISTRY_PATH),
-            os.path.join(path, RegistryManager.DIMENSION_REGISTRY_PATH),
+            path / DatasetRegistry.registry_path(),
+            path / ProjectRegistry.registry_path(),
+            path / DimensionRegistry.registry_path(),
+            path / DimensionMappingRegistry.registry_path(),
         ):
-            if not fs_interface.exists(dir_name):
+            if not fs_interface.exists(str(dir_name)):
                 raise FileNotFoundError(f"{dir_name} does not exist")
 
-        return cls(Path(path), fs_interface)
+        return cls(path, fs_interface)
 
     def list_datasets(self):
         """Return the datasets in the registry.
@@ -195,6 +217,11 @@ class RegistryManager(RegistryManagerBase):
             return project_config
 
         config_file = self._get_project_config_file(project_id, version)
+        if not self._fs_intf.exists(config_file):
+            raise DSGValueNotStored(
+                f"config file for project={project_id} {version} does not exist"
+            )
+
         project_config = ProjectConfig.load(config_file, self._dimension_mgr)
         self._projects[key] = project_config
         logger.info("Loaded ProjectConfig for project_id=%s", key)
@@ -247,7 +274,7 @@ class RegistryManager(RegistryManagerBase):
             logger.debug("Loaded DatasetRegistry for dataset_id=%s from cache", dataset_id)
             return registry
 
-        filename = self._get_registry_filename(RegistryType.DATASET, dataset_id)
+        filename = self._get_registry_filename(DatasetRegistry, dataset_id)
         logger.info("Loaded DatasetRegistry for dataset_id=%s", dataset_id)
         return DatasetRegistry.load(filename)
 
@@ -271,11 +298,12 @@ class RegistryManager(RegistryManagerBase):
             logger.debug("Loaded ProjectRegistry for project_id=%s from cache", project_id)
             return registry
 
-        filename = self._get_registry_filename(RegistryType.PROJECT, project_id)
+        filename = self._get_registry_filename(ProjectRegistry, project_id)
         logger.info("Loaded ProjectRegistry for project_id=%s", project_id)
         return ProjectRegistry.load(filename)
 
-    def assign_dimension_id(self, data: dict):
+    @staticmethod
+    def assign_dimension_id(data: dict):
         """Assign dimension_id to each dimension. Print the assigned IDs."""
 
         # TODO: check that id does not already exist in .dsgrid-registry
@@ -285,13 +313,16 @@ class RegistryManager(RegistryManagerBase):
         #   Potential solution: use hash() to check records on file and records to be submitted;
         #   Can use this function to check whether a record exists and suggest the data_submitter
         #   to use that record id if available
+        # NOTE: this has been implemented for dimension mappings and we could use the
+        # same logic.
 
         dim_data = data["dimensions"]
         logger.info("Dimension record ID assignment:")
         for item in dim_data:
             logger.info(" - type: %s, name: %s", item["type"], item["name"])
+
             # assign id, made from dimension.name and a UUID4
-            item["id"] = item["name"].lower().replace(" ", "_") + "__" + str(uuid.uuid4())
+            item["id"] = make_registry_id([item["name"].lower().replace(" ", "_")])
             logger.info("   id: %s", item["id"])
 
     def _register_dimension_config(
@@ -305,7 +336,7 @@ class RegistryManager(RegistryManagerBase):
         # TODO: search also from dataset/../dimensions folder for records and find a union record set
 
         # Just verify that it loads.
-        self._load_config(config_file, registry_type)
+        DimensionConfig.load(config_file)
         version = VersionInfo(major=1)
 
         registration = ConfigRegistrationModel(
@@ -326,7 +357,7 @@ class RegistryManager(RegistryManagerBase):
                 # Time dimensions do not have a record file.
                 item["file"] = os.path.basename(orig_file)
 
-            registry_config = DimensionRegistryModel(
+            registry_config = RegistryBaseModel(
                 version=version,
                 description=item["description"].strip(),
                 registration_history=[registration],
@@ -373,15 +404,13 @@ class RegistryManager(RegistryManagerBase):
             + os.path.splitext(config_file)[1]
         )
 
-    def register_dimension(self, config_file, submitter, log_message):
-        """Registers dimensions from project and its dataset.
+    def register_dimensions(self, config_file, submitter, log_message):
+        """Registers dimensions for projects and datasets.
 
         Parameters
         ----------
-        project_id : str
-            Unique identifier for project
         config_file : str
-            Path to project config file
+            Path to dimension config file
         submitter : str
             Submitter name
         log_message : str
@@ -501,7 +530,7 @@ class RegistryManager(RegistryManagerBase):
         if project_id not in self._project_ids:
             raise ValueError(f"{project_id} is not already stored")
 
-        registry_file = self._get_registry_filename(RegistryType.PROJECT, project_id)
+        registry_file = self._get_registry_filename(ProjectRegistry, project_id)
         registry_config = ProjectRegistryModel(**load_data(registry_file))
         self._update_config(
             project_id, registry_config, config_file, submitter, update_type, log_message
@@ -519,7 +548,7 @@ class RegistryManager(RegistryManagerBase):
             Path to dataset config file
         project_id : str
         dimension_mapping_files : tuple
-            dimension mapping association table filenames
+            dimension mapping filenames
         submitter : str
             Submitter name
         log_message : str
@@ -547,11 +576,16 @@ class RegistryManager(RegistryManagerBase):
 
         assert config.model.dataset_id not in self._dataset_ids, config.model.dataset_id
 
-        mappings = []
+        mapping_references = []
         for filename in dimension_mapping_files:
-            mappings += DimensionMappingsModel(**load_data(filename)).mappings
+            for ref in DimensionMappingReferenceListModel.load(filename).references:
+                if not self.dimension_mapping_manager.has_mapping_id(
+                    ref.mapping_id, version=ref.version
+                ):
+                    raise ValueError(f"mapping_id={ref.mapping_id} is not registered")
+                mapping_references.append(ref)
 
-        project_config.check_dataset_dimension_mappings(config, mappings)
+        project_config.add_dataset_dimension_mappings(config, mapping_references)
 
         version = VersionInfo(major=1)
         registration = ConfigRegistrationModel(
@@ -585,7 +619,7 @@ class RegistryManager(RegistryManagerBase):
 
         status = DatasetRegistryStatus.REGISTERED
         project_registry.set_dataset_status(config.model.dataset_id, status)
-        filename = self._get_registry_filename(RegistryType.PROJECT, project_id)
+        filename = self._get_registry_filename(ProjectRegistry, project_id)
         project_registry.serialize(filename)
 
         project_config.get_dataset(config.model.dataset_id).status = status
@@ -621,7 +655,7 @@ class RegistryManager(RegistryManagerBase):
         if dataset_id not in self._dataset_ids:
             raise ValueError(f"{dataset_id} is not already stored")
 
-        registry_file = self._get_registry_filename(RegistryType.DATASET, dataset_id)
+        registry_file = self._get_registry_filename(DatasetRegistry, dataset_id)
         registry_config = DatasetRegistryModel(**load_data(registry_file))
         self._update_config(
             dataset_id, registry_config, config_file, submitter, update_type, log_message
@@ -649,56 +683,44 @@ class RegistryManager(RegistryManagerBase):
             if project_registry.has_dataset(dataset_id, DatasetRegistryStatus.REGISTERED):
                 project_registry.set_dataset_status(dataset_id, DatasetRegistryStatus.UNREGISTERED)
                 project_registry.serialize(
-                    self._get_registry_filename(RegistryType.PROJECT, project_registry.project_id)
+                    self._get_registry_filename(ProjectRegistry, project_registry.project_id)
                 )
 
         logger.info("Removed %s from the registry.", dataset_id)
 
-    def _get_registry_filename(self, registry_type, config_id):
-        if registry_type == RegistryType.DATASET:
-            sub_path = self.DATASET_REGISTRY_PATH
-        elif registry_type == RegistryType.PROJECT:
-            sub_path = self.PROJECT_REGISTRY_PATH
-        else:
-            assert False
-
-        return self._path / sub_path / config_id / REGISTRY_FILENAME
+    def _get_registry_filename(self, registry_class, config_id):
+        return self._path / registry_class.registry_path() / config_id / REGISTRY_FILENAME
 
     def _get_dataset_config_file(self, dataset_id, version):
         return (
-            self._path / self.DATASET_REGISTRY_PATH / dataset_id / str(version) / DATASET_FILENAME
+            self._path
+            / DatasetRegistry.registry_path()
+            / dataset_id
+            / str(version)
+            / DATASET_FILENAME
         )
 
     def _get_dataset_directory(self, dataset_id):
-        return self._path / self.DATASET_REGISTRY_PATH / dataset_id
+        return self._path / DatasetRegistry.registry_path() / dataset_id
 
     def _get_project_config_file(self, project_id, version):
         return (
-            self._path / self.PROJECT_REGISTRY_PATH / project_id / str(version) / PROJECT_FILENAME
+            self._path
+            / ProjectRegistry.registry_path()
+            / project_id
+            / str(version)
+            / PROJECT_FILENAME
         )
 
     def _get_project_directory(self, project_id):
-        return self._path / self.PROJECT_REGISTRY_PATH / project_id
+        return self._path / ProjectRegistry.registry_path() / project_id
 
     def _get_dimension_config_file(self, version):
         # need to change
-        return self._path / self.DIMENSION_REGISTRY_PATH / str(version) / DIMENSION_FILENAME
+        return self._path / DimensionRegistry.registry_path() / str(version) / DIMENSION_FILENAME
 
     def _get_dimension_directory(self):
-        return self._path / self.DIMENSION_REGISTRY_PATH
-
-    def _load_config(self, config_file, registry_type):
-        if not self._fs_intf.exists(config_file):
-            raise ValueError(f"config file {config_file} does not exist")
-
-        if registry_type == RegistryType.DATASET:
-            config = DatasetConfig.load(config_file, self._dimension_mgr)
-        elif registry_type == RegistryType.PROJECT:
-            config = ProjectConfig.load(config_file, self._dimension_mgr)
-        elif registry_type == RegistryType.DIMENSION:
-            config = DimensionConfig.load(config_file)
-
-        return config
+        return self._path / DimensionRegistry.registry_path()
 
     def _update_config(
         self, config_id, registry_config, config_file, submitter, update_type, log_message
@@ -714,7 +736,9 @@ class RegistryManager(RegistryManagerBase):
             registry_type = RegistryType.PROJECT
 
         # This validates that all data.
-        config = self._load_config(config_file, registry_type)  # is this needed?
+        registry_class = get_registry_class(registry_type)
+        registry_class.load(config_file)
+
         registry_config.description = load_data(config_file)[
             "description"
         ]  # always copy the latest from config
@@ -735,7 +759,7 @@ class RegistryManager(RegistryManagerBase):
             log_message=log_message,
         )
         registry_config.registration_history.append(registration)
-        filename = self._get_registry_filename(registry_type, config_id)
+        filename = self._get_registry_filename(registry_class, config_id)
         config_dir = self._get_project_directory(config_id)
         data_dir = config_dir / str(registry_config.version)
         self._fs_intf.mkdir(data_dir)
@@ -785,3 +809,16 @@ def get_registry_path(registry_path=None):
             "set the DSGRID_REGISTRY_PATH environment variable before running the commands."
         )
     return registry_path
+
+
+_REGISTRY_TYPE_TO_CLASS = {
+    RegistryType.DATASET: DatasetRegistry,
+    RegistryType.DIMENSION: DimensionRegistry,
+    RegistryType.DIMENSION_MAPPING: DimensionMappingRegistry,
+    RegistryType.PROJECT: ProjectRegistry,
+}
+
+
+def get_registry_class(registry_type):
+    """Return the subtype of RegistryBase correlated with registry_type."""
+    return _REGISTRY_TYPE_TO_CLASS[registry_type]

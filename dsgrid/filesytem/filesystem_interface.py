@@ -47,7 +47,7 @@ class FilesystemInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def listdir(self, directory, files_only=False, directories_only=False):
+    def listdir(self, directory, files_only=False, directories_only=False, exclude_hidden=False):
         """List the contents of a directory.
 
         Parameters
@@ -57,6 +57,8 @@ class FilesystemInterface(abc.ABC):
             only return files
         directories_only : bool
             only return directories
+        exclude_hidden : bool
+            exclude names starting with "."
 
         Returns
         -------

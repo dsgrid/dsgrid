@@ -12,7 +12,8 @@ import logging
 from pydantic import Field
 from pydantic import validator
 
-from dsgrid.config.dimensions import (
+from .config_base import ConfigBase
+from .dimensions import (
     TimeDimensionModel,
     DimensionModel,
     handle_dimension_union,
@@ -56,29 +57,9 @@ class DimensionConfigModel(DSGBaseModel):
         return handle_dimension_union(value)
 
 
-class DimensionConfig:
+class DimensionConfig(ConfigBase):
     """Provides an interface to a DimensionConfigModel."""
 
-    def __init__(self, model):
-        self._model = model
-
-    @classmethod
-    def load(cls, config_file):
-        model = DimensionConfigModel.load(config_file)
-        return cls(model)
-
-    @property
-    def model(self):
-        return self._model
-
-    # TODO:
-    #   - check binning/partitioning / file size requirements?
-    #   - check unique names
-    #   - check unique files
-    #   - add similar validators as project_config Dimensions
-    # NOTE: project_config.Dimensions has a lot of the
-    #       validators we want here however, its unclear to me how we can
-    #       apply them in both classes because they are root valitors and
-    #       also because Dimensions includes project_dimension and
-    #       supplemental_dimensions which are not required at the dataset
-    #       level.
+    @staticmethod
+    def model_class():
+        return DimensionConfigModel

@@ -71,8 +71,7 @@ def remove_project(ctx, project_id):
 @click.option(
     "-l",
     "--log-message",
-    default="Initial submission",
-    show_default=True,
+    required=True,
     help="reason for submission",
 )
 @click.pass_context
@@ -89,17 +88,42 @@ def register_project(ctx, project_config_file, log_message):
 @click.option(
     "-l",
     "--log-message",
-    default="Initial submission",
-    show_default=True,
+    required=True,
     help="reason for submission",
 )
 @click.pass_context
-def register_dimension(ctx, dimension_config_file, log_message):
+def register_dimensions(ctx, dimension_config_file, log_message):
     """Register new dimensions with the dsgrid repository."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
-    manager.register_dimension(dimension_config_file, submitter, log_message)
+    manager.register_dimensions(dimension_config_file, submitter, log_message)
+
+
+@click.command()
+@click.argument("dimension-mapping-config-file")
+@click.option(
+    "--force",
+    default=False,
+    is_flag=True,
+    show_default=True,
+    help="Register the dimension mappings even if there are duplicates",
+)
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    help="reason for submission",
+)
+@click.pass_context
+def register_dimension_mappings(ctx, dimension_mapping_config_file, log_message, force):
+    """Register new dimension mappings with the dsgrid repository."""
+    registry_path = ctx.parent.params["path"]
+    submitter = getpass.getuser()
+    mgr = RegistryManager.load(registry_path).dimension_mapping_manager
+    mgr.register_dimension_mappings(
+        dimension_mapping_config_file, submitter, log_message, force=force
+    )
 
 
 @click.command()
@@ -138,7 +162,7 @@ def update_project(ctx, project_config_file, log_message, update_type):
 )
 @click.option(
     "-m",
-    "--dimension-mappings",
+    "--dimension-mapping-files",
     type=click.Path(exists=True),
     multiple=True,
     show_default=True,
@@ -152,13 +176,13 @@ def update_project(ctx, project_config_file, log_message, update_type):
     help="reason for submission",
 )
 @click.pass_context
-def submit_dataset(ctx, dataset_config_file, project_id, dimension_mappings, log_message):
+def submit_dataset(ctx, dataset_config_file, project_id, dimension_mapping_files, log_message):
     """Submit a new dataset to a dsgrid project."""
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
     manager.submit_dataset(
-        dataset_config_file, project_id, dimension_mappings, submitter, log_message
+        dataset_config_file, project_id, dimension_mapping_files, submitter, log_message
     )
 
 
@@ -190,7 +214,8 @@ registry.add_command(list_)
 registry.add_command(remove_dataset)
 registry.add_command(remove_project)
 registry.add_command(register_project)
-registry.add_command(register_dimension)
+registry.add_command(register_dimensions)
+registry.add_command(register_dimension_mappings)
 registry.add_command(submit_dataset)
 registry.add_command(sync)
 registry.add_command(update_project)

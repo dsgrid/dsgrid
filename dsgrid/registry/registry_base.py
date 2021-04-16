@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 class RegistryBaseModel(DSGBaseModel):
     """Base class for models that get registered in the registry"""
 
-    version: Optional[Union[str, VersionInfo]] = Field(
+    version: Union[str, VersionInfo] = Field(
         title="version",
         description="dimension version",
     )
@@ -59,8 +59,8 @@ class RegistryBase(ConfigBase, abc.ABC):
         """
 
     @property
-    def registration(self):
-        return self._model.registration
+    def registration_history(self):
+        return self._model.registration_history
 
     def serialize(self, filename):
         dump_data(serialize_model(self._model), filename)

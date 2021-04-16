@@ -15,7 +15,8 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
 )
 from dsgrid.utils.versioning import make_version, handle_version_or_str
-
+from dsgrid.filesytem.aws import sync
+from dsgrid.common import S3_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +84,7 @@ class ProjectRegistry(RegistryBase):
     """Controls a project registry."""
 
     PROJECT_REGISTRY_PATH = Path("projects")
+    PROJECT_REGISTRY_S3_PATH = f"{S3_REGISTRY}/projects"
 
     @staticmethod
     def model_class():
@@ -91,6 +93,18 @@ class ProjectRegistry(RegistryBase):
     @staticmethod
     def registry_path():
         return ProjectRegistry.PROJECT_REGISTRY_PATH
+
+    @staticmethod
+    def registry_s3_path():
+        return ProjectRegistry.PROJECT_REGISTRY_S3_PATH
+
+    @staticmethod
+    def sync_push():
+        sync(ProjectRegistry.registry_path(), ProjectRegistry.registry_s3_path())
+
+    @staticmethod
+    def sync_pull():
+        sync(ProjectRegistry.registry_s3_path(), ProjectRegistry.registry_path())
 
     def has_dataset(self, dataset_id, status):
         """Return True if the dataset_id is stored with status."""

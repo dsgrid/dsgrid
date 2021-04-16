@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 @click.group()
 @click.option(
     "--path",
-    default=LOCAL_REGISTRY,  # TEMPORARY: S3_REGISTRY is not yet supported
+    default=LOCAL_REGISTRY,
     show_default=True,
     envvar="DSGRID_REGISTRY_PATH",
     help="path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
@@ -71,7 +71,7 @@ def remove_project(ctx, project_id):
 @click.option(
     "-l",
     "--log-message",
-    default="Initial submission",
+    default="Initial submission",  # TODO: prevent dup "initial submissions" logs
     show_default=True,
     help="reason for submission",
 )

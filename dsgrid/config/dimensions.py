@@ -45,7 +45,7 @@ class DimensionBaseModel(DSGBaseModel):
         description="dimension module",
         default="dsgrid.dimension.standard",
     )
-    class_name: Optional[str] = Field(
+    class_name: str = Field(
         title="class_name",
         description="dimension model class name",
         alias="class",
@@ -55,10 +55,20 @@ class DimensionBaseModel(DSGBaseModel):
         description="dimension model class",
         alias="dimension_class",
     )
-    description: Optional[str] = Field(
+    description: str = Field(
         title="description of dimension record",
         description="description of dimension record, this gets stored in both dimension config file and dimension registry",
         alias="description",
+    )
+    upgrade: Optional[bool] = Field(
+        title="upgrade",
+        description="boolean flag to update an existing dimension record in the the reigstry",
+        default=False,
+    )
+    log_message: Optional[str] = Field(
+        title="log_message",
+        description="log message to apply to the dimension registry toml",
+        default="Initial Submission",
     )
 
     @validator("name")
@@ -79,7 +89,6 @@ class DimensionBaseModel(DSGBaseModel):
         if not hasattr(mod, cls_name):
             if class_name is None:
                 msg = (
-                    "Setting class based on name failed. "
                     f'There is no class "{cls_name}" in module: {mod}.'
                     "\nIf you are using a unique dimension name, you must "
                     "specify the dimension class."
@@ -103,6 +112,15 @@ class DimensionBaseModel(DSGBaseModel):
             importlib.import_module(values["module"]),
             values["class_name"],
         )
+
+    @validator("log_message", always=True)
+    def check_log_message(cls, log_message, values):
+        if values["upgrade"]:
+            if log_message in ("Initial Submission"):
+                raise ValueError(
+                    "Please provide a helpful log message if your are attempting to register an update to an existing dimension record. HINT: Log messages should include details about what is being updated and/or how it differs from the original version(s)"
+                )
+        return log_message
 
 
 class DimensionModel(DimensionBaseModel):
@@ -148,6 +166,7 @@ class DimensionModel(DimensionBaseModel):
     @validator("filename")
     def check_file(cls, filename):
         """Validate that dimension file exists and has no errors"""
+        # TODO: do we need to support S3 file paths when we already sync the registry at an earlier stage? Technically this means that the path should be local
         # validation for S3 paths (sync locally)
         if filename.startswith("s3://"):
             path = LOCAL_REGISTRY / filename.replace("s3://", "")

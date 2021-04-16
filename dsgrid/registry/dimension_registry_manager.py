@@ -31,15 +31,16 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._dimension_versions = defaultdict(dict)
         self._dimensions = {}  # key = DimensionKey, value = Dimension
         for dim_type in self._fs_intf.listdir(self._path):
-            _type = DimensionType(dim_type)
-            type_path = Path(self._path) / dim_type
-            ids = self._fs_intf.listdir(type_path)
-            for dim_id in ids:
-                dim_path = type_path / dim_id
-                self._dimension_versions[_type][dim_id] = {
-                    VersionInfo.parse(x)
-                    for x in self._fs_intf.listdir(dim_path, directories_only=True)
-                }
+            if dim_type != ".DS_Store":  # FIXME
+                _type = DimensionType(dim_type)
+                type_path = Path(self._path) / dim_type
+                ids = self._fs_intf.listdir(type_path)
+                for dim_id in ids:
+                    dim_path = type_path / dim_id
+                    self._dimension_versions[_type][dim_id] = {
+                        VersionInfo.parse(x)
+                        for x in self._fs_intf.listdir(dim_path, directories_only=True)
+                    }
 
     def get_dimension(self, dimension_type, dimension_id, version):
         """Get the dimension matching the parameters. Returns from cache if already loaded.

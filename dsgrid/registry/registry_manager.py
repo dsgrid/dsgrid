@@ -12,9 +12,10 @@ from dsgrid.common import (
     PROJECT_FILENAME,
     REGISTRY_FILENAME,
     DATASET_FILENAME,
-    DIMENSION_FILENAME,
+    DIMENSIONS_FILENAME,
     LOCAL_REGISTRY,
     S3_REGISTRY,
+    AWS_PROFILE_NAME,
 )
 from dsgrid.data_models import serialize_model
 from dsgrid.config.dataset_config import DatasetConfig
@@ -42,6 +43,7 @@ from .project_registry import (
 from .registry_base import RegistryBaseModel
 from .registry_manager_base import RegistryManagerBase
 from dsgrid.utils.files import dump_data, load_data
+from dsgrid.filesytem.aws import sync
 
 
 logger = logging.getLogger(__name__)
@@ -115,9 +117,9 @@ class RegistryManager(RegistryManagerBase):
         RegistryManager
 
         """
-        # TODO S3
-        if str(path).startswith("s3"):
-            raise Exception(f"S3 is not yet supported: {path}")
+        sync(S3_REGISTRY, path)
+
+        # NOTE: @dtom since the path is always a local registry, this make_filesystem_interface(path) does not work as you intended
         fs_interface = make_filesystem_interface(path)
         path = Path(path)
         for dir_name in (
@@ -125,9 +127,13 @@ class RegistryManager(RegistryManagerBase):
             path / DatasetRegistry.registry_path(),
             path / ProjectRegistry.registry_path(),
             path / DimensionRegistry.registry_path(),
+            path / AssociationTableRegistry.registry_path(),
         ):
             if not fs_interface.exists(str(dir_name)):
-                raise FileNotFoundError(f"{dir_name} does not exist")
+                fs_interface.mkdir(
+                    dir_name
+                )  # FIXME: @dtom why not use the create() method instead?
+            # NOTE: @dtom we actually want to make these dirs if they do not exist, esp. for now since syncing doesn't sync empty folders
 
         return cls(path, fs_interface)
 
@@ -283,13 +289,12 @@ class RegistryManager(RegistryManagerBase):
 
     @staticmethod
     def assign_dimension_id(data: dict):
-        """Assign dimension_id to each dimension. Print the assigned IDs."""
+        """Assign dimension_id to each dimension from the dimension name. Enforce lowercase and replace spaces with dashes."""
 
-        # TODO: check that id does not already exist in .dsgrid-registry
         # TODO: need regular expression check on name and/or limit number of chars in dim id
-        # TODO: currently a dimension record can be registered indefinitely,
-        # each time with a different UUID. Need to enforce that it is registered only once.
-        #   Potential solution: use hash() to check records on file and records to be submitted;
+        # TODO: currently a dimension record can not be registered again if it has the same name and is not indended to be an update
+        # NOTE: we may want to add back the UUID extension to the name, though mmooney does not think this is necessary if we enforce unique names
+        # TODO: currently there is no checking for unique dimension records. Potential solution: use hash() to check records on file and records to be submitted;
         #   Can use this function to check whether a record exists and suggest the data_submitter
         #   to use that record id if available
 
@@ -297,40 +302,107 @@ class RegistryManager(RegistryManagerBase):
         logger.info("Dimension record ID assignment:")
         for item in dim_data:
             logger.info(" - type: %s, name: %s", item["type"], item["name"])
-            # assign id, made from dimension.name and a UUID4
-            item["id"] = item["name"].lower().replace(" ", "_") + "__" + str(uuid.uuid4())
+
+            item["id"] = item["name"].lower().replace(" ", "_")
+
             logger.info("   id: %s", item["id"])
 
-    def _register_dimension_config(
-        self, registry_type, config_file, submitter, log_message, config_data
-    ):
+    def _register_dimension_config(self, registry_type, config_file, submitter, config_data):
         """
         - It validates that the configuration meets all requirements.
         - It files dimension records by dimension type in output registry folder.
         """
+        # TODO: need better docstring here
 
-        # TODO: search also from dataset/../dimensions folder for records and find a union record set
+        config_dimensions = DimensionConfig.load(config_file).model.dimensions
 
-        # Just verify that it loads.
-        DimensionConfig.load(config_file)
-        version = VersionInfo(major=1)
-
-        registration = ConfigRegistrationModel(
-            version=version,
-            submitter=submitter,
-            date=datetime.now(),
-            log_message=log_message,
-        )
+        config_dir = self._get_dimension_directory()
 
         config_file_name = "dimension" + os.path.splitext(config_file)[1]
 
         dim_data = config_data["dimensions"]
         n_registered_dims = 0
         for item in dim_data:
+
+            data_type_dir = config_dir / item["type"]
+
+            # get equiv. config dimension (needed for update and log_message)
+            for config_dim in config_dimensions:
+                if item["name"] == config_dim.name:
+                    break
+
+            # get log_message
+            item["log_message"] = config_dim.log_message
+
+            if config_dim.upgrade:
+                if not os.path.exists(data_type_dir):
+                    raise ValueError(
+                        f"""upgrade is set to true, however there is no dimension with name='{item["name"]}' in the registry"""
+                    )
+                # identify previous version
+                for f in os.listdir(data_type_dir):
+                    fname = f.split("__")[0]
+                    if fname == item["id"]:
+
+                        # FIXME: @dtom fix the version assignment bits
+                        versions = []
+                        log_msgs = []
+
+                        for f in os.listdir(data_type_dir):
+                            fname = f.split("__")[0]
+                            if fname == item["id"]:
+                                for ff in os.listdir(data_type_dir / f):
+                                    if (
+                                        ff != "registry.toml"
+                                    ):  # << FIXME should probably use the registry toml here
+                                        versions.append(ff)
+                                        print(load_data(data_type_dir / f / ff / "dimension.toml"))
+                                        log_msgs.append(
+                                            load_data(data_type_dir / f / ff / "dimension.toml")[
+                                                "log_message"
+                                            ]
+                                        )
+                                break
+                        current_verison = VersionInfo.parse(max(versions))
+                        # set new version - bump major only #FIXME
+                        version = current_verison.bump_major()
+
+                        # check that log message is different from previous version
+                        if item["log_message"] in log_msgs:
+                            raise ValueError(
+                                f"{item['name']} has a duplicate log message. When updating a dimension record, you must supply a log message that is different from previous versions."
+                            )
+
+            else:
+                # set version to 1.0.0
+                version = VersionInfo(major=1)  # FIXME
+
+                # check registry for exist dimension records with the same name
+                # NOTE: I would like to keep this logic, but then remove the UUID component and enforce unique names
+                if os.path.exists(data_type_dir):
+                    for f in os.listdir(data_type_dir):
+                        fname = f.split("__")[0]
+                        if fname == item["id"]:
+                            raise ValueError(
+                                f"Dimension record name='{item['name']}' already exists in the registry. If this is intendended to be a dimension update, please fix the dimension.toml file to set update=True and provide a log message that describes why this dimension is being updated and what makes it different from the previous version. If this is not indended to be an update to and existing record, please rename the dimension record with a unique and descriptive name that distinguishes this dimension record from similarly named dimensions in the registry."
+                            )
+                            break
+
+            # assign version for outputing to user log
+            item["version"] = f"{version.major}.{version.minor}.{version.patch}"
+
+            registration = ConfigRegistrationModel(
+                version=version,
+                submitter=submitter,
+                date=datetime.now(),
+                log_message=item["log_message"],
+            )
+
             # Leading directories from the original are not relevant in the registry.
             orig_file = item.get("file")
             if orig_file is not None:
                 # Time dimensions do not have a record file.
+                # TODO: Should we add a record for time dimensions? This may be needed, esp. considering there will need to be a map for TEMPO 0-168 hours to the hours in a year.
                 item["file"] = os.path.basename(orig_file)
 
             registry_config = RegistryBaseModel(
@@ -338,9 +410,7 @@ class RegistryManager(RegistryManagerBase):
                 description=item["description"].strip(),
                 registration_history=[registration],
             )
-            config_dir = self._get_dimension_directory()
 
-            data_type_dir = config_dir / item["type"]
             data_dir = data_type_dir / item["id"] / str(version)
             self._fs_intf.mkdir(data_type_dir)
             self._fs_intf.mkdir(data_dir)
@@ -348,9 +418,7 @@ class RegistryManager(RegistryManagerBase):
             filename = Path(os.path.dirname(data_dir)) / REGISTRY_FILENAME
             data = serialize_model(registry_config)
 
-            # TODO: if we want to update AWS directly, this needs to change.
-
-            # export registry.toml
+            # export registry.toml to local registry path
             dump_data(data, filename)
 
             # export individual dimension_config.toml
@@ -364,6 +432,9 @@ class RegistryManager(RegistryManagerBase):
                 )
 
             n_registered_dims += 1
+
+        # register to s3
+        DimensionRegistry.sync_push(self._path)
 
         logger.info(
             "Registered %s %s(s) with version=%s", n_registered_dims, registry_type.value, version
@@ -381,7 +452,7 @@ class RegistryManager(RegistryManagerBase):
         )
 
     def register_dimension(self, config_file, submitter, log_message):
-        """Registers dimensions from project and its dataset.
+        """Registers dimensions.
 
         Parameters
         ----------
@@ -402,11 +473,18 @@ class RegistryManager(RegistryManagerBase):
         data = load_data(config_file)
         self.assign_dimension_id(data)
 
+        # TODO: need a validator to see if the same dimension hasn't been
+        # uploaded already; simple check on name and file size or modified data should be sufficient
+
         self._register_dimension_config(
-            RegistryType.DIMENSION, config_file, submitter, log_message, data
+            # FIXME: @dtom we do not need to use the command line log_message anymore
+            RegistryType.DIMENSION,
+            config_file,
+            submitter,
+            data,
         )
 
-        # save a copy to
+        # save a record of dimensions registered to project dir
         config_file_updated = self._config_file_extend_name(config_file, "with assigned id")
         dump_data(data, config_file_updated)
 
@@ -692,7 +770,7 @@ class RegistryManager(RegistryManagerBase):
 
     def _get_dimension_config_file(self, version):
         # need to change
-        return self._path / DimensionRegistry.registry_path() / str(version) / DIMENSION_FILENAME
+        return self._path / DimensionRegistry.registry_path() / str(version) / DIMENSIONS_FILENAME
 
     def _get_dimension_directory(self):
         return self._path / DimensionRegistry.registry_path()
@@ -767,9 +845,7 @@ def get_registry_path(registry_path=None):
     if registry_path is None:
         registry_path = os.environ.get("DSGRID_REGISTRY_PATH", None)
     if registry_path is None:
-        registry_path = (
-            LOCAL_REGISTRY  # TEMPORARY: Replace with S3_REGISTRY when that is supported
-        )
+        registry_path = LOCAL_REGISTRY
     if not os.path.exists(registry_path):
         raise ValueError(
             f"Registry path {registry_path} does not exist. To create the registry, "

@@ -45,9 +45,15 @@ class DatasetRegistry(RegistryBase):
         return DatasetRegistry.DATASET_REGISTRY_S3_PATH
 
     @staticmethod
-    def sync_push():
-        sync(DatasetRegistry.registry_path(), DatasetRegistry.registry_s3_path())
+    def sync_push(local_registry_path):
+        sync(
+            local_registry_path / DatasetRegistry.registry_path(),
+            DatasetRegistry.registry_s3_path(),
+        )
 
     @staticmethod
-    def sync_pull():
-        sync(DatasetRegistry.registry_s3_path(), DatasetRegistry.registry_path())
+    def sync_pull(local_registry_path):
+        sync(
+            local_registry_path / DatasetRegistry.registry_s3_path(),
+            DatasetRegistry.registry_path(),
+        )

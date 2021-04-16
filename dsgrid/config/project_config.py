@@ -110,7 +110,8 @@ class InputDatasetModel(DSGBaseModel):
         description="dataset ID",
     )
     dataset_type: str = Field(  # TODO this needs to be ENUM
-        title="dataset_type", description="Dataset Type"
+        title="dataset_type",
+        description="Dataset Type",
     )
     version: Union[str, VersionInfo] = Field(
         title="version",

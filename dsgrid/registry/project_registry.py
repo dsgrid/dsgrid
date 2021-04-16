@@ -99,12 +99,18 @@ class ProjectRegistry(RegistryBase):
         return ProjectRegistry.PROJECT_REGISTRY_S3_PATH
 
     @staticmethod
-    def sync_push():
-        sync(ProjectRegistry.registry_path(), ProjectRegistry.registry_s3_path())
+    def sync_push(local_registry_path):
+        sync(
+            local_registry_path / ProjectRegistry.registry_path(),
+            ProjectRegistry.registry_s3_path(),
+        )
 
     @staticmethod
-    def sync_pull():
-        sync(ProjectRegistry.registry_s3_path(), ProjectRegistry.registry_path())
+    def sync_pull(local_registry_path):
+        sync(
+            local_registry_path / ProjectRegistry.registry_s3_path(),
+            ProjectRegistry.registry_path(),
+        )
 
     def has_dataset(self, dataset_id, status):
         """Return True if the dataset_id is stored with status."""

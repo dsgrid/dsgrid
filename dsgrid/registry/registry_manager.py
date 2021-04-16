@@ -558,6 +558,8 @@ class RegistryManager(RegistryManagerBase):
         config_filename = data_dir / ("project" + os.path.splitext(config_file)[1])
         dump_data(serialize_model(config.model), config_filename)
 
+        ProjectRegistry.sync_push(self._path)
+
         logger.info("Registered project %s with version=%s", config.model.project_id, version)
         return version
 

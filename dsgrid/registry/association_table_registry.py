@@ -28,9 +28,15 @@ class AssociationTableRegistry(RegistryBase):
         return AssociationTableRegistry.ASSOCIATION_TABLE_S3_REGISTRY_PATH
 
     @staticmethod
-    def sync_push():
-        sync(AssociationTableRegistry.registry_path(), AssociationTableRegistry.registry_s3_path())
+    def sync_push(local_registry_path):
+        sync(
+            local_registry_path / AssociationTableRegistry.registry_path(),
+            AssociationTableRegistry.registry_s3_path(),
+        )
 
     @staticmethod
-    def sync_pull():
-        sync(AssociationTableRegistry.registry_s3_path(), AssociationTableRegistry.registry_path())
+    def sync_pull(local_registry_path):
+        sync(
+            local_registry_path / AssociationTableRegistry.registry_s3_path(),
+            AssociationTableRegistry.registry_path(),
+        )

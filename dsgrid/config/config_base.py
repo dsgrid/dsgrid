@@ -18,7 +18,7 @@ class ConfigBase(abc.ABC):
         """Load the config from a file.
 
         Parameters
-        ----------
+        ---------
         config_file : str
 
         Returns

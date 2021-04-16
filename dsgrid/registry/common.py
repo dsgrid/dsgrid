@@ -18,9 +18,9 @@ from dsgrid.utils.versioning import make_version
 class RegistryType(Enum):
     """Registry types"""
 
-    ASSOCIATION_TABLE = "association_table"
     DATASET = "dataset"
     DIMENSION = "dimension"
+    DIMENSION_MAPPING = "dimension_mapping"
     PROJECT = "project"
 
 

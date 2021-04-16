@@ -16,7 +16,7 @@ from dsgrid.common import (
     S3_REGISTRY,
 )
 from dsgrid.data_models import serialize_model
-from dsgrid.config.association_tables import AssociationTableReferenceListModel
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.dimension_config import DimensionConfig
@@ -32,8 +32,8 @@ from .common import (
     make_default_config_registration,
     make_registry_id,
 )
-from .association_table_registry import AssociationTableRegistry
-from .association_table_registry_manager import AssociationTableRegistryManager
+from .dimension_mapping_registry import DimensionMappingRegistry
+from .dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from .dataset_registry import DatasetRegistry, DatasetRegistryModel
 from .dimension_registry import DimensionRegistry
 from .dimension_registry_manager import DimensionRegistryManager
@@ -64,14 +64,12 @@ class RegistryManager(RegistryManagerBase):
         self._projects = {}  # (project_id, version) to ProjectConfig. Loaded on demand.
         self._project_registries = {}  # project_id to ProjectRegistry. Loaded on demand.
         self._datasets = {}  # dataset_id to DatasetConfig. Loaded on demand.
-        # TODO: use CacheKey as soon as projects store dataset version
         self._dataset_registries = {}  # dataset_id to DatasetRegistry. Loaded on demand.
-        # TODO: manage association tables?
         self._dimension_mgr = DimensionRegistryManager(
             Path(path) / DimensionRegistry.registry_path(), fs_interface
         )
-        self._association_table_dimension_mgr = AssociationTableRegistryManager(
-            Path(path) / AssociationTableRegistry.registry_path(), fs_interface
+        self._dimension_mapping_dimension_mgr = DimensionMappingRegistryManager(
+            Path(path) / DimensionMappingRegistry.registry_path(), fs_interface
         )
 
         project_ids = self._fs_intf.listdir(self._path / ProjectRegistry.registry_path())
@@ -101,13 +99,13 @@ class RegistryManager(RegistryManagerBase):
         fs_interface.mkdir(path / DatasetRegistry.registry_path())
         fs_interface.mkdir(path / ProjectRegistry.registry_path())
         fs_interface.mkdir(path / DimensionRegistry.registry_path())
-        fs_interface.mkdir(path / AssociationTableRegistry.registry_path())
+        fs_interface.mkdir(path / DimensionMappingRegistry.registry_path())
         logger.info("Created registry at %s", path)
         return cls(path, fs_interface)
 
     @property
-    def association_table_dimension_manager(self):
-        return self._association_table_dimension_mgr
+    def dimension_mapping_manager(self):
+        return self._dimension_mapping_dimension_mgr
 
     @property
     def dimension_manager(self):
@@ -308,7 +306,7 @@ class RegistryManager(RegistryManagerBase):
         #   Potential solution: use hash() to check records on file and records to be submitted;
         #   Can use this function to check whether a record exists and suggest the data_submitter
         #   to use that record id if available
-        # NOTE: this has been implemented for association tables and we could use the
+        # NOTE: this has been implemented for dimension mappings and we could use the
         # same logic.
 
         dim_data = data["dimensions"]
@@ -544,7 +542,7 @@ class RegistryManager(RegistryManagerBase):
             Path to dataset config file
         project_id : str
         dimension_mapping_files : tuple
-            dimension mapping association table filenames
+            dimension mapping filenames
         submitter : str
             Submitter name
         log_message : str
@@ -573,16 +571,16 @@ class RegistryManager(RegistryManagerBase):
 
         assert config.model.dataset_id not in self._dataset_ids, config.model.dataset_id
 
-        table_references = []
+        mapping_references = []
         for filename in dimension_mapping_files:
-            contents = Path(filename).read_text()
-            for ref in AssociationTableReferenceListModel.load(filename).references:
-                key = ConfigKey(ref.association_table_id, ref.version)
-                if not self.association_table_dimension_manager.has_association_table_id(key):
-                    raise ValueError(f"association_table_id={key.id} is not registered")
-                table_references.append(ref)
+            for ref in DimensionMappingReferenceListModel.load(filename).references:
+                if not self.dimension_mapping_manager.has_mapping_id(
+                    ref.mapping_id, version=ref.version
+                ):
+                    raise ValueError(f"mapping_id={ref.mapping_id} is not registered")
+                mapping_references.append(ref)
 
-        project_config.add_dataset_dimension_mappings(config, table_references)
+        project_config.add_dataset_dimension_mappings(config, mapping_references)
 
         version = VersionInfo(major=1)
         registration = ConfigRegistrationModel(
@@ -809,9 +807,9 @@ def get_registry_path(registry_path=None):
 
 
 _REGISTRY_TYPE_TO_CLASS = {
-    RegistryType.ASSOCIATION_TABLE: AssociationTableRegistry,
     RegistryType.DATASET: DatasetRegistry,
     RegistryType.DIMENSION: DimensionRegistry,
+    RegistryType.DIMENSION_MAPPING: DimensionMappingRegistry,
     RegistryType.PROJECT: ProjectRegistry,
 }
 

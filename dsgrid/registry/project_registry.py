@@ -37,8 +37,6 @@ RUNNING LIST OF TODOS
 # TODO: would be nice to have a status message like "1 more dataset to load"
 """
 
-# association_tables: Optional[List[str]] = Field(title="association_tabls", default=[])
-
 
 class ProjectDatasetRegistryModel(DSGBaseModel):
     """Project registration details for datasets"""

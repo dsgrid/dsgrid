@@ -103,13 +103,13 @@ def register_dimensions(ctx, dimension_config_file, log_message):
 
 
 @click.command()
-@click.argument("association-table-config-file")
+@click.argument("dimension-mapping-config-file")
 @click.option(
     "--force",
     default=False,
     is_flag=True,
     show_default=True,
-    help="Register the association tables even if they are duplicate",
+    help="Register the dimension mappings even if they are duplicate",
 )
 @click.option(
     "-l",
@@ -119,13 +119,13 @@ def register_dimensions(ctx, dimension_config_file, log_message):
     help="reason for submission",
 )
 @click.pass_context
-def register_association_tables(ctx, association_table_config_file, log_message, force):
-    """Register new association tables with the dsgrid repository."""
+def register_dimension_mappings(ctx, dimension_mapping_config_file, log_message, force):
+    """Register new dimension mappings with the dsgrid repository."""
     registry_path = ctx.parent.params["path"]
     submitter = getpass.getuser()
-    mgr = RegistryManager.load(registry_path).association_table_dimension_manager
-    mgr.register_association_tables(
-        association_table_config_file, submitter, log_message, force=force
+    mgr = RegistryManager.load(registry_path).dimension_mapping_manager
+    mgr.register_dimension_mappings(
+        dimension_mapping_config_file, submitter, log_message, force=force
     )
 
 
@@ -218,7 +218,7 @@ registry.add_command(remove_dataset)
 registry.add_command(remove_project)
 registry.add_command(register_project)
 registry.add_command(register_dimensions)
-registry.add_command(register_association_tables)
+registry.add_command(register_dimension_mappings)
 registry.add_command(submit_dataset)
 registry.add_command(sync)
 registry.add_command(update_project)

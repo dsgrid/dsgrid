@@ -27,7 +27,7 @@ from pydantic import root_validator, validator
 from semver import VersionInfo
 
 from .config_base import ConfigBase
-from .association_tables import AssociationTableReferenceListModel
+from .dimension_mapping_base import DimensionMappingReferenceListModel
 from .dimensions import (
     DimensionReferenceModel,
     DimensionType,
@@ -169,12 +169,12 @@ class InputDatasetsModel(DSGBaseModel):
 class DimensionMappingsModel(DSGBaseModel):
     """Defines intra-project and dataset-to-project dimension mappings."""
 
-    project: Optional[List[AssociationTableReferenceListModel]] = Field(
+    project: Optional[List[DimensionMappingReferenceListModel]] = Field(
         title="project",
         description="intra-project mappings",
         default=[],
     )
-    datasets: Optional[Dict[str, AssociationTableReferenceListModel]] = Field(
+    datasets: Optional[Dict[str, DimensionMappingReferenceListModel]] = Field(
         title="datasets",
         description="dataset-to-project mappings for each registered dataset",
         default={},
@@ -265,7 +265,7 @@ class ProjectConfig(ConfigBase):
         ----------
         dataset_config : DatasetConfig
         references : list
-            list of AssociationTableReferenceModel
+            list of DimensionMappingReferenceModel
 
         Raises
         ------
@@ -277,20 +277,20 @@ class ProjectConfig(ConfigBase):
         if dataset_config.model.dataset_id not in self.model.dimension_mappings:
             self.model.dimension_mappings.datasets[
                 dataset_config.model.dataset_id
-            ] = AssociationTableReferenceListModel(references=[])
+            ] = DimensionMappingReferenceListModel(references=[])
         mappings = self.model.dimension_mappings.datasets[dataset_config.model.dataset_id]
-        existing_ids = set((x.association_table_id for x in mappings.references))
+        existing_ids = set((x.mapping_id for x in mappings.references))
         for reference in references:
-            if reference.association_table_id not in existing_ids:
+            if reference.mapping_id not in existing_ids:
                 mappings.references.append(reference)
                 logger.info(
                     "Added dimension mapping for dataset=%s: %s",
                     dataset_config.model.dataset_id,
-                    reference.association_table_id,
+                    reference.mapping_id,
                 )
 
     def check_dataset_dimension_mappings(
-        self, dataset_config, references: AssociationTableReferenceListModel
+        self, dataset_config, references: DimensionMappingReferenceListModel
     ):
         """Check that a dataset provides required mappings to the project.
 
@@ -298,7 +298,7 @@ class ProjectConfig(ConfigBase):
         ----------
         dataset_config : DatasetConfig
         references : list
-            list of AssociationTableReferenceModel
+            list of DimensionMappingReferenceModel
 
         Raises
         ------

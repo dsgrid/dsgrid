@@ -8,10 +8,10 @@ from .registry_base import RegistryBaseModel, RegistryBase
 logger = logging.getLogger(__name__)
 
 
-class AssociationTableRegistry(RegistryBase):
-    """Controls association table registration for mapping dimensions"""
+class DimensionMappingRegistry(RegistryBase):
+    """Controls registration for dimension mappings"""
 
-    ASSOCIATION_TABLE_REGISTRY_PATH = Path("association_tables")
+    DIMENSION_MAPPING_REGISTRY_PATH = Path("dimension_mappings")
 
     @staticmethod
     def model_class():
@@ -19,4 +19,4 @@ class AssociationTableRegistry(RegistryBase):
 
     @staticmethod
     def registry_path():
-        return AssociationTableRegistry.ASSOCIATION_TABLE_REGISTRY_PATH
+        return DimensionMappingRegistry.DIMENSION_MAPPING_REGISTRY_PATH

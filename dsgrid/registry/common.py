@@ -55,7 +55,7 @@ class VersionUpdateType(Enum):
 
 # These keys are used to store references to project/dataset configs and dimensions
 # in dictionaries.
-# The DimensionKey is useful for comparing whether # a project and
+# The DimensionKey is useful for comparing whether a project and
 # dataset have the same dimension.
 ConfigKey = namedtuple("ConfigKey", ["id", "version"])
 DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])

@@ -26,9 +26,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
     def __init__(self, path, fs_interface):
         super().__init__(path, fs_interface)
-        # value = DimensionMappingBaseModel
-        self._current_versions = {}
-        self._mappings = {}  # key = ConfigKey, value = DimensionMappingModel
+        self._current_versions = {}  # mapping_id to current version
+        self._mappings = {}  # ConfigKey to DimensionMappingModel
 
         for mapping_id in self._fs_intf.listdir(self._path, directories_only=True):
             id_path = Path(self._path) / mapping_id

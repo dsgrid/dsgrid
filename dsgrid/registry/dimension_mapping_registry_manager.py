@@ -29,7 +29,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._current_versions = {}  # mapping_id to current version
         self._mappings = {}  # ConfigKey to DimensionMappingModel
 
-        for mapping_id in self._fs_intf.listdir(self._path, directories_only=True):
+        for mapping_id in self._fs_intf.listdir(
+            self._path, directories_only=True, exclude_hidden=True
+        ):
             id_path = Path(self._path) / mapping_id
             registry = DimensionMappingRegistry.load(id_path / REGISTRY_FILENAME)
             self._current_versions[mapping_id] = registry.model.version

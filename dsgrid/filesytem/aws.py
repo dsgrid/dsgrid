@@ -38,7 +38,7 @@ class AwsS3Bucket(FilesystemInterface):
     def exists(self, path):
         assert False, "not supported yet"
 
-    def listdir(self, directory, files_only=False, directories_only=False):
+    def listdir(self, directory, files_only=False, directories_only=False, exclude_hidden=True):
         if files_only or directories_only:
             assert False, "limiting output not supported yet"
         result = self._client.list_objects_v2(Bucket=self._bucket, Prefix=directory)

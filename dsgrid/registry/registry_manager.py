@@ -72,8 +72,16 @@ class RegistryManager(RegistryManagerBase):
             Path(path) / DimensionMappingRegistry.registry_path(), fs_interface
         )
 
-        project_ids = self._fs_intf.listdir(self._path / ProjectRegistry.registry_path())
-        dataset_ids = self._fs_intf.listdir(self._path / DatasetRegistry.registry_path())
+        project_ids = self._fs_intf.listdir(
+            self._path / ProjectRegistry.registry_path(),
+            directories_only=True,
+            exclude_hidden=True,
+        )
+        dataset_ids = self._fs_intf.listdir(
+            self._path / DatasetRegistry.registry_path(),
+            directories_only=True,
+            exclude_hidden=True,
+        )
         self._project_ids = set(project_ids)
         self._dataset_ids = set(dataset_ids)
 

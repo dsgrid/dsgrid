@@ -30,15 +30,19 @@ class DimensionRegistryManager(RegistryManagerBase):
         # value = DimensionBaseModel
         self._dimension_versions = defaultdict(dict)
         self._dimensions = {}  # key = DimensionKey, value = Dimension
-        for dim_type in self._fs_intf.listdir(self._path):
+        for dim_type in self._fs_intf.listdir(
+            self._path, directories_only=True, exclude_hidden=True
+        ):
             _type = DimensionType(dim_type)
             type_path = Path(self._path) / dim_type
-            ids = self._fs_intf.listdir(type_path)
+            ids = self._fs_intf.listdir(type_path, directories_only=True, exclude_hidden=True)
             for dim_id in ids:
                 dim_path = type_path / dim_id
                 self._dimension_versions[_type][dim_id] = {
                     VersionInfo.parse(x)
-                    for x in self._fs_intf.listdir(dim_path, directories_only=True)
+                    for x in self._fs_intf.listdir(
+                        dim_path, directories_only=True, exclude_hidden=True
+                    )
                 }
 
     def get_dimension(self, dimension_type, dimension_id, version):

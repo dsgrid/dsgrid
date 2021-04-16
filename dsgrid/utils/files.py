@@ -1,13 +1,33 @@
 """File utility functions"""
 
+import hashlib
 import logging
 import os
 import json
+from pathlib import Path
 
 import toml
 
 
 logger = logging.getLogger(__name__)
+
+
+def compute_file_hash(filename):
+    """Compute a hash of the contents of a file.
+
+    Parameters
+    ----------
+    filename : str
+
+    Returns
+    -------
+    str
+        hash in the form of a hex number converted to a string
+
+    """
+    hash_obj = hashlib.sha256()
+    hash_obj.update(Path(filename).read_bytes())
+    return hash_obj.hexdigest()
 
 
 def dump_data(data, filename, **kwargs):

@@ -2,6 +2,7 @@ import csv
 import importlib
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from pydantic import validator
@@ -19,7 +20,7 @@ from dsgrid.dimension.time import (
     TimezoneType,
 )
 from dsgrid.filesytem.aws import sync
-from dsgrid.utils.files import load_data
+from dsgrid.utils.files import compute_file_hash, load_data
 from dsgrid.utils.versioning import handle_version_or_str
 
 
@@ -131,6 +132,11 @@ class DimensionModel(DimensionBaseModel):
         alias="file",
         description="filename containing dimension records",
     )
+    # TODO: enable this once we add support for checking for duplicate dimensions
+    # file_hash: Optional[str] = Field(
+    #    title="file_hash",
+    #    description="hash of the contents of the file"
+    # )
     # TODO: I think we may remove mappings altogether in favor of associations
     # TODO: I think we need to add the association table to
     #   dimensions.associations.project_dimensions in the config
@@ -180,6 +186,11 @@ class DimensionModel(DimensionBaseModel):
             raise ValueError(f"file {filename} does not exist")
 
         return filename
+
+    # @validator("file_hash")
+    # def compute_file_hash(cls, file_hash, values):
+    #    """Validate record file"""
+    #    return file_hash or compute_file_hash(values["filename"])
 
     # TODO: is this what we want?
     # @validator(

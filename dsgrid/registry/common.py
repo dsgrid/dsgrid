@@ -1,6 +1,8 @@
 """Common definitions for registry components"""
 
+import itertools
 import re
+import uuid
 from collections import namedtuple
 from datetime import datetime
 from enum import Enum
@@ -53,9 +55,8 @@ class VersionUpdateType(Enum):
 
 # These keys are used to store references to project/dataset configs and dimensions
 # in dictionaries.
-# The AssociationTableKey and DimensionKey is useful for comparing whether
-# a project and dataset have the same dimension.
-AssociationTableKey = namedtuple("AssociationTableKey", ["from_type", "to_type", "id", "version"])
+# The DimensionKey is useful for comparing whether # a project and
+# dataset have the same dimension.
 ConfigKey = namedtuple("ConfigKey", ["id", "version"])
 DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 
@@ -80,9 +81,36 @@ def get_version_from_filename(filename):
     return match.groupdict("handle"), make_version(match.groupdict("version"))
 
 
+def make_default_config_registration(submitter, log_message):
+    version = VersionInfo(major=1)
+    return ConfigRegistrationModel(
+        version=version,
+        submitter=submitter,
+        date=datetime.now(),
+        log_message=log_message,
+    )
+
+
 def make_filename_from_version(handle, version):
     """Make a filename with the handle and version."""
     return f"{handle}-v{version}.toml"
+
+
+def make_registry_id(fields, delimiter="__"):
+    """Make a unique ID by concatenating a list of fields with a UUID.
+
+    Parameters
+    ----------
+    fields : list
+    delimiter : str
+        Delimiter used for concatenation
+
+    Returns
+    -------
+    str
+
+    """
+    return delimiter.join(itertools.chain((str(x) for x in fields), [str(uuid.uuid4())]))
 
 
 # def update_version(id_handle, update, registry_path):

@@ -11,7 +11,7 @@ from dsgrid.config.association_tables import AssociationTableModel
 from dsgrid.config.dimension_mapping_config import DimensionMappingConfig
 from dsgrid.exceptions import DSGValueNotStored, DSGDuplicateRecords
 from dsgrid.data_models import serialize_model
-from dsgrid.registry.common import ConfigKey, make_default_config_registration, ConfigKey
+from dsgrid.registry.common import ConfigKey, make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import dump_data
 from .dimension_mapping_registry import DimensionMappingRegistry
 from .registry_base import RegistryBaseModel
@@ -186,7 +186,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)
 
-        registration = make_default_config_registration(submitter, log_message)
+        registration = make_initial_config_registration(submitter, log_message)
         dest_config_filename = "dimension_mapping" + os.path.splitext(config_file)[1]
         config_dir = Path(os.path.dirname(config_file))
 

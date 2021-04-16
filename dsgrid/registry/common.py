@@ -81,7 +81,7 @@ def get_version_from_filename(filename):
     return match.groupdict("handle"), make_version(match.groupdict("version"))
 
 
-def make_default_config_registration(submitter, log_message):
+def make_initial_config_registration(submitter, log_message):
     version = VersionInfo(major=1)
     return ConfigRegistrationModel(
         version=version,

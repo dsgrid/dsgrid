@@ -29,7 +29,7 @@ from .common import (
     VersionUpdateType,
     ConfigRegistrationModel,
     ConfigKey,
-    make_default_config_registration,
+    make_initial_config_registration,
     make_registry_id,
 )
 from .dimension_mapping_registry import DimensionMappingRegistry

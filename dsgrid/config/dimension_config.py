@@ -69,7 +69,5 @@ class DimensionConfig(ConfigBase):
         """Assign unique IDs to each mapping in the config"""
         logger.info("Dimension record ID assignment:")
         for dim in self.model.dimensions:
-            logger.info(" - type: %s, name: %s", dim.dimension_type, dim.name)
             # assign id, made from dimension.name and a UUID
             dim.dimension_id = make_registry_id([dim.name.lower().replace(" ", "_")])
-            logger.info("   id: %s", dim.dimension_id)

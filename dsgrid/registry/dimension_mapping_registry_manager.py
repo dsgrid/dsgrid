@@ -134,6 +134,11 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             # able to find the path.
             model_data["file"] = os.path.basename(mapping.filename)
             dump_data(model_data, dest_dir / dest_config_filename)
+            logger.info(
+                "Registered dimension mapping id=%s version=%s",
+                mapping.mapping_id,
+                registration.version,
+            )
 
         logger.info(
             "Registered %s dimension mapping(s) with version=%s",

@@ -205,6 +205,13 @@ class DimensionRegistryManager(RegistryManagerBase):
                 model_data["file"] = os.path.basename(dimension.filename)
 
             dump_data(model_data, dest_dir / dest_config_filename)
+            logger.info(
+                "Registered dimension id=%s type=%s version=%s name=%s",
+                dimension.dimension_id,
+                dimension.dimension_type.value,
+                registration.version,
+                dimension.name,
+            )
 
         logger.info(
             "Registered %s dimensions with version=%s",

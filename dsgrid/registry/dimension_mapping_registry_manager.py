@@ -4,12 +4,10 @@ import logging
 import os
 from pathlib import Path
 
-from semver import VersionInfo
-
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.association_tables import AssociationTableModel
 from dsgrid.config.dimension_mapping_config import DimensionMappingConfig
-from dsgrid.exceptions import DSGValueNotStored, DSGDuplicateRecords
+from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.data_models import serialize_model
 from dsgrid.registry.common import ConfigKey, make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import dump_data
@@ -26,77 +24,50 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
     def __init__(self, path, fs_interface):
         super().__init__(path, fs_interface)
-        self._current_versions = {}  # mapping_id to current version
         self._mappings = {}  # ConfigKey to DimensionMappingModel
 
-        for mapping_id in self._fs_intf.listdir(
-            self._path, directories_only=True, exclude_hidden=True
-        ):
-            id_path = Path(self._path) / mapping_id
-            registry = DimensionMappingRegistry.load(id_path / REGISTRY_FILENAME)
-            self._current_versions[mapping_id] = registry.model.version
+    @staticmethod
+    def registry_class():
+        return DimensionMappingRegistry
 
-    def check_unique_records(self, mapping_config: DimensionMappingConfig, warn_only=False):
+    def check_unique_records(self, config: DimensionMappingConfig, warn_only=False):
         """Check if any new tables have identical records as existing tables.
 
         Parameters
         ----------
-        mapping_config : DimensionMappingConfig
+        config : DimensionMappingConfig
         warn_only: bool
             If True, log a warning instead of raising an exception.
 
         Raises
         ------
-        DSGDuplicateRecords
+        DSGDuplicateValueRegistered
             Raised if there are duplicates and warn_only is False.
 
         """
         hashes = set()
         for mapping_id, version in self._current_versions.items():
-            mapping = self.get_dimension_mapping(mapping_id, version)
+            mapping = self.get_by_id(mapping_id, version)
             hashes.add(mapping.file_hash)
 
-        duplicates = [x.mapping_id for x in mapping_config.model.mappings if x.file_hash in hashes]
+        duplicates = [x.mapping_id for x in config.model.mappings if x.file_hash in hashes]
         if duplicates:
             if warn_only:
                 logger.warning("Dimension mapping records are duplicated: %s", duplicates)
             else:
-                raise DSGDuplicateRecords(f"duplicate dimension mapping records: {duplicates}")
+                raise DSGDuplicateValueRegistered(
+                    f"duplicate dimension mapping records: {duplicates}"
+                )
 
-    def get_dimension_mapping(self, mapping_id, version=None):
-        """Get the dimension mapping matching the parameters. Returns from cache if already loaded.
-
-        Parameters
-        ----------
-        mapping_id : str
-        version : VersionInfo
-            If None, return the latest version.
-
-        Returns
-        -------
-        DimensionMappingBaseModel
-
-        Raises
-        ------
-        DSGValueNotStored
-            Raised if the dimension_mapping is not stored.
-
-        """
+    def get_by_id(self, item_id, version=None):
         if version is None:
-            version = sorted(list(self._current_versions[mapping_id]))[-1]
-        key = ConfigKey(mapping_id, version)
-        return self.get_dimension_mapping_by_key(key)
+            version = sorted(list(self._current_versions[item_id]))[-1]
+        key = ConfigKey(item_id, version)
+        return self.get_by_key(key)
 
-    def get_dimension_mapping_by_key(self, key):
-        """Get the dimension mapping matching key. Returns from cache if already loaded.
-
-        Parameters
-        ----------
-        key : ConfigKey Key
-
-        """
-        if not self.has_mapping_id(key.id, version=key.version):
-            raise DSGValueNotStored(f"dimension_mapping not stored: {key}")
+    def get_by_key(self, key):
+        if not self.has_id(key.id, version=key.version):
+            raise DSGValueNotRegistered(f"dimension mapping={key}")
 
         mapping = self._mappings.get(key)
         if mapping is not None:
@@ -106,39 +77,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         dimension_mapping = AssociationTableModel.load(filename)
         self._mappings[key] = dimension_mapping
         return dimension_mapping
-
-    def has_mapping_id(self, mapping_id, version=None):
-        """Return True if an dimension mapping matching the parameters is stored.
-
-        Parameters
-        ----------
-        mapping_id : str
-        version : VersionInfo
-            If None, use latest.
-
-        Returns
-        -------
-        bool
-
-        """
-        if version is None:
-            return mapping_id in self._current_versions
-        path = self._path / mapping_id / str(version)
-        return self._fs_intf.exists(path)
-
-    def iter_mapping_ids(self):
-        """Return an iterator over the registered dimension mapping IDs."""
-        return self._current_versions.keys()
-
-    def list_mapping_ids(self):
-        """Return the dimension mapping IDs.
-
-        Returns
-        -------
-        list
-
-        """
-        return sorted(list(self.iter_mapping_ids()))
 
     def load_dimension_mappings(self, dimension_mapping_references):
         """Load dimension_mappings from files.
@@ -157,31 +95,11 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         mappings = {}
         for ref in dimension_mapping_references:
             key = ConfigKey(ref.id, ref.version)
-            mappings[key] = self.get_dimension_mapping_by_key(key)
+            mappings[key] = self.get_by_key(key)
 
         return mappings
 
-    def register_dimension_mappings(self, config_file, submitter, log_message, force=False):
-        """Registers dimension mappings.
-
-        Parameters
-        ----------
-        config_file : str
-            Path to dimension mapping config file
-        submitter : str
-            Submitter name
-        log_message : str
-        force : bool
-            If true, register the mapping even if it is duplicate.
-
-        Raises
-        ------
-        ValueError
-            Raised if the config_file is invalid.
-        DSGDuplicateValueStored
-            Raised if the mapping is already registered.
-
-        """
+    def register(self, config_file, submitter, log_message, force=False):
         config = DimensionMappingConfig.load(config_file)
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)

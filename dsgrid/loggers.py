@@ -12,7 +12,7 @@ import logging.config
 # you're either setting up logger name, or you want to set up a bunch of loggers
 # for the different packages?
 def setup_logging(
-    name, filename, console_level=logging.INFO, file_level=logging.INFO, packages=None
+    name, filename, console_level=logging.INFO, file_level=logging.INFO, packages=None, mode="w"
 ):
     """Configures logging to file and console.
 
@@ -53,7 +53,7 @@ def setup_logging(
                 "class": "logging.FileHandler",
                 "level": file_level,
                 "filename": filename,
-                "mode": "w",
+                "mode": mode,
                 "formatter": "detailed",
             },
         },

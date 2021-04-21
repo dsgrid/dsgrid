@@ -1,6 +1,6 @@
 import pytest
 
-from dsgrid.exceptions import DSGValueNotStored
+from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
 from dsgrid.config.project_config import ProjectConfig, ProjectConfigModel
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
@@ -28,7 +28,7 @@ def test_project_invalid_id(config_as_dict, dimension_manager):
     first = dimensions[0]
     first["dimension_id"] = "invalid"
     model = ProjectConfigModel(**config_as_dict)
-    with pytest.raises(DSGValueNotStored):
+    with pytest.raises(DSGValueNotRegistered):
         dimension_manager.load_dimensions(model.dimensions.project_dimensions)
 
 

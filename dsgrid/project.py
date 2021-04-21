@@ -8,10 +8,9 @@ from pyspark.sql import SparkSession
 from dsgrid.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType  # , MappingType
 from dsgrid.dimension.store import DimensionStore
-from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored
+from dsgrid.exceptions import DSGInvalidField, DSGValueNotRegistered
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
 from dsgrid.utils.spark import init_spark
-from dsgrid.utils.versioning import make_version
 
 
 logger = logging.getLogger(__name__)
@@ -89,7 +88,7 @@ class Project:
 
         """
         if dataset_id not in self._datasets:
-            raise DSGValueNotStored(f"dataset {dataset_id} has not been loaded")
+            raise ValueError(f"dataset {dataset_id} has not been loaded")
         return self._datasets[dataset_id]
 
     def load_dataset(self, dataset_id):
@@ -101,7 +100,9 @@ class Project:
 
         """
         if dataset_id not in self._dataset_configs:
-            raise DSGValueNotStored(f"dataset {dataset_id} is not stored in the project")
+            raise DSGValueNotRegistered(
+                f"dataset_id={dataset_id} is not registered in the project"
+            )
         config = self._dataset_configs[dataset_id]
         dataset = Dataset.load(config)
         dataset.create_views()

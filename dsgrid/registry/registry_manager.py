@@ -20,8 +20,10 @@ from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListMo
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.dimension_config import DimensionConfig
-from dsgrid.exceptions import DSGValueNotStored
+from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
+from dsgrid.filesytem.aws import AwsS3Bucket
 from dsgrid.filesytem.factory import make_filesystem_interface
+from dsgrid.filesytem.local_filesystem import LocalFilesystem
 from .common import (
     RegistryType,
     DatasetRegistryStatus,
@@ -50,7 +52,7 @@ from dsgrid.utils.files import dump_data, load_data
 logger = logging.getLogger(__name__)
 
 
-class RegistryManager(RegistryManagerBase):
+class RegistryManager:
     """Manages registration of all projects and datasets.
 
     Whichever module loads this class will sync the official registry to the local
@@ -60,15 +62,21 @@ class RegistryManager(RegistryManagerBase):
     """
 
     def __init__(self, path, fs_interface):
-        super().__init__(path, fs_interface)
+        if isinstance(fs_interface, AwsS3Bucket):
+            self._path = fs_interface.path
+        else:
+            assert isinstance(fs_interface, LocalFilesystem)
+            self._path = path
+
+        self._fs_intf = fs_interface
         self._projects = {}  # (project_id, version) to ProjectConfig. Loaded on demand.
         self._project_registries = {}  # project_id to ProjectRegistry. Loaded on demand.
         self._datasets = {}  # dataset_id to DatasetConfig. Loaded on demand.
         self._dataset_registries = {}  # dataset_id to DatasetRegistry. Loaded on demand.
-        self._dimension_mgr = DimensionRegistryManager(
+        self._dimension_mgr = DimensionRegistryManager.load(
             Path(path) / DimensionRegistry.registry_path(), fs_interface
         )
-        self._dimension_mapping_dimension_mgr = DimensionMappingRegistryManager(
+        self._dimension_mapping_dimension_mgr = DimensionMappingRegistryManager.load(
             Path(path) / DimensionMappingRegistry.registry_path(), fs_interface
         )
 
@@ -178,12 +186,12 @@ class RegistryManager(RegistryManagerBase):
 
         Raises
         ------
-        ValueError
-            Raised if the project_id is not stored.
+        DSGValueNotRegistered
+            Raised if the project_id is not registered.
 
         """
         if project_id not in self._project_ids:
-            raise ValueError(f"project={project_id} is not registered")
+            raise DSGValueNotRegistered(f"project_id={project_id}")
 
         self._fs_intf.rmtree(self._get_project_directory(project_id))
         logger.info("Removed %s from the registry.", project_id)
@@ -203,7 +211,7 @@ class RegistryManager(RegistryManagerBase):
 
         """
         if project_id not in self._project_ids:
-            raise ValueError(f"project={project_id} is not registered")
+            raise DSGValueNotRegistered(f"project_id={project_id}")
 
         if version is None:
             if registry is None:
@@ -218,8 +226,8 @@ class RegistryManager(RegistryManagerBase):
 
         config_file = self._get_project_config_file(project_id, version)
         if not self._fs_intf.exists(config_file):
-            raise DSGValueNotStored(
-                f"config file for project={project_id} {version} does not exist"
+            raise DSGValueNotRegistered(
+                f"config file for project_id={project_id} {version} does not exist"
             )
 
         project_config = ProjectConfig.load(config_file, self._dimension_mgr)
@@ -240,7 +248,7 @@ class RegistryManager(RegistryManagerBase):
 
         """
         if dataset_id not in self._dataset_ids:
-            raise ValueError(f"dataset={dataset_id} is not registered")
+            raise DSGValueNotRegistered(f"dataset_id={dataset_id}")
 
         dataset_config = self._datasets.get(dataset_id)
         if dataset_config is not None:
@@ -267,7 +275,7 @@ class RegistryManager(RegistryManagerBase):
 
         """
         if dataset_id not in self._dataset_ids:
-            raise ValueError(f"dataset={dataset_id} is not registered")
+            raise DSGValueNotRegistered(f"dataset_id={dataset_id}")
 
         registry = self._dataset_registries.get(dataset_id)
         if registry is not None:
@@ -291,7 +299,7 @@ class RegistryManager(RegistryManagerBase):
 
         """
         if project_id not in self._project_ids:
-            raise ValueError(f"project={project_id} is not registered")
+            raise DSGValueNotRegistered(f"project_id={project_id}")
 
         registry = self._project_registries.get(project_id)
         if registry is not None:
@@ -301,141 +309,6 @@ class RegistryManager(RegistryManagerBase):
         filename = self._get_registry_filename(ProjectRegistry, project_id)
         logger.info("Loaded ProjectRegistry for project_id=%s", project_id)
         return ProjectRegistry.load(filename)
-
-    @staticmethod
-    def assign_dimension_id(data: dict):
-        """Assign dimension_id to each dimension. Print the assigned IDs."""
-
-        # TODO: check that id does not already exist in .dsgrid-registry
-        # TODO: need regular expression check on name and/or limit number of chars in dim id
-        # TODO: currently a dimension record can be registered indefinitely,
-        # each time with a different UUID. Need to enforce that it is registered only once.
-        #   Potential solution: use hash() to check records on file and records to be submitted;
-        #   Can use this function to check whether a record exists and suggest the data_submitter
-        #   to use that record id if available
-        # NOTE: this has been implemented for dimension mappings and we could use the
-        # same logic.
-
-        dim_data = data["dimensions"]
-        logger.info("Dimension record ID assignment:")
-        for item in dim_data:
-            logger.info(" - type: %s, name: %s", item["type"], item["name"])
-
-            # assign id, made from dimension.name and a UUID4
-            item["id"] = make_registry_id([item["name"].lower().replace(" ", "_")])
-            logger.info("   id: %s", item["id"])
-
-    def _register_dimension_config(
-        self, registry_type, config_file, submitter, log_message, config_data
-    ):
-        """
-        - It validates that the configuration meets all requirements.
-        - It files dimension records by dimension type in output registry folder.
-        """
-
-        # TODO: search also from dataset/../dimensions folder for records and find a union record set
-
-        # Just verify that it loads.
-        DimensionConfig.load(config_file)
-        version = VersionInfo(major=1)
-
-        registration = ConfigRegistrationModel(
-            version=version,
-            submitter=submitter,
-            date=datetime.now(),
-            log_message=log_message,
-        )
-
-        config_file_name = "dimension" + os.path.splitext(config_file)[1]
-
-        dim_data = config_data["dimensions"]
-        n_registered_dims = 0
-        for item in dim_data:
-            # Leading directories from the original are not relevant in the registry.
-            orig_file = item.get("file")
-            if orig_file is not None:
-                # Time dimensions do not have a record file.
-                item["file"] = os.path.basename(orig_file)
-
-            registry_config = RegistryBaseModel(
-                version=version,
-                description=item["description"].strip(),
-                registration_history=[registration],
-            )
-            config_dir = self._get_dimension_directory()
-
-            data_type_dir = config_dir / item["type"]
-            data_dir = data_type_dir / item["id"] / str(version)
-            self._fs_intf.mkdir(data_type_dir)
-            self._fs_intf.mkdir(data_dir)
-
-            filename = Path(os.path.dirname(data_dir)) / REGISTRY_FILENAME
-            data = serialize_model(registry_config)
-
-            # TODO: if we want to update AWS directly, this needs to change.
-
-            # export registry.toml
-            dump_data(data, filename)
-
-            # export individual dimension_config.toml
-            dump_data(item, data_dir / config_file_name)
-
-            # export dimension record file
-            if orig_file is not None:
-                dimension_record = Path(os.path.dirname(config_file)) / orig_file
-                self._fs_intf.copy_file(
-                    dimension_record, data_dir / os.path.basename(item["file"])
-                )
-
-            n_registered_dims += 1
-
-        logger.info(
-            "Registered %s %s(s) with version=%s", n_registered_dims, registry_type.value, version
-        )
-        return version
-
-    def _config_file_extend_name(self, config_file, name_extension):
-        """Add name extension to existing config_file"""
-        name_extension = str(name_extension).lower().replace(" ", "_")
-        return (
-            os.path.splitext(config_file)[0]
-            + "_"
-            + name_extension
-            + os.path.splitext(config_file)[1]
-        )
-
-    def register_dimensions(self, config_file, submitter, log_message):
-        """Registers dimensions for projects and datasets.
-
-        Parameters
-        ----------
-        config_file : str
-            Path to dimension config file
-        submitter : str
-            Submitter name
-        log_message : str
-
-        Raises
-        ------
-        ValueError
-            Raised if the config_file is invalid.
-
-        """
-        data = load_data(config_file)
-        self.assign_dimension_id(data)
-
-        self._register_dimension_config(
-            RegistryType.DIMENSION, config_file, submitter, log_message, data
-        )
-
-        # save a copy to
-        config_file_updated = self._config_file_extend_name(config_file, "with assigned id")
-        dump_data(data, config_file_updated)
-
-        logger.info(
-            "--> New config file containing the dimension ID assignment exported: %s",
-            config_file_updated,
-        )
 
     def register_project(self, config_file, submitter, log_message):
         """Registers a new project with DSGRID.
@@ -454,11 +327,13 @@ class RegistryManager(RegistryManagerBase):
         ------
         ValueError
             Raised if the config_file is invalid.
+        DSGDuplicateValueRegistered
+            Raised if the project_id is already registered.
 
         """
         config = ProjectConfig.load(config_file, self._dimension_mgr)
         if config.model.project_id in self._project_ids:
-            raise ValueError(f"{config.model.project_id} is already registered")
+            raise DSGDuplicateValueRegistered(f"project_id={config.model.project_id}")
 
         version = VersionInfo(major=1)
         registration = ConfigRegistrationModel(
@@ -528,7 +403,7 @@ class RegistryManager(RegistryManagerBase):
         project_id = data["project_id"]
 
         if project_id not in self._project_ids:
-            raise ValueError(f"{project_id} is not already stored")
+            raise DSGValueNotRegistered(f"project_id={project_id}")
 
         registry_file = self._get_registry_filename(ProjectRegistry, project_id)
         registry_config = ProjectRegistryModel(**load_data(registry_file))
@@ -556,15 +431,17 @@ class RegistryManager(RegistryManagerBase):
         Raises
         ------
         ValueError
-            Raised if the config_file or project_id is invalid.
+            Raised if the config_file is invalid.
             Raised if the project does not contain this dataset.
+        DSGDuplicateValueRegistered
+            Raised if the dataset is already registered with the project.
 
         """
         config = DatasetConfig.load(config_file, self._dimension_mgr)
         project_registry = self.load_project_registry(project_id)
 
         if project_registry.has_dataset(config.model.dataset_id, DatasetRegistryStatus.REGISTERED):
-            raise ValueError(
+            raise DSGDuplicateValueRegistered(
                 f"dataset={config.model.dataset_id} has already been submitted to project={project_id}"
             )
 
@@ -579,10 +456,8 @@ class RegistryManager(RegistryManagerBase):
         mapping_references = []
         for filename in dimension_mapping_files:
             for ref in DimensionMappingReferenceListModel.load(filename).references:
-                if not self.dimension_mapping_manager.has_mapping_id(
-                    ref.mapping_id, version=ref.version
-                ):
-                    raise ValueError(f"mapping_id={ref.mapping_id} is not registered")
+                if not self.dimension_mapping_manager.has_id(ref.mapping_id, version=ref.version):
+                    raise DSGValueNotRegistered(f"mapping_id={ref.mapping_id}")
                 mapping_references.append(ref)
 
         project_config.add_dataset_dimension_mappings(config, mapping_references)
@@ -649,11 +524,13 @@ class RegistryManager(RegistryManagerBase):
         ------
         ValueError
             Raised if the config_file is invalid.
+        DSGValueNotRegistered
+            Raised if the dataset_id is not registered.
 
         """
         assert False, "not tested and probably not correct"
         if dataset_id not in self._dataset_ids:
-            raise ValueError(f"{dataset_id} is not already stored")
+            raise DSGValueNotRegistered(f"dataset_id={dataset_id}")
 
         registry_file = self._get_registry_filename(DatasetRegistry, dataset_id)
         registry_config = DatasetRegistryModel(**load_data(registry_file))
@@ -670,12 +547,12 @@ class RegistryManager(RegistryManagerBase):
 
         Raises
         ------
-        ValueError
+        DSGValueNotRegistered
             Raised if the dataset_id is not registered.
 
         """
         if dataset_id not in self._dataset_ids:
-            raise ValueError(f"dataset={dataset_id} is not registered")
+            raise DSGValueNotRegistered(f"dataset_id={dataset_id}")
 
         self._fs_intf.rmtree(self._get_dataset_directory(dataset_id))
 
@@ -718,9 +595,6 @@ class RegistryManager(RegistryManagerBase):
     def _get_dimension_config_file(self, version):
         # need to change
         return self._path / DimensionRegistry.registry_path() / str(version) / DIMENSION_FILENAME
-
-    def _get_dimension_directory(self):
-        return self._path / DimensionRegistry.registry_path()
 
     def _update_config(
         self, config_id, registry_config, config_file, submitter, update_type, log_message

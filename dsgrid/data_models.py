@@ -43,12 +43,14 @@ class DSGBaseModel(BaseModel):
             os.chdir(orig)
 
 
-def serialize_model(model):
+def serialize_model(model: DSGBaseModel):
     """Serialize a model to a dict, converting values as needed."""
+    # TODO: we should be able to use model.json and custom JSON encoders
+    # instead of doing this, at least in most cases.
     return _serialize_model_data(model.dict(by_alias=True))
 
 
-def _serialize_model_data(data):
+def _serialize_model_data(data: dict):
     for key, val in data.items():
         data[key] = _serialize_model_item(val)
     return data

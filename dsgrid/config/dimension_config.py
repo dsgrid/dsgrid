@@ -19,6 +19,7 @@ from .dimensions import (
     handle_dimension_union,
 )
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.registry.common import make_registry_id
 from dsgrid.utils.utilities import check_uniqueness
 
 
@@ -63,3 +64,12 @@ class DimensionConfig(ConfigBase):
     @staticmethod
     def model_class():
         return DimensionConfigModel
+
+    def assign_ids(self):
+        """Assign unique IDs to each mapping in the config"""
+        logger.info("Dimension record ID assignment:")
+        for dim in self.model.dimensions:
+            logger.info(" - type: %s, name: %s", dim.dimension_type, dim.name)
+            # assign id, made from dimension.name and a UUID
+            dim.dimension_id = make_registry_id([dim.name.lower().replace(" ", "_")])
+            logger.info("   id: %s", dim.dimension_id)

@@ -6,8 +6,10 @@ import logging
 import click
 
 from dsgrid.common import S3_REGISTRY, LOCAL_REGISTRY
+from dsgrid.loggers import setup_logging
 from dsgrid.registry.common import VersionUpdateType
 from dsgrid.filesytem import aws
+from dsgrid.registry.common import REGISTRY_LOG_FILE
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -25,6 +27,10 @@ logger = logging.getLogger(__name__)
 @click.pass_context
 def registry(ctx, path):
     """Manage a registry."""
+    # We want to keep a log of items that have been registered on the
+    # current system. But we probably don't want this to grow forever.
+    # Consider truncating or rotating.
+    setup_logging("dsgrid", REGISTRY_LOG_FILE, mode="a")
 
 
 @click.command()
@@ -50,9 +56,9 @@ def list_(ctx):
         print(f"  - {dataset}")
     print("\nDimensions:")
     dim_mgr = manager.dimension_manager
-    for dimension_type in dim_mgr.list_dimension_types():
+    for dimension_type in dim_mgr.list_types():
         print(f"  - {dimension_type.value}")
-        for dimension_id in dim_mgr.list_dimension_ids(dimension_type):
+        for dimension_id in dim_mgr.list_ids(dimension_type=dimension_type):
             print(f"    - {dimension_id}")
 
 
@@ -95,9 +101,9 @@ def register_project(ctx, project_config_file, log_message):
 def register_dimensions(ctx, dimension_config_file, log_message):
     """Register new dimensions with the dsgrid repository."""
     registry_path = ctx.parent.params["path"]
-    manager = RegistryManager.load(registry_path)
+    manager = RegistryManager.load(registry_path).dimension_manager
     submitter = getpass.getuser()
-    manager.register_dimensions(dimension_config_file, submitter, log_message)
+    manager.register(dimension_config_file, submitter, log_message)
 
 
 @click.command()
@@ -121,9 +127,7 @@ def register_dimension_mappings(ctx, dimension_mapping_config_file, log_message,
     registry_path = ctx.parent.params["path"]
     submitter = getpass.getuser()
     mgr = RegistryManager.load(registry_path).dimension_mapping_manager
-    mgr.register_dimension_mappings(
-        dimension_mapping_config_file, submitter, log_message, force=force
-    )
+    mgr.register(dimension_mapping_config_file, submitter, log_message, force=force)
 
 
 @click.command()

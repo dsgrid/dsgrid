@@ -64,9 +64,10 @@ def test_register_project_and_dataset(test_data_dir):
             test_data_dir / "dimension.toml",
             test_data_dir / dataset_dir / "dimension.toml",
         ):
-            check_run_command(
-                f"dsgrid registry --path={path} register-dimensions {dim_config_file} -l log"
-            )
+            cmd = f"dsgrid registry --path={path} register-dimensions {dim_config_file} -l log"
+            check_run_command(cmd)
+            # Can't register duplicates.
+            assert run_command(cmd) != 0
 
         cmd = f"dsgrid registry --path={path} register-dimension-mappings {dimension_mapping_config} -l log"
         check_run_command(cmd)

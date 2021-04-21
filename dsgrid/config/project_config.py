@@ -32,7 +32,7 @@ from .dimensions import (
     DimensionReferenceModel,
     DimensionType,
 )
-from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored, DSGInvalidDimensionMapping
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import DatasetRegistryStatus
 from dsgrid.utils.utilities import check_uniqueness

@@ -15,6 +15,9 @@ from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.versioning import make_version
 
 
+REGISTRY_LOG_FILE = "dsgrid_registry.log"
+
+
 class RegistryType(Enum):
     """Registry types"""
 

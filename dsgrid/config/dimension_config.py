@@ -10,7 +10,7 @@ from typing import List, Optional, Union, Dict
 import logging
 
 from pydantic import Field
-from pydantic import validator, root_validator
+from pydantic import validator
 
 from .config_base import ConfigBase
 from .dimensions import (

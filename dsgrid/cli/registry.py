@@ -59,35 +59,59 @@ def list_(ctx):
     manager.dimension_mapping_manager.show()
 
 
-@click.command()
+@click.group()
+@click.pass_context
+def projects(ctx):
+    """Project subcommands"""
+
+
+@click.group()
+@click.pass_context
+def datasets(ctx):
+    """Dataset subcommands"""
+
+
+@click.group()
+@click.pass_context
+def dimensions(ctx):
+    """Dimension subcommands"""
+
+
+@click.group()
+@click.pass_context
+def dimension_mappings(ctx):
+    """Dimension mapping subcommands"""
+
+
+@click.command(name="list")
 @click.pass_context
 def list_dimensions(ctx):
     """List the registered dimensions."""
-    registry_path = ctx.parent.params["path"]
+    registry_path = ctx.parent.parent.params["path"]
     manager = RegistryManager.load(registry_path).dimension_manager
     manager.show()
 
 
-@click.command()
+@click.command(name="list")
 @click.pass_context
 def list_dimension_mappings(ctx):
     """List the registered dimension mappings."""
-    registry_path = ctx.parent.params["path"]
+    registry_path = ctx.parent.parent.params["path"]
     manager = RegistryManager.load(registry_path).dimension_mapping_manager
     manager.show()
 
 
-@click.command()
+@click.command(name="remove")
 @click.argument("project-id")
 @click.pass_context
 def remove_project(ctx, project_id):
     """Remove a project from the dsgrid repository."""
-    registry_path = ctx.parent.params["path"]
+    registry_path = ctx.parent.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     manager.remove_project(project_id)
 
 
-@click.command()
+@click.command(name="register")
 @click.argument("project-config-file")
 @click.option(
     "-l",
@@ -98,13 +122,13 @@ def remove_project(ctx, project_id):
 @click.pass_context
 def register_project(ctx, project_config_file, log_message):
     """Register a new project with the dsgrid repository."""
-    registry_path = ctx.parent.params["path"]
+    registry_path = ctx.parent.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
     manager.register_project(project_config_file, submitter, log_message)
 
 
-@click.command()
+@click.command(name="register")
 @click.argument("dimension-config-file")
 @click.option(
     "-l",
@@ -115,13 +139,13 @@ def register_project(ctx, project_config_file, log_message):
 @click.pass_context
 def register_dimensions(ctx, dimension_config_file, log_message):
     """Register new dimensions with the dsgrid repository."""
-    registry_path = ctx.parent.params["path"]
+    registry_path = ctx.parent.parent.params["path"]
     manager = RegistryManager.load(registry_path).dimension_manager
     submitter = getpass.getuser()
     manager.register(dimension_config_file, submitter, log_message)
 
 
-@click.command()
+@click.command(name="register")
 @click.argument("dimension-mapping-config-file")
 @click.option(
     "--force",
@@ -139,13 +163,13 @@ def register_dimensions(ctx, dimension_config_file, log_message):
 @click.pass_context
 def register_dimension_mappings(ctx, dimension_mapping_config_file, log_message, force):
     """Register new dimension mappings with the dsgrid repository."""
-    registry_path = ctx.parent.params["path"]
+    registry_path = ctx.parent.parent.params["path"]
     submitter = getpass.getuser()
     mgr = RegistryManager.load(registry_path).dimension_mapping_manager
     mgr.register(dimension_mapping_config_file, submitter, log_message, force=force)
 
 
-@click.command()
+@click.command(name="update")
 @click.argument("project-config-file")
 @click.option(
     "-l",
@@ -164,7 +188,7 @@ def register_dimension_mappings(ctx, dimension_mapping_config_file, log_message,
 @click.pass_context
 def update_project(ctx, project_config_file, log_message, update_type):
     """Update an existing project registry."""
-    registry_path = ctx.parent.params["path"]
+    registry_path = ctx.parent.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
     manager.update_project(project_config_file, submitter, update_type, log_message)
@@ -195,9 +219,9 @@ def update_project(ctx, project_config_file, log_message, update_type):
     help="reason for submission",
 )
 @click.pass_context
-def submit_dataset(ctx, dataset_config_file, project_id, dimension_mapping_files, log_message):
+def submit(ctx, dataset_config_file, project_id, dimension_mapping_files, log_message):
     """Submit a new dataset to a dsgrid project."""
-    registry_path = ctx.parent.params["path"]
+    registry_path = ctx.parent.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     submitter = getpass.getuser()
     manager.submit_dataset(
@@ -210,12 +234,12 @@ def submit_dataset(ctx, dataset_config_file, project_id, dimension_mapping_files
 # TODO: update_dataset
 
 
-@click.command()
+@click.command(name="remove")
 @click.argument("dataset-id")
 @click.pass_context
 def remove_dataset(ctx, dataset_id):
     """Remove a dataset from the dsgrid repository."""
-    registry_path = ctx.parent.params["path"]
+    registry_path = ctx.parent.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     manager.remove_dataset(dataset_id)
 
@@ -228,15 +252,23 @@ def sync(ctx):
     aws.sync(S3_REGISTRY, registry_path)
 
 
+projects.add_command(register_project)
+projects.add_command(remove_project)
+projects.add_command(update_project)
+
+datasets.add_command(submit)
+datasets.add_command(remove_dataset)
+
+dimensions.add_command(register_dimensions)
+dimensions.add_command(list_dimensions)
+
+dimension_mappings.add_command(register_dimension_mappings)
+dimension_mappings.add_command(list_dimension_mappings)
+
 registry.add_command(create)
 registry.add_command(list_)
-registry.add_command(list_dimensions)
-registry.add_command(list_dimension_mappings)
-registry.add_command(remove_dataset)
-registry.add_command(remove_project)
-registry.add_command(register_project)
-registry.add_command(register_dimensions)
-registry.add_command(register_dimension_mappings)
-registry.add_command(submit_dataset)
+registry.add_command(projects)
+registry.add_command(datasets)
+registry.add_command(dimensions)
+registry.add_command(dimension_mappings)
 registry.add_command(sync)
-registry.add_command(update_project)

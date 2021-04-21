@@ -58,6 +58,7 @@ setup(
         "findspark",
         "numpy",
         "pandas",
+        "prettytable",
         "pydantic",
         "pyspark",
         "semver",

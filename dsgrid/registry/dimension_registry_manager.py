@@ -1,21 +1,31 @@
 """Manages the registry for dimensions"""
 
 import logging
+import os
 from collections import defaultdict
 from pathlib import Path
 
+from prettytable import PrettyTable
 from semver import VersionInfo
 
+from dsgrid.common import REGISTRY_FILENAME
+from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimensions import (
     DimensionType,
     DimensionModel,
     TimeDimensionModel,
+    serialize_dimension_model,
 )
-from dsgrid.exceptions import DSGValueNotStored
+from dsgrid.data_models import serialize_model
+from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.registry.common import (
     DimensionKey,
+    make_initial_config_registration,
 )
-from dsgrid.registry.registry_manager_base import RegistryManagerBase
+from dsgrid.utils.files import dump_data, load_data
+from .registry_base import RegistryBaseModel
+from .registry_manager_base import RegistryManagerBase
+from .dimension_registry import DimensionRegistry
 
 
 logger = logging.getLogger(__name__)
@@ -28,55 +38,70 @@ class DimensionRegistryManager(RegistryManagerBase):
         super().__init__(path, fs_interface)
         self._dimensions = {}  # key = (dimension_type, dimension_id, version)
         # value = DimensionBaseModel
-        self._dimension_versions = defaultdict(dict)
         self._dimensions = {}  # key = DimensionKey, value = Dimension
+        self._id_to_type = {}
+        self._registry_configs = {}
+
+    def inventory(self):
         for dim_type in self._fs_intf.listdir(
             self._path, directories_only=True, exclude_hidden=True
         ):
             _type = DimensionType(dim_type)
-            type_path = Path(self._path) / dim_type
+            type_path = self._path / dim_type
             ids = self._fs_intf.listdir(type_path, directories_only=True, exclude_hidden=True)
             for dim_id in ids:
                 dim_path = type_path / dim_id
-                self._dimension_versions[_type][dim_id] = {
-                    VersionInfo.parse(x)
-                    for x in self._fs_intf.listdir(
-                        dim_path, directories_only=True, exclude_hidden=True
-                    )
-                }
+                registry = self.registry_class().load(dim_path / REGISTRY_FILENAME)
+                self._registry_configs[dim_id] = registry
+                self._id_to_type[dim_id] = _type
 
-    def get_dimension(self, dimension_type, dimension_id, version):
-        """Get the dimension matching the parameters. Returns from cache if already loaded.
+    @staticmethod
+    def registry_class():
+        return DimensionRegistry
+
+    def check_unique_records(self, config: DimensionConfig, warn_only=False):
+        """Check if any new tables have identical records as existing tables.
 
         Parameters
         ----------
-        dimension_type : DimensionType
-        dimension_id : str
-        version : VersionInfo
-
-        Returns
-        -------
-        DimensionBaseModel
+        config : DimensionMappingConfig
+        warn_only: bool
+            If True, log a warning instead of raising an exception.
 
         Raises
         ------
-        DSGValueNotStored
-            Raised if the dimension is not stored.
+        DSGDuplicateValueRegistered
+            Raised if there are duplicates and warn_only is False.
 
         """
-        key = DimensionKey(dimension_type, dimension_id, version)
-        return self.get_dimension_by_key(key)
+        hashes = set()
+        for dimension_id, registry_config in self._registry_configs.items():
+            dimension = self.get_by_id(dimension_id, registry_config.model.version)
+            if isinstance(dimension, TimeDimensionModel):
+                continue
+            hashes.add(dimension.file_hash)
 
-    def get_dimension_by_key(self, key):
-        """Get the dimension matching key. Returns from cache if already loaded.
+        duplicates = [
+            x.dimension_id
+            for x in config.model.dimensions
+            if not isinstance(x, TimeDimensionModel) and x.file_hash in hashes
+        ]
+        if duplicates:
+            if warn_only:
+                logger.warning("Dimension records are duplicated: %s", duplicates)
+            else:
+                raise DSGDuplicateValueRegistered(f"duplicate dimension records: {duplicates}")
 
-        Parameters
-        ----------
-        key : Dimension Key
+    def get_by_id(self, item_id, version=None, force=False):
+        dimension_type = self._id_to_type[item_id]
+        if version is None:
+            version = sorted(list(self._registry_configs[item_id].model.version))[-1]
+        key = DimensionKey(dimension_type, item_id, version)
+        return self.get_by_key(key)
 
-        """
-        if not self.has_dimension_id(key):
-            raise DSGValueNotStored(f"dimension not stored: {key}")
+    def get_by_key(self, key):
+        if not self.has_id(key.id):
+            raise DSGValueNotRegistered(f"{key}")
 
         dimension = self._dimensions.get(key)
         if dimension is not None:
@@ -91,29 +116,18 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._dimensions[key] = dimension
         return dimension
 
-    def has_dimension_id(self, key):
-        """Return True if a dimension matching the parameters is stored.
+    def has_id(self, item_id, version=None):
+        if version is None:
+            return item_id in self._registry_configs
+        dimension_type = self._id_to_type[item_id]
+        path = self._path / str(dimension_type) / item_id / str(version)
+        return self._fs_intf.exists(path)
 
-        Parameters
-        ----------
-        key : DimensionKey
-
-        Returns
-        -------
-        bool
-
-        """
-        return (
-            key.type in self._dimension_versions
-            and key.id in self._dimension_versions[key.type]
-            and key.version in self._dimension_versions[key.type][key.id]
-        )
-
-    def list_dimension_types(self):
+    def list_types(self):
         """Return the dimension types present in the registry."""
-        return list(self._dimension_versions.keys())
+        return {self._id_to_type[x] for x in self._registry_configs}
 
-    def list_dimension_ids(self, dimension_type):
+    def list_ids(self, dimension_type=None):
         """Return the dimension ids for the given type.
 
         Parameters
@@ -125,7 +139,12 @@ class DimensionRegistryManager(RegistryManagerBase):
         list
 
         """
-        return sorted(list(self._dimension_versions[dimension_type].keys()))
+        if dimension_type is None:
+            return super().list_ids()
+
+        ids = [x for x in self._registry_configs if self._id_to_type[x] == dimension_type]
+        ids.sort()
+        return ids
 
     def load_dimensions(self, dimension_references):
         """Load dimensions from files.
@@ -139,6 +158,92 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimensions = {}
         for dim in dimension_references:
             key = DimensionKey(dim.dimension_type, dim.dimension_id, dim.version)
-            dimensions[key] = self.get_dimension_by_key(key)
+            dimensions[key] = self.get_by_key(key)
 
         return dimensions
+
+    def register(self, config_file, submitter, log_message, force=False):
+        config = DimensionConfig.load(config_file)
+        config.assign_ids()
+        self.check_unique_records(config, warn_only=force)
+        # TODO: check that id does not already exist in .dsgrid-registry
+        # TODO: need regular expression check on name and/or limit number of chars in dim id
+
+        registration = make_initial_config_registration(submitter, log_message)
+        dest_config_filename = "dimension" + os.path.splitext(config_file)[1]
+        config_dir = Path(os.path.dirname(config_file))
+
+        for dimension in config.model.dimensions:
+            registry_config = RegistryBaseModel(
+                version=registration.version,
+                description=dimension.description.strip(),
+                registration_history=[registration],
+            )
+            dest_dir = (
+                self._path
+                / dimension.dimension_type.value
+                / dimension.dimension_id
+                / str(registration.version)
+            )
+            self._fs_intf.mkdir(dest_dir)
+
+            filename = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
+            data = serialize_model(registry_config)
+            # TODO: if we want to update AWS directly, this needs to change.
+            dump_data(data, filename)
+
+            model_data = serialize_dimension_model(dimension)
+            # Time dimensions do not have a record file.
+            orig_file = getattr(dimension, "filename", None)
+            if orig_file is not None:
+                # Leading directories from the original are not relevant in the registry.
+                dest_record_file = dest_dir / os.path.basename(orig_file)
+                self._fs_intf.copy_file(config_dir / dimension.filename, dest_record_file)
+                # We have to make this change in the serialized dict instead of
+                # model because Pydantic will fail the assignment due to not being
+                # able to find the path.
+                model_data["file"] = os.path.basename(dimension.filename)
+
+            dump_data(model_data, dest_dir / dest_config_filename)
+            logger.info(
+                "Registered dimension id=%s type=%s version=%s name=%s",
+                dimension.dimension_id,
+                dimension.dimension_type.value,
+                registration.version,
+                dimension.name,
+            )
+
+        logger.info(
+            "Registered %s dimensions with version=%s",
+            len(config.model.dimensions),
+            registration.version,
+        )
+
+    def show(self, dimension_type=None, submitter=None):
+        # TODO: filter by type and submitter
+        table = PrettyTable(title="Dimensions")
+        table.field_names = (
+            "Type",
+            "ID",
+            "Version",
+            "Registration Date",
+            "Submitter",
+            "Description",
+        )
+        rows = []
+        for dimension_id, registry_config in self._registry_configs.items():
+            last_reg = registry_config.model.registration_history[-1]
+            row = (
+                self._id_to_type[dimension_id].value,
+                dimension_id,
+                last_reg.version,
+                last_reg.date,
+                last_reg.submitter,
+                registry_config.model.description,
+            )
+            rows.append(row)
+
+        rows.sort(key=lambda x: x[0])
+        table.add_rows(rows)
+
+        print(table)

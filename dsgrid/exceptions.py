@@ -9,10 +9,6 @@ class DSGBaseWarning(Warning):
     """Base class for all dsgrid warnings."""
 
 
-class DSGDuplicateRecords(Warning):
-    """Raised if the user attempts to store duplicate records."""
-
-
 class DSGInvalidField(DSGBaseException):
     """Raised if a field is missing or invalid."""
 
@@ -41,8 +37,12 @@ class DSGDatasetConfigError(DSGBaseException):
     """Error for bad dataset configuration inputs"""
 
 
-class DSGValueNotStored(DSGBaseException):
-    """Raised if a value is not stored."""
+class DSGDuplicateValueRegistered(Warning):
+    """Raised if the user attempts to register a duplicate value."""
+
+
+class DSGValueNotRegistered(DSGBaseException):
+    """Raised if a value is not registered."""
 
 
 class DSGConfigWarning(DSGBaseWarning):

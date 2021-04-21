@@ -64,11 +64,12 @@ def test_register_project_and_dataset(test_data_dir):
             test_data_dir / "dimension.toml",
             test_data_dir / dataset_dir / "dimension.toml",
         ):
-            check_run_command(
-                f"dsgrid registry --path={path} register-dimensions {dim_config_file} -l log"
-            )
+            cmd = f"dsgrid registry --path={path} dimensions register {dim_config_file} -l log"
+            check_run_command(cmd)
+            # Can't register duplicates.
+            assert run_command(cmd) != 0
 
-        cmd = f"dsgrid registry --path={path} register-dimension-mappings {dimension_mapping_config} -l log"
+        cmd = f"dsgrid registry --path={path} dimension-mappings register {dimension_mapping_config} -l log"
         check_run_command(cmd)
         # Can't register duplicates.
         assert run_command(cmd) != 0
@@ -81,7 +82,7 @@ def test_register_project_and_dataset(test_data_dir):
         replace_dimension_uuids_from_registry(path, (project_config, dataset_config))
 
         check_run_command(
-            f"dsgrid registry --path={path} register-project {project_config} -l log"
+            f"dsgrid registry --path={path} projects register {project_config} -l log"
         )
         output = {}
         check_run_command(f"dsgrid registry --path={path} list", output)
@@ -89,7 +90,7 @@ def test_register_project_and_dataset(test_data_dir):
         assert "test" in output["stdout"]
 
         check_run_command(
-            f"dsgrid registry --path={path} submit-dataset {dataset_config} "
+            f"dsgrid registry --path={path} datasets submit {dataset_config} "
             "--project-id test "
             "--log-message=test_submission "
             f"--dimension-mapping-files={dimension_mapping_refs}"

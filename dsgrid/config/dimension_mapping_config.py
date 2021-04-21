@@ -41,4 +41,3 @@ class DimensionMappingConfig(ConfigBase):
             from_type = table.from_dimension.dimension_type
             to_type = table.to_dimension.dimension_type
             table.mapping_id = make_registry_id((from_type.value, to_type.value))
-            logger.info("Created dimension mapping ID %s", table.mapping_id)

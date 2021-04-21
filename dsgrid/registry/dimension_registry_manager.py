@@ -5,6 +5,7 @@ import os
 from collections import defaultdict
 from pathlib import Path
 
+from prettytable import PrettyTable
 from semver import VersionInfo
 
 from dsgrid.common import REGISTRY_FILENAME
@@ -39,6 +40,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         # value = DimensionBaseModel
         self._dimensions = {}  # key = DimensionKey, value = Dimension
         self._id_to_type = {}
+        self._registry_configs = {}
 
     def inventory(self):
         for dim_type in self._fs_intf.listdir(
@@ -50,7 +52,7 @@ class DimensionRegistryManager(RegistryManagerBase):
             for dim_id in ids:
                 dim_path = type_path / dim_id
                 registry = self.registry_class().load(dim_path / REGISTRY_FILENAME)
-                self._current_versions[dim_id] = registry.model.version
+                self._registry_configs[dim_id] = registry
                 self._id_to_type[dim_id] = _type
 
     @staticmethod
@@ -73,8 +75,8 @@ class DimensionRegistryManager(RegistryManagerBase):
 
         """
         hashes = set()
-        for dimension_id, version in self._current_versions.items():
-            dimension = self.get_by_id(dimension_id, version)
+        for dimension_id, registry_config in self._registry_configs.items():
+            dimension = self.get_by_id(dimension_id, registry_config.model.version)
             if isinstance(dimension, TimeDimensionModel):
                 continue
             hashes.add(dimension.file_hash)
@@ -93,7 +95,7 @@ class DimensionRegistryManager(RegistryManagerBase):
     def get_by_id(self, item_id, version=None, force=False):
         dimension_type = self._id_to_type[item_id]
         if version is None:
-            version = sorted(list(self._current_versions[item_id]))[-1]
+            version = sorted(list(self._registry_configs[item_id].model.version))[-1]
         key = DimensionKey(dimension_type, item_id, version)
         return self.get_by_key(key)
 
@@ -116,14 +118,14 @@ class DimensionRegistryManager(RegistryManagerBase):
 
     def has_id(self, item_id, version=None):
         if version is None:
-            return item_id in self._current_versions
+            return item_id in self._registry_configs
         dimension_type = self._id_to_type[item_id]
         path = self._path / str(dimension_type) / item_id / str(version)
         return self._fs_intf.exists(path)
 
     def list_types(self):
         """Return the dimension types present in the registry."""
-        return [self._id_to_type[x] for x in self._current_versions]
+        return {self._id_to_type[x] for x in self._registry_configs}
 
     def list_ids(self, dimension_type=None):
         """Return the dimension ids for the given type.
@@ -140,7 +142,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         if dimension_type is None:
             return super().list_ids()
 
-        ids = [x for x in self._current_versions if self._id_to_type[x] == dimension_type]
+        ids = [x for x in self._registry_configs if self._id_to_type[x] == dimension_type]
         ids.sort()
         return ids
 
@@ -204,34 +206,37 @@ class DimensionRegistryManager(RegistryManagerBase):
 
             dump_data(model_data, dest_dir / dest_config_filename)
 
-            # export dimension record file
-            # if orig_file is not None:
-            #    dimension_record = Path(os.path.dirname(config_file)) / orig_file
-            #    self._fs_intf.copy_file(
-            #        dimension_record, data_dir / os.path.basename(dimension.filename)
-            #    )
-
         logger.info(
             "Registered %s dimensions with version=%s",
             len(config.model.dimensions),
             registration.version,
         )
 
-        # save a copy to
-        # config_file_updated = self._config_file_extend_name(config_file, "with assigned id")
-        # dump_data(serialize_model(config), config_file_updated)
-
-        # logger.info(
-        #    "--> New config file containing the dimension ID assignment exported: %s",
-        #    config_file_updated,
-        # )
-
-    def _config_file_extend_name(self, config_file, name_extension):
-        """Add name extension to existing config_file"""
-        name_extension = str(name_extension).lower().replace(" ", "_")
-        return (
-            os.path.splitext(config_file)[0]
-            + "_"
-            + name_extension
-            + os.path.splitext(config_file)[1]
+    def show(self, dimension_type=None, submitter=None):
+        # TODO: filter by type and submitter
+        table = PrettyTable(title="Dimensions")
+        table.field_names = (
+            "Type",
+            "ID",
+            "Version",
+            "Registration Date",
+            "Submitter",
+            "Description",
         )
+        rows = []
+        for dimension_id, registry_config in self._registry_configs.items():
+            last_reg = registry_config.model.registration_history[-1]
+            row = (
+                self._id_to_type[dimension_id].value,
+                dimension_id,
+                last_reg.version,
+                last_reg.date,
+                last_reg.submitter,
+                registry_config.model.description,
+            )
+            rows.append(row)
+
+        rows.sort(key=lambda x: x[0])
+        table.add_rows(rows)
+
+        print(table)

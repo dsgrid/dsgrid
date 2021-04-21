@@ -55,11 +55,26 @@ def list_(ctx):
     for dataset in manager.list_datasets():
         print(f"  - {dataset}")
     print("\nDimensions:")
-    dim_mgr = manager.dimension_manager
-    for dimension_type in dim_mgr.list_types():
-        print(f"  - {dimension_type.value}")
-        for dimension_id in dim_mgr.list_ids(dimension_type=dimension_type):
-            print(f"    - {dimension_id}")
+    manager.dimension_manager.show()
+    manager.dimension_mapping_manager.show()
+
+
+@click.command()
+@click.pass_context
+def list_dimensions(ctx):
+    """List the registered dimensions."""
+    registry_path = ctx.parent.params["path"]
+    manager = RegistryManager.load(registry_path).dimension_manager
+    manager.show()
+
+
+@click.command()
+@click.pass_context
+def list_dimension_mappings(ctx):
+    """List the registered dimension mappings."""
+    registry_path = ctx.parent.params["path"]
+    manager = RegistryManager.load(registry_path).dimension_mapping_manager
+    manager.show()
 
 
 @click.command()
@@ -215,6 +230,8 @@ def sync(ctx):
 
 registry.add_command(create)
 registry.add_command(list_)
+registry.add_command(list_dimensions)
+registry.add_command(list_dimension_mappings)
 registry.add_command(remove_dataset)
 registry.add_command(remove_project)
 registry.add_command(register_project)

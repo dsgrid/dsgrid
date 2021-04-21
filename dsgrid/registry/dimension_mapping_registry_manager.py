@@ -4,6 +4,8 @@ import logging
 import os
 from pathlib import Path
 
+from prettytable import PrettyTable
+
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.association_tables import AssociationTableModel
 from dsgrid.config.dimension_mapping_config import DimensionMappingConfig
@@ -46,8 +48,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         """
         hashes = set()
-        for mapping_id, version in self._current_versions.items():
-            mapping = self.get_by_id(mapping_id, version)
+        for mapping_id, registry_config in self._registry_configs.items():
+            mapping = self.get_by_id(mapping_id, registry_config.model.version)
             hashes.add(mapping.file_hash)
 
         duplicates = [x.mapping_id for x in config.model.mappings if x.file_hash in hashes]
@@ -61,7 +63,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
     def get_by_id(self, item_id, version=None):
         if version is None:
-            version = sorted(list(self._current_versions[item_id]))[-1]
+            version = sorted(list(self._registry_configs[item_id].model.version))[-1]
         key = ConfigKey(item_id, version)
         return self.get_by_key(key)
 
@@ -138,3 +140,24 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             len(config.model.mappings),
             registration.version,
         )
+
+    def show(self, submitter=None):
+        # TODO: filter by submitter
+        table = PrettyTable(title="Dimension Mappings")
+        table.field_names = ("ID", "Version", "Registration Date", "Submitter", "Description")
+        rows = []
+        for mapping_id, registry_config in self._registry_configs.items():
+            last_reg = registry_config.model.registration_history[-1]
+            row = (
+                mapping_id,
+                last_reg.version,
+                last_reg.date,
+                last_reg.submitter,
+                registry_config.model.description,
+            )
+            rows.append(row)
+
+        rows.sort(key=lambda x: x[0])
+        table.add_rows(rows)
+
+        print(table)

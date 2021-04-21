@@ -23,7 +23,7 @@ class RegistryManagerBase(abc.ABC):
             self._path = path
 
         self._fs_intf = fs_interface
-        self._current_versions = {}  # ID to current version
+        self._registry_configs = {}  # ID to current version
 
     def inventory(self):
         for item_id in self._fs_intf.listdir(
@@ -31,7 +31,7 @@ class RegistryManagerBase(abc.ABC):
         ):
             id_path = Path(self._path) / item_id
             registry = self.registry_class().load(id_path / REGISTRY_FILENAME)
-            self._current_versions[item_id] = registry.model.version
+            self._registry_configs[item_id] = registry
 
     @classmethod
     def load(cls, path, fs_intferace):
@@ -115,6 +115,10 @@ class RegistryManagerBase(abc.ABC):
     def registry_class():
         """Return the class used for the registry item."""
 
+    @abc.abstractmethod
+    def show(self, **kwargs):
+        """Show a summary of the registered items in a table."""
+
     def get_current_version(self, item_id):
         """Return the current version in the registry.
 
@@ -123,7 +127,7 @@ class RegistryManagerBase(abc.ABC):
         VersionInfo
 
         """
-        return self._current_versions[item_id]
+        return self._registry_configs[item_id].model.version
 
     @property
     def fs_interface(self):
@@ -145,13 +149,13 @@ class RegistryManagerBase(abc.ABC):
 
         """
         if version is None:
-            return item_id in self._current_versions
+            return item_id in self._registry_configs
         path = self._path / item_id / str(version)
         return self._fs_intf.exists(path)
 
     def iter_ids(self):
         """Return an iterator over the registered IDs."""
-        return self._current_versions.keys()
+        return self._registry_configs.keys()
 
     def list_ids(self, **kwargs):
         """Return the IDs.

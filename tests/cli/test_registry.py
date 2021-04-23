@@ -9,7 +9,7 @@ import pytest
 
 from dsgrid.utils.run_command import check_run_command, run_command
 from tests.common import (
-    replace_association_table_uuids_from_registry,
+    replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )
 
@@ -42,7 +42,7 @@ def create_registry(tmpdir):
     assert (path / "projects").exists()
     assert (path / "datasets").exists()
     assert (path / "dimensions").exists()
-    assert (path / "association_tables").exists()
+    assert (path / "dimension_mappings").exists()
     return path
 
 
@@ -55,44 +55,45 @@ def test_register_project_and_dataset(test_data_dir):
         path = create_registry(base_dir)
         dataset_dir = Path("datasets/input/sector_models/comstock")
         dataset_dim_dir = dataset_dir / "dimensions"
-        association_table_config = test_data_dir / dataset_dim_dir / "association_tables.toml"
-        association_table_refs = (
-            test_data_dir / dataset_dim_dir / "association_table_references.toml"
+        dimension_mapping_config = test_data_dir / dataset_dim_dir / "dimension_mappings.toml"
+        dimension_mapping_refs = (
+            test_data_dir / dataset_dim_dir / "dimension_mapping_references.toml"
         )
 
         for dim_config_file in (
             test_data_dir / "dimension.toml",
             test_data_dir / dataset_dir / "dimension.toml",
         ):
-            check_run_command(
-                f"dsgrid registry --path={path} register-dimensions {dim_config_file}"
-            )
+            cmd = f"dsgrid registry --path={path} dimensions register {dim_config_file} -l log"
+            check_run_command(cmd)
+            # Can't register duplicates.
+            assert run_command(cmd) != 0
 
-        cmd = (
-            f"dsgrid registry --path={path} register-association-tables {association_table_config}"
-        )
+        cmd = f"dsgrid registry --path={path} dimension-mappings register {dimension_mapping_config} -l log"
         check_run_command(cmd)
         # Can't register duplicates.
         assert run_command(cmd) != 0
 
         project_config = test_data_dir / "project.toml"
         dataset_config = test_data_dir / dataset_dir / "dataset.toml"
-        replace_association_table_uuids_from_registry(
-            path, (project_config, association_table_refs)
+        replace_dimension_mapping_uuids_from_registry(
+            path, (project_config, dimension_mapping_refs)
         )
         replace_dimension_uuids_from_registry(path, (project_config, dataset_config))
 
-        check_run_command(f"dsgrid registry --path={path} register-project {project_config}")
+        check_run_command(
+            f"dsgrid registry --path={path} projects register {project_config} -l log"
+        )
         output = {}
         check_run_command(f"dsgrid registry --path={path} list", output)
         assert regex_project.search(output["stdout"]) is not None
         assert "test" in output["stdout"]
 
         check_run_command(
-            f"dsgrid registry --path={path} submit-dataset {dataset_config} "
+            f"dsgrid registry --path={path} datasets submit {dataset_config} "
             "--project-id test "
             "--log-message=test_submission "
-            f"--dimension-mapping-files={association_table_refs}"
+            f"--dimension-mapping-files={dimension_mapping_refs}"
         )
 
         output = {}

@@ -8,17 +8,12 @@ class ConfigBase(abc.ABC):
     def __init__(self, model):
         self._model = model
 
-    @staticmethod
-    @abc.abstractmethod
-    def model_class():
-        """Return the data model class backing the config"""
-
     @classmethod
-    def load(cls, config_file):
+    def load(cls, config_file, *args, **kwargs):
         """Load the config from a file.
 
         Parameters
-        ----------
+        ---------
         config_file : str
 
         Returns
@@ -26,6 +21,11 @@ class ConfigBase(abc.ABC):
         ConfigBase
 
         """
+        # Subclasses can reimplement this method if they need more arguments.
+        return cls._load(config_file)
+
+    @classmethod
+    def _load(cls, config_file):
         model = cls.model_class().load(config_file)
         return cls(model)
 
@@ -39,3 +39,8 @@ class ConfigBase(abc.ABC):
 
         """
         return self._model
+
+    @staticmethod
+    @abc.abstractmethod
+    def model_class():
+        """Return the data model class backing the config"""

@@ -15,12 +15,15 @@ from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.versioning import make_version
 
 
+REGISTRY_LOG_FILE = "dsgrid_registry.log"
+
+
 class RegistryType(Enum):
     """Registry types"""
 
-    ASSOCIATION_TABLE = "association_table"
     DATASET = "dataset"
     DIMENSION = "dimension"
+    DIMENSION_MAPPING = "dimension_mapping"
     PROJECT = "project"
 
 
@@ -55,7 +58,7 @@ class VersionUpdateType(Enum):
 
 # These keys are used to store references to project/dataset configs and dimensions
 # in dictionaries.
-# The DimensionKey is useful for comparing whether # a project and
+# The DimensionKey is useful for comparing whether a project and
 # dataset have the same dimension.
 ConfigKey = namedtuple("ConfigKey", ["id", "version"])
 DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
@@ -81,7 +84,7 @@ def get_version_from_filename(filename):
     return match.groupdict("handle"), make_version(match.groupdict("version"))
 
 
-def make_default_config_registration(submitter, log_message):
+def make_initial_config_registration(submitter, log_message):
     version = VersionInfo(major=1)
     return ConfigRegistrationModel(
         version=version,

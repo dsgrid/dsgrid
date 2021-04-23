@@ -27,12 +27,12 @@ from pydantic import root_validator, validator
 from semver import VersionInfo
 
 from .config_base import ConfigBase
-from .association_tables import AssociationTableReferenceListModel
+from .dimension_mapping_base import DimensionMappingReferenceListModel
 from .dimensions import (
     DimensionReferenceModel,
     DimensionType,
 )
-from dsgrid.exceptions import DSGInvalidField, DSGValueNotStored, DSGInvalidDimensionMapping
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import DatasetRegistryStatus
 from dsgrid.utils.utilities import check_uniqueness
@@ -170,12 +170,12 @@ class InputDatasetsModel(DSGBaseModel):
 class DimensionMappingsModel(DSGBaseModel):
     """Defines intra-project and dataset-to-project dimension mappings."""
 
-    project: Optional[List[AssociationTableReferenceListModel]] = Field(
+    project: Optional[List[DimensionMappingReferenceListModel]] = Field(
         title="project",
         description="intra-project mappings",
         default=[],
     )
-    datasets: Optional[Dict[str, AssociationTableReferenceListModel]] = Field(
+    datasets: Optional[Dict[str, DimensionMappingReferenceListModel]] = Field(
         title="datasets",
         description="dataset-to-project mappings for each registered dataset",
         default={},
@@ -238,6 +238,12 @@ class ProjectConfig(ConfigBase):
     def model_class():
         return ProjectConfigModel
 
+    @classmethod
+    def load(cls, config_file, dimension_manager):
+        config = cls._load(config_file)
+        config.load_dimensions(dimension_manager)
+        return config
+
     def load_dimensions(self, dimension_manager):
         """Load all project dimensions.
 
@@ -266,7 +272,7 @@ class ProjectConfig(ConfigBase):
         ----------
         dataset_config : DatasetConfig
         references : list
-            list of AssociationTableReferenceModel
+            list of DimensionMappingReferenceModel
 
         Raises
         ------
@@ -278,20 +284,20 @@ class ProjectConfig(ConfigBase):
         if dataset_config.model.dataset_id not in self.model.dimension_mappings:
             self.model.dimension_mappings.datasets[
                 dataset_config.model.dataset_id
-            ] = AssociationTableReferenceListModel(references=[])
+            ] = DimensionMappingReferenceListModel(references=[])
         mappings = self.model.dimension_mappings.datasets[dataset_config.model.dataset_id]
-        existing_ids = set((x.association_table_id for x in mappings.references))
+        existing_ids = set((x.mapping_id for x in mappings.references))
         for reference in references:
-            if reference.association_table_id not in existing_ids:
+            if reference.mapping_id not in existing_ids:
                 mappings.references.append(reference)
                 logger.info(
                     "Added dimension mapping for dataset=%s: %s",
                     dataset_config.model.dataset_id,
-                    reference.association_table_id,
+                    reference.mapping_id,
                 )
 
     def check_dataset_dimension_mappings(
-        self, dataset_config, references: AssociationTableReferenceListModel
+        self, dataset_config, references: DimensionMappingReferenceListModel
     ):
         """Check that a dataset provides required mappings to the project.
 
@@ -299,7 +305,7 @@ class ProjectConfig(ConfigBase):
         ----------
         dataset_config : DatasetConfig
         references : list
-            list of AssociationTableReferenceModel
+            list of DimensionMappingReferenceModel
 
         Raises
         ------
@@ -349,8 +355,8 @@ class ProjectConfig(ConfigBase):
 
         Returns
         -------
-        list
-            list of DimensionBaseModel
+        dict
+            dict of DimensionBaseModel keyed by DimensionKey
 
         """
         return self._project_dimensions
@@ -361,8 +367,8 @@ class ProjectConfig(ConfigBase):
 
         Returns
         -------
-        list
-            list of DimensionBaseModel
+        dict
+            dict of DimensionBaseModel keyed by DimensionKey
 
         """
         return self._supplemental_dimensions

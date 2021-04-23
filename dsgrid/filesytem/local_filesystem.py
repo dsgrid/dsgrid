@@ -18,10 +18,12 @@ class LocalFilesystem(FilesystemInterface):
     def exists(self, path):
         return os.path.exists(path)
 
-    def listdir(self, directory, files_only=False, directories_only=False):
+    def listdir(self, directory, files_only=False, directories_only=False, exclude_hidden=False):
         contents = os.listdir(directory)
+        if exclude_hidden:
+            contents = [x for x in contents if not x.startswith(".")]
         if files_only:
-            return [x for x in contents if os.path.isfile(x)]
+            return [x for x in contents if os.path.isfile(os.path.join(directory, x))]
         if directories_only:
             return [x for x in contents if os.path.isdir(os.path.join(directory, x))]
         return contents

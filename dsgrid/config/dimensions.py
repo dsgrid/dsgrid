@@ -10,7 +10,7 @@ from pydantic import Field
 from semver import VersionInfo
 
 from dsgrid.common import LOCAL_REGISTRY
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, serialize_model
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
@@ -132,11 +132,9 @@ class DimensionModel(DimensionBaseModel):
         alias="file",
         description="filename containing dimension records",
     )
-    # TODO: enable this once we add support for checking for duplicate dimensions
-    # file_hash: Optional[str] = Field(
-    #    title="file_hash",
-    #    description="hash of the contents of the file"
-    # )
+    file_hash: Optional[str] = Field(
+        title="file_hash", description="hash of the contents of the file"
+    )
     # TODO: I think we may remove mappings altogether in favor of associations
     # TODO: I think we need to add the association table to
     #   dimensions.associations.project_dimensions in the config
@@ -187,10 +185,14 @@ class DimensionModel(DimensionBaseModel):
 
         return filename
 
-    # @validator("file_hash")
-    # def compute_file_hash(cls, file_hash, values):
-    #    """Validate record file"""
-    #    return file_hash or compute_file_hash(values["filename"])
+    @validator("file_hash")
+    def compute_file_hash(cls, file_hash, values):
+        if "filename" not in values:
+            # TODO
+            # We are getting here for Time. That shouldn't be happening.
+            # This seems to work, but something is broken.
+            return None
+        return file_hash or compute_file_hash(values["filename"])
 
     # TODO: is this what we want?
     # @validator(
@@ -351,3 +353,15 @@ def handle_dimension_union(value):
     else:
         val = DimensionModel(**value)
     return val
+
+
+def serialize_dimension_model(model: DimensionBaseModel):
+    data = serialize_model(model)
+    data["module"] = str(data["module"])
+    data["dimension_class"] = None
+    if isinstance(model, DimensionModel):
+        data["records"] = None  # These get reloaded from the file.
+    else:
+        data["start"] = str(data["start"])
+        data["end"] = str(data["end"])
+    return data

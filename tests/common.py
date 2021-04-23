@@ -1,21 +1,26 @@
+"""Common functions used across tests"""
+
 import fileinput
 import os
 import re
 from pathlib import Path
 
+from dsgrid.filesytem.local_filesystem import LocalFilesystem
 
-def replace_association_table_uuids_from_registry(registry_dir, filenames):
-    uuids = read_association_table_uuid_mapping(registry_dir)
+
+def replace_dimension_mapping_uuids_from_registry(registry_dir, filenames):
+    uuids = read_dimension_mapping_uuid_mapping(registry_dir)
     for filename in filenames:
-        replace_association_table_uuids(filename, uuids)
+        replace_dimension_mapping_uuids(filename, uuids)
 
 
-def read_association_table_uuid_mapping(registry_dir):
+def read_dimension_mapping_uuid_mapping(registry_dir):
+    fs_intf = LocalFilesystem()
     dir_name = Path(registry_dir)
     mappings = {}
     regex = re.compile(r"(?P<from_dimension>\w+)__(?P<to_dimension>\w+)__(?P<uuid>[-0-9a-f]+)$")
-    path = dir_name / "association_tables"
-    for item in os.listdir(path):
+    path = dir_name / "dimension_mappings"
+    for item in fs_intf.listdir(path, directories_only=True, exclude_hidden=True):
         assert os.path.isdir(path / item), str(path / item)
         match = regex.search(item)
         assert match, item
@@ -30,9 +35,9 @@ def read_association_table_uuid_mapping(registry_dir):
     return mappings
 
 
-def replace_association_table_uuids(filename, uuids):
+def replace_dimension_mapping_uuids(filename, uuids):
     regex = re.compile(
-        r"association_table_id = \"(?P<from_dimension>\w+)__(?P<to_dimension>\w+)__(?P<uuid>[-0-9a-f]+)\""
+        r"mapping_id = \"(?P<from_dimension>\w+)__(?P<to_dimension>\w+)__(?P<uuid>[-0-9a-f]+)\""
     )
     with fileinput.input(files=[filename], inplace=True) as f:
         for line in f:
@@ -43,7 +48,7 @@ def replace_association_table_uuids(filename, uuids):
                 from_dimension = match.groupdict()["from_dimension"]
                 to_dimension = match.groupdict()["to_dimension"]
                 new_uuid = uuids[(from_dimension, to_dimension)]
-                print(f'association_table_id = "{from_dimension}__{to_dimension}__{new_uuid}"')
+                print(f'mapping_id = "{from_dimension}__{to_dimension}__{new_uuid}"')
 
 
 def replace_dimension_uuids_from_registry(registry_dir, filenames):
@@ -53,15 +58,14 @@ def replace_dimension_uuids_from_registry(registry_dir, filenames):
 
 
 def read_dimension_uuid_mapping(registry_dir):
+    fs_intf = LocalFilesystem()
     dir_name = Path(registry_dir)
     mappings = {}
     regex = re.compile(r"(?P<dimension_type>\w+)__(?P<uuid>[-0-9a-f]+)$")
-    for dim_type in os.listdir(dir_name / "dimensions"):
-        dim_path = dir_name / "dimensions" / dim_type
-        if not os.path.isdir(dim_path):
-            continue
-        for dim in os.listdir(dim_path):
-            assert os.path.isdir(dim_path / dim), str(dim_path / dim)
+    dim_base_path = dir_name / "dimensions"
+    for dim_type in fs_intf.listdir(dim_base_path, directories_only=True, exclude_hidden=True):
+        dim_path = dim_base_path / dim_type
+        for dim in fs_intf.listdir(dim_path, directories_only=True, exclude_hidden=True):
             match = regex.search(dim)
             assert match, dim
             data = match.groupdict()

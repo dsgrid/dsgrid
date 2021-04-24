@@ -19,15 +19,15 @@ def test_project_load():
 
 def test_dataset_load():
     project = Project.load("test")
-    dataset_id = "comstock"
+    dataset_id = "efs-comstock"
     project.load_dataset(dataset_id)
     dataset = project.get_dataset(dataset_id)
     assert isinstance(dataset, Dataset)
     spark = SparkSession.getActiveSession()
-    data = spark.sql("select * from comstock__load_data")
+    data = spark.sql("select * from efs-comstock__load_data")
     assert "timestamp" in data.columns
     assert "fans" in data.columns
-    lookup = spark.sql("select * from comstock__load_data_lookup")
+    lookup = spark.sql("select * from efs-comstock__load_data_lookup")
     assert "subsector" in lookup.columns
     assert "data_id" in lookup.columns
 

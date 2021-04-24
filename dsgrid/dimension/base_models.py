@@ -16,7 +16,7 @@ class DimensionType(Enum):
     SECTOR = "sector"
     SUBSECTOR = "subsector"
     TIME = "time"
-    WEATHER = "weather"
+    WEATHER_YEAR = "weather_year"
     MODEL_YEAR = "model_year"
     SCENARIO = "scenario"
     DATA_SOURCE = "data_source"
@@ -67,8 +67,8 @@ class TimeDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all time dimensions"""
 
 
-class WeatherDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for weather dimensions"""
+class WeatherYearDimensionBaseModel(DimensionRecordBaseModel):
+    """Base class for weather year dimensions"""
 
 
 _DIMENSION_TO_MODEL = {
@@ -77,7 +77,7 @@ _DIMENSION_TO_MODEL = {
     DimensionType.SECTOR: SectorDimensionBaseModel,
     DimensionType.SUBSECTOR: SubSectorDimensionBaseModel,
     DimensionType.TIME: TimeDimensionBaseModel,
-    DimensionType.WEATHER: WeatherDimensionBaseModel,
+    DimensionType.WEATHER_YEAR: WeatherYearDimensionBaseModel,
     DimensionType.MODEL_YEAR: ModelYearDimensionBaseModel,
     DimensionType.SCENARIO: ScenarioDimensionBaseModel,
     DimensionType.DATA_SOURCE: DataSourceDimensionBaseModel,

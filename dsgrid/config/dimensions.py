@@ -2,7 +2,6 @@ import csv
 import importlib
 import os
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from pydantic import validator
@@ -19,7 +18,6 @@ from dsgrid.dimension.time import (
     TimeFrequency,
     TimezoneType,
 )
-from dsgrid.filesytem.aws import sync
 from dsgrid.utils.files import compute_file_hash, load_data
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -58,18 +56,9 @@ class DimensionBaseModel(DSGBaseModel):
     )
     description: str = Field(
         title="description of dimension record",
-        description="description of dimension record, this gets stored in both dimension config file and dimension registry",
+        description="a helpf description of the dimension records that is helpful, memorable, and "
+        "identifiable; this description will get stored in the dimension record registry",
         alias="description",
-    )
-    upgrade: Optional[bool] = Field(
-        title="upgrade",
-        description="boolean flag to update an existing dimension record in the the reigstry",
-        default=False,
-    )
-    log_message: Optional[str] = Field(
-        title="log_message",
-        description="log message to apply to the dimension registry toml",
-        default="Initial Submission",
     )
 
     @validator("name")
@@ -114,15 +103,6 @@ class DimensionBaseModel(DSGBaseModel):
             values["class_name"],
         )
 
-    @validator("log_message", always=True)
-    def check_log_message(cls, log_message, values):
-        if values["upgrade"]:
-            if log_message in ("Initial Submission"):
-                raise ValueError(
-                    "Please provide a helpful log message if your are attempting to register an update to an existing dimension record. HINT: Log messages should include details about what is being updated and/or how it differs from the original version(s)"
-                )
-        return log_message
-
 
 class DimensionModel(DimensionBaseModel):
     """Defines a non-time dimension"""
@@ -142,8 +122,8 @@ class DimensionModel(DimensionBaseModel):
         title="association_table",
         description="optional table that provides mappings of foreign keys",
     )
-    # TODO: why is version needed here?
-    version: Optional[Union[str, VersionInfo]] = Field(title="version", description="version")
+    # # TODO: why is version needed here?
+    # version: Optional[Union[str, VersionInfo]] = Field(title="version", description="version")
     # TODO: some of the dimensions will enforce dimension mappings while
     #   others may not
     # TODO: I really don't think we need these mappings at this stage.
@@ -172,7 +152,8 @@ class DimensionModel(DimensionBaseModel):
     @validator("filename")
     def check_file(cls, filename):
         """Validate that dimension file exists and has no errors"""
-        # TODO: do we need to support S3 file paths when we already sync the registry at an earlier stage? Technically this means that the path should be local
+        # TODO: do we need to support S3 file paths when we already sync the registry at an
+        #   earlier stage? Technically this means that the path should be local
         # validation for S3 paths (sync locally)
         if filename.startswith("s3://"):
             path = LOCAL_REGISTRY / filename.replace("s3://", "")

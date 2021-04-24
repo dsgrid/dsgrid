@@ -61,7 +61,7 @@ class DimensionConfigModel(DSGBaseModel):
             "tempo",
             "model",
             "source",
-            "dimesnion",
+            "dimension",
         ]
         prohibited_names = prohibited_names + [x + "s" for x in prohibited_names]
         for x in values:

@@ -59,3 +59,7 @@ class DSGFileInputWarning(DSGBaseWarning):
 
 class DSGJSONError(DSGBaseException):
     """Error with JSON file"""
+
+
+class DSGFilesystemInterfaceError(DSGBaseException):
+    """Error with FileSystemInterface command"""

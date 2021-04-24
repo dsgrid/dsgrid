@@ -5,9 +5,10 @@ import logging
 from pathlib import Path
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.filesytem.aws import AwsS3Bucket
-from dsgrid.filesytem.local_filesystem import LocalFilesystem
 
+# from dsgrid.filesytem.aws import AwsS3Bucket
+from dsgrid.filesytem.local_filesystem import LocalFilesystem
+from dsgrid.filesytem.cloud_filesystem import CloudFilesystemInterface
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +16,27 @@ logger = logging.getLogger(__name__)
 class RegistryManagerBase(abc.ABC):
     """Base class for all registry managers."""
 
-    def __init__(self, path, fs_interface):
-        if isinstance(fs_interface, AwsS3Bucket):
-            self._path = fs_interface.path
-        else:
-            assert isinstance(fs_interface, LocalFilesystem)
-            self._path = path
+    def __init__(self, path, fs_interface, cloud_interface, offline_mode, dryrun_mode):
+        # if isinstance(fs_interface, CloudFilesystemInterface):
+        #     self._path = fs_interface.path
+        # else:
+        #     assert isinstance(fs_interface, LocalFilesystem)
+        #     self._path = path
+        assert isinstance(fs_interface, LocalFilesystem)
+        self._path = path
+
+        if cloud_interface is not None:
+            assert isinstance(cloud_interface, CloudFilesystemInterface)
+            self._remote_path = cloud_interface.path
+
+        self._fs_intf = fs_interface
+        self._cld_intf = cloud_interface
 
         self._fs_intf = fs_interface
         self._registry_configs = {}  # ID to current version
+
+        self._offline_mode = offline_mode
+        self._dryrun_mode = dryrun_mode
 
     def inventory(self):
         for item_id in self._fs_intf.listdir(
@@ -34,16 +47,19 @@ class RegistryManagerBase(abc.ABC):
             self._registry_configs[item_id] = registry
 
     @classmethod
-    def load(cls, path, fs_intferace):
+    def load(cls, path, fs_intferace, cloud_interface, offline_mode, dryrun_mode):
         """Load the registry manager.
 
         path : str
         fs_intferace : FilesystemInterface
+        cloud_interface : CloudFilesystemInterface
+        offline_mode : bool
+        dryrun_mode :  bool
 
         RegistryManagerBase
 
         """
-        mgr = cls(path, fs_intferace)
+        mgr = cls(path, fs_intferace, cloud_interface, offline_mode, dryrun_mode)
         mgr.inventory()
         return mgr
 

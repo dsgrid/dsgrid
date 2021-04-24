@@ -27,7 +27,7 @@ from dsgrid.dimension.base_models import (
     ScenarioDimensionBaseModel,
     SectorDimensionBaseModel,
     SubSectorDimensionBaseModel,
-    WeatherDimensionBaseModel,
+    WeatherYearDimensionBaseModel,
 )
 
 BaseOrm = declarative_base()
@@ -234,8 +234,8 @@ class Season(TimeDimensionModel):
 # ---------------------------
 # OTHER DIMENSIONS
 # ---------------------------
-class Weather(WeatherDimensionBaseModel):
-    """Weather attributes"""
+class WeatherYear(WeatherYearDimensionBaseModel):
+    """Weather Year attributes"""
 
 
 class ModelYear(ModelYearDimensionBaseModel):

@@ -1,4 +1,4 @@
-"""Defines interface to access all filesytems"""
+"""Defines interface to access all filesystems"""
 
 import abc
 

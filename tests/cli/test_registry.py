@@ -65,7 +65,7 @@ def test_register_project_and_dataset(test_data_dir):
             test_data_dir / "dimensions.toml",
             # test_data_dir / dataset_dir / "dimensions.toml",
         ):
-            cmd = f"dsgrid registry --path={path} dimensions register {dim_config_file} -l log --offline"
+            cmd = f"dsgrid registry --offline --path={path} dimensions register {dim_config_file} -l log"
             check_run_command(cmd)
             # Can't register duplicates.
             assert run_command(cmd) != 0
@@ -84,10 +84,10 @@ def test_register_project_and_dataset(test_data_dir):
         replace_dimension_uuids_from_registry(path, (project_config, dataset_config))
 
         check_run_command(
-            f"dsgrid registry --path={path} projects register {project_config} -l log --offline"
+            f"dsgrid registry --offline --path={path} projects register {project_config} -l log"
         )
         output = {}
-        check_run_command(f"dsgrid registry --path={path} list --offline", output)
+        check_run_command(f"dsgrid registry --offline --path={path} list", output)
         assert regex_project.search(output["stdout"]) is not None
         assert "test" in output["stdout"]
 
@@ -100,5 +100,5 @@ def test_register_project_and_dataset(test_data_dir):
         # )
 
         output = {}
-        check_run_command(f"dsgrid registry --path={path} list --offline", output)
+        check_run_command(f"dsgrid registry --offline --path={path} list", output)
         assert regex_dataset.search(output["stdout"]) is not None

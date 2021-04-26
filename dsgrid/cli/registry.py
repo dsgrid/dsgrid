@@ -11,7 +11,8 @@ import click
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.loggers import setup_logging
 from dsgrid.registry.common import VersionUpdateType
-from dsgrid.filesytem import aws
+
+# from dsgrid.filesytem import aws
 from dsgrid.registry.common import REGISTRY_LOG_FILE
 from dsgrid.registry.registry_manager import RegistryManager
 
@@ -55,32 +56,20 @@ def registry(ctx, path, offline, dry_run):
 @click.argument("registry_path")
 def create(registry_path):
     """Create a new registry."""
-    RegistryManager.create(registry_path, offline_mode=True)
+    RegistryManager.create(registry_path)
 
 
 # TODO: Support registry file reads without syncing using something like sfs3
 @click.command(name="list")
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
 # TODO: options for only projects or datasets
 # TODO: can we run this in offline mode?
-def list_(ctx, offline, dry_run):
+def list_(ctx):
     """List the contents of a registry."""
     registry_path = ctx.parent.params["path"]
-    manager = RegistryManager.load(registry_path, offline, dry_run)
+    offline_mode = ctx.parent.params["offline"]
+    dry_run_mode = ctx.parent.params["dry_run"]
+    manager = RegistryManager.load(registry_path, offline_mode, dry_run_mode)
     print(f"Registry: {registry_path}")
     print("Projects:")
     for project in manager.list_projects():
@@ -118,72 +107,38 @@ def dimension_mappings(ctx):
 
 
 @click.command(name="list")
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline"
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write"
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def list_dimensions(ctx, offline, dry_run):
+def list_dimensions(ctx):
     """List the registered dimensions."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path, offline, dry_run).dimension_manager
+    offline_mode = ctx.parent.parent.params["offline"]
+    dry_run_mode = ctx.parent.parent.params["dry_run"]
+    manager = RegistryManager.load(registry_path, offline_mode, dry_run_mode).dimension_manager
     manager.show()
 
 
 @click.command(name="list")
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def list_dimension_mappings(ctx, offline, dry_run):
+def list_dimension_mappings(ctx):
     """List the registered dimension mappings."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path, offline, dry_run).dimension_mapping_manager
+    offline_mode = ctx.parent.parent.params["offline"]
+    dry_run_mode = ctx.parent.parent.params["dry_run"]
+    manager = RegistryManager.load(
+        registry_path, offline_mode, dry_run_mode
+    ).dimension_mapping_manager
     manager.show()
 
 
 @click.command(name="remove")
 @click.argument("project-id")
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def remove_project(ctx, project_id, offline, dry_run):
+def remove_project(ctx, project_id):
     """Remove a project from the dsgrid repository."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path, offline, dry_run)
+    offline_mode = ctx.parent.parent.params["offline"]
+    dry_run_mode = ctx.parent.parent.params["dry_run"]
+    manager = RegistryManager.load(registry_path, offline_mode, dry_run_mode)
     manager.remove_project(project_id)
 
 
@@ -195,25 +150,13 @@ def remove_project(ctx, project_id, offline, dry_run):
     required=True,
     help="reason for submission",
 )
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline"
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def register_project(ctx, project_config_file, log_message, offline, dry_run):
+def register_project(ctx, project_config_file, log_message):
     """Register a new project with the dsgrid repository."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path, offline, dry_run)
+    offline_mode = ctx.parent.parent.params["offline"]
+    dry_run_mode = ctx.parent.parent.params["dry_run"]
+    manager = RegistryManager.load(registry_path, offline_mode, dry_run_mode)
     submitter = getpass.getuser()
     manager.register_project(project_config_file, submitter, log_message)
 
@@ -226,25 +169,13 @@ def register_project(ctx, project_config_file, log_message, offline, dry_run):
     required=True,
     help="reason for submission",
 )
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def register_dimensions(ctx, dimension_config_file, log_message, offline, dry_run):
+def register_dimensions(ctx, dimension_config_file, log_message):
     """Register new dimensions with the dsgrid repository."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path, offline, dry_run).dimension_manager
+    offline_mode = ctx.parent.parent.params["offline"]
+    dry_run_mode = ctx.parent.parent.params["dry_run"]
+    manager = RegistryManager.load(registry_path, offline_mode, dry_run_mode).dimension_manager
     submitter = getpass.getuser()
     manager.register(dimension_config_file, submitter, log_message)
 
@@ -265,28 +196,16 @@ def register_dimensions(ctx, dimension_config_file, log_message, offline, dry_ru
     required=True,
     help="reason for submission",
 )
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def register_dimension_mappings(
-    ctx, dimension_mapping_config_file, log_message, force, offline, dry_run
-):
+def register_dimension_mappings(ctx, dimension_mapping_config_file, log_message, force):
     """Register new dimension mappings with the dsgrid repository."""
     registry_path = ctx.parent.parent.params["path"]
+    offline_mode = ctx.parent.parent.params["offline"]
+    dry_run_mode = ctx.parent.parent.params["dry_run"]
     submitter = getpass.getuser()
-    manager = RegistryManager.load(registry_path, offline, dry_run).dimension_mapping_manager
+    manager = RegistryManager.load(
+        registry_path, offline_mode, dry_run_mode
+    ).dimension_mapping_manager
     manager.register(dimension_mapping_config_file, submitter, log_message, force=force)
 
 
@@ -306,25 +225,13 @@ def register_dimension_mappings(
     type=click.Choice([x.value for x in VersionUpdateType]),
     callback=lambda ctx, x: VersionUpdateType(x),
 )
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def update_project(ctx, project_config_file, log_message, update_type, offline, dry_run):
+def update_project(ctx, project_config_file, log_message, update_type):
     """Update an existing project registry."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path, offline, dry_run)
+    offline_mode = ctx.parent.parent.params["offline"]
+    dry_run_mode = ctx.parent.parent.params["dry_run"]
+    manager = RegistryManager.load(registry_path, offline_mode, dry_run_mode)
     submitter = getpass.getuser()
     manager.update_project(project_config_file, submitter, update_type, log_message)
 
@@ -353,27 +260,13 @@ def update_project(ctx, project_config_file, log_message, update_type, offline, 
     type=str,
     help="reason for submission",
 )
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def submit(
-    ctx, dataset_config_file, project_id, dimension_mapping_files, log_message, offline, dry_run
-):
+def submit(ctx, dataset_config_file, project_id, dimension_mapping_files, log_message):
     """Submit a new dataset to a dsgrid project."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path, offline, dry_run)
+    offline_mode = ctx.parent.parent.params["offline"]
+    dry_run_mode = ctx.parent.parent.params["dry_run"]
+    manager = RegistryManager.load(registry_path, offline_mode, dry_run_mode)
     submitter = getpass.getuser()
     manager.submit_dataset(
         dataset_config_file, project_id, dimension_mapping_files, submitter, log_message
@@ -387,25 +280,13 @@ def submit(
 
 @click.command(name="remove")
 @click.argument("dataset-id")
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
 def remove_dataset(ctx, dataset_id, offline, dry_run):
     """Remove a dataset from the dsgrid repository."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path, offline, dry_run)
+    offline_mode = ctx.parent.parent.params["offline"]
+    dry_run_mode = ctx.parent.parent.params["dry_run"]
+    manager = RegistryManager.load(registry_path, offline_mode, dry_run_mode)
     manager.remove_dataset(dataset_id)
 
 
@@ -415,7 +296,7 @@ def remove_dataset(ctx, dataset_id, offline, dry_run):
 def sync(ctx):
     """Sync the official dsgrid registry to the local system."""
     registry_path = ctx.parent.params["path"]
-    aws.sync(REMOTE_REGISTRY, registry_path)
+    # aws.sync(REMOTE_REGISTRY, registry_path)
 
 
 projects.add_command(register_project)

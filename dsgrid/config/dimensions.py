@@ -122,8 +122,6 @@ class DimensionModel(DimensionBaseModel):
         title="association_table",
         description="optional table that provides mappings of foreign keys",
     )
-    # # TODO: why is version needed here?
-    # version: Optional[Union[str, VersionInfo]] = Field(title="version", description="version")
     # TODO: some of the dimensions will enforce dimension mappings while
     #   others may not
     # TODO: I really don't think we need these mappings at this stage.
@@ -284,8 +282,6 @@ class TimeDimensionModel(DimensionBaseModel):
         default="mean",
         description="TODO",
     )
-    # TODO: why is version needed here?
-    version: Optional[Union[str, VersionInfo]] = Field(title="version", description="version")
 
     @validator("start", "end", pre=True)
     def check_times(cls, val, values):

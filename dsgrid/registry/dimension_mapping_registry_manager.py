@@ -24,8 +24,8 @@ logger = logging.getLogger(__name__)
 class DimensionMappingRegistryManager(RegistryManagerBase):
     """Manages registered dimension mappings."""
 
-    def __init__(self, path, fs_interface, cloud_interface, offline_mode, dryrun_mode):
-        super().__init__(path, fs_interface, cloud_interface, offline_mode, dryrun_mode)
+    def __init__(self, path, fs_interface, cloud_interface, offline_mode, dry_run_mode):
+        super().__init__(path, fs_interface, cloud_interface, offline_mode, dry_run_mode)
         self._mappings = {}  # ConfigKey to DimensionMappingModel
 
     @staticmethod
@@ -122,7 +122,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 registration_history=[registration],
             )
 
-            if not self._dryrun_mode:
+            if not self._dry_run_mode:
                 dest_dir = self._path / mapping.mapping_id / str(registration.version)
                 self._fs_intf.mkdir(dest_dir)
 
@@ -152,7 +152,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                     registration.version,
                 )
 
-        if not self._dryrun_mode:
+        if not self._dry_run_mode:
             logger.info(
                 "Registered %s dimension mapping(s) with version=%s",
                 len(config.model.mappings),

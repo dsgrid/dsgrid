@@ -47,7 +47,7 @@ def registry(ctx, path, offline, dry_run):
     # We want to keep a log of items that have been registered on the
     # current system. But we probably don't want this to grow forever.
     # Consider truncating or rotating.
-    # TODO: pass in offline and dryrun arguments into logs
+    # TODO: pass in offline and dry_run arguments into logs
     setup_logging("dsgrid", REGISTRY_LOG_FILE, mode="a")
 
 
@@ -55,8 +55,7 @@ def registry(ctx, path, offline, dry_run):
 @click.argument("registry_path")
 def create(registry_path):
     """Create a new registry."""
-    # TODO: is this in offline mode only?
-    RegistryManager.create(registry_path)
+    RegistryManager.create(registry_path, offline_mode=True)
 
 
 # TODO: Support registry file reads without syncing using something like sfs3

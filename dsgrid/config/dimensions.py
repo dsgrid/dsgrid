@@ -56,7 +56,7 @@ class DimensionBaseModel(DSGBaseModel):
     )
     description: str = Field(
         title="description of dimension record",
-        description="a helpf description of the dimension records that is helpful, memorable, and "
+        description="a description of the dimension records that is helpful, memorable, and "
         "identifiable; this description will get stored in the dimension record registry",
         alias="description",
     )

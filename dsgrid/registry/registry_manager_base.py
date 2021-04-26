@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 class RegistryManagerBase(abc.ABC):
     """Base class for all registry managers."""
 
-    def __init__(self, path, fs_interface, cloud_interface, offline_mode, dryrun_mode):
+    def __init__(self, path, fs_interface, cloud_interface, offline_mode, dry_run_mode):
         # if isinstance(fs_interface, CloudFilesystemInterface):
         #     self._path = fs_interface.path
         # else:
@@ -36,7 +36,7 @@ class RegistryManagerBase(abc.ABC):
         self._registry_configs = {}  # ID to current version
 
         self._offline_mode = offline_mode
-        self._dryrun_mode = dryrun_mode
+        self._dry_run_mode = dry_run_mode
 
     def inventory(self):
         for item_id in self._fs_intf.listdir(
@@ -47,19 +47,19 @@ class RegistryManagerBase(abc.ABC):
             self._registry_configs[item_id] = registry
 
     @classmethod
-    def load(cls, path, fs_intferace, cloud_interface, offline_mode, dryrun_mode):
+    def load(cls, path, fs_intferace, cloud_interface, offline_mode, dry_run_mode):
         """Load the registry manager.
 
         path : str
         fs_intferace : FilesystemInterface
         cloud_interface : CloudFilesystemInterface
         offline_mode : bool
-        dryrun_mode :  bool
+        dry_run_mode :  bool
 
         RegistryManagerBase
 
         """
-        mgr = cls(path, fs_intferace, cloud_interface, offline_mode, dryrun_mode)
+        mgr = cls(path, fs_intferace, cloud_interface, offline_mode, dry_run_mode)
         mgr.inventory()
         return mgr
 

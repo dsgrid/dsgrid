@@ -32,28 +32,15 @@ logger = logging.getLogger(__name__)
 class DimensionRegistryManager(RegistryManagerBase):
     """Manages registered dimensions."""
 
-    def __init__(self, path, fs_interface, cloud_interface, offline_mode, dryrun_mode):
-        super().__init__(path, fs_interface, cloud_interface, offline_mode, dryrun_mode)
+    def __init__(self, path, fs_interface, cloud_interface, offline_mode, dry_run_mode):
+        super().__init__(path, fs_interface, cloud_interface, offline_mode, dry_run_mode)
         self._dimensions = {}  # key = (dimension_type, dimension_id, version)
         # value = DimensionBaseModel
         self._dimensions = {}  # key = DimensionKey, value = Dimension
-        # <<<<<<< HEAD
-        #         for dim_type in self._fs_intf.listdir(self._path):
-        #             if dim_type != ".DS_Store":  # FIXME
-        #                 _type = DimensionType(dim_type)
-        #                 type_path = Path(self._path) / dim_type
-        #                 ids = self._fs_intf.listdir(type_path)
-        #                 for dim_id in ids:
-        #                     dim_path = type_path / dim_id
-        #                     self._dimension_versions[_type][dim_id] = {
-        #                         VersionInfo.parse(x)
-        #                         for x in self._fs_intf.listdir(dim_path, directories_only=True)
-        #                     }
-        # =======
         self._id_to_type = {}
         self._registry_configs = {}
         self._offline_mode = offline_mode
-        self._dryrun_mode = dryrun_mode
+        self._dry_run_mode = dry_run_mode
 
     @property
     def log_offline_message(self):
@@ -75,7 +62,6 @@ class DimensionRegistryManager(RegistryManagerBase):
             )
             for dim_id in ids:
                 dim_path = type_path / dim_id
-                print(dim_path / REGISTRY_FILENAME)
                 registry = self.registry_class().load(dim_path / REGISTRY_FILENAME)
                 self._registry_configs[dim_id] = registry
                 self._id_to_type[dim_id] = _type
@@ -83,8 +69,6 @@ class DimensionRegistryManager(RegistryManagerBase):
     @staticmethod
     def registry_class():
         return DimensionRegistry
-
-    # >>>>>>> develop
 
     def check_unique_records(self, config: DimensionConfig, warn_only=False):
         """Check if any new tables have identical records as existing tables.
@@ -207,7 +191,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 registration_history=[registration],
             )
 
-            if not self._dryrun_mode:
+            if not self._dry_run_mode:
                 dest_dir = (
                     self._path
                     / dimension.dimension_type.value
@@ -252,7 +236,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 )
 
         # sync with remote registery
-        if not self._dryrun_mode:
+        if not self._dry_run_mode:
             if not self._offline_mode:
                 DimensionRegistry.sync_push(self._path)
             logger.info(

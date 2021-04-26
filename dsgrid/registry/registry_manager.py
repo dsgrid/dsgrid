@@ -57,7 +57,7 @@ class RegistryManager:
 
     # TODO: how are we supporting offline mode?
 
-    def __init__(self, path, fs_interface, cloud_interface, offline_mode, dryrun_mode):
+    def __init__(self, path, fs_interface, cloud_interface, offline_mode, dry_run_mode):
         # if isinstance(fs_interface, S3Filesystem):
         #     self._path = fs_interface.path
         # else:
@@ -70,7 +70,7 @@ class RegistryManager:
         self._fs_intf = fs_interface
         self._cld_intf = cloud_interface
         self._offline_mode = offline_mode
-        self._dryrun_mode = dryrun_mode
+        self._dry_run_mode = dry_run_mode
         self._projects = {}  # (project_id, version) to ProjectConfig. Loaded on demand.
         self._project_registries = {}  # project_id to ProjectRegistry. Loaded on demand.
         self._datasets = {}  # dataset_id to DatasetConfig. Loaded on demand.
@@ -80,14 +80,14 @@ class RegistryManager:
             fs_interface,
             cloud_interface,
             offline_mode,
-            dryrun_mode,
+            dry_run_mode,
         )
         self._dimension_mapping_dimension_mgr = DimensionMappingRegistryManager.load(
             Path(path) / DimensionMappingRegistry.registry_path(),
             fs_interface,
             cloud_interface,
             offline_mode,
-            dryrun_mode,
+            dry_run_mode,
         )
 
         project_ids = self._fs_intf.listdir(
@@ -106,9 +106,8 @@ class RegistryManager:
         self._dataset_ids = set(dataset_ids)
 
     @classmethod
-    # TODO: Is this method needed?
     def create(cls, path):
-        """Creates a new RegistryManager at the given path.
+        """Creates a new RegistryManager at the given path. Used in tests.
 
         Parameters
         ----------
@@ -143,7 +142,7 @@ class RegistryManager:
         return self._dimension_mgr
 
     @classmethod
-    def load(cls, path, offline_mode=False, dryrun_mode=False):
+    def load(cls, path, offline_mode=False, dry_run_mode=False):
         """Loads a local registry from a given path and loads the remote registry if offline_mode
          is False. If offline_mode is False, load() also syncs the local registry with the remote
          registry.
@@ -154,7 +153,7 @@ class RegistryManager:
             Local registry path
         offline_mode : bool
             Load registry in offline mode; default is False
-        dryrun_mode : bool
+        dry_run_mode : bool
             Test registry operations in dry-run "test" mode (i.e., do not commit changes to remote)
 
         Returns
@@ -189,7 +188,7 @@ class RegistryManager:
                 if not fs_interface.exists(str(dir_name)):
                     fs_interface.mkdir(dir_name)
         logger.info(f"Loaded local registry at {path}")
-        return cls(path, fs_interface, cloud_interface, offline_mode, dryrun_mode)
+        return cls(path, fs_interface, cloud_interface, offline_mode, dry_run_mode)
 
     @property
     def log_offline_message(self):
@@ -411,7 +410,7 @@ class RegistryManager:
         # redundant. It needs to be in project.toml so that we can load older versions of a
         # project. It may be convenient to be in the registry.toml for quick searches but
         # should not be required.
-        if not self._dryrun_mode:
+        if not self._dry_run_mode:
             self._fs_intf.mkdir(data_dir)
             registry_filename = config_dir / REGISTRY_FILENAME
             dump_data(serialize_model(registry_model), registry_filename)
@@ -537,7 +536,7 @@ class RegistryManager:
         config_dir = self._get_dataset_directory(config.model.dataset_id)
         data_dir = config_dir / str(version)
 
-        if not self._dryrun_mode:
+        if not self._dry_run_mode:
             self._fs_intf.mkdir(data_dir)
             filename = config_dir / REGISTRY_FILENAME
             data = serialize_model(registry_config)
@@ -557,14 +556,14 @@ class RegistryManager:
         status = DatasetRegistryStatus.REGISTERED
         project_registry.set_dataset_status(config.model.dataset_id, status)
         filename = self._get_registry_filename(ProjectRegistry, project_id)
-        if not self._dryrun_mode:
+        if not self._dry_run_mode:
             project_registry.serialize(filename)
 
         project_config.get_dataset(config.model.dataset_id).status = status
         project_file = self._get_project_config_file(
             project_config.model.project_id, project_registry.version
         )
-        if not self._dryrun_mode:
+        if not self._dry_run_mode:
             dump_data(serialize_model(project_config.model), project_file)
             if not self._offline_mode:
                 ProjectRegistry.sync_push(self._path)  # TODO: two syncs in one function?
@@ -625,11 +624,11 @@ class RegistryManager:
         for project_registry in self._project_registries.values():
             if project_registry.has_dataset(dataset_id, DatasetRegistryStatus.REGISTERED):
                 project_registry.set_dataset_status(dataset_id, DatasetRegistryStatus.UNREGISTERED)
-                if not self._dryrun_mode:
+                if not self._dry_run_mode:
                     project_registry.serialize(
                         self._get_registry_filename(ProjectRegistry, project_registry.project_id)
                     )
-        if not self._dryrun_mode:
+        if not self._dry_run_mode:
             if not self._offline_mode:
                 ProjectRegistry.sync_push(self._path)
             logger.info("%sRemoved %s from the registry.", self.log_offline_message, dataset_id)
@@ -712,7 +711,7 @@ class RegistryManager:
         config_dir = self._get_project_directory(config_id)
         data_dir = config_dir / str(registry_config.version)
 
-        if not self._dryrun_mode:
+        if not self._dry_run_mode:
             self._fs_intf.mkdir(data_dir)
 
             if registry_type == RegistryType.DATASET:

@@ -38,7 +38,7 @@ class LocalFilesystem(FilesystemInterface):
     def rm(self, path):
         if os.path.exists(path):
             if os.path.isdir(path):
-                if len([f for f in os.listdir(path)]) > 0:
+                if os.listdir(path) > 0:
                     self.rm_tree(path)
                 else:
                     os.removedirs(path)

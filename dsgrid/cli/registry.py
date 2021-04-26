@@ -48,13 +48,8 @@ def list_(ctx):
     registry_path = ctx.parent.params["path"]
     manager = RegistryManager.load(registry_path)
     print(f"Registry: {registry_path}")
-    print("Projects:")
-    for project in manager.list_projects():
-        print(f"  - {project}")
-    print("\nDatasets:")
-    for dataset in manager.list_datasets():
-        print(f"  - {dataset}")
-    print("\nDimensions:")
+    manager.project_manager.show()
+    manager.dataset_manager.show()
     manager.dimension_manager.show()
     manager.dimension_mapping_manager.show()
 
@@ -107,8 +102,8 @@ def list_dimension_mappings(ctx):
 def remove_project(ctx, project_id):
     """Remove a project from the dsgrid repository."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path)
-    manager.remove_project(project_id)
+    manager = RegistryManager.load(registry_path).project_manager
+    manager.remove(project_id)
 
 
 @click.command(name="register")
@@ -123,11 +118,53 @@ def remove_project(ctx, project_id):
 def register_project(ctx, project_config_file, log_message):
     """Register a new project with the dsgrid repository."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path)
+    manager = RegistryManager.load(registry_path).project_manager
     submitter = getpass.getuser()
-    manager.register_project(project_config_file, submitter, log_message)
+    manager.register(project_config_file, submitter, log_message)
 
 
+@click.command()
+@click.option(
+    "-d",
+    "--dataset-id",
+    required=True,
+    type=str,
+    help="dataset identifier",
+)
+@click.option(
+    "-p",
+    "--project-id",
+    required=True,
+    type=str,
+    help="project identifier",
+)
+@click.option(
+    "-m",
+    "--dimension-mapping-files",
+    type=click.Path(exists=True),
+    multiple=True,
+    show_default=True,
+    help="dimension mapping file(s)",
+)
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    type=str,
+    help="reason for submission",
+)
+@click.pass_context
+def submit_dataset(ctx, dataset_id, project_id, dimension_mapping_files, log_message):
+    """Submit a dataset to a dsgrid project."""
+    registry_path = ctx.parent.parent.params["path"]
+    manager = RegistryManager.load(registry_path).project_manager
+    submitter = getpass.getuser()
+    manager.submit_dataset(project_id, dataset_id, dimension_mapping_files, submitter, log_message)
+
+
+# TODO: When resubmitting an existing dataset to a project, is that a new command or an extension
+# of submit_dataset?
+# TODO: update_dataset
 @click.command(name="register")
 @click.argument("dimension-config-file")
 @click.option(
@@ -189,49 +226,26 @@ def register_dimension_mappings(ctx, dimension_mapping_config_file, log_message,
 def update_project(ctx, project_config_file, log_message, update_type):
     """Update an existing project registry."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path)
+    manager = RegistryManager.load(registry_path).project_manager
     submitter = getpass.getuser()
-    manager.update_project(project_config_file, submitter, update_type, log_message)
+    manager.update(project_config_file, submitter, update_type, log_message)
 
 
-@click.command()
+@click.command(name="register")
 @click.argument("dataset-config-file")
-@click.option(
-    "-p",
-    "--project-id",
-    required=True,
-    type=str,
-    help="project identifier",
-)
-@click.option(
-    "-m",
-    "--dimension-mapping-files",
-    type=click.Path(exists=True),
-    multiple=True,
-    show_default=True,
-    help="dimension mapping file(s)",
-)
 @click.option(
     "-l",
     "--log-message",
     required=True,
-    type=str,
     help="reason for submission",
 )
 @click.pass_context
-def submit(ctx, dataset_config_file, project_id, dimension_mapping_files, log_message):
-    """Submit a new dataset to a dsgrid project."""
+def register_dataset(ctx, dataset_config_file, log_message):
+    """Register a new dataset with the dsgrid repository."""
     registry_path = ctx.parent.parent.params["path"]
-    manager = RegistryManager.load(registry_path)
+    manager = RegistryManager.load(registry_path).dataset_manager
     submitter = getpass.getuser()
-    manager.submit_dataset(
-        dataset_config_file, project_id, dimension_mapping_files, submitter, log_message
-    )
-
-
-# TODO: When resubmitting an existing dataset to a project, is that a new command or an extension
-# of submit_dataset?
-# TODO: update_dataset
+    manager.register(dataset_config_file, submitter, log_message)
 
 
 @click.command(name="remove")
@@ -255,9 +269,10 @@ def sync(ctx):
 projects.add_command(register_project)
 projects.add_command(remove_project)
 projects.add_command(update_project)
+projects.add_command(submit_dataset)
 
-datasets.add_command(submit)
 datasets.add_command(remove_dataset)
+datasets.add_command(register_dataset)
 
 dimensions.add_command(register_dimensions)
 dimensions.add_command(list_dimensions)

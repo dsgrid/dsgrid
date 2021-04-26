@@ -136,7 +136,7 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: check project_dimension_mapping (optional) if exists
 
         # TODO AWS
-        return local_path
+        return str(local_path)
 
 
 class DatasetConfig(ConfigBase):

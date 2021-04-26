@@ -49,9 +49,6 @@ def create_registry(tmpdir):
 def test_register_project_and_dataset(test_data_dir):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
-        regex_project = re.compile(r"Projects.*\n.*test")
-        regex_dataset = re.compile(r"Datasets.*\n.*comstock")
-
         path = create_registry(base_dir)
         dataset_dir = Path("datasets/input/sector_models/comstock")
         dataset_dim_dir = dataset_dir / "dimensions"
@@ -82,20 +79,17 @@ def test_register_project_and_dataset(test_data_dir):
         replace_dimension_uuids_from_registry(path, (project_config, dataset_config))
 
         check_run_command(
+            f"dsgrid registry --path={path} datasets register {dataset_config} -l log"
+        )
+        check_run_command(
             f"dsgrid registry --path={path} projects register {project_config} -l log"
         )
-        output = {}
-        check_run_command(f"dsgrid registry --path={path} list", output)
-        assert regex_project.search(output["stdout"]) is not None
-        assert "test" in output["stdout"]
-
         check_run_command(
-            f"dsgrid registry --path={path} datasets submit {dataset_config} "
-            "--project-id test "
-            "--log-message=test_submission "
-            f"--dimension-mapping-files={dimension_mapping_refs}"
+            f"dsgrid registry --path={path} projects submit-dataset -d comstock -p test -l log"
         )
-
         output = {}
         check_run_command(f"dsgrid registry --path={path} list", output)
+        regex_project = re.compile(r"test.*1\.0\.0")
+        regex_dataset = re.compile(r"comstock.*1\.0\.0")
+        assert regex_project.search(output["stdout"]) is not None
         assert regex_dataset.search(output["stdout"]) is not None

@@ -49,6 +49,17 @@ class RegistryBase(ConfigBase, abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
+    def config_filename():
+        """Return the config filename.
+
+        Returns
+        -------
+        str
+
+        """
+
+    @staticmethod
+    @abc.abstractmethod
     def registry_path():
         """Return the path to these records in the registry.
 

@@ -2,11 +2,9 @@
 
 import logging
 import os
-from collections import defaultdict
 from pathlib import Path
 
 from prettytable import PrettyTable
-from semver import VersionInfo
 
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dimension_config import DimensionConfig
@@ -40,7 +38,6 @@ class DimensionRegistryManager(RegistryManagerBase):
         # value = DimensionBaseModel
         self._dimensions = {}  # key = DimensionKey, value = Dimension
         self._id_to_type = {}
-        self._registry_configs = {}
 
     def inventory(self):
         for dim_type in self._fs_intf.listdir(
@@ -54,6 +51,10 @@ class DimensionRegistryManager(RegistryManagerBase):
                 registry = self.registry_class().load(dim_path / REGISTRY_FILENAME)
                 self._registry_configs[dim_id] = registry
                 self._id_to_type[dim_id] = _type
+
+    @staticmethod
+    def name():
+        return "Dimensions"
 
     @staticmethod
     def registry_class():
@@ -74,29 +75,29 @@ class DimensionRegistryManager(RegistryManagerBase):
             Raised if there are duplicates and warn_only is False.
 
         """
-        hashes = set()
+        hashes = {}
         for dimension_id, registry_config in self._registry_configs.items():
             dimension = self.get_by_id(dimension_id, registry_config.model.version)
             if isinstance(dimension, TimeDimensionModel):
                 continue
-            hashes.add(dimension.file_hash)
+            hashes[dimension.file_hash] = dimension_id
 
-        duplicates = [
-            x.dimension_id
-            for x in config.model.dimensions
-            if not isinstance(x, TimeDimensionModel) and x.file_hash in hashes
-        ]
+        duplicates = []
+        for dimension in config.model.dimensions:
+            if not isinstance(dimension, TimeDimensionModel) and dimension.file_hash in hashes:
+                duplicates.append((dimension.dimension_id, hashes[dimension.file_hash]))
+
         if duplicates:
-            if warn_only:
-                logger.warning("Dimension records are duplicated: %s", duplicates)
-            else:
+            for dup in duplicates:
+                logger.error("%s duplicates existing dimension ID %s", dup[0], dup[1])
+            if not warn_only:
                 raise DSGDuplicateValueRegistered(f"duplicate dimension records: {duplicates}")
 
-    def get_by_id(self, item_id, version=None, force=False):
-        dimension_type = self._id_to_type[item_id]
+    def get_by_id(self, config_id, version=None, force=False):
+        dimension_type = self._id_to_type[config_id]
         if version is None:
-            version = sorted(list(self._registry_configs[item_id].model.version))[-1]
-        key = DimensionKey(dimension_type, item_id, version)
+            version = self._registry_configs[config_id].model.version
+        key = DimensionKey(dimension_type, config_id, version)
         return self.get_by_key(key)
 
     def get_by_key(self, key):
@@ -116,11 +117,11 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._dimensions[key] = dimension
         return dimension
 
-    def has_id(self, item_id, version=None):
+    def has_id(self, config_id, version=None):
         if version is None:
-            return item_id in self._registry_configs
-        dimension_type = self._id_to_type[item_id]
-        path = self._path / str(dimension_type) / item_id / str(version)
+            return config_id in self._registry_configs
+        dimension_type = self._id_to_type[config_id]
+        path = self._path / str(dimension_type) / config_id / str(version)
         return self._fs_intf.exists(path)
 
     def list_types(self):
@@ -142,9 +143,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         if dimension_type is None:
             return super().list_ids()
 
-        ids = [x for x in self._registry_configs if self._id_to_type[x] == dimension_type]
-        ids.sort()
-        return ids
+        return sorted((x for x in self._registry_configs if self._id_to_type[x] == dimension_type))
 
     def load_dimensions(self, dimension_references):
         """Load dimensions from files.
@@ -174,7 +173,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         config_dir = Path(os.path.dirname(config_file))
 
         for dimension in config.model.dimensions:
-            registry_config = RegistryBaseModel(
+            registry_model = RegistryBaseModel(
                 version=registration.version,
                 description=dimension.description.strip(),
                 registration_history=[registration],
@@ -187,10 +186,10 @@ class DimensionRegistryManager(RegistryManagerBase):
             )
             self._fs_intf.mkdir(dest_dir)
 
-            filename = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
-            data = serialize_model(registry_config)
+            registry_file = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
+            data = serialize_model(registry_model)
             # TODO: if we want to update AWS directly, this needs to change.
-            dump_data(data, filename)
+            dump_data(data, registry_file)
 
             model_data = serialize_dimension_model(dimension)
             # Time dimensions do not have a record file.
@@ -212,6 +211,8 @@ class DimensionRegistryManager(RegistryManagerBase):
                 registration.version,
                 dimension.name,
             )
+            self._update_registry_cache(dimension.dimension_id, registry_model)
+            self._id_to_type[dimension.dimension_id] = dimension.dimension_type
 
         logger.info(
             "Registered %s dimensions with version=%s",
@@ -247,3 +248,6 @@ class DimensionRegistryManager(RegistryManagerBase):
         table.add_rows(rows)
 
         print(table)
+
+    def update(self, config_file, submitter, update_type, log_message):
+        assert False, "not supported yet"

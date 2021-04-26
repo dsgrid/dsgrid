@@ -14,6 +14,10 @@ class DimensionRegistry(RegistryBase):
     DIMENSION_REGISTRY_PATH = Path("dimensions")
 
     @staticmethod
+    def config_filename():
+        return "dimension.toml"
+
+    @staticmethod
     def model_class():
         return RegistryBaseModel
 

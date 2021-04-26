@@ -26,6 +26,10 @@ class DatasetRegistry(RegistryBase):
 
     DATASET_REGISTRY_PATH = Path("datasets")
 
+    @staticmethod
+    def config_filename():
+        return "dataset.toml"
+
     @property
     def dataset_id(self):
         return self._model.dataset_id

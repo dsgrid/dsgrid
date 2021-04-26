@@ -83,6 +83,10 @@ class ProjectRegistry(RegistryBase):
     PROJECT_REGISTRY_PATH = Path("projects")
 
     @staticmethod
+    def config_filename():
+        return "project.toml"
+
+    @staticmethod
     def model_class():
         return ProjectRegistryModel
 

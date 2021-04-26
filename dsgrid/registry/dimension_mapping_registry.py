@@ -14,6 +14,10 @@ class DimensionMappingRegistry(RegistryBase):
     DIMENSION_MAPPING_REGISTRY_PATH = Path("dimension_mappings")
 
     @staticmethod
+    def config_filename():
+        return "dimension_mapping.toml"
+
+    @staticmethod
     def model_class():
         return RegistryBaseModel
 

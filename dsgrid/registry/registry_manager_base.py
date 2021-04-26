@@ -4,7 +4,11 @@ import abc
 import logging
 from pathlib import Path
 
+from prettytable import PrettyTable
+
+from .registry_base import RegistryBaseModel
 from dsgrid.common import REGISTRY_FILENAME
+from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.filesytem.aws import AwsS3Bucket
 from dsgrid.filesytem.local_filesystem import LocalFilesystem
 
@@ -23,27 +27,33 @@ class RegistryManagerBase(abc.ABC):
             self._path = path
 
         self._fs_intf = fs_interface
-        self._registry_configs = {}  # ID to current version
+        self._registry_configs = {}  # ID to registry config
 
     def inventory(self):
-        for item_id in self._fs_intf.listdir(
+        for config_id in self._fs_intf.listdir(
             self._path, directories_only=True, exclude_hidden=True
         ):
-            id_path = Path(self._path) / item_id
+            id_path = Path(self._path) / config_id
             registry = self.registry_class().load(id_path / REGISTRY_FILENAME)
-            self._registry_configs[item_id] = registry
+            self._registry_configs[config_id] = registry
 
     @classmethod
-    def load(cls, path, fs_intferace):
+    def load(cls, path, fs_interface, *args, **kwargs):
         """Load the registry manager.
 
         path : str
-        fs_intferace : FilesystemInterface
+        fs_interface : FilesystemInterface
 
         RegistryManagerBase
 
         """
-        mgr = cls(path, fs_intferace)
+        mgr = cls(path, fs_interface)
+        mgr.inventory()
+        return mgr
+
+    @classmethod
+    def _load(cls, path, fs_interface):
+        mgr = cls(path, fs_interface)
         mgr.inventory()
         return mgr
 
@@ -67,12 +77,12 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_by_id(self, item_id, version=None):
+    def get_by_id(self, config_id, version=None):
         """Get the item matching matching ID. Returns from cache if already loaded.
 
         Parameters
         ----------
-        item_id : str
+        config_id : str
         version : VersionInfo
             If None, return the latest version.
 
@@ -87,6 +97,17 @@ class RegistryManagerBase(abc.ABC):
 
         """
 
+    @staticmethod
+    @abc.abstractmethod
+    def name():
+        """Return the name of the registry, used for reporting.
+
+        Returns
+        -------
+        str
+
+        """
+
     @abc.abstractmethod
     def register(self, config_file, submitter, log_message, force=False):
         """Registers a config file in the registry.
@@ -94,7 +115,7 @@ class RegistryManagerBase(abc.ABC):
         Parameters
         ----------
         config_file : str
-            Path to dimension mapping config file
+            Path to  config file
         submitter : str
             Submitter name
         log_message : str
@@ -106,7 +127,7 @@ class RegistryManagerBase(abc.ABC):
         ValueError
             Raised if the config_file is invalid.
         DSGDuplicateValueRegistered
-            Raised if the mapping is already registered.
+            Raised if the config ID is already registered.
 
         """
 
@@ -116,10 +137,67 @@ class RegistryManagerBase(abc.ABC):
         """Return the class used for the registry item."""
 
     @abc.abstractmethod
-    def show(self, **kwargs):
-        """Show a summary of the registered items in a table."""
+    def update(self, config_file, submitter, update_type, log_message):
+        """Updates an existing registry with new parameters or data.
 
-    def get_current_version(self, item_id):
+        Parameters
+        ----------
+        config_file : str
+            Path to project config file
+        submitter : str
+            Submitter name
+        update_type : VersionUpdateType
+        log_message : str
+
+        Raises
+        ------
+        ValueError
+            Raised if the config_file is invalid.
+
+        """
+
+    def _check_if_already_registered(self, config_id):
+        if config_id in self._registry_configs:
+            raise DSGDuplicateValueRegistered(f"{self.name()}={config_id}")
+
+    def _check_if_not_registered(self, config_id):
+        if config_id not in self._registry_configs:
+            raise DSGValueNotRegistered(f"{self.name()}={config_id}")
+
+    def _update_registry_cache(self, config_id, registry_model: RegistryBaseModel):
+        assert config_id not in self._registry_configs, config_id
+        self._registry_configs[config_id] = self.registry_class()(registry_model)
+
+    def get_config_directory(self, config_id):
+        """Return the path to the config file.
+
+        Parameters
+        ----------
+        config_id : str
+
+        Returns
+        -------
+        str
+
+        """
+        return self._path / config_id
+
+    def get_config_file(self, config_id, version):
+        """Return the path to the config file.
+
+        Parameters
+        ----------
+        config_id : str
+        version : VersionInfo
+
+        Returns
+        -------
+        str
+
+        """
+        return self._path / config_id / str(version) / self.registry_class().config_filename()
+
+    def get_current_version(self, config_id):
         """Return the current version in the registry.
 
         Returns
@@ -127,19 +205,49 @@ class RegistryManagerBase(abc.ABC):
         VersionInfo
 
         """
-        return self._registry_configs[item_id].model.version
+        return self._registry_configs[config_id].model.version
+
+    def get_registry_config(self, config_id):
+        """Return the registry config.
+
+        Parameters
+        ----------
+        config_id : str
+
+        Returns
+        -------
+        RegistryBase
+
+        """
+        if config_id not in self._registry_configs:
+            raise DSGValueNotRegistered(f"{self.name()}={config_id}")
+        return self._registry_configs[config_id]
+
+    def get_registry_file(self, config_id):
+        """Return the path to the registry file.
+
+        Parameters
+        ----------
+        config_id : str
+
+        Returns
+        -------
+        str
+
+        """
+        return self._path / config_id / REGISTRY_FILENAME
 
     @property
     def fs_interface(self):
         """Return the filesystem interface."""
         return self._fs_intf
 
-    def has_id(self, item_id, version=None):
+    def has_id(self, config_id, version=None):
         """Return True if an item matching the parameters is stored.
 
         Parameters
         ----------
-        item_id : str
+        config_id : str
         version : VersionInfo
             If None, use latest.
 
@@ -149,9 +257,8 @@ class RegistryManagerBase(abc.ABC):
 
         """
         if version is None:
-            return item_id in self._registry_configs
-        path = self._path / item_id / str(version)
-        return self._fs_intf.exists(path)
+            return config_id in self._registry_configs
+        return self._fs_intf.exists(self._path / config_id / str(version))
 
     def iter_ids(self):
         """Return an iterator over the registered IDs."""
@@ -165,4 +272,44 @@ class RegistryManagerBase(abc.ABC):
         list
 
         """
-        return sorted(list(self.iter_ids()))
+        return sorted(self.iter_ids())
+
+    def remove(self, config_id):
+        """Remove an item from the registry
+
+        Parameters
+        ----------
+        config_id : str
+
+        Raises
+        ------
+        DSGValueNotRegistered
+            Raised if the project_id is not registered.
+
+        """
+        if config_id not in self._registry_configs:
+            raise DSGValueNotRegistered(f"project_id={config_id}")
+
+        self._fs_intf.rmtree(self.get_config_directory(config_id))
+        logger.info("Removed %s from the registry.", config_id)
+
+    def show(self, **kwargs):
+        """Show a summary of the registered items in a table."""
+        # TODO: filter by submitter
+        table = PrettyTable(title=self.name())
+        table.field_names = ("ID", "Version", "Registration Date", "Submitter", "Description")
+        rows = []
+        for config_id, registry_config in self._registry_configs.items():
+            last_reg = registry_config.model.registration_history[-1]
+            row = (
+                config_id,
+                last_reg.version,
+                last_reg.date,
+                last_reg.submitter,
+                registry_config.model.description,
+            )
+            rows.append(row)
+
+        rows.sort(key=lambda x: x[0])
+        table.add_rows(rows)
+        print(table)

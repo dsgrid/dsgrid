@@ -43,12 +43,15 @@ class Project:
         if spark is None:
             spark = init_spark("project")
 
-        registry = RegistryManager.load(get_registry_path(registry_path=registry_path))
-        project_registry = registry.load_project_registry(project_id)
-        registered_datasets = project_registry.list_registered_datasets()
+        registry_path = get_registry_path(registry_path=registry_path)
+        manager = RegistryManager.load(registry_path)
+        dataset_manager = manager.dataset_manager
+        project_manager = manager.project_manager
+        registry = project_manager.get_registry_config(project_id)
+        registered_datasets = registry.list_registered_datasets()
         if version is None:
-            version = project_registry.version
-        config = registry.load_project_config(project_id, version=version)
+            version = registry.version
+        config = project_manager.get_by_id(project_id, version=version)
 
         project_dimension_store = DimensionStore.load(
             itertools.chain(
@@ -58,7 +61,7 @@ class Project:
         dataset_dim_stores = {}
         dataset_configs = {}
         for dataset_id in registered_datasets:
-            dataset_config = registry.load_dataset_config(dataset_id)
+            dataset_config = dataset_manager.get_by_id(dataset_id)
             dataset_configs[dataset_id] = dataset_config
             dataset_dim_stores[dataset_id] = DimensionStore.load(
                 dataset_config.dimensions.values()

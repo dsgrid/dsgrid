@@ -18,7 +18,9 @@ def read_dimension_mapping_uuid_mapping(registry_dir):
     fs_intf = LocalFilesystem()
     dir_name = Path(registry_dir)
     mappings = {}
-    regex = re.compile(r"(?P<from_dimension>\w+)__(?P<to_dimension>\w+)__(?P<uuid>[-0-9a-f]+)$")
+    regex = re.compile(
+        r"(?P<from_dimension>[-\w]+)__(?P<to_dimension>[-\w]+)__(?P<uuid>[-0-9a-f]+)$"
+    )
     path = dir_name / "dimension_mappings"
     for item in fs_intf.listdir(path, directories_only=True, exclude_hidden=True):
         assert os.path.isdir(path / item), str(path / item)
@@ -37,7 +39,7 @@ def read_dimension_mapping_uuid_mapping(registry_dir):
 
 def replace_dimension_mapping_uuids(filename, uuids):
     regex = re.compile(
-        r"mapping_id = \"(?P<from_dimension>\w+)__(?P<to_dimension>\w+)__(?P<uuid>[-0-9a-f]+)\""
+        r"mapping_id = \"(?P<from_dimension>[-\w]+)__(?P<to_dimension>[-\w]+)__(?P<uuid>[-0-9a-f]+)\""
     )
     with fileinput.input(files=[filename], inplace=True) as f:
         for line in f:
@@ -61,7 +63,7 @@ def read_dimension_uuid_mapping(registry_dir):
     fs_intf = LocalFilesystem()
     dir_name = Path(registry_dir)
     mappings = {}
-    regex = re.compile(r"(?P<dimension_type>\w+)__(?P<uuid>[-0-9a-f]+)$")
+    regex = re.compile(r"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)$")
     dim_base_path = dir_name / "dimensions"
     for dim_type in fs_intf.listdir(dim_base_path, directories_only=True, exclude_hidden=True):
         dim_path = dim_base_path / dim_type
@@ -78,7 +80,7 @@ def read_dimension_uuid_mapping(registry_dir):
 
 
 def replace_dimension_uuids(filename, uuids):
-    regex = re.compile(r"dimension_id = \"(?P<dimension_type>\w+)__(?P<uuid>[-0-9a-f]+)\"")
+    regex = re.compile(r"dimension_id = \"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)\"")
     with fileinput.input(files=[filename], inplace=True) as f:
         for line in f:
             match = regex.search(line)

@@ -96,18 +96,18 @@ class S3Filesystem(CloudFilesystemInterface):
                             objects.append(k)
                         else:
                             objects.append(key.split(k)[0] + k)
-
+            if not directories_only:
+                return objects
             if directories_only:
-                file_objects, dir_objects = [], []
+                file_objects, dir_objects = set(), set()
                 for key in keys:  # TODO: remove some repetition here
                     if not key.endswith("/"):
-                        file_objects.append(key)
+                        file_objects.add(key)
                 for key in objects:
                     if key not in file_objects:
-                        dir_objects.append(key)
+                        dir_objects.add(key)
                 return dir_objects
-
-            return objects
+            assert False
 
     def mkdir(self, directory):
         assert False, "not supported yet"
@@ -169,7 +169,7 @@ class S3Filesystem(CloudFilesystemInterface):
             relconent = os.path.relpath(content, local_interface.path)
             if relconent not in s3_contents:
                 local_interface.rm(content)
-                print(f"delete: {content}")  # TODO: log this
+                logger.log("delete: %s", content)
         S3Filesystem.sync(s3_filesystem.path, local_interface.path, include_data)
 
     @staticmethod

@@ -19,6 +19,8 @@ from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.registry.common import (
     DimensionKey,
     make_initial_config_registration,
+    log_dry_run_mode_prefix,
+    log_offline_mode_prefix,
 )
 from dsgrid.utils.files import dump_data
 from .registry_base import RegistryBaseModel
@@ -41,14 +43,6 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._registry_configs = {}
         self._offline_mode = offline_mode
         self._dry_run_mode = dry_run_mode
-
-    @property
-    def log_offline_message(self):
-        if self._offline_mode:
-            msg = "* OFFLINE MODE * | "
-        else:
-            msg = ""
-        return msg
 
     def inventory(self):
         for dim_type in self._fs_intf.listdir(
@@ -184,6 +178,17 @@ class DimensionRegistryManager(RegistryManagerBase):
         dest_config_filename = "dimension" + os.path.splitext(config_file)[1]
         config_dir = Path(os.path.dirname(config_file))
 
+        if self._dry_run_mode:
+            for dimension in config.model.dimensions:
+                logger.info(
+                    "%sDimension validated for registration: type=%s version=%s" "name=%s",
+                    log_dry_run_mode_prefix(self._dry_run_mode),
+                    dimension.dimension_type.value,
+                    registration.version,
+                    dimension.name,
+                )
+            return None
+
         for dimension in config.model.dimensions:
             registry_config = RegistryBaseModel(
                 version=registration.version,
@@ -191,60 +196,51 @@ class DimensionRegistryManager(RegistryManagerBase):
                 registration_history=[registration],
             )
 
-            if not self._dry_run_mode:
-                dest_dir = (
-                    self._path
-                    / dimension.dimension_type.value
-                    / dimension.dimension_id
-                    / str(registration.version)
-                )
-                self._fs_intf.mkdir(dest_dir)
+            dest_dir = (
+                self._path
+                / dimension.dimension_type.value
+                / dimension.dimension_id
+                / str(registration.version)
+            )
+            self._fs_intf.mkdir(dest_dir)
 
-                filename = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
-                data = serialize_model(registry_config)
-                dump_data(data, filename)
+            filename = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
+            data = serialize_model(registry_config)
+            dump_data(data, filename)
 
-                model_data = serialize_dimension_model(dimension)
-                # Time dimensions do not have a record file. # TODO-- Maybe they should?
-                orig_file = getattr(dimension, "filename", None)
-                if orig_file is not None:
-                    # Leading directories from the original are not relevant in the registry.
-                    dest_record_file = dest_dir / os.path.basename(orig_file)
-                    self._fs_intf.copy_file(config_dir / dimension.filename, dest_record_file)
-                    # We have to make this change in the serialized dict instead of
-                    # model because Pydantic will fail the assignment due to not being
-                    # able to find the path.
-                    model_data["file"] = os.path.basename(dimension.filename)
+            model_data = serialize_dimension_model(dimension)
+            # Time dimensions do not have a record file. # TODO-- Maybe they should?
+            orig_file = getattr(dimension, "filename", None)
+            if orig_file is not None:
+                # Leading directories from the original are not relevant in the registry.
+                dest_record_file = dest_dir / os.path.basename(orig_file)
+                self._fs_intf.copy_file(config_dir / dimension.filename, dest_record_file)
+                # We have to make this change in the serialized dict instead of
+                # model because Pydantic will fail the assignment due to not being
+                # able to find the path.
+                model_data["file"] = os.path.basename(dimension.filename)
 
-                dump_data(model_data, dest_dir / dest_config_filename)
+            dump_data(model_data, dest_dir / dest_config_filename)
 
-                logger.info(
-                    "%sRegistered dimension id=%s type=%s version=%s name=%s",
-                    self.log_offline_message,
-                    dimension.dimension_id,
-                    dimension.dimension_type.value,
-                    registration.version,
-                    dimension.name,
-                )
-            else:
-                logger.info(
-                    "* DRY-RUN MODE * | Dimension validated for registration: type=%s version=%s"
-                    "name=%s",
-                    dimension.dimension_type.value,
-                    registration.version,
-                    dimension.name,
-                )
+            logger.info(
+                "Registered dimension id=%s type=%s version=%s name=%s",
+                dimension.dimension_id,
+                dimension.dimension_type.value,
+                registration.version,
+                dimension.name,
+            )
 
         # sync with remote registery
-        if not self._dry_run_mode:
-            if not self._offline_mode:
-                DimensionRegistry.sync_push(self._path)
-            logger.info(
-                "%sRegistered %s dimensions with version=%s",
-                self.log_offline_message,
-                len(config.model.dimensions),
-                registration.version,
-            )
+        if not self._offline_mode:
+            DimensionRegistry.sync_push(self._path)
+        logger.info(
+            "%sRegistered %s dimensions with version=%s",
+            log_offline_mode_prefix(self._offline_mode),
+            len(config.model.dimensions),
+            registration.version,
+        )
+
+        return None
 
     def show(self, dimension_type=None, submitter=None):
         # TODO: filter by type and submitter

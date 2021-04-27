@@ -47,28 +47,9 @@ class DimensionConfigModel(DSGBaseModel):
     def check_names(cls, values: dict) -> dict:
         """Validate dimension names are unique across all dimensions and descriptive"""
         check_uniqueness(
-            (x.name.lower().replace(" ", "-") for x in values),
+            [dim.name for dim in values],
             "dimension record name",
         )
-        # TODO: improve validation for alloweable dimension record names.
-        prohibited_names = [x.value.replace("_", "") for x in DimensionType] + [
-            "county",
-            "counties",
-            "year",
-            "hourly",
-            "comstock",
-            "resstock",
-            "tempo",
-            "model",
-            "source",
-            "dimension",
-        ]
-        prohibited_names = prohibited_names + [x + "s" for x in prohibited_names]
-        for x in values:
-            if x.name.lower().replace(" ", "-") in prohibited_names:
-                raise ValueError(
-                    f" Dimension name '{x.name}' is not descriptive enough for a dimension record name. Please be more descriptive in your naming. Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable, identifiable, and reusable for other datasets and projects. e.g., 'time-2012-est-houlry-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name."
-                )
         return values
 
     @validator("dimensions", pre=True, each_item=True, always=True)

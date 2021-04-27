@@ -11,7 +11,12 @@ from dsgrid.config.association_tables import AssociationTableModel
 from dsgrid.config.dimension_mapping_config import DimensionMappingConfig
 from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.data_models import serialize_model
-from dsgrid.registry.common import ConfigKey, make_initial_config_registration, ConfigKey
+from dsgrid.registry.common import (
+    ConfigKey,
+    make_initial_config_registration,
+    log_dry_run_mode_prefix,
+    log_offline_mode_prefix,
+)
 from dsgrid.utils.files import dump_data
 from .dimension_mapping_registry import DimensionMappingRegistry
 from .registry_base import RegistryBaseModel
@@ -115,6 +120,15 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         dest_config_filename = "dimension_mapping" + os.path.splitext(config_file)[1]
         config_dir = Path(os.path.dirname(config_file))
 
+        if self._dry_run_mode:
+            logger.info(
+                "%s%s dimension mapping(s) validated for registration with " "version=%s",
+                log_dry_run_mode_prefix(self._dry_run_mode),
+                len(config.model.mappings),
+                registration.version,
+            )
+            return None
+
         for mapping in config.model.mappings:
             registry_config = RegistryBaseModel(
                 version=registration.version,
@@ -122,49 +136,33 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 registration_history=[registration],
             )
 
-            if not self._dry_run_mode:
-                dest_dir = self._path / mapping.mapping_id / str(registration.version)
-                self._fs_intf.mkdir(dest_dir)
+            dest_dir = self._path / mapping.mapping_id / str(registration.version)
+            self._fs_intf.mkdir(dest_dir)
 
-                filename = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
-                data = serialize_model(registry_config)
-                # TODO: if we want to update AWS directly, this needs to change.
-                dump_data(data, filename)
+            filename = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
+            data = serialize_model(registry_config)
+            dump_data(data, filename)
 
-                # Leading directories from the original are not relevant in the registry.
-                dest_record_file = dest_dir / os.path.basename(mapping.filename)
-                self._fs_intf.copy_file(config_dir / mapping.filename, dest_record_file)
+            # Leading directories from the original are not relevant in the registry.
+            dest_record_file = dest_dir / os.path.basename(mapping.filename)
+            self._fs_intf.copy_file(config_dir / mapping.filename, dest_record_file)
 
-                model_data = serialize_model(mapping)
-                # We have to make this change in the serialized dict instead of
-                # model because Pydantic will fail the assignment due to not being
-                # able to find the path.
-                model_data["file"] = os.path.basename(mapping.filename)
-                dump_data(model_data, dest_dir / dest_config_filename)
+            model_data = serialize_model(mapping)
+            # We have to make this change in the serialized dict instead of
+            # model because Pydantic will fail the assignment due to not being
+            # able to find the path.
+            model_data["file"] = os.path.basename(mapping.filename)
+            dump_data(model_data, dest_dir / dest_config_filename)
 
-                if not self._offline_mode:
-                    DimensionMappingRegistry.sync_push(self._path)
+        if not self._offline_mode:
+            DimensionMappingRegistry.sync_push(self._path)
 
-                logger.info(
-                    "%sRegistered dimension mapping id=%s version=%s",
-                    self.log_offline_message,
-                    mapping.mapping_id,
-                    registration.version,
-                )
-
-        if not self._dry_run_mode:
-            logger.info(
-                "Registered %s dimension mapping(s) with version=%s",
-                len(config.model.mappings),
-                registration.version,
-            )
-        else:
-            logger.info(
-                "* DRY-RUN MODE * | %s dimension mapping(s) validated for registration with "
-                "version=%s",
-                len(config.model.mappings),
-                registration.version,
-            )
+        logger.info(
+            "%sRegistered dimension mapping id=%s version=%s",
+            log_offline_mode_prefix(self._offline_mode),
+            mapping.mapping_id,
+            registration.version,
+        )
 
     def show(self, submitter=None):
         # TODO: filter by submitter

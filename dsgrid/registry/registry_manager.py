@@ -30,6 +30,8 @@ from .common import (
     VersionUpdateType,
     ConfigRegistrationModel,
     ConfigKey,
+    log_dry_run_mode_prefix,
+    log_offline_mode_prefix,
 )
 from .dimension_mapping_registry import DimensionMappingRegistry
 from .dimension_mapping_registry_manager import DimensionMappingRegistryManager
@@ -179,24 +181,12 @@ class RegistryManager:
         ):
             if not fs_interface.exists(str(dir_name)):
                 fs_interface.mkdir(dir_name)
-        # NOTE: @dtom we actually want to make these dirs if they do not exist, esp. for now
-        # since syncing doesn't sync empty folders. Does this mean we should call create()?
-        # NOTE: if dimension type dirs do not exist, then we need to make them or else it fails.
-        # maybe we can find a better way around this.
         for dim_type in DimensionType:
             for dir_name in (path / DimensionRegistry.registry_path() / dim_type.value,):
                 if not fs_interface.exists(str(dir_name)):
                     fs_interface.mkdir(dir_name)
         logger.info(f"Loaded local registry at {path}")
         return cls(path, fs_interface, cloud_interface, offline_mode, dry_run_mode)
-
-    @property
-    def log_offline_message(self):
-        if self._offline_mode:
-            msg = "* OFFLINE MODE * | "
-        else:
-            msg = ""
-        return msg
 
     def list_datasets(self):
         """Return the datasets in the registry.
@@ -405,34 +395,38 @@ class RegistryManager:
         config_dir = self._get_project_directory(config.model.project_id)
         data_dir = config_dir / str(version)
 
+        if self._dry_run_mode:
+            logger.info(
+                "%sProject with version=%s validated for registration",
+                log_dry_run_mode_prefix(self._dry_run_mode),
+                config.model.project_id,
+                version,
+            )
+            return None
+
         # Serialize the registry file as well as the updated ProjectConfig to the registry.
         # TODO: Both the registry.toml and project.toml contain dataset status, which is
         # redundant. It needs to be in project.toml so that we can load older versions of a
         # project. It may be convenient to be in the registry.toml for quick searches but
         # should not be required.
-        if not self._dry_run_mode:
-            self._fs_intf.mkdir(data_dir)
-            registry_filename = config_dir / REGISTRY_FILENAME
-            dump_data(serialize_model(registry_model), registry_filename)
+        self._fs_intf.mkdir(data_dir)
+        registry_filename = config_dir / REGISTRY_FILENAME
+        dump_data(serialize_model(registry_model), registry_filename)
 
-            config_filename = data_dir / ("project" + os.path.splitext(config_file)[1])
-            dump_data(serialize_model(config.model), config_filename)
+        config_filename = data_dir / ("project" + os.path.splitext(config_file)[1])
+        dump_data(serialize_model(config.model), config_filename)
 
-            # sync with remote registry
-            if not self._offline_mode:
-                ProjectRegistry.sync_push(self._path)
-            logger.info(
-                "%sRegistered project %s with version=%s",
-                self.log_offline_message,
-                config.model.project_id,
-                version,
-            )
-        else:
-            logger.info(
-                "* DRY-RUN MODE * | Project with version=%s validated for registration",
-                config.model.project_id,
-                version,
-            )
+        # sync with remote registry
+        if not self._offline_mode:
+            ProjectRegistry.sync_push(self._path)
+
+        logger.info(
+            "%sRegistered project %s with version=%s",
+            log_offline_mode_prefix(self._offline_mode),
+            config.model.project_id,
+            version,
+        )
+        return None
 
         return version
 
@@ -499,8 +493,7 @@ class RegistryManager:
 
         if project_registry.has_dataset(config.model.dataset_id, DatasetRegistryStatus.REGISTERED):
             raise DSGDuplicateValueRegistered(
-                f"dataset={config.model.dataset_id} has already been submitted to "
-                "project={project_id}"
+                f"dataset={config.model.dataset_id} has already been submitted to project={project_id}"
             )
 
         project_config = self.load_project_config(project_id, registry=project_registry)
@@ -536,37 +529,67 @@ class RegistryManager:
         config_dir = self._get_dataset_directory(config.model.dataset_id)
         data_dir = config_dir / str(version)
 
-        if not self._dry_run_mode:
-            self._fs_intf.mkdir(data_dir)
-            filename = config_dir / REGISTRY_FILENAME
-            data = serialize_model(registry_config)
-            config_filename = "dataset" + os.path.splitext(config_file)[1]
-            dump_data(data, filename)
-            self._fs_intf.copy_file(config_file, data_dir / config_filename)
-            if not self._offline_mode:
-                ProjectRegistry.sync_push(self._path)
+        if self._dry_run_mode:
             logger.info(
-                "%sRegistered dataset %s with version=%s in project %s",
-                self.log_offline_message,
+                "%sDataset registration validated for dataset_id=%s with version=%s",
+                log_dry_run_mode_prefix(self._dry_run_mode),
+                config.model.dataset_id,
+                version,  # TODO what is the version of the dataset (not project)?
+            )
+            return None
+
+        self._fs_intf.mkdir(data_dir)
+        filename = config_dir / REGISTRY_FILENAME
+        data = serialize_model(registry_config)
+        config_filename = "dataset" + os.path.splitext(config_file)[1]
+        dump_data(data, filename)
+        self._fs_intf.copy_file(config_file, data_dir / config_filename)
+        if not self._offline_mode:
+            ProjectRegistry.sync_push(
+                self._path
+            )  # TODO: keeping this 1st sync because it will be needed when register and submit are split into two CLI calls
+        logger.info(
+            "%sRegistered dataset %s with version=%s in project %s",
+            log_offline_mode_prefix(self._offline_mode),
+            config.model.dataset_id,
+            version,  # TODO: is this the dataset version or the project version?
+            project_id,
+        )
+
+        if (
+            self._dry_run_mode
+        ):  # TODO: keeping this second dry_run_mode check for when splitting register and submit
+            logger.info(
+                "%s Dataset submission to project validated for dataset_id=%s (version=%s) and project_id=%s (version=%s)",
+                log_dry_run_mode_prefix(self._dry_run_mode),
                 config.model.dataset_id,
                 version,
                 project_id,
-            )
-
+                version,  # TODO: which is the version of project vs. dataset?
+            )  # TOOD: what is the dry run mode log message?
+            return None
         status = DatasetRegistryStatus.REGISTERED
         project_registry.set_dataset_status(config.model.dataset_id, status)
         filename = self._get_registry_filename(ProjectRegistry, project_id)
-        if not self._dry_run_mode:
-            project_registry.serialize(filename)
+        project_registry.serialize(filename)
 
         project_config.get_dataset(config.model.dataset_id).status = status
         project_file = self._get_project_config_file(
             project_config.model.project_id, project_registry.version
         )
-        if not self._dry_run_mode:
-            dump_data(serialize_model(project_config.model), project_file)
-            if not self._offline_mode:
-                ProjectRegistry.sync_push(self._path)  # TODO: two syncs in one function?
+        dump_data(serialize_model(project_config.model), project_file)
+
+        if not self._offline_mode:
+            ProjectRegistry.sync_push(self._path)
+
+        logger.info(
+            "%sSucessfully submitted dataset_id=%s (version=%s) to project_id=%s (version=%s)",
+            log_offline_mode_prefix(self._offline_mode),
+            config.model.dataset_id,
+            version,  # TODO: what is the dataset version vs. project version?
+            project_id,
+            version,
+        )
 
         self._dataset_ids.add(config.model.dataset_id)
 
@@ -619,25 +642,32 @@ class RegistryManager:
         if dataset_id not in self._dataset_ids:
             raise DSGValueNotRegistered(f"dataset_id={dataset_id}")
 
+        if self._dry_run_mode:
+            logger.info(
+                "%sRemoval of dataset_id=%s from registry validated",
+                log_dry_run_mode_prefix(self._dry_run_mode),
+                dataset_id,
+            )
+            return None
+
         self._fs_intf.rmtree(self._get_dataset_directory(dataset_id))
 
         for project_registry in self._project_registries.values():
             if project_registry.has_dataset(dataset_id, DatasetRegistryStatus.REGISTERED):
                 project_registry.set_dataset_status(dataset_id, DatasetRegistryStatus.UNREGISTERED)
-                if not self._dry_run_mode:
-                    project_registry.serialize(
-                        self._get_registry_filename(ProjectRegistry, project_registry.project_id)
-                    )
-        if not self._dry_run_mode:
-            if not self._offline_mode:
-                ProjectRegistry.sync_push(self._path)
-            logger.info("%sRemoved %s from the registry.", self.log_offline_message, dataset_id)
-        else:
-            logger.info(
-                "* DRY-RUN MODE * | Removal of dataset_id=%s from registry validated",
-                self.log_offline_message,
-                dataset_id,
-            )
+                project_registry.serialize(
+                    self._get_registry_filename(ProjectRegistry, project_registry.project_id)
+                )
+
+        if not self._offline_mode:
+            ProjectRegistry.sync_push(self._path)
+
+        logger.info(
+            "%sRemoved %s from the registry.",
+            log_offline_mode_prefix(self._offline_mode),
+            dataset_id,
+        )
+        return None
 
     def _get_registry_filename(self, registry_class, config_id):
         return self._path / registry_class.registry_path() / config_id / REGISTRY_FILENAME
@@ -711,43 +741,43 @@ class RegistryManager:
         config_dir = self._get_project_directory(config_id)
         data_dir = config_dir / str(registry_config.version)
 
-        if not self._dry_run_mode:
-            self._fs_intf.mkdir(data_dir)
+        if self._dry_run_mode:
+            logger.info(
+                "%sUpdate validated for %s %s with version=%s",
+                log_dry_run_mode_prefix(self._dry_run_mode),
+                registry_type.value,
+                config_id,
+                registry_config.version,
+            )
+            return None
 
+        self._fs_intf.mkdir(data_dir)
+
+        if registry_type == RegistryType.DATASET:
+            config_file_name = "dataset"
+        elif registry_type == RegistryType.PROJECT:
+            config_file_name = "project"
+        config_file_name = config_file_name + os.path.splitext(config_file)[1]
+
+        dump_data(serialize_model(registry_config), filename)
+        self._fs_intf.copy_file(config_file, data_dir / config_file_name)
+        dimensions_dir = Path(os.path.dirname(config_file)) / "dimensions"
+        # copy new dimensions, to be removed with dimension id mapping
+        self._fs_intf.copy_tree(dimensions_dir, data_dir / "dimensions")
+
+        if not self._offline_mode:
             if registry_type == RegistryType.DATASET:
-                config_file_name = "dataset"
+                DatasetRegistry.sync_push(self._path)
             elif registry_type == RegistryType.PROJECT:
-                config_file_name = "project"
-            config_file_name = config_file_name + os.path.splitext(config_file)[1]
-
-            dump_data(serialize_model(registry_config), filename)
-            self._fs_intf.copy_file(config_file, data_dir / config_file_name)
-            dimensions_dir = Path(os.path.dirname(config_file)) / "dimensions"
-            # copy new dimensions, to be removed with dimension id mapping
-            self._fs_intf.copy_tree(dimensions_dir, data_dir / "dimensions")
-
-            # **************************
-            # TODO: Add SYNC HERE
-            # **************************
-            if not self._offline_mode:
-                if registry_type == RegistryType.DATASET:
-                    DatasetRegistry.sync_push(self._path)
-                elif registry_type == RegistryType.PROJECT:
-                    ProjectRegistry.sync_push(self._path)
-            logger.info(
-                "%sUpdated %s %s with version=%s",
-                self.log_offline_message,
-                registry_type.value,
-                config_id,
-                registry_config.version,
-            )
-        else:
-            logger.info(
-                "* DRY-RUN MODE * | Update validated for %s %s with version=%s",
-                registry_type.value,
-                config_id,
-                registry_config.version,
-            )
+                ProjectRegistry.sync_push(self._path)
+        logger.info(
+            "%sUpdated %s %s with version=%s",
+            log_offline_mode_prefix(self._offline_mode),
+            registry_type.value,
+            config_id,
+            registry_config.version,
+        )
+        return None
 
 
 def get_registry_path(registry_path=None):

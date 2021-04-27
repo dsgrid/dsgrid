@@ -1,10 +1,13 @@
 """Implementation for local filesytem"""
 
+import logging
 import os
 import shutil
 from pathlib import Path
 
 from dsgrid.filesytem.filesystem_interface import FilesystemInterface
+
+logger = logging.getLogger(__name__)
 
 
 class LocalFilesystem(FilesystemInterface):
@@ -42,8 +45,9 @@ class LocalFilesystem(FilesystemInterface):
                     self.rm_tree(path)
                 else:
                     os.removedirs(path)
-            if os.path.isfile(path):
+            elif os.path.isfile(path):
                 os.remove(path)
+        logger.warning("path %s does not exist", path)
 
 
 class LocalRegistryFilesystem(LocalFilesystem):

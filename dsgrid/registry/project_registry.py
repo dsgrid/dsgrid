@@ -9,13 +9,14 @@ from pydantic import validator
 from semver import VersionInfo
 
 from .registry_base import RegistryBaseModel, RegistryBase
-from dsgrid.data_models import DSGBaseModel, serialize_model
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import (
     DatasetRegistryStatus,
     ProjectRegistryStatus,
 )
-from dsgrid.utils.versioning import make_version, handle_version_or_str
-
+from dsgrid.utils.versioning import make_version
+from dsgrid.filesytem.factory import make_filesystem_interface
+from dsgrid.common import REMOTE_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,12 @@ class ProjectRegistryModel(RegistryBaseModel):
 class ProjectRegistry(RegistryBase):
     """Controls a project registry."""
 
-    PROJECT_REGISTRY_PATH = Path("projects")
+    PROJECT_REGISTRY_PATH = Path("configs/projects")
+    PROJECT_REGISTRY_REMOTE_PATH = f"{REMOTE_REGISTRY}/{PROJECT_REGISTRY_PATH}/"
+
+    @staticmethod
+    def cloud_interface(self):
+        return make_filesystem_interface(ProjectRegistry.PROJECT_REGISTRY_REMOTE_PATH)
 
     @staticmethod
     def config_filename():
@@ -93,6 +99,24 @@ class ProjectRegistry(RegistryBase):
     @staticmethod
     def registry_path():
         return ProjectRegistry.PROJECT_REGISTRY_PATH
+
+    @staticmethod
+    def registry_remote_path():
+        return ProjectRegistry.PROJECT_REGISTRY_REMOTE_PATH
+
+    @staticmethod
+    def sync_push(local_registry_path):
+        ProjectRegistry.cloud_interface.sync_push(
+            local_registry=local_registry_path / ProjectRegistry.registry_path(),
+            remote_registry=ProjectRegistry.registry_remote_path(),
+        )
+
+    @staticmethod
+    def sync_pull(local_registry_path):
+        ProjectRegistry.cloud_interface.sync_pull(
+            ProjectRegistry.registry_remote_path(),
+            local_registry=local_registry_path / ProjectRegistry.registry_path(),
+        )
 
     def has_dataset(self, dataset_id, status):
         """Return True if the dataset_id is stored with status."""

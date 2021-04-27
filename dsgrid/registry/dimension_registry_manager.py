@@ -188,7 +188,6 @@ class DimensionRegistryManager(RegistryManagerBase):
 
             registry_file = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
             data = serialize_model(registry_model)
-            # TODO: if we want to update AWS directly, this needs to change.
             dump_data(data, registry_file)
 
             model_data = serialize_dimension_model(dimension)

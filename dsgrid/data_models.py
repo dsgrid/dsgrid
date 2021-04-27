@@ -32,7 +32,7 @@ class DSGBaseModel(BaseModel):
         filename : str
 
         """
-        base_dir = os.path.dirname(filename)
+        base_dir = os.path.dirname(str(filename))
         orig = os.getcwd()
         os.chdir(base_dir)
         try:

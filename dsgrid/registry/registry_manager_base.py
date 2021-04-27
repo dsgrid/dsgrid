@@ -38,7 +38,9 @@ class RegistryManagerBase(abc.ABC):
             self._registry_configs[config_id] = registry
 
     @classmethod
-    def load(cls, path, fs_interface, *args, **kwargs):
+    def load(
+        cls, path, fs_interface, cloud_interface, offline_mode, dry_run_mode, *args, **kwargs
+    ):
         """Load the registry manager.
 
         path : str

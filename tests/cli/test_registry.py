@@ -61,12 +61,12 @@ def test_register_project_and_dataset(test_data_dir):
             test_data_dir / "dimension.toml",
             test_data_dir / dataset_dir / "dimension.toml",
         ):
-            cmd = f"dsgrid registry --path={path} dimensions register {dim_config_file} -l log"
+            cmd = f"dsgrid registry --path={path} --offline dimensions register {dim_config_file} -l log"
             check_run_command(cmd)
             # Can't register duplicates.
             assert run_command(cmd) != 0
 
-        cmd = f"dsgrid registry --path={path} dimension-mappings register {dimension_mapping_config} -l log"
+        cmd = f"dsgrid registry --path={path} --offline dimension-mappings register {dimension_mapping_config} -l log"
         check_run_command(cmd)
         # Can't register duplicates.
         assert run_command(cmd) != 0
@@ -79,16 +79,16 @@ def test_register_project_and_dataset(test_data_dir):
         replace_dimension_uuids_from_registry(path, (project_config, dataset_config))
 
         check_run_command(
-            f"dsgrid registry --path={path} datasets register {dataset_config} -l log"
+            f"dsgrid registry --path={path} --offline datasets register {dataset_config} -l log"
         )
         check_run_command(
-            f"dsgrid registry --path={path} projects register {project_config} -l log"
+            f"dsgrid registry --path={path} --offline projects register {project_config} -l log"
         )
         check_run_command(
-            f"dsgrid registry --path={path} projects submit-dataset -d comstock -p test -l log"
+            f"dsgrid registry --path={path} --offline projects submit-dataset -d comstock -p test -l log"
         )
         output = {}
-        check_run_command(f"dsgrid registry --path={path} list", output)
+        check_run_command(f"dsgrid registry --path={path} --offline list", output)
         regex_project = re.compile(r"test.*1\.0\.0")
         regex_dataset = re.compile(r"comstock.*1\.0\.0")
         assert regex_project.search(output["stdout"]) is not None

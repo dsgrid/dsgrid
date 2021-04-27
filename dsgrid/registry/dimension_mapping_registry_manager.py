@@ -127,7 +127,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
             registry_file = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
             data = serialize_model(registry_model)
-            # TODO: if we want to update AWS directly, this needs to change.
             dump_data(data, registry_file)
 
             # Leading directories from the original are not relevant in the registry.
@@ -146,6 +145,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 registration.version,
             )
             self._update_registry_cache(mapping.mapping_id, registry_model)
+
+        if not self._offline_mode:
+            DimensionMappingRegistry.sync_push(self._path)
 
         logger.info(
             "Registered %s dimension mapping(s) with version=%s",

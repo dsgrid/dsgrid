@@ -85,7 +85,9 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         if self.dry_run_mode:
             logger.info(
-                "Dataset registration validated for dataset_id=%s", config.model.dataset_id
+                "%s Dataset registration validated for dataset_id=%s",
+                self._log_dry_run_mode_prefix(),
+                config.model.dataset_id,
             )
             return
 

@@ -176,7 +176,8 @@ class DimensionRegistryManager(RegistryManagerBase):
         if self.dry_run_mode:
             for dimension in config.model.dimensions:
                 logger.info(
-                    "Dimension validated for registration: type=%s name=%s",
+                    "%s Dimension validated for registration: type=%s name=%s",
+                    self._log_dry_run_mode_prefix(),
                     dimension.dimension_type.value,
                     dimension.name,
                 )

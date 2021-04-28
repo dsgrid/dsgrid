@@ -119,7 +119,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         if self.dry_run_mode:
             for mapping in config.model.mappings:
                 logger.info(
-                    "Dimension mapping validated for registration: from=%s to=%s",
+                    "%s Dimension mapping validated for registration: from=%s to=%s",
+                    self._log_dry_run_mode_prefix(),
                     mapping.from_type.value,
                     mapping.to_type.value,
                 )

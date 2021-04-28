@@ -162,6 +162,9 @@ class RegistryManagerBase(abc.ABC):
         if config_id not in self._registry_configs:
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
 
+    def _log_dry_run_mode_prefix(self):
+        return "* DRY RUN MODE * |" if self.dry_run_mode else ""
+
     def _log_offline_mode_prefix(self):
         return "* OFFLINE MODE * |" if self.offline_mode else ""
 

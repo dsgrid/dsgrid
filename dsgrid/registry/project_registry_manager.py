@@ -111,7 +111,8 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         if self.dry_run_mode:
             logger.info(
-                "Project validated for registration project_id=%s",
+                "%s Project validated for registration project_id=%s",
+                self._log_dry_run_mode_prefix(),
                 config.model.project_id,
             )
             return
@@ -210,7 +211,8 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         if self.dry_run_mode:
             logger.info(
-                "Dataset submission to project validated dataset_id=%s project_id=%s",
+                "%s Dataset submission to project validated dataset_id=%s project_id=%s",
+                self._log_dry_run_mode_prefix(),
                 dataset_id,
                 project_id,
             )

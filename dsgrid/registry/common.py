@@ -16,7 +16,7 @@ from dsgrid.utils.versioning import make_version
 
 
 REGISTRY_LOG_FILE = "dsgrid_registry.log"
-REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w\s-]+$")
+REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
 
 
 class RegistryType(Enum):
@@ -64,6 +64,8 @@ class VersionUpdateType(Enum):
 ConfigKey = namedtuple("ConfigKey", ["id", "version"])
 DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 
+# Convenience container to be shared among the registry managers.
+# Obviates the need to pass parameters to many constructors.
 RegistryManagerParams = namedtuple(
     "RegistryManagerParams",
     ["base_path", "remote_path", "fs_interface", "cloud_interface", "offline", "dry_run"],

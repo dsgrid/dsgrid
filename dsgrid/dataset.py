@@ -21,6 +21,9 @@ class Dataset:
         self._load_data_lookup = load_data_lookup  # DataFrame of dimension elements
         self._load_data = data  # DataFrame containing load data
         self._id = config.model.dataset_id
+        # Can't use dashes in view names. This will need to be handled when we implement
+        # queries based on dataset ID.
+        self._id_for_views = config.model.dataset_id.replace("-", "_")
         # TODO: do we need a DimensionStore here?
 
     @classmethod
@@ -45,12 +48,10 @@ class Dataset:
         return dataset
 
     def _make_view_name(self, name):
-        _id = self._id.replace("-", "_")
-        return f"{_id}__{name}"
+        return f"{self._id_for_views}__{name}"
 
     def _make_view_names(self):
-        _id = self._id.replace("-", "_")
-        return (f"{_id}__{name}" for name in self.VIEW_NAMES)
+        return (f"{self._id_for_views}__{name}" for name in self.VIEW_NAMES)
 
     def create_views(self):
         """Create views for each of the tables in this dataset."""

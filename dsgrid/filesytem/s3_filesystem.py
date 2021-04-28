@@ -159,6 +159,7 @@ class S3Filesystem(CloudFilesystemInterface):
         include_data : bool, optional
             Flag to include data dir, by default False
         """
+        assert False, "temporarily disabled"
         s3_filesystem = S3Filesystem(REMOTE_REGISTRY)
         local_interface = LocalRegistryFilesystem(local_registry)
         local_contents = local_interface.listdir()
@@ -188,6 +189,7 @@ class S3Filesystem(CloudFilesystemInterface):
         include_data : bool, optional
             Flag to include data directory, by default False
         """
+        assert False, "temporarily disabled"
         # TODO: Must fail if lock files exist.
         # TODO: Prevent pushing hidden/unwanted files (e.g., .DS_STORE)
         s3_path = S3Filesystem(REMOTE_REGISTRY).path

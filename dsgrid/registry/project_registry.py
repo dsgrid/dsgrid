@@ -82,11 +82,6 @@ class ProjectRegistry(RegistryBase):
     """Controls a project registry."""
 
     PROJECT_REGISTRY_PATH = Path("configs/projects")
-    PROJECT_REGISTRY_REMOTE_PATH = f"{REMOTE_REGISTRY}/{PROJECT_REGISTRY_PATH}/"
-
-    @staticmethod
-    def cloud_interface(self):
-        return make_filesystem_interface(ProjectRegistry.PROJECT_REGISTRY_REMOTE_PATH)
 
     @staticmethod
     def config_filename():
@@ -99,24 +94,6 @@ class ProjectRegistry(RegistryBase):
     @staticmethod
     def registry_path():
         return ProjectRegistry.PROJECT_REGISTRY_PATH
-
-    @staticmethod
-    def registry_remote_path():
-        return ProjectRegistry.PROJECT_REGISTRY_REMOTE_PATH
-
-    @staticmethod
-    def sync_push(local_registry_path):
-        ProjectRegistry.cloud_interface.sync_push(
-            local_registry=local_registry_path / ProjectRegistry.registry_path(),
-            remote_registry=ProjectRegistry.registry_remote_path(),
-        )
-
-    @staticmethod
-    def sync_pull(local_registry_path):
-        ProjectRegistry.cloud_interface.sync_pull(
-            ProjectRegistry.registry_remote_path(),
-            local_registry=local_registry_path / ProjectRegistry.registry_path(),
-        )
 
     def has_dataset(self, dataset_id, status):
         """Return True if the dataset_id is stored with status."""

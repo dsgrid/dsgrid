@@ -28,7 +28,7 @@ class Project:
         self._datasets = {}
 
     @classmethod
-    def load(cls, project_id, registry_path=None, version=None):
+    def load(cls, project_id, registry_path=None, version=None, offline_mode=False):
         """Load a project from the registry.
 
         Parameters
@@ -37,6 +37,8 @@ class Project:
         registry_path : str | None
         version : str | None
             Use the latest if not specified.
+        offline_mode : bool
+            If True, don't sync with remote registry
 
         """
         spark = SparkSession.getActiveSession()
@@ -44,7 +46,7 @@ class Project:
             spark = init_spark("project")
 
         registry_path = get_registry_path(registry_path=registry_path)
-        manager = RegistryManager.load(registry_path)
+        manager = RegistryManager.load(registry_path, offline_mode=offline_mode)
         dataset_manager = manager.dataset_manager
         project_manager = manager.project_manager
         registry = project_manager.get_registry_config(project_id)

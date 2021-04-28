@@ -16,7 +16,7 @@ def replace_dimension_mapping_uuids_from_registry(registry_dir, filenames):
 
 def read_dimension_mapping_uuid_mapping(registry_dir):
     fs_intf = LocalFilesystem()
-    dir_name = Path(registry_dir)
+    dir_name = Path(registry_dir) / "configs"
     mappings = {}
     regex = re.compile(
         r"(?P<from_dimension>[-\w]+)__(?P<to_dimension>[-\w]+)__(?P<uuid>[-0-9a-f]+)$"
@@ -61,7 +61,7 @@ def replace_dimension_uuids_from_registry(registry_dir, filenames):
 
 def read_dimension_uuid_mapping(registry_dir):
     fs_intf = LocalFilesystem()
-    dir_name = Path(registry_dir)
+    dir_name = Path(registry_dir) / "configs"
     mappings = {}
     regex = re.compile(r"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)$")
     dim_base_path = dir_name / "dimensions"

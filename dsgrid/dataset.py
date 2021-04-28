@@ -45,10 +45,12 @@ class Dataset:
         return dataset
 
     def _make_view_name(self, name):
-        return f"{self._id}__{name}"
+        _id = self._id.replace("-", "_")
+        return f"{_id}__{name}"
 
     def _make_view_names(self):
-        return (f"{self._id}__{name}" for name in self.VIEW_NAMES)
+        _id = self._id.replace("-", "_")
+        return (f"{_id}__{name}" for name in self.VIEW_NAMES)
 
     def create_views(self):
         """Create views for each of the tables in this dataset."""

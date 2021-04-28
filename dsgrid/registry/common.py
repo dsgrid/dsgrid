@@ -16,6 +16,7 @@ from dsgrid.utils.versioning import make_version
 
 
 REGISTRY_LOG_FILE = "dsgrid_registry.log"
+REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w-]+$")
 
 
 class RegistryType(Enum):
@@ -62,6 +63,11 @@ class VersionUpdateType(Enum):
 # dataset have the same dimension.
 ConfigKey = namedtuple("ConfigKey", ["id", "version"])
 DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
+
+RegistryManagerParams = namedtuple(
+    "RegistryManagerParams",
+    ["base_path", "remote_path", "fs_interface", "cloud_interface", "offline", "dry_run"],
+)
 
 
 class ConfigRegistrationModel(DSGBaseModel):
@@ -185,43 +191,3 @@ def make_registry_id(fields, delimiter="__"):
 #        serialize_registry(t, make_filename_from_version(id_handle, t["version"]))
 #
 #    return version
-
-
-def log_offline_mode_prefix(offline_mode):
-    """Returns log message prefix for offline mode registry operations
-
-    Parameters
-    ----------
-    offline_mode : bool
-        Boolean flag for offline mode
-
-    Returns
-    -------
-    str
-        Offline mode log message prefix
-    """
-    if offline_mode:
-        msg = "* OFFLINE MODE * | "
-    else:
-        msg = ""
-    return msg
-
-
-def log_dry_run_mode_prefix(dry_run_mode):
-    """Returns log message prefix for dry-run mode registry operations
-
-    Parameters
-    ----------
-    dry_run_mode : bool
-        Boolean flag for dry-run mode
-
-    Returns
-    -------
-    str
-        Dry-run mode log message prefix
-    """
-    if dry_run_mode:
-        msg = "* DRY-RUN MODE * | "
-    else:
-        msg = ""
-    return msg

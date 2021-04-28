@@ -7,13 +7,11 @@ from pathlib import Path
 from prettytable import PrettyTable
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.association_tables import AssociationTableModel
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.data_models import serialize_model
 from dsgrid.registry.common import (
-    ConfigKey,
     make_initial_config_registration,
     ConfigKey,
     DatasetRegistryStatus,
@@ -36,8 +34,8 @@ logger = logging.getLogger(__name__)
 class ProjectRegistryManager(RegistryManagerBase):
     """Manages registered dimension projects."""
 
-    def __init__(self, path, fs_interface):
-        super().__init__(path, fs_interface)
+    def __init__(self, path, params):
+        super().__init__(path, params)
         self._projects = {}  # ConfigKey to ProjectModel
         self._dataset_mgr = None
         self._dimension_mgr = None
@@ -110,6 +108,14 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._check_if_already_registered(config.model.project_id)
 
         registration = make_initial_config_registration(submitter, log_message)
+
+        if self.dry_run_mode:
+            logger.info(
+                "Project validated for registration project_id=%s",
+                config.model.project_id,
+            )
+            return
+
         dataset_registries = []
         for dataset in config.iter_datasets():
             status = DatasetRegistryStatus.UNREGISTERED
@@ -128,26 +134,32 @@ class ProjectRegistryManager(RegistryManagerBase):
             dataset_registries=dataset_registries,
             registration_history=[registration],
         )
-        config_dir = self.get_config_directory(config.model.project_id)
-        data_dir = config_dir / str(registration.version)
+        registry_dir = self.get_registry_directory(config.model.project_id)
+        data_dir = registry_dir / str(registration.version)
 
         # Serialize the registry file as well as the updated ProjectConfig to the registry.
         # TODO: Both the registry.toml and project.toml contain dataset status, which is
         # redundant. It needs to be in project.toml so that we can load older versions of a
         # project. It may be convenient to be in the registry.toml for quick searches but
         # should not be required.
-        self._fs_intf.mkdir(data_dir)
-        registry_filename = config_dir / REGISTRY_FILENAME
+        self.fs_interface.mkdir(data_dir)
+        registry_filename = registry_dir / REGISTRY_FILENAME
         dump_data(serialize_model(registry_model), registry_filename)
 
         config_filename = data_dir / ("project" + os.path.splitext(config_file)[1])
         dump_data(serialize_model(config.model), config_filename)
 
         self._update_registry_cache(config.model.project_id, registry_model)
+
+        if not self.offline_mode:
+            self.cloud_interface.sync_push(registry_dir)
+
         logger.info(
-            "Registered project %s with version=%s", config.model.project_id, registration.version
+            "%s Registered project %s with version=%s",
+            self._log_offline_mode_prefix(),
+            config.model.project_id,
+            registration.version,
         )
-        return registration.version
 
     def submit_dataset(
         self, project_id, dataset_id, dimension_mapping_files, submitter, log_message
@@ -196,6 +208,14 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
 
+        if self.dry_run_mode:
+            logger.info(
+                "Dataset submission to project validated dataset_id=%s project_id=%s",
+                dataset_id,
+                project_id,
+            )
+            return
+
         # The dataset status is recorded in both project registry and config files.
         status = DatasetRegistryStatus.REGISTERED
         registry.set_dataset_status(dataset_id, status)
@@ -203,11 +223,15 @@ class ProjectRegistryManager(RegistryManagerBase):
         registry.serialize(filename)
 
         project_config.get_dataset(dataset_id).status = status
-        project_file = self.get_config_file(project_config.model.project_id, registry.version)
+        project_file = self.get_config_file(project_id, registry.version)
         dump_data(serialize_model(project_config.model), project_file)
 
+        if not self.offline_mode:
+            self.cloud_interface.sync_push(self.get_registry_directory(project_id))
+
         logger.info(
-            "Registered dataset %s with version=%s in project %s",
+            "%s Registered dataset %s with version=%s in project %s",
+            self._log_offline_mode_prefix(),
             dataset_id,
             registry.version,
             project_id,
@@ -216,11 +240,14 @@ class ProjectRegistryManager(RegistryManagerBase):
         # TODO: update project with new version
 
     def update(self, config_file, submitter, update_type, log_message):
+        assert False, "Updating a project is not currently supported"
+        # Commented-out code from registry_manager.py needs to be ported here and tested.
         config = ProjectConfig.load(config_file)
         self._check_if_not_registered(config.model.project_id)
 
         registry_file = self.get_registry_file(config.model.project_id)
         registry_config = ProjectRegistryModel(**load_data(registry_file))
+
         self._update_config(
             config.model.project_id,
             registry_config,

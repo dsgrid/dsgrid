@@ -8,26 +8,26 @@ from dsgrid.exceptions import DSGValueNotRegistered
 
 
 def test_project_load():
-    project = Project.load("test")
+    project = Project.load("test", offline_mode=True)
     assert isinstance(project, Project)
-    project = Project.load("test", version="1.0.0")
+    project = Project.load("test", version="1.0.0", offline_mode=True)
     assert isinstance(project, Project)
     with pytest.raises(DSGValueNotRegistered):
-        project = Project.load("test", version="0.0.0")
+        project = Project.load("test", version="0.0.0", offline_mode=True)
         assert isinstance(project, Project)
 
 
 def test_dataset_load():
-    project = Project.load("test")
+    project = Project.load("test", offline_mode=True)
     dataset_id = "efs-comstock"
     project.load_dataset(dataset_id)
     dataset = project.get_dataset(dataset_id)
     assert isinstance(dataset, Dataset)
     spark = SparkSession.getActiveSession()
-    data = spark.sql("select * from efs-comstock__load_data")
+    data = spark.sql("select * from efs-comstock__load_data".replace("-", "_"))
     assert "timestamp" in data.columns
     assert "fans" in data.columns
-    lookup = spark.sql("select * from efs-comstock__load_data_lookup")
+    lookup = spark.sql("select * from efs-comstock__load_data_lookup".replace("-", "_"))
     assert "subsector" in lookup.columns
     assert "data_id" in lookup.columns
 

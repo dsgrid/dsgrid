@@ -37,7 +37,7 @@ class DimensionMappingConfig(ConfigBase):
 
     def assign_ids(self):
         """Assign unique IDs to each mapping in the config"""
-        for table in self.model.mappings:
-            from_type = table.from_dimension.dimension_type
-            to_type = table.to_dimension.dimension_type
-            table.mapping_id = make_registry_id((from_type.value, to_type.value))
+        for mapping in self.model.mappings:
+            from_type = mapping.from_dimension.dimension_type
+            to_type = mapping.to_dimension.dimension_type
+            mapping.mapping_id = make_registry_id((from_type.value, to_type.value))

@@ -25,6 +25,10 @@ class DSGInvalidDimensionMapping(DSGBaseException):
     """Raised if a mapping is not stored or is invalid."""
 
 
+class DSGInvalidOperation(DSGBaseException):
+    """Raised if a requested user operation is invalid."""
+
+
 class DSGRuntimeError(DSGBaseException):
     """Raised if there was a generic runtime error."""
 

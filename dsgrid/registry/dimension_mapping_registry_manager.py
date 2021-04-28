@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 class DimensionMappingRegistryManager(RegistryManagerBase):
     """Manages registered dimension mappings."""
 
-    def __init__(self, path, fs_interface):
-        super().__init__(path, fs_interface)
+    def __init__(self, path, params):
+        super().__init__(path, params)
         self._mappings = {}  # ConfigKey to DimensionMappingModel
 
     @staticmethod
@@ -64,7 +64,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 logger.error("%s duplicates existing mapping ID %s", dup[0], dup[1])
             if not warn_only:
                 raise DSGDuplicateValueRegistered(
-                    f"duplicate dimension mapping records: {duplicates}"
+                    f"There are {len(duplicates)} duplicate dimension mapping records."
                 )
 
     def get_by_id(self, config_id, version=None):
@@ -116,6 +116,15 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         dest_config_filename = "dimension_mapping" + os.path.splitext(config_file)[1]
         config_dir = Path(os.path.dirname(config_file))
 
+        if self.dry_run_mode:
+            for mapping in config.model.mappings:
+                logger.info(
+                    "Dimension mapping validated for registration: from=%s to=%s",
+                    mapping.from_type.value,
+                    mapping.to_type.value,
+                )
+            return
+
         for mapping in config.model.mappings:
             registry_model = RegistryBaseModel(
                 version=registration.version,
@@ -123,7 +132,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 registration_history=[registration],
             )
             dest_dir = self._path / mapping.mapping_id / str(registration.version)
-            self._fs_intf.mkdir(dest_dir)
+            self.fs_interface.mkdir(dest_dir)
 
             registry_file = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
             data = serialize_model(registry_model)
@@ -131,7 +140,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
             # Leading directories from the original are not relevant in the registry.
             dest_record_file = dest_dir / os.path.basename(mapping.filename)
-            self._fs_intf.copy_file(config_dir / mapping.filename, dest_record_file)
+            self.fs_interface.copy_file(config_dir / mapping.filename, dest_record_file)
 
             model_data = serialize_model(mapping)
             # We have to make this change in the serialized dict instead of
@@ -140,17 +149,21 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             model_data["file"] = os.path.basename(mapping.filename)
             dump_data(model_data, dest_dir / dest_config_filename)
             logger.info(
-                "Registered dimension mapping id=%s version=%s",
+                "%s Registered dimension mapping id=%s version=%s",
+                self._log_offline_mode_prefix(),
                 mapping.mapping_id,
                 registration.version,
             )
             self._update_registry_cache(mapping.mapping_id, registry_model)
 
-        if not self._offline_mode:
-            DimensionMappingRegistry.sync_push(self._path)
+        if not self.offline_mode:
+            # Sync the entire dimension mapping registry path because it's probably cheaper
+            # than syncing each changed path individually.
+            self.cloud_interface.sync_push(self._path)
 
         logger.info(
-            "Registered %s dimension mapping(s) with version=%s",
+            "%s Registered %s dimension mapping(s) with version=%s",
+            self._log_offline_mode_prefix(),
             len(config.model.mappings),
             registration.version,
         )

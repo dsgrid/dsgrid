@@ -18,6 +18,7 @@ from dsgrid.dimension.time import (
     TimeFrequency,
     TimezoneType,
 )
+from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, load_data
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -65,6 +66,9 @@ class DimensionBaseModel(DSGBaseModel):
     def check_name(cls, name):
         if name == "":
             raise ValueError(f'Empty name field for dimension: "{cls}"')
+
+        if REGEX_VALID_REGISTRY_NAME.search(name) is None:
+            raise ValueError(f"dimension name={name} does not meet the requirements")
 
         # TODO: improve validation for alloweable dimension record names.
         prohibited_names = [x.value.replace("_", "") for x in DimensionType] + [

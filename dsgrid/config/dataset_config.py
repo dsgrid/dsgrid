@@ -110,9 +110,11 @@ class DatasetConfigModel(DSGBaseModel):
         if path.startswith("s3://"):
             # For unit test purposes this always uses the defaul local registry instead of
             # whatever the user created with RegistryManager.
-            local_path = LOCAL_REGISTRY_DATA / path.split("/")[-1]
-            # S3Filesystem.sync_data_pull(s3_data_path=path, local_data_path=LOCAL_REGISTRY_DATA+path.split('/)[-1])
-            logger.warning("skipping AWS sync")  # TODO DT
+            # TODO: Interpretation of this path is confusing. We need a better way.
+            # The path in the remote location should be verified but it does not need
+            # to be synced as part of this validation.
+            subpaths = path.split("/")
+            local_path = LOCAL_REGISTRY_DATA / subpaths[-2] / subpaths[-1]
         else:
             local_path = Path(path)
             if not local_path.exists():

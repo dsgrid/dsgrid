@@ -2,15 +2,19 @@
 
 import abc
 import logging
+import os.path
 from pathlib import Path
 
 from prettytable import PrettyTable
 
+from .common import RegistryManagerParams
 from .registry_base import RegistryBaseModel
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
-from dsgrid.filesytem.aws import AwsS3Bucket
-from dsgrid.filesytem.local_filesystem import LocalFilesystem
+from dsgrid.exceptions import (
+    DSGValueNotRegistered,
+    DSGDuplicateValueRegistered,
+    DSGInvalidOperation,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -19,37 +23,29 @@ logger = logging.getLogger(__name__)
 class RegistryManagerBase(abc.ABC):
     """Base class for all registry managers."""
 
-    def __init__(self, path, fs_interface):
-        if isinstance(fs_interface, AwsS3Bucket):
-            self._path = fs_interface.path
-        else:
-            assert isinstance(fs_interface, LocalFilesystem)
-            self._path = path
-
-        self._fs_intf = fs_interface
+    def __init__(self, path, params: RegistryManagerParams):
+        self._path = path
+        self._params = params
         self._registry_configs = {}  # ID to registry config
 
     def inventory(self):
-        for config_id in self._fs_intf.listdir(
+        for config_id in self.fs_interface.listdir(
             self._path, directories_only=True, exclude_hidden=True
         ):
-            id_path = Path(self._path) / config_id
-            registry = self.registry_class().load(id_path / REGISTRY_FILENAME)
+            registry = self.registry_class().load(self.get_registry_file(config_id))
             self._registry_configs[config_id] = registry
 
     @classmethod
-    def load(
-        cls, path, fs_interface, cloud_interface, offline_mode, dry_run_mode, *args, **kwargs
-    ):
+    def load(cls, path, params, *args, **kwargs):
         """Load the registry manager.
 
         path : str
-        fs_interface : FilesystemInterface
+        params : RegistryManagerParams
 
         RegistryManagerBase
 
         """
-        mgr = cls(path, fs_interface)
+        mgr = cls(path, params)
         mgr.inventory()
         return mgr
 
@@ -166,23 +162,51 @@ class RegistryManagerBase(abc.ABC):
         if config_id not in self._registry_configs:
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
 
+    def _log_offline_mode_prefix(self):
+        return "* OFFLINE MODE * |" if self.offline_mode else ""
+
     def _update_registry_cache(self, config_id, registry_model: RegistryBaseModel):
         assert config_id not in self._registry_configs, config_id
         self._registry_configs[config_id] = self.registry_class()(registry_model)
 
-    def get_config_directory(self, config_id):
+    def _raise_if_dry_run(self, operation):
+        if self.dry_run_mode:
+            raise DSGInvalidOperation(f"operation={operation} is not allowed in dry-run mode")
+
+    @property
+    def cloud_interface(self):
+        """Return the CloudStorageInterface to sync remote data."""
+        return self._params.cloud_interface
+
+    @property
+    def fs_interface(self):
+        """Return the FilesystemInterface to list directories and read/write files."""
+        return self._params.fs_interface
+
+    @property
+    def offline_mode(self):
+        """Return True if there is to be no syncing with the remote registry."""
+        return self._params.offline
+
+    @property
+    def dry_run_mode(self):
+        """Return True if no registry changes are to be made. Checking only."""
+        return self._params.dry_run
+
+    def get_config_directory(self, config_id, version):
         """Return the path to the config file.
 
         Parameters
         ----------
         config_id : str
+        version : VersionInfo
 
         Returns
         -------
         str
 
         """
-        return self._path / config_id
+        return self.get_registry_directory(config_id) / str(version)
 
     def get_config_file(self, config_id, version):
         """Return the path to the config file.
@@ -197,7 +221,9 @@ class RegistryManagerBase(abc.ABC):
         str
 
         """
-        return self._path / config_id / str(version) / self.registry_class().config_filename()
+        return (
+            self.get_config_directory(config_id, version) / self.registry_class().config_filename()
+        )
 
     def get_current_version(self, config_id):
         """Return the current version in the registry.
@@ -225,6 +251,20 @@ class RegistryManagerBase(abc.ABC):
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
         return self._registry_configs[config_id]
 
+    def get_registry_directory(self, config_id):
+        """Return the directory containing data for config_id (registry.toml and versions).
+
+        Parameters
+        ----------
+        config_id : str
+
+        Returns
+        -------
+        str
+
+        """
+        return self._path / config_id
+
     def get_registry_file(self, config_id):
         """Return the path to the registry file.
 
@@ -237,12 +277,7 @@ class RegistryManagerBase(abc.ABC):
         str
 
         """
-        return self._path / config_id / REGISTRY_FILENAME
-
-    @property
-    def fs_interface(self):
-        """Return the filesystem interface."""
-        return self._fs_intf
+        return self.get_registry_directory(config_id) / REGISTRY_FILENAME
 
     def has_id(self, config_id, version=None):
         """Return True if an item matching the parameters is stored.
@@ -260,7 +295,7 @@ class RegistryManagerBase(abc.ABC):
         """
         if version is None:
             return config_id in self._registry_configs
-        return self._fs_intf.exists(self._path / config_id / str(version))
+        return self.fs_interface.exists(self.get_config_directory(config_id, version))
 
     def iter_ids(self):
         """Return an iterator over the registered IDs."""
@@ -289,10 +324,9 @@ class RegistryManagerBase(abc.ABC):
             Raised if the project_id is not registered.
 
         """
-        if config_id not in self._registry_configs:
-            raise DSGValueNotRegistered(f"project_id={config_id}")
-
-        self._fs_intf.rmtree(self.get_config_directory(config_id))
+        self._raise_if_dry_run("remove")
+        self._check_if_not_registered(config_id)
+        self.fs_interface.rmtree(self.get_registry_directory(config_id))
         logger.info("Removed %s from the registry.", config_id)
 
     def show(self, **kwargs):
@@ -315,3 +349,26 @@ class RegistryManagerBase(abc.ABC):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
         print(table)
+
+    def sync_pull(self, path):
+        """Synchronizes files from the remote registry to local.
+        Deletes any files locally that do not exist on remote.
+
+        path : Path
+            Local path
+
+        """
+        relative_path = Path(path).relative_to(self._params.base_path)
+        remote_path = f"{self._params.remote_path}/{relative_path}"
+        self.cloud_interface.sync_pull(remote_path, path)
+
+    def sync_push(self, path):
+        """Synchronizes files from the local path to the remote registry.
+
+        path : Path
+            Local path
+
+        """
+        relative_path = Path(path).relative_to(self._params.base_path)
+        remote_path = f"{self._params.remote_path}/{relative_path}"
+        self.cloud_interface.sync_push(path, remote_path)

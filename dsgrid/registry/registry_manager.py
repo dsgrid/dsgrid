@@ -2,35 +2,18 @@
 
 import logging
 import os
-from datetime import datetime
 from pathlib import Path
 
-from semver import VersionInfo
-
 from dsgrid.common import (
-    PROJECT_FILENAME,
-    REGISTRY_FILENAME,
-    DATASET_FILENAME,
-    DIMENSION_FILENAME,
     LOCAL_REGISTRY,
-    S3_REGISTRY,
+    REMOTE_REGISTRY,
 )
-from dsgrid.data_models import serialize_model
-from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
-from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
-from dsgrid.filesytem.aws import AwsS3Bucket
+from dsgrid.cloud.factory import make_cloud_storage_interface
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.filesytem.factory import make_filesystem_interface
-from dsgrid.filesytem.local_filesystem import LocalFilesystem
 from .common import (
     RegistryType,
-    DatasetRegistryStatus,
-    ProjectRegistryStatus,
-    VersionUpdateType,
-    ConfigRegistrationModel,
-    ConfigKey,
-    make_initial_config_registration,
-    make_registry_id,
+    RegistryManagerParams,
 )
 from .dimension_mapping_registry import DimensionMappingRegistry
 from .dimension_mapping_registry_manager import DimensionMappingRegistryManager
@@ -40,7 +23,6 @@ from .dimension_registry import DimensionRegistry
 from .dimension_registry_manager import DimensionRegistryManager
 from .project_registry import ProjectRegistry
 from .project_registry_manager import ProjectRegistryManager
-from dsgrid.utils.files import dump_data, load_data
 
 
 logger = logging.getLogger(__name__)
@@ -55,28 +37,20 @@ class RegistryManager:
 
     """
 
-    def __init__(self, path, fs_interface):
-        if isinstance(fs_interface, AwsS3Bucket):
-            self._path = fs_interface.path
-        else:
-            assert isinstance(fs_interface, LocalFilesystem)
-            self._path = path
-
-        self._fs_intf = fs_interface
-        self._datasets = {}  # dataset_id to DatasetConfig. Loaded on demand.
-        self._dataset_registries = {}  # dataset_id to DatasetRegistry. Loaded on demand.
+    def __init__(self, params: RegistryManagerParams):
+        self._params = params
         self._dimension_mgr = DimensionRegistryManager.load(
-            Path(path) / DimensionRegistry.registry_path(), fs_interface
+            params.base_path / DimensionRegistry.registry_path(), params
         )
         self._dimension_mapping_dimension_mgr = DimensionMappingRegistryManager.load(
-            Path(path) / DimensionMappingRegistry.registry_path(), fs_interface
+            params.base_path / DimensionMappingRegistry.registry_path(), params
         )
         self._dataset_mgr = DatasetRegistryManager.load(
-            Path(path) / DatasetRegistry.registry_path(), fs_interface, self._dimension_mgr
+            params.base_path / DatasetRegistry.registry_path(), params, self._dimension_mgr
         )
         self._project_mgr = ProjectRegistryManager.load(
-            Path(path) / ProjectRegistry.registry_path(),
-            fs_interface,
+            params.base_path / ProjectRegistry.registry_path(),
+            params,
             self._dataset_mgr,
             self._dimension_mgr,
             self._dimension_mapping_dimension_mgr,
@@ -95,7 +69,6 @@ class RegistryManager:
         RegistryManager
 
         """
-        # TODO S3
         if str(path).startswith("s3"):
             raise Exception(f"s3 is not currently supported: {path}")
 
@@ -106,7 +79,11 @@ class RegistryManager:
         fs_interface.mkdir(path / DimensionRegistry.registry_path())
         fs_interface.mkdir(path / DimensionMappingRegistry.registry_path())
         logger.info("Created registry at %s", path)
-        return cls(path, fs_interface)
+        cloud_interface = make_cloud_storage_interface(path, "", offline=True)
+        params = RegistryManagerParams(
+            Path(path), REMOTE_REGISTRY, fs_interface, cloud_interface, offline=True, dry_run=False
+        )
+        return cls(params)
 
     @property
     def dataset_manager(self):
@@ -125,12 +102,16 @@ class RegistryManager:
         return self._project_mgr
 
     @classmethod
-    def load(cls, path):
+    def load(cls, path, offline_mode=False, dry_run_mode=False):
         """Loads a registry from the given path.
 
         Parameters
         ----------
         path : str
+        offline_mode : bool
+            Load registry in offline mode; default is False
+        dry_run_mode : bool
+            Test registry operations in dry-run "test" mode (i.e., do not commit changes to remote)
 
         Returns
         -------
@@ -141,6 +122,15 @@ class RegistryManager:
         if str(path).startswith("s3"):
             raise Exception(f"S3 is not yet supported: {path}")
         fs_interface = make_filesystem_interface(path)
+        cloud_interface = make_cloud_storage_interface(path, REMOTE_REGISTRY, offline=offline_mode)
+
+        if not offline_mode:
+            logger.info("Sync from remote registry.")
+            cloud_interface.sync_pull(REMOTE_REGISTRY, path)
+
+        params = RegistryManagerParams(
+            path, REMOTE_REGISTRY, fs_interface, cloud_interface, offline_mode, dry_run_mode
+        )
         path = Path(path)
         for dir_name in (
             path,
@@ -152,7 +142,22 @@ class RegistryManager:
             if not fs_interface.exists(str(dir_name)):
                 raise FileNotFoundError(f"{dir_name} does not exist")
 
-        return cls(path, fs_interface)
+        for dim_type in DimensionType:
+            dir_name = path / DimensionRegistry.registry_path() / dim_type.value
+            if not fs_interface.exists(str(dir_name)):
+                fs_interface.mkdir(dir_name)
+
+        logger.info(
+            f"Loaded local registry at %s offline_mode=%s dry_run_mode=%s",
+            path,
+            offline_mode,
+            dry_run_mode,
+        )
+        return cls(params)
+
+    @property
+    def path(self):
+        return self._params.base_path
 
     # TODO: currently unused but may be needed for project/dataset updates
     # def _update_config(

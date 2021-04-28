@@ -16,7 +16,7 @@ from dsgrid.utils.versioning import make_version
 
 
 REGISTRY_LOG_FILE = "dsgrid_registry.log"
-REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w-]+$")
+REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w\s-]+$")
 
 
 class RegistryType(Enum):

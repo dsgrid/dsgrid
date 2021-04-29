@@ -66,14 +66,15 @@ def test_register_project_and_dataset(test_data_dir):
         manager = RegistryManager.load(path, offline_mode=True)
         for dim_config_file in (
             test_data_dir / "dimensions.toml",
-            # TODO: we used to have two of these. What happened to the second?
-            # test_data_dir / dataset_dir / "dimensions.toml",
+            test_data_dir / dataset_dir / "dimensions.toml",
         ):
             dim_mgr = manager.dimension_manager
             dim_mgr.register(dim_config_file, user, log_message)
             assert dim_mgr.list_ids()
-            with pytest.raises(DSGDuplicateValueRegistered):
-                dim_mgr.register(dim_config_file, user, log_message)
+            if dim_config_file == test_data_dir / "dimensions.toml":
+                # The other one has time only - no records.
+                with pytest.raises(DSGDuplicateValueRegistered):
+                    dim_mgr.register(dim_config_file, user, log_message)
 
         # dim_mapping_mgr = manager.dimension_mapping_manager
         # dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
@@ -96,7 +97,7 @@ def test_register_project_and_dataset(test_data_dir):
 
         dataset_mgr = manager.dataset_manager
         dataset_mgr.register(dataset_config_file, user, log_message)
-        dataset_id = "efs-comstock"
+        dataset_id = "efs_comstock"
         assert dataset_mgr.list_ids() == [dataset_id]
         dataset_config = dataset_mgr.get_by_id(dataset_id)
 

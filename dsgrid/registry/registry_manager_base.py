@@ -42,6 +42,8 @@ class RegistryManagerBase(abc.ABC):
         path : str
         params : RegistryManagerParams
 
+        Returns
+        -------
         RegistryManagerBase
 
         """

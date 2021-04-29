@@ -160,7 +160,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         if not self.offline_mode:
             # Sync the entire dimension mapping registry path because it's probably cheaper
             # than syncing each changed path individually.
-            self.cloud_interface.sync_push(self._path)
+            self.sync_push(self._path)
 
         logger.info(
             "%s Registered %s dimension mapping(s) with version=%s",

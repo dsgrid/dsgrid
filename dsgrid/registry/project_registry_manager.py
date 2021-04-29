@@ -153,7 +153,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._update_registry_cache(config.model.project_id, registry_model)
 
         if not self.offline_mode:
-            self.cloud_interface.sync_push(registry_dir)
+            self.sync_push(registry_dir)
 
         logger.info(
             "%s Registered project %s with version=%s",
@@ -229,7 +229,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         dump_data(serialize_model(project_config.model), project_file)
 
         if not self.offline_mode:
-            self.cloud_interface.sync_push(self.get_registry_directory(project_id))
+            self.sync_push(self.get_registry_directory(project_id))
 
         logger.info(
             "%s Registered dataset %s with version=%s in project %s",

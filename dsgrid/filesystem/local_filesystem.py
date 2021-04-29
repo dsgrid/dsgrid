@@ -5,7 +5,7 @@ import os
 import shutil
 from pathlib import Path
 
-from dsgrid.filesytem.filesystem_interface import FilesystemInterface
+from dsgrid.filesystem.filesystem_interface import FilesystemInterface
 
 logger = logging.getLogger(__name__)
 

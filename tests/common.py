@@ -5,7 +5,7 @@ import os
 import re
 from pathlib import Path
 
-from dsgrid.filesytem.local_filesystem import LocalFilesystem
+from dsgrid.filesystem.local_filesystem import LocalFilesystem
 
 
 def replace_dimension_mapping_uuids_from_registry(registry_dir, filenames):

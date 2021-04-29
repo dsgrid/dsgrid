@@ -10,7 +10,7 @@ from dsgrid.common import (
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.filesytem.factory import make_filesystem_interface
+from dsgrid.filesystem.factory import make_filesystem_interface
 from .common import (
     RegistryType,
     RegistryManagerParams,
@@ -120,7 +120,7 @@ class RegistryManager:
         """
         # TODO S3
         if str(path).startswith("s3"):
-            raise Exception(f"S3 is not yet supported: {path}")
+            raise Exception(f"S3 is not yet supported as the base path: {path}")
         fs_interface = make_filesystem_interface(path)
         cloud_interface = make_cloud_storage_interface(path, REMOTE_REGISTRY, offline=offline_mode)
 

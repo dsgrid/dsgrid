@@ -61,12 +61,14 @@ def test_register_project_and_dataset(test_data_dir):
 
         for dim_config_file in (
             test_data_dir / "dimensions.toml",
-            # test_data_dir / dataset_dir / "dimension.toml",
+            test_data_dir / dataset_dir / "dimensions.toml",
         ):
             cmd = f"dsgrid registry --path={path} --offline dimensions register {dim_config_file} -l log"
             check_run_command(cmd)
             # Can't register duplicates.
-            # assert run_command(cmd) != 0
+            if dim_config_file == test_data_dir / "dimensions.toml":
+                # The other one has time only - no records.
+                assert run_command(cmd) != 0
 
         # cmd = f"dsgrid registry --path={path} --offline dimension-mappings register {dimension_mapping_config} -l log"
         # check_run_command(cmd)
@@ -87,11 +89,11 @@ def test_register_project_and_dataset(test_data_dir):
             f"dsgrid registry --path={path} --offline projects register {project_config} -l log"
         )
         check_run_command(
-            f"dsgrid registry --path={path} --offline projects submit-dataset -d efs-comstock -p test -l log"
+            f"dsgrid registry --path={path} --offline projects submit-dataset -d efs_comstock -p test -l log"
         )
         output = {}
         check_run_command(f"dsgrid registry --path={path} --offline list", output)
         regex_project = re.compile(r"test.*1\.0\.0")
-        regex_dataset = re.compile(r"efs-comstock.*1\.0\.0")
+        regex_dataset = re.compile(r"efs_comstock.*1\.0\.0")
         assert regex_project.search(output["stdout"]) is not None
         assert regex_dataset.search(output["stdout"]) is not None

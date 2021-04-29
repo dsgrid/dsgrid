@@ -15,7 +15,7 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
 )
 from dsgrid.utils.versioning import make_version
-from dsgrid.filesytem.factory import make_filesystem_interface
+from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.common import REMOTE_REGISTRY
 
 logger = logging.getLogger(__name__)

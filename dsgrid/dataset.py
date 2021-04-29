@@ -23,7 +23,6 @@ class Dataset:
         self._id = config.model.dataset_id
         # Can't use dashes in view names. This will need to be handled when we implement
         # queries based on dataset ID.
-        self._id_for_views = config.model.dataset_id.replace("-", "_")
         # TODO: do we need a DimensionStore here?
 
     @classmethod
@@ -48,10 +47,10 @@ class Dataset:
         return dataset
 
     def _make_view_name(self, name):
-        return f"{self._id_for_views}__{name}"
+        return f"{self._id}__{name}"
 
     def _make_view_names(self):
-        return (f"{self._id_for_views}__{name}" for name in self.VIEW_NAMES)
+        return (f"{self._id}__{name}" for name in self.VIEW_NAMES)
 
     def create_views(self):
         """Create views for each of the tables in this dataset."""

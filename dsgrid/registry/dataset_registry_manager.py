@@ -2,12 +2,8 @@
 
 import logging
 import os
-from pathlib import Path
-
-from prettytable import PrettyTable
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.association_tables import AssociationTableModel
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.data_models import serialize_model
@@ -101,10 +97,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         data_dir = registry_dir / str(registration.version)
 
         # Serialize the registry file as well as the updated DatasetConfig to the registry.
-        # TODO: Both the registry.toml and dataset.toml contain dataset status, which is
-        # redundant. It needs to be in dataset.toml so that we can load older versions of a
-        # dataset. It may be convenient to be in the registry.toml for quick searches but
-        # should not be required.
         self.fs_interface.mkdir(data_dir)
         registry_filename = registry_dir / REGISTRY_FILENAME
         dump_data(serialize_model(registry_model), registry_filename)
@@ -115,7 +107,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._update_registry_cache(config.model.dataset_id, registry_model)
 
         if not self.offline_mode:
-            self.cloud_interface.sync_push(registry_dir)
+            self.sync_push(registry_dir)
 
         logger.info(
             "%s Registered dataset %s with version=%s",

@@ -18,8 +18,11 @@ class DimensionRegistry(RegistryBase):
     DIMENSION_REGISTRY_REMOTE_PATH = f"{REMOTE_REGISTRY}/{DIMENSION_REGISTRY_PATH}/"
 
     @staticmethod
-    def cloud_interface(self):
-        return make_filesystem_interface(DimensionRegistry.DIMENSION_REGISTRY_REMOTE_PATH)
+    def cloud_interface():
+        cloud_interface = make_filesystem_interface(
+            DimensionRegistry.DIMENSION_REGISTRY_REMOTE_PATH
+        )
+        return cloud_interface
 
     @staticmethod
     def model_class():
@@ -35,14 +38,20 @@ class DimensionRegistry(RegistryBase):
 
     @staticmethod
     def sync_push(local_registry_path):
-        DimensionRegistry.cloud_interface.sync_push(
+        cloud_interface = make_filesystem_interface(
+            DimensionRegistry.DIMENSION_REGISTRY_REMOTE_PATH
+        )
+        cloud_interface.sync_push(
             local_registry=local_registry_path,
             remote_registry=DimensionRegistry.registry_remote_path(),
         )
 
     @staticmethod
     def sync_pull(local_registry_path):
-        DimensionRegistry.cloud_interface.sync_pull(
+        cloud_interface = make_filesystem_interface(
+            DimensionRegistry.DIMENSION_REGISTRY_REMOTE_PATH
+        )
+        cloud_interface.sync_pull(
             remote_registry=DimensionRegistry.registry_remote_path(),
             local_registry=local_registry_path,
         )

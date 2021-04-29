@@ -169,7 +169,7 @@ class S3Filesystem(CloudFilesystemInterface):
             local_contents = [
                 c
                 for c in local_contents
-                if not str(c).split(local_registry)[1].startswith("/data")
+                if not str(c).split(str(local_registry))[1].startswith("/data")
             ]
         for content in local_contents:
             relconent = os.path.relpath(content, local_interface.path)
@@ -196,7 +196,7 @@ class S3Filesystem(CloudFilesystemInterface):
         """
         # TODO: Must fail if lock files exist.
         # TODO: Prevent pushing hidden/unwanted files (e.g., .DS_STORE)
-        s3_path = S3Filesystem(REMOTE_REGISTRY).path
+        s3_path = S3Filesystem(remote_registry).path
         local_path = LocalRegistryFilesystem(local_registry).path
 
         S3Filesystem.sync(local_path, s3_path, include_data)

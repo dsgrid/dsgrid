@@ -110,7 +110,7 @@ class DatasetConfigModel(DSGBaseModel):
         if path.startswith("s3://"):
             # For unit test purposes this always uses the defaul local registry instead of
             # whatever the user created with RegistryManager.
-            local_path = LOCAL_REGISTRY_DATA / path.replace("s3://", "")
+            local_path = LOCAL_REGISTRY_DATA / path.replace("s3://nrel-dsgrid-registry/data/", "")
             # S3Filesystem.sync_data_pull(s3_data_path=path, local_data_path=LOCAL_REGISTRY_DATA+path.split('/)[-1])
             logger.warning("skipping AWS sync")  # TODO DT
         else:

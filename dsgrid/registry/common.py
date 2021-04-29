@@ -16,6 +16,25 @@ from dsgrid.utils.versioning import make_version
 
 
 REGISTRY_LOG_FILE = "dsgrid_registry.log"
+REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
+REGEX_VALID_REGISTRY_CONFIG_ID_1 = re.compile(r"^[\w-]+$")
+REGEX_VALID_REGISTRY_CONFIG_ID_2 = re.compile(r"^[\w]+$")
+
+
+def check_config_id_1(config_id, tag):
+    # Raises ValueError because this is used in Pydantic models.
+    if not REGEX_VALID_REGISTRY_CONFIG_ID_1.search(config_id):
+        raise ValueError(
+            f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, underscores, and dashes."
+        )
+
+
+def check_config_id_2(config_id, tag):
+    # Raises ValueError because this is used in Pydantic models.
+    if not REGEX_VALID_REGISTRY_CONFIG_ID_2.search(config_id):
+        raise ValueError(
+            f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, and underscores."
+        )
 
 
 class RegistryType(Enum):
@@ -62,6 +81,13 @@ class VersionUpdateType(Enum):
 # dataset have the same dimension.
 ConfigKey = namedtuple("ConfigKey", ["id", "version"])
 DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
+
+# Convenience container to be shared among the registry managers.
+# Obviates the need to pass parameters to many constructors.
+RegistryManagerParams = namedtuple(
+    "RegistryManagerParams",
+    ["base_path", "remote_path", "fs_interface", "cloud_interface", "offline", "dry_run"],
+)
 
 
 class ConfigRegistrationModel(DSGBaseModel):

@@ -22,12 +22,12 @@ from dsgrid.config.dimensions import TimeDimensionModel
 from dsgrid.dimension.base_models import (
     EndUseDimensionBaseModel,
     GeographyDimensionBaseModel,
-    ModelDimensionBaseModel,
+    DataSourceDimensionBaseModel,
     ModelYearDimensionBaseModel,
     ScenarioDimensionBaseModel,
     SectorDimensionBaseModel,
     SubSectorDimensionBaseModel,
-    WeatherDimensionBaseModel,
+    WeatherYearDimensionBaseModel,
 )
 
 BaseOrm = declarative_base()
@@ -37,14 +37,15 @@ enduse_model_association = Table(
     "enduse_model",
     BaseOrm.metadata,
     Column("enduse", String(255), ForeignKey("EndUse.id")),
-    Column("model", String(255), ForeignKey("Model.id")),
+    Column("data_source", String(255), ForeignKey("DataSource.id")),
 )
+# FIXME: @dtom should this be data_source or datasource? Repeat fix.
 
 
 model_subsector_association = Table(
     "model_subsector",
     BaseOrm.metadata,
-    Column("model", String(255), ForeignKey("Model.id")),
+    Column("data_source", String(255), ForeignKey("DataSource.id")),
     Column("subsector", String(255), ForeignKey("SubSector.id")),
 )
 
@@ -174,7 +175,7 @@ class SubSectorOrm(BaseOrm):
     abbr = Column(String(255), nullable=False)
 
     model = relationship(
-        "ModelOrm",
+        "DataSourceOrm",
         secondary=model_subsector_association,
         back_populates="subsector",
     )
@@ -205,7 +206,7 @@ class EndUseOrm(BaseOrm):
     units = Column(String(255), nullable=False)
 
     model = relationship(
-        "ModelOrm",
+        "DataSourceOrm",
         secondary=enduse_model_association,
         back_populates="enduse",
     )
@@ -233,20 +234,20 @@ class Season(TimeDimensionModel):
 # ---------------------------
 # OTHER DIMENSIONS
 # ---------------------------
-class Weather(WeatherDimensionBaseModel):
-    """ attributes"""
+class WeatherYear(WeatherYearDimensionBaseModel):
+    """Weather Year attributes"""
 
 
 class ModelYear(ModelYearDimensionBaseModel):
-    """ attributes"""
+    """Model Year attributes"""
 
 
-class Model(ModelDimensionBaseModel):
-    """Model attributes"""
+class DataSource(DataSourceDimensionBaseModel):
+    """DataSource attributes"""
 
 
-class ModelOrm(BaseOrm):
-    __tablename__ = "Model"
+class DataSourceOrm(BaseOrm):
+    __tablename__ = "DataSource"
 
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
@@ -254,12 +255,12 @@ class ModelOrm(BaseOrm):
     enduse = relationship(
         "EndUseOrm",
         secondary=enduse_model_association,
-        back_populates="model",
+        back_populates="data_source",
     )
     subsector = relationship(
         "SubSectorOrm",
         secondary=model_subsector_association,
-        back_populates="model",
+        back_populates="data_source",
     )
 
 

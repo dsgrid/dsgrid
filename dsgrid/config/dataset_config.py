@@ -16,12 +16,12 @@ from pydantic import Field
 from pydantic import validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
+from dsgrid.registry.common import check_config_id_2
 from .config_base import ConfigBase
 from .dimensions import (
     DimensionReferenceModel,
 )
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.filesytem.aws import sync
 
 
 # TODO: likely needs refinement (missing mappings)
@@ -77,15 +77,10 @@ class DatasetConfigModel(DSGBaseModel):
         title="dataset_type",
         description="DSG defined input dataset type",
     )
-    # TODO: is this necessary?
-    model_name: str = Field(
-        title="model_name",
-        description="model name",
-    )
-    # TODO: This must be validated against the same field in ProjectConfigModel at registration.
-    model_sector: str = Field(
-        title="model_sector",
-        description="model sector",
+    # TODO: This must be validated against the project's dimension records for data_source
+    data_source: str = Field(
+        title="data_source",
+        description="data source name, e.g. 'ComStock'",
     )
     path: str = Field(
         title="path",
@@ -106,7 +101,13 @@ class DatasetConfigModel(DSGBaseModel):
     )
 
     # TODO: if local path provided, we want to upload to S3 and set the path
-    #   here to S3 path
+    #   in the toml file back to S3 path --> does this happen in DatasetConfig instead?
+
+    @validator("dataset_id")
+    def check_dataset_id(cls, dataset_id):
+        """Check dataset ID validity"""
+        check_config_id_2(dataset_id, "Dataset")
+        return dataset_id
 
     @validator("path")
     def check_path(cls, path):
@@ -116,9 +117,11 @@ class DatasetConfigModel(DSGBaseModel):
         if path.startswith("s3://"):
             # For unit test purposes this always uses the defaul local registry instead of
             # whatever the user created with RegistryManager.
-            local_path = LOCAL_REGISTRY_DATA / path.replace("s3://", "")
-            # sync(path, local_path)
-            logger.warning("skipping AWS sync")  # TODO DT
+            # TODO: Interpretation of this path is confusing. We need a better way.
+            # The path in the remote location should be verified but it does not need
+            # to be synced as part of this validation.
+            subpaths = path.split("/")
+            local_path = LOCAL_REGISTRY_DATA / subpaths[-2] / subpaths[-1]
         else:
             local_path = Path(path)
             if not local_path.exists():
@@ -135,8 +138,7 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: check dataset_dimension_mapping (optional) if exists
         # TODO: check project_dimension_mapping (optional) if exists
 
-        # TODO AWS
-        return local_path
+        return str(local_path)
 
 
 class DatasetConfig(ConfigBase):

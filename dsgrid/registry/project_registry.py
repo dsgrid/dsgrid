@@ -9,13 +9,14 @@ from pydantic import validator
 from semver import VersionInfo
 
 from .registry_base import RegistryBaseModel, RegistryBase
-from dsgrid.data_models import DSGBaseModel, serialize_model
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import (
     DatasetRegistryStatus,
     ProjectRegistryStatus,
 )
-from dsgrid.utils.versioning import make_version, handle_version_or_str
-
+from dsgrid.utils.versioning import make_version
+from dsgrid.filesystem.factory import make_filesystem_interface
+from dsgrid.common import REMOTE_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +81,11 @@ class ProjectRegistryModel(RegistryBaseModel):
 class ProjectRegistry(RegistryBase):
     """Controls a project registry."""
 
-    PROJECT_REGISTRY_PATH = Path("projects")
+    PROJECT_REGISTRY_PATH = Path("configs/projects")
+
+    @staticmethod
+    def config_filename():
+        return "project.toml"
 
     @staticmethod
     def model_class():

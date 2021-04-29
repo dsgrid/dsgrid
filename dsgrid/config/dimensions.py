@@ -2,7 +2,6 @@ import csv
 import importlib
 import os
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from pydantic import validator
@@ -19,7 +18,7 @@ from dsgrid.dimension.time import (
     TimeFrequency,
     TimezoneType,
 )
-from dsgrid.filesytem.aws import sync
+from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, load_data
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -46,19 +45,20 @@ class DimensionBaseModel(DSGBaseModel):
         description="dimension module",
         default="dsgrid.dimension.standard",
     )
-    class_name: Optional[str] = Field(
+    class_name: str = Field(
         title="class_name",
-        description="dimension model class name",
+        description="dimension record model class name",
         alias="class",
     )
     cls: Optional[type] = Field(
         title="cls",
-        description="dimension model class",
+        description="dimension record model class",
         alias="dimension_class",
     )
-    description: Optional[str] = Field(
-        title="description of dimension record",
-        description="description of dimension record, this gets stored in both dimension config file and dimension registry",
+    description: str = Field(
+        title="description",
+        description="a description of the dimension records that is helpful, memorable, and "
+        "identifiable; this description will get stored in the dimension record registry",
         alias="description",
     )
 
@@ -66,6 +66,29 @@ class DimensionBaseModel(DSGBaseModel):
     def check_name(cls, name):
         if name == "":
             raise ValueError(f'Empty name field for dimension: "{cls}"')
+
+        if REGEX_VALID_REGISTRY_NAME.search(name) is None:
+            raise ValueError(f"dimension name={name} does not meet the requirements")
+
+        # TODO: improve validation for alloweable dimension record names.
+        prohibited_names = [x.value.replace("_", "") for x in DimensionType] + [
+            "county",
+            "counties",
+            "year",
+            "hourly",
+            "comstock",
+            "resstock",
+            "tempo",
+            "model",
+            "source",
+            "data-source",
+            "dimension",
+        ]
+        prohibited_names = prohibited_names + [x + "s" for x in prohibited_names]
+        if name.lower().replace(" ", "-") in prohibited_names:
+            raise ValueError(
+                f" Dimension name '{name}' is not descriptive enough for a dimension record name. Please be more descriptive in your naming. Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable, identifiable, and reusable for other datasets and projects. e.g., 'time-2012-est-houlry-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name."
+            )
         return name
 
     @validator("class_name", always=True)
@@ -80,7 +103,6 @@ class DimensionBaseModel(DSGBaseModel):
         if not hasattr(mod, cls_name):
             if class_name is None:
                 msg = (
-                    "Setting class based on name failed. "
                     f'There is no class "{cls_name}" in module: {mod}.'
                     "\nIf you are using a unique dimension name, you must "
                     "specify the dimension class."
@@ -152,6 +174,8 @@ class DimensionModel(DimensionBaseModel):
     @validator("filename")
     def check_file(cls, filename):
         """Validate that dimension file exists and has no errors"""
+        # TODO: do we need to support S3 file paths when we already sync the registry at an
+        #   earlier stage? Technically this means that the path should be local
         # validation for S3 paths (sync locally)
         if filename.startswith("s3://"):
             path = LOCAL_REGISTRY / filename.replace("s3://", "")

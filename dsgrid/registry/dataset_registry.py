@@ -7,7 +7,8 @@ from pathlib import Path
 from pydantic import Field
 
 from .registry_base import RegistryBaseModel, RegistryBase
-
+from dsgrid.filesystem.factory import make_filesystem_interface
+from dsgrid.common import REMOTE_REGISTRY
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +25,11 @@ class DatasetRegistryModel(RegistryBaseModel):
 class DatasetRegistry(RegistryBase):
     """Controls dataset registration"""
 
-    DATASET_REGISTRY_PATH = Path("datasets")
+    DATASET_REGISTRY_PATH = Path("configs/datasets")
+
+    @staticmethod
+    def config_filename():
+        return "dataset.toml"
 
     @property
     def dataset_id(self):

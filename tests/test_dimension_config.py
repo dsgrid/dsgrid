@@ -30,20 +30,19 @@ def test_dimension_config_invalid_dimension_filename(config_as_dict):
         DimensionConfigModel(**config_as_dict)
 
 
-def test_dimension_config_invalid_dimension_name_to_class(config_as_dict):
-    for dimension in config_as_dict["dimensions"]:
-        if dimension["name"] == "County":
-            dimension["name"] = "InvalidCounty"
-            break
-    with pytest.raises(ValueError):
-        DimensionConfigModel(**config_as_dict)
+# def test_dimension_config_invalid_dimension_name_to_class(config_as_dict):
+#     for dimension in config_as_dict["dimensions"]:
+#         if dimension["name"] == "County":
+#             dimension["name"] = "InvalidCounty"
+#             break
+#     with pytest.raises(ValueError):
+#         DimensionConfigModel(**config_as_dict)
 
 
 def test_dimension_config_invalid_dimension_class(config_as_dict):
     for dimension in config_as_dict["dimensions"]:
-        if dimension["name"] == "County":
-            dimension["class"] = "InvalidCounty"
-            break
+        dimension["class"] = "InvalidClassName"
+        break
     with pytest.raises(ValueError):
         DimensionConfigModel(**config_as_dict)
 

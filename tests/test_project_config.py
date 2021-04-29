@@ -14,7 +14,7 @@ def config_as_dict():
 
 @pytest.fixture
 def dimension_manager():
-    registry = RegistryManager.load(get_registry_path())
+    registry = RegistryManager.load(get_registry_path(), offline_mode=True)
     return registry.dimension_manager
 
 
@@ -52,9 +52,10 @@ def test_project_duplicate_type(config_as_dict, dimension_manager):
     index = None
     duplicate = None
     for i, dim in enumerate(config_as_dict["dimensions"]["supplemental_dimensions"]):
-        if dim["dimension_id"].startswith("state"):
+        if dim["dimension_id"].startswith("us_states"):
             index = i
             config_as_dict["dimensions"]["project_dimensions"].append(dim)
+    assert index is not None
     config_as_dict["dimensions"]["supplemental_dimensions"].pop(index)
 
     with pytest.raises(ValueError):

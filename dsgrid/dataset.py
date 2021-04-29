@@ -21,6 +21,8 @@ class Dataset:
         self._load_data_lookup = load_data_lookup  # DataFrame of dimension elements
         self._load_data = data  # DataFrame containing load data
         self._id = config.model.dataset_id
+        # Can't use dashes in view names. This will need to be handled when we implement
+        # queries based on dataset ID.
         # TODO: do we need a DimensionStore here?
 
     @classmethod

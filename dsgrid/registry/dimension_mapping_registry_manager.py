@@ -4,8 +4,6 @@ import logging
 import os
 from pathlib import Path
 
-from prettytable import PrettyTable
-
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.association_tables import AssociationTableModel
 from dsgrid.config.dimension_mapping_config import DimensionMappingConfig
@@ -24,9 +22,13 @@ logger = logging.getLogger(__name__)
 class DimensionMappingRegistryManager(RegistryManagerBase):
     """Manages registered dimension mappings."""
 
-    def __init__(self, path, fs_interface):
-        super().__init__(path, fs_interface)
+    def __init__(self, path, params):
+        super().__init__(path, params)
         self._mappings = {}  # ConfigKey to DimensionMappingModel
+
+    @staticmethod
+    def name():
+        return "Dimension Mappings"
 
     @staticmethod
     def registry_class():
@@ -47,24 +49,28 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             Raised if there are duplicates and warn_only is False.
 
         """
-        hashes = set()
+        hashes = {}
         for mapping_id, registry_config in self._registry_configs.items():
             mapping = self.get_by_id(mapping_id, registry_config.model.version)
-            hashes.add(mapping.file_hash)
+            hashes[mapping.file_hash] = mapping_id
 
-        duplicates = [x.mapping_id for x in config.model.mappings if x.file_hash in hashes]
+        duplicates = []
+        for mapping in config.model.mappings:
+            if mapping.file_hash in hashes:
+                duplicates.append((mapping.mapping_id, hashes[mapping.file_hash]))
+
         if duplicates:
-            if warn_only:
-                logger.warning("Dimension mapping records are duplicated: %s", duplicates)
-            else:
+            for dup in duplicates:
+                logger.error("%s duplicates existing mapping ID %s", dup[0], dup[1])
+            if not warn_only:
                 raise DSGDuplicateValueRegistered(
-                    f"duplicate dimension mapping records: {duplicates}"
+                    f"There are {len(duplicates)} duplicate dimension mapping records."
                 )
 
-    def get_by_id(self, item_id, version=None):
+    def get_by_id(self, config_id, version=None):
         if version is None:
-            version = sorted(list(self._registry_configs[item_id].model.version))[-1]
-        key = ConfigKey(item_id, version)
+            version = self._registry_configs[config_id].model.version
+        key = ConfigKey(config_id, version)
         return self.get_by_key(key)
 
     def get_by_key(self, key):
@@ -75,7 +81,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         if mapping is not None:
             return mapping
 
-        filename = self._path / key.id / str(key.version) / "dimension_mapping.toml"
+        filename = self.get_config_file(key.id, key.version)
         dimension_mapping = AssociationTableModel.load(filename)
         self._mappings[key] = dimension_mapping
         return dimension_mapping
@@ -110,23 +116,32 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         dest_config_filename = "dimension_mapping" + os.path.splitext(config_file)[1]
         config_dir = Path(os.path.dirname(config_file))
 
+        if self.dry_run_mode:
+            for mapping in config.model.mappings:
+                logger.info(
+                    "%s Dimension mapping validated for registration: from=%s to=%s",
+                    self._log_dry_run_mode_prefix(),
+                    mapping.from_type.value,
+                    mapping.to_type.value,
+                )
+            return
+
         for mapping in config.model.mappings:
-            registry_config = RegistryBaseModel(
+            registry_model = RegistryBaseModel(
                 version=registration.version,
                 description=mapping.description.strip(),
                 registration_history=[registration],
             )
             dest_dir = self._path / mapping.mapping_id / str(registration.version)
-            self._fs_intf.mkdir(dest_dir)
+            self.fs_interface.mkdir(dest_dir)
 
-            filename = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
-            data = serialize_model(registry_config)
-            # TODO: if we want to update AWS directly, this needs to change.
-            dump_data(data, filename)
+            registry_file = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
+            data = serialize_model(registry_model)
+            dump_data(data, registry_file)
 
             # Leading directories from the original are not relevant in the registry.
             dest_record_file = dest_dir / os.path.basename(mapping.filename)
-            self._fs_intf.copy_file(config_dir / mapping.filename, dest_record_file)
+            self.fs_interface.copy_file(config_dir / mapping.filename, dest_record_file)
 
             model_data = serialize_model(mapping)
             # We have to make this change in the serialized dict instead of
@@ -135,34 +150,24 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             model_data["file"] = os.path.basename(mapping.filename)
             dump_data(model_data, dest_dir / dest_config_filename)
             logger.info(
-                "Registered dimension mapping id=%s version=%s",
+                "%s Registered dimension mapping id=%s version=%s",
+                self._log_offline_mode_prefix(),
                 mapping.mapping_id,
                 registration.version,
             )
+            self._update_registry_cache(mapping.mapping_id, registry_model)
+
+        if not self.offline_mode:
+            # Sync the entire dimension mapping registry path because it's probably cheaper
+            # than syncing each changed path individually.
+            self.sync_push(self._path)
 
         logger.info(
-            "Registered %s dimension mapping(s) with version=%s",
+            "%s Registered %s dimension mapping(s) with version=%s",
+            self._log_offline_mode_prefix(),
             len(config.model.mappings),
             registration.version,
         )
 
-    def show(self, submitter=None):
-        # TODO: filter by submitter
-        table = PrettyTable(title="Dimension Mappings")
-        table.field_names = ("ID", "Version", "Registration Date", "Submitter", "Description")
-        rows = []
-        for mapping_id, registry_config in self._registry_configs.items():
-            last_reg = registry_config.model.registration_history[-1]
-            row = (
-                mapping_id,
-                last_reg.version,
-                last_reg.date,
-                last_reg.submitter,
-                registry_config.model.description,
-            )
-            rows.append(row)
-
-        rows.sort(key=lambda x: x[0])
-        table.add_rows(rows)
-
-        print(table)
+    def update(self, config_file, submitter, update_type, log_message):
+        assert False, "not supported yet"

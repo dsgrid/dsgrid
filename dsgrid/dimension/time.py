@@ -34,6 +34,7 @@ class TimeValueMeasurement(Enum):
     MIN = "min"
     MAX = "max"
     MEASURED = "measured"
+    TOTAL = "total"
 
 
 class TimeFrequency(Enum):

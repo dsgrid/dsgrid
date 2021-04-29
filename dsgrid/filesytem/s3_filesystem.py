@@ -140,9 +140,11 @@ class S3Filesystem(CloudFilesystemInterface):
         """Base sync function to sync S3 registry with local registry."""
         # TODO: is it possible to prevent this from being called outside of the class?
         start = time.time()
-        sync_command = f"aws s3 sync {src} {dst} --profile {AWS_PROFILE_NAME} --exclude *.DS_STORE"
-        if include_data is False:
-            sync_command = sync_command + " --exclude data/"
+        sync_command = (
+            f"aws s3 sync {src} {dst} --profile {AWS_PROFILE_NAME} --exclude '**/.DS_STORE'"
+        )
+        if not include_data:
+            sync_command = sync_command + " --exclude data/*"
         logger.info("Running %s", sync_command)
         check_run_command(sync_command)
         logger.info("Command took %s seconds", time.time() - start)
@@ -164,12 +166,16 @@ class S3Filesystem(CloudFilesystemInterface):
         local_contents = local_interface.listdir()
         s3_contents = s3_filesystem.listdir()
         if not include_data:
-            local_contents = [c for c in local_contents if not str(c).startswith("data/")]
+            local_contents = [
+                c
+                for c in local_contents
+                if not str(c).split(local_registry)[1].startswith("/data")
+            ]
         for content in local_contents:
             relconent = os.path.relpath(content, local_interface.path)
             if relconent not in s3_contents:
                 local_interface.rm(content)
-                logger.log("delete: %s", content)
+                logger.info("delete: %s", str(content))
         S3Filesystem.sync(s3_filesystem.path, local_interface.path, include_data)
 
     @staticmethod

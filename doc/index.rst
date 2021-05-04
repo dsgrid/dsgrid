@@ -15,6 +15,7 @@ datasets.
    :caption: Contents:
 
    data_format
+   config_data_models
    api
 
 Indices and tables

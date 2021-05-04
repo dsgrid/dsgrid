@@ -2,7 +2,7 @@ import csv
 import importlib
 import os
 from datetime import datetime
-from typing import Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
 from pydantic import validator
 from pydantic import Field
@@ -50,7 +50,7 @@ class DimensionBaseModel(DSGBaseModel):
         description="dimension record model class name",
         alias="class",
     )
-    cls: Optional[type] = Field(
+    cls: Optional[Any] = Field(
         title="cls",
         description="dimension record model class",
         alias="dimension_class",

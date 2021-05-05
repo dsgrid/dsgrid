@@ -164,6 +164,13 @@ class DimensionRegistryManager(RegistryManagerBase):
         return dimensions
 
     def register(self, config_file, submitter, log_message, force=False):
+        if self.offline_mode or self.dry_run_mode:
+            self._register(config_file, submitter, log_message, force=force)
+        else:
+            with self.cloud_interface.make_lock(self.relative_remote_path(self._path)):
+                self._register(config_file, submitter, log_message, force=force)
+
+    def _register(self, config_file, submitter, log_message, force=False):
         config = DimensionConfig.load(config_file)
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)

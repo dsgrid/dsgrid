@@ -3,8 +3,6 @@
 import logging
 import abc
 
-import boto3
-
 from .filesystem_interface import FilesystemInterface
 
 logger = logging.getLogger(__name__)
@@ -104,79 +102,31 @@ class CloudFilesystemInterface(FilesystemInterface):
         """
 
     @abc.abstractmethod
-    def lock_exists(self, directory):
-        """[summary]
-
-        Parameters
-        ----------
-        directory : [type]
-            [description]
-        """
-
-    @abc.abstractmethod
-    def make_lock(self, directory):
-        """[summary]
-
-        Parameters
-        ----------
-        directory : [type]
-            [description]
-        """
-
-    @abc.abstractmethod
-    def remove_lock(self, directory):
-        """[summary]
-
-        Parameters
-        ----------
-        directory : [type]
-            [description]
-        """
-
-    @abc.abstractmethod
-    def listregistry(self, directory):
-        """[summary]
-
-        Parameters
-        ----------
-        directory : [type]
-            [description]
-        """
-
-    @abc.abstractmethod
     def check_versions(self, directory):
-        """[summary]
+        """Check for multiple versions and versioning expectations of files.
 
         Parameters
         ----------
-        directory : [type]
-            [description]
+        directory : str
+            Directory path
+        """
+
+    @abc.abstractmethod
+    def list_versions(self, path):
+        """List all versions of an S3 file object. Only possible in versioned buckets.
+
+        Parameters
+        ----------
+        path : str
+            Path
         """
 
     @abc.abstractclassmethod
-    def sync_pull(self, src, dst, include_data=False):
-        """[summary]
+    def touch(self, filepath):
+        """Touch
 
         Parameters
         ----------
-        src : [type]
-            [description]
-        dst : [type]
-            [description]
-        include_data : bool, optional
-            [description], by default False
-        """
-
-    @abc.abstractclassmethod
-    def sync_push(self, src, dst, include_data=False):
-        """[summary]
-
-        Parameters
-        ----------
-        src : [type]
-            [description]
-        dst : [type]
-            [description]
-        include_data : bool, optional
-            [description], by default False
+        directory : str
+            filepath
         """

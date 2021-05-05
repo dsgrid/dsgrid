@@ -29,6 +29,12 @@ logger = logging.getLogger(__name__)
     help="path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
 )
 @click.option(
+    "--remote-path",
+    default=REMOTE_REGISTRY,
+    show_default=True,
+    help="path to dsgrid remote registry. Default is the s3://nrel-dsgrid-registry located on nrel-aws-dsgrid account.",
+)
+@click.option(
     "--offline",
     "-o",
     is_flag=True,
@@ -43,14 +49,14 @@ logger = logging.getLogger(__name__)
     help="run registry commands in dry-run mode without writing to the local or remote registry",
 )
 @click.pass_context
-def registry(ctx, path, offline, dry_run):
+def registry(ctx, path, remote_path, offline, dry_run):
     """Manage a registry."""
     # We want to keep a log of items that have been registered on the
     # current system. But we probably don't want this to grow forever.
     # Consider truncating or rotating.
     # TODO: pass in offline and dry_run arguments into logs
     setup_logging("dsgrid", REGISTRY_LOG_FILE, mode="a")
-    ctx.obj = RegistryManager.load(path, offline_mode=offline, dry_run_mode=dry_run)
+    ctx.obj = RegistryManager.load(path, remote_path, offline_mode=offline, dry_run_mode=dry_run)
 
 
 # TODO: Support registry file reads without syncing using something like sfs3
@@ -273,7 +279,6 @@ def remove_dataset(registry_manager, dataset_id, offline, dry_run):
 
 @click.command()
 @click.pass_obj
-# TODO is this a sync pull command?
 def sync(registry_manager):
     """Sync the official dsgrid registry to the local system."""
     # aws.sync(REMOTE_REGISTRY, registry_manager.path)

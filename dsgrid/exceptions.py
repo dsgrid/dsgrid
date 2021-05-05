@@ -67,3 +67,7 @@ class DSGJSONError(DSGBaseException):
 
 class DSGFilesystemInterfaceError(DSGBaseException):
     """Error with FileSystemInterface command"""
+
+
+class DSGRegistryLockError(DSGBaseException):
+    """Error with a locked registry"""

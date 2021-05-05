@@ -3,8 +3,6 @@ from pathlib import Path
 
 
 from .registry_base import RegistryBaseModel, RegistryBase
-from dsgrid.filesystem.factory import make_filesystem_interface
-from dsgrid.common import REMOTE_REGISTRY
 
 logger = logging.getLogger(__name__)
 

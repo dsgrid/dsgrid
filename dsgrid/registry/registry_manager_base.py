@@ -1,6 +1,7 @@
 """Base class for all registry managers."""
 
 import abc
+from contextlib import contextmanager
 import logging
 import os.path
 from pathlib import Path
@@ -9,7 +10,7 @@ from prettytable import PrettyTable
 
 from .common import RegistryManagerParams
 from .registry_base import RegistryBaseModel
-from dsgrid.common import REGISTRY_FILENAME
+from dsgrid.common import REGISTRY_FILENAME, SYNC_EXCLUDE_LIST
 from dsgrid.exceptions import (
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
@@ -316,6 +317,12 @@ class RegistryManagerBase(abc.ABC):
         """
         return sorted(self.iter_ids())
 
+    def relative_remote_path(self, path):
+        """Return relative remote registry path."""
+        relative_path = Path(path).relative_to(self._params.base_path)
+        remote_path = f"{self._params.remote_path}/{relative_path}"
+        return remote_path
+
     def remove(self, config_id):
         """Remove an item from the registry
 
@@ -363,9 +370,10 @@ class RegistryManagerBase(abc.ABC):
             Local path
 
         """
-        relative_path = Path(path).relative_to(self._params.base_path)
-        remote_path = f"{self._params.remote_path}/{relative_path}"
-        self.cloud_interface.sync_pull(remote_path, path)
+        remote_path = self.relative_remote_path(path)
+        self.cloud_interface.sync_pull(
+            remote_path, path, exclude=SYNC_EXCLUDE_LIST, delete_local=True
+        )
 
     def sync_push(self, path):
         """Synchronizes files from the local path to the remote registry.
@@ -374,6 +382,7 @@ class RegistryManagerBase(abc.ABC):
             Local path
 
         """
-        relative_path = Path(path).relative_to(self._params.base_path)
-        remote_path = f"{self._params.remote_path}/{relative_path}"
-        self.cloud_interface.sync_push(path, remote_path)
+        remote_path = self.relative_remote_path(path)
+        self.cloud_interface.sync_push(
+            remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
+        )

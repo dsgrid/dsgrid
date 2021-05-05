@@ -80,6 +80,8 @@ def _get_module_from_extension(filename, **kwargs):
         mod = json
     elif ext == ".toml":
         mod = toml
+    elif ext == ".lock":
+        mod = toml
     elif "mod" in kwargs:
         mod = kwargs["mod"]
     else:

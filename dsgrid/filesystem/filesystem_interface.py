@@ -86,3 +86,13 @@ class FilesystemInterface(abc.ABC):
         directory : str
 
         """
+
+    @abc.abstractmethod
+    def touch(self, path):
+        """Touch
+
+        Parameters
+        ----------
+        directory : str
+            filepath
+        """

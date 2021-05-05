@@ -59,11 +59,12 @@ class S3Filesystem(CloudFilesystemInterface):
     ):
         contents = [x for x in self.S3Path(directory).glob("*") if x.name != ""]
         if exclude_hidden:
+            # NOTE: this does not currently ignore hidden directories in the path.
             contents = [x for x in contents if not x.name.startswith(".")]
         if files_only:
-            return [x for x in contents if x.is_file()]
+            return [x.name for x in contents if x.is_file()]
         if directories_only:
-            return [x for x in contents if x.is_dir()]
+            return [x.name for x in contents if x.is_dir()]
         return [x.name for x in contents]
 
     def list_versions(self, directory, prefix=""):

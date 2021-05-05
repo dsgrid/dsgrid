@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
     "--remote-path",
     default=REMOTE_REGISTRY,
     show_default=True,
-    help="path to dsgrid remote registry. Default is the s3://nrel-dsgrid-registry located on nrel-aws-dsgrid account.",
+    help="path to dsgrid remote registry",
 )
 @click.option(
     "--offline",

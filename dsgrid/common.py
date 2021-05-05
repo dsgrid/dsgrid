@@ -9,4 +9,4 @@ REGISTRY_FILENAME = "registry.toml"
 DATASET_FILENAME = "dataset.toml"
 DIMENSIONS_FILENAME = "dimensions.toml"
 
-SYNC_EXCLUDE_LIST = ["*.DS_STORE", "**/*.lock"]
+SYNC_EXCLUDE_LIST = ["*.DS_Store", "**/*.lock"]

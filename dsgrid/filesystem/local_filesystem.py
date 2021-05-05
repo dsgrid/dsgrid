@@ -42,6 +42,7 @@ class LocalFilesystem(FilesystemInterface):
     ):
         contents = [c for c in Path(directory).rglob(pattern)]
         if exclude_hidden:
+            # NOTE: this does not currently ignore hidden directories in the path.
             contents = [x for x in contents if not x.name.startswith(".")]
         if files_only:
             return [x for x in contents if os.path.isfile(x)]

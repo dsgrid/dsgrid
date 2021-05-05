@@ -14,9 +14,8 @@ def test_make_and_release_lock():
         user="mmooney",
         profile=AWS_PROFILE_NAME,
     )
-    with s3.make_lock(directory="s3://nrel-dsgrid-registry-test") as f:
+    with s3.make_lock(directory="s3://nrel-dsgrid-registry-test"):
         contents = s3._s3_filesystem.listdir()
-        print(contents)
     assert s3._s3_filesystem.listdir() == []
 
 

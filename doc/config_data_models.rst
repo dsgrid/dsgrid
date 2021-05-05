@@ -1,6 +1,5 @@
-********************************
 DSGRID Configuration Data Models
-********************************
+================================
 
 .. Note to Meghan: you probably won't like the title. The second is an alternative.
  
@@ -11,7 +10,7 @@ DSGRID Configuration Data Models
 
 
 InputSectorDataset
-==================
+~~~~~~~~~~~~~~~~~~
 
 .. csv-table:: 
    :file: _build/config_tables/InputSectorDataset.csv

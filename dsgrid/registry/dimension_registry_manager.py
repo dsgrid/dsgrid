@@ -167,7 +167,8 @@ class DimensionRegistryManager(RegistryManagerBase):
         if self.offline_mode or self.dry_run_mode:
             self._register(config_file, submitter, log_message, force=force)
         else:
-            with self.cloud_interface.make_lock(self.relative_remote_path(self._path)):
+            lock_file_path = self.get_registry_lockfile(None)
+            with self.cloud_interface.make_lock(lock_file_path):
                 self._register(config_file, submitter, log_message, force=force)
 
     def _register(self, config_file, submitter, log_message, force=False):

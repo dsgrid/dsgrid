@@ -106,8 +106,10 @@ class ProjectRegistryManager(RegistryManagerBase):
     def register(self, config_file, submitter, log_message, force=False):
         if self.offline_mode or self.dry_run_mode:
             self._register(config_file, submitter, log_message, force=force)
-        with self.cloud_interface.make_lock(self.relative_remote_path(self._path)):
-            self._register(config_file, submitter, log_message, force=force)
+        else:
+            lock_file_path = self.get_registry_lockfile(load_data(config_file)["project_id"])
+            with self.cloud_interface.make_lock(lock_file_path):
+                self._register(config_file, submitter, log_message, force=force)
 
     def _register(self, config_file, submitter, log_message, force=False):
         config = ProjectConfig.load(config_file, self._dimension_mgr)
@@ -159,6 +161,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._update_registry_cache(config.model.project_id, registry_model)
 
         if not self.offline_mode:
+            registry_dir = self.get_registry_directory(load_data(config_file)["project_id"])
             self.sync_push(registry_dir)
 
         logger.info(

@@ -1,9 +1,14 @@
+from pathlib import Path
 import pytest
+from tempfile import TemporaryDirectory, gettempdir
 
+from dsgrid.cloud.factory import make_cloud_storage_interface
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
-from dsgrid.exceptions import DSGRegistryLockError
+from dsgrid.exceptions import DSGRegistryLockError, DSGMakeLockError
+from dsgrid.registry.registry_manager import RegistryManager
 
 AWS_PROFILE_NAME = "nrel-aws-dsgrid"
+TEST_REGISTRY = "s3://nrel-dsgrid-registry-test"
 
 
 def test_make_and_release_lock():
@@ -11,32 +16,61 @@ def test_make_and_release_lock():
         local_path="",
         remote_path="s3://nrel-dsgrid-registry-test",
         uuid="123",
-        user="mmooney",
+        user="test",
         profile=AWS_PROFILE_NAME,
     )
-    with s3.make_lock(directory="s3://nrel-dsgrid-registry-test"):
-        contents = s3._s3_filesystem.listdir()
-    assert s3._s3_filesystem.listdir() == []
+    with s3.make_lock("s3://nrel-dsgrid-registry-test/configs/.locks/test.lock"):
+        assert s3._s3_filesystem.S3Path(
+            "s3://nrel-dsgrid-registry-test/configs/.locks/test.lock"
+        ).exists()
+    assert s3._s3_filesystem.listdir("configs/.locks") == []
 
 
-def test_sync_push_and_pull_fail_if_lock_exists():
+def test_sync_push_fail_if_lock_exists():
+
     s3 = S3StorageInterface(
         local_path="",
         remote_path="s3://nrel-dsgrid-registry-test",
         uuid="123",
-        user="mmooney",
+        user="test",
         profile=AWS_PROFILE_NAME,
     )
-    s3_v2 = S3StorageInterface(
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        lockfile = "s3://nrel-dsgrid-registry-test/configs/.locks/dimensions.lock"
+        with s3.make_lock(lockfile):
+            assert s3._s3_filesystem.S3Path(lockfile).exists()
+            s3 = s3.check_lock(lockfile)
+            manager = RegistryManager.create(
+                path=base_dir / "dsgrid-registry", user="test", remote_path=TEST_REGISTRY
+            )
+            manager.dimension_manager.cloud_interface = make_cloud_storage_interface(
+                base_dir / "dsgrid-registry",
+                remote_path=TEST_REGISTRY,
+                user="test",
+                offline=False,
+                uuid="0",
+            )
+            with pytest.raises(DSGRegistryLockError):
+                manager.dimension_manager.cloud_interface.check_lock(lockfile)
+            with pytest.raises(DSGRegistryLockError):
+                manager.dimension_manager.sync_push(
+                    base_dir / "dsgrid-registry/configs/dimensions/geography/test/1.0.0"
+                )
+
+
+def test_bad_lockfile():
+    s3 = S3StorageInterface(
         local_path="",
         remote_path="s3://nrel-dsgrid-registry-test",
         uuid="123",
-        user="mmooney",
+        user="test",
         profile=AWS_PROFILE_NAME,
     )
-    with s3.make_lock(directory="s3://nrel-dsgrid-registry-test"):
-        contents = s3._s3_filesystem.listdir()
-        with pytest.raises(DSGRegistryLockError):
-            s3_v2.sync_push(remote_path="s3://nrel-dsgrid-registry-test", local_path="")
-        with pytest.raises(DSGRegistryLockError):
-            s3_v2.sync_pull(remote_path="s3://nrel-dsgrid-registry-test", local_path="")
+    with pytest.raises(DSGMakeLockError):
+        for bad_lockfile in (
+            "s3://nrel-dsgrid-registry-test/configs/.locks/test.locks",
+            "s3://nrel-dsgrid-registry-test/configs/.lock/test.lock",
+        ):
+            with s3.make_lock(bad_lockfile):
+                pass

@@ -3,10 +3,11 @@ from datetime import datetime
 import json
 import logging
 import os
+from pathlib import Path
 import time
 
 from .cloud_storage_interface import CloudStorageInterface
-from dsgrid.exceptions import DSGRegistryLockError
+from dsgrid.exceptions import DSGMakeLockError, DSGRegistryLockError
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
 from dsgrid.filesystem.s3_filesystem import S3Filesystem
 from dsgrid.utils.run_command import check_run_command
@@ -27,7 +28,7 @@ class S3StorageInterface(CloudStorageInterface):
 
     def _sync(self, src, dst, exclude=None):
         start = time.time()
-        sync_command = f"aws s3 sync {src} {dst} --profile {self._s3_filesystem.profile}"
+        sync_command = f"aws s3 sync {src} {dst} --profile {self._s3_filesystem._profile}"
         if exclude:
             for x in exclude:
                 sync_command = sync_command + f" --exclude {x}"
@@ -35,41 +36,53 @@ class S3StorageInterface(CloudStorageInterface):
         check_run_command(sync_command)
         logger.info("Command took %s seconds", time.time() - start)
 
-    def check_locks(self, directory):
-        filepath = self._s3_filesystem.S3Path(directory)
-        if self.lock_exists(filepath):
-            lock_file = self.get_locks(filepath)[0]  ## grab only one lock file
-            lock_contents = self.read_lock(lock_file)
+    def check_lock(self, path):
+        self.check_valid_lockfile(path)
+        filepath = self._s3_filesystem.S3Path(path)
+        if filepath.exists():
+            lock_contents = self.read_lock(filepath)
             if (
                 not self._uuid == lock_contents["uuid"]
-                and not self._user == lock_contents["username"]
+                or not self._user == lock_contents["username"]
             ):
                 raise DSGRegistryLockError(
                     f"Registry path {str(filepath)} is currently locked by {lock_contents['username']}, timestamp={lock_contents['timestamp']}, uuid={lock_contents['uuid']}."
                 )
 
+    def check_valid_lockfile(self, path):
+        path = Path(path)
+        # check that lock file is of type .lock
+        if path.suffix != ".lock":
+            raise DSGMakeLockError(f"Lock file path provided ({path}) must be a valid .lock path")
+        # check that lock file in expected dirs
+        relative_path = Path(path).parent
+        if str(relative_path).startswith("s3:/nrel-dsgrid-registry/"):
+            relative_path = relative_path.relative_to("s3:/nrel-dsgrid-registry/")
+        if str(relative_path).startswith("/"):
+            relative_path = relative_path.relative_to("/")
+        if relative_path == Path("configs/.locks"):
+            pass
+        elif relative_path == Path("data/.locks"):
+            assert False, "Data locks are currently not supported."
+        else:
+            DSGMakeLockError(
+                "Lock file path provided must have relative path of configs/.locks or data/.locks"
+            )
+        return True
+
     def get_locks(self, directory):
-        contents = list(
-            self._s3_filesystem.S3Path(directory).rglob(pattern="*.lock")
-        )  # This seems to be slow
+        contents = list(self._s3_filesystem.S3Path(directory).glob(pattern="*"))
         return contents
 
-    def lock_exists(self, directory):
+    def locks_exists(self, directory):
         contents = self.get_locks(directory)
         return contents != []
 
     @contextmanager
-    def make_lock(self, directory):
+    def make_lock(self, path):
         try:
-            filepath = self._s3_filesystem.S3Path(f"{directory}/registry.lock")
-            if filepath.exists():
-                lockfile_contents = self.read_lock(filepath)
-                username = lockfile_contents["username"]
-                uuid = lockfile_contents["uuid"]
-                timestamp = lockfile_contents["timestamp"]
-                raise DSGRegistryLockError(
-                    f"Registry path {str(filepath)} is currently locked by {username}. Lock created as {timestamp} with uuid={uuid}."
-                )
+            self.check_lock(path)
+            filepath = self._s3_filesystem.S3Path(path)
             self._s3_filesystem.S3Path(filepath).write_text(
                 "{"
                 + f'"username": "{self._user}", "uuid": "{self._uuid}", "timestamp": "{datetime.now()}"'
@@ -77,14 +90,14 @@ class S3StorageInterface(CloudStorageInterface):
             )
             yield
         finally:
-            self.remove_lock(directory)
+            self.remove_lock(path)
 
     def read_lock(self, path):
         lockfile_contents = json.loads(self._s3_filesystem.S3Path(path).read_text())
         return lockfile_contents
 
-    def remove_lock(self, directory, force=False):
-        filepath = self._s3_filesystem.S3Path(f"{directory}/registry.lock")
+    def remove_lock(self, path, force=False):
+        filepath = self._s3_filesystem.S3Path(path)
         if filepath.exists():
             lockfile_contents = self.read_lock(filepath)
             if not force:
@@ -98,7 +111,6 @@ class S3StorageInterface(CloudStorageInterface):
             filepath.unlink()
 
     def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False):
-        self.check_locks(remote_path)
         if delete_local:
             local_contents = self._local_filesystem.rglob(local_path)
             s3_contents = self._s3_filesystem.rglob(remote_path)
@@ -110,5 +122,4 @@ class S3StorageInterface(CloudStorageInterface):
         self._sync(remote_path, local_path, exclude)
 
     def sync_push(self, remote_path, local_path, exclude=None):
-        self.check_locks(remote_path)
         self._sync(local_path, remote_path, exclude)

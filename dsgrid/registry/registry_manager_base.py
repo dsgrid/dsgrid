@@ -184,6 +184,11 @@ class RegistryManagerBase(abc.ABC):
         """Return the CloudStorageInterface to sync remote data."""
         return self._params.cloud_interface
 
+    @cloud_interface.setter
+    def cloud_interface(self, cloud_interface):
+        """Set the CloudStorageInterface (used in testing)"""
+        self._params = self._params._replace(cloud_interface=cloud_interface)
+
     @property
     def fs_interface(self):
         """Return the FilesystemInterface to list directories and read/write files."""
@@ -256,6 +261,28 @@ class RegistryManagerBase(abc.ABC):
         if config_id not in self._registry_configs:
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
         return self._registry_configs[config_id]
+
+    def get_registry_lockfile(self, config_id):
+        """Return registry lock file path.
+
+        Parameters
+        ----------
+        config_id : str
+            Config ID
+
+        Returns
+        -------
+        str
+            Lock file path
+        """
+        if self.__class__.name() == "Projects":
+            return f"configs/.locks/{config_id}.lock"
+        elif self.__class__.name() == "Datasets":
+            return f"configs/.locks/{config_id}.lock"
+        elif self.__class__.name() == "Dimensions":
+            return "configs/.locks/dimensions.lock"
+        elif self.__class__.name() == "Dimension Mappings":
+            return "configs/.locks/dimension_mappings.lock"
 
     def get_registry_directory(self, config_id):
         """Return the directory containing data for config_id (registry.toml and versions).
@@ -383,6 +410,8 @@ class RegistryManagerBase(abc.ABC):
 
         """
         remote_path = self.relative_remote_path(path)
+        lock_file_path = self.get_registry_lockfile(path.name)
+        self.cloud_interface.check_lock(lock_file_path)
         self.cloud_interface.sync_push(
             remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
         )

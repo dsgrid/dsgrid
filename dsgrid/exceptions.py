@@ -71,3 +71,7 @@ class DSGFilesystemInterfaceError(DSGBaseException):
 
 class DSGRegistryLockError(DSGBaseException):
     """Error with a locked registry"""
+
+
+class DSGMakeLockError(DSGBaseException):
+    """Error when making registry lock"""

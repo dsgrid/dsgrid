@@ -21,19 +21,30 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractclassmethod
-    def check_locks(self, directory):
-        """Checks recursively if a lock file exists anywhere within a directory.
-        Returns an error if lock file(s) exist.
+    def check_lock(self, path):
+        """Checks if a given lock file path exists and that it was created by the same username and uuid.
+
+        Returns an error if the existing lock file's username and uuid do not match.
 
         # Parameters
         # ----------
-        # directory : str
-        #     Directory path
+        # path : str
+        #     Lock file path
+        """
+
+    @abc.abstractclassmethod
+    def check_valid_lockfile(self, path):
+        """Checks if a given lock file path is valid. Returns errors if invalid.
+
+        # Parameters
+        # ----------
+        # path : str
+        #     Lock file path
         """
 
     @abc.abstractclassmethod
     def get_locks(self, directory):
-        """Returns list of lock files that exist anywhere (recursively) within a directory tree.
+        """Returns list of lock files exist within a directory (non-recursive).
 
         Parameters
         ----------
@@ -42,7 +53,7 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def lock_exists(self, directory):
+    def locks_exists(self, directory):
         """Returns True if a lock exists with a directory.
 
         Parameters
@@ -53,13 +64,13 @@ class CloudStorageInterface(abc.ABC):
 
     @abc.abstractmethod
     @contextmanager
-    def make_lock(self, directory):
-        """Context manager to make a registry.lock file with directory path. On close, it removes the lock file.
+    def make_lock(self, path):
+        """Context manager to make a lock file given the file path. On close, it removes the lock file.
 
         Parameters
         ----------
-        directory : str
-            Directory path
+        path : str
+            Lock file path
 
         Raises
         ------
@@ -78,13 +89,13 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def remove_lock(self, directory, force=False):
-        """Remove the lock at directory path.
+    def remove_lock(self, path, force=False):
+        """Remove the lock given a lock path.
 
         Parameters
         ----------
-        directory : str
-            Directory path
+        path : str
+            Lock file path
         force : bool
             Boolean flag to force removal of lock file that does not have the same UUID or username, by default False
 

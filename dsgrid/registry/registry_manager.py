@@ -146,7 +146,7 @@ class RegistryManager:
         if not offline_mode:
             logger.info("Sync from remote registry.")
             cloud_interface.sync_pull(
-                remote_path + "/configs", path / "configs", exclude=SYNC_EXCLUDE_LIST
+                remote_path + "/configs", str(path) + "/configs", exclude=SYNC_EXCLUDE_LIST
             )
 
         params = RegistryManagerParams(

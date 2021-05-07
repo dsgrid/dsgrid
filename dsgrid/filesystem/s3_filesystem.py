@@ -32,14 +32,15 @@ class S3Filesystem(CloudFilesystemInterface):
         """Get formatted S3 key from provided path for S3Path module"""
         if not path:
             path = ""
-        if str(path).startswith(f"/{self._bucket}"):
-            path = str(path)[len(f"/{self._bucket}") :]
-        if str(path).startswith(self._bucket):
-            path = str(path)[len({self._bucket}) :]
-        if str(path).startswith(self._uri):
-            path = str(path).replace(self._uri, "")
-        if str(path).startswith("/"):
-            path = str(path)[1:]
+        path = str(path)
+        if path.startswith(f"/{self._bucket}"):
+            path = path[len(f"/{self._bucket}") + 1 :]
+        elif path.startswith(self._bucket):
+            path = path[len(self._bucket) + 1 :]
+        elif path.startswith(self._uri):
+            path = path.replace(self._uri + 1, "")
+        elif path.startswith("/"):
+            path = path[1:]
         return path
 
     def check_versions(self, directory):

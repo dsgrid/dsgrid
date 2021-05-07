@@ -75,3 +75,7 @@ class DSGRegistryLockError(DSGBaseException):
 
 class DSGMakeLockError(DSGBaseException):
     """Error when making registry lock"""
+
+
+class DSGInvalidRegistryState(DSGBaseException):
+    """Invalid Registry State"""

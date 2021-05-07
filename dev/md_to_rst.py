@@ -3,7 +3,7 @@ import logging
 import os
 from subprocess import call, list2cmdline
 
-from layerstack import start_console_log
+from dsgrid.loggers import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -71,8 +71,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # start logging
-    start_console_log(log_level=logging.DEBUG if args.debug else logging.INFO)
+    setup_logging("dsgrid", None, console_level=logging.DEBUG if args.debug else logging.INFO)
 
     # perform conversion
     convert_files(args.file_registry)

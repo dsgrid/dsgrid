@@ -37,11 +37,11 @@ class S3StorageInterface(CloudStorageInterface):
         check_run_command(sync_command)
         logger.info("Command took %s seconds", time.time() - start)
 
-    def check_lock(self, path):
+    def check_lock_file(self, path):
         self.check_valid_lockfile(path)
         filepath = self._s3_filesystem.S3Path(path)
         if filepath.exists():
-            lock_contents = self.read_lock(filepath)
+            lock_contents = self.read_lock_file(filepath)
             if (
                 not self._uuid == lock_contents["uuid"]
                 or not self._user == lock_contents["username"]
@@ -80,9 +80,9 @@ class S3StorageInterface(CloudStorageInterface):
         return contents != []
 
     @contextmanager
-    def make_lock(self, path):
+    def make_lock_file(self, path):
         try:
-            self.check_lock(path)
+            self.check_lock_file(path)
             filepath = self._s3_filesystem.S3Path(path)
             lock_content = {
                 "username": self._user,
@@ -92,16 +92,16 @@ class S3StorageInterface(CloudStorageInterface):
             self._s3_filesystem.S3Path(filepath).write_text(json.dumps(lock_content))
             yield
         finally:
-            self.remove_lock(path)
+            self.remove_lock_file(path)
 
-    def read_lock(self, path):
+    def read_lock_file(self, path):
         lockfile_contents = json.loads(self._s3_filesystem.S3Path(path).read_text())
         return lockfile_contents
 
-    def remove_lock(self, path, force=False):
+    def remove_lock_file(self, path, force=False):
         filepath = self._s3_filesystem.S3Path(path)
         if filepath.exists():
-            lockfile_contents = self.read_lock(filepath)
+            lockfile_contents = self.read_lock_file(filepath)
             if not force:
                 if (
                     not self._uuid == lockfile_contents["uuid"]

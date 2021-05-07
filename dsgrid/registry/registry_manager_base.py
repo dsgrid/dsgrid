@@ -134,8 +134,8 @@ class RegistryManagerBase(abc.ABC):
         if self.offline_mode or self.dry_run_mode:
             self._register(config_file, submitter, log_message, force=force)
         else:
-            lock_file_path = self.get_registry_lockfile(load_data(config_file)["project_id"])
-            with self.cloud_interface.make_lock(lock_file_path):
+            lock_file_path = self.get_registry_lock_file(load_data(config_file)["project_id"])
+            with self.cloud_interface.make_lock_file(lock_file_path):
                 self._register(config_file, submitter, log_message, force=force)
 
     @staticmethod
@@ -268,7 +268,7 @@ class RegistryManagerBase(abc.ABC):
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
         return self._registry_configs[config_id]
 
-    def get_registry_lockfile(self, config_id):
+    def get_registry_lock_file(self, config_id):
         """Return registry lock file path.
 
         Parameters
@@ -416,8 +416,8 @@ class RegistryManagerBase(abc.ABC):
 
         """
         remote_path = self.relative_remote_path(path)
-        lock_file_path = self.get_registry_lockfile(path.name)
-        self.cloud_interface.check_lock(lock_file_path)
+        lock_file_path = self.get_registry_lock_file(path.name)
+        self.cloud_interface.check_lock_file(lock_file_path)
         self.cloud_interface.sync_push(
             remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
         )

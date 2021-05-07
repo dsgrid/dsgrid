@@ -21,7 +21,7 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def check_lock(self, path):
+    def check_lock_file(self, path):
         """Checks if a given lock file path exists and that it was created by the same username and uuid.
 
         Returns an error if the existing lock file's username and uuid do not match.
@@ -69,7 +69,7 @@ class CloudStorageInterface(abc.ABC):
 
     @abc.abstractmethod
     @contextmanager
-    def make_lock(self, path):
+    def make_lock_file(self, path):
         """Context manager to make a lock file given the file path. On close, it removes the lock file.
 
         Parameters
@@ -84,7 +84,7 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def read_lock(self, path):
+    def read_lock_file(self, path):
         """Reads a lock file and returns a dictionary of its contents.
 
         Parameters
@@ -94,8 +94,8 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def remove_lock(self, path, force=False):
-        """Remove the lock given a lock path.
+    def remove_lock_file(self, path, force=False):
+        """Remove a lock file.
 
         Parameters
         ----------

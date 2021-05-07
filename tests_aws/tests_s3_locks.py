@@ -19,7 +19,7 @@ def test_make_and_release_lock():
         user="test",
         profile=AWS_PROFILE_NAME,
     )
-    with s3.make_lock("s3://nrel-dsgrid-registry-test/configs/.locks/test.lock"):
+    with s3.make_lock_file("s3://nrel-dsgrid-registry-test/configs/.locks/test.lock"):
         assert s3._s3_filesystem.S3Path(
             "s3://nrel-dsgrid-registry-test/configs/.locks/test.lock"
         ).exists()
@@ -38,9 +38,9 @@ def test_sync_push_fail_if_lock_exists():
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
         lockfile = "s3://nrel-dsgrid-registry-test/configs/.locks/dimensions.lock"
-        with s3.make_lock(lockfile):
+        with s3.make_lock_file(lockfile):
             assert s3._s3_filesystem.S3Path(lockfile).exists()
-            s3 = s3.check_lock(lockfile)
+            s3 = s3.check_lock_file(lockfile)
             manager = RegistryManager.create(
                 path=base_dir / "dsgrid-registry", user="test", remote_path=TEST_REGISTRY
             )
@@ -52,7 +52,7 @@ def test_sync_push_fail_if_lock_exists():
                 uuid="0",
             )
             with pytest.raises(DSGRegistryLockError):
-                manager.dimension_manager.cloud_interface.check_lock(lockfile)
+                manager.dimension_manager.cloud_interface.check_lock_file(lockfile)
             with pytest.raises(DSGRegistryLockError):
                 manager.dimension_manager.sync_push(
                     base_dir / "dsgrid-registry/configs/dimensions/geography/test/1.0.0"
@@ -72,5 +72,5 @@ def test_bad_lockfile():
             "s3://nrel-dsgrid-registry-test/configs/.locks/test.locks",
             "s3://nrel-dsgrid-registry-test/configs/.lock/test.lock",
         ):
-            with s3.make_lock(bad_lockfile):
+            with s3.make_lock_file(bad_lockfile):
                 pass

@@ -7,7 +7,7 @@ class FakeStorageInterface(CloudStorageInterface):
     def _sync(self, remote_path, local_path, exclude=None):
         pass
 
-    def check_lock(self, path):
+    def check_lock_file(self, path):
         pass
 
     def check_valid_lockfile(self, path):
@@ -19,13 +19,13 @@ class FakeStorageInterface(CloudStorageInterface):
     def locks_exists(self, directory):
         pass
 
-    def make_lock(self, path):
+    def make_lock_file(self, path):
         pass
 
-    def read_lock(self, path):
+    def read_lock_file(self, path):
         pass
 
-    def remove_lock(self, path):
+    def remove_lock_file(self, path):
         pass
 
     def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False):

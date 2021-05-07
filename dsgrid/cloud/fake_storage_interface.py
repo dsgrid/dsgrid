@@ -13,10 +13,10 @@ class FakeStorageInterface(CloudStorageInterface):
     def check_valid_lock_file(self, path):
         pass
 
-    def get_locks(self, directory):
+    def get_lock_filess(self, directory):
         pass
 
-    def locks_exists(self, directory):
+    def lock_files_exist(self, directory):
         pass
 
     def make_lock_file(self, path):

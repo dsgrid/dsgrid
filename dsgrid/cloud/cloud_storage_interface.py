@@ -38,7 +38,7 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def check_valid_lockfile(self, path):
+    def check_valid_lock_file(self, path):
         """Checks if a given lock file path is valid. Returns errors if invalid.
 
         Parameters

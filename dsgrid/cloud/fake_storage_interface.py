@@ -10,7 +10,7 @@ class FakeStorageInterface(CloudStorageInterface):
     def check_lock_file(self, path):
         pass
 
-    def check_valid_lockfile(self, path):
+    def check_valid_lock_file(self, path):
         pass
 
     def get_locks(self, directory):

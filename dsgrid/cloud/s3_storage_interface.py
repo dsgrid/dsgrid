@@ -38,7 +38,7 @@ class S3StorageInterface(CloudStorageInterface):
         logger.info("Command took %s seconds", time.time() - start)
 
     def check_lock_file(self, path):
-        self.check_valid_lockfile(path)
+        self.check_valid_lock_file(path)
         filepath = self._s3_filesystem.S3Path(path)
         if filepath.exists():
             lock_contents = self.read_lock_file(filepath)
@@ -50,7 +50,7 @@ class S3StorageInterface(CloudStorageInterface):
                     f"Registry path {str(filepath)} is currently locked by {lock_contents['username']}, timestamp={lock_contents['timestamp']}, uuid={lock_contents['uuid']}."
                 )
 
-    def check_valid_lockfile(self, path):
+    def check_valid_lock_file(self, path):
         path = Path(path)
         # check that lock file is of type .lock
         if path.suffix != ".lock":

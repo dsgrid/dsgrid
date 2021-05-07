@@ -6,21 +6,6 @@ class CloudStorageInterface(abc.ABC):
     """Defines interface to synchronize data stored on a cloud storage system."""
 
     @abc.abstractmethod
-    def _sync(self, src, dst, exclude=None):
-        """Base sync function.
-
-        Parameters
-        ----------
-        src : str
-            source path
-        dst : str
-            destination path
-        exclude : list, optional
-            list of exclusion patterns to exclude, by default None.
-            If excluding whole directories, the exclusion must end with /* , e.g. "data/*".
-        """
-
-    @abc.abstractmethod
     def check_lock_file(self, path):
         """Checks if a given lock file path exists and that it was created by the same username and uuid.
 

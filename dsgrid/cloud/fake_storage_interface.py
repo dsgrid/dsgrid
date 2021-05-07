@@ -4,9 +4,6 @@ from .cloud_storage_interface import CloudStorageInterface
 class FakeStorageInterface(CloudStorageInterface):
     """Fake interface for tests and local mode."""
 
-    def _sync(self, remote_path, local_path, exclude=None):
-        pass
-
     def check_lock_file(self, path):
         pass
 

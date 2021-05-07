@@ -9,11 +9,9 @@ import logging
 import click
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
-from dsgrid.loggers import setup_logging
 from dsgrid.registry.common import VersionUpdateType
 
 # from dsgrid.filesystem import aws
-from dsgrid.registry.common import REGISTRY_LOG_FILE
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -45,11 +43,6 @@ logger = logging.getLogger(__name__)
 @click.pass_context
 def registry(ctx, path, offline, dry_run):
     """Manage a registry."""
-    # We want to keep a log of items that have been registered on the
-    # current system. But we probably don't want this to grow forever.
-    # Consider truncating or rotating.
-    # TODO: pass in offline and dry_run arguments into logs
-    setup_logging("dsgrid", REGISTRY_LOG_FILE, mode="a")
     ctx.obj = RegistryManager.load(path, offline_mode=offline, dry_run_mode=dry_run)
 
 

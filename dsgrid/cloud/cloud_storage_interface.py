@@ -26,10 +26,15 @@ class CloudStorageInterface(abc.ABC):
 
         Returns an error if the existing lock file's username and uuid do not match.
 
-        # Parameters
-        # ----------
-        # path : str
-        #     Lock file path
+        Parameters
+        ----------
+        path : str
+            Lock file path
+
+        Raises
+        ------
+        DSGRegistryLockError
+            exception is raised if any lock files are found
         """
 
     @abc.abstractclassmethod

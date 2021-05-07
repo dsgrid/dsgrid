@@ -52,7 +52,7 @@ class S3Filesystem(CloudFilesystemInterface):
         assert False, "not supported yet"
 
     def exists(self, path):
-        return S3Path(path).exists()
+        return self.S3Path(path).exists()
 
     def listdir(
         self, directory="", files_only=False, directories_only=False, exclude_hidden=False

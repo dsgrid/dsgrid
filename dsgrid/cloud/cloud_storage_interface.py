@@ -117,9 +117,9 @@ class CloudStorageInterface(abc.ABC):
         local_path : str
             Local registry path
         delete_local : bool
-            Deletes files and directories that exist in the local but in the remote
+            If true, this method deletes files and directories that exist in the local_path but not in the remote_path
         exclude : list, optional
-            List of exclusion patterns to exclude, by default None.
+            List of patterns to exclude, by default None.
             If excluding whole directories, the exclusion must end with /* , e.g. "data/*"
 
         """

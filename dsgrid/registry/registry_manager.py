@@ -118,7 +118,7 @@ class RegistryManager:
         ----------
         path : str
             base path of the local or base registry
-        remote_path: str
+        remote_path: str, optional
             path of the remote registry; default is REMOTE_REGISTRY
         offline_mode : bool
             Load registry in offline mode; default is False

@@ -10,8 +10,13 @@ def make_cloud_storage_interface(local_path, remote_path, uuid, user, offline=Fa
     ----------
     local_path : str
     remote_path : str
-    offline : bool
+    uuid : str
+        Unique ID to be used when generating cloud locks.
+    user : str
+        Username to be used when generating cloud locks.
+    offline : bool, optional
         If True, don't perform any remote syncing operations.
+
 
     Returns
     -------

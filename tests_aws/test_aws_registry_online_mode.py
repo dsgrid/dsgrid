@@ -21,6 +21,7 @@ TEST_REGISTRY = "s3://nrel-dsgrid-registry-test"
 
 @pytest.fixture
 def test_project_dir():
+    """make a temporary test project dir copied from US_DATA_REPO contents"""
     if DATA_REPO is None:
         print(
             "You must define the environment US_DATA_REPO with the path to the "
@@ -81,6 +82,7 @@ def clean_remote_registry(s3_filesystem, prefix=""):
 
 
 def test_aws_registry_workflow_online_mode(test_project_dir):
+    """Test the registry workflow where online_mode=True, using the test remote registry"""
     try:
         with TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir)
@@ -94,15 +96,18 @@ def test_aws_registry_workflow_online_mode(test_project_dir):
                 profile=S3_PROFILE_NAME,
             )
 
+            # create temp local registry
             path = create_local_registry(base_dir)
             assert LocalFilesystem().listdir(path)
             dataset_dir = Path("datasets/sector_models/comstock")
 
+            # refresh remote test registry (clean/ create empty)
             clean_remote_registry(s3_cloud_storage._s3_filesystem)
             create_empty_remote_registry(s3_cloud_storage._s3_filesystem)
 
             manager = RegistryManager.load(path=path, remote_path=TEST_REGISTRY, user=submitter)
 
+            # test registry dimensions for project and dataset
             for dim_config_file in (
                 test_project_dir / "dimensions.toml",
                 test_project_dir / dataset_dir / "dimensions.toml",

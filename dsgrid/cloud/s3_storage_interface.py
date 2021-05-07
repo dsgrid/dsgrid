@@ -115,10 +115,10 @@ class S3StorageInterface(CloudStorageInterface):
             local_contents = self._local_filesystem.rglob(local_path)
             s3_contents = self._s3_filesystem.rglob(remote_path)
             for content in local_contents:
-                relconent = os.path.relpath(content, local_path)
-                if relconent not in s3_contents:
+                relcontent = os.path.relpath(content, local_path)
+                if relcontent not in s3_contents:
                     self._local_filesystem.rm(content)
-                    logger.info("delete: %s", content)
+                    logger.info("delete: %s because it is not in %s", relcontent, remote_path)
         self._sync(remote_path, local_path, exclude)
 
     def sync_push(self, remote_path, local_path, exclude=None):

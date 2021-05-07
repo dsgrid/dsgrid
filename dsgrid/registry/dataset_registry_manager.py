@@ -78,7 +78,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._register(config_file, submitter, log_message, force=force)
         else:
             lock_file_path = self.get_registry_lockfile(load_data(config_file)["dataset_id"])
-            with self.cloud_interface.make_lock(load_data(config_file)["dataset_id"]):
+            with self.cloud_interface.make_lock(lock_file_path):
                 self._register(config_file, submitter, log_message, force=force)
 
     def _register(self, config_file, submitter, log_message, force=False):

@@ -113,7 +113,7 @@ class CloudStorageInterface(abc.ABC):
     @abc.abstractmethod
     def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False):
         """Synchronize data from remote_path to local_path.
-        Deletes any files in local_path that do not exist in remote_path.
+        If delete_local is True, this deletes any files in local_path that do not exist in remote_path.
 
         Parameters
         ----------

@@ -84,7 +84,7 @@ def test_registry_path_expectations():
     )
     msg = "INVALID REGISTRY STATE: An invalid file was pushed to dsgrid registry: {file}"
     for level_0 in s3._s3_filesystem.listdir(exclude_hidden=False):
-        # L0: Must be condig
+        # L0: Only 3 dirs allowed: /configs, /data, /.locks
         if level_0 not in ("configs", "data", ".locks"):
             raise DSGInvalidRegistryState(msg.format(file=level_0))
         for level_1 in s3._s3_filesystem.listdir(directory=level_0):
@@ -95,7 +95,7 @@ def test_registry_path_expectations():
                     if base_level_1_file.suffix != ".lock":
                         raise DSGInvalidRegistryState(msg.format(file=F))
                 elif level_0 == "data":
-                    pass
+                    pass  # TODO: Build out /data/ file checks
                 elif level_0 == "configs":
                     # L1: make sure dir is of specific category type
                     if level_1 not in ("dimensions", "projects", "datasets", "dimension_mappings"):

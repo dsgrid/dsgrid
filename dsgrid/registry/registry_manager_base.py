@@ -3,11 +3,11 @@
 import abc
 from contextlib import contextmanager
 import logging
-import os.path
 from pathlib import Path
 
 from prettytable import PrettyTable
 
+from dsgrid import timer_stats_collector
 from .common import RegistryManagerParams
 from .registry_base import RegistryBaseModel
 from dsgrid.common import REGISTRY_FILENAME, SYNC_EXCLUDE_LIST
@@ -16,6 +16,7 @@ from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidOperation,
 )
+from dsgrid.utils.timing import Timer, track_timing
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,7 @@ class RegistryManagerBase(abc.ABC):
         self._params = params
         self._registry_configs = {}  # ID to registry config
 
+    @track_timing(timer_stats_collector)
     def inventory(self):
         for config_id in self.fs_interface.listdir(
             self._path, directories_only=True, exclude_hidden=True

@@ -9,11 +9,9 @@ import logging
 import click
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
-from dsgrid.loggers import setup_logging
 from dsgrid.registry.common import VersionUpdateType
 
 # from dsgrid.filesystem import aws
-from dsgrid.registry.common import REGISTRY_LOG_FILE
 from dsgrid.registry.registry_manager import RegistryManager
 
 

@@ -49,11 +49,6 @@ logger = logging.getLogger(__name__)
 @click.pass_context
 def registry(ctx, path, remote_path, offline, dry_run):
     """Manage a registry."""
-    # We want to keep a log of items that have been registered on the
-    # current system. But we probably don't want this to grow forever.
-    # Consider truncating or rotating.
-    # TODO: pass in offline and dry_run arguments into logs
-    setup_logging("dsgrid", REGISTRY_LOG_FILE, mode="a")
     ctx.obj = RegistryManager.load(path, remote_path, offline_mode=offline, dry_run_mode=dry_run)
 
 

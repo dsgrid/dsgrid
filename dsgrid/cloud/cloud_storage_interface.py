@@ -48,7 +48,7 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_lock_filess(self, directory):
+    def get_lock_files(self, directory):
         """Returns list of lock files exist within a directory (non-recursive).
 
         Parameters

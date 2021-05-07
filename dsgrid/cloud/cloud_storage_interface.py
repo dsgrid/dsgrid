@@ -5,7 +5,7 @@ from contextlib import contextmanager
 class CloudStorageInterface(abc.ABC):
     """Defines interface to synchronize data stored on a cloud storage system."""
 
-    @abc.abstractclassmethod
+    @abc.abstractmethod
     def _sync(self, src, dst, exclude=None):
         """Base sync function.
 
@@ -20,7 +20,7 @@ class CloudStorageInterface(abc.ABC):
             If excluding whole directories, the exclusion must end with /* , e.g. "data/*".
         """
 
-    @abc.abstractclassmethod
+    @abc.abstractmethod
     def check_lock(self, path):
         """Checks if a given lock file path exists and that it was created by the same username and uuid.
 
@@ -37,17 +37,17 @@ class CloudStorageInterface(abc.ABC):
             exception is raised if any lock files are found
         """
 
-    @abc.abstractclassmethod
+    @abc.abstractmethod
     def check_valid_lockfile(self, path):
         """Checks if a given lock file path is valid. Returns errors if invalid.
 
-        # Parameters
-        # ----------
-        # path : str
-        #     Lock file path
+        Parameters
+        ----------
+        path : str
+            Lock file path
         """
 
-    @abc.abstractclassmethod
+    @abc.abstractmethod
     def get_locks(self, directory):
         """Returns list of lock files exist within a directory (non-recursive).
 

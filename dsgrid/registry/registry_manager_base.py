@@ -131,6 +131,12 @@ class RegistryManagerBase(abc.ABC):
             Raised if the config ID is already registered.
 
         """
+        if self.offline_mode or self.dry_run_mode:
+            self._register(config_file, submitter, log_message, force=force)
+        else:
+            lock_file_path = self.get_registry_lockfile(load_data(config_file)["project_id"])
+            with self.cloud_interface.make_lock(lock_file_path):
+                self._register(config_file, submitter, log_message, force=force)
 
     @staticmethod
     @abc.abstractmethod

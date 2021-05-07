@@ -38,7 +38,7 @@ class S3Filesystem(CloudFilesystemInterface):
         elif path.startswith(self._bucket):
             path = path[len(self._bucket) + 1 :]
         elif path.startswith(self._uri):
-            path = path.replace(self._uri + 1, "")
+            path = path.replace(self._uri + "/", "")
         elif path.startswith("/"):
             path = path[1:]
         return path

@@ -121,7 +121,7 @@ class CloudFilesystemInterface(FilesystemInterface):
             Path
         """
 
-    @abc.abstractclassmethod
+    @abc.abstractmethod
     def touch(self, filepath):
         """Touch
 

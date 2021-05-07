@@ -1,5 +1,6 @@
 from contextlib import contextmanager
 from datetime import datetime
+from dsgrid.utils.files import dump_data
 import json
 import logging
 import os
@@ -83,11 +84,12 @@ class S3StorageInterface(CloudStorageInterface):
         try:
             self.check_lock(path)
             filepath = self._s3_filesystem.S3Path(path)
-            self._s3_filesystem.S3Path(filepath).write_text(
-                "{"
-                + f'"username": "{self._user}", "uuid": "{self._uuid}", "timestamp": "{datetime.now()}"'
-                + "}"
-            )
+            lock_content = {
+                "username": self._user,
+                "uuid": self._uuid,
+                "timestamp": str(datetime.now()),
+            }
+            self._s3_filesystem.S3Path(filepath).write_text(json.dumps(lock_content))
             yield
         finally:
             self.remove_lock(path)
@@ -108,6 +110,12 @@ class S3StorageInterface(CloudStorageInterface):
                     raise DSGRegistryLockError(
                         f"Registry path {str(filepath)} is currently locked by {lockfile_contents['username']}. Lock created as {lockfile_contents['timestamp']} with uuid={lockfile_contents['uuid']}."
                     )
+            if force:
+                logger.warning(
+                    "Force removed lock file with user=%s and uuid=%s",
+                    lockfile_contents["username"],
+                    lockfile_contents["uuid"],
+                )
             filepath.unlink()
 
     def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False):

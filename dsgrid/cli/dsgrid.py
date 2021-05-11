@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def cli(log_file, no_prompts, verbose):
+@click.pass_context
+def cli(ctx, log_file, no_prompts, verbose):
     """dsgrid commands"""
     if log_file.exists():
         size_mb = log_file.stat().st_size / (1024 * 1024)
@@ -38,6 +39,8 @@ def cli(log_file, no_prompts, verbose):
 
     level = logging.DEBUG if verbose else logging.INFO
     setup_logging("dsgrid", log_file, console_level=level, file_level=level, mode="a")
+
+    ctx.obj = {"no_prompts": no_prompts}
 
 
 @cli.resultcallback()

@@ -110,7 +110,13 @@ class RegistryManager:
 
     @classmethod
     def load(
-        cls, path, remote_path=REMOTE_REGISTRY, offline_mode=False, dry_run_mode=False, user=None
+        cls,
+        path,
+        remote_path=REMOTE_REGISTRY,
+        offline_mode=False,
+        dry_run_mode=False,
+        user=None,
+        no_prompts=False,
     ):
         """Loads a registry from the given path.
 
@@ -126,6 +132,8 @@ class RegistryManager:
             Test registry operations in dry-run "test" mode (i.e., do not commit changes to remote)
         user : str
             username
+        no_prompts : bool
+            If no_prompts is False, the user will be prompted to continue sync pulling the registry if lock files exist.
 
         Returns
         -------
@@ -144,10 +152,30 @@ class RegistryManager:
         )
 
         if not offline_mode:
-            logger.info("Sync from remote registry.")
-            cloud_interface.sync_pull(
-                remote_path + "/configs", str(path) + "/configs", exclude=SYNC_EXCLUDE_LIST
-            )
+            lock_files = cloud_interface.get_lock_files()
+            if len(lock_files) > 0:
+                msg = f"There are {len(lock_files)} lock files in the registry:"
+                for lock_file in lock_files:
+                    msg = msg + "\n\t" + f"- {lock_file}"
+                logger.log(msg)
+                if not no_prompts:
+                    msg = (
+                        msg
+                        + "\n... Do you want to continue syncing the registry contents? [Y] >>> "
+                    )
+                    val = input(msg)
+                    if val == "" or val.lower() == "y":
+                        sync = True
+                    else:
+                        logger.info("Skipping remote registry sync.")
+            else:
+                sync = True
+
+            if sync:
+                logger.info("Sync from remote registry.")
+                cloud_interface.sync_pull(
+                    remote_path + "/configs", str(path) + "/configs", exclude=SYNC_EXCLUDE_LIST
+                )
 
         params = RegistryManagerParams(
             path, remote_path, fs_interface, cloud_interface, offline_mode, dry_run_mode

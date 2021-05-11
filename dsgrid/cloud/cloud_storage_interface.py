@@ -37,7 +37,7 @@ class CloudStorageInterface(abc.ABC):
         """Returns list of lock files exist within the /.locks directory (non-recursive)."""
 
     @abc.abstractmethod
-    def lock_files_exist(self):
+    def has_lock_files(self):
         """Returns True if a .lock file exists within the /.locks directory."""
 
     @abc.abstractmethod
@@ -109,8 +109,10 @@ class CloudStorageInterface(abc.ABC):
         Parameters
         ----------
         remote_path : str
+            Remote registry path
         local_path : str
+            Local registry path
         exclude : list, optional
-            List of exclusion patterns to exclude, by default None.
-            If excluding whole directories, the exclusion must end with /* , e.g. "data/*".
+            List of patterns to exclude, by default None.
+            If excluding whole directories, the exclusion must end with /* , e.g. "data/*"
         """

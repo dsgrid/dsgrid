@@ -270,6 +270,7 @@ class RegistryManagerBase(abc.ABC):
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
         return self._registry_configs[config_id]
 
+    @abc.abstractmethod
     def get_registry_lock_file(self, config_id):
         """Return registry lock file path.
 
@@ -283,14 +284,6 @@ class RegistryManagerBase(abc.ABC):
         str
             Lock file path
         """
-        if self.__class__.name() == "Projects":
-            return f"configs/.locks/{config_id}.lock"
-        elif self.__class__.name() == "Datasets":
-            return f"configs/.locks/{config_id}.lock"
-        elif self.__class__.name() == "Dimensions":
-            return "configs/.locks/dimensions.lock"
-        elif self.__class__.name() == "Dimension Mappings":
-            return "configs/.locks/dimension_mappings.lock"
 
     def get_registry_directory(self, config_id):
         """Return the directory containing data for config_id (registry.toml and versions).

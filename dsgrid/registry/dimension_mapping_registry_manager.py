@@ -86,6 +86,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._mappings[key] = dimension_mapping
         return dimension_mapping
 
+    def get_registery_lock_file(self, config_id):
+        return "configs/.locks/dimension_mappings.lock"
+
     def load_dimension_mappings(self, dimension_mapping_references):
         """Load dimension_mappings from files.
 
@@ -108,12 +111,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         return mappings
 
     def register(self, config_file, submitter, log_message, force=False):
-        if self.offline_mode or self.dry_run_mode:
+        lock_file_path = self.get_registry_lock_file(None)
+        with self.cloud_interface.make_lock_file(lock_file_path):
             self._register(config_file, submitter, log_message, force=force)
-        else:
-            lock_file_path = self.get_registry_lock_file(None)
-            with self.cloud_interface.make_lock_file(lock_file_path):
-                self._register(config_file, submitter, log_message, force=force)
 
     def _register(self, config_file, submitter, log_message, force=False):
         config = DimensionMappingConfig.load(config_file)

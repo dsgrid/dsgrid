@@ -39,7 +39,7 @@ class S3StorageInterface(CloudStorageInterface):
 
     def check_lock_file(self, path):
         self.check_valid_lock_file(path)
-        filepath = self._s3_filesystem.S3Path(path)
+        filepath = self._s3_filesystem.s3_path(path)
         if filepath.exists():
             lock_contents = self.read_lock_file(filepath)
             if (
@@ -72,10 +72,10 @@ class S3StorageInterface(CloudStorageInterface):
         return True
 
     def get_lock_files(self):
-        contents = list(self._s3_filesystem.S3Path(".locks").glob(pattern="*"))
+        contents = list(self._s3_filesystem.s3_path(".locks").glob(pattern="*"))
         return contents
 
-    def lock_files_exist(self):
+    def has_lock_files(self):
         contents = self.get_lock_files()
         return contents != []
 
@@ -83,23 +83,23 @@ class S3StorageInterface(CloudStorageInterface):
     def make_lock_file(self, path):
         try:
             self.check_lock_file(path)
-            filepath = self._s3_filesystem.S3Path(path)
+            filepath = self._s3_filesystem.s3_path(path)
             lock_content = {
                 "username": self._user,
                 "uuid": self._uuid,
                 "timestamp": str(datetime.now()),
             }
-            self._s3_filesystem.S3Path(filepath).write_text(json.dumps(lock_content))
+            self._s3_filesystem.s3_path(filepath).write_text(json.dumps(lock_content))
             yield
         finally:
             self.remove_lock_file(path)
 
     def read_lock_file(self, path):
-        lockfile_contents = json.loads(self._s3_filesystem.S3Path(path).read_text())
+        lockfile_contents = json.loads(self._s3_filesystem.s3_path(path).read_text())
         return lockfile_contents
 
     def remove_lock_file(self, path, force=False):
-        filepath = self._s3_filesystem.S3Path(path)
+        filepath = self._s3_filesystem.s3_path(path)
         if filepath.exists():
             lockfile_contents = self.read_lock_file(filepath)
             if not force:

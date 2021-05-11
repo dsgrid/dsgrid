@@ -53,12 +53,12 @@ class S3Filesystem(CloudFilesystemInterface):
         assert False, "not supported yet"
 
     def exists(self, path):
-        return self.S3Path(path).exists()
+        return self.s3_path(path).exists()
 
     def listdir(
         self, directory="", files_only=False, directories_only=False, exclude_hidden=False
     ):
-        contents = [x for x in self.S3Path(directory).glob("*") if x.name != ""]
+        contents = [x for x in self.s3_path(directory).glob("*") if x.name != ""]
         if exclude_hidden:
             # NOTE: this does not currently ignore hidden directories in the path.
             contents = [x for x in contents if not x.name.startswith(".")]
@@ -90,9 +90,10 @@ class S3Filesystem(CloudFilesystemInterface):
         exclude_hidden=True,
         pattern="*",
     ):
-        directory = str(self.S3Path(directory))
-        contents = list(self.S3Path(directory).rglob(pattern))
+        directory = str(self.s3_path(directory))
+        contents = list(self.s3_path(directory).rglob(pattern))
         if exclude_hidden:
+            # NOTE: this does not currently ignore hidden directories in the path.
             contents = [
                 str(x).replace(f"{directory}/", "") for x in contents if not x.name.startswith(".")
             ]
@@ -105,10 +106,10 @@ class S3Filesystem(CloudFilesystemInterface):
     def rm_tree(self, directory):
         assert False, "not supported yet"
 
-    def S3Path(self, path):
+    def s3_path(self, path):
         """Returns S3Path"""
         path = self._Key(path)
         return S3Path(f"/{self._bucket}/{path}")
 
     def touch(self, filepath):
-        self.S3Path(filepath).touch()
+        self.s3_path(filepath).touch()

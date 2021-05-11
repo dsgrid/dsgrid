@@ -103,13 +103,13 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._projects[key] = project
         return project
 
+    def get_registry_lock_file(self, config_id):
+        return f"configs/.locks/{config_id}.lock"
+
     def register(self, config_file, submitter, log_message, force=False):
-        if self.offline_mode or self.dry_run_mode:
+        lock_file_path = self.get_registry_lock_file(load_data(config_file)["project_id"])
+        with self.cloud_interface.make_lock_file(lock_file_path):
             self._register(config_file, submitter, log_message, force=force)
-        else:
-            lock_file_path = self.get_registry_lock_file(load_data(config_file)["project_id"])
-            with self.cloud_interface.make_lock_file(lock_file_path):
-                self._register(config_file, submitter, log_message, force=force)
 
     def _register(self, config_file, submitter, log_message, force=False):
         config = ProjectConfig.load(config_file, self._dimension_mgr)

@@ -73,13 +73,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._datasets[key] = dataset
         return dataset
 
+    def get_registery_lock_file(self, config_id):
+        return f"configs/.locks/{config_id}.lock"
+
     def register(self, config_file, submitter, log_message, force=False):
-        if self.offline_mode or self.dry_run_mode:
+        lock_file_path = self.get_registry_lock_file(load_data(config_file)["dataset_id"])
+        with self.cloud_interface.make_lock_file(lock_file_path):
             self._register(config_file, submitter, log_message, force=force)
-        else:
-            lock_file_path = self.get_registry_lock_file(load_data(config_file)["dataset_id"])
-            with self.cloud_interface.make_lock_file(lock_file_path):
-                self._register(config_file, submitter, log_message, force=force)
 
     def _register(self, config_file, submitter, log_message, force=False):
         config = DatasetConfig.load(config_file, self._dimension_mgr)

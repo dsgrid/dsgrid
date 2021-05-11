@@ -94,14 +94,12 @@ class S3Filesystem(CloudFilesystemInterface):
         contents = list(self.s3_path(directory).rglob(pattern))
         if exclude_hidden:
             # NOTE: this does not currently ignore hidden directories in the path.
-            contents = [
-                str(x).replace(f"{directory}/", "") for x in contents if not x.name.startswith(".")
-            ]
+            contents = [str(x) for x in contents if not x.name.startswith(".")]
         if files_only:
-            return [str(x).replace(f"{directory}/", "") for x in contents if x.is_file()]
+            return [str(x) for x in contents if x.is_file()]
         if directories_only:
-            return [str(x).replace(f"{directory}/", "") for x in contents if x.is_dir()]
-        return [str(x).replace(f"{directory}/", "") for x in contents]
+            return [str(x) for x in contents if x.is_dir()]
+        return [str(x) for x in contents]
 
     def rm_tree(self, directory):
         assert False, "not supported yet"

@@ -40,8 +40,6 @@ def cli(ctx, log_file, no_prompts, verbose):
     level = logging.DEBUG if verbose else logging.INFO
     setup_logging("dsgrid", log_file, console_level=level, file_level=level, mode="a")
 
-    ctx.obj = {"no_prompts": no_prompts}
-
 
 @cli.resultcallback()
 def callback(*args, **kwargs):

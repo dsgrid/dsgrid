@@ -72,12 +72,12 @@ class S3StorageInterface(CloudStorageInterface):
         return True
 
     def get_lock_files(self):
-        contents = list(self._s3_filesystem.s3_path(".locks").glob(pattern="*"))
+        contents = self._s3_filesystem.s3_path(".locks").glob(pattern="*")
         return contents
 
     def has_lock_files(self):
         contents = self.get_lock_files()
-        return contents != []
+        return next(contents, None) is not None
 
     @contextmanager
     def make_lock_file(self, path):

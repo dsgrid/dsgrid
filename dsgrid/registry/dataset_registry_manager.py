@@ -73,7 +73,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._datasets[key] = dataset
         return dataset
 
-    def get_registery_lock_file(self, config_id):
+    def get_registry_lock_file(self, config_id):
         return f"configs/.locks/{config_id}.lock"
 
     def register(self, config_file, submitter, log_message, force=False):

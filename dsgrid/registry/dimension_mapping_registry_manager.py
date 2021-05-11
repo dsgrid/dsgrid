@@ -86,7 +86,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._mappings[key] = dimension_mapping
         return dimension_mapping
 
-    def get_registery_lock_file(self, config_id):
+    def get_registry_lock_file(self, config_id):
         return "configs/.locks/dimension_mappings.lock"
 
     def load_dimension_mappings(self, dimension_mapping_references):

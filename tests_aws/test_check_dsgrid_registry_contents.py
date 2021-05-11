@@ -1,6 +1,4 @@
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
-from dsgrid.filesystem.s3_filesystem import S3Filesystem
-from pydantic import BaseModel
 from dsgrid.dimension.base_models import DimensionType
 from pathlib import Path
 from dsgrid.exceptions import DSGInvalidRegistryState

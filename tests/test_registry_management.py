@@ -4,74 +4,42 @@ import shutil
 import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory, gettempdir
-
 import pytest
 
 from dsgrid.exceptions import DSGDuplicateValueRegistered
 from dsgrid.registry.common import DatasetRegistryStatus
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
 from tests.common import (
     replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )
 
 
-DATA_REPO = os.environ.get("US_DATA_REPO")
-
-
-@pytest.fixture
-def test_data_dir():
-    if DATA_REPO is None:
-        print(
-            "You must define the environment US_DATA_REPO with the path to the "
-            "dsgrid-data-UnitedStates repository"
-        )
-        sys.exit(1)
-
-    tmpdir = Path(gettempdir()) / "test_us_data"
-    if os.path.exists(tmpdir):
-        shutil.rmtree(tmpdir)
-    os.mkdir(tmpdir)
-    shutil.copytree(Path(DATA_REPO) / "dsgrid_project", tmpdir / "dsgrid_project")
-    yield tmpdir / "dsgrid_project"
-    shutil.rmtree(tmpdir)
-
-
-def create_registry(tmpdir):
-    path = Path(tmpdir) / "dsgrid-registry"
-    RegistryManager.create(path)
-    assert path.exists()
-    assert (path / "configs/projects").exists()
-    assert (path / "configs/datasets").exists()
-    assert (path / "configs/dimensions").exists()
-    assert (path / "configs/dimension_mappings").exists()
-    return path
-
-
-def test_register_project_and_dataset(test_data_dir):
+def test_register_project_and_dataset(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
-        path = create_registry(base_dir)
+        path = create_local_test_registry(base_dir)
         dataset_dir = Path("datasets/sector_models/comstock")
         dataset_dim_dir = dataset_dir / "dimensions"
         # TODO: The data repo currently does not have valid dimension mappings.
         # Disabling these tests.
-        # dimension_mapping_config = test_data_dir / dataset_dim_dir / "dimension_mappings.toml"
+        # dimension_mapping_config = make_test_project_dir / dataset_dim_dir / "dimension_mappings.toml"
         # dimension_mapping_refs = (
-        #    test_data_dir / dataset_dim_dir / "dimension_mapping_references.toml"
+        #    make_test_project_dir / dataset_dim_dir / "dimension_mapping_references.toml"
         # )
 
         user = "test_user"
         log_message = "registration message"
         manager = RegistryManager.load(path, offline_mode=True)
         for dim_config_file in (
-            test_data_dir / "dimensions.toml",
-            test_data_dir / dataset_dir / "dimensions.toml",
+            make_test_project_dir / "dimensions.toml",
+            make_test_project_dir / dataset_dir / "dimensions.toml",
         ):
             dim_mgr = manager.dimension_manager
             dim_mgr.register(dim_config_file, user, log_message)
             assert dim_mgr.list_ids()
-            if dim_config_file == test_data_dir / "dimensions.toml":
+            if dim_config_file == make_test_project_dir / "dimensions.toml":
                 # The other one has time only - no records.
                 with pytest.raises(DSGDuplicateValueRegistered):
                     dim_mgr.register(dim_config_file, user, log_message)
@@ -82,8 +50,8 @@ def test_register_project_and_dataset(test_data_dir):
         # with pytest.raises(DSGDuplicateValueRegistered):
         #    dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
 
-        project_config_file = test_data_dir / "project.toml"
-        dataset_config_file = test_data_dir / dataset_dir / "dataset.toml"
+        project_config_file = make_test_project_dir / "project.toml"
+        dataset_config_file = make_test_project_dir / dataset_dir / "dataset.toml"
         # replace_dimension_mapping_uuids_from_registry(
         #    path, (project_config_file, dimension_mapping_refs)
         # )

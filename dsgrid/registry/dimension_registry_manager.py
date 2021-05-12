@@ -119,6 +119,9 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._dimensions[key] = dimension
         return dimension
 
+    def get_registry_lock_file(self, config_id):
+        return "configs/.locks/dimensions.lock"
+
     def has_id(self, config_id, version=None):
         if version is None:
             return config_id in self._registry_configs
@@ -164,6 +167,11 @@ class DimensionRegistryManager(RegistryManagerBase):
         return dimensions
 
     def register(self, config_file, submitter, log_message, force=False):
+        lock_file_path = self.get_registry_lock_file(None)
+        with self.cloud_interface.make_lock_file(lock_file_path):
+            self._register(config_file, submitter, log_message, force=force)
+
+    def _register(self, config_file, submitter, log_message, force=False):
         config = DimensionConfig.load(config_file)
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)

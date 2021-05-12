@@ -1,6 +1,7 @@
 """Base class for all registry managers."""
 
 import abc
+from contextlib import contextmanager
 import logging
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from prettytable import PrettyTable
 from dsgrid import timer_stats_collector
 from .common import RegistryManagerParams
 from .registry_base import RegistryBaseModel
-from dsgrid.common import REGISTRY_FILENAME
+from dsgrid.common import REGISTRY_FILENAME, SYNC_EXCLUDE_LIST
 from dsgrid.exceptions import (
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
@@ -132,6 +133,12 @@ class RegistryManagerBase(abc.ABC):
             Raised if the config ID is already registered.
 
         """
+        if self.offline_mode or self.dry_run_mode:
+            self._register(config_file, submitter, log_message, force=force)
+        else:
+            lock_file_path = self.get_registry_lock_file(load_data(config_file)["project_id"])
+            with self.cloud_interface.make_lock_file(lock_file_path):
+                self._register(config_file, submitter, log_message, force=force)
 
     @staticmethod
     @abc.abstractmethod
@@ -184,6 +191,11 @@ class RegistryManagerBase(abc.ABC):
     def cloud_interface(self):
         """Return the CloudStorageInterface to sync remote data."""
         return self._params.cloud_interface
+
+    @cloud_interface.setter
+    def cloud_interface(self, cloud_interface):
+        """Set the CloudStorageInterface (used in testing)"""
+        self._params = self._params._replace(cloud_interface=cloud_interface)
 
     @property
     def fs_interface(self):
@@ -258,6 +270,21 @@ class RegistryManagerBase(abc.ABC):
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
         return self._registry_configs[config_id]
 
+    @abc.abstractmethod
+    def get_registry_lock_file(self, config_id):
+        """Return registry lock file path.
+
+        Parameters
+        ----------
+        config_id : str
+            Config ID
+
+        Returns
+        -------
+        str
+            Lock file path
+        """
+
     def get_registry_directory(self, config_id):
         """Return the directory containing data for config_id (registry.toml and versions).
 
@@ -318,6 +345,12 @@ class RegistryManagerBase(abc.ABC):
         """
         return sorted(self.iter_ids())
 
+    def relative_remote_path(self, path):
+        """Return relative remote registry path."""
+        relative_path = Path(path).relative_to(self._params.base_path)
+        remote_path = f"{self._params.remote_path}/{relative_path}"
+        return remote_path
+
     def remove(self, config_id):
         """Remove an item from the registry
 
@@ -365,9 +398,10 @@ class RegistryManagerBase(abc.ABC):
             Local path
 
         """
-        relative_path = Path(path).relative_to(self._params.base_path)
-        remote_path = f"{self._params.remote_path}/{relative_path}"
-        self.cloud_interface.sync_pull(remote_path, path)
+        remote_path = self.relative_remote_path(path)
+        self.cloud_interface.sync_pull(
+            remote_path, path, exclude=SYNC_EXCLUDE_LIST, delete_local=True
+        )
 
     def sync_push(self, path):
         """Synchronizes files from the local path to the remote registry.
@@ -376,6 +410,9 @@ class RegistryManagerBase(abc.ABC):
             Local path
 
         """
-        relative_path = Path(path).relative_to(self._params.base_path)
-        remote_path = f"{self._params.remote_path}/{relative_path}"
-        self.cloud_interface.sync_push(path, remote_path)
+        remote_path = self.relative_remote_path(path)
+        lock_file_path = self.get_registry_lock_file(path.name)
+        self.cloud_interface.check_lock_file(lock_file_path)
+        self.cloud_interface.sync_push(
+            remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
+        )

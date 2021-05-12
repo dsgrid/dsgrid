@@ -103,7 +103,15 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._projects[key] = project
         return project
 
+    def get_registry_lock_file(self, config_id):
+        return f"configs/.locks/{config_id}.lock"
+
     def register(self, config_file, submitter, log_message, force=False):
+        lock_file_path = self.get_registry_lock_file(load_data(config_file)["project_id"])
+        with self.cloud_interface.make_lock_file(lock_file_path):
+            self._register(config_file, submitter, log_message, force=force)
+
+    def _register(self, config_file, submitter, log_message, force=False):
         config = ProjectConfig.load(config_file, self._dimension_mgr)
         self._check_if_already_registered(config.model.project_id)
 
@@ -153,6 +161,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._update_registry_cache(config.model.project_id, registry_model)
 
         if not self.offline_mode:
+            registry_dir = self.get_registry_directory(load_data(config_file)["project_id"])
             self.sync_push(registry_dir)
 
         logger.info(

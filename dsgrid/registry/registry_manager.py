@@ -1,12 +1,15 @@
 """Manages registration of all projects and datasets."""
 
+import getpass
 import logging
 import os
 from pathlib import Path
+import uuid
 
 from dsgrid.common import (
     LOCAL_REGISTRY,
     REMOTE_REGISTRY,
+    SYNC_EXCLUDE_LIST,
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
 from dsgrid.dimension.base_models import DimensionType
@@ -17,7 +20,7 @@ from .common import (
 )
 from .dimension_mapping_registry import DimensionMappingRegistry
 from .dimension_mapping_registry_manager import DimensionMappingRegistryManager
-from .dataset_registry import DatasetRegistry, DatasetRegistryModel
+from .dataset_registry import DatasetRegistry
 from .dataset_registry_manager import DatasetRegistryManager
 from .dimension_registry import DimensionRegistry
 from .dimension_registry_manager import DimensionRegistryManager
@@ -57,7 +60,7 @@ class RegistryManager:
         )
 
     @classmethod
-    def create(cls, path):
+    def create(cls, path, remote_path=REMOTE_REGISTRY, user=None):
         """Creates a new RegistryManager at the given path.
 
         Parameters
@@ -69,6 +72,10 @@ class RegistryManager:
         RegistryManager
 
         """
+        if not user:
+            user = getpass.getuser()
+        uid = str(uuid.uuid4())
+
         if str(path).startswith("s3"):
             raise Exception(f"s3 is not currently supported: {path}")
 
@@ -79,9 +86,9 @@ class RegistryManager:
         fs_interface.mkdir(path / DimensionRegistry.registry_path())
         fs_interface.mkdir(path / DimensionMappingRegistry.registry_path())
         logger.info("Created registry at %s", path)
-        cloud_interface = make_cloud_storage_interface(path, "", offline=True)
+        cloud_interface = make_cloud_storage_interface(path, "", offline=True, uuid=uid, user=user)
         params = RegistryManagerParams(
-            Path(path), REMOTE_REGISTRY, fs_interface, cloud_interface, offline=True, dry_run=False
+            Path(path), remote_path, fs_interface, cloud_interface, offline=True, dry_run=False
         )
         return cls(params)
 
@@ -102,34 +109,76 @@ class RegistryManager:
         return self._project_mgr
 
     @classmethod
-    def load(cls, path, offline_mode=False, dry_run_mode=False):
+    def load(
+        cls,
+        path,
+        remote_path=REMOTE_REGISTRY,
+        offline_mode=False,
+        dry_run_mode=False,
+        user=None,
+        no_prompts=False,
+    ):
         """Loads a registry from the given path.
 
         Parameters
         ----------
         path : str
+            base path of the local or base registry
+        remote_path: str, optional
+            path of the remote registry; default is REMOTE_REGISTRY
         offline_mode : bool
             Load registry in offline mode; default is False
         dry_run_mode : bool
             Test registry operations in dry-run "test" mode (i.e., do not commit changes to remote)
+        user : str
+            username
+        no_prompts : bool
+            If no_prompts is False, the user will be prompted to continue sync pulling the registry if lock files exist.
 
         Returns
         -------
         RegistryManager
 
         """
+        if not user:
+            user = getpass.getuser()
+        uid = str(uuid.uuid4())
         # TODO S3
         if str(path).startswith("s3"):
             raise Exception(f"S3 is not yet supported as the base path: {path}")
         fs_interface = make_filesystem_interface(path)
-        cloud_interface = make_cloud_storage_interface(path, REMOTE_REGISTRY, offline=offline_mode)
+        cloud_interface = make_cloud_storage_interface(
+            path, remote_path, offline=offline_mode, uuid=uid, user=user
+        )
 
         if not offline_mode:
-            logger.info("Sync from remote registry.")
-            cloud_interface.sync_pull(REMOTE_REGISTRY, path)
+            lock_files = list(cloud_interface.get_lock_files())
+            if lock_files:
+                msg = f"There are {len(lock_files)} lock files in the registry:"
+                for lock_file in lock_files:
+                    msg = msg + "\n\t" + f"- {lock_file}"
+                logger.log(msg)
+                if not no_prompts:
+                    msg = (
+                        msg
+                        + "\n... Do you want to continue syncing the registry contents? [Y] >>> "
+                    )
+                    val = input(msg)
+                    if val == "" or val.lower() == "y":
+                        sync = True
+                    else:
+                        logger.info("Skipping remote registry sync.")
+            else:
+                sync = True
+
+            if sync:
+                logger.info("Sync from remote registry.")
+                cloud_interface.sync_pull(
+                    remote_path + "/configs", str(path) + "/configs", exclude=SYNC_EXCLUDE_LIST
+                )
 
         params = RegistryManagerParams(
-            path, REMOTE_REGISTRY, fs_interface, cloud_interface, offline_mode, dry_run_mode
+            path, remote_path, fs_interface, cloud_interface, offline_mode, dry_run_mode
         )
         path = Path(path)
         for dir_name in (

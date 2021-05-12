@@ -86,6 +86,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._mappings[key] = dimension_mapping
         return dimension_mapping
 
+    def get_registry_lock_file(self, config_id):
+        return "configs/.locks/dimension_mappings.lock"
+
     def load_dimension_mappings(self, dimension_mapping_references):
         """Load dimension_mappings from files.
 
@@ -108,6 +111,11 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         return mappings
 
     def register(self, config_file, submitter, log_message, force=False):
+        lock_file_path = self.get_registry_lock_file(None)
+        with self.cloud_interface.make_lock_file(lock_file_path):
+            self._register(config_file, submitter, log_message, force=force)
+
+    def _register(self, config_file, submitter, log_message, force=False):
         config = DimensionMappingConfig.load(config_file)
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)

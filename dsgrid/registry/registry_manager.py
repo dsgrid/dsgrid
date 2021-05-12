@@ -152,8 +152,8 @@ class RegistryManager:
         )
 
         if not offline_mode:
-            lock_files = cloud_interface.get_lock_files()
-            if cloud_interface.has_lock_files():
+            lock_files = list(cloud_interface.get_lock_files())
+            if lock_files:
                 msg = f"There are {len(lock_files)} lock files in the registry:"
                 for lock_file in lock_files:
                     msg = msg + "\n\t" + f"- {lock_file}"

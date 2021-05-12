@@ -77,7 +77,7 @@ class S3StorageInterface(CloudStorageInterface):
 
     def has_lock_files(self):
         contents = self.get_lock_files()
-        return bool(contents)
+        return next(contents, None) is not None
 
     @contextmanager
     def make_lock_file(self, path):

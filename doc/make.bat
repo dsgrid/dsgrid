@@ -25,6 +25,7 @@ if errorlevel 9009 (
 	exit /b 1
 )
 
+python make_config_model_tables.py -o %BUILDDIR%/config_tables
 %SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 goto end
 

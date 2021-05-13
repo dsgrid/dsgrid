@@ -1,6 +1,7 @@
 """Base functionality for all Pydantic data models used in dsgrid"""
 
 import enum
+import json
 import os
 
 from pydantic import BaseModel
@@ -41,6 +42,19 @@ class DSGBaseModel(BaseModel):
 
         finally:
             os.chdir(orig)
+
+    @classmethod
+    def schema_json(cls, by_alias=True, indent=None) -> str:
+        data = cls.schema(by_alias=by_alias)
+        return json.dumps(data, indent=indent, cls=ExtendedJSONEncoder)
+
+
+class ExtendedJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, VersionInfo):
+            return str(obj)
+
+        return json.JSONEncoder.default(self, obj)
 
 
 def serialize_model(model: DSGBaseModel):

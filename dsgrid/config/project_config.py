@@ -34,7 +34,7 @@ from .dimensions import (
 )
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.registry.common import DatasetRegistryStatus, check_config_id_2
+from dsgrid.registry.common import ProjectRegistryStatus, DatasetRegistryStatus, check_config_id_2
 
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
@@ -124,7 +124,7 @@ class InputDatasetModel(DSGBaseModel):
     status: Optional[DatasetRegistryStatus] = Field(
         title="status",
         description="registration status of the dataset",
-        default=DatasetRegistryStatus.REGISTERED,
+        default=DatasetRegistryStatus.UNREGISTERED,
     )
     # TODO this model_sector must be validated in the dataset_config
     model_sector: str = Field(
@@ -199,6 +199,9 @@ class ProjectConfigModel(DSGBaseModel):
         title="name",
         description="project name",
     )
+    status: ProjectRegistryStatus = Field(
+        tile="status", description="project registry status", default="Initial Registration"
+    )
     description: str = Field(
         title="description",
         description="describe project in details",
@@ -248,6 +251,10 @@ class ProjectConfig(ConfigBase):
     def model_class():
         return ProjectConfigModel
 
+    @staticmethod
+    def config_filename():
+        return "project.toml"
+
     @classmethod
     def load(cls, config_file, dimension_manager):
         config = cls._load(config_file)
@@ -267,7 +274,7 @@ class ProjectConfig(ConfigBase):
             self.model.dimensions.supplemental_dimensions
         )
         dims = itertools.chain(base_dimensions.values(), supplemental_dimensions.values())
-        check_uniqueness((x.name for x in dims), "dimension name")
+        check_uniqueness((x.model.name for x in dims), "dimension name")
         check_uniqueness((getattr(x, "cls") for x in dims), "dimension cls")
 
         self._base_dimensions.update(base_dimensions)
@@ -340,19 +347,34 @@ class ProjectConfig(ConfigBase):
                 # TODO: if there are proejct dimension IDs that are missing from the dataset, log a warning
                 # TODO: consider throwing an error if a dataset dimension_id maps to too many project dimension ids (unless aggregation is specified)
 
+    @property
+    def config_id(self):
+        return self._model.project_id
+
     def get_dataset(self, dataset_id):
         """Return a dataset by ID."""
         for dataset in self.model.input_datasets.datasets:
             if dataset.dataset_id == dataset_id:
                 return dataset
 
-        raise DSGInvalidField(f"no dataset with dataset_id={dataset_id}")
+        raise DSGInvalidField(
+            f"project_id={self._model.project_id} does not have dataset_id={dataset_id}"
+        )
 
-    def has_dataset(self, dataset_id):
-        """Return True if the dataset_id is present in the configuration."""
-        for _id in self.iter_dataset_ids():
-            if _id == dataset_id:
-                return True
+    def has_dataset(self, dataset_id, status=None):
+        """Return True if the dataset_id is present in the configuration.
+
+        Parameters
+        ----------
+        dataset_id : str
+        status : None | DatasetRegistryStatus
+            If set, only return True if the status matches.
+        """
+        for dataset in self.iter_datasets():
+            if dataset.dataset_id == dataset_id:
+                if status is None or dataset.status == status:
+                    return True
+                return False
 
         # TODO DT: what about benchmark and historical?
         return False
@@ -364,6 +386,69 @@ class ProjectConfig(ConfigBase):
     def iter_dataset_ids(self):
         for dataset in self.model.input_datasets.datasets:
             yield dataset.dataset_id
+
+    def list_registered_dataset_ids(self):
+        """List registered datasets associated with the project.
+
+        Returns
+        -------
+        list
+            list of dataset IDs
+
+        """
+        status = DatasetRegistryStatus.REGISTERED
+        return [x.dataset_id for x in self._iter_datasets_by_status(status)]
+
+    def list_unregistered_dataset_ids(self):
+        """Get unregistered datasets associated with project registry.
+
+        Returns
+        -------
+        list
+            list of dataset IDs
+
+        """
+        status = DatasetRegistryStatus.UNREGISTERED
+        return [x.dataset_id for x in self._iter_datasets_by_status(status)]
+
+    def _iter_datasets_by_status(self, status: DatasetRegistryStatus) -> InputDatasetModel:
+        for dataset in self.iter_datasets():
+            if dataset.status == status:
+                yield dataset
+
+    def set_status(self, status):
+        """Set the project status to the given value.
+
+        Parameters
+        ----------
+        status : ProjectRegistryStatus
+
+        """
+        self.model.status = status
+        logger.info("Set project_id=%s status=%s", self.config_id, status)
+
+    def set_dataset_status(self, dataset_id, status):
+        """Set the dataset status to the given value.
+
+        Parameters
+        ----------
+        dataset_id : str
+        status : DatasetRegistryStatus
+
+        Raises
+        ------
+        ValueError
+            Raised if dataset_id is not stored.
+
+        """
+        dataset = self.get_dataset(dataset_id)
+        dataset.status = status
+        logger.info(
+            "Set dataset_id=%s status=%s for project_id=%s",
+            dataset_id,
+            status,
+            self._model.project_id,
+        )
 
     @property
     def base_dimensions(self):

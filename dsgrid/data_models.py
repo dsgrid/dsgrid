@@ -33,7 +33,7 @@ class DSGBaseModel(BaseModel):
         filename : str
 
         """
-        base_dir = os.path.dirname(str(filename))
+        base_dir = os.path.abspath(os.path.dirname(str(filename)))
         orig = os.getcwd()
         os.chdir(base_dir)
         try:
@@ -53,6 +53,8 @@ class ExtendedJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, VersionInfo):
             return str(obj)
+        if isinstance(obj, enum.Enum):
+            return obj.value
 
         return json.JSONEncoder.default(self, obj)
 

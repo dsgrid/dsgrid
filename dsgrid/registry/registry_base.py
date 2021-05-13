@@ -45,8 +45,6 @@ class RegistryBaseModel(DSGBaseModel):
 class RegistryBase(ConfigBase, abc.ABC):
     """Base class for classes that store records in the registry"""
 
-    DIMENSION_REGISTRY_PATH = Path("registry/dimensions")
-
     @staticmethod
     @abc.abstractmethod
     def config_filename():

@@ -101,18 +101,17 @@ class DatasetRegistryManager(RegistryManagerBase):
             description=config.model.description,
             registration_history=[registration],
         )
+        registry_config = DatasetRegistry(registry_model)
         registry_dir = self.get_registry_directory(config.model.dataset_id)
         data_dir = registry_dir / str(registration.version)
 
         # Serialize the registry file as well as the updated DatasetConfig to the registry.
         self.fs_interface.mkdir(data_dir)
         registry_filename = registry_dir / REGISTRY_FILENAME
-        dump_data(serialize_model(registry_model), registry_filename)
+        registry_config.serialize(registry_filename)
+        config.serialize(self.get_config_directory(config.config_id, registry_config.version))
 
-        config_filename = data_dir / ("dataset" + os.path.splitext(config_file)[1])
-        dump_data(serialize_model(config.model), config_filename)
-
-        self._update_registry_cache(config.model.dataset_id, registry_model)
+        self._update_registry_cache(config.model.dataset_id, registry_config)
 
         if not self.offline_mode:
             self.sync_push(registry_dir)
@@ -140,13 +139,19 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         logger.info("Removed %s from the registry.", config_id)
 
-    def update(self, config_file, submitter, update_type, log_message):
-        assert False, "Updating a dataset is not currently supported"
-        # Commented-out code from registry_manager.py needs to be ported here and tested.
-        self._check_if_not_registered(config_id)
+    def update(self, config_file, config_id, submitter, update_type, log_message, version):
+        config = DatasetConfig.load(config_file, self.dimension_manager)
+        self._check_update(config, config_id, version)
+        lock_file_path = self.get_registry_lock_file(config.config_id)
+        with self.cloud_interface.make_lock_file(lock_file_path):
+            # Note that projects will not pick up these changes until submit-dataset
+            # is called again.
+            return self._update(config, submitter, update_type, log_message)
 
-        registry_file = self._get_registry_filename(dataset_id)
-        registry_config = DatasetRegistryModel(**load_data(registry_file))
-        self._update_config(
-            dataset_id, registry_config, config_file, submitter, update_type, log_message
-        )
+    def _update(self, config, submitter, update_type, log_message):
+        registry = self.get_registry_config(config.config_id)
+        old_key = ConfigKey(config.config_id, registry.version)
+        version = self._update_config(config, submitter, update_type, log_message)
+        new_key = ConfigKey(config.config_id, version)
+        self._datasets.pop(old_key, None)
+        self._datasets[new_key] = config

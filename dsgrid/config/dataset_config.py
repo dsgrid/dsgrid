@@ -149,6 +149,14 @@ class DatasetConfig(ConfigBase):
         self._dimensions = {}
 
     @staticmethod
+    def config_filename():
+        return "dataset.toml"
+
+    @property
+    def config_id(self):
+        return self._model.dataset_id
+
+    @staticmethod
     def model_class():
         return DatasetConfigModel
 

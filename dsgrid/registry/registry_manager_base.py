@@ -1,21 +1,23 @@
 """Base class for all registry managers."""
 
 import abc
-from contextlib import contextmanager
 import logging
+from datetime import datetime
 from pathlib import Path
 
 from prettytable import PrettyTable
 
 from dsgrid import timer_stats_collector
-from .common import RegistryManagerParams
+from .common import RegistryManagerParams, ConfigRegistrationModel, VersionUpdateType
 from .registry_base import RegistryBaseModel
 from dsgrid.common import REGISTRY_FILENAME, SYNC_EXCLUDE_LIST
 from dsgrid.exceptions import (
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
     DSGInvalidOperation,
+    DSGInvalidParameter,
 )
+from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import Timer, track_timing
 
 
@@ -146,24 +148,73 @@ class RegistryManagerBase(abc.ABC):
         """Return the class used for the registry item."""
 
     @abc.abstractmethod
-    def update(self, config_file, submitter, update_type, log_message):
+    def update(self, config_file, config_id, submitter, update_type, log_message, version):
         """Updates an existing registry with new parameters or data.
 
         Parameters
         ----------
         config_file : str
             Path to project config file
+        config_id : str
         submitter : str
             Submitter name
         update_type : VersionUpdateType
         log_message : str
+        version : VersionInfo
+            Version to update; must be the current version.
 
         Raises
         ------
         ValueError
             Raised if the config_file is invalid.
+        DSGInvalidParameter
+            Raised if config_id does not match config_file.
+            Raised if the version is not the current version.
 
         """
+
+    def _check_update(self, config, config_id, version):
+        if config.config_id != config_id:
+            raise DSGInvalidParameter(
+                f"ID={config_id} does not match ID in file: {config.config_id}"
+            )
+
+        cur_version = self.get_current_version(config_id)
+        if version != cur_version:
+            raise DSGInvalidParameter(f"version={version} is not current. Current={cur_version}")
+
+    def _update_config(self, config, submitter, update_type, log_message):
+        config_id = config.config_id
+        registry_config = self.get_registry_config(config_id)
+
+        if update_type == VersionUpdateType.MAJOR:
+            registry_config.version = registry_config.version.bump_major()
+        elif update_type == VersionUpdateType.MINOR:
+            registry_config.version = registry_config.version.bump_minor()
+        elif update_type == VersionUpdateType.PATCH:
+            registry_config.version = registry_config.version.bump_patch()
+
+        registration = ConfigRegistrationModel(
+            version=registry_config.version,
+            submitter=submitter,
+            date=datetime.now(),
+            log_message=log_message,
+        )
+        registry_config.registration_history.insert(0, registration)
+        registry_config.serialize(self.get_registry_file(config_id))
+
+        new_config_dir = self.get_config_directory(config_id, registry_config.version)
+        self.fs_interface.mkdir(new_config_dir)
+        config.serialize(new_config_dir)
+
+        self._update_registry_cache(config_id, registry_config)
+        logger.info(
+            "Updated registry and config information for %s ID=%s version=%s",
+            self.name(),
+            config_id,
+            registry_config.version,
+        )
+        return registry_config.version
 
     def _check_if_already_registered(self, config_id):
         if config_id in self._registry_configs:
@@ -179,9 +230,8 @@ class RegistryManagerBase(abc.ABC):
     def _log_offline_mode_prefix(self):
         return "* OFFLINE MODE * |" if self.offline_mode else ""
 
-    def _update_registry_cache(self, config_id, registry_model: RegistryBaseModel):
-        assert config_id not in self._registry_configs, config_id
-        self._registry_configs[config_id] = self.registry_class()(registry_model)
+    def _update_registry_cache(self, config_id, registry_config):
+        self._registry_configs[config_id] = registry_config
 
     def _raise_if_dry_run(self, operation):
         if self.dry_run_mode:
@@ -196,6 +246,29 @@ class RegistryManagerBase(abc.ABC):
     def cloud_interface(self, cloud_interface):
         """Set the CloudStorageInterface (used in testing)"""
         self._params = self._params._replace(cloud_interface=cloud_interface)
+
+    def dump(self, config_id, directory, version=None):
+        """Dump the config file to directory.
+
+        Parameters
+        ----------
+        config_id : str
+        directory : str
+        version : VersionInfo | None
+            Defaults to current version.
+
+        """
+        config = self.get_by_id(config_id, version)
+        filename = config.serialize(directory)
+        if version is None:
+            version = self._registry_configs[config_id].version
+        logger.info(
+            "Dumped config for type=%s ID=%s version=%s to %s",
+            self.name(),
+            config_id,
+            version,
+            filename,
+        )
 
     @property
     def fs_interface(self):
@@ -225,6 +298,8 @@ class RegistryManagerBase(abc.ABC):
         str
 
         """
+        if version is None:
+            version = self.get_current_version(config_id)
         return self.get_registry_directory(config_id) / str(version)
 
     def get_config_file(self, config_id, version):

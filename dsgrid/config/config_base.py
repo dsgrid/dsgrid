@@ -1,5 +1,8 @@
 import abc
-import os
+from pathlib import Path
+
+from dsgrid.data_models import serialize_model
+from dsgrid.utils.files import dump_data
 
 
 class ConfigBase(abc.ABC):
@@ -29,6 +32,28 @@ class ConfigBase(abc.ABC):
         model = cls.model_class().load(config_file)
         return cls(model)
 
+    @staticmethod
+    @abc.abstractmethod
+    def config_filename():
+        """Return the config filename.
+
+        Returns
+        -------
+        str
+
+        """
+
+    @property
+    @abc.abstractmethod
+    def config_id(self):
+        """Return the configuration ID.
+
+        Returns
+        -------
+        str
+
+        """
+
     @property
     def model(self):
         """Return the data model for the config.
@@ -44,3 +69,14 @@ class ConfigBase(abc.ABC):
     @abc.abstractmethod
     def model_class():
         """Return the data model class backing the config"""
+
+    def serialize(self, path):
+        """Serialize the configuration to a path.
+
+        path : str
+            Directory
+
+        """
+        filename = Path(path) / self.config_filename()
+        dump_data(serialize_model(self.model), filename)
+        return filename

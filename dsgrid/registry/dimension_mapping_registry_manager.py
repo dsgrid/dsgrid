@@ -5,13 +5,13 @@ import os
 from pathlib import Path
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.association_tables import AssociationTableModel
-from dsgrid.config.dimension_mapping_config import DimensionMappingConfig
+from dsgrid.config.association_tables import AssociationTableConfig
+from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
 from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.data_models import serialize_model
 from dsgrid.registry.common import ConfigKey, make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import dump_data
-from .dimension_mapping_registry import DimensionMappingRegistry
+from .dimension_mapping_registry import DimensionMappingRegistry, DimensionMappingRegistryModel
 from .registry_base import RegistryBaseModel
 from .registry_manager_base import RegistryManagerBase
 
@@ -34,12 +34,12 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def registry_class():
         return DimensionMappingRegistry
 
-    def check_unique_records(self, config: DimensionMappingConfig, warn_only=False):
+    def check_unique_records(self, config: DimensionMappingsConfig, warn_only=False):
         """Check if any new tables have identical records as existing tables.
 
         Parameters
         ----------
-        config : DimensionMappingConfig
+        config : DimensionMappingsConfig
         warn_only: bool
             If True, log a warning instead of raising an exception.
 
@@ -51,7 +51,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         """
         hashes = {}
         for mapping_id, registry_config in self._registry_configs.items():
-            mapping = self.get_by_id(mapping_id, registry_config.model.version)
+            mapping = self.get_by_id(mapping_id, registry_config.model.version).model
             hashes[mapping.file_hash] = mapping_id
 
         duplicates = []
@@ -67,7 +67,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                     f"There are {len(duplicates)} duplicate dimension mapping records."
                 )
 
-    def validate_records(self, config: DimensionMappingConfig, warn_only=False):
+    def validate_records(self, config: DimensionMappingsConfig, warn_only=False):
         """Validate dimension mapping records.
 
         Check:
@@ -91,9 +91,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             return mapping
 
         filename = self.get_config_file(key.id, key.version)
-        dimension_mapping = AssociationTableModel.load(filename)
-        self._mappings[key] = dimension_mapping
-        return dimension_mapping
+        config = AssociationTableConfig.load(filename)
+        self._mappings[key] = config
+        return config
 
     def get_registry_lock_file(self, config_id):
         return "configs/.locks/dimension_mappings.lock"
@@ -115,7 +115,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         mappings = {}
         for ref in dimension_mapping_references:
             key = ConfigKey(ref.id, ref.version)
-            mappings[key] = self.get_by_key(key)
+            mappings[key] = self.get_by_key(key).model
 
         return mappings
 
@@ -125,14 +125,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             self._register(config_file, submitter, log_message, force=force)
 
     def _register(self, config_file, submitter, log_message, force=False):
-        config = DimensionMappingConfig.load(config_file)
+        config = DimensionMappingsConfig.load(config_file)
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)
         self.validate_records(config, warn_only=force)
 
         registration = make_initial_config_registration(submitter, log_message)
-        dest_config_filename = "dimension_mapping" + os.path.splitext(config_file)[1]
-        config_dir = Path(os.path.dirname(config_file))
+        src_dir = Path(os.path.dirname(config_file))
 
         if self.dry_run_mode:
             for mapping in config.model.mappings:
@@ -145,35 +144,29 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             return
 
         for mapping in config.model.mappings:
-            registry_model = RegistryBaseModel(
+            registry_model = DimensionMappingRegistryModel(
+                dimension_mapping_id=mapping.mapping_id,
                 version=registration.version,
                 description=mapping.description.strip(),
                 registration_history=[registration],
             )
-            dest_dir = self._path / mapping.mapping_id / str(registration.version)
-            self.fs_interface.mkdir(dest_dir)
+            registry_config = DimensionMappingRegistry(registry_model)
+            dst_dir = self._path / mapping.mapping_id / str(registration.version)
+            self.fs_interface.mkdir(dst_dir)
 
-            registry_file = Path(os.path.dirname(dest_dir)) / REGISTRY_FILENAME
-            data = serialize_model(registry_model)
-            dump_data(data, registry_file)
+            registry_file = Path(os.path.dirname(dst_dir)) / REGISTRY_FILENAME
+            registry_config.serialize(registry_file)
 
-            # Leading directories from the original are not relevant in the registry.
-            dest_record_file = dest_dir / os.path.basename(mapping.filename)
-            self.fs_interface.copy_file(config_dir / mapping.filename, dest_record_file)
-
-            model_data = serialize_model(mapping)
-            # We have to make this change in the serialized dict instead of
-            # model because Pydantic will fail the assignment due to not being
-            # able to find the path.
-            model_data["file"] = os.path.basename(mapping.filename)
-            dump_data(model_data, dest_dir / dest_config_filename)
+            at_config = AssociationTableConfig(mapping)
+            at_config.src_dir = src_dir
+            at_config.serialize(dst_dir)
+            self._update_registry_cache(mapping.mapping_id, registry_config)
             logger.info(
                 "%s Registered dimension mapping id=%s version=%s",
                 self._log_offline_mode_prefix(),
                 mapping.mapping_id,
                 registration.version,
             )
-            self._update_registry_cache(mapping.mapping_id, registry_model)
 
         if not self.offline_mode:
             # Sync the entire dimension mapping registry path because it's probably cheaper
@@ -187,5 +180,33 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             registration.version,
         )
 
-    def update(self, config_file, submitter, update_type, log_message):
-        assert False, "not supported yet"
+    def dump(self, config_id, directory, version=None):
+        config = self.get_by_id(config_id, version)
+        config.serialize(directory)
+
+        if version is None:
+            version = self._registry_configs[config_id].version
+        logger.info(
+            "Dumped dimension mapping for type=%s ID=%s version=%s to %s",
+            self.name(),
+            config_id,
+            version,
+            directory,
+        )
+
+    def update(self, config_file, config_id, submitter, update_type, log_message, version):
+        config = AssociationTableConfig.load(config_file)
+        self._check_update(config, config_id, version)
+
+        lock_file_path = self.get_registry_lock_file(None)
+        with self.cloud_interface.make_lock_file(lock_file_path):
+            return self._update(config, submitter, update_type, log_message)
+
+    def _update(self, config, submitter, update_type, log_message):
+        registry = self.get_registry_config(config.config_id)
+        old_key = ConfigKey(config.config_id, registry.version)
+        version = self._update_config(config, submitter, update_type, log_message)
+        new_key = ConfigKey(config.config_id, version)
+        self._mappings.pop(old_key, None)
+        self._mappings[new_key] = config
+        return version

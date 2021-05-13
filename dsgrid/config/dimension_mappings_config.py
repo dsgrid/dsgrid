@@ -14,7 +14,7 @@ from dsgrid.registry.common import make_registry_id, check_config_id_1
 logger = logging.getLogger(__name__)
 
 
-class DimensionMappingConfigModel(DSGBaseModel):
+class DimensionMappingsConfigModel(DSGBaseModel):
     """Represents dimension mapping model configurations"""
 
     # This may eventually change to a Union if there are more subclasses.
@@ -22,18 +22,22 @@ class DimensionMappingConfigModel(DSGBaseModel):
         title="mappings",
         description="dimension mappings between and within projects and datasets",
     )
-    registration: Optional[Dict] = Field(
-        title="registration",
-        description="registration information",
-    )
 
 
-class DimensionMappingConfig(ConfigBase):
-    """Provides an interface to a DimensionMappingConfigModel."""
+class DimensionMappingsConfig(ConfigBase):
+    """Provides an interface to a DimensionMappingsConfigModel."""
+
+    @staticmethod
+    def config_filename():
+        return "dimension_mappings.toml"
+
+    @property
+    def config_id(self):
+        return self._model.dimension_mapping_id
 
     @staticmethod
     def model_class():
-        return DimensionMappingConfigModel
+        return DimensionMappingsConfigModel
 
     def assign_ids(self):
         """Assign unique IDs to each mapping in the config"""

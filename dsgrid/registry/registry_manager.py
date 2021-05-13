@@ -211,67 +211,6 @@ class RegistryManager:
     def path(self):
         return self._params.base_path
 
-    # TODO: currently unused but may be needed for project/dataset updates
-    # def _update_config(
-    #    self, config_id, registry_config, config_file, submitter, update_type, log_message
-    # ):
-    #    # TODO: need to check that there are indeed changes to the config
-    #    # TODO: if a new version is created but is deleted in .dsgrid-registry, version number should be reset
-    #    #   accordingly, currently it does not.
-    #    # desired feature: undo a revision
-
-    #    if isinstance(registry_config, DatasetRegistryModel):
-    #        registry_type = RegistryType.DATASET
-    #    else:
-    #        registry_type = RegistryType.PROJECT
-
-    #    # This validates that all data.
-    #    registry_class = get_registry_class(registry_type)
-    #    registry_class.load(config_file)
-
-    #    registry_config.description = load_data(config_file)[
-    #        "description"
-    #    ]  # always copy the latest from config
-
-    #    if update_type == VersionUpdateType.MAJOR:
-    #        registry_config.version = registry_config.version.bump_major()
-    #    elif update_type == VersionUpdateType.MINOR:
-    #        registry_config.version = registry_config.version.bump_minor()
-    #    elif update_type == VersionUpdateType.PATCH:
-    #        registry_config.version = registry_config.version.bump_patch()
-    #    else:
-    #        assert False
-
-    #    registration = ConfigRegistrationModel(
-    #        version=registry_config.version,
-    #        submitter=submitter,
-    #        date=datetime.now(),
-    #        log_message=log_message,
-    #    )
-    #    registry_config.registration_history.append(registration)
-    #    filename = self._get_registry_filename(registry_class, config_id)
-    #    config_dir = self._get_project_directory(config_id)
-    #    data_dir = config_dir / str(registry_config.version)
-    #    self._fs_intf.mkdir(data_dir)
-
-    #    if registry_type == RegistryType.DATASET:
-    #        config_file_name = "dataset"
-    #    elif registry_type == RegistryType.PROJECT:
-    #        config_file_name = "project"
-    #    config_file_name = config_file_name + os.path.splitext(config_file)[1]
-
-    #    dump_data(serialize_model(registry_config), filename)
-    #    self._fs_intf.copy_file(config_file, data_dir / config_file_name)
-    #    dimensions_dir = Path(os.path.dirname(config_file)) / "dimensions"
-    #    # copy new dimensions, to be removed with dimension id mapping
-    #    self._fs_intf.copy_tree(dimensions_dir, data_dir / "dimensions")
-    #    logger.info(
-    #        "Updated %s %s with version=%s",
-    #        registry_type.value,
-    #        config_id,
-    #        registry_config.version,
-    #    )
-
 
 def get_registry_path(registry_path=None):
     """

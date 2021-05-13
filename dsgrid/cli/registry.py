@@ -5,8 +5,10 @@
 
 import getpass
 import logging
+from pathlib import Path
 
 import click
+from semver import VersionInfo
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.registry.common import VersionUpdateType
@@ -16,6 +18,20 @@ from dsgrid.registry.registry_manager import RegistryManager
 
 
 logger = logging.getLogger(__name__)
+
+
+def _version_info_callback(ctx, param, val):
+    if val is None:
+        return val
+    return VersionInfo.parse(val)
+
+
+def _version_info_required_callback(ctx, param, val):
+    return VersionInfo.parse(val)
+
+
+def _version_update_callback(ctx, param, val):
+    return VersionUpdateType(val)
 
 
 @click.group()
@@ -199,6 +215,28 @@ def register_dimensions(registry_manager, dimension_config_file, log_message):
     manager.register(dimension_config_file, submitter, log_message)
 
 
+@click.command(name="dump")
+@click.argument("dimension-id")
+@click.option(
+    "-v",
+    "--version",
+    callback=_version_info_callback,
+    help="Version to dump; defaults to latest",
+)
+@click.option(
+    "-d",
+    "--directory",
+    default=".",
+    type=click.Path(exists=True),
+    help="Directory in which to create file",
+)
+@click.pass_obj
+def dump_dimension(registry_manager, dimension_id, version, directory):
+    """Dump a dimension config file from the registry."""
+    manager = registry_manager.dimension_manager
+    manager.dump(dimension_id, Path(directory), version=version)
+
+
 @click.command(name="register")
 @click.argument("dimension-mapping-config-file")
 @click.option(
@@ -228,6 +266,13 @@ def register_dimension_mappings(
 @click.command(name="update")
 @click.argument("project-config-file")
 @click.option(
+    "-p",
+    "--project-id",
+    required=True,
+    type=str,
+    help="project ID",
+)
+@click.option(
     "-l",
     "--log-message",
     required=True,
@@ -239,14 +284,45 @@ def register_dimension_mappings(
     "--update-type",
     required=True,
     type=click.Choice([x.value for x in VersionUpdateType]),
-    callback=lambda ctx, x: VersionUpdateType(x),
+    callback=_version_update_callback,
+)
+@click.option(
+    "-v",
+    "--version",
+    required=True,
+    callback=_version_info_required_callback,
+    help="Version to update; must be the current version.",
 )
 @click.pass_obj
-def update_project(registry_manager, project_config_file, log_message, update_type):
+def update_project(
+    registry_manager, project_config_file, project_id, log_message, update_type, version
+):
     """Update an existing project registry."""
     manager = registry_manager.project_manager
     submitter = getpass.getuser()
-    manager.update(project_config_file, submitter, update_type, log_message)
+    manager.update(project_config_file, project_id, submitter, update_type, log_message, version)
+
+
+@click.command(name="dump")
+@click.argument("project-id")
+@click.option(
+    "-v",
+    "--version",
+    callback=_version_info_callback,
+    help="Version to dump; defaults to latest",
+)
+@click.option(
+    "-d",
+    "--directory",
+    default=".",
+    type=click.Path(exists=True),
+    help="Directory in which to create file",
+)
+@click.pass_obj
+def dump_project(registry_manager, project_id, version, directory):
+    """Dump a project config file from the registry."""
+    manager = registry_manager.project_manager
+    manager.dump(project_id, directory, version=version)
 
 
 @click.command(name="register")
@@ -273,6 +349,52 @@ def remove_dataset(registry_manager, dataset_id, offline, dry_run):
     registry_manager.dataset_manager.remove_dataset(dataset_id)
 
 
+@click.command(name="update")
+@click.argument("dataset-config-file")
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    type=str,
+    help="reason for submission",
+)
+@click.option(
+    "-t",
+    "--update-type",
+    required=True,
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=_version_update_callback,
+)
+@click.pass_obj
+def update_dataset(registry_manager, dataset_config_file, log_message, update_type):
+    """Update an existing dataset registry."""
+    manager = registry_manager.dataset_manager
+    submitter = getpass.getuser()
+    manager.update(dataset_config_file, submitter, update_type, log_message)
+
+
+@click.command(name="dump")
+@click.argument("dataset-id")
+@click.option(
+    "-v",
+    "--version",
+    callback=_version_info_callback,
+    help="Version to dump; defaults to latest",
+)
+@click.option(
+    "-d",
+    "--directory",
+    default=".",
+    type=click.Path(exists=True),
+    help="Directory in which to create file",
+)
+@click.pass_obj
+def dump_dataset(registry_manager, dataset_id, version, directory):
+    """Dump a dataset config file from the registry."""
+    manager = registry_manager.dataset_manager
+    manager.dump(dataset_id, directory, version=version)
+
+
 @click.command()
 @click.pass_obj
 def sync(registry_manager):
@@ -285,13 +407,17 @@ projects.add_command(register_project)
 projects.add_command(remove_project)
 projects.add_command(update_project)
 projects.add_command(submit_dataset)
+projects.add_command(dump_project)
 
+datasets.add_command(dump_dataset)
 datasets.add_command(list_datasets)
 datasets.add_command(remove_dataset)
 datasets.add_command(register_dataset)
+datasets.add_command(update_dataset)
 
 dimensions.add_command(register_dimensions)
 dimensions.add_command(list_dimensions)
+dimensions.add_command(dump_dimension)
 
 dimension_mappings.add_command(register_dimension_mappings)
 dimension_mappings.add_command(list_dimension_mappings)

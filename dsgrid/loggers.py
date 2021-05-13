@@ -67,17 +67,19 @@ def setup_logging(
     packages.add("dsgrid")
     for package in packages:
         log_config["loggers"][package] = {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "DEBUG",
             "propagate": False,
         }
+        if filename is not None:
+            log_config["loggers"][package]["handlers"].append("file")
 
     # ETH@20210325 - This logic should be applied to packages as well? This makes
     # me think that this should really be two functions--one for setting up a
     # logger by name and the other for setting up loggers for a list of packages.
+    # DT: I think the issue is fixed, but we can still consider your point.
     if filename is None:
         log_config["handlers"].pop("file")
-        log_config["loggers"][name]["handlers"].remove("file")
 
     logging.config.dictConfig(log_config)
     logger = logging.getLogger(name)

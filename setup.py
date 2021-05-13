@@ -62,6 +62,7 @@ setup(
         "prettytable",
         "pydantic",
         "pyspark",
+        "s3path",
         "semver",
         "sqlalchemy",
         "toml",

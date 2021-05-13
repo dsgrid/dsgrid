@@ -1,7 +1,7 @@
 import os
 import sys
 
-
+# PROJECT_REPO = '/Users/mmooney/Documents/github/github.com/dsgrid/dsgrid-project-EFS'
 PROJECT_REPO = os.environ.get("TEST_PROJECT_REPO")
 
 if PROJECT_REPO is None:

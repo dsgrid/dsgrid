@@ -1,5 +1,8 @@
 # Dsgrid Data Structure
 
+### The dsgrid Distrbuted Data Format
+A dsgrid dataset is a distributed data format, meaning that it is made up of one or more independently registered datasets. For example, a dsgrid dataset may be made up of many sector model datasets that are compiled [insert better description here] together to represent a holistic dataset on energy demand across multiple sectors. We call these input datasets and they are registered to dsgrid by sector modelers (also called dsgrid data contributors). Each input dataset has its own set of dimension definitions and its own parquet file paths (hence the "distributed data format"). When you query dsgrid for a published dataset, you are really querying many datasets distributed across the [dsgrid registry](LINK-TO-PATH-HERE).
+
 ### Dataset Registration
 Dataset registration is required before it can be ingested into `dsgrid`. Registration is facilitated by .toml file(s) as shown below. Registration entries are stored <span style="color:red"> on *S3* </span>.
 
@@ -10,7 +13,7 @@ Dataset registration is required before it can be ingested into `dsgrid`. Regist
 	- For mapping options, select from `no mapping`, `association table`, or `association table with a scaling factor`
 	- If `no mapping`, Base Dimensions must match dataset dimensions.
 	- Submit `association table` as an input .toml file for `dataset-submit`.
-- `project_mapping.toml`: 
+- `dimension_mapping.toml`: 
     - defines `association table` to map dataset to Base Dimensions
 
 ### Data Tables
@@ -82,3 +85,5 @@ Dataset registration is required before it can be ingested into `dsgrid`. Regist
 - Stores sectoral scaling factors as single numbers and other scaling factors of similar nature
 - Can be looked up by xxx
 
+### Time zones
+<span style="color:red"> TODO: need to provide a note about time zone formatting in Spark and how it strips out the time zone and converts it to UTC by default. If you open up the parquet data outside of spark, the time zone will be UTC time (which may be different then the `Time Dimension`) </span>

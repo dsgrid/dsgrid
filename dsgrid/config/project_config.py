@@ -7,6 +7,7 @@ from pydantic import root_validator, validator
 from semver import VersionInfo
 
 from .config_base import ConfigBase
+from .dataset_config import InputDatasetType
 from .dimension_mapping_base import DimensionMappingReferenceModel
 from .dimensions import (
     DimensionReferenceModel,
@@ -20,7 +21,7 @@ from dsgrid.registry.common import (
     check_config_id_strict,
 )
 
-from dsgrid.utils.utilities import check_uniqueness
+from dsgrid.utils.utilities import check_uniqueness, format_enum_for_docs
 from dsgrid.utils.versioning import handle_version_or_str
 
 # from dsgrid.dimension.time import (
@@ -35,16 +36,31 @@ logger = logging.getLogger(__name__)
 
 
 class DimensionsModel(DSGBaseModel):
-    """Contains dimensions defined by a dataset"""
+    """Contains dimensions defined by a project"""
 
     base_dimensions: List[DimensionReferenceModel] = Field(
         title="base_dimensions",
-        description="dimensions defined by the project",
+        description="List of registry references (``DimensionReferenceModel``) for a project's "
+        "base dimensions (or core dimensions).",
+        requirements=(
+            "All base ``DimensionType`` must be defined and only one dimension reference per type "
+            "is allowed.",
+        ),
     )
     supplemental_dimensions: Optional[List[DimensionReferenceModel]] = Field(
         title="supplemental_dimensions",
-        description="supplemental dimensions",
+        description="List of registry references for a project's supplemental dimensions.",
+        requirements=(
+            "Dimensions references of the same ``DimensionType`` are allowed for supplemental "
+            "dimension refrences (i.e., multiple `Geography` types are allowed).",
+        ),
+        notes=(
+            "Supplemental dimensions are used to support additional querying and transformations",
+            "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
+            "base data.",
+        ),
         default=[],
+        optional=True,
     )
 
     @validator("base_dimensions")
@@ -91,37 +107,50 @@ class DimensionsModel(DSGBaseModel):
 
 
 class InputDatasetModel(DSGBaseModel):
-    """Defines an input dataset"""
+    """Defines an input dataset for the project config."""
 
     dataset_id: str = Field(
         title="dataset_id",
-        description="dataset ID",
+        description="Unique dataset identifier.",
     )
-    dataset_type: str = Field(  # TODO this needs to be ENUM
+    dataset_type: InputDatasetType = Field(
         title="dataset_type",
-        description="Dataset Type",
+        description="Dataset type.",
+        options=format_enum_for_docs(InputDatasetType),
     )
     version: Union[str, VersionInfo] = Field(
         title="version",
-        description="version of the dataset",
+        description="Version of the registered dataset",
+        default="1.0.0",  # TODO: convert to VersionInfo type?
+        requirements=(
+            "The version string must be in semver format (e.g., '1.0.0') and it must be a valid/"
+            "existing version in the registry.",
+        ),
+        # TODO: add notes about warnings for outdated versions?
+        # TODO: Maybe version needs to be Optional at first. Is
     )
     status: Optional[DatasetRegistryStatus] = Field(
         title="status",
-        description="registration status of the dataset, added by dsgrid",
+        description="Registration status of the dataset, added by dsgrid.",
         default=DatasetRegistryStatus.UNREGISTERED,
         dsg_internal=True,
+        notes=("status is "),
     )
     # TODO this model_sector must be validated in the dataset_config
-    model_sector: str = Field(
+    # TODO: this is only necessary for input_model types
+    model_sector: str = Field(  # TODO: should this be data_source instead?
+        # TODO: need to discuss with team why this is needed. One potential reason is because it is
+        # helpful to query at some point which datasets have not yet been registered. Dataset_id may
+        # not be all that descriptive, but the data_source is. We may also want the metric_type here too.
         title="model_sector",
-        description="model sector",
+        description="Model sector ID, required only if dataset type is ``sector_model``.",  # TODO: add validator
+        optional=True,
     )
     # TODO: is this needed?
     # sectors: List[str] = Field(
     #    title="sectors",
     #    description="sectors used in the project",
     # )
-
     @validator("version")
     def check_version(cls, version):
         return handle_version_or_str(version)
@@ -130,21 +159,9 @@ class InputDatasetModel(DSGBaseModel):
 class InputDatasetsModel(DSGBaseModel):
     """Defines all input datasets for a project"""
 
-    # TODO: incorrect
-    benchmark: List[str] = Field(
-        title="benchmark",
-        default=[],
-        description="benchmark",
-    )
-    # TODO: incorrect
-    historical: List[str] = Field(
-        title="historical",
-        default=[],
-        description="historical",
-    )
     datasets: List[InputDatasetModel] = Field(
         title="datasets",
-        description="project input datasets",
+        description="List of project input datasets",
     )
 
     # TODO:
@@ -158,19 +175,40 @@ class DimensionMappingsModel(DSGBaseModel):
 
     base_to_base: Optional[List[DimensionMappingReferenceModel]] = Field(
         title="base_to_base",
-        description="base-to-base dimension mappings (e.g., sector to subsector) that define the project dimension expectations for input datasets and allowable queries",
+        description="Base dimension to base dimension mappings (e.g., sector to subsector) that "
+        "define the project dimension expectations for input datasets and allowable queries.",
         default=[],
+        optional=True,
+        notes=(
+            "At the project-level, base-to-base mappings are optional. If no base-to-base"
+            " dimension mapping is provided, dsgrid assumes a full-join of all base dimension"
+            " records. For example, if a full-join is assumed for the sector dimension, then all"
+            " sectors will map to all subsectors, they will also map to all geographies, all model"
+            " years, and so forth.",
+            # TODO: have we implemented this full join assumption?
+        ),
     )
     base_to_supplemental: Optional[List[DimensionMappingReferenceModel]] = Field(
         title="base_to_supplemental",
-        description="base dimension to supplemental dimension mappings (e.g., county to state) used to support various queries and dimension transformations",
+        description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
+        " used to support various queries and dimension transformations.",
         default=[],
+        optional=True,
     )
     dataset_to_project: Optional[Dict[str, List[DimensionMappingReferenceModel]]] = Field(
         title="dataset_to_project",
-        description="dataset-to-project mappings added to a project configuration after a dataset is submitted to the project",
+        description="Dataset-to-project mappings map dataset dimensions to project dimensions.",
         default={},
         dsg_internal=True,
+        optional=True,
+        notes=(
+            "Once a dataset is submitted to a project, dsgrid adds the dataset-to-project mappings"
+            " to the project config",
+            "Some projects may not have any dataset-to-project mappings. Dataset-to-project"
+            " mappings are only supplied if a dataset's dimensions do not match the project's"
+            " dimension. ",
+        ),
+        # TODO: need to document missing dimensoin records, fill values, etc.
     )
 
 
@@ -179,46 +217,57 @@ class ProjectConfigModel(DSGBaseModel):
 
     project_id: str = Field(
         title="project_id",
-        description="project identifier",
+        description="A unique project identifier that is project-specific (e.g., "
+        "'standard-scenarios-2021').",
+        requirements=("must not contain any dashes (`-`)",),
+        # @DT - I can also point directly to the validator, however, not all validation takes place
+        #   in these pydantic validators, so maybe we just list them here in the requirements
+        #   instead of pointing directly to the validators
     )
     name: str = Field(
         title="name",
-        description="project name",
+        description="A project name to accompany the ID.",
+        # TODO: do project names also need to be unique?
     )
-    status: ProjectRegistryStatus = Field(
-        tile="status",
+    description: str = Field(
+        title="description",
+        description="Detailed project description.",
+        notes=(
+            "The description will get stored in the project registry and may be used for searching",
+        ),  # TODO: is this true about all fields here?
+    )
+    status: Optional[ProjectRegistryStatus] = Field(
+        title="status",
         description="project registry status",
         default="Initial Registration",
         dsg_internal=True,
     )
-    description: str = Field(
-        title="description",
-        description="describe project in details",
-    )
-    input_datasets: InputDatasetsModel = Field(
-        title="input_datasets",
-        description="input datasets for the project",
+    datasets: List[InputDatasetModel] = Field(
+        title="datasets",
+        description="List of input datasets for the project.",
+        # TODO: can include
     )
     dimensions: DimensionsModel = Field(
         title="dimensions",
-        description="dimensions",
+        description="List of `base` and `supplemental` dimensions.",
     )
     dimension_mappings: Optional[DimensionMappingsModel] = Field(
         title="dimension_mappings",
-        description="list of base-to-base and base-to-supplemental mappings",
+        description="List of base-to-base and base-to-supplemental mappings.",  # TODO: technically also includes dataset-to-project mappings
         default=[],
+        optional=True,
+        notes=("`[dimension_mappings]` are optional at the project level.",),
     )
-    registration: Optional[Dict] = Field(
+    registration: Optional[Dict] = Field(  # TODO: Is this still being used?
         title="registration",
-        description="registration information",
+        description="Registration information",
         dsg_internal=True,
     )
 
     @validator("project_id")
     def check_project_id_handle(cls, project_id):
         """Check for valid characters in project id"""
-        # TODO: any other invalid character for the project_id?
-        # TODO: may want to check for pre-existing project_id
+        # TODO: may want to check for pre-existing project_id --> are we doing this?
         #       (e.g., LA100 Run 1 vs. LA100 Run 0 kind of thing)
         if "-" in project_id:
             raise ValueError('invalid character "-" in project id')
@@ -226,7 +275,7 @@ class ProjectConfigModel(DSGBaseModel):
         check_config_id_strict(project_id, "Project")
         return project_id
 
-    # TODO: validate that datasets listed are listed by the project
+    # TODO: validate that datasets listed are listed by the project -- are we doing this?
 
 
 class ProjectConfig(ConfigBase):

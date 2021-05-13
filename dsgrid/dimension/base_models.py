@@ -25,14 +25,16 @@ class DimensionType(Enum):
 class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 
+    # TODO: add support/links for docs
     id: str = Field(
         title="ID",
-        description="unique identifier within a dimension",
+        description="Unique identifier within a dimension",
     )
     name: str = Field(
         title="name",
-        description="user-defined name",
+        description="User-defined name",
     )
+    # TODO: feel free to add comments here
 
 
 class EndUseDimensionBaseModel(DimensionRecordBaseModel):

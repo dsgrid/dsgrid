@@ -16,7 +16,7 @@ class DatasetRegistryModel(RegistryBaseModel):
 
     dataset_id: str = Field(
         title="dataset_id",
-        description="dataset identifier",
+        description="Dataset identifier",
     )
 
 

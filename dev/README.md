@@ -96,9 +96,8 @@ python ../dev/md_to_rst.py md_files.txt
 ### Refresh API Documentation
 
 - Make sure dsgrid is installed or is in your PYTHONPATH
-- Delete the contents of `api`.
-- Run `sphinx-apidoc -o api ..` from the `doc` folder.
-- Compare `api/modules.rst` to `api.rst`. Delete `setup.rst` and references to it.
+- Delete the contents of `source/api`.
+- Run `sphinx-apidoc -o source/api ../dsgrid` from the `docs/source` folder.
 - 'git push' changes to the documentation source code as needed.
 - Make the documentation per below
 

@@ -24,15 +24,15 @@ class ProjectDatasetRegistryModel(DSGBaseModel):
 
     dataset_id: str = Field(
         title="dataset_id",
-        description="dataset identifier",
+        description="Dataset identifier",
     )
     version: Optional[Union[None, str, VersionInfo]] = Field(
         title="dataset_version",
-        description="full dataset version to be used to find dataset registry",
+        description="Full dataset version to be used to find dataset registry",
     )
     status: DatasetRegistryStatus = Field(
         title="status",
-        description="dataset status within the project",
+        description="Dataset status within the project",
     )
 
     @validator("version")
@@ -47,7 +47,7 @@ class ProjectRegistryModel(RegistryBaseModel):
 
     project_id: str = Field(
         tile="project_id",
-        description="unique project identifier",
+        description="Unique project identifier",
     )
 
 

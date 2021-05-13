@@ -32,15 +32,15 @@ class DimensionMap:
 class DimensionDirectMapping(DSGBaseModel):
     field: str = Field(
         title="field",
-        description="field in from_dimension containing foreign_key",
+        description="Field in from_dimension containing foreign_key",
     )
     to_dimension: Union[str, type] = Field(
         title="to_dimension",
-        description="target Dimension for mapping, initially a str",
+        description="Target Dimension for mapping, initially a str",
     )
     foreign_key: str = Field(
         title="foreign_key",
-        description="key in to_dimension",
+        description="Key in to_dimension",
     )
 
 
@@ -77,7 +77,7 @@ class ManyToManyMapping(MappingBaseModel):
     filename: str = Field(
         title="file",
         alias="file",
-        description="file that defines the associations",
+        description="File that defines the associations",
     )
 
     @validator("filename")

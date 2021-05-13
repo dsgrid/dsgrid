@@ -98,11 +98,20 @@ class ConfigRegistrationModel(DSGBaseModel):
 
     version: Union[str, VersionInfo] = Field(
         title="version",
-        description="version resulting from the registration",
+        description="Version resulting from the registration",
     )
-    submitter: str = Field(title="submitter", description="person that submitted the registration")
-    date: datetime = Field(title="date", description="registration date")
-    log_message: Optional[str] = Field(title="log_message", description="reason for the update")
+    submitter: str = Field(
+        title="submitter",
+        description="Username that submitted the registration",
+    )
+    date: datetime = Field(
+        title="date",
+        description="Registration date",
+    )
+    log_message: Optional[str] = Field(
+        title="log_message",
+        description="Reason for the update",
+    )
 
 
 def get_version_from_filename(filename):

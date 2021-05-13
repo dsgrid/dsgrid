@@ -1,6 +1,21 @@
 Dsgrid Data Structure
 =====================
 
+Distrbuted Data Format
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A dsgrid dataset is a distributed data format, meaning that it is made
+up of one or more independently registered datasets. For example, a
+dsgrid dataset may be made up of many sector model datasets that are
+compiled [insert better description here] together to represent a
+holistic dataset on energy demand across multiple sectors. We call these
+input datasets and they are registered to dsgrid by sector modelers
+(also called dsgrid data contributors). Each input dataset has its own
+set of dimension definitions and its own parquet file paths (hence the
+“distributed data format”). When you query dsgrid for a published
+dataset, you are really querying many datasets distributed across the
+`dsgrid registry <LINK-TO-PATH-HERE>`__.
+
 Dataset Registration
 ~~~~~~~~~~~~~~~~~~~~
 
@@ -19,12 +34,11 @@ Registration entries are stored on S3.
    -  For mapping options, select from ``no mapping``,
       ``association table``, or
       ``association table with a scaling factor``
-   -  If ``no mapping``, Base Dimensions must match dataset
-      dimensions.
+   -  If ``no mapping``, Base Dimensions must match dataset dimensions.
    -  Submit ``association table`` as an input .toml file for
       ``dataset-submit``.
 
--  ``project_mapping.toml``:
+-  ``dimension_mapping.toml``:
 
    -  defines ``association table`` to map dataset to Base Dimensions
 
@@ -65,8 +79,8 @@ Data Tables
    mapping from base data file dimensions to dataset dimensions (e.g.,
    ComStock locational multipliers)
 -  ``Project_dimension_mapping`` (optional): defines the conversion
-   mapping from dataset dimensions to Base Dimensions (is this a type
-   of association table?) (e.g., mapping to convert from dataset spatial
+   mapping from dataset dimensions to Base Dimensions (is this a type of
+   association table?) (e.g., mapping to convert from dataset spatial
    resolution to project spatial resolution)
 -  ``scaling_factor_table(s)`` (optional): store scaling factors for
    data disaggregation from one dimension to another
@@ -114,3 +128,12 @@ Metadata option for scaling factors still valid?
 -  Stores sectoral scaling factors as single numbers and other scaling
    factors of similar nature
 -  Can be looked up by xxx
+
+Time zones
+~~~~~~~~~~
+
+:red:`TODO: need to provide a note about time zone formatting in Spark and how
+it strips out the time zone and converts it to UTC by default. If you
+open up the parquet data outside of spark, the time zone will be UTC
+time (which may be different then the ``Time Dimension``)`
+

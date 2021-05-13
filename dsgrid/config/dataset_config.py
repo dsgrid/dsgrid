@@ -1,5 +1,12 @@
+"""
+Running List of TODO's:
+
+
+Questions:
+- Do diemsnion names need to be distinct from project's? What if the dataset
+is using the same dimension as the project?
+"""
 from enum import Enum
-import datetime
 from pathlib import Path
 from typing import List, Optional, Dict
 import os
@@ -15,8 +22,10 @@ from .dimensions import (
     DimensionReferenceModel,
 )
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.utils.utilities import format_enum_for_docs
 
 
+# TODO: likely needs refinement (missing mappings)
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 
@@ -24,14 +33,22 @@ logger = logging.getLogger(__name__)
 
 
 class InputDatasetType(Enum):
+    """Dataset types for a input dataset."""
+
     SECTOR_MODEL = "sector_model"
     HISTORICAL = "historical"
     BENCHMARK = "benchmark"
 
 
 class DSGDatasetParquetType(Enum):
+    """Dataset parquet types.
+
+    TODO: are we going to end up using this? If not, remove."""
+
     LOAD_DATA = "load_data"  # required
     LOAD_DATA_LOOKUP = "load_data_lookup"  # required
+    DATASET_DIMENSION_MAPPING = "dataset_dimension_mapping"  # optional
+    PROJECT_DIMENSION_MAPPING = "project_dimension_mapping"  # optional
 
 
 # TODO will need to rename this as it really should be more generic inputs
@@ -47,10 +64,11 @@ class InputSectorDataset(DSGBaseModel):
         title="data_type",
         alias="type",
         description="DSG parquet input dataset type",
+        options=format_enum_for_docs(DSGDatasetParquetType),
     )
     directory: str = Field(
         title="directory",
-        description="directory with parquet files",
+        description="Directory with parquet files",
     )
 
     # TODO:
@@ -61,97 +79,61 @@ class InputSectorDataset(DSGBaseModel):
     #   5. any specific scaling factor checks?
 
 
-class DataClassificationType(Enum):
-    """Data risk classification type
-
-    The moderate class includes all data under an NDA, data classified as business sensitive,
-    data classification as Critical Energy Infrastructure Infromation (CEII), or data with
-    Personal Identifiable Information (PII).
-
-    See https://uit.stanford.edu/guide/riskclassifications for more information.
-    """
-
-    LOW = "low"
-    MODERATE = "moderate"
-
-
 class DatasetConfigModel(DSGBaseModel):
-    """Represents model dataset configurations"""
+    """Represents dataset configurations."""
 
     dataset_id: str = Field(
         title="dataset_id",
-        description="dataset identifier",
+        description="Unique dataset identifier.",
+        requirements=(
+            "When registering a dataset to a project, the dataset_id must match the expected ID "
+            "defined in the project config.",
+            "For posterity, dataset_id cannot be the same as the model name (e.g., dataset cannot"
+            " be 'ComStock')",
+        )
+        # TODO: what are the requirements again? list them in the notes
     )
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
-        description="DSG defined input dataset type",
+        description="Input dataset type.",
+        options=f"{format_enum_for_docs(InputDatasetType)}",
     )
     # TODO: This must be validated against the project's dimension records for data_source
+    # TODO: This must also be validated against the project_config
     data_source: str = Field(
         title="data_source",
-        description="data source name, e.g. 'ComStock'",
+        description="Data source name, e.g. 'ComStock'.",
+        requirements=(
+            "When registering a dataset to a project, the `data_source` field must match one of "
+            "the dimension ID records defined by the project's base data source dimension.",
+        ),
+        # TODO: it would be nice to extend the description here with a CLI example of how to list the project's data source IDs.
     )
     path: str = Field(
         title="path",
-        description="path containing data",
+        description="Local path containing data to be registered on the remote registry.",  # TODO: Do we support S3 paths located somewhere else?
     )
     description: str = Field(
         title="description",
-        description="describe dataset in details",
-    )
-    origin_creator: str = Field(
-        title="origin_creator",
-        description="Origin data creator's name (first and last)",
-    )
-    origin_organization: str = Field(
-        title="origin_organization",
-        description="Origin organization name, e.g., NREL",
-    )
-    origin_contributors: List[str] = Field(
-        title="origin_contributors",
-        description="List of origin data contributor's first and last names"
-        """ e.g., ["Harry Potter", "Ronald Weasley"]""",
-        required=False,
-    )
-    origin_project: str = Field(
-        title="origin_project",
-        description="Origin project name",
-        optional=True,
-    )
-    origin_date: str = Field(
-        title="origin_date",
-        description="Date the source data was generated",
-    )
-    origin_version: str = Field(
-        title="origin_version",
-        description="Version of the origin data",
-    )
-    source: str = Field(
-        title="source",
-        description="Source of the data (text description or link)",
-    )
-    data_classification: DataClassificationType = Field(
-        title="data_classification",
-        description="Data security classification (e.g., low, moderate, high)",
-    )
-    tags: Optional[List[str]] = Field(
-        title="source",
-        description="List of data tags",
-        required=False,
+        description="A detailed description of the dataset.",
     )
     dimensions: List[DimensionReferenceModel] = Field(
         title="dimensions",
-        description="dimensions defined by the dataset",
+        description="List of registered dimension references that make up the dimensions of dataset.",
+        requirements=(
+            "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined ........."
+            "..................",
+            "* Only one dimension reference per type is allowed",
+            "* Each reference is to an existing registered dimension.",
+        )
+        # TODO: Add to notes - link to registering dimensions page
+        # TODO: Add to notes - link to example of how to list dimensions to find existing registered dimensions
     )
-    user_defined_metadata: Optional[Dict] = Field(
-        title="user_defined_metadata",
-        description="Additional user defined metadata fields",
-        default={},
-        required=False,
+    # TODO: Metdata is TBD
+    metadata: Optional[Dict] = Field(
+        title="metdata",
+        description=" TBD. metadata information such as origin_date, creator, contacts, organization, tags, etc.",
     )
-
-    # TODO: if local path provided, we want to upload to S3 and set the path
-    #   in the toml file back to S3 path --> does this happen in DatasetConfig instead?
 
     @validator("dataset_id")
     def check_dataset_id(cls, dataset_id):
@@ -189,14 +171,6 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: check project_dimension_mapping (optional) if exists
 
         return str(local_path)
-
-    @validator("origin_project", "origin_version")
-    def check_optional_origin_fields(cls, val, values):
-        """Require optional origin metadata fields if the dataset type is sector model"""
-        if values.get("dataset_type") == InputDatasetType.SECTOR_MODEL:
-            if not val:
-                raise ValueError(f"{val} must be defined if the dataset_type is sector_model")
-        return val
 
 
 class DatasetConfig(ConfigBase):

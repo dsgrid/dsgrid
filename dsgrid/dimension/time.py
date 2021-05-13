@@ -1,35 +1,56 @@
 """Dimesions related to time"""
 
 from enum import Enum
+from dsgrid.data_models import Enum, DSGEnum, Value
 
 from pydantic.dataclasses import dataclass
 
 
-class LeapDayAdjustmentType(Enum):
+class LeapDayAdjustmentType(DSGEnum):
     """Timezone enum types"""
+
+    DROP_DEC31 = Value(
+        value="drop_dec31", description="To adjust for leap years, December 31st gets dropped"
+    )
+    DROP_FEB29 = Value(
+        value="drop_feb29",
+        description="Feburary 29th is dropped. Currently not yet supported by dsgrid.",
+    )
+    DROP_JAN1 = Value(
+        value="drop_jan1", description="To adjust for leap years, January 1st gets dropped"
+    )
 
     # TODO: need some kind of mapping from this enum to leap day
     #       adjustment methods
-    DROP_DEC31 = "drop_dec31"
-    DROP_FEB29 = "drop_feb29"
-    DROP_JAN1 = "drop_jan1"
 
 
-class Period(Enum):
+class Period(DSGEnum):
     """Time period enum types"""
 
-    # TODO: R2PD uses a different set; do we want to align?
-    # https://github.com/Smart-DS/R2PD/blob/master/R2PD/tshelpers.py#L15
-    PERIOD_ENDING = "period_ending"
-    PERIOD_BEGINNING = "period_beginning"
-    INSTANTANEOUS = "instantaneous"
+    PERIOD_ENDING = Value(
+        value="period_ending",
+        description="A time period that is period ending is coded by the end time. E.g., 2pm (with"
+        " freq=1h) represents a period of time between 1-2pm.",
+    )
+    PERIOD_BEGINNING = Value(
+        value="period_beginning",
+        description="A time period that is period beginning is coded by the beginning time. E.g., "
+        "2pm (with freq=1h) represents a period of time between 2-3pm. This is the dsgrid default.",
+    )
+    INSTANTANEOUS = Value(
+        value="instantaneous",
+        description="The time record value represents measured, instantaneous time",
+    )
+
+
+# TODO: R2PD uses a different set; do we want to align?
+# https://github.com/Smart-DS/R2PD/blob/master/R2PD/tshelpers.py#L15
+#
 
 
 class TimeValueMeasurement(Enum):
     """Time value measurement enum types"""
 
-    # TODO: any kind of mappings/conversions for this?
-    # TODO: may want a way to alarm if input data != project data measurement
     MEAN = "mean"
     MIN = "min"
     MAX = "max"
@@ -48,7 +69,6 @@ class TimeFrequency(Enum):
     _1_WEEK = "1 week"
     _1_MONTH = "1 month"
     _1_YEAR = "1 year"
-    _1_SECOND = "1 second"
 
 
 class TimezoneType(Enum):

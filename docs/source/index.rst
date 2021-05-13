@@ -11,12 +11,20 @@ datasets.
 
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 4
    :caption: Contents:
 
+   
+   overview
+   user_guides/index
+   configs/index
    data_format
-   config_data_models
+   commands
    api
+
+      
+..   cli
+
 
 Indices and tables
 ==================

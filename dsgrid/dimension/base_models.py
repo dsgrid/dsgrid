@@ -21,6 +21,7 @@ class DimensionType(Enum):
     MODEL_YEAR = "model_year"
     SCENARIO = "scenario"
     DATA_SOURCE = "data_source"
+    METRIC_TYPE = "metric_type"
 
 
 class DimensionRecordBaseModel(DSGBaseModel):
@@ -46,6 +47,10 @@ class GeographyDimensionBaseModel(DimensionRecordBaseModel):
 
 class DataSourceDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all data source dimensions"""
+
+
+class MetricTypeDimensionBaseModel(DimensionRecordBaseModel):
+    """Base class for all metric type dimensions"""
 
 
 class ModelYearDimensionBaseModel(DimensionRecordBaseModel):
@@ -82,6 +87,7 @@ _DIMENSION_TO_MODEL = {
     DimensionType.MODEL_YEAR: ModelYearDimensionBaseModel,
     DimensionType.SCENARIO: ScenarioDimensionBaseModel,
     DimensionType.DATA_SOURCE: DataSourceDimensionBaseModel,
+    DimensionType.METRIC_TYPE: MetricTypeDimensionBaseModel,
 }
 
 

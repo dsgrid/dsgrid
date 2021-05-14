@@ -91,10 +91,6 @@ class DatasetConfigModel(DSGBaseModel):
         title="data_source",
         description="data source name, e.g. 'ComStock'",
     )
-    # TODO: This must be validated against the project's dimension records for metric_type
-    metric_type: str = Field(
-        title="metric_type", description="data metric type ID, e.g., 'energy_use'"
-    )
     path: str = Field(
         title="path",
         description="path containing data",

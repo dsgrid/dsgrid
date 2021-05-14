@@ -6,12 +6,12 @@ Dataset registration is required before it can be ingested into `dsgrid`. Regist
 - `dataset.toml`: 
     - configuration file that holds all other metadata details
 - `project.toml`:
-    - defines project requirements and any mapping required to map datasets to project dimensions
+    - defines project requirements and any mapping required to map datasets to Base Dimensions
 	- For mapping options, select from `no mapping`, `association table`, or `association table with a scaling factor`
-	- If `no mapping`, project dimensions must match dataset dimensions.
+	- If `no mapping`, Base Dimensions must match dataset dimensions.
 	- Submit `association table` as an input .toml file for `dataset-submit`.
 - `project_mapping.toml`: 
-    - defines `association table` to map dataset to project dimensions
+    - defines `association table` to map dataset to Base Dimensions
 
 ### Data Tables
 - `load_data`: contains load time series by end use columns indexed by a dataframe index, as shown below:
@@ -43,7 +43,7 @@ Dataset registration is required before it can be ingested into `dsgrid`. Regist
 ```
 
 - `dataset_dimension_mapping` (optional): defines the conversion mapping from base data file dimensions to dataset dimensions (e.g., ComStock locational multipliers)
-- `Project_dimension_mapping` (optional): defines the conversion mapping from dataset dimensions to project dimensions <span style="color:red">(is this a type of association table?)</span> (e.g., mapping to convert from dataset spatial resolution to project spatial resolution)
+- `Project_dimension_mapping` (optional): defines the conversion mapping from dataset dimensions to Base Dimensions <span style="color:red">(is this a type of association table?)</span> (e.g., mapping to convert from dataset spatial resolution to project spatial resolution)
 - `scaling_factor_table(s)` (optional): store scaling factors for data disaggregation from one dimension to another
 
 ### Data Partitioning

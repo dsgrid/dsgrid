@@ -141,7 +141,7 @@ class DimensionModel(DimensionBaseModel):
     )
     # TODO: I think we may remove mappings altogether in favor of associations
     # TODO: I think we need to add the association table to
-    #   dimensions.associations.project_dimensions in the config
+    #   dimensions.associations.base_dimensions in the config
     association_table: Optional[str] = Field(
         title="association_table",
         description="optional table that provides mappings of foreign keys",

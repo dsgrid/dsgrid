@@ -15,18 +15,18 @@ Registration entries are stored on S3.
 -  ``project.toml``:
 
    -  defines project requirements and any mapping required to map
-      datasets to project dimensions
+      datasets to Base Dimensions
    -  For mapping options, select from ``no mapping``,
       ``association table``, or
       ``association table with a scaling factor``
-   -  If ``no mapping``, project dimensions must match dataset
+   -  If ``no mapping``, Base Dimensions must match dataset
       dimensions.
    -  Submit ``association table`` as an input .toml file for
       ``dataset-submit``.
 
 -  ``project_mapping.toml``:
 
-   -  defines ``association table`` to map dataset to project dimensions
+   -  defines ``association table`` to map dataset to Base Dimensions
 
 Data Tables
 ~~~~~~~~~~~
@@ -65,7 +65,7 @@ Data Tables
    mapping from base data file dimensions to dataset dimensions (e.g.,
    ComStock locational multipliers)
 -  ``Project_dimension_mapping`` (optional): defines the conversion
-   mapping from dataset dimensions to project dimensions (is this a type
+   mapping from dataset dimensions to Base Dimensions (is this a type
    of association table?) (e.g., mapping to convert from dataset spatial
    resolution to project spatial resolution)
 -  ``scaling_factor_table(s)`` (optional): store scaling factors for

@@ -169,13 +169,13 @@ class SubmitDataset(DSGBaseModel):
         if not association_tables:
             project_config = cls.get_config("project", values["project_version"])
             dataset_config = cls.get_config("dataset", values["dataset_version"])
-            project_dimensions = [p for p in project_config.dimensions.project_dimensions]
+            base_dimensions = [p for p in project_config.dimensions.base_dimensions]
             mappings = []
             for dimension in dataset_config.dimensions:
                 data_dim_type = dimension.dimension_type
                 # TODO: @dthom do we have a wrapper tohelp with getting
                 #   dimensions of a certain type?
-                for i, pdimension in enumerate(project_dimensions):
+                for i, pdimension in enumerate(base_dimensions):
                     if pdimension.dimension_type == data_dim_type:
                         mappings.append(
                             {

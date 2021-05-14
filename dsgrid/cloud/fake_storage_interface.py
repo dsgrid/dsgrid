@@ -19,10 +19,7 @@ class FakeStorageInterface(CloudStorageInterface):
 
     @contextmanager
     def make_lock_file(self, path):
-        try:
-            yield
-        finally:
-            pass
+        yield
 
     def read_lock_file(self, path):
         pass

@@ -23,6 +23,7 @@ from dsgrid.dimension.base_models import (
     EndUseDimensionBaseModel,
     GeographyDimensionBaseModel,
     DataSourceDimensionBaseModel,
+    MetricTypeDimensionBaseModel,
     ModelYearDimensionBaseModel,
     ScenarioDimensionBaseModel,
     SectorDimensionBaseModel,
@@ -236,6 +237,10 @@ class Season(TimeDimensionModel):
 # ---------------------------
 class WeatherYear(WeatherYearDimensionBaseModel):
     """Weather Year attributes"""
+
+
+class MetricType(MetricTypeDimensionBaseModel):
+    """Metric Type attributes"""
 
 
 class ModelYear(ModelYearDimensionBaseModel):

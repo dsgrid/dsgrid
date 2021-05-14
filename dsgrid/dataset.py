@@ -4,7 +4,9 @@ import logging
 from pathlib import Path
 
 from pyspark.sql import SparkSession
+from pyspark.sql.functions import col, lit
 
+from dsgrid.utils.spark import init_spark
 
 logger = logging.getLogger(__name__)
 
@@ -21,6 +23,7 @@ class Dataset:
         self._load_data_lookup = load_data_lookup  # DataFrame of dimension elements
         self._load_data = data  # DataFrame containing load data
         self._id = config.model.dataset_id
+        self._config = config
         # Can't use dashes in view names. This will need to be handled when we implement
         # queries based on dataset ID.
         # TODO: do we need a DimensionStore here?
@@ -39,12 +42,22 @@ class Dataset:
 
         """
         spark = SparkSession.getActiveSession()
+        if spark is None:
+            spark = init_spark(config.model.dataset_id)
         path = Path(config.model.path)
         load_data_lookup = spark.read.parquet(str(path / cls.LOOKUP_FILENAME))
+        load_data_lookup = cls._add_trivial_dimensions(load_data_lookup, config)
         data = spark.read.parquet(str(path / cls.DATA_FILENAME))
         logger.debug("Loaded Dataset from %s", path)
         dataset = cls(config, load_data_lookup, data)
         return dataset
+
+    def _add_trivial_dimensions(load_data_lookup, config):
+        """Add trivial 1-element dimensions to load_data_lookup."""
+        trivial = config.get_trivial_dimensions()
+        for dim, dim_id in trivial.items():
+            load_data_lookup = load_data_lookup.withColumn(dim, lit(dim_id))
+        return load_data_lookup
 
     def _make_view_name(self, name):
         return f"{self._id}__{name}"
@@ -62,6 +75,18 @@ class Dataset:
         """Delete views of the tables in this dataset."""
         for view in self._make_view_names():
             self._spark.catalog.dropTempView(view)
+
+    def check_dataset(self):
+        """Raises exception if anything in the dataset is
+        incorrect/inconsistent."""
+        trivial = self._config.get_trivial_dimensions()
+        dimension_records = self._config.get_dimension_records()
+
+        # TODO: confirm all dimensions are accounted for
+        # TODO: check scaling factors already applied
+        # TODO: check total counts/length of things
+        # TODO: check binning/partitioning / file size requirements - maybe?
+        # TODO: check unique dimension records
 
     # TODO: this is likely throwaway code
 

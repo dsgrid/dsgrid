@@ -22,7 +22,7 @@ from .dimensions import (
     DimensionReferenceModel,
 )
 from dsgrid.data_models import DSGBaseModel
-
+from dsgrid.dimension.base_models import DimensionType
 
 # TODO: likely needs refinement (missing mappings)
 LOAD_DATA_FILENAME = "load_data.parquet"
@@ -156,6 +156,7 @@ class DatasetConfig(ConfigBase):
     def load(cls, config_file, dimension_manager):
         config = cls._load(config_file)
         config.load_dimensions(dimension_manager)
+        config.check_dataset()
         return config
 
     def load_dimensions(self, dimension_manager):
@@ -171,6 +172,56 @@ class DatasetConfig(ConfigBase):
     @property
     def dimensions(self):
         return self._dimensions
+
+    def get_trivial_dimensions(self):
+        """
+        Get dict of trivial 1-element data dimensions.
+        Returns:
+            dict: trivial dimension dictionary.
+                  {"dimension name": dimension id}
+        """
+        trivial_dimensions = {}
+        for d in self._dimensions:
+            print(d)
+            if d.type == DimensionType["DATA_SOURCE"]:
+                print(d)
+            # if d.type != DimensionType["TIME"]:
+            #     if d.trivial is True:
+            #         trivial_dimensions[d.dimension_type.value] = d.records[0]["id"]
+        return trivial_dimensions
+
+    def get_dimension_records(self):
+        """Get dict of data dimension records"""
+        # NOTE: this changes once we pull in the dimension registry
+        dimensions = {}
+        for d in self._model.dimensions:
+            dimensions[d.dimension_type.value] = d.records
+        return dimensions
+
+    def check_trivial_record_length(self):
+        """Check that trivial dimensions have only 1 record."""
+        dimension_records = self.get_dimension_records()
+        trivial_dimensions = self.get_trivial_dimensions()
+        for d in dimension_records:
+            if d in trivial_dimensions:
+                len_records = len(dimension_records[d])
+                if len_records != 1:
+                    raise ValueError(  # TODO change error type
+                        f"Trivial dimensions must have only 1 record but {len_records} records found for dimension={d}"
+                    )
+
+    def check_dataset(self):
+        """Raises exception if anything in the dataset is
+        incorrect/inconsistent."""
+        trivial = self.get_trivial_dimensions()
+        self.check_trivial_record_length()
+        # TODO: check that trivial dimensions are missing in load_data.parquet and load_data_lookup.parquet
+        # TODO: check expected files exist (load_data, load_data_lookup, scalars?)
+        # TODO: check binning/partitioning / file size requirements
+
+    # TODO:
+    #   - check unique names of dimensions
+    #   - check unique files for dimension records
 
     # TODO:
     #   - check binning/partitioning / file size requirements?

@@ -332,6 +332,11 @@ class DimensionReferenceModel(DSGBaseModel):
         title="version",
         description="version of the dimension",
     )
+    trivial: Optional[bool] = Field(
+        title="trivial",
+        default=False,
+        description="Boolean flag for if the dimension is trivial (i.e., 1-element dimension) and does not exist in the data_lookup_parquet",
+    )
 
     @validator("version")
     def check_version(cls, version):

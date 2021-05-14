@@ -12,7 +12,7 @@
 - enforce supplemental dimensions to have a from/to mapping to the project
     dimension of the same type?
 - I think we need to add the association table to
-    dimensions.associations.project_dimensions in the config
+    dimensions.associations.base_dimensions in the config
 
 - Add registry details
 - need to generate input data config
@@ -53,8 +53,8 @@ logger = logging.getLogger(__name__)
 class DimensionsModel(DSGBaseModel):
     """Contains dimensions defined by a dataset"""
 
-    project_dimensions: List[DimensionReferenceModel] = Field(
-        title="project_dimensions",
+    base_dimensions: List[DimensionReferenceModel] = Field(
+        title="base_dimensions",
         description="dimensions defined by the project",
     )
     supplemental_dimensions: Optional[List[DimensionReferenceModel]] = Field(
@@ -63,17 +63,17 @@ class DimensionsModel(DSGBaseModel):
         default=[],
     )
 
-    @validator("project_dimensions")
+    @validator("base_dimensions")
     def check_project_dimension(cls, val):
-        """Validate project_dimensions types"""
+        """Validate base_dimensions types"""
         dimension_types = [i.dimension_type for i in val]
         required_dim_types = list(DimensionType)
-        # validate required dimensions for project_dimensions
+        # validate required dimensions for base_dimensions
         for i in required_dim_types:
             if i not in dimension_types:
                 raise ValueError(
                     f"Required project dimension {i} is not in project ",
-                    "config project.project_dimensions",
+                    "config project.base_dimensions",
                 )
         check_uniqueness(dimension_types, "project_dimension")
         return val
@@ -90,7 +90,7 @@ class DimensionsModel(DSGBaseModel):
         # Should already have been checked.
         # assert len(supplemental_mapping) == \
         #   len(values["supplemental_dimensions"])
-        # for dim in values["project_dimensions"]:
+        # for dim in values["base_dimensions"]:
         #    mappings = getattr(dim, "mappings", [])
         #    # TODO: other mapping types
         #    for mapping in (
@@ -234,7 +234,7 @@ class ProjectConfig(ConfigBase):
 
     def __init__(self, model):
         super().__init__(model)
-        self._project_dimensions = {}
+        self._base_dimensions = {}
         self._supplemental_dimensions = {}
 
     @staticmethod
@@ -248,24 +248,22 @@ class ProjectConfig(ConfigBase):
         return config
 
     def load_dimensions(self, dimension_manager):
-        """Load all project dimensions.
+        """Load all Base Dimensions.
 
         Parameters
         ----------
         dimension_manager : DimensionRegistryManager
 
         """
-        project_dimensions = dimension_manager.load_dimensions(
-            self.model.dimensions.project_dimensions
-        )
+        base_dimensions = dimension_manager.load_dimensions(self.model.dimensions.base_dimensions)
         supplemental_dimensions = dimension_manager.load_dimensions(
             self.model.dimensions.supplemental_dimensions
         )
-        dims = itertools.chain(project_dimensions.values(), supplemental_dimensions.values())
+        dims = itertools.chain(base_dimensions.values(), supplemental_dimensions.values())
         check_uniqueness((x.name for x in dims), "dimension name")
         check_uniqueness((getattr(x, "cls") for x in dims), "dimension cls")
 
-        self._project_dimensions.update(project_dimensions)
+        self._base_dimensions.update(base_dimensions)
         self._supplemental_dimensions.update(supplemental_dimensions)
 
     def add_dataset_dimension_mappings(self, dataset_config, references):
@@ -317,7 +315,7 @@ class ProjectConfig(ConfigBase):
 
         """
         # The dataset has to have each project dimension or provide a mapping.
-        project_keys = set(self.project_dimensions.keys())
+        project_keys = set(self.base_dimensions.keys())
         dataset_keys = set(dataset_config.dimensions)
         requires_mapping = project_keys.difference(dataset_keys)
         # TODO: re-enable when dimension mappings are fixed
@@ -354,8 +352,8 @@ class ProjectConfig(ConfigBase):
             yield dataset.dataset_id
 
     @property
-    def project_dimensions(self):
-        """Return the project dimensions.
+    def base_dimensions(self):
+        """Return the Base Dimensions.
 
         Returns
         -------
@@ -363,7 +361,7 @@ class ProjectConfig(ConfigBase):
             dict of DimensionBaseModel keyed by DimensionKey
 
         """
-        return self._project_dimensions
+        return self._base_dimensions
 
     @property
     def supplemental_dimensions(self):

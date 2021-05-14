@@ -57,7 +57,7 @@ class Project:
 
         project_dimension_store = DimensionStore.load(
             itertools.chain(
-                config.project_dimensions.values(), config.supplemental_dimensions.values()
+                config.base_dimensions.values(), config.supplemental_dimensions.values()
             ),
         )
         dataset_dim_stores = {}
@@ -128,8 +128,8 @@ class Project:
     The code below is subject to change.
     """
 
-    def _iter_project_dimensions(self):
-        for dimension in self.config.dimensions.project_dimensions:
+    def _iter_base_dimensions(self):
+        for dimension in self.config.dimensions.base_dimensions:
             yield dimension
 
     def _iter_input_datasets(self):
@@ -140,7 +140,7 @@ class Project:
         return [x.dataset_id for x in self._iter_input_datasets()]
 
     def get_project_dimension(self, dimension_type):
-        for dimension in self._iter_project_dimensions():
+        for dimension in self._iter_base_dimensions():
             if dimension.dimension_type == dimension_type:
                 return dimension
         raise DSGInvalidField(f"{dimension_type} is not stored")

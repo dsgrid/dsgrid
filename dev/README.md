@@ -16,6 +16,12 @@ pip install -e .[dev] # includes what is needed for tests and code development
 pip install -e .[admin] # dev plus what is needed for creating documentation and releasing packages
 ```
 
+**Setting up pre-commit hooks**
+
+```
+pre-commit install
+```
+
 **Additional software required for publishing documentation:**
 
 - [Pandoc](https://pandoc.org/installing.html)

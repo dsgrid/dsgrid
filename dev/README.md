@@ -22,6 +22,35 @@ pip install -e .[admin] # dev plus what is needed for creating documentation and
 
 ## Run Tests
 
+In addition to grabbing the branch of dsgrid you want to test and making you've 
+activated an environment with dsgrid installed per the above, you'll need to set 
+up dsgrid for testing by setting environment variables:
+
+```
+# point to your checkout of the dsgrid-data-UnitedStates repository (adjusting
+# the path as needed)
+export US_DATA_REPO="/home/$USER/dsgrid-data-UnitedStates"
+# feel free to use a different path for storing your test registry--this is just 
+# an example
+export DSGRID_REGISTRY_PATH="/home/$USER/.dsgrid-test-registry"
+```
+
+and then running the commands:
+```
+dsgrid-internal create-registry $DSGRID_REGISTRY_PATH
+dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline dimensions register $US_DATA_REPO/dsgrid_project/dimensions.toml -l "initial registration"
+dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline dimensions register $US_DATA_REPO/dsgrid_project/datasets/sector_models/comstock/dimensions.toml -l "initial registration"
+# environment variable substitutions will not actually work--replace with paths
+python -c 'from tests.common import *;replace_dimension_uuids_from_registry("${DSGRID_REGISTRY_PATH}", ["${US_DATA_REPO}/dsgrid_project/project.toml", "${US_DATA_REPO}/dsgrid_project/datasets/sector_models/comstock/dataset.toml"])'
+dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline projects register $US_DATA_REPO/dsgrid_project/project.toml -l "initial registration"
+aws s3 sync s3://nrel-dsgrid-scratch/dsgrid_v2.0.0/commercial/load_data_lookup.parquet $DSGRID_REGISTRY_PATH/data/efs-comstock/1.0.0/load_data_lookup.parquet
+aws s3 sync s3://nrel-dsgrid-scratch/dsgrid_v2.0.0/commercial/load_data.parquet $DSGRID_REGISTRY_PATH/data/efs-comstock/1.0.0/load_data.parquet
+dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline datasets register $US_DATA_REPO/dsgrid_project/datasets/sector_models/comstock/dataset.toml -l "initial registration"
+dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline projects submit-dataset -p test -d efs_comstock -l "initial registration"
+```
+
+After that you can run the tests:
+
 ```
 cd dsgrid
 pytest tests

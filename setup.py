@@ -54,6 +54,7 @@ setup(
     ],
     test_suite="tests",
     install_requires=[
+        "awscli",
         "boto3",
         "click",
         "findspark",

@@ -173,7 +173,7 @@ class DimensionMappingsModel(DSGBaseModel):
 
     base_to_base: Optional[List[DimensionMappingReferenceModel]] = Field(
         title="base_to_base",
-        description="base-to-base dimension mappings (e.g., sector to subsector) that define the project dimension expectations for input datasets and alloweable queries",
+        description="base-to-base dimension mappings (e.g., sector to subsector) that define the project dimension expectations for input datasets and allowable queries",
         default=[],
     )
     base_to_supplemental: Optional[List[DimensionMappingReferenceModel]] = Field(
@@ -292,7 +292,7 @@ class ProjectConfig(ConfigBase):
         if dataset_config.model.dataset_id not in self.model.dimension_mappings:
             self.model.dimension_mappings.datasets[
                 dataset_config.model.dataset_id
-            ] = DimensionMappingReferenceModel(references=[])
+            ] = DimensionMappingReferenceModel()
         mappings = self.model.dimension_mappings.datasets[dataset_config.model.dataset_id]
         existing_ids = set((x.mapping_id for x in mappings.references))
         for reference in references:

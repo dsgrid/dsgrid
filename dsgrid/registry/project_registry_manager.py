@@ -7,7 +7,7 @@ from pathlib import Path
 from prettytable import PrettyTable
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.data_models import serialize_model
@@ -211,7 +211,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         mapping_references = []
         for filename in dimension_mapping_files:
-            for ref in DimensionMappingReferenceListModel.load(filename).references:
+            for ref in DimensionMappingReferenceModel.load(filename).references:
                 if not self.dimension_mapping_manager.has_id(ref.mapping_id, version=ref.version):
                     raise DSGValueNotRegistered(f"mapping_id={ref.mapping_id}")
                 mapping_references.append(ref)

@@ -37,7 +37,10 @@ class DimensionMappingBaseModel(DSGBaseModel):
 
 
 class DimensionMappingReferenceModel(DSGBaseModel):
-    """Reference to a dimension mapping stored in the registry"""
+    """Reference to a dimension mapping stored in the registry.
+
+    The DimensionMappingReferenceModel is utilized by the project configuration (project.toml) as well as by the dimension mapping reference configuration (dimension_mapping_references.toml) that may be required when submitting a dataset to a project.
+    """
 
     from_dimension_type: DimensionType = Field(
         title="from_dimension_type",
@@ -55,16 +58,17 @@ class DimensionMappingReferenceModel(DSGBaseModel):
         title="version",
         description="version of the dimension",
     )
+    required_for_validation: Optional[bool] = Field(
+        title="version",
+        description="set to False if a given base-to-base dimension mapping is NOT required for input dataset validation; default is True",
+        default=True,
+    )
 
     @validator("version")
     def check_version(cls, version):
         return handle_version_or_str(version)
 
-
-class DimensionMappingReferenceListModel(DSGBaseModel):
-    """List of dimension mapping references"""
-
-    references: List[DimensionMappingReferenceModel] = Field(
-        title="references",
-        description="list of dimension mapping references",
-    )
+    # @validator("required_for_validation")
+    # def check_required_for_validation_field(cls, value):
+    #     # TODO if base_to_supplemental, raise error
+    #     return value

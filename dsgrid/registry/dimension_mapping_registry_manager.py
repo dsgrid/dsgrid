@@ -129,8 +129,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 logger.info(
                     "%s Dimension mapping validated for registration: from=%s to=%s",
                     self._log_dry_run_mode_prefix(),
-                    mapping.from_type.value,
-                    mapping.to_type.value,
+                    mapping.from_dimension.dimension_id,
+                    mapping.to_dimension.dimension_id,
                 )
             return
 

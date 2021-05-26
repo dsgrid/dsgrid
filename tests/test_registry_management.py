@@ -21,9 +21,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         base_dir = Path(tmpdir)
         path = create_local_test_registry(base_dir)
         dataset_dir = Path("datasets/sector_models/comstock")
-        dataset_dim_dir = dataset_dir / "dimensions"
-        # TODO: The data repo currently does not have valid dimension mappings.
-        # Disabling these tests.
+        project_dimension_mapping_config = make_test_project_dir / "dimension_mappings.toml"
         dimension_mapping_config = make_test_project_dir / dataset_dir / "dimension_mappings.toml"
         dimension_mapping_refs = (
             make_test_project_dir / dataset_dir / "dimension_mapping_references.toml"
@@ -45,6 +43,7 @@ def test_register_project_and_dataset(make_test_project_dir):
                     dim_mgr.register(dim_config_file, user, log_message)
 
         dim_mapping_mgr = manager.dimension_mapping_manager
+        dim_mapping_mgr.register(project_dimension_mapping_config, user, log_message)
         dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
         assert dim_mapping_mgr.list_ids()
         with pytest.raises(DSGDuplicateValueRegistered):
@@ -52,9 +51,9 @@ def test_register_project_and_dataset(make_test_project_dir):
 
         project_config_file = make_test_project_dir / "project.toml"
         dataset_config_file = make_test_project_dir / dataset_dir / "dataset.toml"
-        # replace_dimension_mapping_uuids_from_registry(
-        #    path, (project_config_file, dimension_mapping_refs)
-        # )
+        replace_dimension_mapping_uuids_from_registry(
+            path, (project_config_file, dimension_mapping_refs)
+        )
         replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
 
         project_mgr = manager.project_manager

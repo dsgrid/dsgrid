@@ -290,16 +290,14 @@ class ProjectConfig(ConfigBase):
         """
         self.check_dataset_dimension_mappings(dataset_config, references)
         if dataset_config.model.dataset_id not in self.model.dimension_mappings.dataset_to_project:
-            self.model.dimension_mappings.datasets[
-                dataset_config.model.dataset_id
-            ] = DimensionMappingReferenceModel()
+            self.model.dimension_mappings.dataset_to_project[dataset_config.model.dataset_id] = []
         mappings = self.model.dimension_mappings.dataset_to_project[
             dataset_config.model.dataset_id
         ]
-        existing_ids = set((x.mapping_id for x in mappings.references))
+        existing_ids = set((x.mapping_id for x in mappings))
         for reference in references:
             if reference.mapping_id not in existing_ids:
-                mappings.references.append(reference)
+                mappings.append(reference)
                 logger.info(
                     "Added dimension mapping for dataset=%s: %s",
                     dataset_config.model.dataset_id,

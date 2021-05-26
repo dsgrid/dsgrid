@@ -72,3 +72,12 @@ class DimensionMappingReferenceModel(DSGBaseModel):
     # def check_required_for_validation_field(cls, value):
     #     # TODO if base_to_supplemental, raise error
     #     return value
+
+
+class DimensionMappingReferenceListModel(DSGBaseModel):
+    """List of dimension mapping references"""
+
+    references: List[DimensionMappingReferenceModel] = Field(
+        title="references",
+        description="list of dimension mapping references",
+    )

@@ -19,10 +19,11 @@ def test_register_project_and_dataset(make_test_project_dir):
         dataset_dim_dir = dataset_dir / "dimensions"
         # TODO: The data repo currently does not have valid dimension mappings.
         # Disabling these tests.
-        # dimension_mapping_config = make_test_project_dir / dataset_dim_dir / "dimension_mappings.toml"
-        # dimension_mapping_refs = (
-        #    make_test_project_dir / dataset_dim_dir / "dimension_mapping_references.toml"
-        # )
+        # TODO: add data dimension mappings and project dimension mappings.toml
+        dimension_mapping_config = make_test_project_dir / dataset_dir / "dimension_mappings.toml"
+        dimension_mapping_refs = (
+            make_test_project_dir / dataset_dir / "dimension_mapping_references.toml"
+        )
 
         for dim_config_file in (
             make_test_project_dir / "dimensions.toml",
@@ -35,10 +36,10 @@ def test_register_project_and_dataset(make_test_project_dir):
                 # The other one has time only - no records.
                 assert run_command(cmd) != 0
 
-        # cmd = f"dsgrid registry --path={path} --offline dimension-mappings register {dimension_mapping_config} -l log"
-        # check_run_command(cmd)
+        cmd = f"dsgrid registry --path={path} --offline dimension-mappings register {dimension_mapping_config} -l log"
+        check_run_command(cmd)
         # Can't register duplicates.
-        # assert run_command(cmd) != 0
+        assert run_command(cmd) != 0
 
         project_config = make_test_project_dir / "project.toml"
         dataset_config = make_test_project_dir / dataset_dir / "dataset.toml"

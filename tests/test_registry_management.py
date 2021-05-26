@@ -24,10 +24,10 @@ def test_register_project_and_dataset(make_test_project_dir):
         dataset_dim_dir = dataset_dir / "dimensions"
         # TODO: The data repo currently does not have valid dimension mappings.
         # Disabling these tests.
-        # dimension_mapping_config = make_test_project_dir / dataset_dim_dir / "dimension_mappings.toml"
-        # dimension_mapping_refs = (
-        #    make_test_project_dir / dataset_dim_dir / "dimension_mapping_references.toml"
-        # )
+        dimension_mapping_config = make_test_project_dir / dataset_dir / "dimension_mappings.toml"
+        dimension_mapping_refs = (
+            make_test_project_dir / dataset_dir / "dimension_mapping_references.toml"
+        )
 
         user = "test_user"
         log_message = "registration message"
@@ -44,11 +44,11 @@ def test_register_project_and_dataset(make_test_project_dir):
                 with pytest.raises(DSGDuplicateValueRegistered):
                     dim_mgr.register(dim_config_file, user, log_message)
 
-        # dim_mapping_mgr = manager.dimension_mapping_manager
-        # dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
-        # assert dim_mapping_mgr.list_ids()
-        # with pytest.raises(DSGDuplicateValueRegistered):
-        #    dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
+        dim_mapping_mgr = manager.dimension_mapping_manager
+        dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
+        assert dim_mapping_mgr.list_ids()
+        with pytest.raises(DSGDuplicateValueRegistered):
+            dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
 
         project_config_file = make_test_project_dir / "project.toml"
         dataset_config_file = make_test_project_dir / dataset_dir / "dataset.toml"
@@ -72,7 +72,8 @@ def test_register_project_and_dataset(make_test_project_dir):
         project_mgr.submit_dataset(
             project_config.model.project_id,
             dataset_config.model.dataset_id,
-            [],  # [dimension_mapping_refs],
+            # [],  # TODO: this doesn't work being empty at the moment?
+            [dimension_mapping_refs],  # TODO: this also doesn't work because of [[references]]
             user,
             log_message,
         )

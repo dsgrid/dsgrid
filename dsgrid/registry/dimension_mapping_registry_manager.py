@@ -67,14 +67,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                     f"There are {len(duplicates)} duplicate dimension mapping records."
                 )
 
-    def validate_records(self, config=DimensionMappingConfig, warn_only=False):
-        # for dup in duplicates:
-        #     logger.error("%s duplicates existing mapping ID %s", dup[0], dup[1])
-        #     if not warn_only:
-        #         raise DSGDuplicateValueRegistered(
-        #             f"There are {len(duplicates)} duplicate dimension mapping records."
-        #         )
-        # TODO: MM
+    def validate_records(self, config: DimensionMappingConfig, warn_only=False):
+        """Validate dimension mapping records.
+
+        Check:
+        - from_id and to_id column names
+        - check for duplicate IDs and log a warning if they exist (sometimes we want them to exist if it is an aggregation)
+        """
         pass
 
     def get_by_id(self, config_id, version=None):

@@ -325,13 +325,20 @@ class ProjectConfig(ConfigBase):
         project_keys = set(self.base_dimensions.keys())
         dataset_keys = set(dataset_config.dimensions)
         requires_mapping = project_keys.difference(dataset_keys)
-        # TODO: re-enable when dimension mappings are fixed
-        # if requires_mapping:
-        #    raise DSGInvalidDimensionMapping(
-        #        f"dataset {dataset_config.model.dataset_id} has missing dimension mappings: {requires_mapping}"
-        #    )
+        for dimension in requires_mapping:
+            if dimension.type.value == "time":
+                pass  # TODO: need to programmatically generate a time dimension mapping
+            else:
+                if dimension.type not in [i.to_dimension_type for i in references]:
+                    raise DSGInvalidDimensionMapping(
+                        f"dataset {dataset_config.model.dataset_id} has missing dimension mappings: {dimension}"
+                    )
 
-        # TODO: handle dimension_mappings
+                # TODO: check that all expected dimension IDs are present
+                # project_dimension_ids = [i["id"] for i in self.base_dimensions[dimension].records]
+                # dataset_dimension_id = [i["id"] for i in dataset_config.dimensions[dimension].records] # TODO: how do I get dimension mapping records?
+                # TODO: if there are proejct dimension IDs that are missing from the dataset, log a warning
+                # TODO: consider throwing an error if a dataset dimension_id maps to too many project dimension ids (unless aggregation is specified)
 
     def get_dataset(self, dataset_id):
         """Return a dataset by ID."""

@@ -17,9 +17,6 @@ def test_register_project_and_dataset(make_test_project_dir):
         path = create_local_test_registry(base_dir)
         dataset_dir = Path("datasets/sector_models/comstock")
         dataset_dim_dir = dataset_dir / "dimensions"
-        # TODO: The data repo currently does not have valid dimension mappings.
-        # Disabling these tests.
-        # TODO: add data dimension mappings and project dimension mappings.toml
         dimension_mapping_config = make_test_project_dir / dataset_dir / "dimension_mappings.toml"
         dimension_mapping_refs = (
             make_test_project_dir / dataset_dir / "dimension_mapping_references.toml"

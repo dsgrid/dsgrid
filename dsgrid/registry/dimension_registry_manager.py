@@ -249,7 +249,12 @@ class DimensionRegistryManager(RegistryManagerBase):
         return self._path / dimension_type.value / config_id
 
     def show(self, dimension_type=None, submitter=None):
-        # TODO: filter by type and submitter
+        logger.info(
+            "List registered dimensions for dimension_type=%s and submitter=%s",
+            ("all" if dimension_type is None else dimension_type),
+            ("all" if submitter is None else submitter),
+        )
+
         table = PrettyTable(title="Dimensions")
         table.field_names = (
             "Type",
@@ -259,18 +264,29 @@ class DimensionRegistryManager(RegistryManagerBase):
             "Submitter",
             "Description",
         )
+        table._max_width = {
+            "ID": 50,
+            "Description": 50,
+        }
+
         rows = []
         for dimension_id, registry_config in self._registry_configs.items():
-            last_reg = registry_config.model.registration_history[0]
-            row = (
-                self._id_to_type[dimension_id].value,
-                dimension_id,
-                last_reg.version,
-                last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
-                last_reg.submitter,
-                registry_config.model.description,
-            )
-            rows.append(row)
+            reg_dim_type = self._id_to_type[dimension_id].value
+
+            # apply filters
+            if dimension_type is None or dimension_type == reg_dim_type:
+                last_reg = registry_config.model.registration_history[-1] #[0] or [-1]
+
+                if submitter is None or submitter == last_reg.submitter:
+                    row = (
+                        reg_dim_type,
+                        dimension_id,
+                        last_reg.version,
+                        last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
+                        last_reg.submitter,
+                        registry_config.model.description,
+                    )
+                    rows.append(row)
 
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)

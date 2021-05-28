@@ -483,22 +483,33 @@ class RegistryManagerBase(abc.ABC):
         self._registry_configs.pop(config_id, None)
         logger.info("Removed %s from the registry.", config_id)
 
-    def show(self, **kwargs):
+    def show(self, submitter=None, **kwargs):
         """Show a summary of the registered items in a table."""
-        # TODO: filter by submitter
+        logger.info(
+            "List registered dimensions for submitter=%s",
+            ("all" if submitter is None else submitter),
+        )
+
         table = PrettyTable(title=self.name())
         table.field_names = ("ID", "Version", "Registration Date", "Submitter", "Description")
+        table._max_width = {
+            "ID": 50,
+            "Description": 50,
+        }
+
         rows = []
         for config_id, registry_config in self._registry_configs.items():
-            last_reg = registry_config.model.registration_history[0]
-            row = (
-                config_id,
-                last_reg.version,
-                last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
-                last_reg.submitter,
-                registry_config.model.description,
-            )
-            rows.append(row)
+            last_reg = registry_config.model.registration_history[-1] # [0] or [-1]
+
+            if submitter is None or submitter == last_reg.submitter:
+                row = (
+                    config_id,
+                    last_reg.version,
+                    last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
+                    last_reg.submitter,
+                    registry_config.model.description,
+                )
+                rows.append(row)
 
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)

@@ -5,6 +5,8 @@ import logging
 import os
 from pathlib import Path
 
+from prettytable import PrettyTable
+
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.association_tables import AssociationTableConfig
 from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
@@ -28,12 +30,26 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         super().__init__(path, params)
         self._mappings = {}  # ConfigKey to DimensionMappingModel
         self._dimension_mgr = None
+        # self._id_to_type = {}
 
     @classmethod
     def load(cls, path, fs_interface, dimension_manager):
         mgr = cls._load(path, fs_interface)
         mgr.dimension_manager = dimension_manager
         return mgr
+        
+    # def inventory(self):
+    #     for map_id in self.fs_interface.listdir(
+    #         self._path, directories_only=True, exclude_hidden=True
+    #     ):
+    #         map_path = self._path / map_id
+    #         registry = self.registry_class().load(map_path / REGISTRY_FILENAME)
+    #         self._registry_configs[map_id] = registry
+    #         registry_config = self.get_by_id(map_id)
+    #         self._id_to_type[map_id] = [
+    #             registry_config.from_dimension.dimension_type.value,
+    #             registry_config.to_dimension.dimension_type.value,
+    #         ]
 
     @staticmethod
     def name():
@@ -250,3 +266,48 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._remove(config_id)
         for key in [x for x in self._mappings if x.id == config_id]:
             self._mappings.pop(key)
+
+    # def show(self, dimension_type=None, submitter=None):
+    #     logger.info(
+    #         "List registered dimensions for dimension_type=%s and submitter=%s",
+    #         ("all" if dimension_type is None else dimension_type),
+    #         ("all" if submitter is None else submitter),
+    #     )
+
+    #     table = PrettyTable(title="Dimensions")
+    #     table.field_names = (
+    #         "Type [From, To]",
+    #         "ID",
+    #         "Version",
+    #         "Registration Date",
+    #         "Submitter",
+    #         "Description",
+    #     )
+    #     table._max_width = {
+    #         "ID": 50,
+    #         "Description": 50,
+    #     }
+
+    #     rows = []
+    #     for dimension_id, registry_config in self._registry_configs.items():
+    #         reg_dim_type = self._id_to_type[dimension_id]
+
+    #         # apply filters
+    #         if dimension_type is None or dimension_type in reg_dim_type:
+    #             last_reg = registry_config.model.registration_history[-1]
+
+    #             if submitter is None or submitter == last_reg.submitter:
+    #                 row = (
+    #                     reg_dim_type,
+    #                     dimension_id,
+    #                     last_reg.version,
+    #                     last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
+    #                     last_reg.submitter,
+    #                     registry_config.model.description,
+    #                 )
+    #                 rows.append(row)
+
+    #     rows.sort(key=lambda x: x[0])
+    #     table.add_rows(rows)
+
+    #     print(table)

@@ -87,6 +87,29 @@ def dimensions(registry_manager):
 def dimension_mappings(registry_manager):
     """Dimension mapping subcommands"""
 
+# # TODO: Support registry file reads without syncing using something like sfs3
+# @click.command(name="list")
+# @click.option(
+#     "--dimension-type",
+#     required=False,
+#     help="filter: type of dimension to list, single field",
+# )
+# @click.option(
+#     "--submitter",
+#     required=False,
+#     help="filter: submitter to list, single field",
+# )
+# @click.pass_obj
+# def list_(registry_manager, dimension_type, submitter):
+#     """List the contents of a registry."""
+#     print(f"Registry: {registry_manager.path}")
+#     registry_manager.project_manager.show(submitter=submitter)
+#     registry_manager.dataset_manager.show(submitter=submitter)
+#     registry_manager.dimension_manager.show(dimension_type=dimension_type, submitter=submitter)
+#     registry_manager.dimension_mapping_manager.show(
+#         dimension_type=dimension_type, submitter=submitter
+#     )
+
 
 @click.group()
 @click.pass_obj
@@ -118,6 +141,11 @@ Dimension Commands
 
 
 @click.command(name="list")
+@click.option(
+    "--submitter",
+    required=False,
+    help="filter: submitter to list, single field",
+)
 @click.pass_obj
 def list_dimensions(registry_manager):
     """List the registered dimensions."""
@@ -224,13 +252,45 @@ def remove_dimension(registry_manager, dimension_id):
 """
 Dimension Mapping Commands
 """
+# def list_datasets(registry_manager, submitter):
+#     """List the registered dimensions."""
+#     registry_manager.dataset_manager.show(submitter=submitter)
+
+
+# @click.command(name="list")
+# @click.option(
+#     "--dimension-type",
+#     required=False,
+#     help="filter: type of dimension to list, single field",
+# )
+# @click.option(
+#     "--submitter",
+#     required=False,
+#     help="filter: submitter to list, single field",
+# )
+# @click.pass_obj
+# def list_dimensions(registry_manager, dimension_type, submitter):
+#     """List the registered dimensions."""
+#     registry_manager.dimension_manager.show(dimension_type=dimension_type, submitter=submitter)
 
 
 @click.command(name="list")
+@click.option(
+    "--dimension-type",
+    required=False,
+    help="filter: type of dimension to list, single field",
+)
+@click.option(
+    "--submitter",
+    required=False,
+    help="filter: submitter to list, single field",
+)
 @click.pass_obj
-def list_dimension_mappings(registry_manager):
+def list_dimension_mappings(registry_manager, dimension_type, submitter):
     """List the registered dimension mappings."""
-    registry_manager.dimension_mapping_manager.show()
+    registry_manager.dimension_mapping_manager.show(
+        dimension_type=dimension_type, submitter=submitter
+    )
 
 
 @click.command(name="register")
@@ -334,6 +394,17 @@ def update_dimension_mapping(
         log_message,
         version,
     )
+
+# @click.command(name="list")
+# @click.option(
+#     "--submitter",
+#     required=False,
+#     help="filter: submitter to list, single field",
+# )
+# @click.pass_obj
+# def list_projects(registry_manager, submitter):
+#     """List the registered dimensions."""
+#     registry_manager.project_manager.show(submitter=submitter)
 
 
 @click.command(name="remove")

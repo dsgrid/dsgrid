@@ -26,7 +26,7 @@ from dsgrid.dimension.base_models import (
     ModelYearDimensionBaseModel,
     ScenarioDimensionBaseModel,
     SectorDimensionBaseModel,
-    SubSectorDimensionBaseModel,
+    SubsectorDimensionBaseModel,
     WeatherYearDimensionBaseModel,
 )
 
@@ -46,14 +46,14 @@ model_subsector_association = Table(
     "model_subsector",
     BaseOrm.metadata,
     Column("data_source", String(255), ForeignKey("DataSource.id")),
-    Column("subsector", String(255), ForeignKey("SubSector.id")),
+    Column("subsector", String(255), ForeignKey("Subsector.id")),
 )
 
 
 subsector_sector_association = Table(
     "subsector_sector",
     BaseOrm.metadata,
-    Column("subsector", String(255), ForeignKey("SubSector.id")),
+    Column("subsector", String(255), ForeignKey("Subsector.id")),
     Column("sector", String(255), ForeignKey("Sector.id")),
 )
 
@@ -140,7 +140,7 @@ class SectorOrm(BaseOrm):
     name = Column(String(255), nullable=False)
 
     subsector = relationship(
-        "SubSectorOrm",
+        "SubsectorOrm",
         secondary=subsector_sector_association,
         back_populates="sector",
     )
@@ -149,7 +149,7 @@ class SectorOrm(BaseOrm):
 # ---------------------------
 # SUBSECTOR DIMENSIONS
 # ---------------------------
-class SubSector(SubSectorDimensionBaseModel):
+class Subsector(SubsectorDimensionBaseModel):
     """Subsector attributes"""
 
     # NOTE: making sector optional for now, we may remove because it should be
@@ -166,8 +166,8 @@ class SubSector(SubSectorDimensionBaseModel):
         return value or ""
 
 
-class SubSectorOrm(BaseOrm):
-    __tablename__ = "SubSector"
+class SubsectorOrm(BaseOrm):
+    __tablename__ = "Subsector"
 
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
@@ -258,7 +258,7 @@ class DataSourceOrm(BaseOrm):
         back_populates="data_source",
     )
     subsector = relationship(
-        "SubSectorOrm",
+        "SubsectorOrm",
         secondary=model_subsector_association,
         back_populates="data_source",
     )

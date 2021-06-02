@@ -17,6 +17,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         path = create_local_test_registry(base_dir)
         dataset_dir = Path("datasets/sector_models/comstock")
         dataset_dim_dir = dataset_dir / "dimensions"
+        project_dimension_mapping_config = make_test_project_dir / "dimension_mappings.toml"
         dimension_mapping_config = make_test_project_dir / dataset_dir / "dimension_mappings.toml"
         dimension_mapping_refs = (
             make_test_project_dir / dataset_dir / "dimension_mapping_references.toml"
@@ -33,16 +34,16 @@ def test_register_project_and_dataset(make_test_project_dir):
                 # The other one has time only - no records.
                 assert run_command(cmd) != 0
 
-        cmd = f"dsgrid registry --path={path} --offline dimension-mappings register {dimension_mapping_config} -l log"
-        check_run_command(cmd)
-        # Can't register duplicates.
-        assert run_command(cmd) != 0
+        for dim_mapping_config in (project_dimension_mapping_config, dimension_mapping_config):
+            cmd = f"dsgrid registry --path={path} --offline dimension-mappings register {dim_mapping_config} -l log"
+            check_run_command(cmd)
+            assert run_command(cmd) != 0
 
         project_config = make_test_project_dir / "project.toml"
         dataset_config = make_test_project_dir / dataset_dir / "dataset.toml"
-        # replace_dimension_mapping_uuids_from_registry(
-        #    path, (project_config, dimension_mapping_refs)
-        # )
+        replace_dimension_mapping_uuids_from_registry(
+            path, (project_config, dimension_mapping_refs)
+        )
         replace_dimension_uuids_from_registry(path, (project_config, dataset_config))
 
         check_run_command(
@@ -51,11 +52,9 @@ def test_register_project_and_dataset(make_test_project_dir):
         check_run_command(
             f"dsgrid registry --path={path} --offline projects register {project_config} -l log"
         )
-
-        # TODO: uncomment this once we update dimension_mapping_reference.toml with the registered dimension mapping files
-        # check_run_command(
-        #     f"dsgrid registry --path={path} --offline projects submit-dataset -d efs_comstock -m {dimension_mapping_refs} -p test -l log"
-        # )
+        check_run_command(
+            f"dsgrid registry --path={path} --offline projects submit-dataset -d efs_comstock -m {dimension_mapping_refs} -p test -l log"
+        )
         output = {}
         check_run_command(f"dsgrid registry --path={path} --offline list", output)
         regex_project = re.compile(r"test.*1\.0\.0")

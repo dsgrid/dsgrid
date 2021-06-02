@@ -78,11 +78,19 @@ class FilesystemInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def rglob(self, files_only=False, directories_only=False, exclude_hidden=False, pattern="*"):
+    def rglob(
+        self,
+        directory,
+        files_only=False,
+        directories_only=False,
+        exclude_hidden=False,
+        pattern="*",
+    ):
         """Recursively search a path and return a list of relative paths that match criteria.
 
         Parameters
         ----------
+        directory : str
         files_only : bool, optional
             Return files only, by default False
         directories_only : bool, optional

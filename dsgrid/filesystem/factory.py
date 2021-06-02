@@ -1,6 +1,5 @@
 from pathlib import Path
 
-# from .aws import AwsS3Bucket
 from .local_filesystem import LocalFilesystem
 from .s3_filesystem import S3Filesystem
 

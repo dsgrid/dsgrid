@@ -274,7 +274,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     #         ("all" if submitter is None else submitter),
     #     )
 
-    #     table = PrettyTable(title="Dimensions")
+    #     table = PrettyTable(title="Dimension Mappings")
     #     table.field_names = (
     #         "Type [From, To]",
     #         "ID",

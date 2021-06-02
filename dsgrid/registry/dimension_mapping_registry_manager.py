@@ -37,7 +37,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         mgr = cls._load(path, fs_interface)
         mgr.dimension_manager = dimension_manager
         return mgr
-        
+
     # def inventory(self):
     #     for map_id in self.fs_interface.listdir(
     #         self._path, directories_only=True, exclude_hidden=True
@@ -47,8 +47,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     #         self._registry_configs[map_id] = registry
     #         registry_config = self.get_by_id(map_id)
     #         self._id_to_type[map_id] = [
-    #             registry_config.from_dimension.dimension_type.value,
-    #             registry_config.to_dimension.dimension_type.value,
+    #             registry_config.from_dimension.dimension_type,
+    #             registry_config.to_dimension.dimension_type,
     #         ]
 
     @staticmethod
@@ -290,7 +290,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
     #     rows = []
     #     for dimension_id, registry_config in self._registry_configs.items():
-    #         reg_dim_type = self._id_to_type[dimension_id]
+    #         reg_dim_type = [x.value for x in self._id_to_type[dimension_id]]
 
     #         # apply filters
     #         if dimension_type is None or dimension_type in reg_dim_type:

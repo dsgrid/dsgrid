@@ -59,7 +59,7 @@ class SectorDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all subsector dimensions"""
 
 
-class SubSectorDimensionBaseModel(DimensionRecordBaseModel):
+class SubsectorDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all subsector dimensions"""
 
 
@@ -75,7 +75,7 @@ _DIMENSION_TO_MODEL = {
     DimensionType.END_USE: EndUseDimensionBaseModel,
     DimensionType.GEOGRAPHY: GeographyDimensionBaseModel,
     DimensionType.SECTOR: SectorDimensionBaseModel,
-    DimensionType.SUBSECTOR: SubSectorDimensionBaseModel,
+    DimensionType.SUBSECTOR: SubsectorDimensionBaseModel,
     DimensionType.TIME: TimeDimensionBaseModel,
     DimensionType.WEATHER_YEAR: WeatherYearDimensionBaseModel,
     DimensionType.MODEL_YEAR: ModelYearDimensionBaseModel,

@@ -27,7 +27,7 @@ from pydantic import root_validator, validator
 from semver import VersionInfo
 
 from .config_base import ConfigBase
-from .dimension_mapping_base import DimensionMappingReferenceListModel
+from .dimension_mapping_base import DimensionMappingReferenceModel
 from .dimensions import (
     DimensionReferenceModel,
     DimensionType,
@@ -169,16 +169,21 @@ class InputDatasetsModel(DSGBaseModel):
 
 
 class DimensionMappingsModel(DSGBaseModel):
-    """Defines intra-project and dataset-to-project dimension mappings."""
+    """Defines all dimension mappings associated with a dsgrid project, including base-to-base, base-to-supplemental, and dataset-to-project mappings."""
 
-    project: Optional[List[DimensionMappingReferenceListModel]] = Field(
-        title="project",
-        description="intra-project mappings",
+    base_to_base: Optional[List[DimensionMappingReferenceModel]] = Field(
+        title="base_to_base",
+        description="base-to-base dimension mappings (e.g., sector to subsector) that define the project dimension expectations for input datasets and allowable queries",
         default=[],
     )
-    datasets: Optional[Dict[str, DimensionMappingReferenceListModel]] = Field(
-        title="datasets",
-        description="dataset-to-project mappings for each registered dataset",
+    base_to_supplemental: Optional[List[DimensionMappingReferenceModel]] = Field(
+        title="base_to_supplemental",
+        description="base dimension to supplemental dimension mappings (e.g., county to state) used to support various queries and dimension transformations",
+        default=[],
+    )
+    dataset_to_project: Optional[Dict[str, List[DimensionMappingReferenceModel]]] = Field(
+        title="dataset_to_project",
+        description="dataset-to-project mappings added to a project configuration after a dataset is submitted to the project",
         default={},
     )
 
@@ -194,6 +199,10 @@ class ProjectConfigModel(DSGBaseModel):
         title="name",
         description="project name",
     )
+    description: str = Field(
+        title="description",
+        description="describe project in details",
+    )
     input_datasets: InputDatasetsModel = Field(
         title="input_datasets",
         description="input datasets for the project",
@@ -204,16 +213,12 @@ class ProjectConfigModel(DSGBaseModel):
     )
     dimension_mappings: Optional[DimensionMappingsModel] = Field(
         title="dimension_mappings",
-        description="intra-project and dataset-to-project dimension mappings",
-        default=DimensionMappingsModel(),
+        description="list of base-to-base and base-to-supplemental mappings",
+        default=[],
     )
     registration: Optional[Dict] = Field(
         title="registration",
         description="registration information",
-    )
-    description: str = Field(
-        title="description",
-        description="describe project in details",
     )
 
     @validator("project_id")
@@ -227,6 +232,8 @@ class ProjectConfigModel(DSGBaseModel):
 
         check_config_id_2(project_id, "Project")
         return project_id
+
+    # TODO: validate that datasets listed are listed by the project
 
 
 class ProjectConfig(ConfigBase):
@@ -282,15 +289,15 @@ class ProjectConfig(ConfigBase):
 
         """
         self.check_dataset_dimension_mappings(dataset_config, references)
-        if dataset_config.model.dataset_id not in self.model.dimension_mappings:
-            self.model.dimension_mappings.datasets[
-                dataset_config.model.dataset_id
-            ] = DimensionMappingReferenceListModel(references=[])
-        mappings = self.model.dimension_mappings.datasets[dataset_config.model.dataset_id]
-        existing_ids = set((x.mapping_id for x in mappings.references))
+        if dataset_config.model.dataset_id not in self.model.dimension_mappings.dataset_to_project:
+            self.model.dimension_mappings.dataset_to_project[dataset_config.model.dataset_id] = []
+        mappings = self.model.dimension_mappings.dataset_to_project[
+            dataset_config.model.dataset_id
+        ]
+        existing_ids = set((x.mapping_id for x in mappings))
         for reference in references:
             if reference.mapping_id not in existing_ids:
-                mappings.references.append(reference)
+                mappings.append(reference)
                 logger.info(
                     "Added dimension mapping for dataset=%s: %s",
                     dataset_config.model.dataset_id,
@@ -298,7 +305,7 @@ class ProjectConfig(ConfigBase):
                 )
 
     def check_dataset_dimension_mappings(
-        self, dataset_config, references: DimensionMappingReferenceListModel
+        self, dataset_config, references: DimensionMappingReferenceModel
     ):
         """Check that a dataset provides required mappings to the project.
 
@@ -318,13 +325,20 @@ class ProjectConfig(ConfigBase):
         project_keys = set(self.base_dimensions.keys())
         dataset_keys = set(dataset_config.dimensions)
         requires_mapping = project_keys.difference(dataset_keys)
-        # TODO: re-enable when dimension mappings are fixed
-        # if requires_mapping:
-        #    raise DSGInvalidDimensionMapping(
-        #        f"dataset {dataset_config.model.dataset_id} has missing dimension mappings: {requires_mapping}"
-        #    )
+        for dimension in requires_mapping:
+            if dimension.type.value == "time":
+                pass  # TODO: need to programmatically generate a time dimension mapping
+            else:
+                if dimension.type not in [i.to_dimension_type for i in references]:
+                    raise DSGInvalidDimensionMapping(
+                        f"dataset {dataset_config.model.dataset_id} has missing dimension mappings: {dimension}"
+                    )
 
-        # TODO: handle dimension_mappings
+                # TODO: check that all expected dimension IDs are present
+                # project_dimension_ids = [i["id"] for i in self.base_dimensions[dimension].records]
+                # dataset_dimension_id = [i["id"] for i in dataset_config.dimensions[dimension].records] # TODO: how do I get dimension mapping records?
+                # TODO: if there are proejct dimension IDs that are missing from the dataset, log a warning
+                # TODO: consider throwing an error if a dataset dimension_id maps to too many project dimension ids (unless aggregation is specified)
 
     def get_dataset(self, dataset_id):
         """Return a dataset by ID."""

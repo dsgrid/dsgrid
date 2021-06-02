@@ -174,7 +174,10 @@ class RegistryManager:
             if sync:
                 logger.info("Sync from remote registry.")
                 cloud_interface.sync_pull(
-                    remote_path + "/configs", str(path) + "/configs", exclude=SYNC_EXCLUDE_LIST
+                    remote_path + "/configs",
+                    str(path) + "/configs",
+                    exclude=SYNC_EXCLUDE_LIST,
+                    delete_local=True,
                 )
 
         params = RegistryManagerParams(
@@ -189,7 +192,7 @@ class RegistryManager:
             path / DimensionMappingRegistry.registry_path(),
         ):
             if not fs_interface.exists(str(dir_name)):
-                raise FileNotFoundError(f"{dir_name} does not exist")
+                fs_interface.mkdir(dir_name)
 
         for dim_type in DimensionType:
             dir_name = path / DimensionRegistry.registry_path() / dim_type.value

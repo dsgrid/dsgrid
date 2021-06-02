@@ -70,7 +70,7 @@ class DimensionBaseModel(DSGBaseModel):
         if REGEX_VALID_REGISTRY_NAME.search(name) is None:
             raise ValueError(f"dimension name={name} does not meet the requirements")
 
-        # TODO: improve validation for alloweable dimension record names.
+        # TODO: improve validation for allowable dimension record names.
         prohibited_names = [x.value.replace("_", "") for x in DimensionType] + [
             "county",
             "counties",

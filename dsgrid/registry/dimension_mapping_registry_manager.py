@@ -67,6 +67,15 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                     f"There are {len(duplicates)} duplicate dimension mapping records."
                 )
 
+    def validate_records(self, config: DimensionMappingConfig, warn_only=False):
+        """Validate dimension mapping records.
+
+        Check:
+        - from_id and to_id column names
+        - check for duplicate IDs and log a warning if they exist (sometimes we want them to exist if it is an aggregation)
+        """
+        pass
+
     def get_by_id(self, config_id, version=None):
         if version is None:
             version = self._registry_configs[config_id].model.version
@@ -119,6 +128,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         config = DimensionMappingConfig.load(config_file)
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)
+        self.validate_records(config, warn_only=force)
 
         registration = make_initial_config_registration(submitter, log_message)
         dest_config_filename = "dimension_mapping" + os.path.splitext(config_file)[1]
@@ -129,8 +139,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 logger.info(
                     "%s Dimension mapping validated for registration: from=%s to=%s",
                     self._log_dry_run_mode_prefix(),
-                    mapping.from_type.value,
-                    mapping.to_type.value,
+                    mapping.from_dimension.dimension_id,
+                    mapping.to_dimension.dimension_id,
                 )
             return
 

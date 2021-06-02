@@ -121,7 +121,14 @@ class S3StorageInterface(CloudStorageInterface):
     def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False):
         if delete_local:
             local_contents = self._local_filesystem.rglob(local_path)
-            s3_contents = self._s3_filesystem.rglob(remote_path)
+            s3_contents = [
+                str(
+                    self._s3_filesystem.s3_path(x).relative_to(
+                        self._s3_filesystem.s3_path(remote_path)
+                    )
+                )
+                for x in self._s3_filesystem.rglob(remote_path)
+            ]
             for content in local_contents:
                 relcontent = os.path.relpath(content, local_path)
                 if relcontent not in s3_contents:

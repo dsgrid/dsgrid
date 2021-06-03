@@ -10,7 +10,6 @@ from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.cli.download import download
 from dsgrid.cli.query import query
 from dsgrid.cli.registry import registry
-from dsgrid.cli.submit import submit
 from dsgrid.loggers import setup_logging
 
 
@@ -58,4 +57,3 @@ def callback(*args, **kwargs):
 cli.add_command(download)
 cli.add_command(query)
 cli.add_command(registry)
-cli.add_command(submit)

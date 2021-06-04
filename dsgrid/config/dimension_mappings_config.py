@@ -8,7 +8,7 @@ from semver import VersionInfo
 from .association_tables import AssociationTableModel
 from .config_base import ConfigBase
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.registry.common import make_registry_id, check_config_id_1
+from dsgrid.registry.common import make_registry_id, check_config_id_loose
 
 
 logger = logging.getLogger(__name__)
@@ -45,5 +45,5 @@ class DimensionMappingsConfig(ConfigBase):
             from_type = mapping.from_dimension.dimension_id.split("__")[0]
             to_type = mapping.to_dimension.dimension_id.split("__")[0]
             mapping_id = make_registry_id((from_type, to_type))
-            check_config_id_1(mapping_id, "Dimension Mapping")
+            check_config_id_loose(mapping_id, "Dimension Mapping")
             mapping.mapping_id = mapping_id

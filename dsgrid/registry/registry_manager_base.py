@@ -201,7 +201,7 @@ class RegistryManagerBase(abc.ABC):
             log_message=log_message,
         )
         registry_config.registration_history.insert(0, registration)
-        registry_config.serialize(self.get_registry_file(config_id))
+        registry_config.serialize(self.get_registry_file(config_id), force=True)
 
         new_config_dir = self.get_config_directory(config_id, registry_config.version)
         self.fs_interface.mkdir(new_config_dir)
@@ -247,7 +247,7 @@ class RegistryManagerBase(abc.ABC):
         """Set the CloudStorageInterface (used in testing)"""
         self._params = self._params._replace(cloud_interface=cloud_interface)
 
-    def dump(self, config_id, directory, version=None):
+    def dump(self, config_id, directory, version=None, force=False):
         """Dump the config file to directory.
 
         Parameters
@@ -256,10 +256,12 @@ class RegistryManagerBase(abc.ABC):
         directory : str
         version : VersionInfo | None
             Defaults to current version.
+        force : bool
+            If True, overwrite files if they exist.
 
         """
         config = self.get_by_id(config_id, version)
-        filename = config.serialize(directory)
+        filename = config.serialize(directory, force=force)
         if version is None:
             version = self._registry_configs[config_id].version
         logger.info(

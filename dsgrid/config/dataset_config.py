@@ -16,7 +16,7 @@ from pydantic import Field
 from pydantic import validator
 
 from dsgrid.common import LOCAL_REGISTRY_DATA
-from dsgrid.registry.common import check_config_id_2
+from dsgrid.registry.common import check_config_id_strict
 from .config_base import ConfigBase
 from .dimensions import (
     DimensionReferenceModel,
@@ -106,7 +106,7 @@ class DatasetConfigModel(DSGBaseModel):
     @validator("dataset_id")
     def check_dataset_id(cls, dataset_id):
         """Check dataset ID validity"""
-        check_config_id_2(dataset_id, "Dataset")
+        check_config_id_strict(dataset_id, "Dataset")
         return dataset_id
 
     @validator("path")

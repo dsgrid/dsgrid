@@ -66,7 +66,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         return DimensionRegistry
 
     def check_unique_records(self, config: DimensionsConfig, warn_only=False):
-        """Check if any new tables have identical records as existing tables.
+        """Check if any new dimension record files have identical contents as any existing files.
 
         Parameters
         ----------
@@ -94,7 +94,9 @@ class DimensionRegistryManager(RegistryManagerBase):
 
         if duplicates:
             for dup in duplicates:
-                logger.error("%s duplicates existing dimension ID %s", dup[0], dup[1])
+                logger.error(
+                    "%s has duplicate content with existing dimension ID %s", dup[0], dup[1]
+                )
             if not warn_only:
                 raise DSGDuplicateValueRegistered(
                     f"There are {len(duplicates)} duplicate dimension mapping records."
@@ -214,7 +216,7 @@ class DimensionRegistryManager(RegistryManagerBase):
             self.fs_interface.mkdir(dst_dir)
 
             registry_file = Path(os.path.dirname(dst_dir)) / REGISTRY_FILENAME
-            registry_config.serialize(registry_file)
+            registry_config.serialize(registry_file, force=True)
 
             dimension_config = get_dimension_config(dimension, src_dir)
             dimension_config.serialize(dst_dir)
@@ -273,9 +275,9 @@ class DimensionRegistryManager(RegistryManagerBase):
 
         print(table)
 
-    def dump(self, config_id, directory, version=None):
+    def dump(self, config_id, directory, version=None, force=False):
         config = self.get_by_id(config_id, version)
-        config.serialize(directory)
+        config.serialize(directory, force=force)
 
         if version is None:
             version = self._registry_configs[config_id].version

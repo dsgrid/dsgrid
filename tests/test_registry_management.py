@@ -8,7 +8,7 @@ from tempfile import TemporaryDirectory, gettempdir
 import pytest
 from semver import VersionInfo
 
-from dsgrid.exceptions import DSGDuplicateValueRegistered, DSGInvalidParameter
+from dsgrid.exceptions import DSGDuplicateValueRegistered, DSGInvalidParameter, DSGInvalidOperation
 from dsgrid.registry.common import DatasetRegistryStatus, VersionUpdateType
 from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.project_registry_manager import ProjectRegistryManager
@@ -139,10 +139,14 @@ def submit_dataset(
 
 
 def check_config_update(tmpdir, mgr, config_id, user, version):
+    """Runs basic positive and negative update tests for the config. Also tests dump."""
     config_file = Path(tmpdir) / mgr.registry_class().config_filename()
     assert not config_file.exists()
     try:
         mgr.dump(config_id, tmpdir)
+        with pytest.raises(DSGInvalidOperation):
+            mgr.dump(config_id, tmpdir)
+        mgr.dump(config_id, tmpdir, force=True)
         assert config_file.exists()
         config_data = load_data(config_file)
         config_data["description"] += "; updated description"

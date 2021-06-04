@@ -16,22 +16,25 @@ from dsgrid.utils.versioning import make_version
 
 
 REGISTRY_LOG_FILE = "dsgrid_registry.log"
+# Allows letters, numbers, underscores, spaces, dashes
 REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
-REGEX_VALID_REGISTRY_CONFIG_ID_1 = re.compile(r"^[\w-]+$")
-REGEX_VALID_REGISTRY_CONFIG_ID_2 = re.compile(r"^[\w]+$")
+# Allows letters, numbers, underscores, dashes
+REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE = re.compile(r"^[\w-]+$")
+# Allows letters, numbers, underscores
+REGEX_VALID_REGISTRY_CONFIG_ID_STRICT = re.compile(r"^[\w]+$")
 
 
-def check_config_id_1(config_id, tag):
+def check_config_id_loose(config_id, tag):
     # Raises ValueError because this is used in Pydantic models.
-    if not REGEX_VALID_REGISTRY_CONFIG_ID_1.search(config_id):
+    if not REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE.search(config_id):
         raise ValueError(
             f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, underscores, and dashes."
         )
 
 
-def check_config_id_2(config_id, tag):
+def check_config_id_strict(config_id, tag):
     # Raises ValueError because this is used in Pydantic models.
-    if not REGEX_VALID_REGISTRY_CONFIG_ID_2.search(config_id):
+    if not REGEX_VALID_REGISTRY_CONFIG_ID_STRICT.search(config_id):
         raise ValueError(
             f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, and underscores."
         )

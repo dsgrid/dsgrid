@@ -35,7 +35,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         return DimensionMappingRegistry
 
     def check_unique_records(self, config: DimensionMappingsConfig, warn_only=False):
-        """Check if any new tables have identical records as existing tables.
+        """Check if any new mapping files have identical contents as any existing files.
 
         Parameters
         ----------
@@ -61,7 +61,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         if duplicates:
             for dup in duplicates:
-                logger.error("%s duplicates existing mapping ID %s", dup[0], dup[1])
+                logger.error(
+                    "%s has duplicate content with existing mapping ID %s", dup[0], dup[1]
+                )
             if not warn_only:
                 raise DSGDuplicateValueRegistered(
                     f"There are {len(duplicates)} duplicate dimension mapping records."
@@ -155,7 +157,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             self.fs_interface.mkdir(dst_dir)
 
             registry_file = Path(os.path.dirname(dst_dir)) / REGISTRY_FILENAME
-            registry_config.serialize(registry_file)
+            registry_config.serialize(registry_file, force=True)
 
             at_config = AssociationTableConfig(mapping)
             at_config.src_dir = src_dir
@@ -180,9 +182,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             registration.version,
         )
 
-    def dump(self, config_id, directory, version=None):
+    def dump(self, config_id, directory, version=None, force=False):
         config = self.get_by_id(config_id, version)
-        config.serialize(directory)
+        config.serialize(directory, force=force)
 
         if version is None:
             version = self._registry_configs[config_id].version

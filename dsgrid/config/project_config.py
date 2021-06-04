@@ -34,7 +34,11 @@ from .dimensions import (
 )
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.registry.common import ProjectRegistryStatus, DatasetRegistryStatus, check_config_id_2
+from dsgrid.registry.common import (
+    ProjectRegistryStatus,
+    DatasetRegistryStatus,
+    check_config_id_strict,
+)
 
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
@@ -233,7 +237,7 @@ class ProjectConfigModel(DSGBaseModel):
         if "-" in project_id:
             raise ValueError('invalid character "-" in project id')
 
-        check_config_id_2(project_id, "Project")
+        check_config_id_strict(project_id, "Project")
         return project_id
 
     # TODO: validate that datasets listed are listed by the project

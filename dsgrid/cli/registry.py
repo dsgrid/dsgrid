@@ -228,13 +228,21 @@ def register_dimensions(registry_manager, dimension_config_file, log_message):
     "--directory",
     default=".",
     type=click.Path(exists=True),
-    help="Directory in which to create file",
+    help="Directory in which to create config and data files",
+)
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite files if they exist.",
 )
 @click.pass_obj
-def dump_dimension(registry_manager, dimension_id, version, directory):
-    """Dump a dimension config file from the registry."""
+def dump_dimension(registry_manager, dimension_id, version, directory, force):
+    """Dump a dimension config file (and any related data) from the registry."""
     manager = registry_manager.dimension_manager
-    manager.dump(dimension_id, Path(directory), version=version)
+    manager.dump(dimension_id, Path(directory), version=version, force=force)
 
 
 @click.command(name="register")
@@ -261,6 +269,36 @@ def register_dimension_mappings(
     submitter = getpass.getuser()
     manager = registry_manager.dimension_mapping_manager
     manager.register(dimension_mapping_config_file, submitter, log_message, force=force)
+
+
+@click.command(name="dump")
+@click.argument("dimension-mapping-id")
+@click.option(
+    "-v",
+    "--version",
+    callback=_version_info_callback,
+    help="Version to dump; defaults to latest",
+)
+@click.option(
+    "-d",
+    "--directory",
+    default=".",
+    type=click.Path(exists=True),
+    help="Directory in which to create config and data files",
+)
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite files if they exist.",
+)
+@click.pass_obj
+def dump_dimension_mapping(registry_manager, dimension_mapping_id, version, directory, force):
+    """Dump a dimension mapping config file (and any related data) from the registry."""
+    manager = registry_manager.dimension_mapping_manager
+    manager.dump(dimension_mapping_id, Path(directory), version=version, force=force)
 
 
 @click.command(name="update")
@@ -316,13 +354,21 @@ def update_project(
     "--directory",
     default=".",
     type=click.Path(exists=True),
-    help="Directory in which to create file",
+    help="Directory in which to create the config file",
+)
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite files if they exist.",
 )
 @click.pass_obj
-def dump_project(registry_manager, project_id, version, directory):
+def dump_project(registry_manager, project_id, version, directory, force):
     """Dump a project config file from the registry."""
     manager = registry_manager.project_manager
-    manager.dump(project_id, directory, version=version)
+    manager.dump(project_id, directory, version=version, force=force)
 
 
 @click.command(name="register")
@@ -386,13 +432,21 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
     "--directory",
     default=".",
     type=click.Path(exists=True),
-    help="Directory in which to create file",
+    help="Directory in which to create the config file",
+)
+@click.option(
+    "-f",
+    "--force",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite files if they exist.",
 )
 @click.pass_obj
-def dump_dataset(registry_manager, dataset_id, version, directory):
+def dump_dataset(registry_manager, dataset_id, version, directory, force):
     """Dump a dataset config file from the registry."""
     manager = registry_manager.dataset_manager
-    manager.dump(dataset_id, directory, version=version)
+    manager.dump(dataset_id, directory, version=version, force=force)
 
 
 @click.command()
@@ -421,6 +475,7 @@ dimensions.add_command(dump_dimension)
 
 dimension_mappings.add_command(register_dimension_mappings)
 dimension_mappings.add_command(list_dimension_mappings)
+dimension_mappings.add_command(dump_dimension_mapping)
 
 registry.add_command(list_)
 registry.add_command(projects)

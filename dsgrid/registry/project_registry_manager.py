@@ -131,7 +131,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         # Serialize the registry file as well as the updated ProjectConfig to the registry.
         self.fs_interface.mkdir(data_dir)
         registry_filename = registry_dir / REGISTRY_FILENAME
-        registry_config.serialize(registry_filename)
+        registry_config.serialize(registry_filename, force=True)
         config.serialize(self.get_config_directory(config.config_id, registry_config.version))
 
         self._update_registry_cache(config.model.project_id, registry_config)

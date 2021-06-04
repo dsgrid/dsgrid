@@ -99,7 +99,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 )
             if not warn_only:
                 raise DSGDuplicateValueRegistered(
-                    f"There are {len(duplicates)} duplicate dimension mapping records."
+                    f"There are {len(duplicates)} dimensions with duplicate content (data files)."
                 )
 
     def get_by_id(self, config_id, version=None, force=False):

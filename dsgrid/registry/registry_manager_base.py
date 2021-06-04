@@ -343,8 +343,7 @@ class RegistryManagerBase(abc.ABC):
         RegistryBase
 
         """
-        if config_id not in self._registry_configs:
-            raise DSGValueNotRegistered(f"{self.name()}={config_id}")
+        self._check_if_not_registered(config_id)
         return self._registry_configs[config_id]
 
     @abc.abstractmethod
@@ -428,8 +427,9 @@ class RegistryManagerBase(abc.ABC):
         remote_path = f"{self._params.remote_path}/{relative_path}"
         return remote_path
 
+    @abc.abstractmethod
     def remove(self, config_id):
-        """Remove an item from the registry
+        """Remove an item from the registry.
 
         Parameters
         ----------
@@ -441,9 +441,15 @@ class RegistryManagerBase(abc.ABC):
             Raised if the project_id is not registered.
 
         """
+
+    def _remove(self, config_id):
+        if not self.offline_mode:
+            # TODO: DSGRID-145
+            raise Exception("sync-push of config removal is currently not supported")
         self._raise_if_dry_run("remove")
         self._check_if_not_registered(config_id)
-        self.fs_interface.rmtree(self.get_registry_directory(config_id))
+        self.fs_interface.rm_tree(self.get_registry_directory(config_id))
+        self._registry_configs.pop(config_id, None)
         logger.info("Removed %s from the registry.", config_id)
 
     def show(self, **kwargs):

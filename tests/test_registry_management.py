@@ -8,7 +8,12 @@ from tempfile import TemporaryDirectory, gettempdir
 import pytest
 from semver import VersionInfo
 
-from dsgrid.exceptions import DSGDuplicateValueRegistered, DSGInvalidParameter, DSGInvalidOperation
+from dsgrid.exceptions import (
+    DSGDuplicateValueRegistered,
+    DSGInvalidParameter,
+    DSGInvalidOperation,
+    DSGValueNotRegistered,
+)
 from dsgrid.registry.common import DatasetRegistryStatus, VersionUpdateType
 from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.project_registry_manager import ProjectRegistryManager
@@ -105,6 +110,12 @@ def test_register_project_and_dataset(make_test_project_dir):
             dim_dir, dimension_mapping_mgr, dimension_mapping_id, user, VersionInfo.parse("1.0.0")
         )
 
+        # Test removals.
+        check_config_remove(project_mgr, project_id)
+        check_config_remove(dataset_mgr, dataset_id)
+        check_config_remove(dimension_mgr, dimension_id)
+        check_config_remove(dimension_mapping_mgr, dimension_mapping_id)
+
 
 def register_project(project_mgr, config_file, project_id, user, log_message):
     project_mgr.register(config_file, user, log_message)
@@ -182,3 +193,10 @@ def check_config_update(tmpdir, mgr, config_id, user, version):
     finally:
         if config_file.exists():
             os.remove(config_file)
+
+
+def check_config_remove(mgr, config_id):
+    """Runs removal tests for the config."""
+    mgr.remove(config_id)
+    with pytest.raises(DSGValueNotRegistered):
+        mgr.get_by_id(config_id)

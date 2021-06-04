@@ -79,6 +79,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         pass
 
     def get_by_id(self, config_id, version=None):
+        self._check_if_not_registered(config_id)
         if version is None:
             version = self._registry_configs[config_id].model.version
         key = ConfigKey(config_id, version)
@@ -212,3 +213,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._mappings.pop(old_key, None)
         self._mappings[new_key] = config
         return version
+
+    def remove(self, config_id):
+        self._remove(config_id)
+        for key in [x for x in self._mappings if x.id == config_id]:
+            self._mappings.pop(key)

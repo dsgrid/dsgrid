@@ -54,6 +54,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._dimension_mgr = val
 
     def get_by_id(self, config_id, version=None):
+        self._check_if_not_registered(config_id)
         if version is None:
             version = self._registry_configs[config_id].model.version
         key = ConfigKey(config_id, version)
@@ -155,3 +156,8 @@ class DatasetRegistryManager(RegistryManagerBase):
         new_key = ConfigKey(config.config_id, version)
         self._datasets.pop(old_key, None)
         self._datasets[new_key] = config
+
+    def remove(self, config_id):
+        self._remove(config_id)
+        for key in [x for x in self._datasets if x.id == config_id]:
+            self._datasets.pop(key)

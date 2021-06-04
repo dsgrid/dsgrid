@@ -103,6 +103,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 )
 
     def get_by_id(self, config_id, version=None, force=False):
+        self._check_if_not_registered(config_id)
         dimension_type = self._id_to_type[config_id]
         if version is None:
             version = self._registry_configs[config_id].model.version
@@ -305,3 +306,9 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._dimensions.pop(old_key, None)
         self._dimensions[new_key] = config
         return version
+
+    def remove(self, config_id):
+        self._remove(config_id)
+        for key in [x for x in self._dimensions if x.id == config_id]:
+            self._dimensions.pop(key)
+            self._id_to_type.pop(key.id, None)

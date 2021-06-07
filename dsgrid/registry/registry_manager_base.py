@@ -490,7 +490,7 @@ class RegistryManagerBase(abc.ABC):
         table.field_names = ("ID", "Version", "Registration Date", "Submitter", "Description")
         rows = []
         for config_id, registry_config in self._registry_configs.items():
-            last_reg = registry_config.model.registration_history[-1]
+            last_reg = registry_config.model.registration_history[0]
             row = (
                 config_id,
                 last_reg.version,

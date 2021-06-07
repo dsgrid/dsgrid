@@ -261,7 +261,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         )
         rows = []
         for dimension_id, registry_config in self._registry_configs.items():
-            last_reg = registry_config.model.registration_history[-1]
+            last_reg = registry_config.model.registration_history[0]
             row = (
                 self._id_to_type[dimension_id].value,
                 dimension_id,

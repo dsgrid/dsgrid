@@ -41,18 +41,9 @@ export US_DATA_REPO="/home/$USER/dsgrid-data-UnitedStates"
 export DSGRID_REGISTRY_PATH="/home/$USER/.dsgrid-test-registry"
 ```
 
-and then running the commands:
+and then running:
 ```
-dsgrid-internal create-registry $DSGRID_REGISTRY_PATH
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline dimensions register $US_DATA_REPO/dsgrid_project/dimensions.toml -l "initial registration"
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline dimensions register $US_DATA_REPO/dsgrid_project/datasets/sector_models/comstock/dimensions.toml -l "initial registration"
-# environment variable substitutions will not actually work--replace with paths
-python -c 'from tests.common import *;replace_dimension_uuids_from_registry("${DSGRID_REGISTRY_PATH}", ["${US_DATA_REPO}/dsgrid_project/project.toml", "${US_DATA_REPO}/dsgrid_project/datasets/sector_models/comstock/dataset.toml"])'
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline projects register $US_DATA_REPO/dsgrid_project/project.toml -l "initial registration"
-aws s3 sync s3://nrel-dsgrid-scratch/dsgrid_v2.0.0/commercial/load_data_lookup.parquet $DSGRID_REGISTRY_PATH/data/efs-comstock/1.0.0/load_data_lookup.parquet
-aws s3 sync s3://nrel-dsgrid-scratch/dsgrid_v2.0.0/commercial/load_data.parquet $DSGRID_REGISTRY_PATH/data/efs-comstock/1.0.0/load_data.parquet
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline datasets register $US_DATA_REPO/dsgrid_project/datasets/sector_models/comstock/dataset.toml -l "initial registration"
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline projects submit-dataset -p test -d efs_comstock -l "initial registration"
+python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH
 ```
 
 After that you can run the tests:
@@ -68,17 +59,9 @@ option flag           | effect
 --------------------- | ------
 --log-cli-level=DEBUG | emits log messages to the console. level can be set to DEBUG, INFO, WARN, ERROR
 
-## Creating a local registry with the US Data
-
-Here is how to create a local registry for dev/test purposes.
-
-```
-python tests/make_us_data_registry.py ./local-registry
-```
-
 ## Interactive Exploration
 
-In addition to the CLI tools you use `scripts/registry` to explore a registry interactively.
+In addition to the CLI tools you can use `scripts/registry.py` to explore a registry interactively.
 
 Be sure to use the `debug` function from the `devtools` package when exploring Pydantic models.
 ```

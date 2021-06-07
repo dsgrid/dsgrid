@@ -1,5 +1,6 @@
 """Manages the registry for dimensions"""
 
+import getpass
 import logging
 import os
 from pathlib import Path
@@ -42,7 +43,7 @@ class DimensionRegistryManager(RegistryManagerBase):
     def __init__(self, path, params):
         super().__init__(path, params)
         self._dimensions = {}  # key = DimensionKey, value = DimensionConfig
-        self._id_to_type = {}
+        self._id_to_type = {}  # key = str, value = DimensionType
 
     def inventory(self):
         for dim_type in self.fs_interface.listdir(
@@ -265,7 +266,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 self._id_to_type[dimension_id].value,
                 dimension_id,
                 last_reg.version,
-                last_reg.date,
+                last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
                 last_reg.submitter,
                 registry_config.model.description,
             )
@@ -274,11 +275,15 @@ class DimensionRegistryManager(RegistryManagerBase):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
 
+        table.align = "l"
+        table.max_width = 70
         print(table)
 
     def dump(self, config_id, directory, version=None, force=False):
+        path = Path(directory)
+        os.makedirs(path, exist_ok=True)
         config = self.get_by_id(config_id, version)
-        config.serialize(directory, force=force)
+        config.serialize(path, force=force)
 
         if version is None:
             version = self._registry_configs[config_id].version
@@ -287,22 +292,28 @@ class DimensionRegistryManager(RegistryManagerBase):
             self.name(),
             config_id,
             version,
-            directory,
+            path,
         )
 
-    def update(self, config_file, config_id, submitter, update_type, log_message, version):
+    def update_from_file(
+        self, config_file, config_id, submitter, update_type, log_message, version
+    ):
         config = load_dimension_config(config_file)
         self._check_update(config, config_id, version)
+        self.update(config, update_type, log_message, submitter=submitter)
 
+    def update(self, config, update_type, log_message, submitter=None):
+        if submitter is None:
+            submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(None)
         with self.cloud_interface.make_lock_file(lock_file_path):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
         registry = self.get_registry_config(config.config_id)
-        old_key = DimensionKey(config.config_id, config.model.dimension_type, registry.version)
+        old_key = DimensionKey(config.model.dimension_type, config.config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)
-        new_key = DimensionKey(config.config_id, config.model.dimension_type, version)
+        new_key = DimensionKey(config.model.dimension_type, config.config_id, version)
         self._dimensions.pop(old_key, None)
         self._dimensions[new_key] = config
         return version

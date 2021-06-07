@@ -109,10 +109,7 @@ Registry Commands
 def list_(registry_manager):
     """List the contents of a registry."""
     print(f"Registry: {registry_manager.path}")
-    registry_manager.project_manager.show()
-    registry_manager.dataset_manager.show()
-    registry_manager.dimension_manager.show()
-    registry_manager.dimension_mapping_manager.show()
+    registry_manager.show()
 
 
 """
@@ -211,7 +208,7 @@ def update_dimension(
     """Update an existing dimension registry."""
     manager = registry_manager.dimension_mapping_registry_manager
     submitter = getpass.getuser()
-    manager.update(
+    manager.update_from_file(
         dimension_config_file, dimension_id, submitter, update_type, log_message, version
     )
 
@@ -329,7 +326,7 @@ def update_dimension_mapping(
     """Update an existing dimension mapping registry."""
     manager = registry_manager.dimension_mapping_registry_manager
     submitter = getpass.getuser()
-    manager.update(
+    manager.update_from_file(
         dimension_mapping_config_file,
         dimension_mapping_id,
         submitter,
@@ -479,7 +476,9 @@ def update_project(
     """Update an existing project registry."""
     manager = registry_manager.project_manager
     submitter = getpass.getuser()
-    manager.update(project_config_file, project_id, submitter, update_type, log_message, version)
+    manager.update_from_file(
+        project_config_file, project_id, submitter, update_type, log_message, version
+    )
 
 
 @click.command(name="remove")
@@ -569,7 +568,7 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
     """Update an existing dataset registry."""
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
-    manager.update(dataset_config_file, submitter, update_type, log_message)
+    manager.update_from_file(dataset_config_file, submitter, update_type, log_message)
 
 
 @click.command(name="remove")

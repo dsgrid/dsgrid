@@ -2,6 +2,7 @@
 
 import abc
 import logging
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -148,8 +149,10 @@ class RegistryManagerBase(abc.ABC):
         """Return the class used for the registry item."""
 
     @abc.abstractmethod
-    def update(self, config_file, config_id, submitter, update_type, log_message, version):
-        """Updates an existing registry with new parameters or data.
+    def update_from_file(
+        self, config_file, config_id, submitter, update_type, log_message, version
+    ):
+        """Updates the current registry with new parameters or data from a file.
 
         Parameters
         ----------
@@ -157,11 +160,32 @@ class RegistryManagerBase(abc.ABC):
             Path to project config file
         config_id : str
         submitter : str
-            Submitter name
         update_type : VersionUpdateType
         log_message : str
         version : VersionInfo
-            Version to update; must be the current version.
+            Version to update. Must be the current version.
+
+        Raises
+        ------
+        ValueError
+            Raised if the config_file is invalid.
+        DSGInvalidParameter
+            Raised if config_id does not match config_file.
+            Raised if the version is not the current version.
+
+        """
+
+    @abc.abstractmethod
+    def update(self, config, update_type, log_message, submitter=None):
+        """Updates the current registry with new parameters or data.
+
+        Parameters
+        ----------
+        config : ConfigBase
+        update_type : VersionUpdateType
+        log_message : str
+        submitter : str | None
+            Submitter name. Use current user if None.
 
         Raises
         ------
@@ -260,8 +284,10 @@ class RegistryManagerBase(abc.ABC):
             If True, overwrite files if they exist.
 
         """
+        path = Path(directory)
+        os.makedirs(path, exist_ok=True)
         config = self.get_by_id(config_id, version)
-        filename = config.serialize(directory, force=force)
+        filename = config.serialize(path, force=force)
         if version is None:
             version = self._registry_configs[config_id].version
         logger.info(
@@ -407,6 +433,11 @@ class RegistryManagerBase(abc.ABC):
             return config_id in self._registry_configs
         return self.fs_interface.exists(self.get_config_directory(config_id, version))
 
+    def iter_configs(self):
+        """Return an iterator over the registered configs."""
+        for config_id in self.iter_ids():
+            yield self.get_by_id(config_id)
+
     def iter_ids(self):
         """Return an iterator over the registered IDs."""
         return self._registry_configs.keys()
@@ -463,7 +494,7 @@ class RegistryManagerBase(abc.ABC):
             row = (
                 config_id,
                 last_reg.version,
-                last_reg.date,
+                last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
                 last_reg.submitter,
                 registry_config.model.description,
             )
@@ -471,6 +502,8 @@ class RegistryManagerBase(abc.ABC):
 
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
+        table.max_width = 70
+        table.align = "l"
         print(table)
 
     def sync_pull(self, path):

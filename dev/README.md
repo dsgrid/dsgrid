@@ -68,6 +68,22 @@ option flag           | effect
 --------------------- | ------
 --log-cli-level=DEBUG | emits log messages to the console. level can be set to DEBUG, INFO, WARN, ERROR
 
+## Creating a local registry with the US Data
+
+Here is how to create a local registry for dev/test purposes.
+
+```
+python tests/make_us_data_registry.py ./local-registry
+```
+
+## Interactive Exploration
+
+In addition to the CLI tools you use `scripts/registry` to explore a registry interactively.
+
+```
+ipython -i scripts/registry.py -- --path=$DSGRID_REGISTRY_PATH --offline
+```
+
 ## Publish Documentation
 
 The documentation is built with [Sphinx](http://sphinx-doc.org/index.html). There are several steps to creating and publishing the documentation:

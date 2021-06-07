@@ -1,5 +1,6 @@
 """Manages the registry for dimension mappings"""
 
+import getpass
 import logging
 import os
 from pathlib import Path
@@ -12,6 +13,7 @@ from dsgrid.data_models import serialize_model
 from dsgrid.registry.common import ConfigKey, make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import dump_data
 from .dimension_mapping_registry import DimensionMappingRegistry, DimensionMappingRegistryModel
+from .dimension_registry_manager import DimensionRegistryManager
 from .registry_base import RegistryBaseModel
 from .registry_manager_base import RegistryManagerBase
 
@@ -25,10 +27,25 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def __init__(self, path, params):
         super().__init__(path, params)
         self._mappings = {}  # ConfigKey to DimensionMappingModel
+        self._dimension_mgr = None
+
+    @classmethod
+    def load(cls, path, fs_interface, dimension_manager):
+        mgr = cls._load(path, fs_interface)
+        mgr.dimension_manager = dimension_manager
+        return mgr
 
     @staticmethod
     def name():
         return "Dimension Mappings"
+
+    @property
+    def dimension_manager(self):
+        return self._dimension_mgr
+
+    @dimension_manager.setter
+    def dimension_manager(self, val: DimensionRegistryManager):
+        self._dimension_mgr = val
 
     @staticmethod
     def registry_class():
@@ -147,6 +164,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             return
 
         for mapping in config.model.mappings:
+            from_id = mapping.to_dimension.dimension_id
+            to_id = mapping.to_dimension.dimension_id
+            if not self.dimension_manager.has_id(from_id):
+                raise DSGValueNotRegistered(f"from_dimension ID {from_id} is not registered")
+            if not self.dimension_manager.has_id(to_id):
+                raise DSGValueNotRegistered(f"to_dimension ID {to_id} is not registered")
+
             registry_model = DimensionMappingRegistryModel(
                 dimension_mapping_id=mapping.mapping_id,
                 version=registration.version,
@@ -184,8 +208,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         )
 
     def dump(self, config_id, directory, version=None, force=False):
+        path = Path(directory)
+        os.makedirs(path, exist_ok=True)
         config = self.get_by_id(config_id, version)
-        config.serialize(directory, force=force)
+        config.serialize(path, force=force)
 
         if version is None:
             version = self._registry_configs[config_id].version
@@ -194,13 +220,19 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             self.name(),
             config_id,
             version,
-            directory,
+            path,
         )
 
-    def update(self, config_file, config_id, submitter, update_type, log_message, version):
+    def update_from_file(
+        self, config_file, config_id, submitter, update_type, log_message, version
+    ):
         config = AssociationTableConfig.load(config_file)
         self._check_update(config, config_id, version)
+        self.update(config, update_type, log_message, submitter=submitter)
 
+    def update(self, config, update_type, log_message, submitter=None):
+        if submitter is None:
+            submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(None)
         with self.cloud_interface.make_lock_file(lock_file_path):
             return self._update(config, submitter, update_type, log_message)

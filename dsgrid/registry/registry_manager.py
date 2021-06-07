@@ -12,6 +12,9 @@ from dsgrid.common import (
     SYNC_EXCLUDE_LIST,
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.filesystem.factory import make_filesystem_interface
 from .common import (
@@ -46,7 +49,9 @@ class RegistryManager:
             params.base_path / DimensionRegistry.registry_path(), params
         )
         self._dimension_mapping_dimension_mgr = DimensionMappingRegistryManager.load(
-            params.base_path / DimensionMappingRegistry.registry_path(), params
+            params.base_path / DimensionMappingRegistry.registry_path(),
+            params,
+            self._dimension_mgr,
         )
         self._dataset_mgr = DatasetRegistryManager.load(
             params.base_path / DatasetRegistry.registry_path(), params, self._dimension_mgr
@@ -210,6 +215,175 @@ class RegistryManager:
     @property
     def path(self):
         return self._params.base_path
+
+    def show(self):
+        """Show tables of all registry configs."""
+        self.project_manager.show()
+        self.dataset_manager.show()
+        self.dimension_manager.show()
+        self.dimension_mapping_manager.show()
+
+    def update_dependent_configs(self, config, version, update_type, log_message):
+        """Update all configs that consume this config. Recursive.
+        Passing a dimension may trigger an update to a project and a dimension mapping.
+        The change to that dimension mapping may trigger another update to the project.
+        This guarantees that each config version will only be bumped once.
+
+        Parameters
+        ----------
+        config : ConfigBase
+        version : VersionInfo
+        update_type : VersionUpdateType
+        log_message : str
+
+        """
+        if isinstance(config, DimensionConfig):
+            self._update_dimension_users(config, version, update_type, log_message)
+        elif isinstance(config, DimensionMappingBaseModel):
+            self._update_dimension_mapping_users(config, version, update_type, log_message)
+        elif isinstance(config, DatasetConfig):
+            self._update_dataset_users(config, version, update_type, log_message)
+        else:
+            assert False, type(config)
+
+    def _update_dimension_users(self, config: DimensionConfig, version, update_type, log_message):
+        # Order is important because
+        # - dimension mappings may have this dimension.
+        # - datasets may have this dimension.
+        # - projects may have this dimension as well as updated mappings and datasets.
+        updated_dimension_versions = {config.config_id: version}
+        updated_mappings = {}
+        updated_mapping_versions = {}
+        updated_datasets = {}
+        updated_dataset_versions = {}
+        updated_projects = {}
+
+        self._update_dimension_mappings_with_dimensions(
+            updated_dimension_versions, updated_mappings
+        )
+        for mapping in updated_mappings.values():
+            self.dimension_mapping_manager.update(mapping, update_type, log_message)
+            updated_mapping_versions[
+                mapping.config_id
+            ] = self.dimension_mapping_manager.get_current_version(mapping.config_id)
+            logger.info(
+                "Updated dimension mapping %s as a result of dimension update", mapping.config_id
+            )
+
+        self._update_datasets_with_dimensions(updated_dimension_versions, updated_datasets)
+        for dataset in updated_datasets.values():
+            self.dataset_manager.update(dataset, update_type, log_message)
+            updated_dataset_versions[dataset.config_id] = self.dataset_manager.get_current_version(
+                dataset.config_id
+            )
+            logger.info("Updated dataset %s as a result of dimension update", dataset.config_id)
+
+        self._update_projects_with_dimensions(updated_dimension_versions, updated_projects)
+        self._update_projects_with_dimension_mappings(updated_mapping_versions, updated_projects)
+        self._update_projects_with_datasets(updated_dataset_versions, updated_projects)
+        for project in updated_projects.values():
+            self.project_manager.update(project, update_type, log_message)
+            logger.info("Updated project %s as a result of dimension update", project.config_id)
+
+    def _update_dimension_mapping_users(
+        self, config: DimensionMappingBaseModel, version, update_type, log_message
+    ):
+        updated_mapping_versions = {config.config_id: version}
+        updated_projects = {}
+        self._update_projects_with_dimension_mappings(updated_mapping_versions, updated_projects)
+        for project in updated_projects.values():
+            self.project_manager.update(project, update_type, log_message)
+            logger.info(
+                "Updated project %s as a result of dimension mapping update", project.config_id
+            )
+
+    def _update_dataset_users(self, config: DatasetConfig, version, update_type, log_message):
+        updated_dataset_versions = {config.config_id: version}
+        updated_projects = {}
+        self._update_projects_with_datasets(updated_dataset_versions, updated_projects)
+        for project in updated_projects.values():
+            self.project_manager.update(project, update_type, log_message)
+            logger.info("Updated project %s as a result of dataset update", project.config_id)
+
+    def _update_dimension_mappings_with_dimensions(self, updated_dimensions, updated_mappings):
+        if not updated_dimensions:
+            return
+        for mapping in self.dimension_mapping_manager.iter_configs():
+            updated = False
+            if mapping.model.from_dimension.dimension_id in updated_dimensions:
+                mapping.model.from_dimension.version = updated_dimensions[
+                    mapping.model.from_dimension.dimension_id
+                ]
+                updated = True
+            elif mapping.model.to_dimension.dimension_id in updated_dimensions:
+                mapping.model.to_dimension.version = updated_dimensions[
+                    mapping.model.to_dimension.dimension_id
+                ]
+                updated = True
+            if updated and mapping.config_id not in updated_mappings:
+                updated_mappings[mapping.config_id] = mapping
+
+    def _update_datasets_with_dimensions(self, updated_dimensions, updated_datasets):
+        if not updated_dimensions:
+            return
+        for dataset in self.dataset_manager.iter_configs():
+            updated = False
+            for dimension_ref in dataset.model.dimensions:
+                if dimension_ref.dimension_id in updated_dimensions:
+                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    updated = True
+            if updated and dataset.config_id not in updated_datasets:
+                updated_datasets[dataset.config_id] = dataset
+
+    def _update_projects_with_dimensions(self, updated_dimensions, updated_projects):
+        if not updated_dimensions:
+            return
+        for project in self.project_manager.iter_configs():
+            updated = False
+            for dimension_ref in project.model.dimensions.base_dimensions:
+                if dimension_ref.dimension_id in updated_dimensions:
+                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    updated = True
+            for dimension_ref in project.model.dimensions.supplemental_dimensions:
+                if dimension_ref.dimension_id in updated_dimensions:
+                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    updated = True
+            if updated and project.config_id not in updated_projects:
+                updated_projects[project.config_id] = project
+
+    def _update_projects_with_dimension_mappings(self, updated_mappings, updated_projects):
+        if not updated_mappings:
+            return
+        for project in self.project_manager.iter_configs():
+            updated = False
+            for mapping_ref in project.model.dimension_mappings.base_to_base:
+                if mapping_ref.mapping_id in updated_mappings:
+                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                    updated = True
+            for mapping_ref in project.model.dimension_mappings.base_to_supplemental:
+                if mapping_ref.mapping_id in updated_mappings:
+                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                    updated = True
+            for mapping_list in project.model.dimension_mappings.dataset_to_project.values():
+                for mapping_ref in mapping_list:
+                    if mapping_ref.mapping_id in updated_mappings:
+                        mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                        updated_project = True
+            if updated and project.config_id not in updated_projects:
+                updated_projects[project.config_id] = project
+
+    def _update_projects_with_datasets(self, updated_datasets, updated_projects):
+        if not updated_datasets:
+            return
+        for project in self.project_manager.iter_configs():
+            updated = False
+            for dataset in project.model.input_datasets.datasets:
+                # TODO: does dataset status matter? update unregistered?
+                if dataset.dataset_id in updated_datasets:
+                    dataset.version = updated_datasets[dataset.dataset_id]
+                    updated = True
+            if updated and project.config_id not in updated_projects:
+                updated_projects[project.config_id] = project
 
 
 def get_registry_path(registry_path=None):

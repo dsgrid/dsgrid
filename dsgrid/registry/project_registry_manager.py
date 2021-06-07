@@ -1,5 +1,5 @@
 """Manages the registry for dimension projects"""
-
+import getpass
 import logging
 
 from dsgrid.common import REGISTRY_FILENAME
@@ -224,9 +224,16 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_config.config_id,
         )
 
-    def update(self, config_file, config_id, submitter, update_type, log_message, version):
+    def update_from_file(
+        self, config_file, config_id, submitter, update_type, log_message, version
+    ):
         config = ProjectConfig.load(config_file, self.dimension_manager)
         self._check_update(config, config_id, version)
+        self.update(config, update_type, log_message, submitter=submitter)
+
+    def update(self, config, update_type, log_message, submitter=None):
+        if submitter is None:
+            submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(config.config_id)
         with self.cloud_interface.make_lock_file(lock_file_path):
             # TODO DSGRID-81: Adding new dimensions or dimension mappings requires

@@ -3,7 +3,6 @@ import os
 import pytest
 
 from dsgrid.config.dimensions_config import DimensionsConfigModel
-from dsgrid.config.dimensions import DimensionModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE
 

@@ -34,6 +34,10 @@ def test_register_project_and_dataset(make_test_project_dir):
                 # The other one has time only - no records.
                 assert run_command(cmd) != 0
 
+        replace_dimension_uuids_from_registry(
+            path, (project_dimension_mapping_config, dimension_mapping_config)
+        )
+
         for dim_mapping_config in (project_dimension_mapping_config, dimension_mapping_config):
             cmd = f"dsgrid registry --path={path} --offline dimension-mappings register {dim_mapping_config} -l log"
             check_run_command(cmd)

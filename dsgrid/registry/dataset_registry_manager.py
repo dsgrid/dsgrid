@@ -1,5 +1,6 @@
 """Manages the registry for dimension datasets"""
 
+import getpass
 import logging
 import os
 
@@ -140,9 +141,16 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         logger.info("Removed %s from the registry.", config_id)
 
-    def update(self, config_file, config_id, submitter, update_type, log_message, version):
+    def update_from_file(
+        self, config_file, config_id, submitter, update_type, log_message, version
+    ):
         config = DatasetConfig.load(config_file, self.dimension_manager)
         self._check_update(config, config_id, version)
+        self.update(config, update_type, log_message, submitter)
+
+    def update(self, config, update_type, log_message, submitter=None):
+        if submitter is None:
+            submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(config.config_id)
         with self.cloud_interface.make_lock_file(lock_file_path):
             # Note that projects will not pick up these changes until submit-dataset

@@ -1,3 +1,4 @@
+import getpass
 import os
 import re
 import shutil
@@ -24,81 +25,59 @@ from tests.common import (
     replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )
+from tests.make_us_data_registry import make_us_data_registry
 
 
 def test_register_project_and_dataset(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
-        path = create_local_test_registry(base_dir)
-        dataset_dir = Path("datasets/sector_models/comstock")
-        project_dimension_mapping_config = make_test_project_dir / "dimension_mappings.toml"
-        dimension_mapping_config = make_test_project_dir / dataset_dir / "dimension_mappings.toml"
-        dimension_mapping_refs = (
-            make_test_project_dir / dataset_dir / "dimension_mapping_references.toml"
-        )
-
-        user = "test_user"
-        log_message = "registration message"
-        manager = RegistryManager.load(path, offline_mode=True)
-
-        # register dimensions
-        dimension_id = None
-        for dim_config_file in (
-            make_test_project_dir / "dimensions.toml",
-            make_test_project_dir / dataset_dir / "dimensions.toml",
-        ):
-            dim_mgr = manager.dimension_manager
-            dim_mgr.register(dim_config_file, user, log_message)
-            assert dim_mgr.list_ids()
-            if dimension_id is None:
-                dimension_id = dim_mgr.list_ids()[0]
-            if dim_config_file == make_test_project_dir / "dimensions.toml":
-                # The other one has time only - no records.
-                with pytest.raises(DSGDuplicateValueRegistered):
-                    dim_mgr.register(dim_config_file, user, log_message)
-
-        assert dimension_id is not None
-
-        # register dimension mappings
-        dim_mapping_mgr = manager.dimension_mapping_manager
-        dim_mapping_mgr.register(project_dimension_mapping_config, user, log_message)
-        dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
-        dim_mapping_ids = dim_mapping_mgr.list_ids()
-        assert dim_mapping_ids
-        with pytest.raises(DSGDuplicateValueRegistered):
-            dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
-        dimension_mapping_id = dim_mapping_ids[0]
-
-        # The project/dataset config files need to use the UUIDs that were just registered.
-        # Make the modifications in our local copy.
-        project_config_file = make_test_project_dir / "project.toml"
-        dataset_config_file = make_test_project_dir / dataset_dir / "dataset.toml"
-        replace_dimension_mapping_uuids_from_registry(
-            path, (project_config_file, dimension_mapping_refs)
-        )
-        replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
-
-        # Register project and dataset and connect them together.
-        project_id = "test"
-        dataset_id = "efs_comstock"
+        manager = make_us_data_registry(base_dir, make_test_project_dir)
         project_mgr = manager.project_manager
         dataset_mgr = manager.dataset_manager
         dimension_mgr = manager.dimension_manager
         dimension_mapping_mgr = manager.dimension_mapping_manager
+        project_ids = project_mgr.list_ids()
+        assert len(project_ids) == 1
+        project_id = project_ids[0]
+        dataset_ids = dataset_mgr.list_ids()
+        dataset_id = dataset_ids[0]
+        assert len(dataset_ids) == 1
+        dimension_ids = dimension_mgr.list_ids()
+        assert dimension_ids
+        dimension_id = dimension_ids[0]
+        dimension_mapping_ids = dimension_mapping_mgr.list_ids()
+        assert dimension_mapping_ids
+        dimension_mapping_id = dimension_mapping_ids[0]
+        user = getpass.getuser()
+        log_message = "intial registration"
 
-        register_project(project_mgr, project_config_file, project_id, user, log_message)
-        register_dataset(dataset_mgr, dataset_config_file, dataset_id, user, log_message)
+        project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.1.0"))
+        dataset = project_config.get_dataset(dataset_id)
+        assert dataset.status == DatasetRegistryStatus.REGISTERED
 
-        project_config = project_mgr.get_by_id(project_id)
-        dataset_config = dataset_mgr.get_by_id(dataset_id)
-        submit_dataset(
-            project_mgr,
-            project_config,
-            dataset_config,
-            [dimension_mapping_refs],
-            user,
-            log_message,
-        )
+        # The project version from before dataset submission should still be there.
+        project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.0.0"))
+        dataset = project_config.get_dataset(dataset_id)
+        assert dataset.status == DatasetRegistryStatus.UNREGISTERED
+
+        with pytest.raises(DSGDuplicateValueRegistered):
+            project_config_file = make_test_project_dir / "project.toml"
+            project_mgr.register(project_config_file, user, log_message)
+
+        with pytest.raises(DSGDuplicateValueRegistered):
+            dataset_config_file = (
+                make_test_project_dir / "datasets/sector_models/comstock/dataset.toml"
+            )
+            dataset_mgr.register(dataset_config_file, user, log_message)
+
+        with pytest.raises(DSGDuplicateValueRegistered):
+            dim_config_file = make_test_project_dir / "dimensions.toml"
+            dimension_mgr.register(dim_config_file, user, log_message)
+
+        with pytest.raises(DSGDuplicateValueRegistered):
+            dset_dir = Path("datasets/sector_models/comstock")
+            dimension_mapping_config = make_test_project_dir / dset_dir / "dimension_mappings.toml"
+            dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
 
         # Test updates to all configs.
         check_config_update(base_dir, project_mgr, project_id, user, VersionInfo.parse("1.1.0"))
@@ -115,6 +94,61 @@ def test_register_project_and_dataset(make_test_project_dir):
         check_config_remove(dataset_mgr, dataset_id)
         check_config_remove(dimension_mgr, dimension_id)
         check_config_remove(dimension_mapping_mgr, dimension_mapping_id)
+
+
+def test_auto_updates(make_test_project_dir):
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        mgr = make_us_data_registry(base_dir, make_test_project_dir)
+        project_mgr = mgr.project_manager
+        dataset_mgr = mgr.dataset_manager
+        dimension_mgr = mgr.dimension_manager
+        dimension_mapping_mgr = mgr.dimension_mapping_manager
+        project_id = project_mgr.list_ids()[0]
+        dataset_id = dataset_mgr.list_ids()[0]
+        dimension_id = [x for x in dimension_mgr.iter_ids() if x.startswith("us_counties")][0]
+        dimension = dimension_mgr.get_by_id(dimension_id)
+        dimension.model.description += "; test update"
+        update_type = VersionUpdateType.MINOR
+        log_message = "test update"
+        dimension_mgr.update(dimension, update_type, log_message)
+        version = dimension_mgr.get_current_version(dimension.config_id)
+
+        # Find a mapping that uses this dimension and verify that it gets updated.
+        mapping = None
+        for _mapping in dimension_mapping_mgr.iter_configs():
+            fields = _mapping.config_id.split("__")
+            if fields[0].startswith("us_counties") and fields[1].startswith("us_census_regions"):
+                mapping = _mapping
+                break
+        assert mapping is not None
+        orig_version = dimension_mapping_mgr.get_current_version(mapping.config_id)
+        assert orig_version == VersionInfo.parse("1.0.0")
+
+        mgr.update_dependent_configs(dimension, version, update_type, log_message)
+
+        new_version = dimension_mapping_mgr.get_current_version(mapping.config_id)
+        assert new_version == VersionInfo.parse("1.1.0")
+
+        project = project_mgr.get_by_id(project_id)
+        found = False
+        for mapping_ref in project.model.dimension_mappings.base_to_supplemental:
+            if mapping_ref.mapping_id == mapping.config_id:
+                assert mapping_ref.version == new_version
+                found = True
+        assert found
+
+        dataset = dataset_mgr.get_by_id(dataset_id)
+        found = False
+        for dimension_ref in dataset.model.dimensions:
+            if dimension_ref.dimension_id == dimension.config_id:
+                assert dimension_ref.version == VersionInfo.parse("1.1.0")
+                found = True
+        assert found
+
+        assert project.model.input_datasets.datasets[0].version == VersionInfo.parse("1.1.0")
+        assert project_mgr.get_current_version(project_id) == VersionInfo.parse("1.2.0")
+        assert dataset_mgr.get_current_version(dataset_id) == VersionInfo.parse("1.1.0")
 
 
 def register_project(project_mgr, config_file, project_id, user, log_message):
@@ -139,14 +173,6 @@ def submit_dataset(
         user,
         log_message,
     )
-    project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.1.0"))
-    dataset = project_config.get_dataset(dataset_id)
-    assert dataset.status == DatasetRegistryStatus.REGISTERED
-
-    # The old one should still be there.
-    project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.0.0"))
-    dataset = project_config.get_dataset(dataset_id)
-    assert dataset.status == DatasetRegistryStatus.UNREGISTERED
 
 
 def check_config_update(tmpdir, mgr, config_id, user, version):
@@ -163,7 +189,7 @@ def check_config_update(tmpdir, mgr, config_id, user, version):
         config_data["description"] += "; updated description"
         dump_data(config_data, config_file)
         with pytest.raises(DSGInvalidParameter):
-            mgr.update(
+            mgr.update_from_file(
                 config_file,
                 "invalid_config_id",
                 user,
@@ -172,7 +198,7 @@ def check_config_update(tmpdir, mgr, config_id, user, version):
                 version,
             )
         with pytest.raises(DSGInvalidParameter):
-            mgr.update(
+            mgr.update_from_file(
                 config_file,
                 config_id,
                 user,
@@ -181,7 +207,7 @@ def check_config_update(tmpdir, mgr, config_id, user, version):
                 version.bump_patch(),
             )
 
-        mgr.update(
+        mgr.update_from_file(
             config_file,
             config_id,
             user,

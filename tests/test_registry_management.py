@@ -149,6 +149,21 @@ def test_auto_updates(make_test_project_dir):
         assert project_mgr.get_current_version(project_id) == VersionInfo.parse("1.2.0")
         assert dataset_mgr.get_current_version(dataset_id) == VersionInfo.parse("1.1.0")
 
+        # The project should get updated again if we update the dimension mapping.
+        mapping.model.description += "test update"
+        dimension_mapping_mgr.update(mapping, VersionUpdateType.PATCH, "test update")
+        assert dimension_mapping_mgr.get_current_version(mapping.config_id) == VersionInfo.parse(
+            "1.1.1"
+        )
+        mgr.update_dependent_configs(mapping, VersionUpdateType.PATCH, "test update")
+        assert project_mgr.get_current_version(project_id) == VersionInfo.parse("1.2.1")
+
+        # And again if we update the dataset.
+        dataset.model.description += "test update"
+        dataset_mgr.update(dataset, VersionUpdateType.PATCH, "test update")
+        mgr.update_dependent_configs(dataset, VersionUpdateType.PATCH, "test update")
+        assert project_mgr.get_current_version(project_id) == VersionInfo.parse("1.2.2")
+
 
 def register_project(project_mgr, config_file, project_id, user, log_message):
     project_mgr.register(config_file, user, log_message)

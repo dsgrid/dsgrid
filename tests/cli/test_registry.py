@@ -61,7 +61,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         )
         output = {}
         check_run_command(f"dsgrid registry --path={path} --offline list", output)
-        regex_project = re.compile(r"test.*1\.0\.0")
+        regex_project = re.compile(r"test.*1\.1\.0")
         regex_dataset = re.compile(r"efs_comstock.*1\.0\.0")
         assert regex_project.search(output["stdout"]) is not None
         assert regex_dataset.search(output["stdout"]) is not None

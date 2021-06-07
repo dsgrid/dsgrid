@@ -223,7 +223,7 @@ class RegistryManager:
         self.dimension_manager.show()
         self.dimension_mapping_manager.show()
 
-    def update_dependent_configs(self, config, version, update_type, log_message):
+    def update_dependent_configs(self, config, update_type, log_message):
         """Update all configs that consume this config. Recursive.
         Passing a dimension may trigger an update to a project and a dimension mapping.
         The change to that dimension mapping may trigger another update to the project.
@@ -232,16 +232,18 @@ class RegistryManager:
         Parameters
         ----------
         config : ConfigBase
-        version : VersionInfo
         update_type : VersionUpdateType
         log_message : str
 
         """
         if isinstance(config, DimensionConfig):
+            version = self.dimension_manager.get_current_version(config.config_id)
             self._update_dimension_users(config, version, update_type, log_message)
         elif isinstance(config, DimensionMappingBaseModel):
+            version = self.dimension_mapping_manager.get_current_version(config.config_id)
             self._update_dimension_mapping_users(config, version, update_type, log_message)
         elif isinstance(config, DatasetConfig):
+            version = self.dataset_manager.get_current_version(config.config_id)
             self._update_dataset_users(config, version, update_type, log_message)
         else:
             assert False, type(config)

@@ -112,7 +112,6 @@ def test_auto_updates(make_test_project_dir):
         update_type = VersionUpdateType.MINOR
         log_message = "test update"
         dimension_mgr.update(dimension, update_type, log_message)
-        version = dimension_mgr.get_current_version(dimension.config_id)
 
         # Find a mapping that uses this dimension and verify that it gets updated.
         mapping = None
@@ -125,7 +124,7 @@ def test_auto_updates(make_test_project_dir):
         orig_version = dimension_mapping_mgr.get_current_version(mapping.config_id)
         assert orig_version == VersionInfo.parse("1.0.0")
 
-        mgr.update_dependent_configs(dimension, version, update_type, log_message)
+        mgr.update_dependent_configs(dimension, update_type, log_message)
 
         new_version = dimension_mapping_mgr.get_current_version(mapping.config_id)
         assert new_version == VersionInfo.parse("1.1.0")

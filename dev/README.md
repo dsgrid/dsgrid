@@ -80,8 +80,14 @@ python tests/make_us_data_registry.py ./local-registry
 
 In addition to the CLI tools you use `scripts/registry` to explore a registry interactively.
 
+Be sure to use the `debug` function from the `devtools` package when exploring Pydantic models.
 ```
 ipython -i scripts/registry.py -- --path=$DSGRID_REGISTRY_PATH --offline
+In [1]: mgr.show()
+
+In [2]: dataset = dmgr.get_by_id("efs_comstock")
+
+In [3]: debug(dataset.model)
 ```
 
 ## Publish Documentation

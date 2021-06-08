@@ -56,7 +56,7 @@ setup(
     install_requires=[
         "awscli",
         "boto3",
-        "click",
+        "click>=8",
         "findspark",
         "numpy",
         "pandas",

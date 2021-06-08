@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def make_us_data_registry(registry_path, repo) -> RegistryManager:
+    """Creates a local registry with the dsgrid-data-UnitedStates repository for testing."""
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
     project_dimension_mapping_config = repo / "dimension_mappings.toml"
@@ -79,17 +80,10 @@ def make_us_data_registry(registry_path, repo) -> RegistryManager:
     help="path to dsgrid-data-UnitedStates registry. Override with the environment variable US_DATA_REPO",
 )
 @click.option(
-    "-r",
-    "--refresh-data",
-    default=False,
-    is_flag=True,
-    show_default=True,
-    help="Refresh the data by making a new copy.",
-)
-@click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def run(registry_path, force, data_repo, refresh_data, verbose):
+def run(registry_path, force, data_repo, verbose):
+    """Creates a local registry with the dsgrid-data-UnitedStates repository for testing."""
     level = logging.DEBUG if verbose else logging.INFO
     setup_logging("dsgrid", "dsgrid_us.log", console_level=level, file_level=level, mode="a")
     if registry_path.exists():
@@ -99,19 +93,9 @@ def run(registry_path, force, data_repo, refresh_data, verbose):
             print(f"{registry_path} already exists. Use --force to overwrite.")
     os.makedirs(registry_path)
     tmp_data_repo = Path(tempfile.gettempdir()) / "tmp_us_data_repo"
-    make_copy = False
     if tmp_data_repo.exists():
-        if refresh_data:
-            shutil.rmtree(tmp_data_repo)
-            make_copy = True
-        else:
-            logger.info("Use existing copy of data.")
-    else:
-        make_copy = True
-    if make_copy:
-        logger.info("Making new copy of data.")
-        shutil.copytree(data_repo, tmp_data_repo)
-
+        shutil.rmtree(tmp_data_repo)
+    shutil.copytree(data_repo, tmp_data_repo)
     make_us_data_registry(registry_path, tmp_data_repo / "dsgrid_project")
 
 

@@ -226,9 +226,13 @@ class RegistryManager:
 
     def update_dependent_configs(self, config, update_type, log_message):
         """Update all configs that consume this config. Recursive.
+        This is an experimental feature and is subject to change.
+        Should only be called an admin that understands the consequences.
         Passing a dimension may trigger an update to a project and a dimension mapping.
         The change to that dimension mapping may trigger another update to the project.
         This guarantees that each config version will only be bumped once.
+
+        It is up to the caller to ensure changes are synced to the remote registry.
 
         Parameters
         ----------

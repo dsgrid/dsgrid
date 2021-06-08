@@ -40,7 +40,7 @@ def cli(ctx, log_file, no_prompts, verbose):
     setup_logging("dsgrid", log_file, console_level=level, file_level=level, mode="a")
 
 
-@cli.resultcallback()
+@cli.result_callback()
 def callback(*args, **kwargs):
     # Raise the console level so that timer stats only go to the log file.
     dsgrid_logger = logging.getLogger("dsgrid")

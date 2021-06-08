@@ -1,14 +1,9 @@
 """Common functions used across tests"""
 
 from pathlib import Path
-from pathlib import Path
-from tempfile import gettempdir
 import fileinput
 import os
-import pytest
 import re
-import shutil
-import sys
 
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
 

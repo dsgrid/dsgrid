@@ -24,10 +24,10 @@ def test_dataset_load():
     dataset = project.get_dataset(dataset_id)
     assert isinstance(dataset, Dataset)
     spark = SparkSession.getActiveSession()
-    data = spark.sql("select * from efs_comstock__load_data".replace("-", "_"))
+    data = spark.sql("select * from efs_comstock__load_data")
     assert "timestamp" in data.columns
     assert "fans" in data.columns
-    lookup = spark.sql("select * from efs_comstock__load_data_lookup".replace("-", "_"))
+    lookup = spark.sql("select * from efs_comstock__load_data_lookup")
     assert "subsector" in lookup.columns
     assert "data_id" in lookup.columns
 

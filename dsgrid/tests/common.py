@@ -30,7 +30,7 @@ def make_test_project_dir():
 
 
 def create_local_test_registry(tmpdir):
-    path = Path(tmpdir) / "dsgrid-registry"
+    path = Path(tmpdir)
     RegistryManager.create(path)
     assert path.exists()
     assert (path / "configs/projects").exists()

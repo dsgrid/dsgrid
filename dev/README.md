@@ -35,10 +35,10 @@ up dsgrid for testing by setting environment variables:
 ```
 # point to your checkout of the dsgrid-data-UnitedStates repository (adjusting
 # the path as needed)
-export US_DATA_REPO="/home/$USER/dsgrid-data-UnitedStates"
+export US_DATA_REPO="$HOME/dsgrid-data-UnitedStates"
 # feel free to use a different path for storing your test registry--this is just 
 # an example
-export DSGRID_REGISTRY_PATH="/home/$USER/.dsgrid-test-registry"
+export DSGRID_REGISTRY_PATH="$HOME/.dsgrid-test-registry"
 ```
 
 and then running:
@@ -66,9 +66,9 @@ In addition to the CLI tools you can use `scripts/registry.py` to explore a regi
 Be sure to use the `debug` function from the `devtools` package when exploring Pydantic models.
 ```
 ipython -i scripts/registry.py -- --path=$DSGRID_REGISTRY_PATH --offline
-In [1]: mgr.show()
+In [1]: manager.show()
 
-In [2]: dataset = dmgr.get_by_id("efs_comstock")
+In [2]: dataset = dataset_manager.get_by_id("efs_comstock")
 
 In [3]: debug(dataset.model)
 ```

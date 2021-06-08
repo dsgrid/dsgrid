@@ -53,12 +53,12 @@ def load(path, remote_path, offline, dry_run, verbose):
 
 
 if __name__ == "__main__":
-    mgr = load(standalone_mode=False)
-    if isinstance(mgr, int):
+    manager = load(standalone_mode=False)
+    if isinstance(manager, int):
         # The user likely invoked --help
-        sys.exit(mgr)
-    pmgr = mgr.project_manager
-    dmgr = mgr.dataset_manager
-    dimmgr = mgr.dimension_manager
-    mmgr = mgr.dimension_mapping_manager
+        sys.exit(manager)
+    project_manager = manager.project_manager
+    dataset_manager = manager.dataset_manager
+    dimension_manager = manager.dimension_manager
+    dimension_mapping_manager = manager.dimension_mapping_manager
     submitter = getpass.getuser()

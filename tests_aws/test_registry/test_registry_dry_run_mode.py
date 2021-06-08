@@ -8,7 +8,7 @@ import uuid
 
 from .common import clean_remote_registry
 
-from dsgrid.tests.common import create_local_test_registry
+from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
 

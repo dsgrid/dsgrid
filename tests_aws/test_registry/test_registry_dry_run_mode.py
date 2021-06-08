@@ -12,7 +12,7 @@ from dsgrid.tests.common import create_local_test_registry, make_test_project_di
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
 
-DATA_REPO = os.environ.get("US_DATA_REPO")
+PROJECT_REPO = os.environ.get("TEST_PROJECT_REPO")
 S3_PROFILE_NAME = "nrel-aws-dsgrid"
 TEST_REGISTRY = "s3://nrel-dsgrid-registry-test"
 

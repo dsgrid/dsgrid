@@ -125,22 +125,6 @@ class DatasetRegistryManager(RegistryManagerBase):
             registration.version,
         )
 
-    def remove(self, config_id):
-        self._raise_if_dry_run("remove")
-        self._check_if_not_registered(config_id)
-
-        self.fs_interface.rmtree(self._get_dataset_directory(config_id))
-
-        assert False, "broken code"  # FIXME
-        for project_registry in self._project_registries.values():
-            if project_registry.has_dataset(config_id, DatasetRegistryStatus.REGISTERED):
-                project_registry.set_dataset_status(config_id, DatasetRegistryStatus.UNREGISTERED)
-                project_registry.serialize(
-                    self._get_registry_filename(ProjectRegistry, project_registry.project_id)
-                )
-
-        logger.info("Removed %s from the registry.", config_id)
-
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
     ):

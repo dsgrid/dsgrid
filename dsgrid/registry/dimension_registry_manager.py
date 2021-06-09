@@ -32,6 +32,7 @@ from dsgrid.registry.common import (
 )
 from .registry_manager_base import RegistryManagerBase
 from .dimension_registry import DimensionRegistry, DimensionRegistryModel
+from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 
 
 logger = logging.getLogger(__name__)
@@ -248,12 +249,9 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_type = self._id_to_type[config_id]
         return self._path / dimension_type.value / config_id
 
-    def show(self, dimension_type=None, submitter=None):
-        logger.info(
-            "List registered dimensions for dimension_type=%s and submitter=%s",
-            ("all" if dimension_type is None else dimension_type),
-            ("all" if submitter is None else submitter),
-        )
+    def show(self, filters=None):
+        if filters:
+            logger.info("List registered dimensions for: %s", filters)
 
         table = PrettyTable(title="Dimensions")
         table.field_names = (
@@ -268,31 +266,32 @@ class DimensionRegistryManager(RegistryManagerBase):
             "ID": 50,
             "Description": 50,
         }
+        # table.max_width = 70
 
+        if filters:
+            transformed_filters = transform_and_validate_filters(filters)
+        field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for dimension_id, registry_config in self._registry_configs.items():
             reg_dim_type = self._id_to_type[dimension_id].value
 
-            # apply filters
-            if dimension_type is None or dimension_type == reg_dim_type:
-                last_reg = registry_config.model.registration_history[-1] #[0] or [-1]
+            last_reg = registry_config.model.registration_history[-1]  # [0] or [-1]
 
-                if submitter is None or submitter == last_reg.submitter:
-                    row = (
-                        reg_dim_type,
-                        dimension_id,
-                        last_reg.version,
-                        last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
-                        last_reg.submitter,
-                        registry_config.model.description,
-                    )
-                    rows.append(row)
+            row = (
+                reg_dim_type,
+                dimension_id,
+                last_reg.version,
+                last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
+                last_reg.submitter,
+                registry_config.model.description,
+            )
+
+            if not filters or matches_filters(row, field_to_index, transformed_filters):
+                rows.append(row)
 
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
-
         table.align = "l"
-        table.max_width = 70
         print(table)
 
     def dump(self, config_id, directory, version=None, force=False):

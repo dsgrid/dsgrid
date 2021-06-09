@@ -5,16 +5,19 @@
 
 import getpass
 import logging
+import sys
 from pathlib import Path
 
 import click
 from semver import VersionInfo
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import VersionUpdateType
 
 # from dsgrid.filesystem import aws
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.filters import accepted_ops
 
 
 logger = logging.getLogger(__name__)
@@ -87,29 +90,6 @@ def dimensions(registry_manager):
 def dimension_mappings(registry_manager):
     """Dimension mapping subcommands"""
 
-# # TODO: Support registry file reads without syncing using something like sfs3
-# @click.command(name="list")
-# @click.option(
-#     "--dimension-type",
-#     required=False,
-#     help="filter: type of dimension to list, single field",
-# )
-# @click.option(
-#     "--submitter",
-#     required=False,
-#     help="filter: submitter to list, single field",
-# )
-# @click.pass_obj
-# def list_(registry_manager, dimension_type, submitter):
-#     """List the contents of a registry."""
-#     print(f"Registry: {registry_manager.path}")
-#     registry_manager.project_manager.show(submitter=submitter)
-#     registry_manager.dataset_manager.show(submitter=submitter)
-#     registry_manager.dimension_manager.show(dimension_type=dimension_type, submitter=submitter)
-#     registry_manager.dimension_mapping_manager.show(
-#         dimension_type=dimension_type, submitter=submitter
-#     )
-
 
 @click.group()
 @click.pass_obj
@@ -126,6 +106,8 @@ def datasets(registry_manager):
 """
 Registry Commands
 """
+
+
 # TODO: Support registry file reads without syncing using something like sfs3
 @click.command(name="list")
 @click.pass_obj
@@ -142,14 +124,22 @@ Dimension Commands
 
 @click.command(name="list")
 @click.option(
-    "--submitter",
-    required=False,
-    help="filter: submitter to list, single field",
+    "-f",
+    "--filter",
+    multiple=True,
+    type=str,
+    help=f"""
+    filter table with a case-insensitive expression in the format 'field operation value', 
+    accept multiple flags\b\n
+    valid operations: {accepted_ops}\n
+    example:\n 
+       -f 'Submitter == username' -f 'Description contains sector'
+    """,
 )
 @click.pass_obj
-def list_dimensions(registry_manager):
+def list_dimensions(registry_manager, filter):
     """List the registered dimensions."""
-    registry_manager.dimension_manager.show()
+    registry_manager.dimension_manager.show(filters=filter)
 
 
 # TODO: update_dataset
@@ -185,7 +175,6 @@ def register_dimensions(registry_manager, dimension_config_file, log_message):
     help="Directory in which to create config and data files",
 )
 @click.option(
-    "-f",
     "--force",
     is_flag=True,
     default=False,
@@ -252,45 +241,26 @@ def remove_dimension(registry_manager, dimension_id):
 """
 Dimension Mapping Commands
 """
-# def list_datasets(registry_manager, submitter):
-#     """List the registered dimensions."""
-#     registry_manager.dataset_manager.show(submitter=submitter)
-
-
-# @click.command(name="list")
-# @click.option(
-#     "--dimension-type",
-#     required=False,
-#     help="filter: type of dimension to list, single field",
-# )
-# @click.option(
-#     "--submitter",
-#     required=False,
-#     help="filter: submitter to list, single field",
-# )
-# @click.pass_obj
-# def list_dimensions(registry_manager, dimension_type, submitter):
-#     """List the registered dimensions."""
-#     registry_manager.dimension_manager.show(dimension_type=dimension_type, submitter=submitter)
 
 
 @click.command(name="list")
 @click.option(
-    "--dimension-type",
-    required=False,
-    help="filter: type of dimension to list, single field",
-)
-@click.option(
-    "--submitter",
-    required=False,
-    help="filter: submitter to list, single field",
+    "-f",
+    "--filter",
+    multiple=True,
+    type=str,
+    help=f"""
+    filter table with a case-insensitive expression in the format 'field operation value', 
+    accept multiple flags\b\n
+    valid operations: {accepted_ops}\n
+    example:\n 
+       -f 'Submitter == username' -f 'Description contains sector'
+    """,
 )
 @click.pass_obj
-def list_dimension_mappings(registry_manager, dimension_type, submitter):
+def list_dimension_mappings(registry_manager, filter):
     """List the registered dimension mappings."""
-    registry_manager.dimension_mapping_manager.show(
-        dimension_type=dimension_type, submitter=submitter
-    )
+    registry_manager.dimension_mapping_manager.show(filters=filter)
 
 
 @click.command(name="register")
@@ -335,7 +305,6 @@ def register_dimension_mappings(
     help="Directory in which to create config and data files",
 )
 @click.option(
-    "-f",
     "--force",
     is_flag=True,
     default=False,
@@ -395,17 +364,6 @@ def update_dimension_mapping(
         version,
     )
 
-# @click.command(name="list")
-# @click.option(
-#     "--submitter",
-#     required=False,
-#     help="filter: submitter to list, single field",
-# )
-# @click.pass_obj
-# def list_projects(registry_manager, submitter):
-#     """List the registered dimensions."""
-#     registry_manager.project_manager.show(submitter=submitter)
-
 
 @click.command(name="remove")
 @click.argument("dimension-mapping-id")
@@ -421,10 +379,28 @@ Project Commands
 
 
 @click.command(name="list")
+@click.option(
+    "-f",
+    "--filter",
+    multiple=True,
+    type=str,
+    help=f"""
+    filter table with a case-insensitive expression in the format 'field operation value', 
+    accept multiple flags\b\n
+    valid operations: {accepted_ops}\n
+    example:\n 
+       -f 'Submitter == username' -f 'Description contains sector'
+    """,
+)
 @click.pass_obj
-def list_projects(registry_manager):
-    """List the registered dimensions."""
-    registry_manager.project_manager.show()
+def list_projects(registry_manager, filter):
+    """List the registered projects."""
+    registry_manager.project_manager.show(filters=filter)
+    # try:
+    #     registry_manager.project_manager.show(filters=filter)
+    # except DSGInvalidParameter as exc:
+    #     print(exc)
+    #     sys.exit(1)
 
 
 @click.command(name="register")
@@ -496,7 +472,6 @@ def submit_dataset(registry_manager, dataset_id, project_id, dimension_mapping_f
     help="Directory in which to create the config file",
 )
 @click.option(
-    "-f",
     "--force",
     is_flag=True,
     default=False,
@@ -566,10 +541,23 @@ Dataset Commands
 
 
 @click.command(name="list")
+@click.option(
+    "-f",
+    "--filter",
+    multiple=True,
+    type=str,
+    help=f"""
+    filter table with a case-insensitive expression in the format 'field operation value', 
+    accept multiple flags\b\n
+    valid operations: {accepted_ops}\n
+    example:\n 
+       -f 'Submitter == username' -f 'Description contains sector'
+    """,
+)
 @click.pass_obj
-def list_datasets(registry_manager):
+def list_datasets(registry_manager, filter):
     """List the registered dimensions."""
-    registry_manager.dataset_manager.show()
+    registry_manager.dataset_manager.show(filters=filter)
 
 
 @click.command(name="register")
@@ -604,7 +592,6 @@ def register_dataset(registry_manager, dataset_config_file, log_message):
     help="Directory in which to create the config file",
 )
 @click.option(
-    "-f",
     "--force",
     is_flag=True,
     default=False,

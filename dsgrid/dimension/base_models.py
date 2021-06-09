@@ -20,7 +20,6 @@ class DimensionType(Enum):
     MODEL_YEAR = "model_year"
     SCENARIO = "scenario"
     DATA_SOURCE = "data_source"
-    # METRIC_TYPE = "metric_type"
 
 
 class DimensionRecordBaseModel(DSGBaseModel):

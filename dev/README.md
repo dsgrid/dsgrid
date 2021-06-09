@@ -16,11 +16,39 @@ pip install -e .[dev] # includes what is needed for tests and code development
 pip install -e .[admin] # dev plus what is needed for creating documentation and releasing packages
 ```
 
+**Setting up pre-commit hooks**
+
+```
+pre-commit install
+```
+
 **Additional software required for publishing documentation:**
 
 - [Pandoc](https://pandoc.org/installing.html)
 
 ## Run Tests
+
+In addition to grabbing the branch of dsgrid you want to test and making you've 
+activated an environment with dsgrid installed per the above, you'll need to set 
+up dsgrid for testing by setting environment variables:
+
+```
+# point to your checkout of the dsgrid-data-UnitedStates repository which is 
+# what we are currently using for tests (adjusting the path as needed)
+export TEST_PROJECT_REPO="$HOME/dsgrid-data-UnitedStates"
+
+# point to your local dsgrid registry path
+# feel free to use a different path for storing your test registry--this is just 
+# an example
+export DSGRID_REGISTRY_PATH="$HOME/.dsgrid-test-registry"
+```
+
+and then running:
+```
+python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH
+```
+
+After that you can run the tests:
 
 ```
 cd dsgrid
@@ -32,6 +60,20 @@ pytest options that may be helpful:
 option flag           | effect
 --------------------- | ------
 --log-cli-level=DEBUG | emits log messages to the console. level can be set to DEBUG, INFO, WARN, ERROR
+
+## Interactive Exploration
+
+In addition to the CLI tools you can use `scripts/registry.py` to explore a registry interactively.
+
+Be sure to use the `debug` function from the `devtools` package when exploring Pydantic models.
+```
+ipython -i scripts/registry.py -- --path=$DSGRID_REGISTRY_PATH --offline
+In [1]: manager.show()
+
+In [2]: dataset = dataset_manager.get_by_id("efs_comstock")
+
+In [3]: debug(dataset.model)
+```
 
 ## Publish Documentation
 

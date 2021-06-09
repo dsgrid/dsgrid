@@ -12,6 +12,10 @@ from dsgrid.common import (
     SYNC_EXCLUDE_LIST,
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
+from dsgrid.config.association_tables import AssociationTableConfig
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.filesystem.factory import make_filesystem_interface
 from .common import (
@@ -46,7 +50,9 @@ class RegistryManager:
             params.base_path / DimensionRegistry.registry_path(), params
         )
         self._dimension_mapping_dimension_mgr = DimensionMappingRegistryManager.load(
-            params.base_path / DimensionMappingRegistry.registry_path(), params
+            params.base_path / DimensionMappingRegistry.registry_path(),
+            params,
+            self._dimension_mgr,
         )
         self._dataset_mgr = DatasetRegistryManager.load(
             params.base_path / DatasetRegistry.registry_path(), params, self._dimension_mgr
@@ -174,7 +180,10 @@ class RegistryManager:
             if sync:
                 logger.info("Sync from remote registry.")
                 cloud_interface.sync_pull(
-                    remote_path + "/configs", str(path) + "/configs", exclude=SYNC_EXCLUDE_LIST
+                    remote_path + "/configs",
+                    str(path) + "/configs",
+                    exclude=SYNC_EXCLUDE_LIST,
+                    delete_local=True,
                 )
 
         params = RegistryManagerParams(
@@ -189,7 +198,7 @@ class RegistryManager:
             path / DimensionMappingRegistry.registry_path(),
         ):
             if not fs_interface.exists(str(dir_name)):
-                raise FileNotFoundError(f"{dir_name} does not exist")
+                fs_interface.mkdir(dir_name)
 
         for dim_type in DimensionType:
             dir_name = path / DimensionRegistry.registry_path() / dim_type.value
@@ -208,66 +217,180 @@ class RegistryManager:
     def path(self):
         return self._params.base_path
 
-    # TODO: currently unused but may be needed for project/dataset updates
-    # def _update_config(
-    #    self, config_id, registry_config, config_file, submitter, update_type, log_message
-    # ):
-    #    # TODO: need to check that there are indeed changes to the config
-    #    # TODO: if a new version is created but is deleted in .dsgrid-registry, version number should be reset
-    #    #   accordingly, currently it does not.
-    #    # desired feature: undo a revision
+    def show(self):
+        """Show tables of all registry configs."""
+        self.project_manager.show()
+        self.dataset_manager.show()
+        self.dimension_manager.show()
+        self.dimension_mapping_manager.show()
 
-    #    if isinstance(registry_config, DatasetRegistryModel):
-    #        registry_type = RegistryType.DATASET
-    #    else:
-    #        registry_type = RegistryType.PROJECT
+    def update_dependent_configs(self, config, update_type, log_message):
+        """Update all configs that consume this config. Recursive.
+        This is an experimental feature and is subject to change.
+        Should only be called an admin that understands the consequences.
+        Passing a dimension may trigger an update to a project and a dimension mapping.
+        The change to that dimension mapping may trigger another update to the project.
+        This guarantees that each config version will only be bumped once.
 
-    #    # This validates that all data.
-    #    registry_class = get_registry_class(registry_type)
-    #    registry_class.load(config_file)
+        It is up to the caller to ensure changes are synced to the remote registry.
 
-    #    registry_config.description = load_data(config_file)[
-    #        "description"
-    #    ]  # always copy the latest from config
+        Parameters
+        ----------
+        config : ConfigBase
+        update_type : VersionUpdateType
+        log_message : str
 
-    #    if update_type == VersionUpdateType.MAJOR:
-    #        registry_config.version = registry_config.version.bump_major()
-    #    elif update_type == VersionUpdateType.MINOR:
-    #        registry_config.version = registry_config.version.bump_minor()
-    #    elif update_type == VersionUpdateType.PATCH:
-    #        registry_config.version = registry_config.version.bump_patch()
-    #    else:
-    #        assert False
+        """
+        if isinstance(config, DimensionConfig):
+            version = self.dimension_manager.get_current_version(config.config_id)
+            self._update_dimension_users(config, version, update_type, log_message)
+        elif isinstance(config, AssociationTableConfig):
+            version = self.dimension_mapping_manager.get_current_version(config.config_id)
+            self._update_dimension_mapping_users(config, version, update_type, log_message)
+        elif isinstance(config, DatasetConfig):
+            version = self.dataset_manager.get_current_version(config.config_id)
+            self._update_dataset_users(config, version, update_type, log_message)
+        else:
+            assert False, type(config)
 
-    #    registration = ConfigRegistrationModel(
-    #        version=registry_config.version,
-    #        submitter=submitter,
-    #        date=datetime.now(),
-    #        log_message=log_message,
-    #    )
-    #    registry_config.registration_history.append(registration)
-    #    filename = self._get_registry_filename(registry_class, config_id)
-    #    config_dir = self._get_project_directory(config_id)
-    #    data_dir = config_dir / str(registry_config.version)
-    #    self._fs_intf.mkdir(data_dir)
+    def _update_dimension_users(self, config: DimensionConfig, version, update_type, log_message):
+        # Order is important because
+        # - dimension mappings may have this dimension.
+        # - datasets may have this dimension.
+        # - projects may have this dimension as well as updated mappings and datasets.
+        updated_dimension_versions = {config.config_id: version}
+        updated_mappings = {}
+        updated_mapping_versions = {}
+        updated_datasets = {}
+        updated_dataset_versions = {}
+        updated_projects = {}
 
-    #    if registry_type == RegistryType.DATASET:
-    #        config_file_name = "dataset"
-    #    elif registry_type == RegistryType.PROJECT:
-    #        config_file_name = "project"
-    #    config_file_name = config_file_name + os.path.splitext(config_file)[1]
+        self._update_dimension_mappings_with_dimensions(
+            updated_dimension_versions, updated_mappings
+        )
+        for mapping in updated_mappings.values():
+            self.dimension_mapping_manager.update(mapping, update_type, log_message)
+            updated_mapping_versions[
+                mapping.config_id
+            ] = self.dimension_mapping_manager.get_current_version(mapping.config_id)
+            logger.info(
+                "Updated dimension mapping %s as a result of dimension update", mapping.config_id
+            )
 
-    #    dump_data(serialize_model(registry_config), filename)
-    #    self._fs_intf.copy_file(config_file, data_dir / config_file_name)
-    #    dimensions_dir = Path(os.path.dirname(config_file)) / "dimensions"
-    #    # copy new dimensions, to be removed with dimension id mapping
-    #    self._fs_intf.copy_tree(dimensions_dir, data_dir / "dimensions")
-    #    logger.info(
-    #        "Updated %s %s with version=%s",
-    #        registry_type.value,
-    #        config_id,
-    #        registry_config.version,
-    #    )
+        self._update_datasets_with_dimensions(updated_dimension_versions, updated_datasets)
+        for dataset in updated_datasets.values():
+            self.dataset_manager.update(dataset, update_type, log_message)
+            updated_dataset_versions[dataset.config_id] = self.dataset_manager.get_current_version(
+                dataset.config_id
+            )
+            logger.info("Updated dataset %s as a result of dimension update", dataset.config_id)
+
+        self._update_projects_with_dimensions(updated_dimension_versions, updated_projects)
+        self._update_projects_with_dimension_mappings(updated_mapping_versions, updated_projects)
+        self._update_projects_with_datasets(updated_dataset_versions, updated_projects)
+        for project in updated_projects.values():
+            self.project_manager.update(project, update_type, log_message)
+            logger.info("Updated project %s as a result of dimension update", project.config_id)
+
+    def _update_dimension_mapping_users(
+        self, config: DimensionMappingBaseModel, version, update_type, log_message
+    ):
+        updated_mapping_versions = {config.config_id: version}
+        updated_projects = {}
+        self._update_projects_with_dimension_mappings(updated_mapping_versions, updated_projects)
+        for project in updated_projects.values():
+            self.project_manager.update(project, update_type, log_message)
+            logger.info(
+                "Updated project %s as a result of dimension mapping update", project.config_id
+            )
+
+    def _update_dataset_users(self, config: DatasetConfig, version, update_type, log_message):
+        updated_dataset_versions = {config.config_id: version}
+        updated_projects = {}
+        self._update_projects_with_datasets(updated_dataset_versions, updated_projects)
+        for project in updated_projects.values():
+            self.project_manager.update(project, update_type, log_message)
+            logger.info("Updated project %s as a result of dataset update", project.config_id)
+
+    def _update_dimension_mappings_with_dimensions(self, updated_dimensions, updated_mappings):
+        if not updated_dimensions:
+            return
+        for mapping in self.dimension_mapping_manager.iter_configs():
+            updated = False
+            if mapping.model.from_dimension.dimension_id in updated_dimensions:
+                mapping.model.from_dimension.version = updated_dimensions[
+                    mapping.model.from_dimension.dimension_id
+                ]
+                updated = True
+            elif mapping.model.to_dimension.dimension_id in updated_dimensions:
+                mapping.model.to_dimension.version = updated_dimensions[
+                    mapping.model.to_dimension.dimension_id
+                ]
+                updated = True
+            if updated and mapping.config_id not in updated_mappings:
+                updated_mappings[mapping.config_id] = mapping
+
+    def _update_datasets_with_dimensions(self, updated_dimensions, updated_datasets):
+        if not updated_dimensions:
+            return
+        for dataset in self.dataset_manager.iter_configs():
+            updated = False
+            for dimension_ref in dataset.model.dimensions:
+                if dimension_ref.dimension_id in updated_dimensions:
+                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    updated = True
+            if updated and dataset.config_id not in updated_datasets:
+                updated_datasets[dataset.config_id] = dataset
+
+    def _update_projects_with_dimensions(self, updated_dimensions, updated_projects):
+        if not updated_dimensions:
+            return
+        for project in self.project_manager.iter_configs():
+            updated = False
+            for dimension_ref in project.model.dimensions.base_dimensions:
+                if dimension_ref.dimension_id in updated_dimensions:
+                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    updated = True
+            for dimension_ref in project.model.dimensions.supplemental_dimensions:
+                if dimension_ref.dimension_id in updated_dimensions:
+                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    updated = True
+            if updated and project.config_id not in updated_projects:
+                updated_projects[project.config_id] = project
+
+    def _update_projects_with_dimension_mappings(self, updated_mappings, updated_projects):
+        if not updated_mappings:
+            return
+        for project in self.project_manager.iter_configs():
+            updated = False
+            for mapping_ref in project.model.dimension_mappings.base_to_base:
+                if mapping_ref.mapping_id in updated_mappings:
+                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                    updated = True
+            for mapping_ref in project.model.dimension_mappings.base_to_supplemental:
+                if mapping_ref.mapping_id in updated_mappings:
+                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                    updated = True
+            for mapping_list in project.model.dimension_mappings.dataset_to_project.values():
+                for mapping_ref in mapping_list:
+                    if mapping_ref.mapping_id in updated_mappings:
+                        mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                        updated_project = True
+            if updated and project.config_id not in updated_projects:
+                updated_projects[project.config_id] = project
+
+    def _update_projects_with_datasets(self, updated_datasets, updated_projects):
+        if not updated_datasets:
+            return
+        for project in self.project_manager.iter_configs():
+            updated = False
+            for dataset in project.model.input_datasets.datasets:
+                # TODO: does dataset status matter? update unregistered?
+                if dataset.dataset_id in updated_datasets:
+                    dataset.version = updated_datasets[dataset.dataset_id]
+                    updated = True
+            if updated and project.config_id not in updated_projects:
+                updated_projects[project.config_id] = project
 
 
 def get_registry_path(registry_path=None):
@@ -287,11 +410,11 @@ def get_registry_path(registry_path=None):
             f"Registry path {registry_path} does not exist. To create the registry, "
             "run the following commands:\n"
             "  dsgrid registry create $DSGRID_REGISTRY_PATH\n"
-            "  dsgrid registry register-project $US_DATA_REPO/dsgrid_project/project.toml\n"
+            "  dsgrid registry register-project $TEST_PROJECT_REPO/dsgrid_project/project.toml\n"
             "  dsgrid registry submit-dataset "
-            "$US_DATA_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "
+            "$TEST_PROJECT_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "
             "-p test -l initial_submission\n"
-            "where $US_DATA_REPO points to the location of the dsgrid-data-UnitedStates "
+            "where $TEST_PROJECT_REPO points to the location of the dsgrid-data-UnitedStates "
             "repository on your system. If you would prefer a different location, "
             "set the DSGRID_REGISTRY_PATH environment variable before running the commands."
         )

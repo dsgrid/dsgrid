@@ -19,7 +19,7 @@ from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
 
 
-DATA_REPO = os.environ.get("US_DATA_REPO")
+PROJECT_REPO = os.environ.get("TEST_PROJECT_REPO")
 S3_PROFILE_NAME = "nrel-aws-dsgrid"
 TEST_REGISTRY = "s3://nrel-dsgrid-registry-test"
 
@@ -34,7 +34,15 @@ def test_pull_delete_local():
         len_fs = len(LocalFilesystem().listdir(path))
         LocalFilesystem().touch(Path(path) / "junk")
         LocalFilesystem().touch(Path(path) / "configss")
-        assert len(LocalFilesystem().listdir(path)) > len_fs
+        s3_cloudinterface = S3StorageInterface(
+            remote_path=TEST_REGISTRY,
+            local_path=path,
+            user=submitter,
+            uuid=str(uuid.uuid4()),
+            profile=S3_PROFILE_NAME,
+        )
+        s3_cloudinterface.sync_pull(remote_path=TEST_REGISTRY, local_path=path, delete_local=True)
+        assert len(LocalFilesystem().listdir(path)) == 0
 
 
 def test_pull_exclude():

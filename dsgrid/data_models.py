@@ -3,6 +3,7 @@
 import enum
 import json
 import os
+from pathlib import Path
 
 from pydantic import BaseModel
 from semver import VersionInfo
@@ -33,11 +34,12 @@ class DSGBaseModel(BaseModel):
         filename : str
 
         """
-        base_dir = os.path.dirname(str(filename))
+        filename = Path(filename)
+        base_dir = filename.parent.absolute()
         orig = os.getcwd()
         os.chdir(base_dir)
         try:
-            cfg = cls(**load_data(os.path.basename(filename)))
+            cfg = cls(**load_data(filename.name))
             return cfg
 
         finally:
@@ -53,6 +55,8 @@ class ExtendedJSONEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, VersionInfo):
             return str(obj)
+        if isinstance(obj, enum.Enum):
+            return obj.value
 
         return json.JSONEncoder.default(self, obj)
 

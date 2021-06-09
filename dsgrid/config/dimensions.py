@@ -1,5 +1,7 @@
 import csv
+import enum
 import importlib
+import json
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
@@ -9,7 +11,7 @@ from pydantic import Field
 from semver import VersionInfo
 
 from dsgrid.common import LOCAL_REGISTRY
-from dsgrid.data_models import DSGBaseModel, serialize_model
+from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncoder
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
@@ -70,7 +72,7 @@ class DimensionBaseModel(DSGBaseModel):
         if REGEX_VALID_REGISTRY_NAME.search(name) is None:
             raise ValueError(f"dimension name={name} does not meet the requirements")
 
-        # TODO: improve validation for alloweable dimension record names.
+        # TODO: improve validation for allowable dimension record names.
         prohibited_names = [x.value.replace("_", "") for x in DimensionType] + [
             "county",
             "counties",
@@ -141,7 +143,7 @@ class DimensionModel(DimensionBaseModel):
     )
     # TODO: I think we may remove mappings altogether in favor of associations
     # TODO: I think we need to add the association table to
-    #   dimensions.associations.project_dimensions in the config
+    #   dimensions.associations.base_dimensions in the config
     association_table: Optional[str] = Field(
         title="association_table",
         description="optional table that provides mappings of foreign keys",
@@ -253,6 +255,13 @@ class DimensionModel(DimensionBaseModel):
 
         return records
 
+    def dict(self, by_alias=True, **kwargs):
+        data = super().dict(by_alias=by_alias, exclude={"cls", "records"}, **kwargs)
+        data["module"] = str(data["module"])
+        data["dimension_class"] = None
+        _convert_for_serialization(data)
+        return data
+
 
 class TimeDimensionModel(DimensionBaseModel):
     """Defines a time dimension"""
@@ -315,6 +324,15 @@ class TimeDimensionModel(DimensionBaseModel):
         # TODO: validate consistency between start, end, frequency
         return val
 
+    def dict(self, by_alias=True, **kwargs):
+        data = super().dict(by_alias=by_alias, exclude={"cls"}, **kwargs)
+        data["module"] = str(data["module"])
+        data["dimension_class"] = None
+        data["start"] = str(data["start"])
+        data["end"] = str(data["end"])
+        _convert_for_serialization(data)
+        return data
+
 
 class DimensionReferenceModel(DSGBaseModel):
     """Reference to a dimension stored in the registry"""
@@ -361,13 +379,7 @@ def handle_dimension_union(value):
     return val
 
 
-def serialize_dimension_model(model: DimensionBaseModel):
-    data = serialize_model(model)
-    data["module"] = str(data["module"])
-    data["dimension_class"] = None
-    if isinstance(model, DimensionModel):
-        data["records"] = None  # These get reloaded from the file.
-    else:
-        data["start"] = str(data["start"])
-        data["end"] = str(data["end"])
-    return data
+def _convert_for_serialization(data):
+    for key, val in data.items():
+        if isinstance(val, enum.Enum):
+            data[key] = val.value

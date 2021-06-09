@@ -49,20 +49,16 @@ class Project:
         manager = RegistryManager.load(registry_path, offline_mode=offline_mode)
         dataset_manager = manager.dataset_manager
         project_manager = manager.project_manager
-        registry = project_manager.get_registry_config(project_id)
-        registered_datasets = registry.list_registered_datasets()
-        if version is None:
-            version = registry.version
         config = project_manager.get_by_id(project_id, version=version)
 
         project_dimension_store = DimensionStore.load(
             itertools.chain(
-                config.project_dimensions.values(), config.supplemental_dimensions.values()
+                config.base_dimensions.values(), config.supplemental_dimensions.values()
             ),
         )
         dataset_dim_stores = {}
         dataset_configs = {}
-        for dataset_id in registered_datasets:
+        for dataset_id in config.list_registered_dataset_ids():
             dataset_config = dataset_manager.get_by_id(dataset_id)
             dataset_configs[dataset_id] = dataset_config
             dataset_dim_stores[dataset_id] = DimensionStore.load(
@@ -128,8 +124,8 @@ class Project:
     The code below is subject to change.
     """
 
-    def _iter_project_dimensions(self):
-        for dimension in self.config.dimensions.project_dimensions:
+    def _iter_base_dimensions(self):
+        for dimension in self.config.dimensions.base_dimensions:
             yield dimension
 
     def _iter_input_datasets(self):
@@ -140,7 +136,7 @@ class Project:
         return [x.dataset_id for x in self._iter_input_datasets()]
 
     def get_project_dimension(self, dimension_type):
-        for dimension in self._iter_project_dimensions():
+        for dimension in self._iter_base_dimensions():
             if dimension.dimension_type == dimension_type:
                 return dimension
         raise DSGInvalidField(f"{dimension_type} is not stored")

@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 from .cloud_storage_interface import CloudStorageInterface
 
 
@@ -16,8 +17,9 @@ class FakeStorageInterface(CloudStorageInterface):
     def has_lock_files(self, directory):
         pass
 
+    @contextmanager
     def make_lock_file(self, path):
-        pass
+        yield
 
     def read_lock_file(self, path):
         pass

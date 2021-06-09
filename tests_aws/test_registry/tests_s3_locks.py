@@ -20,7 +20,7 @@ def test_make_and_release_lock():
         profile=AWS_PROFILE_NAME,
     )
     with s3.make_lock_file("s3://nrel-dsgrid-registry-test/configs/.locks/test.lock"):
-        assert s3._s3_filesystem.s3_path(
+        assert s3._s3_filesystem.path(
             "s3://nrel-dsgrid-registry-test/configs/.locks/test.lock"
         ).exists()
     assert s3._s3_filesystem.listdir("configs/.locks") == []
@@ -39,7 +39,7 @@ def test_sync_push_fail_if_lock_exists():
         base_dir = Path(tmpdir)
         lock_file = "s3://nrel-dsgrid-registry-test/configs/.locks/dimensions.lock"
         with s3.make_lock_file(lock_file):
-            assert s3._s3_filesystem.s3_path(lock_file).exists()
+            assert s3._s3_filesystem.path(lock_file).exists()
             s3 = s3.check_lock_file(lock_file)
             manager = RegistryManager.create(
                 path=base_dir / "dsgrid-registry", user="test", remote_path=TEST_REGISTRY

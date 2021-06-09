@@ -10,7 +10,6 @@ from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.cli.download import download
 from dsgrid.cli.query import query
 from dsgrid.cli.registry import registry
-from dsgrid.cli.submit import submit
 from dsgrid.loggers import setup_logging
 
 
@@ -41,7 +40,7 @@ def cli(ctx, log_file, no_prompts, verbose):
     setup_logging("dsgrid", log_file, console_level=level, file_level=level, mode="a")
 
 
-@cli.resultcallback()
+@cli.result_callback()
 def callback(*args, **kwargs):
     # Raise the console level so that timer stats only go to the log file.
     dsgrid_logger = logging.getLogger("dsgrid")
@@ -58,4 +57,3 @@ def callback(*args, **kwargs):
 cli.add_command(download)
 cli.add_command(query)
 cli.add_command(registry)
-cli.add_command(submit)

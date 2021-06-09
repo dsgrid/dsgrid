@@ -1,16 +1,24 @@
 import logging
 from pathlib import Path
 
+from pydantic import Field
 
 from .registry_base import RegistryBaseModel, RegistryBase
 
 logger = logging.getLogger(__name__)
 
 
+class DimensionRegistryModel(RegistryBaseModel):
+    """Dimension registration class"""
+
+    dimension_id: str = Field(
+        title="dimension_id",
+        description="dimension identifier",
+    )
+
+
 class DimensionRegistry(RegistryBase):
     """Controls dimension (record) registration from datasets and projects"""
-
-    # TODO: add validator to prevent duplication of registered dim records
 
     DIMENSION_REGISTRY_PATH = Path("configs/dimensions")
 
@@ -18,9 +26,13 @@ class DimensionRegistry(RegistryBase):
     def config_filename():
         return "dimension.toml"
 
+    @property
+    def config_id(self):
+        return self.model.dimension_id
+
     @staticmethod
     def model_class():
-        return RegistryBaseModel
+        return DimensionRegistryModel
 
     @staticmethod
     def registry_path():

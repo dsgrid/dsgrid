@@ -30,7 +30,7 @@ class DimensionStore:
         Parameters
         ----------
         dimensions : sequence
-            list or iterable of subtype of DimensionRecordBaseModel
+            list or iterable of DimensionConfig
 
         spark : SparkSession
 
@@ -42,7 +42,7 @@ class DimensionStore:
         records = DimensionRecords()
         store = cls(records)
         for dimension in dimensions:
-            store.add_dimension(dimension)
+            store.add_dimension(dimension.model)
         return store
 
     def add_dimension(self, dimension):

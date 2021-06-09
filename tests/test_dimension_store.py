@@ -15,24 +15,16 @@ from dsgrid.utils.files import load_data
 
 logger = logging.getLogger(__name__)
 
-store_configured = True
-skip_message = 'Test requires Project.load("test").project_dimension_store'
-try:
-    # Use one store for all tests. It won't be mutated after load.
-    project = Project.load("test")
-    store = project.project_dimension_store
-except:
-    store_configured = False
-    logger.error('Unable to access Project.load("test").project_dimension_store')
+# Use one store for all tests. It won't be mutated after load.
+project = Project.load("test", offline_mode=True)
+store = project.project_dimension_store
 
 
-@pytest.mark.skipif(not store_configured, reason=skip_message)
 def test_dimension_store():
     assert store.list_dimension_classes()[:2] == [CensusDivision, CensusRegion]
     assert store.list_dimension_classes(base_class=TimeDimensionModel) == [Time]
 
 
-@pytest.mark.skipif(not store_configured, reason=skip_message)
 def test_dimension_records():
     record_store = store.record_store
     states = record_store.list_records(State)
@@ -45,7 +37,6 @@ def test_dimension_records():
     assert not record_store.has_record(State, "ZZ")
 
 
-@pytest.mark.skipif(not store_configured, reason=skip_message)
 def test_dimension_store_invalid_types():
     class Unknown(BaseModel):
         a: str
@@ -58,7 +49,6 @@ def test_dimension_store_invalid_types():
         assert not record_store.get_record(State, "ZZ")
 
 
-# @pytest.mark.skipif(not store_configured, reason = skip_message)
 # def test_dimension_mapping():
 #    key = store.get_dimension_mapping_key(County, State)
 #    assert key == "state"

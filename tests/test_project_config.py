@@ -2,7 +2,7 @@ import pytest
 
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
-from dsgrid.config.project_config import ProjectConfig, ProjectConfigModel
+from dsgrid.config.project_config import ProjectConfigModel
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
 from tests.data.dimension_models.minimal.models import PROJECT_CONFIG_FILE
 
@@ -18,9 +18,9 @@ def dimension_manager():
     return registry.dimension_manager
 
 
-def test_good_project_config(dimension_manager):
-    config = ProjectConfig.load(PROJECT_CONFIG_FILE, dimension_manager)
-    assert isinstance(config, ProjectConfig)
+def test_good_project_config(config_as_dict):
+    model = ProjectConfigModel(**config_as_dict)
+    assert isinstance(model, ProjectConfigModel)
 
 
 def test_project_invalid_id(config_as_dict, dimension_manager):

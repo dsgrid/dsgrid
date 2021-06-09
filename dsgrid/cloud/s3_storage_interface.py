@@ -39,7 +39,7 @@ class S3StorageInterface(CloudStorageInterface):
 
     def check_lock_file(self, path):
         self.check_valid_lock_file(path)
-        filepath = self._s3_filesystem.s3_path(path)
+        filepath = self._s3_filesystem.path(path)
         if filepath.exists():
             lock_contents = self.read_lock_file(filepath)
             if (
@@ -72,7 +72,7 @@ class S3StorageInterface(CloudStorageInterface):
         return True
 
     def get_lock_files(self):
-        contents = self._s3_filesystem.s3_path(".locks").glob(pattern="*")
+        contents = self._s3_filesystem.path(".locks").glob(pattern="*")
         return contents
 
     def has_lock_files(self):
@@ -83,23 +83,23 @@ class S3StorageInterface(CloudStorageInterface):
     def make_lock_file(self, path):
         try:
             self.check_lock_file(path)
-            filepath = self._s3_filesystem.s3_path(path)
+            filepath = self._s3_filesystem.path(path)
             lock_content = {
                 "username": self._user,
                 "uuid": self._uuid,
                 "timestamp": str(datetime.now()),
             }
-            self._s3_filesystem.s3_path(filepath).write_text(json.dumps(lock_content))
+            self._s3_filesystem.path(filepath).write_text(json.dumps(lock_content))
             yield
         finally:
             self.remove_lock_file(path)
 
     def read_lock_file(self, path):
-        lockfile_contents = json.loads(self._s3_filesystem.s3_path(path).read_text())
+        lockfile_contents = json.loads(self._s3_filesystem.path(path).read_text())
         return lockfile_contents
 
     def remove_lock_file(self, path, force=False):
-        filepath = self._s3_filesystem.s3_path(path)
+        filepath = self._s3_filesystem.path(path)
         if filepath.exists():
             lockfile_contents = self.read_lock_file(filepath)
             if not force:
@@ -121,7 +121,10 @@ class S3StorageInterface(CloudStorageInterface):
     def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False):
         if delete_local:
             local_contents = self._local_filesystem.rglob(local_path)
-            s3_contents = self._s3_filesystem.rglob(remote_path)
+            s3_contents = {
+                str(self._s3_filesystem.path(x).relative_to(self._s3_filesystem.path(remote_path)))
+                for x in self._s3_filesystem.rglob(remote_path)
+            }
             for content in local_contents:
                 relcontent = os.path.relpath(content, local_path)
                 if relcontent not in s3_contents:

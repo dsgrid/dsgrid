@@ -8,14 +8,14 @@ import sys
 from dsgrid.registry.registry_manager import RegistryManager
 
 
-PROJECT_REPO = os.environ.get("US_DATA_REPO")
+PROJECT_REPO = os.environ.get("TEST_PROJECT_REPO")
 
 
 @pytest.fixture
 def make_test_project_dir():
     if PROJECT_REPO is None:
         print(
-            "You must define the environment US_DATA_REPO with the path to the "
+            "You must define the environment TEST_PROJECT_REPO with the path to the "
             "dsgrid-data-UnitedStates repository"
         )
         sys.exit(1)
@@ -30,7 +30,7 @@ def make_test_project_dir():
 
 
 def create_local_test_registry(tmpdir):
-    path = Path(tmpdir) / "dsgrid-registry"
+    path = Path(tmpdir)
     RegistryManager.create(path)
     assert path.exists()
     assert (path / "configs/projects").exists()

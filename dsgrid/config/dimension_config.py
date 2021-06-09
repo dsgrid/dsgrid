@@ -1,73 +1,70 @@
-"""
-Running List of TODO's:
-
-
-Questions:
-- Do diemsnion names need to be distinct from project's? What if the dataset
-is using the same dimension as the project?
-"""
-from typing import List, Optional, Union, Dict
+import abc
 import logging
+import os
+import shutil
+from pathlib import Path
 
-from pydantic import Field
-from pydantic import validator
-
-from .config_base import ConfigBase
+from .config_base import ConfigWithDataFilesBase
 from .dimensions import (
     TimeDimensionModel,
     DimensionModel,
-    handle_dimension_union,
+    DimensionType,
 )
-from dsgrid.data_models import DSGBaseModel
-from dsgrid.registry.common import make_registry_id, check_config_id_1
-from dsgrid.utils.utilities import check_uniqueness
+from dsgrid.data_models import serialize_model
+from dsgrid.exceptions import DSGInvalidOperation
+from dsgrid.utils.files import dump_data, load_data
 
 logger = logging.getLogger(__name__)
 
 
-class DimensionConfigModel(DSGBaseModel):
-    """Represents dimension model configurations"""
+class DimensionBaseConfig(ConfigWithDataFilesBase, abc.ABC):
+    """Base class for dimension configs"""
 
-    dimensions: List[Union[DimensionModel, TimeDimensionModel]] = Field(
-        title="dimensions",
-        description="dimensions for submission to the dimension registry",
-    )
+    @staticmethod
+    def config_filename():
+        return "dimension.toml"
 
-    @validator("dimensions")
-    def check_files(cls, values: dict) -> dict:
-        """Validate dimension files are unique across all dimensions"""
-        check_uniqueness(
-            (x.filename for x in values if isinstance(x, DimensionModel)),
-            "dimension record filename",
-        )
-        return values
-
-    @validator("dimensions")
-    def check_names(cls, values: dict) -> dict:
-        """Validate dimension names are unique across all dimensions and descriptive"""
-        check_uniqueness(
-            [dim.name for dim in values],
-            "dimension record name",
-        )
-        return values
-
-    @validator("dimensions", pre=True, each_item=True, always=True)
-    def handle_dimension_union(cls, values):
-        return handle_dimension_union(values)
+    @property
+    def config_id(self):
+        return self.model.dimension_id
 
 
-class DimensionConfig(ConfigBase):
-    """Provides an interface to a DimensionConfigModel."""
+class DimensionConfig(DimensionBaseConfig):
+    """Provides an interface to a DimensionModel."""
 
     @staticmethod
     def model_class():
-        return DimensionConfigModel
+        return DimensionModel
 
-    def assign_ids(self):
-        """Assign unique IDs to each mapping in the config"""
-        logger.info("Dimension record ID assignment:")
-        for dim in self.model.dimensions:
-            # assign id, made from dimension.name and a UUID
-            dimension_id = make_registry_id([dim.name.lower().replace(" ", "_")])
-            check_config_id_1(dimension_id, "Dimension")
-            dim.dimension_id = dimension_id
+
+class TimeDimensionConfig(DimensionBaseConfig):
+    """Provides an interface to a TimeDimensionModel."""
+
+    @staticmethod
+    def model_class():
+        return TimeDimensionModel
+
+    def serialize(self, path, force=False):
+        model_data = serialize_model(self.model)
+        filename = path / self.config_filename()
+        if filename.exists() and not force:
+            raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
+        dump_data(model_data, filename)
+        return filename
+
+
+def get_dimension_config(model, src_dir):
+    if isinstance(model, TimeDimensionModel):
+        return TimeDimensionConfig(model)
+    elif isinstance(model, DimensionModel):
+        config = DimensionConfig(model)
+        config.src_dir = src_dir
+        return config
+    assert False, type(model)
+
+
+def load_dimension_config(filename):
+    data = load_data(filename)
+    if data["type"] == DimensionType.TIME:
+        return TimeDimensionConfig.load(filename)
+    return DimensionConfig.load(filename)

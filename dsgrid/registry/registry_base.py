@@ -10,6 +10,7 @@ from semver import VersionInfo
 
 from dsgrid.config.config_base import ConfigBase
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.registry.common import (
     ConfigRegistrationModel,
 )
@@ -45,8 +46,6 @@ class RegistryBaseModel(DSGBaseModel):
 class RegistryBase(ConfigBase, abc.ABC):
     """Base class for classes that store records in the registry"""
 
-    DIMENSION_REGISTRY_PATH = Path("registry/dimensions")
-
     @staticmethod
     @abc.abstractmethod
     def config_filename():
@@ -73,7 +72,9 @@ class RegistryBase(ConfigBase, abc.ABC):
     def registration_history(self):
         return self._model.registration_history
 
-    def serialize(self, filename):
+    def serialize(self, filename, force=False):
+        if filename.exists() and not force:
+            raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
         dump_data(serialize_model(self._model), filename)
 
     @property

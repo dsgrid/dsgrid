@@ -30,7 +30,7 @@ class DatasetRegistry(RegistryBase):
         return "dataset.toml"
 
     @property
-    def dataset_id(self):
+    def config_id(self):
         return self._model.dataset_id
 
     @staticmethod

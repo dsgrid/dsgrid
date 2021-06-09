@@ -33,26 +33,19 @@ activated an environment with dsgrid installed per the above, you'll need to set
 up dsgrid for testing by setting environment variables:
 
 ```
-# point to your checkout of the dsgrid-data-UnitedStates repository (adjusting
-# the path as needed)
-export US_DATA_REPO="/home/$USER/dsgrid-data-UnitedStates"
+# point to your checkout of the dsgrid-data-UnitedStates repository which is 
+# what we are currently using for tests (adjusting the path as needed)
+export TEST_PROJECT_REPO="$HOME/dsgrid-data-UnitedStates"
+
+# point to your local dsgrid registry path
 # feel free to use a different path for storing your test registry--this is just 
 # an example
-export DSGRID_REGISTRY_PATH="/home/$USER/.dsgrid-test-registry"
+export DSGRID_REGISTRY_PATH="$HOME/.dsgrid-test-registry"
 ```
 
-and then running the commands:
+and then running:
 ```
-dsgrid-internal create-registry $DSGRID_REGISTRY_PATH
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline dimensions register $US_DATA_REPO/dsgrid_project/dimensions.toml -l "initial registration"
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline dimensions register $US_DATA_REPO/dsgrid_project/datasets/sector_models/comstock/dimensions.toml -l "initial registration"
-# environment variable substitutions will not actually work--replace with paths
-python -c 'from tests.common import *;replace_dimension_uuids_from_registry("${DSGRID_REGISTRY_PATH}", ["${US_DATA_REPO}/dsgrid_project/project.toml", "${US_DATA_REPO}/dsgrid_project/datasets/sector_models/comstock/dataset.toml"])'
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline projects register $US_DATA_REPO/dsgrid_project/project.toml -l "initial registration"
-aws s3 sync s3://nrel-dsgrid-scratch/dsgrid_v2.0.0/commercial/load_data_lookup.parquet $DSGRID_REGISTRY_PATH/data/efs-comstock/1.0.0/load_data_lookup.parquet
-aws s3 sync s3://nrel-dsgrid-scratch/dsgrid_v2.0.0/commercial/load_data.parquet $DSGRID_REGISTRY_PATH/data/efs-comstock/1.0.0/load_data.parquet
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline datasets register $US_DATA_REPO/dsgrid_project/datasets/sector_models/comstock/dataset.toml -l "initial registration"
-dsgrid registry --path=$DSGRID_REGISTRY_PATH --offline projects submit-dataset -p test -d efs_comstock -l "initial registration"
+python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH
 ```
 
 After that you can run the tests:
@@ -67,6 +60,20 @@ pytest options that may be helpful:
 option flag           | effect
 --------------------- | ------
 --log-cli-level=DEBUG | emits log messages to the console. level can be set to DEBUG, INFO, WARN, ERROR
+
+## Interactive Exploration
+
+In addition to the CLI tools you can use `scripts/registry.py` to explore a registry interactively.
+
+Be sure to use the `debug` function from the `devtools` package when exploring Pydantic models.
+```
+ipython -i scripts/registry.py -- --path=$DSGRID_REGISTRY_PATH --offline
+In [1]: manager.show()
+
+In [2]: dataset = dataset_manager.get_by_id("efs_comstock")
+
+In [3]: debug(dataset.model)
+```
 
 ## Publish Documentation
 

@@ -16,7 +16,7 @@ with open(here / "dsgrid" / "_version.py", encoding="utf-8") as f:
 with open(here / "README.md", encoding="utf-8") as f:
     readme = f.read()
 
-dev_requires = ["black", "pre-commit"]
+dev_requires = ["black", "pre-commit", "devtools"]
 
 test_requires = ["pytest", "pytest-cov"]
 
@@ -56,7 +56,7 @@ setup(
     install_requires=[
         "awscli",
         "boto3",
-        "click",
+        "click>=8",
         "findspark",
         "numpy",
         "pandas",

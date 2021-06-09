@@ -1,23 +1,3 @@
-"""
-# ******************************************
-# RUNNING LIST OF PROJECT CONFIG TODOS
-# ******************************************
-
-- we need to establish relationships across project-dimensions (to/from or
-    some kind of mapper)
-- need to establish dsgrid types standard relationship mappers
-- need to use said mapper to run compatibility checks
-- need to better establish expected fields/types in the dimension dataclasses
-    in dsgrid.dimension.standard
-- enforce supplemental dimensions to have a from/to mapping to the project
-    dimension of the same type?
-- I think we need to add the association table to
-    dimensions.associations.base_dimensions in the config
-
-- Add registry details
-- need to generate input data config
-
-"""
 import itertools
 import logging
 from typing import Dict, List, Optional, Union

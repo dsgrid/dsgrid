@@ -73,8 +73,8 @@ def make_us_data_registry(registry_path, repo) -> RegistryManager:
     help="Delete registry-path if it exists.",
 )
 @click.option(
-    "-d",
-    "--data-repo",
+    "-p",
+    "--project-repo",
     envvar="TEST_PROJECT_REPO",
     required=True,
     help="path to dsgrid-data-UnitedStates registry. Override with the environment variable TEST_PROJECT_REPO",
@@ -82,7 +82,7 @@ def make_us_data_registry(registry_path, repo) -> RegistryManager:
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def run(registry_path, force, PROJECT_REPO, verbose):
+def run(registry_path, force, project_repo, verbose):
     """Creates a local registry with the dsgrid-data-UnitedStates repository for testing."""
     level = logging.DEBUG if verbose else logging.INFO
     setup_logging("dsgrid", "dsgrid_us.log", console_level=level, file_level=level, mode="a")
@@ -92,11 +92,11 @@ def run(registry_path, force, PROJECT_REPO, verbose):
         else:
             print(f"{registry_path} already exists. Use --force to overwrite.")
     os.makedirs(registry_path)
-    tmp_PROJECT_REPO = Path(tempfile.gettempdir()) / "tmp_test_project_repo"
-    if tmp_PROJECT_REPO.exists():
-        shutil.rmtree(tmp_PROJECT_REPO)
-    shutil.copytree(PROJECT_REPO, tmp_PROJECT_REPO)
-    make_us_data_registry(registry_path, tmp_PROJECT_REPO / "dsgrid_project")
+    tmp_project_repo = Path(tempfile.gettempdir()) / "tmp_test_project_repo"
+    if tmp_project_repo.exists():
+        shutil.rmtree(tmp_project_repo)
+    shutil.copytree(project_repo, tmp_project_repo)
+    make_us_data_registry(registry_path, tmp_project_repo / "dsgrid_project")
 
 
 if __name__ == "__main__":

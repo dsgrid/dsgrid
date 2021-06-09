@@ -2,6 +2,7 @@ from dsgrid.exceptions import DSGInvalidParameter
 import numpy as np
 
 accepted_ops = ["==", "!=", "contains", "not contains"]
+accepted_ops_to_check = [x for x in accepted_ops if x != "not contains"]
 
 
 def transform_and_validate_filters(filter_expressions):
@@ -16,11 +17,14 @@ def transform_and_validate_filters(filter_expressions):
     for expr_str in filter_expressions:
         check_ops = []
         op = None
-        for opp in accepted_ops:
+        for opp in accepted_ops_to_check:
             check_ops.append(opp in expr_str)
             if opp in expr_str:
                 op = opp
+        # override "contains" if "not contains" exists
+        op = "not contains" if "not contains" in expr_str else op
 
+        print(check_ops)
         if np.sum(check_ops) != 1:
             raise DSGInvalidParameter(f"invalid operation detected, valid ops: {accepted_ops}")
 
@@ -75,7 +79,7 @@ def matches_filter(val, op, required_value):
         return val == required_value
     elif op == "contains":
         return required_value in val
-    elif op == "not contains":
+    elif op == "not-contains":
         return required_value not in val
     elif op == "!=":
         return val != required_value

@@ -644,30 +644,32 @@ def sync(registry_manager):
     # aws.sync(REMOTE_REGISTRY, registry_manager.path)
 
 
+# remove commands are disabled until DSGRID-147 is implemented
+
 dimensions.add_command(list_dimensions)
 dimensions.add_command(register_dimensions)
 dimensions.add_command(dump_dimension)
 dimensions.add_command(update_dimension)
-dimensions.add_command(remove_dimension)
+# dimensions.add_command(remove_dimension)
 
 dimension_mappings.add_command(list_dimension_mappings)
 dimension_mappings.add_command(register_dimension_mappings)
 dimension_mappings.add_command(dump_dimension_mapping)
 dimension_mappings.add_command(update_dimension_mapping)
-dimension_mappings.add_command(remove_dimension_mapping)
+# dimension_mappings.add_command(remove_dimension_mapping)
 
 projects.add_command(list_projects)
 projects.add_command(register_project)
 projects.add_command(submit_dataset)
 projects.add_command(dump_project)
 projects.add_command(update_project)
-projects.add_command(remove_project)
+# projects.add_command(remove_project)
 
 datasets.add_command(list_datasets)
 datasets.add_command(register_dataset)
 datasets.add_command(dump_dataset)
 datasets.add_command(update_dataset)
-datasets.add_command(remove_dataset)
+# datasets.add_command(remove_dataset)
 
 registry.add_command(list_)
 registry.add_command(dimensions)

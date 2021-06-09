@@ -35,7 +35,7 @@ def check_config_dimensions(s3, F, msg):
             dimension_registry_toml = get_joined_file(parts, 3) + "/registry.toml"
             version_1_folder = get_joined_file(parts, 3) + "/1.0.0"
             for file in (dimension_registry_toml, version_1_folder):
-                if not s3._s3_filesystem.s3_path(file).exists():
+                if not s3._s3_filesystem.path(file).exists():
                     raise DSGInvalidRegistryState(msg.format(file=file))
             # make sure all versions are semver
             files = [
@@ -53,9 +53,7 @@ def check_config_dimensions(s3, F, msg):
         if level == 5:
             # L5: /configs/dimensions/{dimension_type}/{dimension_id}__{uuid}/{version}/dimension.toml | ...{dimension}.csv (or json)
             # confirm that dimension.toml exists
-            dimension_toml = s3._s3_filesystem.s3_path(
-                get_joined_file(parts, 4) + "/dimension.toml"
-            )
+            dimension_toml = s3._s3_filesystem.path(get_joined_file(parts, 4) + "/dimension.toml")
             if not dimension_toml.exists():
                 raise DSGInvalidRegistryState(msg.format(file=dimension_toml))
             # confirm that one dimension record is provided (unless dimension type == time)
@@ -87,7 +85,7 @@ def test_registry_path_expectations():
             raise DSGInvalidRegistryState(msg.format(file=level_0))
         for level_1 in s3._s3_filesystem.listdir(directory=level_0):
             base_level_1_file = Path(level_0) / Path(level_1)
-            for F in s3._s3_filesystem.s3_path(level_0 + "/" + level_1).rglob("*"):
+            for F in s3._s3_filesystem.path(level_0 + "/" + level_1).rglob("*"):
                 F = F.relative_to(REGISTRY[4:])
                 if level_0 == ".locks":
                     if base_level_1_file.suffix != ".lock":

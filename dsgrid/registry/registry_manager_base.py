@@ -153,7 +153,7 @@ class RegistryManagerBase(abc.ABC):
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
     ):
-        """Updates the current registry with new parameters or data from a file.
+        """Updates the current registry with new parameters or data from a config file.
 
         Parameters
         ----------

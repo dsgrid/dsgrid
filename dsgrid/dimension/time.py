@@ -59,6 +59,7 @@ class TimezoneType(Enum):
     MST = "MST"
     CST = "CST"
     EST = "EST"
+    LOCAL = "LOCAL"
 
 
 @dataclass

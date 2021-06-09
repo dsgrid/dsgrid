@@ -17,7 +17,7 @@ from dsgrid.registry.common import VersionUpdateType
 
 # from dsgrid.filesystem import aws
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.utils.filters import accepted_ops
+from dsgrid.utils.filters import ACCEPTED_OPS
 
 
 logger = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ Dimension Commands
     help=f"""
     filter table with a case-insensitive expression in the format 'field operation value', 
     accept multiple flags\b\n
-    valid operations: {accepted_ops}\n
+    valid operations: {ACCEPTED_OPS}\n
     example:\n 
        -f 'Submitter == username' -f 'Description contains sector'
     """,
@@ -252,7 +252,7 @@ Dimension Mapping Commands
     help=f"""
     filter table with a case-insensitive expression in the format 'field operation value', 
     accept multiple flags\b\n
-    valid operations: {accepted_ops}\n
+    valid operations: {ACCEPTED_OPS}\n
     example:\n 
        -f 'Submitter == username' -f 'Description contains sector'
     """,
@@ -387,7 +387,7 @@ Project Commands
     help=f"""
     filter table with a case-insensitive expression in the format 'field operation value', 
     accept multiple flags\b\n
-    valid operations: {accepted_ops}\n
+    valid operations: {ACCEPTED_OPS}\n
     example:\n 
        -f 'Submitter == username' -f 'Description contains sector'
     """,
@@ -549,7 +549,7 @@ Dataset Commands
     help=f"""
     filter table with a case-insensitive expression in the format 'field operation value', 
     accept multiple flags\b\n
-    valid operations: {accepted_ops}\n
+    valid operations: {ACCEPTED_OPS}\n
     example:\n 
        -f 'Submitter == username' -f 'Description contains sector'
     """,

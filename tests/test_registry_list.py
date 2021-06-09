@@ -1,11 +1,11 @@
 import pytest
-from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
-from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.common import REMOTE_REGISTRY
+from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
 from dsgrid.exceptions import DSGInvalidParameter
 
 
 registry_manager = RegistryManager.load(
-    path=LOCAL_REGISTRY,
+    path=get_registry_path(),
     remote_path=REMOTE_REGISTRY,
     offline_mode=True,
     dry_run_mode=False,
@@ -53,7 +53,7 @@ def test_registry_list_filters():
     )  # field in 1st cond not available in most managers
 
     # test set 1: good filters for all managers
-    good_filters = (filters1, filters2)
+    good_filters = [filters1, filters2]
     for filters in good_filters:
         registry_manager.project_manager.show(filters=filters)
         registry_manager.dataset_manager.show(filters=filters)

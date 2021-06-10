@@ -2,6 +2,7 @@ import csv
 import enum
 import importlib
 import json
+import pandas as pd
 import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
@@ -266,24 +267,18 @@ class DimensionModel(DimensionBaseModel):
 class TimeDimensionModel(DimensionBaseModel):
     """Defines a time dimension"""
 
-    # TODO: what is this intended purpose?
-    #       originally i thought it was to interpret start/end, but
-    #       the year here is unimportant because it will be based on
-    #       the weather_year
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y-%m-%d %H:%M:%s-%z",
         description="timestamp format",
     )
-    # TODO: we may want a list of start and end times;
-    #       can this be string or list of strings?
-    start: datetime = Field(
+    # TODO: support str or list of str
+    start: str = Field(
         title="start",
         description="first timestamp in the data",
     )
-    # TODO: Is this inclusive or exclusive? --> mm:I don't know what this means
-    # TODO: we may want to support a list of start and end times
-    end: datetime = Field(
+    # TODO: support str or list of str
+    end: str = Field(
         title="end",
         description="last timestamp in the data",
     )
@@ -316,12 +311,15 @@ class TimeDimensionModel(DimensionBaseModel):
         description="TODO",
     )
 
-    @validator("start", "end", pre=True)
+    @validator("frequency")
     def check_times(cls, val, values):
+        """Check that start and end times parse and date range can be generated"""
         # TODO: technical year doesn't matter; needs to apply the weather year
-        # make sure start and end time parse
-        datetime.strptime(val, values["str_format"])
-        # TODO: validate consistency between start, end, frequency
+        start = datetime.strptime(values["start"], values["str_format"])
+        end = datetime.strptime(values["end"], values["str_format"])
+        pd.date_range(
+            start, end, freq=val
+        )  # @DT: Do we want to support frequency aliases here? Instead of our TimeFrequncy Enum? https://pandas.pydata.org/pandas-docs/stable/user_guide/timeseries.html#timeseries-offset-aliases
         return val
 
     def dict(self, by_alias=True, **kwargs):

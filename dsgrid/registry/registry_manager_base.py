@@ -502,7 +502,7 @@ class RegistryManagerBase(abc.ABC):
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for config_id, registry_config in self._registry_configs.items():
-            last_reg = registry_config.model.registration_history[-1]
+            last_reg = registry_config.model.registration_history[0]
 
             row = (
                 config_id,

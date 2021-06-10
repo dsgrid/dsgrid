@@ -395,12 +395,11 @@ Project Commands
 @click.pass_obj
 def list_projects(registry_manager, filter):
     """List the registered projects."""
-    registry_manager.project_manager.show(filters=filter)
-    # try:
-    #     registry_manager.project_manager.show(filters=filter)
-    # except DSGInvalidParameter as exc:
-    #     print(exc)
-    #     sys.exit(1)
+    try:
+        registry_manager.project_manager.show(filters=filter)
+    except DSGInvalidParameter as exc:
+        print(exc)
+        sys.exit(1)
 
 
 @click.command(name="register")

@@ -364,6 +364,9 @@ def handle_dimension_union(value):
     Validate dimension type work around for pydantic Union bug
     related to: https://github.com/samuelcolvin/pydantic/issues/619
     """
+    if isinstance(value, DimensionBaseModel):
+        return value
+
     # NOTE: Errors inside DimensionModel or TimeDimensionModel will be duplicated by Pydantic
     if value["type"] == DimensionType.TIME.value:
         val = TimeDimensionModel(**value)

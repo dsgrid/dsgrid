@@ -5,6 +5,8 @@ import logging
 import os
 from pathlib import Path
 
+from prettytable import PrettyTable
+
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.association_tables import AssociationTableConfig
 from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
@@ -16,6 +18,7 @@ from .dimension_mapping_registry import DimensionMappingRegistry, DimensionMappi
 from .dimension_registry_manager import DimensionRegistryManager
 from .registry_base import RegistryBaseModel
 from .registry_manager_base import RegistryManagerBase
+from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 
 
 logger = logging.getLogger(__name__)
@@ -28,12 +31,26 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         super().__init__(path, params)
         self._mappings = {}  # ConfigKey to DimensionMappingModel
         self._dimension_mgr = None
+        self._id_to_type = {}
 
     @classmethod
     def load(cls, path, fs_interface, dimension_manager):
         mgr = cls._load(path, fs_interface)
         mgr.dimension_manager = dimension_manager
         return mgr
+
+    def inventory(self):
+        for map_id in self.fs_interface.listdir(
+            self._path, directories_only=True, exclude_hidden=True
+        ):
+            map_path = self._path / map_id
+            registry = self.registry_class().load(map_path / REGISTRY_FILENAME)
+            self._registry_configs[map_id] = registry
+            registry_config = self.get_by_id(map_id)
+            self._id_to_type[map_id] = [
+                registry_config.model.from_dimension.dimension_type,
+                registry_config.model.to_dimension.dimension_type,
+            ]
 
     @staticmethod
     def name():
@@ -164,7 +181,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             return
 
         for mapping in config.model.mappings:
-            from_id = mapping.to_dimension.dimension_id
+            from_id = mapping.from_dimension.dimension_id
             to_id = mapping.to_dimension.dimension_id
             if not self.dimension_manager.has_id(from_id):
                 raise DSGValueNotRegistered(f"from_dimension ID {from_id} is not registered")
@@ -187,6 +204,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             at_config = AssociationTableConfig(mapping)
             at_config.src_dir = src_dir
             at_config.serialize(dst_dir)
+            self._id_to_type[mapping.mapping_id] = [
+                mapping.from_dimension.dimension_type,
+                mapping.to_dimension.dimension_type,
+            ]
             self._update_registry_cache(mapping.mapping_id, registry_config)
             logger.info(
                 "%s Registered dimension mapping id=%s version=%s",
@@ -250,3 +271,48 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._remove(config_id)
         for key in [x for x in self._mappings if x.id == config_id]:
             self._mappings.pop(key)
+            self._id_to_type.pop(key.id, None)
+
+    def show(self, filters=None):
+        if filters:
+            logger.info("List registered dimension_mappings for: %s", filters)
+
+        table = PrettyTable(title="Dimension Mappings")
+        table.field_names = (
+            "Type [From, To]",
+            "ID",
+            "Version",
+            "Registration Date",
+            "Submitter",
+            "Description",
+        )
+        table._max_width = {
+            "ID": 50,
+            "Description": 50,
+        }
+        # table.max_width = 70
+
+        if filters:
+            transformed_filters = transform_and_validate_filters(filters)
+        field_to_index = {x: i for i, x in enumerate(table.field_names)}
+        rows = []
+        for dimension_id, registry_config in self._registry_configs.items():
+            reg_dim_type = [x.value for x in self._id_to_type[dimension_id]]
+
+            last_reg = registry_config.model.registration_history[0]
+
+            row = (
+                "[" + ", ".join(reg_dim_type) + "]",  # turn list into str
+                dimension_id,
+                last_reg.version,
+                last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
+                last_reg.submitter,
+                registry_config.model.description,
+            )
+            if not filters or matches_filters(row, field_to_index, transformed_filters):
+                rows.append(row)
+
+        rows.sort(key=lambda x: x[0])
+        table.add_rows(rows)
+        table.align = "l"
+        print(table)

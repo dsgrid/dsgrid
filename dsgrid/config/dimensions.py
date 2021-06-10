@@ -256,7 +256,12 @@ class DimensionModel(DimensionBaseModel):
         return records
 
     def dict(self, by_alias=True, **kwargs):
-        data = super().dict(by_alias=by_alias, exclude={"cls", "records"}, **kwargs)
+        exclude = {"cls", "records"}
+        if "exclude" in kwargs and kwargs["exclude"] is not None:
+            kwargs["exclude"].union(exclude)
+        else:
+            kwargs["exclude"] = exclude
+        data = super().dict(by_alias=by_alias, **kwargs)
         data["module"] = str(data["module"])
         data["dimension_class"] = None
         _convert_for_serialization(data)
@@ -325,7 +330,12 @@ class TimeDimensionModel(DimensionBaseModel):
         return val
 
     def dict(self, by_alias=True, **kwargs):
-        data = super().dict(by_alias=by_alias, exclude={"cls"}, **kwargs)
+        exclude = {"cls"}
+        if "exclude" in kwargs and kwargs["exclude"] is not None:
+            kwargs["exclude"].union(exclude)
+        else:
+            kwargs["exclude"] = exclude
+        data = super().dict(by_alias=by_alias, **kwargs)
         data["module"] = str(data["module"])
         data["dimension_class"] = None
         data["start"] = str(data["start"])

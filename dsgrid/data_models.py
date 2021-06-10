@@ -22,6 +22,7 @@ class DSGBaseModel(BaseModel):
         extra = "forbid"
         use_enum_values = False
         arbitrary_types_allowed = True
+        allow_population_by_field_name = True
 
     @classmethod
     def load(cls, filename):

@@ -107,8 +107,9 @@ class InputDatasetModel(DSGBaseModel):
     )
     status: Optional[DatasetRegistryStatus] = Field(
         title="status",
-        description="registration status of the dataset",
+        description="registration status of the dataset, added by dsgrid",
         default=DatasetRegistryStatus.UNREGISTERED,
+        dsg_internal=True,
     )
     # TODO this model_sector must be validated in the dataset_config
     model_sector: str = Field(
@@ -169,6 +170,7 @@ class DimensionMappingsModel(DSGBaseModel):
         title="dataset_to_project",
         description="dataset-to-project mappings added to a project configuration after a dataset is submitted to the project",
         default={},
+        dsg_internal=True,
     )
 
 
@@ -184,7 +186,10 @@ class ProjectConfigModel(DSGBaseModel):
         description="project name",
     )
     status: ProjectRegistryStatus = Field(
-        tile="status", description="project registry status", default="Initial Registration"
+        tile="status",
+        description="project registry status",
+        default="Initial Registration",
+        dsg_internal=True,
     )
     description: str = Field(
         title="description",
@@ -206,6 +211,7 @@ class ProjectConfigModel(DSGBaseModel):
     registration: Optional[Dict] = Field(
         title="registration",
         description="registration information",
+        dsg_internal=True,
     )
 
     @validator("project_id")

@@ -54,9 +54,14 @@ class InputSectorDataset(DSGBaseModel):
     """Input dataset configuration class"""
 
     data_type: DSGDatasetParquetType = Field(
-        title="data_type", alias="type", description="DSG parquet input dataset type"
+        title="data_type",
+        alias="type",
+        description="DSG parquet input dataset type",
     )
-    directory: str = Field(title="directory", description="directory with parquet files")
+    directory: str = Field(
+        title="directory",
+        description="directory with parquet files",
+    )
 
     # TODO:
     #   1. validate data matches dimensions specified in dataset config;

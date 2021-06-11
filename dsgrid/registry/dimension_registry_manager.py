@@ -87,12 +87,16 @@ class DimensionRegistryManager(RegistryManagerBase):
             dimension = self.get_by_id(dimension_id, registry_config.model.version)
             if isinstance(dimension.model, TimeDimensionModel):
                 continue
-            hashes[dimension.model.file_hash] = dimension_id
+            hashes[dimension.model.file_hash] = {
+                "dimension_id": dimension_id,
+                "dimension_type": dimension.model.dimension_type,
+            }
 
         duplicates = []
         for dimension in config.model.dimensions:
             if not isinstance(dimension, TimeDimensionModel) and dimension.file_hash in hashes:
-                duplicates.append((dimension.dimension_id, hashes[dimension.file_hash]))
+                if dimension.dimension_type == hashes[dimension.file_hash]["dimension_type"]:
+                    duplicates.append((dimension.dimension_id, hashes[dimension.file_hash]))
 
         if duplicates:
             for dup in duplicates:

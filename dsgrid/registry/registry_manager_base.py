@@ -19,6 +19,7 @@ from dsgrid.exceptions import (
     DSGInvalidParameter,
 )
 from dsgrid.utils.files import load_data
+from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.timing import Timer, track_timing
 
 
@@ -483,14 +484,26 @@ class RegistryManagerBase(abc.ABC):
         self._registry_configs.pop(config_id, None)
         logger.info("Removed %s from the registry.", config_id)
 
-    def show(self, **kwargs):
+    def show(self, filters=None, **kwargs):
         """Show a summary of the registered items in a table."""
-        # TODO: filter by submitter
+        if filters:
+            logger.info("List registry for: %s", filters)
+
         table = PrettyTable(title=self.name())
         table.field_names = ("ID", "Version", "Registration Date", "Submitter", "Description")
+        table._max_width = {
+            "ID": 50,
+            "Description": 50,
+        }
+        # table.max_width = 70
+
+        if filters:
+            transformed_filters = transform_and_validate_filters(filters)
+        field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for config_id, registry_config in self._registry_configs.items():
             last_reg = registry_config.model.registration_history[0]
+
             row = (
                 config_id,
                 last_reg.version,
@@ -498,11 +511,11 @@ class RegistryManagerBase(abc.ABC):
                 last_reg.submitter,
                 registry_config.model.description,
             )
-            rows.append(row)
+            if not filters or matches_filters(row, field_to_index, transformed_filters):
+                rows.append(row)
 
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
-        table.max_width = 70
         table.align = "l"
         print(table)
 

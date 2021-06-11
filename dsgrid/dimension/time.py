@@ -48,6 +48,7 @@ class TimeFrequency(Enum):
     _1_WEEK = "1 week"
     _1_MONTH = "1 month"
     _1_YEAR = "1 year"
+    _1_SECOND = "1 second"
 
 
 class TimezoneType(Enum):
@@ -59,6 +60,7 @@ class TimezoneType(Enum):
     MST = "MST"
     CST = "CST"
     EST = "EST"
+    LOCAL = "LOCAL"
 
 
 @dataclass

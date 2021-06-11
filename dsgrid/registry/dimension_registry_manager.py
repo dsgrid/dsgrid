@@ -32,6 +32,7 @@ from dsgrid.registry.common import (
 )
 from .registry_manager_base import RegistryManagerBase
 from .dimension_registry import DimensionRegistry, DimensionRegistryModel
+from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 
 
 logger = logging.getLogger(__name__)
@@ -86,12 +87,16 @@ class DimensionRegistryManager(RegistryManagerBase):
             dimension = self.get_by_id(dimension_id, registry_config.model.version)
             if isinstance(dimension.model, TimeDimensionModel):
                 continue
-            hashes[dimension.model.file_hash] = dimension_id
+            hashes[dimension.model.file_hash] = {
+                "dimension_id": dimension_id,
+                "dimension_type": dimension.model.dimension_type,
+            }
 
         duplicates = []
         for dimension in config.model.dimensions:
             if not isinstance(dimension, TimeDimensionModel) and dimension.file_hash in hashes:
-                duplicates.append((dimension.dimension_id, hashes[dimension.file_hash]))
+                if dimension.dimension_type == hashes[dimension.file_hash]["dimension_type"]:
+                    duplicates.append((dimension.dimension_id, hashes[dimension.file_hash]))
 
         if duplicates:
             for dup in duplicates:
@@ -248,8 +253,10 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_type = self._id_to_type[config_id]
         return self._path / dimension_type.value / config_id
 
-    def show(self, dimension_type=None, submitter=None):
-        # TODO: filter by type and submitter
+    def show(self, filters=None):
+        if filters:
+            logger.info("List registered dimensions for: %s", filters)
+
         table = PrettyTable(title="Dimensions")
         table.field_names = (
             "Type",
@@ -259,24 +266,36 @@ class DimensionRegistryManager(RegistryManagerBase):
             "Submitter",
             "Description",
         )
+        table._max_width = {
+            "ID": 50,
+            "Description": 50,
+        }
+        # table.max_width = 70
+
+        if filters:
+            transformed_filters = transform_and_validate_filters(filters)
+        field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for dimension_id, registry_config in self._registry_configs.items():
+            reg_dim_type = self._id_to_type[dimension_id].value
+
             last_reg = registry_config.model.registration_history[0]
+
             row = (
-                self._id_to_type[dimension_id].value,
+                reg_dim_type,
                 dimension_id,
                 last_reg.version,
                 last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
                 last_reg.submitter,
                 registry_config.model.description,
             )
-            rows.append(row)
+
+            if not filters or matches_filters(row, field_to_index, transformed_filters):
+                rows.append(row)
 
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
-
         table.align = "l"
-        table.max_width = 70
         print(table)
 
     def dump(self, config_id, directory, version=None, force=False):

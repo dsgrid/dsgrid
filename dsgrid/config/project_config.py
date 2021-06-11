@@ -1,23 +1,3 @@
-"""
-# ******************************************
-# RUNNING LIST OF PROJECT CONFIG TODOS
-# ******************************************
-
-- we need to establish relationships across project-dimensions (to/from or
-    some kind of mapper)
-- need to establish dsgrid types standard relationship mappers
-- need to use said mapper to run compatibility checks
-- need to better establish expected fields/types in the dimension dataclasses
-    in dsgrid.dimension.standard
-- enforce supplemental dimensions to have a from/to mapping to the project
-    dimension of the same type?
-- I think we need to add the association table to
-    dimensions.associations.base_dimensions in the config
-
-- Add registry details
-- need to generate input data config
-
-"""
 import itertools
 import logging
 from typing import Dict, List, Optional, Union
@@ -127,8 +107,9 @@ class InputDatasetModel(DSGBaseModel):
     )
     status: Optional[DatasetRegistryStatus] = Field(
         title="status",
-        description="registration status of the dataset",
+        description="registration status of the dataset, added by dsgrid",
         default=DatasetRegistryStatus.UNREGISTERED,
+        dsg_internal=True,
     )
     # TODO this model_sector must be validated in the dataset_config
     model_sector: str = Field(
@@ -189,6 +170,7 @@ class DimensionMappingsModel(DSGBaseModel):
         title="dataset_to_project",
         description="dataset-to-project mappings added to a project configuration after a dataset is submitted to the project",
         default={},
+        dsg_internal=True,
     )
 
 
@@ -204,7 +186,10 @@ class ProjectConfigModel(DSGBaseModel):
         description="project name",
     )
     status: ProjectRegistryStatus = Field(
-        tile="status", description="project registry status", default="Initial Registration"
+        tile="status",
+        description="project registry status",
+        default="Initial Registration",
+        dsg_internal=True,
     )
     description: str = Field(
         title="description",
@@ -226,6 +211,7 @@ class ProjectConfigModel(DSGBaseModel):
     registration: Optional[Dict] = Field(
         title="registration",
         description="registration information",
+        dsg_internal=True,
     )
 
     @validator("project_id")

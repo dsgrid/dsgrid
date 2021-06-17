@@ -23,6 +23,7 @@ from .dimensions import (
 )
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidDimension
 
 # TODO: likely needs refinement (missing mappings)
 LOAD_DATA_FILENAME = "load_data.parquet"
@@ -169,8 +170,21 @@ class DatasetConfig(ConfigBase):
     def load(cls, config_file, dimension_manager):
         config = cls._load(config_file)
         config.load_dimensions(dimension_manager)
-        config.check_dataset()
+        config.check_dimensions(dimension_manager)
+        config.check_dataset(dimension_manager)
         return config
+
+    def check_dimensions(self, dimension_manager):
+        """Raises an error if anything is wrong with the dimensions.
+
+        Parameters
+        ----------
+        dimension_manager : DimensionManager
+
+        """
+        trivial_dimensions = self.get_trivial_dimensions()
+        self._check_trivial_record_length(trivial_dimensions, dimension_manager)
+        # TODO: check data_source field compared to dimension record for data_source (they must match)
 
     def load_dimensions(self, dimension_manager):
         """Load all dataset dimensions.
@@ -181,6 +195,7 @@ class DatasetConfig(ConfigBase):
 
         """
         self._dimensions.update(dimension_manager.load_dimensions(self.model.dimensions))
+        # TODO: @DT maybe this where we apply the year for the date range?
 
     @property
     def dimensions(self):
@@ -189,48 +204,34 @@ class DatasetConfig(ConfigBase):
     def get_trivial_dimensions(self):
         """
         Get dict of trivial 1-element data dimensions.
+
         Returns:
             dict: trivial dimension dictionary.
                   {"dimension name": dimension id}
         """
         trivial_dimensions = {}
-        for d in self._dimensions:
-            print(d)
-            if d.type == DimensionType["DATA_SOURCE"]:
-                print(d)
-            # if d.type != DimensionType["TIME"]:
-            #     if d.trivial is True:
-            #         trivial_dimensions[d.dimension_type.value] = d.records[0]["id"]
+        for d in self.model.dimensions:
+            if d.dimension_type != DimensionType.TIME:
+                if d.trivial:
+                    trivial_dimensions[d.dimension_type.value] = d.dimension_id
         return trivial_dimensions
 
-    def get_dimension_records(self):
-        """Get dict of data dimension records"""
-        # NOTE: this changes once we pull in the dimension registry
-        dimensions = {}
-        for d in self._model.dimensions:
-            dimensions[d.dimension_type.value] = d.records
-        return dimensions
-
-    def check_trivial_record_length(self):
+    def _check_trivial_record_length(self, trivial_dimensions, dimension_manager):
         """Check that trivial dimensions have only 1 record."""
-        dimension_records = self.get_dimension_records()
-        trivial_dimensions = self.get_trivial_dimensions()
-        for d in dimension_records:
-            if d in trivial_dimensions:
-                len_records = len(dimension_records[d])
-                if len_records != 1:
-                    raise ValueError(  # TODO change error type
-                        f"Trivial dimensions must have only 1 record but {len_records} records found for dimension={d}"
-                    )
+        for dim_type, dim_id in trivial_dimensions.items():
+            len_records = len(dimension_manager.get_by_id(dim_id).model.records)
+            if len_records > 1:
+                raise DSGInvalidDimension(
+                    f"Trivial dimensions must have only 1 record but {len_records} records found for dimension={dim_id}"
+                )
 
-    def check_dataset(self):
+    def check_dataset(self, dimension_manager):
         """Raises exception if anything in the dataset is
         incorrect/inconsistent."""
-        trivial = self.get_trivial_dimensions()
-        self.check_trivial_record_length()
         # TODO: check that trivial dimensions are missing in load_data.parquet and load_data_lookup.parquet
         # TODO: check expected files exist (load_data, load_data_lookup, scalars?)
         # TODO: check binning/partitioning / file size requirements
+        # TODO: check that dimensions match data
 
     # TODO:
     #   - check unique names of dimensions

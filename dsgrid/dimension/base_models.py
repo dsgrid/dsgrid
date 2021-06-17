@@ -1,6 +1,7 @@
 """Dimension types for dsgrid"""
 
 from enum import Enum
+from typing import Optional
 
 from pydantic import Field
 
@@ -32,6 +33,18 @@ class DimensionRecordBaseModel(DSGBaseModel):
     name: str = Field(
         title="name",
         description="user-defined name",
+    )
+    label: Optional[str] = Field(
+        title="label",
+        description="dimension label for figures",
+    )
+    abbreviation: Optional[str] = Field(
+        title="abbreviation",
+        description="dimension abbreviation label for figures",
+    )
+    drawing_order: Optional[str] = Field(
+        title="drawing_order",
+        description="dimension drawing order for figures",
     )
 
 

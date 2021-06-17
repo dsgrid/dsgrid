@@ -56,7 +56,7 @@ class Dataset:
         """Add trivial 1-element dimensions to load_data_lookup."""
         trivial = config.get_trivial_dimensions()
         for dim, dim_id in trivial.items():
-            load_data_lookup = load_data_lookup.withColumn(dim, lit(dim_id))
+            load_data_lookup = load_data_lookup.withColumn(dim, F.lit(dim_id))
         return load_data_lookup
 
     def _make_view_name(self, name):

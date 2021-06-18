@@ -2,7 +2,6 @@ import pytest
 from pyspark.sql import SparkSession
 
 from dsgrid.project import Project
-from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dataset import Dataset
 from dsgrid.exceptions import DSGValueNotRegistered
 
@@ -29,7 +28,7 @@ def test_dataset_load():
     assert "fans" in data.columns
     lookup = spark.sql("select * from efs_comstock__load_data_lookup")
     assert "subsector" in lookup.columns
-    assert "data_id" in lookup.columns
+    assert "id" in lookup.columns
 
     project.unload_dataset(dataset_id)
     assert spark.sql("show tables").rdd.isEmpty()

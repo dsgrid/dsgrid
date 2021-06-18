@@ -2,13 +2,19 @@
 
 import enum
 import json
+import logging
 import os
+from datetime import datetime, timedelta
 from pathlib import Path
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+from pydantic.json import isoformat, timedelta_isoformat
 from semver import VersionInfo
 
 from dsgrid.utils.files import load_data
+
+
+logger = logging.getLogger(__name__)
 
 
 class DSGBaseModel(BaseModel):
@@ -42,7 +48,9 @@ class DSGBaseModel(BaseModel):
         try:
             cfg = cls(**load_data(filename.name))
             return cfg
-
+        except ValidationError:
+            logger.exception("Failed to validate %s", filename)
+            raise
         finally:
             os.chdir(orig)
 
@@ -66,15 +74,28 @@ class ExtendedJSONEncoder(json.JSONEncoder):
             return str(obj)
         if isinstance(obj, enum.Enum):
             return obj.value
+        if isinstance(obj, datetime):
+            return isoformat(obj)
+        if isinstance(obj, timedelta):
+            return timedelta_isoformat(obj)
 
         return json.JSONEncoder.default(self, obj)
 
 
-def serialize_model(model: DSGBaseModel):
-    """Serialize a model to a dict, converting values as needed."""
+def serialize_model(model: DSGBaseModel, by_alias=True, exclude=None):
+    """Serialize a model to a dict, converting values as needed.
+
+    Parameters
+    ----------
+    by_alias : bool
+        Forwarded to pydantic.BaseModel.dict.
+    exclude : set
+        Forwarded to pydantic.BaseModel.dict.
+
+    """
     # TODO: we should be able to use model.json and custom JSON encoders
     # instead of doing this, at least in most cases.
-    return _serialize_model_data(model.dict(by_alias=True))
+    return serialize_model_data(model.dict(by_alias=by_alias, exclude=exclude))
 
 
 def serialize_user_model(model: DSGBaseModel):
@@ -82,10 +103,10 @@ def serialize_user_model(model: DSGBaseModel):
     # TODO: we should be able to use model.json and custom JSON encoders
     # instead of doing this, at least in most cases.
     exclude = type(model).get_fields_with_extra_attribute("dsg_internal")
-    return _serialize_model_data(model.dict(by_alias=True, exclude=exclude))
+    return serialize_model_data(model.dict(by_alias=True, exclude=exclude))
 
 
-def _serialize_model_data(data: dict):
+def serialize_model_data(data: dict):
     for key, val in data.items():
         data[key] = _serialize_model_item(val)
     return data
@@ -96,8 +117,12 @@ def _serialize_model_item(val):
         return val.value
     if isinstance(val, VersionInfo):
         return str(val)
+    if isinstance(val, datetime):
+        return isoformat(val)
+    if isinstance(val, timedelta):
+        return timedelta_isoformat(val)
     if isinstance(val, dict):
-        return _serialize_model_data(val)
+        return serialize_model_data(val)
     if isinstance(val, list):
         return [_serialize_model_item(x) for x in val]
     return val

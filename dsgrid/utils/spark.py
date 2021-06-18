@@ -1,9 +1,15 @@
 """Spark helper functions"""
 
+import csv
 import logging
 import multiprocessing
+from pathlib import Path
 
-from pyspark.sql import SparkSession
+from pyspark.sql import DataFrame, Row, SparkSession
+
+from dsgrid.exceptions import DSGInvalidField
+from dsgrid.utils.files import load_data
+from dsgrid.utils.timing import Timer, timer_stats_collector
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +27,110 @@ def init_spark(name, mem="5gb", num_cpus=None):
         .config("spark.cores.max", str(num_cpus))
         .getOrCreate()
     )
+
+
+def create_dataframe(records, cache=False, require_unique=None):
+    """Create a spark DataFrame from a list of records.
+
+    Parameters
+    ----------
+    records : list
+        list of spark.sql.Row
+    cache : bool
+        If True, cache the DataFrame in memory.
+    require_unique : list
+        list of column names (str) to check for uniqueness
+
+    Returns
+    -------
+    spark.sql.DataFrame
+
+    """
+    df = SparkSession.getActiveSession().createDataFrame(records)
+    _post_process_dataframe(df, cache=cache, require_unique=require_unique)
+    return df
+
+
+def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=True):
+    """Create a spark DataFrame from a CSV file.
+
+    Parameters
+    ----------
+    filename : str | Path
+        path to CSV file
+    cache : bool
+        If True, cache the DataFrame in memory.
+    require_unique : list
+        list of column names (str) to check for uniqueness
+
+    Returns
+    -------
+    spark.sql.DataFrame
+
+    Raises
+    ------
+    ValueError
+        Raised if a require_unique column has duplicate values.
+
+    """
+    filename = Path(filename)
+    func = _read_with_spark if read_with_spark else _read_natively
+    df = func(filename)
+    _post_process_dataframe(df, cache=cache, require_unique=require_unique)
+    return df
+
+
+def _read_with_spark(filename):
+    spark = SparkSession.getActiveSession()
+    path = str(filename)
+    if filename.suffix == ".csv":
+        df = spark.read.csv(path, header=True)
+    elif Path(filename).suffix == ".parquet":
+        df = spark.read.parquet(path)
+    elif Path(filename).suffix == ".json":
+        df = spark.read.json(path)
+    else:
+        assert False, f"Unsupported file extension: {filename}"
+    return df
+
+
+def _read_natively(filename):
+    if filename.suffix == ".csv":
+        with open(filename, encoding="utf-8-sig") as f_in:
+            rows = [Row(**x) for x in csv.DictReader(f_in)]
+    elif Path(filename).suffix == ".json":
+        rows = load_data(filename)
+    else:
+        assert False, f"Unsupported file extension: {filename}"
+    return SparkSession.getActiveSession().createDataFrame(rows)
+
+
+def _post_process_dataframe(df, cache=False, require_unique=None):
+    if cache:
+        df = df.cache()
+
+    if require_unique is not None:
+        with Timer(timer_stats_collector, "check_unique"):
+            for column in require_unique:
+                unique = df.select(column).distinct()
+                if unique.count() != df.count():
+                    raise DSGInvalidField(f"DataFrame has duplicate entries for {column}")
+
+
+def get_unique_values(df, column):
+    """Return the unique values of a dataframe in one column.
+
+    Parameters
+    ----------
+    df : pyspark.sql.DataFrame
+    column : str
+
+    Returns
+    -------
+    set
+
+    """
+    return {getattr(x, column) for x in df.select(column).distinct().collect()}
 
 
 def sql(query):

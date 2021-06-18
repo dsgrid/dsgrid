@@ -10,7 +10,7 @@ from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.cli.download import download
 from dsgrid.cli.query import query
 from dsgrid.cli.registry import registry
-from dsgrid.loggers import setup_logging
+from dsgrid.loggers import setup_logging, check_log_file_size
 
 
 logger = logging.getLogger(__name__)
@@ -27,17 +27,10 @@ logger = logging.getLogger(__name__)
 @click.pass_context
 def cli(ctx, log_file, no_prompts, verbose):
     """dsgrid commands"""
-    if log_file.exists():
-        size_mb = log_file.stat().st_size / (1024 * 1024)
-        limit_mb = 10
-        if size_mb > limit_mb and not no_prompts:
-            msg = f"The log file {log_file} has exceeded {limit_mb} MiB. Delete it? [Y] >>> "
-            val = input(msg)
-            if val == "" or val.lower() == "y":
-                os.remove(log_file)
-
+    path = Path(log_file)
+    check_log_file_size(path, no_prompts=no_prompts)
     level = logging.DEBUG if verbose else logging.INFO
-    setup_logging("dsgrid", log_file, console_level=level, file_level=level, mode="a")
+    setup_logging("dsgrid", path, console_level=level, file_level=level, mode="a")
 
 
 @cli.result_callback()

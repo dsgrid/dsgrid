@@ -9,6 +9,7 @@ from dsgrid.registry.registry_manager import RegistryManager
 
 
 PROJECT_REPO = os.environ.get("TEST_PROJECT_REPO")
+LOCAL_DATA_DIRECTORY = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY")
 
 
 @pytest.fixture
@@ -17,6 +18,12 @@ def make_test_project_dir():
         print(
             "You must define the environment TEST_PROJECT_REPO with the path to the "
             "dsgrid-data-UnitedStates repository"
+        )
+        sys.exit(1)
+    if LOCAL_DATA_DIRECTORY is None:
+        print(
+            "You must define the environment DSGRID_LOCAL_DATA_DIRECTORY with the path to your "
+            "copy of datasets."
         )
         sys.exit(1)
 

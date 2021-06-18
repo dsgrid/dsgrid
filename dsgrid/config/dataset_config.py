@@ -15,7 +15,7 @@ import logging
 from pydantic import Field
 from pydantic import validator
 
-from dsgrid.common import LOCAL_REGISTRY_DATA
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.common import check_config_id_strict
 from .config_base import ConfigBase
 from .dimensions import (
@@ -95,6 +95,10 @@ class DatasetConfigModel(DSGBaseModel):
         title="description",
         description="describe dataset in details",
     )
+    load_data_dimension: DimensionType = Field(
+        title="load_data_dimension",
+        description="Columns in the load data table are records of this dimension type.",
+    )
     dimensions: List[DimensionReferenceModel] = Field(
         title="dimensions",
         description="dimensions defined by the dataset",
@@ -120,13 +124,7 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO S3: This requires downloading data to the local system.
         # Can we perform all validation on S3 with an EC2 instance?
         if path.startswith("s3://"):
-            # For unit test purposes this always uses the defaul local registry instead of
-            # whatever the user created with RegistryManager.
-            # TODO: Interpretation of this path is confusing. We need a better way.
-            # The path in the remote location should be verified but it does not need
-            # to be synced as part of this validation.
-            subpaths = path.split("/")
-            local_path = LOCAL_REGISTRY_DATA / subpaths[-2] / subpaths[-1]
+            raise Exception(f"Loading a dataset from S3 is not currently supported: {path}")
         else:
             local_path = Path(path)
             if not local_path.exists():
@@ -184,6 +182,23 @@ class DatasetConfig(ConfigBase):
     @property
     def dimensions(self):
         return self._dimensions
+
+    def get_dimension(self, dimension_type: DimensionType):
+        """Return the dimension matching dimension_type.
+
+        Parameters
+        ----------
+        dimension_type : DimensionType
+
+        Returns
+        -------
+        DimensionConfig
+
+        """
+        for key, dim_config in self.dimensions.items():
+            if key.type == dimension_type:
+                return dim_config
+        assert False, key
 
     # TODO:
     #   - check binning/partitioning / file size requirements?

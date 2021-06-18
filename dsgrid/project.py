@@ -19,11 +19,9 @@ logger = logging.getLogger(__name__)
 class Project:
     """Interface to a dsgrid project."""
 
-    def __init__(self, config, project_dim_store, dataset_configs, dataset_dim_stores):
+    def __init__(self, config, dataset_configs):
         self._spark = SparkSession.getActiveSession()
         self._config = config
-        self._project_dimension_store = project_dim_store
-        self._dataset_dimension_stores = dataset_dim_stores
         self._dataset_configs = dataset_configs
         self._datasets = {}
 
@@ -41,40 +39,23 @@ class Project:
             If True, don't sync with remote registry
 
         """
-        spark = SparkSession.getActiveSession()
-        if spark is None:
-            spark = init_spark("project")
-
         registry_path = get_registry_path(registry_path=registry_path)
         manager = RegistryManager.load(registry_path, offline_mode=offline_mode)
         dataset_manager = manager.dataset_manager
         project_manager = manager.project_manager
         config = project_manager.get_by_id(project_id, version=version)
 
-        project_dimension_store = DimensionStore.load(
-            itertools.chain(
-                config.base_dimensions.values(), config.supplemental_dimensions.values()
-            ),
-        )
-        dataset_dim_stores = {}
         dataset_configs = {}
         for dataset_id in config.list_registered_dataset_ids():
             dataset_config = dataset_manager.get_by_id(dataset_id)
             dataset_configs[dataset_id] = dataset_config
-            dataset_dim_stores[dataset_id] = DimensionStore.load(
-                dataset_config.dimensions.values()
-            )
 
-        return cls(config, project_dimension_store, dataset_configs, dataset_dim_stores)
+        return cls(config, dataset_configs)
 
     @property
     def config(self):
         """Returns the ProjectConfig."""
         return self._config
-
-    @property
-    def project_dimension_store(self):
-        return self._project_dimension_store
 
     def get_dataset(self, dataset_id):
         """Returns a Dataset. Calls load_dataset if it hasn't already been loaded.

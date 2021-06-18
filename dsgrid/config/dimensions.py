@@ -3,14 +3,15 @@ import enum
 import importlib
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import validator
 from pydantic import Field
+from pyspark.sql import DataFrame, Row, SparkSession
 from semver import VersionInfo
 
-from dsgrid.common import LOCAL_REGISTRY
 from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncoder
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
@@ -22,6 +23,7 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, load_data
+from dsgrid.utils.spark import create_dataframe, read_dataframe
 from dsgrid.utils.versioning import handle_version_or_str
 
 
@@ -171,25 +173,15 @@ class DimensionModel(DimensionBaseModel):
     #     description="Defines many-to-many mappings for this dimension",
     #     default=[],
     # )
-    records: Optional[List[Dict]] = Field(
+    records: Optional[DataFrame] = Field(
         title="records",
         description="dimension records in filename that get loaded at runtime",
-        default=[],
         dsg_internal=True,
     )
 
     @validator("filename")
     def check_file(cls, filename):
         """Validate that dimension file exists and has no errors"""
-        # TODO: do we need to support S3 file paths when we already sync the registry at an
-        #   earlier stage? Technically this means that the path should be local
-        # validation for S3 paths (sync locally)
-        if filename.startswith("s3://"):
-            path = LOCAL_REGISTRY / filename.replace("s3://", "")
-            breakpoint()  # TODO DT: this doesn't look right for AWS
-            # sync(filename, path)
-
-        # Validate that filename exists
         if not os.path.isfile(filename):
             raise ValueError(f"file {filename} does not exist")
 
@@ -232,33 +224,16 @@ class DimensionModel(DimensionBaseModel):
             if values.get(req) is None:
                 return records
 
-        filename = values["filename"]
+        filename = Path(values["filename"])
         dim_class = values["cls"]
-        assert not filename.startswith("s3://")  # TODO: see above
+        assert not str(filename).startswith("s3://")  # TODO: see above
 
         if records:
-            raise ValueError("records should not be defined in the project config")
+            raise ValueError("records should not be defined in the dimension config")
 
-        # Deserialize the model, validate, add default values, ensure id
-        # uniqueness, and then store as dict that can be loaded into
-        # Spark later.
         # TODO: Do we want to make sure name is unique too?
-        ids = set()
-        # TODO: Dan - we want to add better support for csv
-        if values["filename"].endswith(".csv"):
-            filerecords = csv.DictReader(open(values["filename"]))
-        else:
-            filerecords = load_data(values["filename"])
-        for record in filerecords:
-            actual = dim_class(**record)
-            if actual.id in ids:
-                raise ValueError(
-                    f"{actual.id} is stored multiple times for " f"{dim_class.__name__}"
-                )
-            ids.add(actual.id)
-            records.append(actual.dict())
-
-        return records
+        # The trick in DSGBaseModel.load where we change directories doesn't work with Spark.
+        return read_dataframe(filename, cache=True, require_unique=["id"], read_with_spark=False)
 
     def dict(self, by_alias=True, **kwargs):
         exclude = {"cls", "records"}
@@ -273,32 +248,37 @@ class DimensionModel(DimensionBaseModel):
         return data
 
 
-class TimeDimensionModel(DimensionBaseModel):
-    """Defines a time dimension"""
+class TimeRange(DSGBaseModel):
+    """Defines a contiguous range of time."""
 
-    # TODO: what is this intended purpose?
-    #       originally i thought it was to interpret start/end, but
-    #       the year here is unimportant because it will be based on
-    #       the weather_year
-    str_format: Optional[str] = Field(
-        title="str_format",
-        default="%Y-%m-%d %H:%M:%s-%z",
-        description="timestamp format",
-    )
-    # TODO: we may want a list of start and end times;
-    #       can this be string or list of strings?
-    start: datetime = Field(
+    start: str = Field(
         title="start",
         description="first timestamp in the data",
     )
     # TODO: Is this inclusive or exclusive? --> mm:I don't know what this means
     # TODO: we may want to support a list of start and end times
-    end: datetime = Field(
+    end: str = Field(
         title="end",
         description="last timestamp in the data",
     )
-    # TODO: it would be nice to have this be a func that splits nmbr from unit
-    frequency: TimeFrequency = Field(
+
+
+class TimeDimensionModel(DimensionBaseModel):
+    """Defines a time dimension"""
+
+    str_format: Optional[str] = Field(
+        title="str_format",
+        default="%Y-%m-%d %H:%M:%s-%z",
+        description="timestamp format",
+    )
+    # TODO: what is this intended purpose?
+    #       originally i thought it was to interpret start/end, but
+    #       the year here is unimportant because it will be based on
+    #       the weather_year
+    ranges: List[TimeRange] = Field(
+        title="time_ranges", description="Defines the contiguous ranges of time in the data."
+    )
+    frequency: timedelta = Field(
         title="frequency",
         description="resolution of the timestamps",
     )
@@ -326,13 +306,15 @@ class TimeDimensionModel(DimensionBaseModel):
         description="TODO",
     )
 
-    @validator("start", "end", pre=True)
-    def check_times(cls, val, values):
-        # TODO: technical year doesn't matter; needs to apply the weather year
-        # make sure start and end time parse
-        datetime.strptime(val, values["str_format"])
-        # TODO: validate consistency between start, end, frequency
-        return val
+    @validator("ranges", pre=True)
+    def check_times(cls, ranges, values):
+        for time_range in ranges:
+            # TODO: technical year doesn't matter; needs to apply the weather year
+            # make sure start and end time parse
+            datetime.strptime(time_range["start"], values["str_format"])
+            datetime.strptime(time_range["end"], values["str_format"])
+            # TODO: validate consistency between start, end, frequency
+        return ranges
 
     def dict(self, by_alias=True, **kwargs):
         exclude = {"cls"}
@@ -343,8 +325,6 @@ class TimeDimensionModel(DimensionBaseModel):
         data = super().dict(by_alias=by_alias, **kwargs)
         data["module"] = str(data["module"])
         data["dimension_class"] = None
-        data["start"] = str(data["start"])
-        data["end"] = str(data["end"])
         _convert_for_serialization(data)
         return data
 

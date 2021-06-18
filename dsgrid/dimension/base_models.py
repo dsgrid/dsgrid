@@ -6,6 +6,7 @@ from pydantic import Field
 
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.utils.utilities import check_uniqueness
 
 
 class DimensionType(Enum):
@@ -90,3 +91,27 @@ def get_record_base_model(type_enum):
     if dim_model is None:
         raise DSGInvalidDimension(f"no mapping for {type_enum}")
     return dim_model
+
+
+def check_required_dimensions(dimensions, tag):
+    """Check that a project or dataset config contains all required dimensions.
+
+    Parameters
+    ----------
+    dimensions : list
+        list of DimensionReferenceModel
+    tag : str
+        User-defined string to include in exception messages
+
+    Raises
+    ------
+    ValueError
+        Raised if a required dimension is not provided.
+
+    """
+    dimension_types = {x.dimension_type for x in dimensions}
+    required_dim_types = set(DimensionType)
+    missing = required_dim_types.difference(dimension_types)
+    if missing:
+        raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
+    check_uniqueness((x.dimension_type for x in dimensions), tag)

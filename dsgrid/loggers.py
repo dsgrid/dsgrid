@@ -2,6 +2,7 @@
 
 import logging
 import logging.config
+import os
 
 
 # ETH@20210325 - What if you want to set up logging for all loggers, or for all
@@ -85,3 +86,15 @@ def setup_logging(
     logger = logging.getLogger(name)
 
     return logger
+
+
+def check_log_file_size(filename, limit_mb=10, no_prompts=False):
+    if not filename.exists():
+        return
+
+    size_mb = filename.stat().st_size / (1024 * 1024)
+    if size_mb > limit_mb and not no_prompts:
+        msg = f"The log file {filename} has exceeded {limit_mb} MiB. Delete it? [Y] >>> "
+        val = input(msg)
+        if val == "" or val.lower() == "y":
+            os.remove(filename)

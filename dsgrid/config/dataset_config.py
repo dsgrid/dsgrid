@@ -213,7 +213,7 @@ class DatasetConfig(ConfigBase):
         for d in self.model.dimensions:
             if d.dimension_type != DimensionType.TIME:
                 if d.trivial:
-                    trivial_dimensions[d.dimension_type.value] = d.dimension_id
+                    trivial_dimensions[d.dimension_type] = DimensionType(d.dimension_id)
         return trivial_dimensions
 
     def _check_trivial_record_length(self, trivial_dimensions, dimension_manager):

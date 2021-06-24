@@ -1,0 +1,13 @@
+master_instance:
+  type: m5.2xlarge
+core_instances:
+  count: 2
+  type: r5.2xlarge # r5 for big data; m5 for less data & less cost
+s3_scratch: s3://nrel-dsgrid-int-scratch/test-emr
+ssh_keys:
+  pkey_location: /Users/roliveir/.ssh/dsgrid-key.pem # The path to your private key file used with AWS.
+  key_name: dsgrid-key # The name of the permission key file on AWS.
+pushbullet:
+  token_path: ~/.pushbullet # path to your access token
+billing_id: 210031
+subnet_id: subnet-03c3675a2bf1477c0 # ensures connectivity

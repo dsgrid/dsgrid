@@ -414,7 +414,7 @@ def get_registry_path(registry_path=None):
             "  dsgrid registry submit-dataset "
             "$TEST_PROJECT_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "
             "-p test -l initial_submission\n"
-            "where $TEST_PROJECT_REPO points to the location of the dsgrid-data-UnitedStates "
+            "where $TEST_PROJECT_REPO points to the location of the dsgrid-project-EFS "
             "repository on your system. If you would prefer a different location, "
             "set the DSGRID_REGISTRY_PATH environment variable before running the commands."
         )

@@ -16,7 +16,7 @@ def make_test_project_dir():
     if PROJECT_REPO is None:
         print(
             "You must define the environment TEST_PROJECT_REPO with the path to the "
-            "dsgrid-data-UnitedStates repository"
+            "dsgrid-project-EFS repository"
         )
         sys.exit(1)
 

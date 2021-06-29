@@ -5,7 +5,7 @@ import sys
 PROJECT_REPO = os.environ.get("TEST_PROJECT_REPO")
 if PROJECT_REPO is None:
     print(
-        "You must define the environment TEST_PROJECT_REPO with the path to the dsgrid-data-UnitedStates repository"
+        "You must define the environment TEST_PROJECT_REPO with the path to the dsgrid-project-EFS repository"
     )
     sys.exit(1)
 

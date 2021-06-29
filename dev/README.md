@@ -33,9 +33,9 @@ activated an environment with dsgrid installed per the above, you'll need to set
 up dsgrid for testing by setting environment variables:
 
 ```
-# point to your checkout of the dsgrid-data-UnitedStates repository which is 
+# point to your checkout of the dsgrid-project-EFS repository which is 
 # what we are currently using for tests (adjusting the path as needed)
-export TEST_PROJECT_REPO="$HOME/dsgrid-data-UnitedStates"
+export TEST_PROJECT_REPO="$HOME/dsgrid-project-EFS"
 
 # point to your local dsgrid registry path
 # feel free to use a different path for storing your test registry--this is just 

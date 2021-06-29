@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def make_us_data_registry(registry_path, repo) -> RegistryManager:
-    """Creates a local registry with the dsgrid-data-UnitedStates repository for testing."""
+    """Creates a local registry with the dsgrid-project-EFS repository for testing."""
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
     project_dimension_mapping_config = repo / "dimension_mappings.toml"
@@ -77,13 +77,13 @@ def make_us_data_registry(registry_path, repo) -> RegistryManager:
     "--project-repo",
     envvar="TEST_PROJECT_REPO",
     required=True,
-    help="path to dsgrid-data-UnitedStates registry. Override with the environment variable TEST_PROJECT_REPO",
+    help="path to dsgrid-project-EFS registry. Override with the environment variable TEST_PROJECT_REPO",
 )
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
 def run(registry_path, force, project_repo, verbose):
-    """Creates a local registry with the dsgrid-data-UnitedStates repository for testing."""
+    """Creates a local registry with the dsgrid-project-EFS repository for testing."""
     level = logging.DEBUG if verbose else logging.INFO
     setup_logging("dsgrid", "dsgrid_us.log", console_level=level, file_level=level, mode="a")
     if registry_path.exists():

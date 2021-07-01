@@ -119,7 +119,7 @@ class DatasetConfigModel(DSGBaseModel):
         title="origin_project",
         description="Origin project name",
     )
-    origin_date: datetime.date = Field(
+    origin_date: str = Field(
         title="origin_date",
         description="Date the source data was generated",
     )
@@ -147,7 +147,7 @@ class DatasetConfigModel(DSGBaseModel):
     user_defined_metadata: Optional[Dict] = Field(
         title="user_defined_metadata",
         description="Additional user defined metadata fields",
-        default=[],
+        default={},
         required=False,
     )
 
@@ -190,6 +190,13 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: check project_dimension_mapping (optional) if exists
 
         return str(local_path)
+
+    validator("origin_date", pre=True)
+
+    def check_origin_date(cls, origin_date):
+        """Make sure origin_data parses as a datetime.date"""
+        datetime.date(origin_date)
+        return origin_date
 
 
 class DatasetConfig(ConfigBase):

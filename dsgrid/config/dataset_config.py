@@ -17,7 +17,6 @@ from .dimensions import (
 from dsgrid.data_models import DSGBaseModel
 
 
-# TODO: likely needs refinement (missing mappings)
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 
@@ -33,8 +32,6 @@ class InputDatasetType(Enum):
 class DSGDatasetParquetType(Enum):
     LOAD_DATA = "load_data"  # required
     LOAD_DATA_LOOKUP = "load_data_lookup"  # required
-    DATASET_DIMENSION_MAPPING = "dataset_dimension_mapping"  # optional
-    PROJECT_DIMENSION_MAPPING = "project_dimension_mapping"  # optional
 
 
 # TODO will need to rename this as it really should be more generic inputs
@@ -114,10 +111,12 @@ class DatasetConfigModel(DSGBaseModel):
         title="origin_contributors",
         description="List of origin data contributor's first and last names"
         """ e.g., ["Harry Potter", "Ronald Weasley"]""",
+        required=False,
     )
     origin_project: str = Field(
         title="origin_project",
         description="Origin project name",
+        optional=True,
     )
     origin_date: str = Field(
         title="origin_date",
@@ -190,13 +189,14 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: check project_dimension_mapping (optional) if exists
 
         return str(local_path)
-
-    validator("origin_date", pre=True)
-
-    def check_origin_date(cls, origin_date):
-        """Make sure origin_data parses as a datetime.date"""
-        datetime.date(origin_date)
-        return origin_date
+    
+    @validator("origin_project")
+    def check_origin_project(cls, origin_project, values):
+        if values.dataset_type == InputDatasetType.SECTOR_MODEL:
+            if not origin_project:
+                raise ValueError(
+                    "origin_project must be defined if the dataset type is sector_model")
+        return origin_project
 
 
 class DatasetConfig(ConfigBase):

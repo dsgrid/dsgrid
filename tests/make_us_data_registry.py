@@ -10,8 +10,8 @@ import click
 from dsgrid.loggers import setup_logging
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import create_local_test_registry
-from tests.common import replace_dimension_uuids_from_registry
-from tests.common import replace_dimension_mapping_uuids_from_registry
+from dsgrid.tests.common import replace_dimension_uuids_from_registry
+from dsgrid.tests.common import replace_dimension_mapping_uuids_from_registry
 
 
 logger = logging.getLogger(__name__)

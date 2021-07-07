@@ -21,7 +21,7 @@ from dsgrid.registry.project_registry_manager import ProjectRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
 from dsgrid.utils.files import dump_data, load_data
-from tests.common import (
+from dsgrid.tests.common import (
     replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )

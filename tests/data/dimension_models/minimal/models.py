@@ -3,6 +3,7 @@ import sys
 
 
 PROJECT_REPO = os.environ.get("TEST_PROJECT_REPO")
+
 if PROJECT_REPO is None:
     print(
         "You must define the environment TEST_PROJECT_REPO with the path to the dsgrid-project-EFS repository"
@@ -12,3 +13,6 @@ if PROJECT_REPO is None:
 
 PROJECT_CONFIG_FILE = os.path.join(PROJECT_REPO, "dsgrid_project", "project.toml")
 DIMENSION_CONFIG_FILE = os.path.join(PROJECT_REPO, "dsgrid_project", "dimensions.toml")
+DIMENSION_MAPPINGS_CONFIG_FILE = os.path.join(
+    PROJECT_REPO, "dsgrid_project", "dimension_mappings.toml"
+)

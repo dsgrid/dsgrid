@@ -15,7 +15,7 @@ from .dimensions import (
     TimeRange,
 )
 from dsgrid.data_models import serialize_model, ExtendedJSONEncoder
-from dsgrid.dimension.time import TimezoneType
+from dsgrid.dimension.time import DatetimeRange, TimezoneType
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import dump_data, load_data
 
@@ -45,6 +45,22 @@ class DimensionConfig(DimensionBaseConfig):
 class TimeDimensionConfig(DimensionBaseConfig):
     """Provides an interface to a TimeDimensionModel."""
 
+    TIMEZONE_TO_TZINFO = {
+        TimezoneType.UTC: datetime.timezone(datetime.timedelta()),
+        TimezoneType.HST: datetime.timedelta(hours=-10),
+        TimezoneType.AST: datetime.timezone(datetime.timedelta(hours=-9)),
+        TimezoneType.APT: pytz.timezone("US/Alaska"),
+        TimezoneType.PST: datetime.timezone(datetime.timedelta(hours=-8)),
+        TimezoneType.PPT: pytz.timezone("US/Pacific"),
+        TimezoneType.MST: datetime.timezone(datetime.timedelta(hours=-7)),
+        TimezoneType.MPT: pytz.timezone("US/Mountain"),
+        TimezoneType.CST: datetime.timezone(datetime.timedelta(hours=-6)),
+        TimezoneType.CPT: pytz.timezone("US/Central"),
+        TimezoneType.EST: datetime.timezone(datetime.timedelta(hours=-5)),
+        TimezoneType.EPT: pytz.timezone("US/Eastern"),
+        # TimezoneType.LOCAL: None,  # TODO: needs handling
+    }
+
     @staticmethod
     def model_class():
         return TimeDimensionModel
@@ -58,12 +74,26 @@ class TimeDimensionConfig(DimensionBaseConfig):
         return filename
 
     def get_time_ranges(self):
+        """Return time ranges with timezone applied.
+
+        Returns
+        -------
+        list
+            list of DatetimeRange
+
+        """
         ranges = []
         tz = self.get_tzinfo()
         for time_range in self.model.ranges:
-            start = time_range.start.replace(tzinfo=tz)
-            end = time_range.end.replace(tzinfo=tz)
-            ranges.append(TimeRange(start=start, end=end))
+            start = datetime.datetime.strptime(time_range.start, self.model.str_format)
+            end = datetime.datetime.strptime(time_range.end, self.model.str_format)
+            ranges.append(
+                DatetimeRange(
+                    start=start.replace(tzinfo=tz),
+                    end=end.replace(tzinfo=tz),
+                    frequency=self.model.frequency,
+                )
+            )
 
         return ranges
 
@@ -75,28 +105,8 @@ class TimeDimensionConfig(DimensionBaseConfig):
         tzinfo
 
         """
-        if self.model.timezone == TimezoneType.EST:
-            if self.model.includes_dst:
-                return pytz.timezone("US/Eastern")
-            else:
-                return datetime.timezone(datetime.timedelta(hours=-5))
-        elif self.model.timezone == TimezoneType.CST:
-            if self.model.includes_dst:
-                return pytz.timezone("US/Central")
-            else:
-                return datetime.timezone(datetime.timedelta(hours=-6))
-        elif self.model.timezone == TimezoneType.MST:
-            if self.model.includes_dst:
-                return pytz.timezone("US/Mountain")
-            else:
-                return datetime.timezone(datetime.timedelta(hours=-7))
-        elif self.model.timezone == TimezoneType.PST:
-            if self.model.includes_dst:
-                return pytz.timezone("US/Pacific")
-            else:
-                return datetime.timezone(datetime.timedelta(hours=-8))
-        else:
-            assert False, tz_type
+        assert self.model.timezone in self.TIMEZONE_TO_TZINFO, self.model.timezone
+        return self.TIMEZONE_TO_TZINFO[self.model.timezone]
 
 
 def get_dimension_config(model, src_dir):

@@ -57,7 +57,7 @@ class ScenarioDimensionBaseModel(DimensionRecordBaseModel):
 
 
 class SectorDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all subsector dimensions"""
+    """Base class for all sector dimensions"""
 
 
 class SubsectorDimensionBaseModel(DimensionRecordBaseModel):

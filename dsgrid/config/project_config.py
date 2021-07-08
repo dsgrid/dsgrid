@@ -32,8 +32,7 @@ from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
 
 # from dsgrid.dimension.time import (
-#     LeapDayAdjustmentType, Period, TimeValueMeasurement, TimeFrequency,
-#     TimezoneType
+#     LeapDayAdjustmentType, Period, TimeValueMeasurement, TimezoneType
 #     )
 
 LOAD_DATA_FILENAME = "load_data.parquet"

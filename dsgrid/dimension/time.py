@@ -1,5 +1,6 @@
 """Dimesions related to time"""
 
+from collections import namedtuple
 from enum import Enum
 
 from pydantic.dataclasses import dataclass
@@ -37,30 +38,22 @@ class TimeValueMeasurement(Enum):
     TOTAL = "total"
 
 
-class TimeFrequency(Enum):
-    # TODO: this is incomplete; good enough for first pass
-    # TODO: it would be nice if this could be
-    # TODO: do we want to support common frequency aliases, e.g.:
-    # https://pandas.pydata.org/docs/user_guide/timeseries.html#timeseries-offset-aliases
-    _15_MIN = "15 min"
-    _1_HOUR = "1 hour"
-    _1_DAY = "1 day"
-    _1_WEEK = "1 week"
-    _1_MONTH = "1 month"
-    _1_YEAR = "1 year"
-    _1_SECOND = "1 second"
-
-
 class TimezoneType(Enum):
     """Timezone enum types"""
 
-    # TODO: TimezoneType enum is likely incomplete
     UTC = "UTC"
-    PST = "PST"
-    MST = "MST"
-    CST = "CST"
-    EST = "EST"
-    LOCAL = "LOCAL"
+    HST = "HawaiiAleutianStandard"
+    AST = "AlaskaStandard"
+    APT = "AlaskaPrevailingStandard"
+    PST = "PacificStandard"
+    PPT = "PacificPrevailing"
+    MST = "MountainStandard"
+    MPT = "MountainPrevailing"
+    CST = "CentralStandard"
+    CPT = "CentralPrevailing"
+    EST = "EasternStandard"
+    EPT = "EasternPrevailing"
+    LOCAL = "LOCAL"  # Implies that the geography's timezone will be dynamically applied.
 
 
 @dataclass
@@ -82,3 +75,6 @@ TIME_ZONE_MAPPING = {
     TimezoneType.CST: Timezone(id="CST", utc_offset=-6, includes_dst=False, tz="Etc/GMT+6"),
     TimezoneType.EST: Timezone(id="EST", utc_offset=-5, includes_dst=False, tz="Etc/GMT+5"),
 }
+
+
+DatetimeRange = namedtuple("DatetimeRange", "start, end, frequency")

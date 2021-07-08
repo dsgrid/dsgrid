@@ -18,7 +18,6 @@ from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     Period,
     TimeValueMeasurement,
-    TimeFrequency,
     TimezoneType,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
@@ -249,17 +248,15 @@ class DimensionModel(DimensionBaseModel):
 
 
 class TimeRange(DSGBaseModel):
-    """Defines a contiguous range of time."""
+    """Defines a continuous range of time."""
 
     start: str = Field(
         title="start",
         description="first timestamp in the data",
     )
-    # TODO: Is this inclusive or exclusive? --> mm:I don't know what this means
-    # TODO: we may want to support a list of start and end times
     end: str = Field(
         title="end",
-        description="last timestamp in the data",
+        description="last timestamp in the data (inclusive)",
     )
 
 
@@ -276,15 +273,12 @@ class TimeDimensionModel(DimensionBaseModel):
     #       the year here is unimportant because it will be based on
     #       the weather_year
     ranges: List[TimeRange] = Field(
-        title="time_ranges", description="Defines the contiguous ranges of time in the data."
+        title="time_ranges",
+        description="Defines the continuous ranges of time in the data.",
     )
     frequency: timedelta = Field(
         title="frequency",
         description="resolution of the timestamps",
-    )
-    includes_dst: bool = Field(
-        title="includes_dst",
-        description="includes daylight savings time",
     )
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
         title="leap_day_adjustment",

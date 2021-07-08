@@ -15,6 +15,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.data_models import serialize_model
 from dsgrid.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
+from dsgrid.dimension.time import Period
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimension, DSGInvalidDataset
 from dsgrid.registry.common import (
     make_initial_config_registration,
@@ -106,10 +107,34 @@ class DatasetRegistryManager(RegistryManagerBase):
                 )
 
     def _check_dataset_time_consistency(self, config: DatasetConfig, load_data):
-        dim = config.get_dimension(DimensionType.TIME)
-        time_ranges = dim.get_time_ranges()
+        time_dim = config.get_dimension(DimensionType.TIME)
+        time_ranges = time_dim.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
+        # TODO: need to support validation of multiple time ranges
         time_range = time_ranges[0]
+
+        weather_dim = config.get_dimension(DimensionType.WEATHER_YEAR)
+        weather_years = {int(x.id) for x in weather_dim.model.records.collect()}
+        assert len(weather_years) == 1, len(weather_years)
+        # TODO: need to support handling of multiple weather years
+
+        if time_range.start.year not in weather_years:
+            raise DSGInvalidDataset(
+                f"weather year mismatch: time_dimension start={time_range.start} weather_years={weather_years}"
+            )
+        if time_range.end.year not in weather_years:
+            valid = True
+            if time_dim.period == Period.PERIOD_BEGINNING:
+                valid = False
+            elif (
+                time_dim.period == Period.PERIOD_ENDING
+                and time_dim.end_time != max(weather_years) + 1
+            ):
+                valid = False
+            if not valid:
+                raise DSGInvalidDataset(
+                    f"weather year mismatch: time_dimension end={time_range.end} weather_years={weather_years}"
+                )
 
         unique = (
             load_data.select("timestamp", "id")
@@ -128,7 +153,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 f"Dataset {config.config_id} does not have common first and last timestamps: {unique}"
             )
 
-        tz = dim.get_tzinfo()
+        tz = time_dim.get_tzinfo()
         dataset_start = unique[0].first_timestamp.astimezone().astimezone(tz)
         dataset_end = unique[0].last_timestamp.astimezone().astimezone(tz)
         if dataset_start != time_range.start:

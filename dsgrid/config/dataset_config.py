@@ -189,14 +189,13 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: check project_dimension_mapping (optional) if exists
 
         return str(local_path)
-    
+
     @validator("origin_project", "origin_version")
     def check_optional_origin_fields(cls, val, values):
         """Require optional origin metadata fields if the dataset type is sector model"""
-        if values.dataset_type == InputDatasetType.SECTOR_MODEL:
+        if values.get("dataset_type") == InputDatasetType.SECTOR_MODEL:
             if not val:
-                raise ValueError(
-                    f"{val} must be defined if the dataset_type is sector_model")
+                raise ValueError(f"{val} must be defined if the dataset_type is sector_model")
         return val
 
 

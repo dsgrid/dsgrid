@@ -248,7 +248,7 @@ class ProjectConfig(ConfigBase):
     @classmethod
     def load(cls, config_file, dimension_manager, dimension_mapping_manager):
         config = cls._load(config_file)
-        config.dimension_mapping_mgr = dimension_mapping_manager
+        config.dimension_mapping_manager = dimension_mapping_manager
         config.load_dimensions(dimension_manager)
         return config
 
@@ -342,7 +342,7 @@ class ProjectConfig(ConfigBase):
             for mapping_ref in references:
                 if mapping_ref.to_dimension_type != dim_key.type:
                     continue
-                mapping = self._dimension_mapping_mgr.get_by_id(mapping_ref.mapping_id)
+                mapping = self.dimension_mapping_manager.get_by_id(mapping_ref.mapping_id)
                 if mapping.model.to_dimension.dimension_id == dim_key.id:
                     if found:
                         # TODO: this will be OK if aggregation is specified.

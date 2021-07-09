@@ -124,11 +124,11 @@ class DatasetRegistryManager(RegistryManagerBase):
             )
         if time_range.end.year not in weather_years:
             valid = True
-            if time_dim.period == Period.PERIOD_BEGINNING:
+            if time_dim.model.period == Period.PERIOD_BEGINNING:
                 valid = False
             elif (
-                time_dim.period == Period.PERIOD_ENDING
-                and time_dim.end_time != max(weather_years) + 1
+                time_dim.model.period == Period.PERIOD_ENDING
+                and time_range.end.year != max(weather_years) + 1
             ):
                 valid = False
             if not valid:

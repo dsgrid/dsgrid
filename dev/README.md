@@ -11,7 +11,7 @@ pip install -e .[tests]
 
 pip install -e .[dev] # includes what is needed for tests and code development
 
-# or 
+# or
 
 pip install -e .[admin] # dev plus what is needed for creating documentation and releasing packages
 ```
@@ -28,19 +28,51 @@ pre-commit install
 
 ## Run Tests
 
-In addition to grabbing the branch of dsgrid you want to test and making you've 
-activated an environment with dsgrid installed per the above, you'll need to set 
+In addition to grabbing the branch of dsgrid you want to test and making you've
+activated an environment with dsgrid installed per the above, you'll need to set
 up dsgrid for testing by setting environment variables:
 
 ```
-# point to your checkout of the dsgrid-project-EFS repository which is 
-# what we are currently using for tests (adjusting the path as needed)
-export TEST_PROJECT_REPO="$HOME/dsgrid-project-EFS"
+# Point to your checkout of the dsgrid-project-EFS repository which is
+# what we are currently using for tests (adjusting the path as needed).
+export TEST_PROJECT_REPO=$HOME/dsgrid-project-EFS
 
-# point to your local dsgrid registry path
-# feel free to use a different path for storing your test registry--this is just 
-# an example
-export DSGRID_REGISTRY_PATH="$HOME/.dsgrid-test-registry"
+# Point to your local dsgrid registry path.
+# Feel free to use a different path for storing your test registry--this is just
+# an example.
+export DSGRID_REGISTRY_PATH=$HOME/.dsgrid-test-registry
+
+# Point to your local directory of datasets. This data will be registered in the
+# registry.
+export DSGRID_LOCAL_DATA_DIRECTORY=$HOME/.dsgrid-data
+
+# This is what that directory should contain:
+tree $DSGRID_LOCAL_DATA_DIRECTORY
+.dsgrid-data
+└── efs_comstock
+    ├── convert_dsg.log
+    ├── dimensions.json
+    ├── enduse.csv
+    ├── geography.csv
+    ├── load_data.parquet
+    │   ├── _SUCCESS
+    │   ├── part-00000-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    │   ├── part-00001-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    │   ├── part-00002-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    │   ├── part-00003-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    │   ├── part-00004-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    │   ├── part-00005-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    │   ├── part-00006-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    │   ├── part-00007-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    │   ├── part-00008-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    │   └── part-00009-080db910-6446-4ff4-ae98-293d79a8f61a-c000.snappy.parquet
+    ├── load_data_lookup.parquet
+    │   ├── _SUCCESS
+    │   └── part-00000-69955796-0a87-4d5f-ba55-b8cbd4b1372d-c000.snappy.parquet
+    ├── scale_factors.json
+    ├── sector.csv
+    ├── test.parquet
+    └── time.csv
 ```
 
 and then running:
@@ -108,7 +140,7 @@ Run `make html` for Mac and Linux; `make.bat html` for Windows.
 
 ### Pushing to GitHub Pages
 
-**TODO:** Structure our GitHub Pages to preserve documentation for different 
+**TODO:** Structure our GitHub Pages to preserve documentation for different
 versions. Dheepak probably has suggestions.
 
 #### Mac/Linux

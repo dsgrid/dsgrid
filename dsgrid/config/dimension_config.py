@@ -12,7 +12,6 @@ from .dimensions import (
     TimeDimensionModel,
     DimensionModel,
     DimensionType,
-    TimeRange,
 )
 from dsgrid.data_models import serialize_model, ExtendedJSONEncoder
 from dsgrid.dimension.time import DatetimeRange, TimezoneType

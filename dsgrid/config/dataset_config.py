@@ -139,9 +139,9 @@ class DatasetConfigModel(DSGBaseModel):
         description="List of data tags",
         required=False,
     )
-    load_data_dimension: DimensionType = Field(
-        title="load_data_dimension",
-        description="Columns in the load data table are records of this dimension type.",
+    load_data_column_dimension: DimensionType = Field(
+        title="load_data_column_dimension",
+        description="Columns in the load_data table are records of this dimension type.",
     )
     dimensions: List[DimensionReferenceModel] = Field(
         title="dimensions",

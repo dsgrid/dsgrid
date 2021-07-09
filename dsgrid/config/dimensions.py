@@ -247,7 +247,7 @@ class DimensionModel(DimensionBaseModel):
         return data
 
 
-class TimeRange(DSGBaseModel):
+class TimeRangeModel(DSGBaseModel):
     """Defines a continuous range of time."""
 
     # This uses str instead of datetime because this object doesn't have the ability
@@ -275,7 +275,7 @@ class TimeDimensionModel(DimensionBaseModel):
         default="%Y-%m-%d %H:%M:%s-%z",
         description="timestamp format",
     )
-    ranges: List[TimeRange] = Field(
+    ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
         description="Defines the continuous ranges of time in the data.",
     )

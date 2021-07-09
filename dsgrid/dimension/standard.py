@@ -29,6 +29,14 @@ from dsgrid.dimension.base_models import (
     SubsectorDimensionBaseModel,
     WeatherYearDimensionBaseModel,
 )
+from dsgrid.dimension.metric_units_and_fuel_types import (
+    EnergyUnit,
+    EnergyServiceUnit,
+    PopulationUnit,
+    StockUnit,
+    EnergyEfficiencyUnit,
+    FuelType,
+)
 
 BaseOrm = declarative_base()
 
@@ -191,8 +199,8 @@ class SubsectorOrm(BaseOrm):
 class EnergyEndUse(MetricDimensionBaseModel):
     """Energy Demand End Use attributes"""
 
-    fuel_id: str
-    units: str
+    fuel_id: FuelType = Field(title="fuel_id", description="fuel type, e.g., electricity")
+    unit: EnergyUnit = Field(title="unit", description="unit for energy demand, e.g., kwh")
 
 
 class EnergyEndUseOrm(BaseOrm):
@@ -200,8 +208,8 @@ class EnergyEndUseOrm(BaseOrm):
 
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
-    units = Column(String(255), nullable=False)  # needs standardization
-    fuel_id = Column(String(255), nullable=False)  # needs standardization
+    unit = Column(String(255), nullable=False)
+    fuel_id = Column(String(255), nullable=False)
 
     model_energy = relationship(
         "DataSourceOrm",
@@ -213,7 +221,9 @@ class EnergyEndUseOrm(BaseOrm):
 class EnergyServiceEndUse(MetricDimensionBaseModel):
     """Energy Service Demand End Use attributes"""
 
-    units: str
+    unit: EnergyServiceUnit = Field(
+        title="unit", description="unit for energy service demand, e.g., mmbtu"
+    )
 
 
 class EnergyServiceEndUseOrm(BaseOrm):
@@ -221,7 +231,7 @@ class EnergyServiceEndUseOrm(BaseOrm):
 
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
-    units = Column(String(255), nullable=False)  # needs standardization
+    unit = Column(String(255), nullable=False)
 
     model_service = relationship(
         "DataSourceOrm",
@@ -233,12 +243,15 @@ class EnergyServiceEndUseOrm(BaseOrm):
 class Population(MetricDimensionBaseModel):
     """Population attributes"""
 
+    unit: PopulationUnit = Field(title="unit", description="unit for population, i.e., capita")
+
 
 class PopulationOrm(BaseOrm):
     __tablename__ = "Population"
 
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
 
     model_population = relationship(
         "DataSourceOrm",
@@ -250,7 +263,7 @@ class PopulationOrm(BaseOrm):
 class Stock(MetricDimensionBaseModel):
     """Stock attributes - includes GDP, building stock, equipment"""
 
-    units: str
+    unit: StockUnit = Field(title="unit", description="unit for stock, e.g., dollars, bldgs")
 
 
 class StockOrm(BaseOrm):
@@ -258,7 +271,7 @@ class StockOrm(BaseOrm):
 
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
-    units = Column(String(255), nullable=False)  # needs standardization
+    unit = Column(String(255), nullable=False)
 
     model_stock = relationship(
         "DataSourceOrm",
@@ -270,7 +283,9 @@ class StockOrm(BaseOrm):
 class EnergyEfficiency(MetricDimensionBaseModel):
     """Energy Efficiency of building stock or equipment"""
 
-    units: str
+    unit: EnergyEfficiencyUnit = Field(
+        title="unit", description="unit for energy or conversion efficiency, e.g., afue"
+    )
 
 
 class EnergyEfficiencyOrm(BaseOrm):
@@ -278,7 +293,7 @@ class EnergyEfficiencyOrm(BaseOrm):
 
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
-    units = Column(String(255), nullable=False)  # needs standardization
+    unit = Column(String(255), nullable=False)
 
     model_efficiency = relationship(
         "DataSourceOrm",

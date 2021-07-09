@@ -37,7 +37,7 @@ class DimensionRecordBaseModel(DSGBaseModel):
 
 
 class MetricDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all metric dimensions (e.g. EndUse)"""
+    """Base class for all metric dimensions (e.g. EnergyEndUse)"""
 
 
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):

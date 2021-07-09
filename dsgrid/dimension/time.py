@@ -77,4 +77,4 @@ TIME_ZONE_MAPPING = {
 }
 
 
-DatetimeRange = namedtuple("DatetimeRange", "start, end, frequency")
+DatetimeRange = namedtuple("DatetimeRange", ["start", "end", "frequency"])

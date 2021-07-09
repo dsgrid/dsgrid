@@ -27,6 +27,7 @@ from dsgrid.registry.common import (
 )
 from dsgrid.dimension.store import DimensionStore
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
+from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
@@ -247,9 +248,17 @@ class ProjectConfig(ConfigBase):
     @classmethod
     def load(cls, config_file, dimension_manager, dimension_mapping_manager):
         config = cls._load(config_file)
-        config._dimension_mapping_mgr = dimension_mapping_manager  # TODO DT: make clean
+        config.dimension_mapping_mgr = dimension_mapping_manager
         config.load_dimensions(dimension_manager)
         return config
+
+    @property
+    def dimension_mapping_manager(self):
+        return self._dimension_mapping_mgr
+
+    @dimension_mapping_manager.setter
+    def dimension_mapping_manager(self, val: DimensionMappingRegistryManager):
+        self._dimension_mapping_mgr = val
 
     def load_dimensions(self, dimension_manager: DimensionRegistryManager):
         """Load all Base Dimensions.

@@ -250,6 +250,9 @@ class DimensionModel(DimensionBaseModel):
 class TimeRange(DSGBaseModel):
     """Defines a continuous range of time."""
 
+    # This uses str instead of datetime because this object doesn't have the ability
+    # to serialize/deserialize by itself (no str-format).
+    # We use the DatetimeRange object during processing.
     start: str = Field(
         title="start",
         description="first timestamp in the data",
@@ -263,15 +266,15 @@ class TimeRange(DSGBaseModel):
 class TimeDimensionModel(DimensionBaseModel):
     """Defines a time dimension"""
 
+    # TODO: what is this intended purpose?
+    #       originally i thought it was to interpret start/end, but
+    #       the year here is unimportant because it will be based on
+    #       the weather_year
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y-%m-%d %H:%M:%s-%z",
         description="timestamp format",
     )
-    # TODO: what is this intended purpose?
-    #       originally i thought it was to interpret start/end, but
-    #       the year here is unimportant because it will be based on
-    #       the weather_year
     ranges: List[TimeRange] = Field(
         title="time_ranges",
         description="Defines the continuous ranges of time in the data.",

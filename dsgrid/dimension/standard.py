@@ -20,10 +20,9 @@ from sqlalchemy.orm import sessionmaker
 
 from dsgrid.config.dimensions import TimeDimensionModel
 from dsgrid.dimension.base_models import (
-    EndUseDimensionBaseModel,
+    MetricDimensionBaseModel,
     GeographyDimensionBaseModel,
     DataSourceDimensionBaseModel,
-    MetricTypeDimensionBaseModel,
     ModelYearDimensionBaseModel,
     ScenarioDimensionBaseModel,
     SectorDimensionBaseModel,
@@ -34,13 +33,12 @@ from dsgrid.dimension.base_models import (
 BaseOrm = declarative_base()
 
 
-enduse_model_association = Table(
-    "enduse_model",
+metric_model_association = Table(
+    "metric_model",
     BaseOrm.metadata,
-    Column("enduse", String(255), ForeignKey("EndUse.id")),
+    Column("metric", String(255), ForeignKey("Metric.id")),
     Column("data_source", String(255), ForeignKey("DataSource.id")),
 )
-# FIXME: @dtom should this be data_source or datasource? Repeat fix.
 
 
 model_subsector_association = Table(
@@ -188,28 +186,104 @@ class SubsectorOrm(BaseOrm):
 
 
 # ---------------------------
-# ENDUSE DIMENSIONS
+# METRIC DIMENSIONS
 # ---------------------------
-class EndUse(EndUseDimensionBaseModel):
-    """End use attributes"""
+class EnergyEndUse(MetricDimensionBaseModel):
+    """Energy Demand End Use attributes"""
 
-    # sector: str  # TODO: the raw data doesn't have this field
     fuel_id: str
     units: str
 
 
-class EndUseOrm(BaseOrm):
-    __tablename__ = "EndUse"
+class EnergyEndUseOrm(BaseOrm):
+    __tablename__ = "EnergyEndUse"
 
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
-    fuel_id = Column(String(255), nullable=False)
-    units = Column(String(255), nullable=False)
+    units = Column(String(255), nullable=False)  # needs standardization
+    fuel_id = Column(String(255), nullable=False)  # needs standardization
 
-    model = relationship(
+    model_energy = relationship(
         "DataSourceOrm",
-        secondary=enduse_model_association,
-        back_populates="enduse",
+        secondary=metric_model_association,
+        back_populates="metric_energy",
+    )
+
+
+class EnergyServiceEndUse(MetricDimensionBaseModel):
+    """Energy Service Demand End Use attributes"""
+
+    units: str
+
+
+class EnergyServiceEndUseOrm(BaseOrm):
+    __tablename__ = "EnergyServiceEndUse"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    units = Column(String(255), nullable=False)  # needs standardization
+
+    model_service = relationship(
+        "DataSourceOrm",
+        secondary=metric_model_association,
+        back_populates="metric_service",
+    )
+
+
+class Population(MetricDimensionBaseModel):
+    """Population attributes"""
+
+
+class PopulationOrm(BaseOrm):
+    __tablename__ = "Population"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+
+    model_population = relationship(
+        "DataSourceOrm",
+        secondary=metric_model_association,
+        back_populates="metric_population",
+    )
+
+
+class Stock(MetricDimensionBaseModel):
+    """Stock attributes - includes GDP, building stock, equipment"""
+
+    units: str
+
+
+class StockOrm(BaseOrm):
+    __tablename__ = "Stock"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    units = Column(String(255), nullable=False)  # needs standardization
+
+    model_stock = relationship(
+        "DataSourceOrm",
+        secondary=metric_model_association,
+        back_populates="metric_stock",
+    )
+
+
+class EnergyEfficiency(MetricDimensionBaseModel):
+    """Energy Efficiency of building stock or equipment"""
+
+    units: str
+
+
+class EnergyEfficiencyOrm(BaseOrm):
+    __tablename__ = "EnergyEfficiency"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    units = Column(String(255), nullable=False)  # needs standardization
+
+    model_efficiency = relationship(
+        "DataSourceOrm",
+        secondary=metric_model_association,
+        back_populates="metric_efficiency",
     )
 
 
@@ -239,10 +313,6 @@ class WeatherYear(WeatherYearDimensionBaseModel):
     """Weather Year attributes"""
 
 
-class MetricType(MetricTypeDimensionBaseModel):
-    """Metric Type attributes"""
-
-
 class ModelYear(ModelYearDimensionBaseModel):
     """Model Year attributes"""
 
@@ -257,15 +327,35 @@ class DataSourceOrm(BaseOrm):
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
 
-    enduse = relationship(
-        "EndUseOrm",
-        secondary=enduse_model_association,
-        back_populates="data_source",
+    metric_energy = relationship(
+        "EnergyEndUseOrm",
+        secondary=metric_model_association,
+        back_populates="model_energy",
+    )
+    metric_service = relationship(
+        "EnergyServiceEndUseOrm",
+        secondary=metric_model_association,
+        back_populates="model_service",
+    )
+    metric_population = relationship(
+        "PopulationOrm",
+        secondary=metric_model_association,
+        back_populates="model_population",
+    )
+    metric_stock = relationship(
+        "StockOrm",
+        secondary=metric_model_association,
+        back_populates="model_stock",
+    )
+    metric_efficiency = relationship(
+        "EnergyEfficiencyOrm",
+        secondary=metric_model_association,
+        back_populates="model_efficiency",
     )
     subsector = relationship(
         "SubsectorOrm",
         secondary=model_subsector_association,
-        back_populates="data_source",
+        back_populates="model",
     )
 
 

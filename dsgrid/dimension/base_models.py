@@ -12,7 +12,7 @@ from dsgrid.utils.utilities import check_uniqueness
 class DimensionType(Enum):
     """Dimension types"""
 
-    END_USE = "end_use"
+    METRIC = "metric"
     GEOGRAPHY = "geography"
     SECTOR = "sector"
     SUBSECTOR = "subsector"
@@ -21,7 +21,6 @@ class DimensionType(Enum):
     MODEL_YEAR = "model_year"
     SCENARIO = "scenario"
     DATA_SOURCE = "data_source"
-    METRIC_TYPE = "metric_type"
 
 
 class DimensionRecordBaseModel(DSGBaseModel):
@@ -37,8 +36,8 @@ class DimensionRecordBaseModel(DSGBaseModel):
     )
 
 
-class EndUseDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all end use dimensions"""
+class MetricDimensionBaseModel(DimensionRecordBaseModel):
+    """Base class for all metric dimensions (e.g. EndUse)"""
 
 
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
@@ -47,10 +46,6 @@ class GeographyDimensionBaseModel(DimensionRecordBaseModel):
 
 class DataSourceDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all data source dimensions"""
-
-
-class MetricTypeDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all metric type dimensions"""
 
 
 class ModelYearDimensionBaseModel(DimensionRecordBaseModel):
@@ -78,7 +73,7 @@ class WeatherYearDimensionBaseModel(DimensionRecordBaseModel):
 
 
 _DIMENSION_TO_MODEL = {
-    DimensionType.END_USE: EndUseDimensionBaseModel,
+    DimensionType.METRIC: MetricDimensionBaseModel,
     DimensionType.GEOGRAPHY: GeographyDimensionBaseModel,
     DimensionType.SECTOR: SectorDimensionBaseModel,
     DimensionType.SUBSECTOR: SubsectorDimensionBaseModel,
@@ -87,7 +82,6 @@ _DIMENSION_TO_MODEL = {
     DimensionType.MODEL_YEAR: ModelYearDimensionBaseModel,
     DimensionType.SCENARIO: ScenarioDimensionBaseModel,
     DimensionType.DATA_SOURCE: DataSourceDimensionBaseModel,
-    DimensionType.METRIC_TYPE: MetricTypeDimensionBaseModel,
 }
 
 

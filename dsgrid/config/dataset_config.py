@@ -1,12 +1,5 @@
-"""
-Running List of TODO's:
-
-
-Questions:
-- Do diemsnion names need to be distinct from project's? What if the dataset
-is using the same dimension as the project?
-"""
 from enum import Enum
+import datetime
 from pathlib import Path
 from typing import List, Optional, Dict
 import os
@@ -24,7 +17,6 @@ from .dimensions import (
 from dsgrid.data_models import DSGBaseModel
 
 
-# TODO: likely needs refinement (missing mappings)
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 
@@ -40,8 +32,6 @@ class InputDatasetType(Enum):
 class DSGDatasetParquetType(Enum):
     LOAD_DATA = "load_data"  # required
     LOAD_DATA_LOOKUP = "load_data_lookup"  # required
-    DATASET_DIMENSION_MAPPING = "dataset_dimension_mapping"  # optional
-    PROJECT_DIMENSION_MAPPING = "project_dimension_mapping"  # optional
 
 
 # TODO will need to rename this as it really should be more generic inputs
@@ -71,6 +61,20 @@ class InputSectorDataset(DSGBaseModel):
     #   5. any specific scaling factor checks?
 
 
+class DataClassificationType(Enum):
+    """Data risk classification type
+
+    The moderate class includes all data under an NDA, data classified as business sensitive,
+    data classification as Critical Energy Infrastructure Infromation (CEII), or data with
+    Personal Identifiable Information (PII).
+
+    See https://uit.stanford.edu/guide/riskclassifications for more information.
+    """
+
+    LOW = "low"
+    MODERATE = "moderate"
+
+
 class DatasetConfigModel(DSGBaseModel):
     """Represents model dataset configurations"""
 
@@ -95,6 +99,45 @@ class DatasetConfigModel(DSGBaseModel):
         title="description",
         description="describe dataset in details",
     )
+    origin_creator: str = Field(
+        title="origin_creator",
+        description="Origin data creator's name (first and last)",
+    )
+    origin_organization: str = Field(
+        title="origin_organization",
+        description="Origin organization name, e.g., NREL",
+    )
+    origin_contributors: List[str] = Field(
+        title="origin_contributors",
+        description="List of origin data contributor's first and last names"
+        """ e.g., ["Harry Potter", "Ronald Weasley"]""",
+        required=False,
+    )
+    origin_project: str = Field(
+        title="origin_project",
+        description="Origin project name",
+        optional=True,
+    )
+    origin_date: str = Field(
+        title="origin_date",
+        description="Date the source data was generated",
+    )
+    origin_version: str = Field(
+        title="origin_version",
+        description="Version of the origin data",
+    )
+    source: str = Field(
+        title="source",
+        description="Source of the data (text description or link)",
+    )
+    data_classification: DataClassificationType = Field(
+        title="data_classification",
+        description="Data security classification (e.g., low, moderate, high)",
+    )
+    tags: Optional[List[str]] = Field(
+        title="source",
+        description="List of data tags",
+        required=False,
     load_data_dimension: DimensionType = Field(
         title="load_data_dimension",
         description="Columns in the load data table are records of this dimension type.",
@@ -103,10 +146,11 @@ class DatasetConfigModel(DSGBaseModel):
         title="dimensions",
         description="dimensions defined by the dataset",
     )
-    # TODO: Metdata is TBD
-    metadata: Optional[Dict] = Field(
-        title="metdata",
-        description="Dataset Metadata",
+    user_defined_metadata: Optional[Dict] = Field(
+        title="user_defined_metadata",
+        description="Additional user defined metadata fields",
+        default={},
+        required=False,
     )
 
     # TODO: if local path provided, we want to upload to S3 and set the path
@@ -142,6 +186,14 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: check project_dimension_mapping (optional) if exists
 
         return str(local_path)
+
+    @validator("origin_project", "origin_version")
+    def check_optional_origin_fields(cls, val, values):
+        """Require optional origin metadata fields if the dataset type is sector model"""
+        if values.get("dataset_type") == InputDatasetType.SECTOR_MODEL:
+            if not val:
+                raise ValueError(f"{val} must be defined if the dataset_type is sector_model")
+        return val
 
 
 class DatasetConfig(ConfigBase):

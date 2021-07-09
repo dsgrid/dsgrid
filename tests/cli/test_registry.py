@@ -5,7 +5,7 @@ from tempfile import TemporaryDirectory, gettempdir
 
 from dsgrid.utils.run_command import check_run_command, run_command
 from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
-from tests.common import (
+from dsgrid.tests.common import (
     replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )

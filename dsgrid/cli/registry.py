@@ -1,8 +1,5 @@
 """Manages a dsgrid registry."""
 
-# TODO: need to support a dataset registry CLI seperate from submit-dataset
-# TODO: Do we want to support dry-run mode for write only? and offline mode for read-only?
-
 import getpass
 import logging
 import sys
@@ -142,7 +139,6 @@ def list_dimensions(registry_manager, filter):
     registry_manager.dimension_manager.show(filters=filter)
 
 
-# TODO: update_dataset
 @click.command(name="register")
 @click.argument("dimension-config-file")
 @click.option(
@@ -220,10 +216,10 @@ def dump_dimension(registry_manager, dimension_id, version, directory, force):
 )
 @click.pass_obj
 def update_dimension(
-    registry_manager, project_config_file, project_id, log_message, update_type, version
+    registry_manager, dimension_config_file, dimension_id, log_message, update_type, version
 ):
     """Update an existing dimension registry."""
-    manager = registry_manager.dimension_mapping_registry_manager
+    manager = registry_manager.dimension_manager
     submitter = getpass.getuser()
     manager.update_from_file(
         dimension_config_file, dimension_id, submitter, update_type, log_message, version
@@ -350,10 +346,15 @@ def dump_dimension_mapping(registry_manager, dimension_mapping_id, version, dire
 )
 @click.pass_obj
 def update_dimension_mapping(
-    registry_manager, project_config_file, project_id, log_message, update_type, version
+    registry_manager,
+    dimension_mapping_config_file,
+    dimension_mapping_id,
+    log_message,
+    update_type,
+    version,
 ):
     """Update an existing dimension mapping registry."""
-    manager = registry_manager.dimension_mapping_registry_manager
+    manager = registry_manager.dimension_mapping_manager
     submitter = getpass.getuser()
     manager.update_from_file(
         dimension_mapping_config_file,

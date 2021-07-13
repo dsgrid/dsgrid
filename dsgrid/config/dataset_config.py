@@ -1,11 +1,3 @@
-"""
-Running List of TODO's:
-
-
-Questions:
-- Do diemsnion names need to be distinct from project's? What if the dataset
-is using the same dimension as the project?
-"""
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Dict
@@ -40,12 +32,12 @@ class InputDatasetType(Enum):
     BENCHMARK = "benchmark"
 
 
-class DSGDatasetParquetType(Enum):
+class DSGDatasetParquetType(DSGEnum):
     """Dataset parquet types.
 
     TODO: are we going to end up using this? If not, remove."""
 
-    LOAD_DATA = "load_data"  # required
+    LOAD_DATA = Value(value="load_data", description="")  # required
     LOAD_DATA_LOOKUP = "load_data_lookup"  # required
     DATASET_DIMENSION_MAPPING = "dataset_dimension_mapping"  # optional
     PROJECT_DIMENSION_MAPPING = "project_dimension_mapping"  # optional
@@ -64,7 +56,7 @@ class InputSectorDataset(DSGBaseModel):
         title="data_type",
         alias="type",
         description="DSG parquet input dataset type",
-        options=format_enum_for_docs(DSGDatasetParquetType),
+        options=DSGDatasetParquetType.format_,
     )
     directory: str = Field(
         title="directory",

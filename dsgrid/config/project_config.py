@@ -41,18 +41,19 @@ class DimensionsModel(DSGBaseModel):
     base_dimensions: List[DimensionReferenceModel] = Field(
         title="base_dimensions",
         description="List of registry references (``DimensionReferenceModel``) for a project's "
-        "base dimensions (or core dimensions).",
+        "base dimensions.",
         requirements=(
-            "All base ``DimensionType`` must be defined and only one dimension reference per type "
-            "is allowed.",
+            "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
+            " one dimension reference per type is allowed.",
         ),
     )
     supplemental_dimensions: Optional[List[DimensionReferenceModel]] = Field(
         title="supplemental_dimensions",
         description="List of registry references for a project's supplemental dimensions.",
         requirements=(
-            "Dimensions references of the same ``DimensionType`` are allowed for supplemental "
-            "dimension refrences (i.e., multiple `Geography` types are allowed).",
+            "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType`"
+            " are allowed for supplemental dimension refrences (i.e., multiple `Geography` types"
+            " are allowed).",
         ),
         notes=(
             "Supplemental dimensions are used to support additional querying and transformations",

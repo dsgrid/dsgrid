@@ -113,8 +113,7 @@ class DatasetConfigModel(DSGBaseModel):
         title="dimensions",
         description="List of registered dimension references that make up the dimensions of dataset.",
         requirements=(
-            "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined ........."
-            "..................",
+            "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined",
             "* Only one dimension reference per type is allowed",
             "* Each reference is to an existing registered dimension.",
         )

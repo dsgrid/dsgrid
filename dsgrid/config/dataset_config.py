@@ -255,7 +255,6 @@ class DatasetConfig(ConfigBase):
 
     # TODO:
     #   - check binning/partitioning / file size requirements?
-    #   - check unique names
     #   - check unique files
     #   - add similar validators as project_config Dimensions
     # NOTE: project_config.Dimensions has a lot of the

@@ -32,10 +32,6 @@ from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingR
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
 
-# from dsgrid.dimension.time import (
-#     LeapDayAdjustmentType, Period, TimeValueMeasurement, TimezoneType
-#     )
-
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 

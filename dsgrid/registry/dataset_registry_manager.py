@@ -86,7 +86,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             try:
                 dimension_types.append(DimensionType(col))
             except ValueError:
-                raise DSGInvalidDimension("load_data_lookup column={col} is not a dimension type")
+                raise DSGInvalidDimension(f"load_data_lookup column={col} is not a dimension type")
 
         if not found_id:
             raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
@@ -110,13 +110,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         time_dim = config.get_dimension(DimensionType.TIME)
         time_ranges = time_dim.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
-        # TODO: need to support validation of multiple time ranges
+        # TODO: need to support validation of multiple time ranges: DSGRID-173
         time_range = time_ranges[0]
 
         weather_dim = config.get_dimension(DimensionType.WEATHER_YEAR)
         weather_years = {int(x.id) for x in weather_dim.model.records.collect()}
         assert len(weather_years) == 1, len(weather_years)
-        # TODO: need to support handling of multiple weather years
+        # TODO: need to support handling of multiple weather years: DSGRID-174
 
         if time_range.start.year not in weather_years:
             raise DSGInvalidDataset(
@@ -124,7 +124,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             )
         if time_range.end.year not in weather_years:
             valid = True
-            if time_dim.model.period == Period.PERIOD_BEGINNING:
+            if time_dim.model.period in (Period.PERIOD_BEGINNING, Period.INSTANTANEOUS):
                 valid = False
             elif (
                 time_dim.model.period == Period.PERIOD_ENDING
@@ -168,7 +168,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     def _check_dataset_internal_consistency(
         self, config: DatasetConfig, load_data, load_data_lookup
     ):
-        self._check_dataset_columns(config, load_data)
+        self._check_load_data_columns(config, load_data)
         data_ids = []
         for row in load_data.select("id").distinct().sort("id").collect():
             if row.id is None:
@@ -186,7 +186,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 f"Data IDs for {config.config_id} data/lookup are inconsistent"
             )
 
-    def _check_dataset_columns(self, config: DatasetConfig, load_data):
+    def _check_load_data_columns(self, config: DatasetConfig, load_data):
         dim_type = config.model.load_data_column_dimension
         dimension = config.get_dimension(dim_type)
         dimension_records = get_unique_values(dimension.model.records, "id")

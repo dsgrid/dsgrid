@@ -57,7 +57,7 @@ class TimeDimensionConfig(DimensionBaseConfig):
         TimezoneType.CPT: pytz.timezone("US/Central"),
         TimezoneType.EST: datetime.timezone(datetime.timedelta(hours=-5)),
         TimezoneType.EPT: pytz.timezone("US/Eastern"),
-        # TimezoneType.LOCAL: None,  # TODO: needs handling
+        # TimezoneType.LOCAL: None,  # TODO: needs handling: DSGRID-171
     }
 
     @staticmethod

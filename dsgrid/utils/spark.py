@@ -52,12 +52,15 @@ def create_dataframe(records, cache=False, require_unique=None):
 
 
 def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=True):
-    """Create a spark DataFrame from a CSV file.
+    """Create a spark DataFrame from a file.
+
+    Supported formats when read_with_spark=True: .csv, .json, .parquet
+    Supported formats when read_with_spark=False: .csv, .json
 
     Parameters
     ----------
     filename : str | Path
-        path to CSV file
+        path to file
     cache : bool
         If True, cache the DataFrame in memory.
     require_unique : list

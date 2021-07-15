@@ -3,14 +3,14 @@
 from enum import Enum
 
 
-class DayType(Enum):
+class DayType(DSGEnum):
     """Day types"""
 
     WEEKEND = "weekend"
     WEEKDAY = "weekday"
 
 
-class Season(Enum):
+class Season(DSGEnum):
     """Seasons"""
 
     WINTER = "winter"

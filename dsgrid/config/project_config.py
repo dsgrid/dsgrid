@@ -21,7 +21,7 @@ from dsgrid.registry.common import (
     check_config_id_strict,
 )
 
-from dsgrid.utils.utilities import check_uniqueness, format_enum_for_docs
+from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
 
 # from dsgrid.dimension.time import (
@@ -117,7 +117,7 @@ class InputDatasetModel(DSGBaseModel):
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
         description="Dataset type.",
-        options=format_enum_for_docs(InputDatasetType),
+        options=InputDatasetType.format_for_docs(),
     )
     version: Union[str, VersionInfo] = Field(
         title="version",

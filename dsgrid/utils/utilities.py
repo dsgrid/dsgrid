@@ -88,11 +88,6 @@ def check_uniqueness(iterable, tag):
         values.add(item)
 
 
-def format_enum_for_docs(enum: Enum):
-    """Rturns formatted enum values for docs."""
-    return str({e.value for e in enum}).replace("'", "``")
-
-
 def list_enum_values(enum: Enum):
     """Returns list enum values."""
     return [e.value for e in enum]

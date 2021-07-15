@@ -1,7 +1,7 @@
 """Dimesions related to time"""
 
 from enum import Enum
-from dsgrid.data_models import Enum, DSGEnum, Value
+from dsgrid.data_models import Enum, DSGEnum, EnumValue
 
 from pydantic.dataclasses import dataclass
 
@@ -9,35 +9,34 @@ from pydantic.dataclasses import dataclass
 class LeapDayAdjustmentType(DSGEnum):
     """Timezone enum types"""
 
-    DROP_DEC31 = Value(
-        value="drop_dec31", description="To adjust for leap years, December 31st gets dropped"
+    DROP_DEC31 = EnumValue(
+        value="drop_dec31",
+        description="To adjust for leap years, December 31st gets dropped",
     )
-    DROP_FEB29 = Value(
+    DROP_FEB29 = EnumValue(
         value="drop_feb29",
         description="Feburary 29th is dropped. Currently not yet supported by dsgrid.",
     )
-    DROP_JAN1 = Value(
-        value="drop_jan1", description="To adjust for leap years, January 1st gets dropped"
+    DROP_JAN1 = EnumValue(
+        value="drop_jan1",
+        description="To adjust for leap years, January 1st gets dropped",
     )
-
-    # TODO: need some kind of mapping from this enum to leap day
-    #       adjustment methods
 
 
 class Period(DSGEnum):
     """Time period enum types"""
 
-    PERIOD_ENDING = Value(
+    PERIOD_ENDING = EnumValue(
         value="period_ending",
         description="A time period that is period ending is coded by the end time. E.g., 2pm (with"
         " freq=1h) represents a period of time between 1-2pm.",
     )
-    PERIOD_BEGINNING = Value(
+    PERIOD_BEGINNING = EnumValue(
         value="period_beginning",
         description="A time period that is period beginning is coded by the beginning time. E.g., "
         "2pm (with freq=1h) represents a period of time between 2-3pm. This is the dsgrid default.",
     )
-    INSTANTANEOUS = Value(
+    INSTANTANEOUS = EnumValue(
         value="instantaneous",
         description="The time record value represents measured, instantaneous time",
     )
@@ -48,7 +47,7 @@ class Period(DSGEnum):
 #
 
 
-class TimeValueMeasurement(Enum):
+class TimeValueMeasurement(DSGEnum):
     """Time value measurement enum types"""
 
     MEAN = "mean"
@@ -58,7 +57,7 @@ class TimeValueMeasurement(Enum):
     TOTAL = "total"
 
 
-class TimeFrequency(Enum):
+class TimeFrequency(DSGEnum):
     # TODO: this is incomplete; good enough for first pass
     # TODO: it would be nice if this could be
     # TODO: do we want to support common frequency aliases, e.g.:
@@ -71,7 +70,7 @@ class TimeFrequency(Enum):
     _1_YEAR = "1 year"
 
 
-class TimezoneType(Enum):
+class TimezoneType(DSGEnum):
     """Timezone enum types"""
 
     # TODO: TimezoneType enum is likely incomplete

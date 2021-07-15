@@ -40,7 +40,7 @@ def check_config_id_strict(config_id, tag):
         )
 
 
-class RegistryType(Enum):
+class RegistryType(DSGEnum):
     """Registry types"""
 
     DATASET = "dataset"
@@ -49,25 +49,23 @@ class RegistryType(Enum):
     PROJECT = "project"
 
 
-class DatasetRegistryStatus(Enum):
+class DatasetRegistryStatus(DSGEnum):
     """Statuses for a dataset within a project"""
 
-    # TODO: is this complete?
     UNREGISTERED = "Unregistered"
     REGISTERED = "Registered"
 
 
-class ProjectRegistryStatus(Enum):
+class ProjectRegistryStatus(DSGEnum):
     """Statuses for a project within the DSGRID registry"""
 
-    # TODO: is this complete?
     INITIAL_REGISTRATION = "Initial Registration"
     IN_PROGRESS = "In Progress"
     COMPLETE = "Complete"
     DEPRECATED = "Deprecated"
 
 
-class VersionUpdateType(Enum):
+class VersionUpdateType(DSGEnum):
     """Types of updates that can be made to projects, datasets, and dimensions"""
 
     # TODO: we need to find general version update types that can be mapped to

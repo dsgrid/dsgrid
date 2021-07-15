@@ -9,7 +9,6 @@ from .dimensions import DimensionReferenceModel
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.versioning import handle_version_or_str
-from dsgrid.utils.utilities import format_enum_for_docs
 
 
 logger = logging.getLogger(__name__)
@@ -47,12 +46,12 @@ class DimensionMappingReferenceModel(DSGBaseModel):
     from_dimension_type: DimensionType = Field(
         title="from_dimension_type",
         description="Dimension Type",
-        options=format_enum_for_docs(DimensionType),
+        options=DimensionType.format_for_docs(),
     )
     to_dimension_type: DimensionType = Field(
         title="to_dimension_type",
         description="Dimension Type",
-        options=format_enum_for_docs(DimensionType),
+        options=DimensionType.format_for_docs(),
     )
     mapping_id: str = Field(
         title="mapping_id",

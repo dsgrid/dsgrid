@@ -13,8 +13,7 @@ from .config_base import ConfigBase
 from .dimensions import (
     DimensionReferenceModel,
 )
-from dsgrid.data_models import DSGBaseModel
-from dsgrid.utils.utilities import format_enum_for_docs
+from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 
 
 # TODO: likely needs refinement (missing mappings)
@@ -24,7 +23,7 @@ LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 logger = logging.getLogger(__name__)
 
 
-class InputDatasetType(Enum):
+class InputDatasetType(DSGEnum):
     """Dataset types for a input dataset."""
 
     SECTOR_MODEL = "sector_model"
@@ -33,14 +32,26 @@ class InputDatasetType(Enum):
 
 
 class DSGDatasetParquetType(DSGEnum):
-    """Dataset parquet types.
+    """Dataset parquet types."""
 
-    TODO: are we going to end up using this? If not, remove."""
-
-    LOAD_DATA = Value(value="load_data", description="")  # required
-    LOAD_DATA_LOOKUP = "load_data_lookup"  # required
-    DATASET_DIMENSION_MAPPING = "dataset_dimension_mapping"  # optional
-    PROJECT_DIMENSION_MAPPING = "project_dimension_mapping"  # optional
+    LOAD_DATA = EnumValue(
+        value="load_data",
+        description="Load data file with id, timestamp, and load value columns",
+    )
+    LOAD_DATA_LOOKUP = EnumValue(
+        value="load_data_lookup",
+        description="Load data file with dimension metadata and and ID which maps to load_data"
+        "file",
+    )
+    # # These are not currently supported by dsgrid but may be needed in the near future
+    # DATASET_DIMENSION_MAPPING = EnumValue(
+    #     value="dataset_dimension_mapping",
+    #     description="",
+    # )  # optional
+    # PROJECT_DIMENSION_MAPPING = EnumValue(
+    #     value="project_dimension_mapping",
+    #     description="",
+    # )  # optional
 
 
 # TODO will need to rename this as it really should be more generic inputs
@@ -56,7 +67,7 @@ class InputSectorDataset(DSGBaseModel):
         title="data_type",
         alias="type",
         description="DSG parquet input dataset type",
-        options=DSGDatasetParquetType.format_,
+        options=DSGDatasetParquetType.format_for_docs(),
     )
     directory: str = Field(
         title="directory",
@@ -88,7 +99,7 @@ class DatasetConfigModel(DSGBaseModel):
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
         description="Input dataset type.",
-        options=f"{format_enum_for_docs(InputDatasetType)}",
+        options=f"{InputDatasetType.format_for_docs()}",
     )
     # TODO: This must be validated against the project's dimension records for data_source
     # TODO: This must also be validated against the project_config

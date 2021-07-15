@@ -60,13 +60,33 @@ class DSGBaseModel(BaseModel):
         return fields
 
 
+class EnumValue:
+    """Class to define a DSGEnum value"""
+
+    def __init__(self, value, description, **kwargs):
+        self.value = value
+        self.description = description
+        for kwarg, val in kwargs.items():
+            self.__setattr__(kwarg, val)
+
+
 class DSGEnum(Enum):
     "dsgrid Enum class"
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls, *args):
         obj = object.__new__(cls)
-        obj._value_ = args[0].value
-        obj.description = args[0].description
+        if isinstance(args[0], EnumValue):
+            obj._value_ = args[0].value
+            obj.description = args[0].description
+            for attr, val in args[0].__dict__.items():
+                if attr not in ("value", "description"):
+                    setattr(obj, attr, val)
+        elif len(args) == 2:
+            obj._value_ = args[0]
+            obj.description = args[1]
+        else:
+            obj._value_ = args
+            obj.description = None
         return obj
 
     @classmethod
@@ -81,14 +101,6 @@ class DSGEnum(Enum):
         for e in cls:
             desc[f"``{e.value}``"] = f"{e.description}"
         return desc
-
-
-class Value:
-    """Class to define a DSGEnum value"""
-
-    def __init__(self, value, description):
-        self.value = value
-        self.description = description
 
 
 class ExtendedJSONEncoder(json.JSONEncoder):

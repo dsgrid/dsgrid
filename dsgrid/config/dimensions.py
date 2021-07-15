@@ -23,7 +23,6 @@ from dsgrid.dimension.time import (
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, load_data
 from dsgrid.utils.versioning import handle_version_or_str
-from dsgrid.utils.utilities import format_enum_for_docs
 
 
 class DimensionBaseModel(DSGBaseModel):
@@ -39,7 +38,7 @@ class DimensionBaseModel(DSGBaseModel):
         title="dimension_type",
         alias="type",
         description="Dimension Type",
-        options=format_enum_for_docs(DimensionType),
+        options=DimensionType.format_for_docs(),
     )
     dimension_id: Optional[str] = Field(
         title="dimension_id",
@@ -327,7 +326,7 @@ class TimeDimensionModel(DimensionBaseModel):
     frequency: TimeFrequency = Field(
         title="frequency",
         description="Resolution of the time data",
-        options=format_enum_for_docs(TimeFrequency),
+        options=TimeFrequency.format_for_docs(),
     )
     includes_dst: bool = Field(
         title="includes_dst",
@@ -337,7 +336,7 @@ class TimeDimensionModel(DimensionBaseModel):
         title="leap_day_adjustment",
         default=None,
         description="TODO",
-        options=format_enum_for_docs(LeapDayAdjustmentType),
+        options=LeapDayAdjustmentType.format_for_docs(),
     )
     period: Period = Field(
         title="period",
@@ -347,14 +346,14 @@ class TimeDimensionModel(DimensionBaseModel):
     timezone: TimezoneType = Field(
         title="timezone",
         description="Timezone of data",
-        options=format_enum_for_docs(TimezoneType),
+        options=TimezoneType.format_for_docs(),
     )
     # TODO: is this a project-level time dimension config?
     value_representation: TimeValueMeasurement = Field(
         title="value_representation",
         default="mean",
         description="TODO",
-        options=format_enum_for_docs(TimeValueMeasurement),
+        options=TimeValueMeasurement.format_for_docs(),
         # requirements=(" ",),
         # notes=(" ",),  # TODO:
     )
@@ -389,7 +388,7 @@ class DimensionReferenceModel(DSGBaseModel):
         title="dimension_type",
         alias="type",
         description="Dimension Type",
-        options=format_enum_for_docs(DimensionType),
+        options=DimensionType.format_for_docs(),
     )
     dimension_id: str = Field(
         title="dimension_id",

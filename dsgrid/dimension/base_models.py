@@ -1,14 +1,12 @@
 """Dimension types for dsgrid"""
 
-from enum import Enum
-
 from pydantic import Field
 
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, DSGEnum
 
 
-class DimensionType(Enum):
+class DimensionType(DSGEnum):
     """Dimension types"""
 
     END_USE = "end_use"

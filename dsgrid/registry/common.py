@@ -11,7 +11,7 @@ from typing import Optional, Union
 from pydantic import Field
 from semver import VersionInfo
 
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, DSGEnum
 from dsgrid.utils.versioning import make_version
 
 

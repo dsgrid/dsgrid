@@ -44,6 +44,7 @@ class DimensionConfig(DimensionBaseConfig):
 class TimeDimensionConfig(DimensionBaseConfig):
     """Provides an interface to a TimeDimensionModel."""
 
+    # TODO: this needs to come from the enum itself
     TIMEZONE_TO_TZINFO = {
         TimezoneType.UTC: datetime.timezone(datetime.timedelta()),
         TimezoneType.HST: datetime.timedelta(hours=-10),
@@ -121,6 +122,7 @@ class TimeDimensionConfig(DimensionBaseConfig):
         """
         assert self.model.timezone in self.TIMEZONE_TO_TZINFO, self.model.timezone
         return self.TIMEZONE_TO_TZINFO[self.model.timezone]
+        return self.model.timezone
 
 
 def get_dimension_config(model, src_dir):

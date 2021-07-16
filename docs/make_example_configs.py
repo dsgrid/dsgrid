@@ -17,7 +17,7 @@ dimension_mappings_config = base_dir / "dimension_mappings.toml"
 dataset_config = dataset_dir / "dataset.toml"
 dimension_mapping_ref_config = dataset_dir / "dimension_mapping_references.toml"
 
-docs_dir = Path(__file__).resolve().parent / "_build" / "example_configs"
+docs_dir = Path(__file__).resolve().parent.parent / "_build" / "example_configs"
 
 os.makedirs(docs_dir, exist_ok=True)
 

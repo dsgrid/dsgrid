@@ -1,7 +1,8 @@
 """Dimensions related to time"""
+import datetime
+import pytz
 
-from enum import Enum
-from dsgrid.data_models import Enum, DSGEnum, EnumValue
+from dsgrid.data_models import DSGEnum, EnumValue
 
 
 class LeapDayAdjustmentType(DSGEnum):
@@ -48,29 +49,96 @@ class Period(DSGEnum):
 class TimeValueMeasurement(DSGEnum):
     """Time value measurement enum types"""
 
-    MEAN = "mean"
-    MIN = "min"
-    MAX = "max"
-    MEASURED = "measured"
-    TOTAL = "total"
+    MEAN = EnumValue(
+        value="mean",
+        description="Data values represent the average value in a time range",
+    )
+    MIN = EnumValue(
+        value="min",
+        description="Data values represent the minimum value in a time range",
+    )
+    MAX = EnumValue(
+        value="max",
+        description="Data values represent the maximum value in a time range",
+    )
+    MEASURED = EnumValue(
+        value="measured",
+        description="Data values represent the measured value at that reported time",
+    )
+    TOTAL = EnumValue(
+        value="total",
+        description="Data values represent the sum of values in a time range",
+    )
 
 
 class TimezoneType(DSGEnum):
     """Timezone enum types"""
 
-    UTC = "UTC"
-    HST = "HawaiiAleutianStandard"
-    AST = "AlaskaStandard"
-    APT = "AlaskaPrevailingStandard"
-    PST = "PacificStandard"
-    PPT = "PacificPrevailing"
-    MST = "MountainStandard"
-    MPT = "MountainPrevailing"
-    CST = "CentralStandard"
-    CPT = "CentralPrevailing"
-    EST = "EasternStandard"
-    EPT = "EasternPrevailing"
-    LOCAL = "LOCAL"  # Implies that the geography's timezone will be dynamically applied.
+    UTC = EnumValue(
+        value="UTC",
+        description="Coordinated Universal Time",
+        tz=datetime.timezone(datetime.timedelta()),
+    )
+    HST = EnumValue(
+        value="HawaiiAleutianStandard",
+        description="Hawaii Standard Time (UTC=-10). Does not include DST shifts.",
+        tz=datetime.timedelta(hours=-10),
+    )
+    AST = EnumValue(
+        value="AlaskaStandard",
+        description="Alaskan Standard Time (UTC=-9). Does not include DST shifts.",
+        tz=datetime.timezone(datetime.timedelta(hours=-9)),
+    )
+    APT = EnumValue(
+        value="AlaskaPrevailingStandard",
+        description="Alaska Prevailing Time. Commonly called Alaska Local Time. Includes DST shifts during DST times.",
+        tz=pytz.timezone("US/Alaska"),
+    )
+    PST = EnumValue(
+        value="PacificStandard",
+        description="Pacific Standard Time (UTC=-8). Does not include DST shifts.",
+        tz=datetime.timezone(datetime.timedelta(hours=-8)),
+    )
+    PPT = EnumValue(
+        value="PacificPrevailing",
+        description="Pacific Prevailing Time. Commonly called Pacific Local Time. Includes DST shifts ,during DST times.",
+        tz=pytz.timezone("US/Pacific"),
+    )
+    MST = EnumValue(
+        value="MountainStandard",
+        description="Mountain Standard Time (UTC=-7). Does not include DST shifts.",
+        tz=datetime.timezone(datetime.timedelta(hours=-7)),
+    )
+    MPT = EnumValue(
+        value="MountainPrevailing",
+        description="Mountain Prevailing Time. Commonly called Mountain Local Time. Includes DST shifts during DST times.",
+        tz=pytz.timezone("US/Mountain"),
+    )
+    CST = EnumValue(
+        value="CentralStandard",
+        description="Central Standard Time (UTC=-6). Does not include DST shifts.",
+        tz=datetime.timezone(datetime.timedelta(hours=-6)),
+    )
+    CPT = EnumValue(
+        value="CentralPrevailing",
+        description="Central Prevailing Time. Commonly called Central Local Time. Includes DST shifts during DST times.",
+        tz=pytz.timezone("US/Central"),
+    )
+    EST = EnumValue(
+        value="EasternStandard",
+        description="Eastern Standard Time (UTC=-5). Does not include DST shifts.",
+        tz=datetime.timezone(datetime.timedelta(hours=-5)),
+    )
+    EPT = EnumValue(
+        value="EasternPrevailing",
+        description="Eastern Prevailing Time. Commonly called Eastern Local Time. Includes DST shifts during DST times.",
+        tz=pytz.timezone("US/Eastern"),
+    )
+    LOCAL = EnumValue(
+        value="LOCAL",
+        description="Local time. Implies that the geography's timezone will be dynamically applied when converting loca time to other time zones.",
+        tz=None,  # TODO: needs handling: DSGRID-171
+    )
 
 
 class DatetimeRange:

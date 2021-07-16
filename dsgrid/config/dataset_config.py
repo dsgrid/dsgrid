@@ -16,7 +16,6 @@ from .dimensions import (
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 
 
-# TODO: likely needs refinement (missing mappings)
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 
@@ -74,13 +73,6 @@ class InputSectorDataset(DSGBaseModel):
         description="Directory with parquet files",
     )
 
-    # TODO:
-    #   1. validate data matches dimensions specified in dataset config;
-    #   2. check that all required dimensions exist in the data or partitioning
-    #   3. check expected counts of things
-    #   4. check for required tables accounted for;
-    #   5. any specific scaling factor checks?
-
 
 class DatasetConfigModel(DSGBaseModel):
     """Represents dataset configurations."""
@@ -114,7 +106,7 @@ class DatasetConfigModel(DSGBaseModel):
     )
     path: str = Field(
         title="path",
-        description="Local path containing data to be registered on the remote registry.",  # TODO: Do we support S3 paths located somewhere else?
+        description="Local path containing data to be registered on the remote registry.",
     )
     description: str = Field(
         title="description",
@@ -228,14 +220,3 @@ class DatasetConfig(ConfigBase):
             if key.type == dimension_type:
                 return dim_config
         assert False, key
-
-    # TODO:
-    #   - check binning/partitioning / file size requirements?
-    #   - check unique files
-    #   - add similar validators as project_config Dimensions
-    # NOTE: project_config.Dimensions has a lot of the
-    #       validators we want here however, its unclear to me how we can
-    #       apply them in both classes because they are root valitors and
-    #       also because Dimensions includes project_dimension and
-    #       supplemental_dimensions which are not required at the dataset
-    #       level.

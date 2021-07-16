@@ -1,6 +1,6 @@
 """Types related to time"""
 
-from enum import Enum
+from dsgrid.data_models import DSGEnum
 
 
 class DayType(DSGEnum):

@@ -1,9 +1,9 @@
 ****************
 Dimension Config
 ****************
-.. include:: ../../_build/config_rsts/_DimensionsDocsModel.rst
+.. include:: ../../_build/config_rsts/DimensionsModel.rst
 
 Example dimensions.toml
 =======================
-.. literalinclude:: ../example_configs/dimensions.toml
+.. literalinclude:: ../../_build/example_configs/dimensions.toml
    :language: toml

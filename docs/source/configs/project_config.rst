@@ -5,5 +5,5 @@ Project Config
 
 Example project.toml
 ====================
-.. literalinclude:: ../example_configs/project.toml
+.. literalinclude:: ../../_build/example_configs/project.toml
    :language: toml

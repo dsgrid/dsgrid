@@ -93,7 +93,7 @@ class DSGEnum(Enum):
             obj._value_ = args[0]
             obj.description = args[1]
         else:
-            obj._value_ = args
+            obj._value_ = args[0]
             obj.description = None
         return obj
 

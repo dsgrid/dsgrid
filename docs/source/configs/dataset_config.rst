@@ -8,5 +8,5 @@ A dataset config is required for each input dataset. The config must contain the
 
 Example dataset.toml
 ====================
-.. literalinclude:: ../example_configs/dataset.toml
+.. literalinclude:: ../../_build/example_configs/dataset.toml
    :language: toml

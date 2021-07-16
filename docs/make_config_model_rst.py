@@ -13,7 +13,7 @@ from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
     DimensionMappingReferenceListModel,
 )
-from dsgrid.config.dimensions import DimensionModel, TimeDimensionModel, _DimensionsDocsModel
+from dsgrid.config.dimensions import DimensionModel, TimeDimensionModel
 from dsgrid.config.project_config import (
     DimensionsModel,
     InputDatasetModel,
@@ -105,7 +105,17 @@ def get_field_details(cls):
             if isinstance(vals.get("type"), pydantic.main.ModelMetaclass):
                 vals["type"] = vals.get("type").__name__
 
-            if "items" in vals:
+            if cls.__name__ == "DimensionsModel":
+                dtype = (
+                    ":class:`~dsgrid.config.dimensions.DimensionModel`, "
+                    ":class:`~dsgrid.config.dimensions.TimeDimensionModel`".replace(
+                        "[", ""
+                    ).replace("]", "")
+                )
+                class_name = "DimensionsModel"
+                mod = "dsgrid.config.project_config"
+                subfields = True
+            elif "items" in vals:
                 class_name = vals["items"]["$ref"]
                 mod = get_class_path(class_name)
                 dtype = f":class:`~{mod}.{class_name}`".replace("[", "").replace("]", "")
@@ -131,16 +141,6 @@ def get_field_details(cls):
                 class_name = None
                 mod = None
                 subfields = None
-            if cls.__name__ == "_DimensionsDocsModel":
-                dtype = (
-                    ":class:`~dsgrid.config.dimensions.DimensionModel`, "
-                    ":class:`~dsgrid.config.dimensions.TimeDimensionModel`".replace(
-                        "[", ""
-                    ).replace("]", "")
-                )
-                class_name = "_DimensionsDocsModel"
-                mod = "dsgrid.config.dimensions"
-                subfields = True
 
             if vals["description"].lower().startswith("list of"):
                 dtype = f"[{dtype}]"
@@ -150,7 +150,7 @@ def get_field_details(cls):
                 "Description": vals["description"],
                 "Type": dtype,
                 "Value Options": vals.get("options", None),
-                "Default": vals.get("default", None),
+                "Default": vals.get("default", "None"),
                 "Optional": str(vals.get("optional", False)),
                 "Requirements": vals.get("requirements", None),
                 "Notes": vals.get("notes", None),
@@ -193,7 +193,7 @@ def get_row(i, field, fields, field_items, cls, indent_level=1):
     t2 = "".join([t] * (indent_level + 1))
 
     # treat dimensions.toml config differently
-    if field == "SubFields" and cls == "dsgrid.config.dimensions._DimensionsDocsModel":
+    if field == "SubFields" and cls == "dsgrid.config.project_config.DimensionsModel":
         rows.append(
             f"{t1}{t}:{field}: The config sub-fields depends on the "
             f":class:`dsgrid.dimensions.base_model.DimensionType`{n}"
@@ -209,15 +209,21 @@ def get_row(i, field, fields, field_items, cls, indent_level=1):
 
     elif field_items[field]:
         if field == "Field":
-            if field_items["Optional"]:
-                rows.append(f"{t1}* {field_items[field]}:{n}")
+            if field_items["Optional"] == "True":
+                rows.append(
+                    f"{t1}* {field_items[field]}  *(Optional)* :{n}"
+                )  # TODO: ask team preference on "optional" placement in docs
             else:
                 rows.append(f"{t1}* {field_items[field]}:{n}")
         elif field == "Value Options":
             if isinstance(field_items[field], dict):
-                options = "".join(
-                    [f"{n}{t1}{t2}* {v[0]}: {v[1]}" for v in field_items[field].items()]
-                )
+                options = []
+                for v in field_items[field].items():
+                    if v[1] == "None":
+                        options.append(f"{n}{t1}{t2}* {v[0]}")
+                    else:
+                        options.append(f"{n}{t1}{t2}* {v[0]}: {v[1]}")
+                options = "".join(options)
                 rows.append(f"{t1}{t}:{field}:{options}{n}")
             else:
                 rows.append(f"{t1}{t}:{field}: {field_items[field]}{n}")
@@ -247,15 +253,14 @@ def make_config_rst(output):
     os.makedirs(output, exist_ok=True)
     for cls in (
         # keep only the config models
-        # ProjectConfigModel,  # project.toml
-        # DatasetConfigModel,  # dataset.toml
-        # _DimensionsDocsModel,  # used
-        # DimensionModel,  # dimensions.toml
+        ProjectConfigModel,  # project.toml
+        DatasetConfigModel,  # dataset.toml
+        DimensionsModel,  # dimensions.toml
         TimeDimensionModel,
-        # DimensionMappingBaseModel,  # dimension mapping toml
-        # DimensionMappingReferenceListModel,  # dimension mapping references toml
-        # # TODO: not sure about these:
-        # AssociationTableModel, # @DT is this used?
+        DimensionMappingBaseModel,  # dimension mapping toml
+        DimensionMappingReferenceListModel,  # dimension mapping references toml
+        # TODO: @DT please confirm whether these models below are being used directly by the user or not. If not, I do not think we need to create .rst docs explaining the fields. Do you agree?
+        # AssociationTableModel,
         # DimensionMappingBaseModel,
         # DimensionMappingReferenceModel,
         # DimensionsModel,

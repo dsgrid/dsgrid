@@ -181,12 +181,13 @@ class DimensionModel(DimensionBaseModel):
         description="Optional table that provides mappings of foreign keys",
         dsg_internal=True,  # -- is this internal? Or is field outdated and should be removed?
     )
-    records: Optional[DataFrame] = Field(
-        title="records",
-        description="Dimension records in filename that get loaded at runtime",
-        default=[],
-        dsg_internal=True,
-    )
+
+    # TODO: Currently this is commented out because .schema isn't able to parse DataFrame
+    # records: Optional[DataFrame] = Field(
+    #     title="records",
+    #     description="Dimension records in filename that get loaded at runtime",
+    #     dsg_internal=True,
+    # )
 
     @validator("filename")
     def check_file(cls, filename):
@@ -226,23 +227,23 @@ class DimensionModel(DimensionBaseModel):
     #     return val
     # ^^ Can we remove the above?
 
-    @validator("records", always=True)
-    def add_records(cls, records, values):
-        """Add records from the file."""
-        prereqs = ("name", "filename", "cls")
-        for req in prereqs:
-            if values.get(req) is None:
-                return records
+    # @validator("records", always=True)
+    # def add_records(cls, records, values):
+    #     """Add records from the file."""
+    #     prereqs = ("name", "filename", "cls")
+    #     for req in prereqs:
+    #         if values.get(req) is None:
+    #             return records
 
-        filename = Path(values["filename"])
-        dim_class = values["cls"]
-        assert not str(filename).startswith("s3://"), "records must exist in the local filesystem"
+    #     filename = Path(values["filename"])
+    #     dim_class = values["cls"]
+    #     assert not str(filename).startswith("s3://"), "records must exist in the local filesystem"
 
-        if records:
-            raise ValueError("records should not be defined in the dimension config")
+    #     if records:
+    #         raise ValueError("records should not be defined in the dimension config")
 
-        # The trick in DSGBaseModel.load where we change directories doesn't work with Spark.
-        return read_dataframe(filename, cache=True, require_unique=["id"], read_with_spark=False)
+    #     # The trick in DSGBaseModel.load where we change directories doesn't work with Spark.
+    #     return read_dataframe(filename, cache=True, require_unique=["id"], read_with_spark=False)
 
     def dict(self, by_alias=True, **kwargs):
         exclude = {"cls", "records"}
@@ -276,18 +277,23 @@ class TimeRangeModel(DSGBaseModel):
 class TimeDimensionModel(DimensionBaseModel):
     """Defines a time dimension"""
 
+    ranges: List[TimeRangeModel] = Field(
+        title="time_ranges",
+        description="Defines the continuous ranges of time in the data.",  # Alternative description: List of start and end times.
+    )
     # TODO: what is this intended purpose?
     #       originally i thought it was to interpret start/end, but
     #       the year here is unimportant because it will be based on
     #       the weather_year
     str_format: Optional[str] = Field(  # TODO: why is this optional?
         title="str_format",
-        default="%Y-%m-%d %H:%M:%s-%z",
-        description="Timestamp format",
-    )
-    ranges: List[TimeRangeModel] = Field(
-        title="time_ranges",
-        description="Defines the continuous ranges of time in the data.",  # Alternative description: List of start and end times.
+        default="%Y-%m-%d %H:%M:%s",
+        description="Timestamp string format",
+        notes=(
+            "The string format is used to parse the timestamps provided in the time ranges",
+            # TODO: are there are any other purposes for the string format? How else do we use it? Is it used to parse the data in the load_data.parquet?
+            "Cheatsheet reference: https://strftime.org/",
+        ),
     )
     frequency: timedelta = Field(
         title="frequency",
@@ -298,31 +304,32 @@ class TimeDimensionModel(DimensionBaseModel):
         title="includes_dst",
         description="Includes daylight savings time",
     )
-    frequency: timedelta = Field(
-        title="frequency",
-        description="Resolution of the timestamps",
-    )
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
         title="leap_day_adjustment",
+        description="Leap day adjustment method applied to time data",
         default=None,
-        description="TODO",  # TODO
-        options=LeapDayAdjustmentType.format_for_docs(),
+        optional=True,
+        options=LeapDayAdjustmentType.format_descriptions_for_docs(),
+        notes=(
+            "The dsgrid default is None, i.e., no adjustment made to leap years.",
+            "Adjustments are made to leap years only.",
+        ),
     )
     period: Period = Field(
         title="period",
-        description="TODO",  # TODO
+        description="The range of time that the value represents",  # TODO @ET help with this description
         options=Period.format_descriptions_for_docs(),
     )
     timezone: TimezoneType = Field(
         title="timezone",
         description="Timezone of data",
-        options=TimezoneType.format_for_docs(),
+        options=TimezoneType.format_descriptions_for_docs(),
     )
     value_representation: TimeValueMeasurement = Field(
         title="value_representation",
         default="mean",
-        description="TODO",
-        options=TimeValueMeasurement.format_for_docs(),
+        description="How the value is measured",  # TODO: @ET help with this description
+        options=TimeValueMeasurement.format_descriptions_for_docs(),
         # requirements=(" ",),
         # notes=(" ",),  # TODO:
     )
@@ -414,20 +421,3 @@ def _convert_for_serialization(data):
     for key, val in data.items():
         if isinstance(val, enum.Enum):
             data[key] = val.value
-
-
-class _DimensionsDocsModel(DSGBaseModel):
-    """Stand-alone model to point to for dimension.toml docs."""
-
-    # TODO: For documentation of dimensions.toml, I propose that we rename the current DimensionsModel (in project.toml) to something like ProjectConfigDimensionsModel (or something) and then rename this model to DimensionsModel
-
-    dimensions: Union[DimensionModel, TimeDimensionModel] = Field(  # TODO: provide better details!
-        title="dimensions",
-        alis="dimension_model",
-        description="List of dimensions",
-        # options=":meth:`dsgrid.configs.dimensions.DimensionModel` or TimeDimensionModel",
-    )
-
-    @validator("dimensions", pre=True, each_item=True, always=True)
-    def handle_dimension_union(cls, values):
-        return handle_dimension_union(values)

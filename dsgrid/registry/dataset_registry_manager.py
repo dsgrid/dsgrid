@@ -1,19 +1,30 @@
 """Manages the registry for dimension datasets"""
 
+import datetime
 import getpass
 import logging
 import os
+from pathlib import Path
+from datetime import timedelta
+
+from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
 
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.data_models import serialize_model
+from dsgrid.dataset import Dataset
+from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
+from dsgrid.dimension.time import Period
+from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimension, DSGInvalidDataset
 from dsgrid.registry.common import (
     make_initial_config_registration,
     ConfigKey,
     DatasetRegistryStatus,
 )
 from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.spark import read_dataframe, get_unique_values
+from dsgrid.utils.timing import timer_stats_collector, Timer
 from .dataset_registry import (
     DatasetRegistry,
     DatasetRegistryModel,
@@ -45,6 +56,163 @@ class DatasetRegistryManager(RegistryManagerBase):
     @staticmethod
     def registry_class():
         return DatasetRegistry
+
+    def _run_checks(self, config: DatasetConfig):
+        self._check_if_already_registered(config.model.dataset_id)
+        check_required_dimensions(config.model.dimensions, "dataset dimensions")
+        if not os.environ.get("__DSGRID_SKIP_DATASET_CONSISTENCY_CHECKS__"):
+            self._check_dataset_consistency(config)
+
+    def _check_dataset_consistency(self, config):
+        spark = SparkSession.getActiveSession()
+        load_data = read_dataframe(Path(config.model.path) / Dataset.DATA_FILENAME)
+        load_data_lookup = read_dataframe(
+            Path(config.model.path) / Dataset.LOOKUP_FILENAME, cache=True
+        )
+        with Timer(timer_stats_collector, "check_lookup_data_consistency"):
+            self._check_lookup_data_consistency(config, load_data_lookup)
+
+        with Timer(timer_stats_collector, "check_dataset_time_consistency"):
+            self._check_dataset_time_consistency(config, load_data)
+        with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
+            self._check_dataset_internal_consistency(config, load_data, load_data_lookup)
+
+    def _check_lookup_data_consistency(self, config, load_data_lookup):
+        found_id = False
+        dimension_types = []
+        for col in load_data_lookup.columns:
+            if col == "id":
+                found_id = True
+                continue
+            try:
+                dimension_types.append(DimensionType(col))
+            except ValueError:
+                raise DSGInvalidDimension(f"load_data_lookup column={col} is not a dimension type")
+
+        if not found_id:
+            raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
+
+        for dimension_type in dimension_types:
+            name = dimension_type.value
+            dimension = config.get_dimension(dimension_type)
+            dim_records = {x.id for x in dimension.model.records.select("id").collect()}
+            lookup_records = get_unique_values(load_data_lookup, name)
+            if dim_records != lookup_records:
+                logger.error(
+                    "Mismatch in load_data_lookup records. dimension=%s mismatched=%s",
+                    name,
+                    lookup_records.symmetric_difference(dim_records),
+                )
+                raise DSGInvalidDataset(
+                    f"load_data_lookup records do not match dimension records for {name}"
+                )
+
+    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data):
+        time_dim = config.get_dimension(DimensionType.TIME)
+        tz = time_dim.get_tzinfo()
+        time_ranges = time_dim.get_time_ranges()
+        assert len(time_ranges) == 1, len(time_ranges)
+        # TODO: need to support validation of multiple time ranges: DSGRID-173
+        # TODO: need to support handling of multiple weather years: DSGRID-174
+
+        weather_dim = config.get_dimension(DimensionType.WEATHER_YEAR)
+        weather_years = [int(x.id) for x in weather_dim.model.records.collect()]
+        weather_years.sort()
+        if len(time_ranges) != len(weather_years):
+            raise DSGInvalidDataset(f"len of time_ranges = {len(time_ranges)} is not equal to len "
+                f"of weather years = {len(weather_years)}")
+
+        expected_times = []
+        for time_range, weather_year in zip(time_ranges, weather_years):
+            if time_range.start.year != weather_year:
+                raise DSGInvalidDataset(
+                    f"weather year mismatch: time_dimension start={time_range.start} weather_year={weather_year}"
+                )
+            if time_range.end.year != weather_year:
+                valid = True
+                if time_dim.model.period in (Period.PERIOD_BEGINNING, Period.INSTANTANEOUS):
+                    valid = False
+                elif (
+                    time_dim.model.period == Period.PERIOD_ENDING
+                    and time_range.end.year != weather_year + 1
+                ):
+                    valid = False
+                if not valid:
+                    raise DSGInvalidDataset(
+                        f"weather year mismatch: time_dimension end={time_range.end} weather_year={weather_year}"
+                    )
+            expected_times.extend(time_dim.list_time_range(time_range))
+
+        timestamps_by_id = (
+            load_data.select("timestamp", "id")
+            .groupby("id")
+            .agg(F.collect_list("timestamp").alias("timestamps"))
+        ).collect()
+        dataset_start = None
+        dataset_end = None
+        for row in timestamps_by_id:
+            timestamps = [x.astimezone().astimezone(tz) for x in row.timestamps]
+            timestamps.sort()
+            if timestamps != expected_times:
+                mismatch = sorted(set(expected_times).difference(set(timestamps)))
+                raise DSGInvalidDataset(f"load_data timestamps do not match expected times. load_data ID={row.id} mismatch={mismatch}")
+            if dataset_start is None:
+                dataset_start = timestamps[0]
+                dataset_end = timestamps[-1]
+
+        if dataset_start != time_ranges[0].start:
+            raise DSGInvalidDimension(
+                f"Mismatch between dataset start time ({dataset_start} and dimension start time ({time_ranges[0].start}"
+            )
+        if dataset_end != time_ranges[-1].end:
+            raise DSGInvalidDimension(
+                f"Mismatch between dataset end time ({dataset_end} and dimension end time: {time_ranges[-1].end}"
+            )
+
+    def _check_dataset_internal_consistency(
+        self, config: DatasetConfig, load_data, load_data_lookup
+    ):
+        self._check_load_data_columns(config, load_data)
+        data_ids = []
+        for row in load_data.select("id").distinct().sort("id").collect():
+            if row.id is None:
+                raise DSGInvalidDataset(f"load_data for dataset {config.config_id} has a null ID")
+            data_ids.append(row.id)
+        lookup_data_ids = []
+        for row in load_data_lookup.select("id").distinct().sort("id").collect():
+            if row.id is None:
+                raise DSGInvalidDataset(
+                    f"load_data_lookup for dataset {config.config_id} has a null data ID"
+                )
+            lookup_data_ids.append(row.id)
+        if data_ids != lookup_data_ids:
+            raise DSGInvalidDataset(
+                f"Data IDs for {config.config_id} data/lookup are inconsistent"
+            )
+
+    def _check_load_data_columns(self, config: DatasetConfig, load_data):
+        dim_type = config.model.load_data_column_dimension
+        dimension = config.get_dimension(dim_type)
+        dimension_records = get_unique_values(dimension.model.records, "id")
+
+        found_id = False
+        dim_columns = set()
+        for col in load_data.columns:
+            if col == "id":
+                found_id = True
+                continue
+            if col == "timestamp":
+                continue
+            dim_columns.add(col)
+
+        if not found_id:
+            raise DSGInvalidDataset("load_data does not include an 'id' column")
+
+        if dimension_records != dim_columns:
+            mismatch = dimension_records.symmetric_difference(dim_columns)
+            raise DSGInvalidDataset(
+                f"Mismatch between load data columns and dimension={dim_type.value} records. Mismatched={mismatch}"
+            )
 
     @property
     def dimension_manager(self):
@@ -85,8 +253,8 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _register(self, config_file, submitter, log_message, force=False):
         config = DatasetConfig.load(config_file, self._dimension_mgr)
-        self._check_if_already_registered(config.model.dataset_id)
-
+        with Timer(timer_stats_collector, "run_dataset_checks"):
+            self._run_checks(config)
         registration = make_initial_config_registration(submitter, log_message)
 
         if self.dry_run_mode:
@@ -112,7 +280,10 @@ class DatasetRegistryManager(RegistryManagerBase):
         registry_filename = registry_dir / REGISTRY_FILENAME
         registry_config.serialize(registry_filename, force=True)
         config.serialize(self.get_config_directory(config.config_id, registry_config.version))
-
+        dataset_path = self.get_registry_data_directory(config.config_id)
+        if self.fs_interface.exists(dataset_path):
+            raise DSGInvalidDataset(f"path already exists: {dataset_path}")
+        self.fs_interface.copy_tree(config.model.path, dataset_path)
         self._update_registry_cache(config.model.dataset_id, registry_config)
 
         if not self.offline_mode:

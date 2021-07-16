@@ -9,6 +9,7 @@ from dsgrid.tests.common import (
     replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )
+from tests.make_us_data_registry import replace_dataset_path
 
 
 def test_register_project_and_dataset(make_test_project_dir):
@@ -45,6 +46,7 @@ def test_register_project_and_dataset(make_test_project_dir):
 
         project_config = make_test_project_dir / "project.toml"
         dataset_config = make_test_project_dir / dataset_dir / "dataset.toml"
+        replace_dataset_path(dataset_config)
         replace_dimension_mapping_uuids_from_registry(
             path, (project_config, dimension_mapping_refs)
         )

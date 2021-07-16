@@ -389,7 +389,7 @@ class RegistryManagerBase(abc.ABC):
         """
 
     def get_registry_directory(self, config_id):
-        """Return the directory containing data for config_id (registry.toml and versions).
+        """Return the directory containing config info for config_id (registry.toml and versions).
 
         Parameters
         ----------
@@ -401,6 +401,20 @@ class RegistryManagerBase(abc.ABC):
 
         """
         return self._path / config_id
+
+    def get_registry_data_directory(self, config_id):
+        """Return the directory containing data for config_id (parquet files).
+
+        Parameters
+        ----------
+        config_id : str
+
+        Returns
+        -------
+        str
+
+        """
+        return Path(self._params.base_path) / "data" / config_id
 
     def get_registry_file(self, config_id):
         """Return the path to the registry file.

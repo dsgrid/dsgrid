@@ -8,26 +8,30 @@ from semver import VersionInfo
 
 from .config_base import ConfigBase
 from .dataset_config import InputDatasetType
+from .dataset_config import DatasetConfig
 from .dimension_mapping_base import DimensionMappingReferenceModel
 from .dimensions import (
     DimensionReferenceModel,
     DimensionType,
 )
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
+from dsgrid.exceptions import (
+    DSGInvalidField,
+    DSGInvalidDimensionMapping,
+    DSGMissingDimensionMapping,
+)
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.registry.common import (
     ProjectRegistryStatus,
     DatasetRegistryStatus,
     check_config_id_strict,
 )
+from dsgrid.dimension.store import DimensionStore
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
+from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
-
-# from dsgrid.dimension.time import (
-#     LeapDayAdjustmentType, Period, TimeValueMeasurement, TimeFrequency,
-#     TimezoneType
-#     )
 
 LOAD_DATA_FILENAME = "load_data.parquet"
 LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
@@ -67,16 +71,7 @@ class DimensionsModel(DSGBaseModel):
     @validator("base_dimensions")
     def check_project_dimension(cls, val):
         """Validate base_dimensions types"""
-        dimension_types = [i.dimension_type for i in val]
-        required_dim_types = list(DimensionType)
-        # validate required dimensions for base_dimensions
-        for i in required_dim_types:
-            if i not in dimension_types:
-                raise ValueError(
-                    f"Required project dimension {i} is not in project ",
-                    "config project.base_dimensions",
-                )
-        check_uniqueness(dimension_types, "project_dimension")
+        check_required_dimensions(val, "project base dimensions")
         return val
 
     @root_validator
@@ -286,6 +281,7 @@ class ProjectConfig(ConfigBase):
         super().__init__(model)
         self._base_dimensions = {}
         self._supplemental_dimensions = {}
+        self._dimension_mapping_mgr = None
 
     @staticmethod
     def model_class():
@@ -296,12 +292,21 @@ class ProjectConfig(ConfigBase):
         return "project.toml"
 
     @classmethod
-    def load(cls, config_file, dimension_manager):
+    def load(cls, config_file, dimension_manager, dimension_mapping_manager):
         config = cls._load(config_file)
+        config.dimension_mapping_manager = dimension_mapping_manager
         config.load_dimensions(dimension_manager)
         return config
 
-    def load_dimensions(self, dimension_manager):
+    @property
+    def dimension_mapping_manager(self):
+        return self._dimension_mapping_mgr
+
+    @dimension_mapping_manager.setter
+    def dimension_mapping_manager(self, val: DimensionMappingRegistryManager):
+        self._dimension_mapping_mgr = val
+
+    def load_dimensions(self, dimension_manager: DimensionRegistryManager):
         """Load all Base Dimensions.
 
         Parameters
@@ -313,9 +318,9 @@ class ProjectConfig(ConfigBase):
         supplemental_dimensions = dimension_manager.load_dimensions(
             self.model.dimensions.supplemental_dimensions
         )
-        dims = itertools.chain(base_dimensions.values(), supplemental_dimensions.values())
+        dims = list(itertools.chain(base_dimensions.values(), supplemental_dimensions.values()))
         check_uniqueness((x.model.name for x in dims), "dimension name")
-        check_uniqueness((getattr(x, "cls") for x in dims), "dimension cls")
+        check_uniqueness((getattr(x.model, "cls") for x in dims), "dimension cls")
 
         self._base_dimensions.update(base_dimensions)
         self._supplemental_dimensions.update(supplemental_dimensions)
@@ -352,7 +357,7 @@ class ProjectConfig(ConfigBase):
                 )
 
     def check_dataset_dimension_mappings(
-        self, dataset_config, references: DimensionMappingReferenceModel
+        self, dataset_config: DatasetConfig, references: DimensionMappingReferenceModel
     ):
         """Check that a dataset provides required mappings to the project.
 
@@ -372,20 +377,36 @@ class ProjectConfig(ConfigBase):
         project_keys = set(self.base_dimensions.keys())
         dataset_keys = set(dataset_config.dimensions)
         requires_mapping = project_keys.difference(dataset_keys)
-        for dimension in requires_mapping:
-            if dimension.type.value == "time":
-                pass  # TODO: need to programmatically generate a time dimension mapping
-            else:
-                if dimension.type not in [i.to_dimension_type for i in references]:
-                    raise DSGInvalidDimensionMapping(
-                        f"dataset {dataset_config.model.dataset_id} has missing dimension mappings: {dimension}"
-                    )
-
-                # TODO: check that all expected dimension IDs are present
-                # project_dimension_ids = [i["id"] for i in self.base_dimensions[dimension].records]
-                # dataset_dimension_id = [i["id"] for i in dataset_config.dimensions[dimension].records] # TODO: how do I get dimension mapping records?
-                # TODO: if there are proejct dimension IDs that are missing from the dataset, log a warning
-                # TODO: consider throwing an error if a dataset dimension_id maps to too many project dimension ids (unless aggregation is specified)
+        for dim_key in requires_mapping:
+            if dim_key.type == DimensionType.TIME:
+                continue
+            dim = self.base_dimensions[dim_key]
+            project_dimension_ids = {
+                x.id for x in dim.model.records.select("id").distinct().collect()
+            }
+            found = False
+            for mapping_ref in references:
+                if mapping_ref.to_dimension_type != dim_key.type:
+                    continue
+                mapping = self.dimension_mapping_manager.get_by_id(mapping_ref.mapping_id)
+                if mapping.model.to_dimension.dimension_id == dim_key.id:
+                    if found:
+                        # TODO: this will be OK if aggregation is specified.
+                        # That is not implemented yet.
+                        raise DSGInvalidDimensionMapping(
+                            f"There are multiple mappings to {dim_key}"
+                        )
+                    dataset_dimension_ids = {
+                        x.to_id for x in mapping.model.records.select("to_id").distinct().collect()
+                    }
+                    missing = project_dimension_ids.difference(dataset_dimension_ids)
+                    if missing:
+                        raise DSGMissingDimensionMapping(
+                            f"missing dimension mapping IDs: {dim_key}: {missing}"
+                        )
+                    found = True
+            if not found:
+                raise DSGMissingDimensionMapping(f"dimension mapping not provided: {dim_key}")
 
     @property
     def config_id(self):

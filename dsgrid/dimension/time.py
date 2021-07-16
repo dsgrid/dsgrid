@@ -1,9 +1,7 @@
-"""Dimesions related to time"""
+"""Dimensions related to time"""
 
 from enum import Enum
 from dsgrid.data_models import Enum, DSGEnum, EnumValue
-
-from pydantic.dataclasses import dataclass
 
 
 class LeapDayAdjustmentType(DSGEnum):
@@ -57,47 +55,66 @@ class TimeValueMeasurement(DSGEnum):
     TOTAL = "total"
 
 
-class TimeFrequency(DSGEnum):
-    # TODO: this is incomplete; good enough for first pass
-    # TODO: it would be nice if this could be
-    # TODO: do we want to support common frequency aliases, e.g.:
-    # https://pandas.pydata.org/docs/user_guide/timeseries.html#timeseries-offset-aliases
-    _15_MIN = "15 min"
-    _1_HOUR = "1 hour"
-    _1_DAY = "1 day"
-    _1_WEEK = "1 week"
-    _1_MONTH = "1 month"
-    _1_YEAR = "1 year"
-
-
 class TimezoneType(DSGEnum):
     """Timezone enum types"""
 
-    # TODO: TimezoneType enum is likely incomplete
     UTC = "UTC"
-    PST = "PST"
-    MST = "MST"
-    CST = "CST"
-    EST = "EST"
-    LOCAL = "LOCAL"
+    HST = "HawaiiAleutianStandard"
+    AST = "AlaskaStandard"
+    APT = "AlaskaPrevailingStandard"
+    PST = "PacificStandard"
+    PPT = "PacificPrevailing"
+    MST = "MountainStandard"
+    MPT = "MountainPrevailing"
+    CST = "CentralStandard"
+    CPT = "CentralPrevailing"
+    EST = "EasternStandard"
+    EPT = "EasternPrevailing"
+    LOCAL = "LOCAL"  # Implies that the geography's timezone will be dynamically applied.
 
 
-@dataclass
-class Timezone:
-    # TODO: Timezone class  is likely incomplete
-    id: str
-    utc_offset: int
-    includes_dst: bool
-    tz: str
+class DatetimeRange:
+    def __init__(self, start, end, frequency):
+        self.start = start
+        self.end = end
+        self.frequency = frequency
 
+    def iter_time_range(self, period: Period, leap_day_adjustment: LeapDayAdjustmentType):
+        """Return a generator of datetimes for a time range.
 
-# TODO: move this to some kind of time module
-# TODO: TIME_ZONE_MAPPING is incomplete
-# EXAMPLE of applying time zone attributes to TimezoneType enum
-TIME_ZONE_MAPPING = {
-    TimezoneType.UTC: Timezone(id="UTC", utc_offset=0, includes_dst=False, tz="Etc/GMT+0"),
-    TimezoneType.PST: Timezone(id="PST", utc_offset=-8, includes_dst=False, tz="Etc/GMT+8"),
-    TimezoneType.MST: Timezone(id="MST", utc_offset=-7, includes_dst=False, tz="Etc/GMT+7"),
-    TimezoneType.CST: Timezone(id="CST", utc_offset=-6, includes_dst=False, tz="Etc/GMT+6"),
-    TimezoneType.EST: Timezone(id="EST", utc_offset=-5, includes_dst=False, tz="Etc/GMT+5"),
-}
+        Parameters
+        ----------
+        period : Period
+        leap_day_adjustment : LeapDayAdjustmentType
+
+        Yields
+        ------
+        datetime
+
+        """
+        cur = self.start
+        end = self.end + self.frequency if period == period.PERIOD_ENDING else self.end
+        while cur < end:
+            if not (
+                leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
+                and cur.month == 2
+                and cur.day == 29
+            ):
+                yield cur
+            cur += self.frequency
+
+    def list_time_range(self, period: Period, leap_day_adjustment: LeapDayAdjustmentType):
+        """Return a list of datetimes for a time range.
+
+        Parameters
+        ----------
+        period : Period
+        leap_day_adjustment : LeapDayAdjustmentType
+
+        Returns
+        -------
+        list
+            list of datetime
+
+        """
+        return list(self.iter_time_range(period, leap_day_adjustment))

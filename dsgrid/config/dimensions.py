@@ -3,25 +3,26 @@ import enum
 import importlib
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 from pydantic import validator
 from pydantic import Field
+from pyspark.sql import DataFrame, Row, SparkSession
 from semver import VersionInfo
 
-from dsgrid.common import LOCAL_REGISTRY
 from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncoder
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     Period,
     TimeValueMeasurement,
-    TimeFrequency,
     TimezoneType,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, load_data
+from dsgrid.utils.spark import create_dataframe, read_dataframe
 from dsgrid.utils.versioning import handle_version_or_str
 
 
@@ -37,7 +38,7 @@ class DimensionBaseModel(DSGBaseModel):
     dimension_type: DimensionType = Field(
         title="dimension_type",
         alias="type",
-        description="Dimension Type",
+        description="Type of the dimension",
         options=DimensionType.format_for_docs(),
     )
     dimension_id: Optional[str] = Field(
@@ -48,36 +49,42 @@ class DimensionBaseModel(DSGBaseModel):
     )
     module: Optional[str] = Field(
         title="module",
-        description="Python module that defines the dimension class",  # TODO: beter description
-        default=":mod:`dsgrid.dimension.standard`",
+        description="Python module with the dimension class",
+        default="dsgrid.dimension.standard",
         optional=True,
         requirements=(
             "Custom user-defined modules are not supported if running dsrid in 'online mode'."
-            " To supply a custom module, dsgrid must be pointing to a custom registry or be"
+            "To supply a custom module, dsgrid must be pointing to a custom registry or be"
             " working in `offline_mode`.",
             "If a user supplied module is provided then the module must be importable in the"
             " user's python environment",
         ),
-        notes=("To register a dimension in the remote dsgrid registry, If an existimg ",),
-        # TODO: NOTE: if offline mode if False, then a user-defined module is not allowed
-        # TODO: provide notes (or links) about how to generate your own class
+        notes=(
+            "dsgrid (in online-mode) only supports the :mod:`dsgrid.dimension.standard` module.",
+            # TODO: we need to fail if it comes from another module && offline_mode is False.
+            #   @DT - where does this fit into the code?
+        ),
     )
     class_name: str = Field(
         title="class_name",
+        description="Dimension record model class name",
         alias="class",
-        description="Pydantic model class name that defines the dimension records",
         notes=(
-            "The dimension class defines the expected and allowable fields of the dimension"
-            " records as well as their data types.",
-            "``dsgrid register dimensions`` only supports dimension classes defined in"
-            " the :mod:`dsgrid.dimension.standard` module.",
+            "The dimension class defines the expected and allowable fields (and their data types)"
+            " for the dimension records file.",
+            "All dimension records must have a 'id' and 'name' field."
+            "Some dimension classes support additional fields that can be used for mapping,"
+            " querying, display, etc.",
+            "dsgrid in online-mode only supports dimension classes defined in the"
+            " :mod:`dsgrid.dimension.standard` module. If dsgrid does not currently support a"
+            " dimension class that you require, please contact the dsgrid-coordination team to"
+            " request a new class feature",
         ),
-        # TODO: provide notes (or links) about how to generate your own class
     )
     cls: Optional[Any] = Field(
         title="cls",
-        alias="dimension_class",
         description="Dimension record model class",
+        alias="dimension_class",
         dsg_internal=True,
     )
     description: str = Field(
@@ -169,34 +176,12 @@ class DimensionModel(DimensionBaseModel):
         description="Hash of the contents of the file",
         dsg_internal=True,
     )
-    # TODO: I think we may remove mappings altogether in favor of associations
-    # TODO: I think we need to add the association table to
-    #   dimensions.associations.base_dimensions in the config
-    association_table: Optional[str] = Field(  # TODO: delete this?
+    association_table: Optional[str] = Field(  # TODO: delete this? -- ??
         title="association_table",
         description="Optional table that provides mappings of foreign keys",
-        dsg_internal=True,
+        dsg_internal=True,  # -- is this internal? Or is field outdated and should be removed?
     )
-    # TODO: some of the dimensions will enforce dimension mappings while
-    #   others may not
-    # TODO: I really don't think we need these mappings at this stage.
-    #   I think association tables are fine.
-    # one_to_many_mappings: Optional[List[OneToManyMapping]] = Field(
-    #     title="one_to_many_mappings",
-    #     description="Defines one-to-many mappings for this dimension",
-    #     default=[],
-    # )
-    # many_to_one_mappings: Optional[List[ManyToOneMapping]] = Field(
-    #     title="many_to_one_mappings",
-    #     description="Defines many-to-one mappings for this dimension",
-    #     default=[],
-    # )
-    # many_to_many_mappings: Optional[List[ManyToManyMapping]] = Field(
-    #     title="many_to_many_mappings",
-    #     description="Defines many-to-many mappings for this dimension",
-    #     default=[],
-    # )
-    records: Optional[List[Dict]] = Field(
+    records: Optional[DataFrame] = Field(
         title="records",
         description="Dimension records in filename that get loaded at runtime",
         default=[],
@@ -206,15 +191,6 @@ class DimensionModel(DimensionBaseModel):
     @validator("filename")
     def check_file(cls, filename):
         """Validate that dimension file exists and has no errors"""
-        # TODO: do we need to support S3 file paths when we already sync the registry at an
-        #   earlier stage? Technically this means that the path should be local
-        # validation for S3 paths (sync locally)
-        if filename.startswith("s3://"):
-            path = LOCAL_REGISTRY / filename.replace("s3://", "")
-            breakpoint()  # TODO DT: this doesn't look right for AWS
-            # sync(filename, path)
-
-        # Validate that filename exists
         if not os.path.isfile(filename):
             raise ValueError(f"file {filename} does not exist")
 
@@ -229,7 +205,7 @@ class DimensionModel(DimensionBaseModel):
             return None
         return file_hash or compute_file_hash(values["filename"])
 
-    # TODO: is this what we want?
+    # TODO: is this what we want? --- Can we remove this entire TODO here?
     # @validator(
     #     "one_to_many_mappings",
     #     "many_to_one_mappings",
@@ -248,6 +224,7 @@ class DimensionModel(DimensionBaseModel):
     #         raise ValueError(f"{module} does not define {val.to_dimension}")
 
     #     return val
+    # ^^ Can we remove the above?
 
     @validator("records", always=True)
     def add_records(cls, records, values):
@@ -257,33 +234,15 @@ class DimensionModel(DimensionBaseModel):
             if values.get(req) is None:
                 return records
 
-        filename = values["filename"]
+        filename = Path(values["filename"])
         dim_class = values["cls"]
-        assert not filename.startswith("s3://")  # TODO: see above
+        assert not str(filename).startswith("s3://"), "records must exist in the local filesystem"
 
         if records:
-            raise ValueError("records should not be defined in the project config")
+            raise ValueError("records should not be defined in the dimension config")
 
-        # Deserialize the model, validate, add default values, ensure id
-        # uniqueness, and then store as dict that can be loaded into
-        # Spark later.
-        # TODO: Do we want to make sure name is unique too?
-        ids = set()
-        # TODO: Dan - we want to add better support for csv
-        if values["filename"].endswith(".csv"):
-            filerecords = csv.DictReader(open(values["filename"]))
-        else:
-            filerecords = load_data(values["filename"])
-        for record in filerecords:
-            actual = dim_class(**record)
-            if actual.id in ids:
-                raise ValueError(
-                    f"{actual.id} is stored multiple times for " f"{dim_class.__name__}"
-                )
-            ids.add(actual.id)
-            records.append(actual.dict())
-
-        return records
+        # The trick in DSGBaseModel.load where we change directories doesn't work with Spark.
+        return read_dataframe(filename, cache=True, require_unique=["id"], read_with_spark=False)
 
     def dict(self, by_alias=True, **kwargs):
         exclude = {"cls", "records"}
@@ -298,6 +257,22 @@ class DimensionModel(DimensionBaseModel):
         return data
 
 
+class TimeRangeModel(DSGBaseModel):
+    """Defines a continuous range of time."""
+
+    # This uses str instead of datetime because this object doesn't have the ability
+    # to serialize/deserialize by itself (no str-format).
+    # We use the DatetimeRange object during processing.
+    start: str = Field(
+        title="start",
+        description="First timestamp in the data",
+    )
+    end: str = Field(
+        title="end",
+        description="Last timestamp in the data (inclusive)",
+    )
+
+
 class TimeDimensionModel(DimensionBaseModel):
     """Defines a time dimension"""
 
@@ -310,37 +285,32 @@ class TimeDimensionModel(DimensionBaseModel):
         default="%Y-%m-%d %H:%M:%s-%z",
         description="Timestamp format",
     )
-    # TODO: we may want a list of start and end times;
-    #       can this be string or list of strings?
-    start: datetime = Field(
-        title="start",
-        description="First timestamp in the data",
+    ranges: List[TimeRangeModel] = Field(
+        title="time_ranges",
+        description="Defines the continuous ranges of time in the data.",  # Alternative description: List of start and end times.
     )
-    # TODO: Is this inclusive or exclusive? --> mm:I don't know what this means
-    # TODO: we may want to support a list of start and end times
-    end: datetime = Field(
-        title="end",
-        description="Last timestamp in the data",
-    )
-    # TODO: it would be nice to have this be a func that splits nmbr from unit
-    frequency: TimeFrequency = Field(
+    frequency: timedelta = Field(
         title="frequency",
-        description="Resolution of the time data",
-        options=TimeFrequency.format_for_docs(),
+        description="Resolution of the timestamps",
+        # TODO: add note/link for how to get timedeltas;
     )
     includes_dst: bool = Field(
         title="includes_dst",
         description="Includes daylight savings time",
     )
+    frequency: timedelta = Field(
+        title="frequency",
+        description="Resolution of the timestamps",
+    )
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
         title="leap_day_adjustment",
         default=None,
-        description="TODO",
+        description="TODO",  # TODO
         options=LeapDayAdjustmentType.format_for_docs(),
     )
     period: Period = Field(
         title="period",
-        description="TODO",
+        description="TODO",  # TODO
         options=Period.format_descriptions_for_docs(),
     )
     timezone: TimezoneType = Field(
@@ -348,7 +318,6 @@ class TimeDimensionModel(DimensionBaseModel):
         description="Timezone of data",
         options=TimezoneType.format_for_docs(),
     )
-    # TODO: is this a project-level time dimension config?
     value_representation: TimeValueMeasurement = Field(
         title="value_representation",
         default="mean",
@@ -358,13 +327,21 @@ class TimeDimensionModel(DimensionBaseModel):
         # notes=(" ",),  # TODO:
     )
 
-    @validator("start", "end", pre=True)
-    def check_times(cls, val, values):
-        # TODO: technical year doesn't matter; needs to apply the weather year
-        # make sure start and end time parse
-        datetime.strptime(val, values["str_format"])
-        # TODO: validate consistency between start, end, frequency
-        return val
+    @validator("ranges", pre=True)
+    def check_times(cls, ranges, values):
+        for time_range in ranges:
+            # make sure start and end time parse
+            datetime.strptime(time_range["start"], values["str_format"])
+            datetime.strptime(time_range["end"], values["str_format"])
+            # TODO: validate consistency between start, end, frequency. End time should always be an interval of the frequency. So, for example, if frequency is 1 hour, and start time starts at 00:00, then end time cannot be 23:59.
+        return ranges
+
+    @validator("leap_day_adjustment")
+    def check_leap_day_adjustment(cls, value):
+        if value is not None:
+            # TODO: DSGRID-172
+            raise ValueError("leap_day_adjustment is not yet supported")
+        return value
 
     def dict(self, by_alias=True, **kwargs):
         exclude = {"cls"}
@@ -375,8 +352,6 @@ class TimeDimensionModel(DimensionBaseModel):
         data = super().dict(by_alias=by_alias, **kwargs)
         data["module"] = str(data["module"])
         data["dimension_class"] = None
-        data["start"] = str(data["start"])
-        data["end"] = str(data["end"])
         _convert_for_serialization(data)
         return data
 
@@ -387,16 +362,16 @@ class DimensionReferenceModel(DSGBaseModel):
     dimension_type: DimensionType = Field(
         title="dimension_type",
         alias="type",
-        description="Dimension Type",
+        description="Type of the dimension",
         options=DimensionType.format_for_docs(),
     )
     dimension_id: str = Field(
         title="dimension_id",
         description="Unique ID of the dimension in the registry",
         notes=(
-            "The dimension ID is generated by dsgrid when a dimension is registered (see "
-            ":red:`Register a Dimension`  )  and it is a concatenation of the user-provided dimension "
-            "name and a auto-generated UUID.",
+            "The dimension ID is generated by dsgrid when a dimension is registered (see"
+            " :red:`Register a Dimension` ) and it is a concatenation of the user-provided"
+            " dimension name and a auto-generated UUID.",
         ),
     )
     version: Union[str, VersionInfo] = Field(
@@ -406,7 +381,7 @@ class DimensionReferenceModel(DSGBaseModel):
             "The version string must be in semver format (e.g., '1.0.0') and it must be "
             " a valid/existing version in the registry.",
         ),
-        # TODO: add notes about warnings for outdated versions?
+        # TODO: add notes about warnings for outdated versions? @DT - are these outdated version warnings implemented yet?
     )
 
     @validator("version")
@@ -442,7 +417,7 @@ def _convert_for_serialization(data):
 
 
 class _DimensionsDocsModel(DSGBaseModel):
-    """Stand-alone model to point to for dimension.toml docs"""
+    """Stand-alone model to point to for dimension.toml docs."""
 
     # TODO: For documentation of dimensions.toml, I propose that we rename the current DimensionsModel (in project.toml) to something like ProjectConfigDimensionsModel (or something) and then rename this model to DimensionsModel
 

@@ -96,6 +96,21 @@ class TimeDimensionConfig(DimensionBaseConfig):
 
         return ranges
 
+    def list_time_range(self, time_range: DatetimeRange):
+        """Return a list of datetimes for a time range.
+
+        Parameters
+        ----------
+        time_range : DatetimeRange
+
+        Returns
+        -------
+        list
+            list of datetime
+
+        """
+        return time_range.list_time_range(self.model.period, self.model.leap_day_adjustment)
+
     def get_tzinfo(self):
         """Return a tzinfo instance for this dimension.
 

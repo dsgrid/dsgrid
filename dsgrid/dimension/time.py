@@ -1,6 +1,5 @@
 """Dimensions related to time"""
 
-from collections import namedtuple
 from enum import Enum
 
 
@@ -54,4 +53,48 @@ class TimezoneType(Enum):
     LOCAL = "LOCAL"  # Implies that the geography's timezone will be dynamically applied.
 
 
-DatetimeRange = namedtuple("DatetimeRange", ["start", "end", "frequency"])
+class DatetimeRange:
+    def __init__(self, start, end, frequency):
+        self.start = start
+        self.end = end
+        self.frequency = frequency
+
+    def iter_time_range(self, period: Period, leap_day_adjustment: LeapDayAdjustmentType):
+        """Return a generator of datetimes for a time range.
+
+        Parameters
+        ----------
+        period : Period
+        leap_day_adjustment : LeapDayAdjustmentType
+
+        Yields
+        ------
+        datetime
+
+        """
+        cur = self.start
+        end = self.end + self.frequency if period == period.PERIOD_ENDING else self.end
+        while cur < end:
+            if not (
+                leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
+                and cur.month == 2
+                and cur.day == 29
+            ):
+                yield cur
+            cur += self.frequency
+
+    def list_time_range(self, period: Period, leap_day_adjustment: LeapDayAdjustmentType):
+        """Return a list of datetimes for a time range.
+
+        Parameters
+        ----------
+        period : Period
+        leap_day_adjustment : LeapDayAdjustmentType
+
+        Returns
+        -------
+        list
+            list of datetime
+
+        """
+        return list(self.iter_time_range(period, leap_day_adjustment))

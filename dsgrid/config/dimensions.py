@@ -311,6 +311,13 @@ class TimeDimensionModel(DimensionBaseModel):
             # TODO: validate consistency between start, end, frequency
         return ranges
 
+    @validator("leap_day_adjustment")
+    def check_leap_day_adjustment(cls, value):
+        if value is not None:
+            # TODO: DSGRID-172
+            raise ValueError("leap_day_adjustment is not yet supported")
+        return value
+
     def dict(self, by_alias=True, **kwargs):
         exclude = {"cls"}
         if "exclude" in kwargs and kwargs["exclude"] is not None:

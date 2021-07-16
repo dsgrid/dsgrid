@@ -63,7 +63,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         if not os.environ.get("__DSGRID_SKIP_DATASET_CONSISTENCY_CHECKS__"):
             self._check_dataset_consistency(config)
 
-    def _check_dataset_consistency(self, config):
+    def _check_dataset_consistency(self, config: DatasetConfig):
         spark = SparkSession.getActiveSession()
         load_data = read_dataframe(Path(config.model.path) / Dataset.DATA_FILENAME)
         load_data_lookup = read_dataframe(
@@ -76,7 +76,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
             self._check_dataset_internal_consistency(config, load_data, load_data_lookup)
 
-    def _check_lookup_data_consistency(self, config, load_data_lookup):
+    def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
         found_id = False
         dimension_types = []
         for col in load_data_lookup.columns:
@@ -114,30 +114,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         time_range = time_ranges[0]
         # TODO: need to support validation of multiple time ranges: DSGRID-173
 
-        weather_dim = config.get_dimension(DimensionType.WEATHER_YEAR)
-        weather_years = [int(x.id) for x in weather_dim.model.records.collect()]
-        # TODO: need to support handling of multiple weather years: DSGRID-174
-        # It is not clear how multiple weather years apply to multiple time ranges.
-        assert len(weather_years) == 1, len(weather_years)
-        weather_year = weather_years[0]
-
-        if time_range.start.year != weather_year:
-            raise DSGInvalidDataset(
-                f"weather year mismatch: time_dimension start={time_range.start} weather_year={weather_year}"
-            )
-        if time_range.end.year != weather_year:
-            valid = True
-            if time_dim.model.period in (Period.PERIOD_BEGINNING, Period.INSTANTANEOUS):
-                valid = False
-            elif (
-                time_dim.model.period == Period.PERIOD_ENDING
-                and time_range.end.year != weather_year + 1
-            ):
-                valid = False
-            if not valid:
-                raise DSGInvalidDataset(
-                    f"weather year mismatch: time_dimension end={time_range.end} weather_year={weather_year}"
-                )
         expected_times = time_dim.list_time_range(time_range)
         actual_timestamps = [
             x.timestamp.astimezone().astimezone(tz)

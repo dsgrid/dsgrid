@@ -6,6 +6,8 @@ import os
 from pathlib import Path
 import uuid
 
+from pyspark.sql import SparkSession
+
 from dsgrid.common import (
     LOCAL_REGISTRY,
     REMOTE_REGISTRY,
@@ -18,6 +20,7 @@ from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.filesystem.factory import make_filesystem_interface
+from dsgrid.utils.spark import init_spark
 from .common import (
     RegistryType,
     RegistryManagerParams,
@@ -45,6 +48,8 @@ class RegistryManager:
     """
 
     def __init__(self, params: RegistryManagerParams):
+        if SparkSession.getActiveSession() is None:
+            init_spark("registry")
         self._params = params
         self._dimension_mgr = DimensionRegistryManager.load(
             params.base_path / DimensionRegistry.registry_path(), params

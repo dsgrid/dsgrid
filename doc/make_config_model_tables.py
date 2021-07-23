@@ -40,7 +40,7 @@ def modify_schema(cls, field_schema):
 VersionInfo.__modify_schema__ = modify_schema
 
 
-def _get_output(_, value):
+def _get_output(_, __, value):
     return Path(value)
 
 
@@ -78,7 +78,7 @@ def make_tables(output):
             f_out.write("\t".join(header) + "\n")
             required_props = set(schema["required"])
             for prop, vals in schema["properties"].items():
-                if vals["title"] == prop:
+                if vals.get("title") in (prop, None):
                     title = prop
                 else:
                     title = vals["title"] + " " + prop

@@ -92,7 +92,9 @@ class ProjectRegistryManager(RegistryManagerBase):
             return project
 
         project = ProjectConfig.load(
-            self.get_config_file(key.id, key.version), self._dimension_mgr
+            self.get_config_file(key.id, key.version),
+            self._dimension_mgr,
+            self._dimension_mapping_mgr,
         )
         self._projects[key] = project
         return project
@@ -101,7 +103,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         return f"configs/.locks/{config_id}.lock"
 
     def register(self, config_file, submitter, log_message, force=False):
-        config = ProjectConfig.load(config_file, self._dimension_mgr)
+        config = ProjectConfig.load(config_file, self._dimension_mgr, self._dimension_mapping_mgr)
         lock_file_path = self.get_registry_lock_file(config.config_id)
         with self.cloud_interface.make_lock_file(lock_file_path):
             self._register(config, submitter, log_message, force=force)
@@ -227,7 +229,9 @@ class ProjectRegistryManager(RegistryManagerBase):
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
     ):
-        config = ProjectConfig.load(config_file, self.dimension_manager)
+        config = ProjectConfig.load(
+            config_file, self.dimension_manager, self.dimension_mapping_manager
+        )
         self._check_update(config, config_id, version)
         self.update(config, update_type, log_message, submitter=submitter)
 

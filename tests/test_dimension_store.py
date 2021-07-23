@@ -7,7 +7,7 @@ from pydantic import BaseModel
 from dsgrid.time.types import DayType, Season
 from dsgrid.config.dimensions import TimeDimensionModel
 from .data.dimension_models.minimal.models import *
-from dsgrid.dimension.standard import County, State, EndUse, CensusDivision, CensusRegion, Time
+from dsgrid.dimension.standard import County, State, CensusDivision, CensusRegion, Time
 from dsgrid.dimension.store import DimensionStore
 from dsgrid.exceptions import *
 from dsgrid.project import Project

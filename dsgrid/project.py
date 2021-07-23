@@ -51,6 +51,7 @@ class Project:
         project_manager = manager.project_manager
         config = project_manager.get_by_id(project_id, version=version)
 
+        print(registry_path)
         project_dimension_store = DimensionStore.load(
             itertools.chain(
                 config.base_dimensions.values(), config.supplemental_dimensions.values()

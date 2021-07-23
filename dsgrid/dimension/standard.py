@@ -21,6 +21,7 @@ from sqlalchemy.orm import sessionmaker
 from dsgrid.config.dimensions import TimeDimensionModel
 from dsgrid.dimension.base_models import (
     MetricDimensionBaseModel,
+    # EndUseDimensionBaseModel, # <---- delete
     GeographyDimensionBaseModel,
     DataSourceDimensionBaseModel,
     ModelYearDimensionBaseModel,
@@ -30,11 +31,6 @@ from dsgrid.dimension.base_models import (
     WeatherYearDimensionBaseModel,
 )
 from dsgrid.dimension.metric_units_and_fuel_types import (
-    EnergyUnit,
-    EnergyServiceUnit,
-    PopulationUnit,
-    StockUnit,
-    EnergyEfficiencyUnit,
     FuelType,
 )
 
@@ -196,11 +192,17 @@ class SubsectorOrm(BaseOrm):
 # ---------------------------
 # METRIC DIMENSIONS
 # ---------------------------
+# class EndUse(EndUseDimensionBaseModel): # <---- delete
+#     """End Use"""
+#     fuel_id: str
+#     units: str
+
+
 class EnergyEndUse(MetricDimensionBaseModel):
     """Energy Demand End Use attributes"""
 
     fuel_id: FuelType = Field(title="fuel_id", description="fuel type, e.g., electricity")
-    unit: EnergyUnit = Field(title="unit", description="unit for energy demand, e.g., kwh")
+    unit: str
 
 
 class EnergyEndUseOrm(BaseOrm):
@@ -221,9 +223,7 @@ class EnergyEndUseOrm(BaseOrm):
 class EnergyServiceEndUse(MetricDimensionBaseModel):
     """Energy Service Demand End Use attributes"""
 
-    unit: EnergyServiceUnit = Field(
-        title="unit", description="unit for energy service demand, e.g., mmbtu"
-    )
+    unit: str
 
 
 class EnergyServiceEndUseOrm(BaseOrm):
@@ -243,7 +243,7 @@ class EnergyServiceEndUseOrm(BaseOrm):
 class Population(MetricDimensionBaseModel):
     """Population attributes"""
 
-    unit: PopulationUnit = Field(title="unit", description="unit for population, i.e., capita")
+    unit: str
 
 
 class PopulationOrm(BaseOrm):
@@ -263,7 +263,7 @@ class PopulationOrm(BaseOrm):
 class Stock(MetricDimensionBaseModel):
     """Stock attributes - includes GDP, building stock, equipment"""
 
-    unit: StockUnit = Field(title="unit", description="unit for stock, e.g., dollars, bldgs")
+    unit: str
 
 
 class StockOrm(BaseOrm):
@@ -283,9 +283,7 @@ class StockOrm(BaseOrm):
 class EnergyEfficiency(MetricDimensionBaseModel):
     """Energy Efficiency of building stock or equipment"""
 
-    unit: EnergyEfficiencyUnit = Field(
-        title="unit", description="unit for energy or conversion efficiency, e.g., afue"
-    )
+    unit: str
 
 
 class EnergyEfficiencyOrm(BaseOrm):

@@ -1,4 +1,6 @@
-"""Units for Metric Types + Fuel Types"""
+"""Metric Units and Fuel Types
+metric units to be standardized at the project level
+"""
 
 from enum import Enum
 
@@ -18,6 +20,9 @@ class EnergyServiceUnit(Enum):
 
     MMBTU = "mmbtu"
     BTU = "btu"
+    LUMEN_ = "lumens"
+    CFM_YRS = "cfm-years"  # ventilation
+    LM_YRS = "lumen-years"
 
 
 class PopulationUnit(Enum):
@@ -29,12 +34,13 @@ class PopulationUnit(Enum):
 class StockUnit(Enum):
     """Acceptable units for stock"""
 
-    # GDP
+    # GDP/Industry
     DOLLAR = "dollars"
 
     # Building stock
     BLDGS = "bldgs"  # no. of buildings
     BLDG_UNITS = "bldg_units"  # no. of building units
+    SQFT = "sqft"
 
     # Equipment
     UNITS = "units"
@@ -60,6 +66,6 @@ class FuelType(Enum):
 
     ELECTRICITY = "electricity"
     NATURAL_GAS = "natural_gas"
-    GASOLINE = "gasoline"  # check with TEMPO
-    DIESEL = "diesel"  # check with TEMPO
+    GASOLINE = "gasoline"
+    DIESEL = "diesel"
     OTHER_FUELS = "other_fuels"

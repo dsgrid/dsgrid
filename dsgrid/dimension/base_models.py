@@ -13,7 +13,6 @@ class DimensionType(Enum):
     """Dimension types"""
 
     METRIC = "metric"
-    # END_USE = "end_use" # <---- delete
     GEOGRAPHY = "geography"
     SECTOR = "sector"
     SUBSECTOR = "subsector"
@@ -39,10 +38,6 @@ class DimensionRecordBaseModel(DSGBaseModel):
 
 class MetricDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all metric dimensions (e.g. EnergyEndUse)"""
-
-
-# class EndUseDimensionBaseModel(DimensionRecordBaseModel):
-#     """Base class for end use dimensions """ # <---- delete
 
 
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
@@ -79,7 +74,6 @@ class WeatherYearDimensionBaseModel(DimensionRecordBaseModel):
 
 _DIMENSION_TO_MODEL = {
     DimensionType.METRIC: MetricDimensionBaseModel,
-    # DimensionType.METRIC: EndUseDimensionBaseModel, # <---- delete
     DimensionType.GEOGRAPHY: GeographyDimensionBaseModel,
     DimensionType.SECTOR: SectorDimensionBaseModel,
     DimensionType.SUBSECTOR: SubsectorDimensionBaseModel,

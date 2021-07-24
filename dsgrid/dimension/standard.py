@@ -21,7 +21,6 @@ from sqlalchemy.orm import sessionmaker
 from dsgrid.config.dimensions import TimeDimensionModel
 from dsgrid.dimension.base_models import (
     MetricDimensionBaseModel,
-    # EndUseDimensionBaseModel, # <---- delete
     GeographyDimensionBaseModel,
     DataSourceDimensionBaseModel,
     ModelYearDimensionBaseModel,
@@ -192,12 +191,6 @@ class SubsectorOrm(BaseOrm):
 # ---------------------------
 # METRIC DIMENSIONS
 # ---------------------------
-# class EndUse(EndUseDimensionBaseModel): # <---- delete
-#     """End Use"""
-#     fuel_id: str
-#     units: str
-
-
 class EnergyEndUse(MetricDimensionBaseModel):
     """Energy Demand End Use attributes"""
 

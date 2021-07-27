@@ -29,9 +29,6 @@ from dsgrid.dimension.base_models import (
     SubsectorDimensionBaseModel,
     WeatherYearDimensionBaseModel,
 )
-from dsgrid.dimension.metric_units_and_fuel_types import (
-    FuelType,
-)
 
 BaseOrm = declarative_base()
 
@@ -194,7 +191,7 @@ class SubsectorOrm(BaseOrm):
 class EnergyEndUse(MetricDimensionBaseModel):
     """Energy Demand End Use attributes"""
 
-    fuel_id: FuelType = Field(title="fuel_id", description="fuel type, e.g., electricity")
+    fuel_id: str
     unit: str
 
 

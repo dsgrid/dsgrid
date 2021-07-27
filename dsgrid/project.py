@@ -28,7 +28,6 @@ class Project:
     @classmethod
     def load(cls, project_id, registry_path=None, version=None, offline_mode=False):
         """Load a project from the registry.
-
         Parameters
         ----------
         project_id : str
@@ -37,7 +36,6 @@ class Project:
             Use the latest if not specified.
         offline_mode : bool
             If True, don't sync with remote registry
-
         """
         registry_path = get_registry_path(registry_path=registry_path)
         manager = RegistryManager.load(registry_path, offline_mode=offline_mode)

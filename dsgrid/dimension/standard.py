@@ -203,12 +203,6 @@ class EnergyEndUseOrm(BaseOrm):
     unit = Column(String(255), nullable=False)
     fuel_id = Column(String(255), nullable=False)
 
-    model_energy = relationship(
-        "DataSourceOrm",
-        secondary=metric_model_association,
-        back_populates="metric_energy",
-    )
-
 
 class EnergyServiceEndUse(MetricDimensionBaseModel):
     """Energy Service Demand End Use attributes"""
@@ -222,12 +216,6 @@ class EnergyServiceEndUseOrm(BaseOrm):
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
     unit = Column(String(255), nullable=False)
-
-    model_service = relationship(
-        "DataSourceOrm",
-        secondary=metric_model_association,
-        back_populates="metric_service",
-    )
 
 
 class Population(MetricDimensionBaseModel):
@@ -243,12 +231,6 @@ class PopulationOrm(BaseOrm):
     name = Column(String(255), nullable=False)
     unit = Column(String(255), nullable=False)
 
-    model_population = relationship(
-        "DataSourceOrm",
-        secondary=metric_model_association,
-        back_populates="metric_population",
-    )
-
 
 class Stock(MetricDimensionBaseModel):
     """Stock attributes - includes GDP, building stock, equipment"""
@@ -263,12 +245,6 @@ class StockOrm(BaseOrm):
     name = Column(String(255), nullable=False)
     unit = Column(String(255), nullable=False)
 
-    model_stock = relationship(
-        "DataSourceOrm",
-        secondary=metric_model_association,
-        back_populates="metric_stock",
-    )
-
 
 class EnergyEfficiency(MetricDimensionBaseModel):
     """Energy Efficiency of building stock or equipment"""
@@ -282,12 +258,6 @@ class EnergyEfficiencyOrm(BaseOrm):
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
     unit = Column(String(255), nullable=False)
-
-    model_efficiency = relationship(
-        "DataSourceOrm",
-        secondary=metric_model_association,
-        back_populates="metric_efficiency",
-    )
 
 
 # ---------------------------
@@ -330,31 +300,6 @@ class DataSourceOrm(BaseOrm):
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
 
-    metric_energy = relationship(
-        "EnergyEndUseOrm",
-        secondary=metric_model_association,
-        back_populates="model_energy",
-    )
-    metric_service = relationship(
-        "EnergyServiceEndUseOrm",
-        secondary=metric_model_association,
-        back_populates="model_service",
-    )
-    metric_population = relationship(
-        "PopulationOrm",
-        secondary=metric_model_association,
-        back_populates="model_population",
-    )
-    metric_stock = relationship(
-        "StockOrm",
-        secondary=metric_model_association,
-        back_populates="model_stock",
-    )
-    metric_efficiency = relationship(
-        "EnergyEfficiencyOrm",
-        secondary=metric_model_association,
-        back_populates="model_efficiency",
-    )
     subsector = relationship(
         "SubsectorOrm",
         secondary=model_subsector_association,

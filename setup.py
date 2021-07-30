@@ -1,55 +1,48 @@
 """
 setup.py
 """
-from codecs import open
-from setuptools import setup, find_packages
-import os
 import logging
-import shlex
-
-try:
-    from pypandoc import convert_text
-except ImportError:
-    convert_text = lambda string, *args, **kwargs: string
-
+from pathlib import Path
+from setuptools import setup, find_packages
 
 logger = logging.getLogger(__name__)
 
+here = Path(__file__).parent.resolve()
+metadata = {}
 
-def read_lines(filename):
-    with open(filename) as f_in:
-        return f_in.readlines()
+with open(here / "dsgrid" / "_version.py", encoding="utf-8") as f:
+    exec(f.read(), metadata)
 
+with open(here / "README.md", encoding="utf-8") as f:
+    readme = f.read()
 
-here = os.path.abspath(os.path.dirname(__file__))
-
-with open("README.md", encoding="utf-8") as readme_file:
-    readme = convert_text(readme_file.read(), "rst", format="md")
-
-with open(os.path.join(here, "dsgrid", "_version.py"), encoding="utf-8") as f:
-    version = f.read()
-
-version = version.split()[2].strip('"').strip("'")
+dev_requires = ["black", "pre-commit", "devtools"]
 
 test_requires = ["pytest", "pytest-cov"]
 
+doc_requires = ["ghp-import", "numpydoc", "pandoc", "sphinx", "sphinx_rtd_theme"]
+
+release_requires = ["twine", "setuptools", "wheel"]
+
 setup(
-    name="dsgrid",
-    version=version,
-    description="dsgrid",
+    name=metadata["__title__"],
+    version=metadata["__version__"],
+    description=metadata["__description__"],
     long_description=readme,
-    author="NREL",
-    maintainer_email="elaine.hale@nrel.gov",
-    url="https://github.com/dsgrid/dsgrid.git",
+    long_description_content_type="text/markdown",
+    author=metadata["__author__"],
+    maintainer_email=metadata["__maintainer_email__"],
+    url=metadata["__url__"],
     packages=find_packages(),
     package_dir={"dsgrid": "dsgrid"},
     entry_points={
         "console_scripts": [
             "dsgrid=dsgrid.cli.dsgrid:cli",
+            "dsgrid-internal=dsgrid.cli.dsgrid_internal:cli",
         ],
     },
     include_package_data=True,
-    license="BSD license",
+    license=metadata["__license__"],
     zip_safe=False,
     keywords="dsgrid",
     classifiers=[
@@ -60,8 +53,24 @@ setup(
         "Programming Language :: Python :: 3.8",
     ],
     test_suite="tests",
-    install_requires=read_lines("requirements.txt"),
+    install_requires=[
+        "awscli",
+        "boto3",
+        "click>=8",
+        "findspark",
+        "numpy",
+        "pandas",
+        "prettytable",
+        "pydantic",
+        "pyspark",
+        "s3path",
+        "semver",
+        "sqlalchemy",
+        "toml",
+    ],
     extras_require={
-        "dev": test_requires,
+        "test": test_requires,
+        "dev": test_requires + dev_requires,
+        "admin": test_requires + dev_requires + doc_requires + release_requires,
     },
 )

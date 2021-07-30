@@ -1,5 +1,0 @@
-click
-numpy
-pandas
-pyspark
-toml

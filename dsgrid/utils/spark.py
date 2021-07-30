@@ -65,6 +65,9 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
         If True, cache the DataFrame in memory.
     require_unique : list
         list of column names (str) to check for uniqueness
+    read_with_spark : bool
+        If True, read the file with pyspark.read. Otherwise, read the file into
+        a list of dicts, convert to pyspark Rows, and then to a DataFrame.
 
     Returns
     -------

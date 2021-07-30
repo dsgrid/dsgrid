@@ -25,6 +25,9 @@ class LeapDayAdjustmentType(DSGEnum):
 class Period(DSGEnum):
     """Time period enum types"""
 
+    # TODO: R2PD uses a different set; do we want to align?
+    # https://github.com/Smart-DS/R2PD/blob/master/R2PD/tshelpers.py#L15
+
     PERIOD_ENDING = EnumValue(
         value="period_ending",
         description="A time period that is period ending is coded by the end time. E.g., 2pm (with"
@@ -39,11 +42,6 @@ class Period(DSGEnum):
         value="instantaneous",
         description="The time record value represents measured, instantaneous time",
     )
-
-
-# TODO: R2PD uses a different set; do we want to align?
-# https://github.com/Smart-DS/R2PD/blob/master/R2PD/tshelpers.py#L15
-#
 
 
 class TimeValueMeasurement(DSGEnum):
@@ -91,7 +89,8 @@ class TimezoneType(DSGEnum):
     )
     APT = EnumValue(
         value="AlaskaPrevailingStandard",
-        description="Alaska Prevailing Time. Commonly called Alaska Local Time. Includes DST shifts during DST times.",
+        description="Alaska Prevailing Time. Commonly called Alaska Local Time. Includes DST"
+        " shifts during DST times.",
         tz=pytz.timezone("US/Alaska"),
     )
     PST = EnumValue(
@@ -101,7 +100,8 @@ class TimezoneType(DSGEnum):
     )
     PPT = EnumValue(
         value="PacificPrevailing",
-        description="Pacific Prevailing Time. Commonly called Pacific Local Time. Includes DST shifts ,during DST times.",
+        description="Pacific Prevailing Time. Commonly called Pacific Local Time. Includes DST"
+        " shifts ,during DST times.",
         tz=pytz.timezone("US/Pacific"),
     )
     MST = EnumValue(
@@ -111,7 +111,8 @@ class TimezoneType(DSGEnum):
     )
     MPT = EnumValue(
         value="MountainPrevailing",
-        description="Mountain Prevailing Time. Commonly called Mountain Local Time. Includes DST shifts during DST times.",
+        description="Mountain Prevailing Time. Commonly called Mountain Local Time. Includes DST"
+        " shifts during DST times.",
         tz=pytz.timezone("US/Mountain"),
     )
     CST = EnumValue(
@@ -121,7 +122,8 @@ class TimezoneType(DSGEnum):
     )
     CPT = EnumValue(
         value="CentralPrevailing",
-        description="Central Prevailing Time. Commonly called Central Local Time. Includes DST shifts during DST times.",
+        description="Central Prevailing Time. Commonly called Central Local Time. Includes DST"
+        " shifts during DST times.",
         tz=pytz.timezone("US/Central"),
     )
     EST = EnumValue(
@@ -131,12 +133,14 @@ class TimezoneType(DSGEnum):
     )
     EPT = EnumValue(
         value="EasternPrevailing",
-        description="Eastern Prevailing Time. Commonly called Eastern Local Time. Includes DST shifts during DST times.",
+        description="Eastern Prevailing Time. Commonly called Eastern Local Time. Includes DST"
+        " shifts during DST times.",
         tz=pytz.timezone("US/Eastern"),
     )
     LOCAL = EnumValue(
         value="LOCAL",
-        description="Local time. Implies that the geography's timezone will be dynamically applied when converting loca time to other time zones.",
+        description="Local time. Implies that the geography's timezone will be dynamically applied"
+        " when converting loca time to other time zones.",
         tz=None,  # TODO: needs handling: DSGRID-171
     )
 

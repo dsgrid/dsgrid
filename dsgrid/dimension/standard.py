@@ -19,7 +19,7 @@ from sqlalchemy.orm import sessionmaker
 
 from dsgrid.config.dimensions import TimeDimensionModel
 from dsgrid.dimension.base_models import (
-    EndUseDimensionBaseModel,
+    MetricDimensionBaseModel,
     GeographyDimensionBaseModel,
     DataSourceDimensionBaseModel,
     ModelYearDimensionBaseModel,
@@ -29,6 +29,31 @@ from dsgrid.dimension.base_models import (
     WeatherYearDimensionBaseModel,
 )
 
+BaseOrm = declarative_base()
+
+
+metric_model_association = Table(
+    "metric_model",
+    BaseOrm.metadata,
+    Column("metric", String(255), ForeignKey("Metric.id")),
+    Column("data_source", String(255), ForeignKey("DataSource.id")),
+)
+
+
+model_subsector_association = Table(
+    "model_subsector",
+    BaseOrm.metadata,
+    Column("data_source", String(255), ForeignKey("DataSource.id")),
+    Column("subsector", String(255), ForeignKey("Subsector.id")),
+)
+
+
+subsector_sector_association = Table(
+    "subsector_sector",
+    BaseOrm.metadata,
+    Column("subsector", String(255), ForeignKey("Subsector.id")),
+    Column("sector", String(255), ForeignKey("Sector.id")),
+)
 
 # ---------------------------
 # GEOGRAPHIC DIMENSIONS
@@ -89,17 +114,80 @@ class Subsector(SubsectorDimensionBaseModel):
 
 
 # ---------------------------
-# ENDUSE DIMENSIONS
+# METRIC DIMENSIONS
 # ---------------------------
-class EndUse(EndUseDimensionBaseModel):
-    """End use attributes"""
+class EnergyEndUse(MetricDimensionBaseModel):
+    """Energy Demand End Use attributes"""
 
-    # sector: str  # TODO: the raw data doesn't have this field
     fuel_id: str
-    units: str
+    unit: str
 
 
-# TODO: @DT are these needed?
+class EnergyEndUseOrm(BaseOrm):
+    __tablename__ = "EnergyEndUse"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
+    fuel_id = Column(String(255), nullable=False)
+
+
+class EnergyServiceEndUse(MetricDimensionBaseModel):
+    """Energy Service Demand End Use attributes"""
+
+    unit: str
+
+
+class EnergyServiceEndUseOrm(BaseOrm):
+    __tablename__ = "EnergyServiceEndUse"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
+
+
+class Population(MetricDimensionBaseModel):
+    """Population attributes"""
+
+    unit: str
+
+
+class PopulationOrm(BaseOrm):
+    __tablename__ = "Population"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
+
+
+class Stock(MetricDimensionBaseModel):
+    """Stock attributes - includes GDP, building stock, equipment"""
+
+    unit: str
+
+
+class StockOrm(BaseOrm):
+    __tablename__ = "Stock"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
+
+
+class EnergyEfficiency(MetricDimensionBaseModel):
+    """Energy Efficiency of building stock or equipment"""
+
+    unit: str
+
+
+class EnergyEfficiencyOrm(BaseOrm):
+    __tablename__ = "EnergyEfficiency"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
+
+
 # ---------------------------
 # TIME DIMENSIONS
 # ---------------------------
@@ -132,6 +220,19 @@ class ModelYear(ModelYearDimensionBaseModel):
 
 class DataSource(DataSourceDimensionBaseModel):
     """DataSource attributes"""
+
+
+class DataSourceOrm(BaseOrm):
+    __tablename__ = "DataSource"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+
+    subsector = relationship(
+        "SubsectorOrm",
+        secondary=model_subsector_association,
+        back_populates="model",
+    )
 
 
 class Scenario(ScenarioDimensionBaseModel):

@@ -10,7 +10,7 @@ from dsgrid.utils.utilities import check_uniqueness
 class DimensionType(DSGEnum):
     """Dimension types"""
 
-    END_USE = "end_use"
+    METRIC = "metric"
     GEOGRAPHY = "geography"
     SECTOR = "sector"
     SUBSECTOR = "subsector"
@@ -36,8 +36,8 @@ class DimensionRecordBaseModel(DSGBaseModel):
     # TODO: feel free to add comments here
 
 
-class EndUseDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all end use dimensions"""
+class MetricDimensionBaseModel(DimensionRecordBaseModel):
+    """Base class for all metric dimensions (e.g. EnergyEndUse)"""
 
 
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
@@ -73,7 +73,7 @@ class WeatherYearDimensionBaseModel(DimensionRecordBaseModel):
 
 
 _DIMENSION_TO_MODEL = {
-    DimensionType.END_USE: EndUseDimensionBaseModel,
+    DimensionType.METRIC: MetricDimensionBaseModel,
     DimensionType.GEOGRAPHY: GeographyDimensionBaseModel,
     DimensionType.SECTOR: SectorDimensionBaseModel,
     DimensionType.SUBSECTOR: SubsectorDimensionBaseModel,

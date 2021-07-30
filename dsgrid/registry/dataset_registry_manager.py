@@ -63,7 +63,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         if not os.environ.get("__DSGRID_SKIP_DATASET_CONSISTENCY_CHECKS__"):
             self._check_dataset_consistency(config)
 
-    def _check_dataset_consistency(self, config):
+    def _check_dataset_consistency(self, config: DatasetConfig):
         spark = SparkSession.getActiveSession()
         load_data = read_dataframe(Path(config.model.path) / Dataset.DATA_FILENAME)
         load_data_lookup = read_dataframe(
@@ -71,13 +71,12 @@ class DatasetRegistryManager(RegistryManagerBase):
         )
         with Timer(timer_stats_collector, "check_lookup_data_consistency"):
             self._check_lookup_data_consistency(config, load_data_lookup)
-
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
             self._check_dataset_time_consistency(config, load_data)
         with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
             self._check_dataset_internal_consistency(config, load_data, load_data_lookup)
 
-    def _check_lookup_data_consistency(self, config, load_data_lookup):
+    def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
         found_id = False
         dimension_types = []
         for col in load_data_lookup.columns:
@@ -112,54 +111,21 @@ class DatasetRegistryManager(RegistryManagerBase):
         tz = time_dim.get_tzinfo()
         time_ranges = time_dim.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
+        time_range = time_ranges[0]
         # TODO: need to support validation of multiple time ranges: DSGRID-173
-        # TODO: need to support handling of multiple weather years: DSGRID-174
 
-        weather_dim = config.get_dimension(DimensionType.WEATHER_YEAR)
-        weather_years = [int(x.id) for x in weather_dim.model.records.collect()]
-        weather_years.sort()
-        if len(time_ranges) != len(weather_years):
-            raise DSGInvalidDataset(f"len of time_ranges = {len(time_ranges)} is not equal to len "
-                f"of weather years = {len(weather_years)}")
-
-        expected_times = []
-        for time_range, weather_year in zip(time_ranges, weather_years):
-            if time_range.start.year != weather_year:
-                raise DSGInvalidDataset(
-                    f"weather year mismatch: time_dimension start={time_range.start} weather_year={weather_year}"
-                )
-            if time_range.end.year != weather_year:
-                valid = True
-                if time_dim.model.period in (Period.PERIOD_BEGINNING, Period.INSTANTANEOUS):
-                    valid = False
-                elif (
-                    time_dim.model.period == Period.PERIOD_ENDING
-                    and time_range.end.year != weather_year + 1
-                ):
-                    valid = False
-                if not valid:
-                    raise DSGInvalidDataset(
-                        f"weather year mismatch: time_dimension end={time_range.end} weather_year={weather_year}"
-                    )
-            expected_times.extend(time_dim.list_time_range(time_range))
-
-        timestamps_by_id = (
-            load_data.select("timestamp", "id")
-            .groupby("id")
-            .agg(F.collect_list("timestamp").alias("timestamps"))
-        ).collect()
-        dataset_start = None
-        dataset_end = None
-        for row in timestamps_by_id:
-            timestamps = [x.astimezone().astimezone(tz) for x in row.timestamps]
-            timestamps.sort()
-            if timestamps != expected_times:
-                mismatch = sorted(set(expected_times).difference(set(timestamps)))
-                raise DSGInvalidDataset(f"load_data timestamps do not match expected times. load_data ID={row.id} mismatch={mismatch}")
-            if dataset_start is None:
-                dataset_start = timestamps[0]
-                dataset_end = timestamps[-1]
-
+        expected_times = time_dim.list_time_range(time_range)
+        actual_timestamps = [
+            x.timestamp.astimezone().astimezone(tz)
+            for x in load_data.select("timestamp").distinct().sort("timestamp").collect()
+        ]
+        if expected_times != actual_timestamps:
+            mismatch = sorted(set(expected_times).difference(set(actual_timestamps)))
+            raise DSGInvalidDataset(
+                f"load_data timestamps do not match expected times. mismatch={mismatch}"
+            )
+        dataset_start = actual_timestamps[0]
+        dataset_end = actual_timestamps[-1]
         if dataset_start != time_ranges[0].start:
             raise DSGInvalidDimension(
                 f"Mismatch between dataset start time ({dataset_start} and dimension start time ({time_ranges[0].start}"
@@ -168,6 +134,17 @@ class DatasetRegistryManager(RegistryManagerBase):
             raise DSGInvalidDimension(
                 f"Mismatch between dataset end time ({dataset_end} and dimension end time: {time_ranges[-1].end}"
             )
+
+        timestamps_by_id = (
+            load_data.select("timestamp", "id")
+            .groupby("id")
+            .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
+        )
+        for row in timestamps_by_id.collect():
+            if row.distinct_timestamps != len(expected_times):
+                raise DSGInvalidDataset(
+                    f"load_data ID={row.id} doesn't have {len(expected_times)} timestamps: actual={row.countDistinct}"
+                )
 
     def _check_dataset_internal_consistency(
         self, config: DatasetConfig, load_data, load_data_lookup

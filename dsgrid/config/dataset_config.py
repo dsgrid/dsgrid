@@ -53,6 +53,26 @@ class DSGDatasetParquetType(DSGEnum):
     # )  # optional
 
 
+class DataClassificationType(DSGEnum):
+    """Data risk classification type.
+
+    See https://uit.stanford.edu/guide/riskclassifications for more information.
+    """
+
+    # TODO: can we get NREL/DOE definitions for these instead of standford's?
+
+    LOW = EnumValue(
+        value="low",
+        description="Low risk data that does not require special data management",
+    )
+    MODERATE = EnumValue(
+        value="moderate",
+        description=(
+            "The moderate class includes all data under an NDA, data classified as business sensitive, data classification as Critical Energy Infrastructure Infromation (CEII), or data with Personal Identifiable Information (PII)."
+        ),
+    )
+
+
 # TODO will need to rename this as it really should be more generic inputs
 #   and not just sector inputs. "InputSectorDataset" is already taken in
 #   project_config.py
@@ -112,6 +132,47 @@ class DatasetConfigModel(DSGBaseModel):
         title="description",
         description="A detailed description of the dataset.",
     )
+    origin_creator: str = Field(
+        title="origin_creator",
+        description="Origin data creator's name (first and last)",
+    )
+    origin_organization: str = Field(
+        title="origin_organization",
+        description="Origin organization name, e.g., NREL",
+    )
+    origin_contributors: List[str] = Field(
+        title="origin_contributors",
+        description="List of origin data contributor's first and last names"
+        """ e.g., ["Harry Potter", "Ronald Weasley"]""",
+        required=False,
+    )
+    origin_project: str = Field(
+        title="origin_project",
+        description="Origin project name",
+        optional=True,
+    )
+    origin_date: str = Field(
+        title="origin_date",
+        description="Date the source data was generated",
+    )
+    origin_version: str = Field(
+        title="origin_version",
+        description="Version of the origin data",
+    )
+    source: str = Field(
+        title="source",
+        description="Source of the data (text description or link)",
+    )
+    data_classification: DataClassificationType = Field(
+        title="data_classification",
+        description="Data security classification (e.g., low, moderate, high)",
+        options=DataClassificationType.format_for_docs(),
+    )
+    tags: Optional[List[str]] = Field(
+        title="source",
+        description="List of data tags",
+        required=False,
+    )
     load_data_column_dimension: DimensionType = Field(
         title="load_data_column_dimension",
         description="Columns in the load_data table are records of this dimension type.",
@@ -127,10 +188,11 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: Add to notes - link to registering dimensions page
         # TODO: Add to notes - link to example of how to list dimensions to find existing registered dimensions
     )
-    # TODO: Metdata is TBD
-    metadata: Optional[Dict] = Field(
-        title="metdata",
-        description=" TBD. metadata information such as origin_date, creator, contacts, organization, tags, etc.",
+    user_defined_metadata: Optional[Dict] = Field(
+        title="user_defined_metadata",
+        description="Additional user defined metadata fields",
+        default={},
+        required=False,
     )
 
     @validator("dataset_id")

@@ -182,6 +182,7 @@ class DatetimeRange:
         cur = self.start
         end = self.end + self.frequency
         end = end + self.frequency if self.time_interval == time_interval.PERIOD_ENDING else end
+        
         while cur < end:
             if not (
                 self.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29

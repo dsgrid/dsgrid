@@ -19,11 +19,9 @@ datasets.
    user_guides/index
    configs/index
    data_format
-   commands
+   commands/index
    api
-
-      
-..   cli
+   cli
 
 
 Indices and tables

@@ -13,6 +13,7 @@ from sqlalchemy import (
     select,
     text,  # Integer, Text, DateTime,
 )
+from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

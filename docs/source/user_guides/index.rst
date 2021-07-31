@@ -10,6 +10,7 @@ User guides
    consumers
    contributors
    coordinators
+   
 .. setup
 .. concepts/index
 .. getting-started
@@ -25,5 +26,6 @@ User guides
 **Contributors**
 .. 
 * :doc:`Setup for contributors <setup>`
-
+..
 **Users**
+

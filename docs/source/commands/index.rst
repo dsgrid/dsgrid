@@ -9,7 +9,8 @@ Command reference
 dsgrid provides commands to download, query, and register data. The links on this page provide help for each command. You can also access help from the command line with the ``--help`` flag:
 
 .. code-block:: bash
-    dsgrid --help
+   
+   dsgrid --help
 
 The following commands are part of dsgrid:
 
@@ -17,4 +18,7 @@ The following commands are part of dsgrid:
    :glob:
    :maxdepth: 2
  
-   commands/*
+   registry
+
+..   list
+..   query

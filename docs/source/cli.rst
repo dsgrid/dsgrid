@@ -1,45 +1,36 @@
+###
 CLI
-###########
+###
+
+dsgrid is primarily a command-line interface (CLI) tool. The CLI is hierachrical with three main operations.
+
+    1. Download
+    2. Query
+    3. Registry
+
+Use the ``--help`` flag to learn more about the dsgrid CLI and see the available commands.
 
 .. command-output:: dsgrid --help
 
 
+Download CLI
+============
+.. todo:: dsgrid Download CLI is under development and is currently non-functional.
 
-query cli
-************
-`dsgrid query` cli is current under development.:red:`Coming Soon. This is currently under development.`
-
-download cli
-************
 `dsgrid download` cli provides an interface for downloading dsgrid data. 
-:red:`Coming Soon. This is currently under development.`
 
-registry cli
-************
+.. command-output:: dsgrid download --help
 
-.. codeblock:: 
-    ```
-    Usage: dsgrid registry [OPTIONS] COMMAND [ARGS]...
 
-    Manage a registry.
+Query CLI
+=========
+.. todo:: dsgrid Query CLI is under development and is currently non-functional.
 
-    Options:
-    --path TEXT  INTERNAL-ONLY: path to dsgrid registry. Override with the
-                environment variable DSGRID_REGISTRY_PATH  [default:
-                /Users/mmooney/.dsgrid-registry]
+.. command-output:: dsgrid query --help
 
-    --help       Show this message and exit.
 
-    Commands:
-    create            Create a new registry.
-    list              List the contents of a registry.
-    register-project  Register a new project with the dsgrid repository.
-    remove-dataset    Remove a dataset from the dsgrid repository.
-    remove-project    Remove a project from the dsgrid repository.
-    submit-dataset    Submit a new dataset to a dsgrid project.
-    update-project    Update an existing project registry.
-    ```
+Registry CLI
+============
+The dsgrid registry CLI provides an interface into the dsgrid registry. Use the dsgrid registry CLI to register new or access existing datasets, dimensions and dimension mapping records, and configs (including dimension, dimension mapping, dataset, and project configs).
 
-.. click:: dsgrid.cli.registry:registry
-   :prog: dsgrid registry
-   :nested: full
+.. command-output:: dsgrid registry --help

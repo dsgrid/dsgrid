@@ -115,7 +115,7 @@ def get_field_details(cls):
                 class_name = "DimensionsModel"
                 mod = "dsgrid.config.project_config"
                 subfields = True
-            elif "items" in vals:
+            elif "items" in vals and "$ref" in vals["items"]:
                 class_name = vals["items"]["$ref"]
                 mod = get_class_path(class_name)
                 dtype = f":class:`~{mod}.{class_name}`".replace("[", "").replace("]", "")

@@ -4,8 +4,7 @@ Dsgrid Data Structure
 Distrbuted Data Format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A dsgrid dataset is a distributed data format, meaning that it is made
-up of one or more independently registered datasets. For example, a
+A dsgrid project is a distributed data format, meaning that it is made up of one or more independently registered datasets. For example, a
 dsgrid dataset may be made up of many sector model datasets that are
 compiled [insert better description here] together to represent a
 holistic dataset on energy demand across multiple sectors. We call these

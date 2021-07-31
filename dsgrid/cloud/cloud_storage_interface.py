@@ -98,7 +98,7 @@ class CloudStorageInterface(abc.ABC):
             If true, this method deletes files and directories that exist in the local_path but not in the remote_path
         exclude : list, optional
             List of patterns to exclude, by default None.
-            If excluding whole directories, the exclusion must end with /* , e.g. "data/*"
+            If excluding whole directories, the exclusion must end with /* , e.g. data/*
 
         """
 
@@ -114,5 +114,5 @@ class CloudStorageInterface(abc.ABC):
             Local registry path
         exclude : list, optional
             List of patterns to exclude, by default None.
-            If excluding whole directories, the exclusion must end with /* , e.g. "data/*"
+            If excluding whole directories, the exclusion must end with /* , e.g. data/*
         """

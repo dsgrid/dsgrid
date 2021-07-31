@@ -142,11 +142,7 @@ class InputDatasetModel(DSGBaseModel):
         description="Model sector ID, required only if dataset type is ``sector_model``.",  # TODO: add validator
         optional=True,
     )
-    # TODO: is this needed?
-    # sectors: List[str] = Field(
-    #    title="sectors",
-    #    description="sectors used in the project",
-    # )
+
     @validator("version")
     def check_version(cls, version):
         return handle_version_or_str(version)
@@ -175,14 +171,14 @@ class DimensionMappingsModel(DSGBaseModel):
         "define the project dimension expectations for input datasets and allowable queries.",
         default=[],
         optional=True,
-        notes=(
-            "At the project-level, base-to-base mappings are optional. If no base-to-base"
-            " dimension mapping is provided, dsgrid assumes a full-join of all base dimension"
-            " records. For example, if a full-join is assumed for the sector dimension, then all"
-            " sectors will map to all subsectors, they will also map to all geographies, all model"
-            " years, and so forth.",
-            # TODO: have we implemented this full join assumption?
-        ),
+        # TODO: DSGRID-186
+        # notes=(
+        #     "At the project-level, base-to-base mappings are optional. If no base-to-base"
+        #     " dimension mapping is provided, dsgrid assumes a full-join of all base dimension"
+        #     " records. For example, if a full-join is assumed for the sector dimension, then all"
+        #     " sectors will map to all subsectors, they will also map to all geographies, all"
+        #     " model years, and so forth.",
+        # ),
     )
     base_to_supplemental: Optional[List[DimensionMappingReferenceModel]] = Field(
         title="base_to_supplemental",
@@ -215,10 +211,7 @@ class ProjectConfigModel(DSGBaseModel):
         title="project_id",
         description="A unique project identifier that is project-specific (e.g., "
         "'standard-scenarios-2021').",
-        requirements=("must not contain any dashes (`-`)",),
-        # @DT - I can also point directly to the validator, however, not all validation takes place
-        #   in these pydantic validators, so maybe we just list them here in the requirements
-        #   instead of pointing directly to the validators
+        requirements=("Must not contain any dashes (`-`)",),
     )
     name: str = Field(
         title="name",
@@ -229,7 +222,8 @@ class ProjectConfigModel(DSGBaseModel):
         title="description",
         description="Detailed project description.",
         notes=(
-            "The description will get stored in the project registry and may be used for searching",
+            "The description will get stored in the project registry and may be used for"
+            " searching",
         ),  # TODO: is this true about all fields here?
     )
     status: Optional[ProjectRegistryStatus] = Field(
@@ -254,7 +248,7 @@ class ProjectConfigModel(DSGBaseModel):
         optional=True,
         notes=("`[dimension_mappings]` are optional at the project level.",),
     )
-    registration: Optional[Dict] = Field(  # TODO: Is this still being used?
+    registration: Optional[Dict] = Field(  # TODO: Is this still being used??
         title="registration",
         description="Registration information",
         dsg_internal=True,
@@ -263,8 +257,6 @@ class ProjectConfigModel(DSGBaseModel):
     @validator("project_id")
     def check_project_id_handle(cls, project_id):
         """Check for valid characters in project id"""
-        # TODO: may want to check for pre-existing project_id --> are we doing this?
-        #       (e.g., LA100 Run 1 vs. LA100 Run 0 kind of thing)
         if "-" in project_id:
             raise ValueError('invalid character "-" in project id')
 

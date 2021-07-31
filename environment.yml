@@ -2,6 +2,7 @@ name: dsgrid
 channels:
   - defaults
 dependencies:
+  - awscli
   - click
   - ipython
   - numpy

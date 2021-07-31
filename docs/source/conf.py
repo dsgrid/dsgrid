@@ -42,14 +42,15 @@ extensions = [
     "sphinx.ext.githubpages",
     "sphinx.ext.napoleon",
     "sphinx.ext.autosectionlabel",
+    "sphinxarg.ext",
     # "sphinx.ext.autosummary",
     # "sphinx_click.ext",
     # "sphinx.ext.ifconfig",
     "sphinx.ext.todo",
     # "sphinxcontrib.plantuml",
-    # 'sphinxcontrib.programoutput',
+    "sphinxcontrib.programoutput",
     # 'sphinxemoji.sphinxemoji'
-    "sphinx_togglebutton",
+    # "sphinx_togglebutton",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -107,6 +108,7 @@ todo_include_todos = True
 # CSS styling
 rst_prolog = """
 .. include:: special.rst
+.. include:: ../special.rst
 
 """
 

@@ -14,7 +14,7 @@ from .dimensions import (
     DimensionType,
 )
 from dsgrid.data_models import serialize_model, ExtendedJSONEncoder
-from dsgrid.dimension.time import DatetimeRange, TimezoneType
+from dsgrid.dimension.time import DatetimeRange, AnnualTimeRange, TimezoneType, make_time_range
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import dump_data, load_data
 
@@ -82,16 +82,18 @@ class TimeDimensionConfig(DimensionBaseConfig):
             start = datetime.datetime.strptime(time_range.start, self.model.str_format)
             end = datetime.datetime.strptime(time_range.end, self.model.str_format)
             ranges.append(
-                DatetimeRange(
+                make_time_range(
                     start=start.replace(tzinfo=tz),
                     end=end.replace(tzinfo=tz),
                     frequency=self.model.frequency,
+                    period=self.model.period,
+                    leap_day_adjustment=self.model.leap_day_adjustment,
                 )
             )
 
         return ranges
 
-    def list_time_range(self, time_range: DatetimeRange):
+    def list_time_range(self, time_range: [DatetimeRange, AnnualTimeRange]):
         """Return a list of datetimes for a time range.
 
         Parameters
@@ -104,7 +106,7 @@ class TimeDimensionConfig(DimensionBaseConfig):
             list of datetime
 
         """
-        return time_range.list_time_range(self.model.time_interval, self.model.leap_day_adjustment)
+        return time_range.list_time_range()
 
     def get_tzinfo(self):
         """Return a tzinfo instance for this dimension.

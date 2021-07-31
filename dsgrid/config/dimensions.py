@@ -309,7 +309,7 @@ class TimeDimensionModel(DimensionBaseModel):
     )
     time_interval: TimeInvervalType = Field(
         title="time_interval",
-        description="The range of time that the value represents",
+        description="The range of time that the value represents, e.g., period-beginning",
         options=TimeInvervalType.format_descriptions_for_docs(),
     )
     timezone: TimezoneType = Field(
@@ -338,6 +338,14 @@ class TimeDimensionModel(DimensionBaseModel):
         if value != LeapDayAdjustmentType.NONE:
             # TODO: DSGRID-172
             raise ValueError("leap_day_adjustment is not yet supported")
+        return value
+
+    @validator("frequency")
+    def check_frequency(cls, value):
+        if value == timedelta(days=366):
+            raise ValueError(
+                "366 days not allowed for frequency, use 365 days to specify annual frequency."
+            )
         return value
 
     def dict(self, by_alias=True, **kwargs):

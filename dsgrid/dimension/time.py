@@ -1,12 +1,13 @@
 """Dimensions related to time"""
 import datetime
 import pytz
+from enum import Enum # maybe
 
 from dsgrid.data_models import DSGEnum, EnumValue
 
 
 class LeapDayAdjustmentType(DSGEnum):
-    """Timezone enum types"""
+    """Leap day adjustment enum types"""
 
     DROP_DEC31 = EnumValue(
         value="drop_dec31",
@@ -148,53 +149,75 @@ class TimezoneType(DSGEnum):
 
 
 class DatetimeRange:
-    def __init__(self, start, end, frequency):
+    def __init__(
+        self, start, end, frequency, time_interval: TimeInvervalType, leap_day_adjustment: LeapDayAdjustmentType
+    ):
         self.start = start
         self.end = end
         self.frequency = frequency
+        self.time_interval = time_interval
+        self.leap_day_adjustment = leap_day_adjustment
 
-    def iter_time_range(
-        self, time_interval: TimeInvervalType, leap_day_adjustment: LeapDayAdjustmentType
-    ):
+    def __repr__(self):
+        return (
+            self.__class__.__qualname__
+            + f"(start={self.start}, end={self.end}, frequency={self.frequency}, "
+            + f"time_interval={self.time_interval}, leap_day_adjustment={self.leap_day_adjustment})"
+        )
+
+    def __str__(self, n_show=5):
+        output = self.list_time_range()
+        n_show = min(len(output) // 2, n_show)
+        n_head = ", ".join([str(x) for x in output[:n_show]])
+        n_tail = ", ".join([str(x) for x in output[-n_show:]])
+        return n_head + ",\n ... , \n" + n_tail
+
+    def iter_time_range(self):
         """Return a generator of datetimes for a time range.
-
-        Parameters
-        ----------
-        time_interval : TimeInvervalType
-        leap_day_adjustment : LeapDayAdjustmentType
-
         Yields
         ------
         datetime
 
         """
         cur = self.start
-        end = (
-            self.end + self.frequency if time_interval == time_interval.PERIOD_ENDING else self.end
-        )
+        end = self.end + self.frequency
+        end = end + self.frequency if self.time_interval == time_interval.PERIOD_ENDING else end
         while cur < end:
             if not (
-                leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
+                self.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
                 and cur.month == 2
                 and cur.day == 29
             ):
                 yield cur
             cur += self.frequency
 
-    def list_time_range(
-        self, time_interval: TimeInvervalType, leap_day_adjustment: LeapDayAdjustmentType
-    ):
+    def list_time_range(self):
         """Return a list of datetimes for a time range.
-
-        Parameters
-        ----------
-        time_interval : TimeInvervalType
-        leap_day_adjustment : LeapDayAdjustmentType
-
         Returns
         -------
         list
             list of datetime
 
         """
-        return list(self.iter_time_range(time_interval, leap_day_adjustment))
+        return list(self.iter_time_range())
+
+
+class AnnualTimeRange(DatetimeRange):
+    def iter_time_range(self):
+        """Return a list of years in the form of datetimes on Jan 1st"""
+        tz = self.start.tzinfo
+        for year in range(self.start.year, self.end.year + 1):
+            yield datetime.datetime(year=year, month=1, day=1, tzinfo=tz)
+
+
+def make_time_range(start, end, frequency, time_interval, leap_day_adjustment):
+    """
+    factor function that decides which TimeRange func to use based on frequency
+    """
+    if frequency == timedelta(days=365):
+        return AnnualTimeRange(start, end, frequency, time_interval, leap_day_adjustment)
+    elif frequency == timedelta(days=366):
+        raise ValueError(
+            "366 days not allowed for frequency, use 365 days to specify annual frequency."
+        )
+    return DatetimeRange(start, end, frequency, time_interval, leap_day_adjustment)

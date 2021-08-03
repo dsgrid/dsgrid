@@ -66,7 +66,6 @@ class DimensionMappingReferenceModel(DSGBaseModel):
         title="version",
         description="Set to False if a given base-to-base dimension mapping is NOT required for input dataset validation; default is True",
         default=True,
-        # TODO: provide default in docs rst parser
     )
 
     @validator("version")

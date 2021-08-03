@@ -33,7 +33,6 @@ class DimensionRecordBaseModel(DSGBaseModel):
         title="name",
         description="User-defined name",
     )
-    # TODO: feel free to add comments here
 
 
 class MetricDimensionBaseModel(DimensionRecordBaseModel):

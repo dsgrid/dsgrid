@@ -285,7 +285,7 @@ class TimeDimensionModel(DimensionBaseModel):
     #       originally i thought it was to interpret start/end, but
     #       the year here is unimportant because it will be based on
     #       the weather_year
-    str_format: Optional[str] = Field(  # TODO: why is this optional?
+    str_format: Optional[str] = Field(
         title="str_format",
         default="%Y-%m-%d %H:%M:%s",
         description="Timestamp string format",

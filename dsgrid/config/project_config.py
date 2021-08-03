@@ -263,8 +263,6 @@ class ProjectConfigModel(DSGBaseModel):
         check_config_id_strict(project_id, "Project")
         return project_id
 
-    # TODO: validate that datasets listed are listed by the project -- are we doing this?
-
 
 class ProjectConfig(ConfigBase):
     """Provides an interface to a ProjectConfigModel."""

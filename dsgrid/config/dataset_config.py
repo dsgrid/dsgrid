@@ -105,8 +105,7 @@ class DatasetConfigModel(DSGBaseModel):
             "defined in the project config.",
             "For posterity, dataset_id cannot be the same as the model name (e.g., dataset cannot"
             " be 'ComStock')",
-        )
-        # TODO: what are the requirements again? list them in the notes
+        ),
     )
     dataset_type: InputDatasetType = Field(
         title="dataset_type",

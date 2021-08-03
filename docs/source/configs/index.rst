@@ -2,9 +2,16 @@
 Configs
 #######
 
+.. contents::
+   :local:
+   :depth: 1
+
+.. todo::
+    Write text for the config index. Include definitions and links for each config type.
+
 .. toctree::
-   :maxdepth: 3
-   :hidden:
+   :glob:
+   :maxdepth: 1
 
    project_config
    dataset_config
@@ -12,5 +19,3 @@ Configs
    dimension_mappings_config
    dimension_mapping_references_config
 
-.. todo::
-    Write text for the config index. Include definitions and links for each config type.

@@ -123,7 +123,7 @@ class InputDatasetModel(DSGBaseModel):
             "existing version in the registry.",
         ),
         # TODO: add notes about warnings for outdated versions?
-        # TODO: Maybe version needs to be Optional at first. Is
+        # TODO: Maybe version needs to be Optional at first.
     )
     status: Optional[DatasetRegistryStatus] = Field(
         title="status",

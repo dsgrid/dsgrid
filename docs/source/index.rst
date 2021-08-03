@@ -16,12 +16,14 @@ datasets.
 
    
    overview
-   user_guides/index
-   configs/index
+   setup
    data_format
-   commands/index
+   configs/index
+   cli/index
+   tutorial
+
    api
-   cli
+   
 
 
 Indices and tables

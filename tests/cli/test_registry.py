@@ -4,6 +4,7 @@ from tempfile import TemporaryDirectory, gettempdir
 
 
 from dsgrid.utils.run_command import check_run_command, run_command
+from dsgrid.utils.files import load_data
 from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
 from dsgrid.tests.common import (
     replace_dimension_mapping_uuids_from_registry,
@@ -17,7 +18,6 @@ def test_register_project_and_dataset(make_test_project_dir):
         base_dir = Path(tmpdir)
         path = create_local_test_registry(base_dir)
         dataset_dir = Path("datasets/sector_models/comstock")
-        dataset_dim_dir = dataset_dir / "dimensions"
         project_dimension_mapping_config = make_test_project_dir / "dimension_mappings.toml"
         dimension_mapping_config = make_test_project_dir / dataset_dir / "dimension_mappings.toml"
         dimension_mapping_refs = (
@@ -45,7 +45,9 @@ def test_register_project_and_dataset(make_test_project_dir):
             assert run_command(cmd) != 0
 
         project_config = make_test_project_dir / "project.toml"
+        project_id = load_data(project_config)["project_id"]
         dataset_config = make_test_project_dir / dataset_dir / "dataset.toml"
+        dataset_id = load_data(dataset_config)["dataset_id"]
         replace_dataset_path(dataset_config)
         replace_dimension_mapping_uuids_from_registry(
             path, (project_config, dimension_mapping_refs)
@@ -59,11 +61,12 @@ def test_register_project_and_dataset(make_test_project_dir):
             f"dsgrid registry --path={path} --offline projects register {project_config} -l log"
         )
         check_run_command(
-            f"dsgrid registry --path={path} --offline projects submit-dataset -d efs_comstock -m {dimension_mapping_refs} -p test -l log"
+            f"dsgrid registry --path={path} --offline projects submit-dataset -d {dataset_id} "
+            f"-m {dimension_mapping_refs} -p {project_id} -l log"
         )
         output = {}
         check_run_command(f"dsgrid registry --path={path} --offline list", output)
-        regex_project = re.compile(r"test.*1\.1\.0")
-        regex_dataset = re.compile(r"efs_comstock.*1\.0\.0")
-        assert regex_project.search(output["stdout"]) is not None
-        assert regex_dataset.search(output["stdout"]) is not None
+        regex_project = re.compile(fr"{project_id}.*1\.1\.0")
+        regex_dataset = re.compile(fr"{dataset_id}.*1\.0\.0")
+        assert regex_project.search(output["stdout"]) is not None, output["stdout"]
+        assert regex_dataset.search(output["stdout"]) is not None, output["stdout"]

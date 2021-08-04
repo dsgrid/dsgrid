@@ -28,13 +28,29 @@ pre-commit install
 
 ## Run Tests
 
-In addition to grabbing the branch of dsgrid you want to test and making you've
-activated an environment with dsgrid installed per the above, you'll need to set
-up dsgrid for testing by setting environment variables:
+In addition to grabbing the branch of dsgrid you want to test and making sure
+you've activated an environment with dsgrid installed per the above, you'll
+need to set up dsgrid for testing by selecting a dataset and setting
+environment variables.
+
+There are two datasets available:
+
+1. https://github.com/dsgrid/dsgrid-test-data (Recommended for unit tests.)
+   This is a stripped-down version of the EFS project and datasets. It is
+   optimized for testing the dsgrid code, not for queries.
+
+2. https://github.com/dsgrid/dsgrid-project-EFS (Recommended for queries.)
+   This is the full version of the EFS project. The datasets must be
+   downloaded from AWS.
+   You can run most unit tests against this data. However, it is slow because
+   the data is large.
+   Some unit tests require specific files from the dsgrid-test-data and will
+   be skipped if you run them on this data.
 
 ```
-# Point to your checkout of the dsgrid-project-EFS repository which is
-# what we are currently using for tests (adjusting the path as needed).
+# Point to your checkout of a project repository (adjusting the path as needed).
+export TEST_PROJECT_REPO=$HOME/dsgrid-test-data/test_efs
+# or
 export TEST_PROJECT_REPO=$HOME/dsgrid-project-EFS
 
 # Point to your local dsgrid registry path.
@@ -44,6 +60,9 @@ export DSGRID_REGISTRY_PATH=$HOME/.dsgrid-test-registry
 
 # Point to your local directory of datasets. This data will be registered in the
 # registry.
+# Minimal test data
+export DSGRID_LOCAL_DATA_DIRECTORY=$HOME/dsgrid-test-data/datasets
+# Pre-downloaded EFS data 
 export DSGRID_LOCAL_DATA_DIRECTORY=$HOME/.dsgrid-data
 
 # This is what that directory should contain:

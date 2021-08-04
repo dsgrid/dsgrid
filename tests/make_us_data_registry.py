@@ -20,21 +20,36 @@ from dsgrid.tests.common import replace_dimension_mapping_uuids_from_registry
 logger = logging.getLogger(__name__)
 
 
-def make_us_data_registry(registry_path, repo) -> RegistryManager:
-    """Creates a local registry with the dsgrid-project-EFS repository for testing."""
+def make_test_data_registry(
+    registry_path, src_dir, dataset_path=None, include_datasets=True
+) -> RegistryManager:
+    """Creates a local registry from a dsgrid project source directory for testing.
+
+    Parameters
+    ----------
+    registry_path : Path
+        Path in which the registry will be created.
+    src_dir : Path
+        Path containing source config files
+    dataset_path : Path | None
+        If None, use "LOCAL_DATA_DIRECTORY" env variable.
+    include_datasets : bool
+        If False, do not register any datasets.
+
+    """
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
-    project_dimension_mapping_config = repo / "dimension_mappings.toml"
-    dimension_mapping_config = repo / dataset_dir / "dimension_mappings.toml"
-    dimension_mapping_refs = repo / dataset_dir / "dimension_mapping_references.toml"
+    project_dimension_mapping_config = src_dir / "dimension_mappings.toml"
+    dimension_mapping_config = src_dir / dataset_dir / "dimension_mappings.toml"
+    dimension_mapping_refs = src_dir / dataset_dir / "dimension_mapping_references.toml"
 
     user = getpass.getuser()
     log_message = "Initial registration"
     manager = RegistryManager.load(path, offline_mode=True)
 
     for dim_config_file in (
-        repo / "dimensions.toml",
-        repo / dataset_dir / "dimensions.toml",
+        src_dir / "dimensions.toml",
+        src_dir / dataset_dir / "dimensions.toml",
     ):
         dim_mgr = manager.dimension_manager
         dim_mgr.register(dim_config_file, user, log_message)
@@ -46,35 +61,40 @@ def make_us_data_registry(registry_path, repo) -> RegistryManager:
     dim_mapping_mgr.register(project_dimension_mapping_config, user, log_message)
     dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
 
-    project_config_file = repo / "project.toml"
-    dataset_config_file = repo / dataset_dir / "dataset.toml"
-    replace_dataset_path(dataset_config_file)
+    project_config_file = src_dir / "project.toml"
+    project_id = load_data(project_config_file)["project_id"]
+    dataset_config_file = src_dir / dataset_dir / "dataset.toml"
+    dataset_id = load_data(dataset_config_file)["dataset_id"]
+    replace_dataset_path(dataset_config_file, dataset_path=dataset_path)
     replace_dimension_mapping_uuids_from_registry(
         path, (project_config_file, dimension_mapping_refs)
     )
     replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
 
     manager.project_manager.register(project_config_file, user, log_message)
-    manager.dataset_manager.register(dataset_config_file, user, log_message)
-    manager.project_manager.submit_dataset(
-        "test",
-        "efs_comstock",
-        [dimension_mapping_refs],
-        user,
-        log_message,
-    )
+    if include_datasets:
+        manager.dataset_manager.register(dataset_config_file, user, log_message)
+        manager.project_manager.submit_dataset(
+            project_id,
+            dataset_id,
+            [dimension_mapping_refs],
+            user,
+            log_message,
+        )
     return manager
 
 
-def replace_dataset_path(dataset_config_file):
-    if LOCAL_DATA_DIRECTORY is None:
-        print(
-            "You must define the environment DSGRID_LOCAL_DATA_DIRECTORY with the path to your "
-            "copy of datasets."
-        )
-        sys.exit(1)
+def replace_dataset_path(dataset_config_file, dataset_path=None):
+    if dataset_path is None:
+        if LOCAL_DATA_DIRECTORY is None:
+            print(
+                "You must define the environment DSGRID_LOCAL_DATA_DIRECTORY with the path to your "
+                "copy of datasets."
+            )
+            sys.exit(1)
+        dataset_path = LOCAL_DATA_DIRECTORY
     config = load_data(dataset_config_file)
-    src_data = Path(LOCAL_DATA_DIRECTORY) / config["dataset_id"]
+    src_data = Path(dataset_path) / config["dataset_id"]
     config["path"] = str(src_data)
     dump_data(config, dataset_config_file)
     logger.info("Replaced dataset path in %s with %s", dataset_config_file, src_data)
@@ -92,7 +112,7 @@ def replace_dataset_path(dataset_config_file):
 )
 @click.option(
     "-p",
-    "--project-repo",
+    "--project-dir",
     envvar="TEST_PROJECT_REPO",
     required=True,
     help="path to dsgrid-project-EFS registry. Override with the environment variable TEST_PROJECT_REPO",
@@ -100,10 +120,10 @@ def replace_dataset_path(dataset_config_file):
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def run(registry_path, force, project_repo, verbose):
-    """Creates a local registry with the dsgrid-project-EFS repository for testing."""
+def run(registry_path, force, project_dir, verbose):
+    """Creates a local registry from a dsgrid project source directory for testing."""
     level = logging.DEBUG if verbose else logging.INFO
-    log_file = Path("dsgrid_us.log")
+    log_file = Path("test_dsgrid_project.log")
     check_log_file_size(log_file, no_prompts=True)
     setup_logging("dsgrid", log_file, console_level=level, file_level=level, mode="a")
     if registry_path.exists():
@@ -112,11 +132,11 @@ def run(registry_path, force, project_repo, verbose):
         else:
             print(f"{registry_path} already exists. Use --force to overwrite.")
     os.makedirs(registry_path)
-    tmp_project_repo = Path(tempfile.gettempdir()) / "tmp_test_project_repo"
-    if tmp_project_repo.exists():
-        shutil.rmtree(tmp_project_repo)
-    shutil.copytree(project_repo, tmp_project_repo)
-    make_us_data_registry(registry_path, tmp_project_repo / "dsgrid_project")
+    tmp_project_dir = Path(tempfile.gettempdir()) / "tmp_test_project_dir"
+    if tmp_project_dir.exists():
+        shutil.rmtree(tmp_project_dir)
+    shutil.copytree(project_dir, tmp_project_dir)
+    make_test_data_registry(registry_path, tmp_project_dir / "dsgrid_project")
     timer_stats_collector.log_stats()
 
 

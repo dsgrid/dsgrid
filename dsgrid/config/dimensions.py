@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+import pandas as pd
 from pydantic import validator
 from pydantic import Field
 from pyspark.sql import DataFrame, Row, SparkSession
@@ -172,10 +173,11 @@ class DimensionModel(DimensionBaseModel):
     #     description="Defines many-to-many mappings for this dimension",
     #     default=[],
     # )
-    records: Optional[DataFrame] = Field(
+    records: Optional[List] = Field(
         title="records",
         description="Dimension records in filename that get loaded at runtime",
         dsg_internal=True,
+        default=[],
     )
 
     @validator("filename")
@@ -230,8 +232,21 @@ class DimensionModel(DimensionBaseModel):
         if records:
             raise ValueError("records should not be defined in the dimension config")
 
-        # The trick in DSGBaseModel.load where we change directories doesn't work with Spark.
-        return read_dataframe(filename, cache=True, require_unique=["id"], read_with_spark=False)
+        records = []
+        if filename.name.endswith(".csv"):
+            with open(filename) as f_in:
+                ids = set()
+                reader = csv.DictReader(f_in)
+                for row in reader:
+                    record = dim_class(**row)
+                    if record.id in ids:
+                        raise ValueError(f"{record.id} is listed multiple times")
+                    ids.add(record.id)
+                    records.append(record)
+        else:
+            raise ValueError(f"only CSV is supported: {filename}")
+
+        return records
 
     def dict(self, by_alias=True, **kwargs):
         exclude = {"cls", "records"}

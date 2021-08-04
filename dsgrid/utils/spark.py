@@ -9,7 +9,7 @@ from pyspark.sql import DataFrame, Row, SparkSession
 
 from dsgrid.exceptions import DSGInvalidField
 from dsgrid.utils.files import load_data
-from dsgrid.utils.timing import Timer, timer_stats_collector
+from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 
 
 logger = logging.getLogger(__name__)
@@ -29,6 +29,7 @@ def init_spark(name, mem="5gb", num_cpus=None):
     )
 
 
+@track_timing(timer_stats_collector)
 def create_dataframe(records, cache=False, require_unique=None):
     """Create a spark DataFrame from a list of records.
 
@@ -51,6 +52,7 @@ def create_dataframe(records, cache=False, require_unique=None):
     return df
 
 
+@track_timing(timer_stats_collector)
 def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=True):
     """Create a spark DataFrame from a file.
 
@@ -90,11 +92,11 @@ def _read_with_spark(filename):
     spark = SparkSession.getActiveSession()
     path = str(filename)
     if filename.suffix == ".csv":
-        df = spark.read.csv(path, header=True)
+        df = spark.read.csv(path, inferSchema=True, header=True)
     elif Path(filename).suffix == ".parquet":
         df = spark.read.parquet(path)
     elif Path(filename).suffix == ".json":
-        df = spark.read.json(path)
+        df = spark.read.json(path, mode="FAILFAST")
     else:
         assert False, f"Unsupported file extension: {filename}"
     return df
@@ -137,6 +139,33 @@ def get_unique_values(df, column):
 
     """
     return {getattr(x, column) for x in df.select(column).distinct().collect()}
+
+
+@track_timing(timer_stats_collector)
+def models_to_dataframe(models, cache=False):
+    """Converts a list of Pydantic models to a Spark DataFrame.
+
+    Parameters
+    ----------
+    models : list
+    cache : If True, cache the DataFrame.
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    """
+    assert models
+    cls = type(models[0])
+    rows = []
+    for model in models:
+        row = Row(**{f: getattr(model, f) for f in cls.__fields__})
+        rows.append(row)
+
+    df = SparkSession.getActiveSession().createDataFrame(rows)
+    if cache:
+        df.cache()
+    return df
 
 
 def sql(query):

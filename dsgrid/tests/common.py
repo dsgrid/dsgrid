@@ -38,6 +38,25 @@ def make_test_project_dir():
     shutil.rmtree(tmpdir)
 
 
+@pytest.fixture
+def make_test_data_dir():
+    if LOCAL_DATA_DIRECTORY is None:
+        print(
+            "You must define the environment DSGRID_LOCAL_DATA_DIRECTORY with the path to your "
+            "copy of datasets."
+        )
+        sys.exit(1)
+
+    tmpdir = Path(gettempdir()) / "test_data"
+    if os.path.exists(tmpdir):
+        shutil.rmtree(tmpdir)
+    os.mkdir(tmpdir)
+    dst_path = tmpdir / "datasets"
+    shutil.copytree(Path(LOCAL_DATA_DIRECTORY), dst_path)
+    yield dst_path
+    shutil.rmtree(tmpdir)
+
+
 def create_local_test_registry(tmpdir):
     path = Path(tmpdir)
     RegistryManager.create(path)

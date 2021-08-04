@@ -6,11 +6,14 @@ import sys
 from pathlib import Path
 from tempfile import TemporaryDirectory, gettempdir
 
+import pyspark
 import pytest
 from semver import VersionInfo
 
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
+    DSGInvalidDataset,
+    DSGInvalidDimension,
     DSGInvalidParameter,
     DSGInvalidOperation,
     DSGValueNotRegistered,
@@ -25,13 +28,13 @@ from dsgrid.tests.common import (
     replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )
-from tests.make_us_data_registry import make_us_data_registry
+from tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
 
 
 def test_register_project_and_dataset(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
-        manager = make_us_data_registry(base_dir, make_test_project_dir)
+        manager = make_test_data_registry(base_dir, make_test_project_dir)
         project_mgr = manager.project_manager
         dataset_mgr = manager.dataset_manager
         dimension_mgr = manager.dimension_manager
@@ -99,7 +102,7 @@ def test_register_project_and_dataset(make_test_project_dir):
 def test_auto_updates(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
-        mgr = make_us_data_registry(base_dir, make_test_project_dir)
+        mgr = make_test_data_registry(base_dir, make_test_project_dir)
         project_mgr = mgr.project_manager
         dataset_mgr = mgr.dataset_manager
         dimension_mgr = mgr.dimension_manager
@@ -108,6 +111,10 @@ def test_auto_updates(make_test_project_dir):
         dataset_id = dataset_mgr.list_ids()[0]
         dimension_id = [x for x in dimension_mgr.iter_ids() if x.startswith("us_counties")][0]
         dimension = dimension_mgr.get_by_id(dimension_id)
+
+        # Test that we can convert records to a Spark DataFrame. Unrelated to the rest.
+        assert isinstance(dimension.get_records_dataframe(), pyspark.sql.DataFrame)
+
         dimension.model.description += "; test update"
         update_type = VersionUpdateType.MINOR
         log_message = "test update"

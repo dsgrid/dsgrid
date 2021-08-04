@@ -192,7 +192,7 @@ class EnergyEndUse(MetricDimensionBaseModel):
     """Energy Demand End Use attributes"""
 
     fuel_id: str
-    unit: str
+    units: str
 
 
 class EnergyEndUseOrm(BaseOrm):

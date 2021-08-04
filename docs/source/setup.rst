@@ -5,7 +5,7 @@ Setup
 
 Python Environment
 ==================
-dsgrid requires python=3.8 or later. If you do not already have a python environment with python>=3.8, then you will need to get this set up. We recommend using `Conda <https://conda.io/projects/conda/en/latest/index.html>`_ to help manage your python packages and environments. 
+dsgrid requires python=3.8 or later. If you do not already have a python environment with python>=3.8, we recommend using `Conda <https://conda.io/projects/conda/en/latest/index.html>`_ to help manage your python packages and environments. 
 
 Steps to make a dsgrid Conda environment:
 
@@ -66,11 +66,7 @@ Configure named profile
 
 Configure named profile for nrel-aws-dsgrid. See `these directions <https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html>`_ for how to configure your named profile for the aws-cli. Or alternatively, follow these directions:
 
-.. code-block:: bash
-    
-    vi ~/.aws/credentials
-
-Then add the following text (replacing XXXX with your creditentials):
+Then add the following text to the ``~/.aws/credentials`` file (replacing XXXX with your creditentials):
 
 .. code-block:: bash
 
@@ -96,10 +92,6 @@ Every dsgrid project needs a github repository to store all configs and misc. sc
 
 Project Repo Organization
 -------------------------
-
-.. todo:: 
-    Provide a means to generate a new empty repo dir
-
 We recommend that dsgrid project repositories use the following directory organization structure:
 
     .. code-block::

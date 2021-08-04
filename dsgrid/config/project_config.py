@@ -216,7 +216,6 @@ class ProjectConfigModel(DSGBaseModel):
     name: str = Field(
         title="name",
         description="A project name to accompany the ID.",
-        # TODO: do project names also need to be unique?
     )
     description: str = Field(
         title="description",
@@ -243,15 +242,12 @@ class ProjectConfigModel(DSGBaseModel):
     )
     dimension_mappings: Optional[DimensionMappingsModel] = Field(
         title="dimension_mappings",
-        description="List of base-to-base and base-to-supplemental mappings.",  # TODO: technically also includes dataset-to-project mappings
+        description="List of project mappings. Initialized with base-to-base and"
+        " base-to-supplemental mappings. dataset-to-project mappings are added by dsgrid as"
+        " datasets get registered with the project.",
         default=[],
         optional=True,
         notes=("`[dimension_mappings]` are optional at the project level.",),
-    )
-    registration: Optional[Dict] = Field(  # TODO: Is this still being used??
-        title="registration",
-        description="Registration information",
-        dsg_internal=True,
     )
 
     @validator("project_id")

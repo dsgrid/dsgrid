@@ -4,16 +4,9 @@ Dsgrid Data Structure
 Distrbuted Data Format
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-A dsgrid project is a distributed data format, meaning that it is made up of one or more independently registered datasets. For example, a
-dsgrid dataset may be made up of many sector model datasets that are
-compiled [insert better description here] together to represent a
-holistic dataset on energy demand across multiple sectors. We call these
-input datasets and they are registered to dsgrid by sector modelers
-(also called dsgrid data contributors). Each input dataset has its own
-set of dimension definitions and its own parquet file paths (hence the
-“distributed data format”). When you query dsgrid for a published
-dataset, you are really querying many datasets distributed across the
-`dsgrid registry <LINK-TO-PATH-HERE>`__.
+A dsgrid project is a distributed data format, meaning that it is made up of one or more independently registered datasets. For example, a dsgrid dataset may be made up of many sector model datasets that are compiled together to represent a holistic dataset on energy demand across multiple sectors. We call these input datasets and they are registered to dsgrid by sector modelers (also called dsgrid data contributors). Each input dataset has its own set of dimension definitions and its own parquet file paths (hence the “distributed data format”). When you query dsgrid for a published dataset, you are really querying many datasets registered with a dsgrid project, e.g., 
+``dsgrid registry project dsgrid_standard_scenarios_2021``.
+
 
 Dataset Registration
 ~~~~~~~~~~~~~~~~~~~~
@@ -130,9 +123,7 @@ Metadata option for scaling factors still valid?
 
 Time zones
 ~~~~~~~~~~
+Both timezone-aware and timezone-unaware timestamps should be converted to UTC when written to the Parquet format. Spark implicitly interprets timestamps in the timezone of the current SQL session and converts them to UTC when writing dataframes to Parquet.
 
-:red:`TODO: need to provide a note about time zone formatting in Spark and how
-it strips out the time zone and converts it to UTC by default. If you
-open up the parquet data outside of spark, the time zone will be UTC
-time (which may be different then the ``Time Dimension``)`
+This behavior is straightforward with timezone-aware timestamps. ``dsgrid`` can interpret the proper time by looking up the time dimension. Timezone-unaware timestamps that will be interpreted as local time should be written as UTC timestamps (i.e., 12pm with no timezone should be written as 12pm UTC).
 

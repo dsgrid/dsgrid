@@ -107,8 +107,7 @@ todo_include_todos = True
 
 # CSS styling
 rst_prolog = """
-.. include:: special.rst
-.. include:: ../special.rst
+.. include:: /special.rst
 
 """
 

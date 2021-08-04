@@ -53,7 +53,7 @@ class DimensionBaseModel(DSGBaseModel):
         default="dsgrid.dimension.standard",
         optional=True,
         requirements=(
-            "Custom user-defined modules are not supported if running dsrid in 'online mode'."
+            "Custom user-defined modules are not supported if running dsgrid in 'online mode'."
             "To supply a custom module, dsgrid must be pointing to a custom registry or be"
             " working in `offline_mode`.",
             "If a user supplied module is provided then the module must be importable in the"
@@ -205,27 +205,6 @@ class DimensionModel(DimensionBaseModel):
             # This seems to work, but something is broken.
             return None
         return file_hash or compute_file_hash(values["filename"])
-
-    # TODO: is this what we want? --- Can we remove this entire TODO here?
-    # @validator(
-    #     "one_to_many_mappings",
-    #     "many_to_one_mappings",
-    #     "many_to_many_mappings",
-    #     each_item=True,
-    # )
-    # def add_mapping_dimension_types(cls, val, values):
-    #     """Find the dimension mappings types and add them."""
-    #     module = importlib.import_module(values["module"])
-    #     val.from_dimension_cls = getattr(module, val.from_dimension, None)
-    #     if val.from_dimension_cls is None:
-    #         raise ValueError(f"{module} does not define {val.from_dimension}")
-
-    #     val.to_dimension_cls = getattr(module, val.to_dimension, None)
-    #     if val.to_dimension_cls is None:
-    #         raise ValueError(f"{module} does not define {val.to_dimension}")
-
-    #     return val
-    # ^^ Can we remove the above?
 
     # @validator("records", always=True)
     # def add_records(cls, records, values):

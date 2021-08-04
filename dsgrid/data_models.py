@@ -100,7 +100,7 @@ class DSGEnum(Enum):
     @classmethod
     def format_for_docs(cls):
         """Returns set of formatted enum values for docs."""
-        return str({e.value for e in cls}).replace("'", "``")
+        return str([e.value for e in cls]).replace("'", "``")
 
     @classmethod
     def format_descriptions_for_docs(cls):

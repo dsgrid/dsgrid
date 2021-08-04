@@ -1,4 +1,4 @@
-"""Example sript to programmatically generate dimenions.toml
+"""Example script to programmatically generate dimenions.toml
 """
 from dsgrid.config.dimension_config import DimensionModel
 from dsgrid.config.dimensions_config import DimensionsConfigModel

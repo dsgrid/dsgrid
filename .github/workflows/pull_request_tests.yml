@@ -1,0 +1,36 @@
+name: Pytests
+
+on: pull_request
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: [3.8]
+        include:
+          # Installing Spark on a Windows VM needs work.
+          - os: ubuntu-latest
+            python-version: 3.8
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install '.[admin]'
+        git clone https://github.com/dsgrid/dsgrid-test-data ~/dsgrid-test-data
+    - name: Run pytests
+      run: |
+        # This does not run the AWS tests.
+        # Credentials would need to be configured.
+        export TEST_PROJECT_REPO=~/dsgrid-test-data/test_efs
+        export DSGRID_LOCAL_DATA_DIRECTORY=~/dsgrid-test-data/datasets
+        export DSGRID_REGISTRY_PATH=./local-registry
+        python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH -f -p $TEST_PROJECT_REPO
+        python -m pytest -v --disable-warnings tests

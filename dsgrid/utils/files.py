@@ -74,6 +74,51 @@ def load_data(filename, **kwargs):
     return data
 
 
+def dump_line_delimited_json(data, filename):
+    """Dump a list of objects to the file as line-delimited JSON.
+
+    Parameters
+    ----------
+    data : list
+    filename : str
+
+    """
+    with open(filename, "w") as f_out:
+        for obj in data:
+            f_out.write(json.dumps(obj))
+            f_out.write("\n")
+
+    logger.debug("Dumped data to %s", filename)
+
+
+def load_line_delimited_json(filename):
+    """Load data from the file that is stored as line-delimited JSON.
+
+    Parameters
+    ----------
+    filename : str
+
+    Returns
+    -------
+    dict
+
+    """
+    objects = []
+    with open(filename) as f_in:
+        for i, line in enumerate(f_in):
+            text = line.strip()
+            if not text:
+                continue
+            try:
+                objects.append(json.loads(text))
+            except Exception:
+                logger.exception("Failed to decode line number %s in %s", i, filename)
+                raise
+
+    logger.debug("Loaded data from %s", filename)
+    return objects
+
+
 def _get_module_from_extension(filename, **kwargs):
     ext = os.path.splitext(filename)[1].lower()
     if ext == ".json":

@@ -1,3 +1,4 @@
+import csv
 import logging
 import os
 import shutil
@@ -9,13 +10,25 @@ from pyspark.sql import DataFrame, Row, SparkSession
 
 from .config_base import ConfigWithDataFilesBase
 from .dimension_mapping_base import DimensionMappingBaseModel
-from dsgrid.data_models import serialize_model_data
+from dsgrid.data_models import serialize_model_data, DSGBaseModel
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import compute_file_hash, dump_data
-from dsgrid.utils.spark import read_dataframe
 
 
 logger = logging.getLogger(__name__)
+
+
+class AssociationTableRecordModel(DSGBaseModel):
+    """Represents one record in association table record files. Maps one dimension to another."""
+
+    from_id: str = Field(
+        title="from_id",
+        description="Source mapping",
+    )
+    to_id: str = Field(
+        title="to_id",
+        description="Destination mapping",
+    )
 
 
 class AssociationTableModel(DimensionMappingBaseModel):
@@ -31,10 +44,11 @@ class AssociationTableModel(DimensionMappingBaseModel):
         description="hash of the contents of the file, computed by dsgrid",
         dsg_internal=True,
     )
-    records: Optional[DataFrame] = Field(
+    records: Optional[List] = Field(
         title="records",
         description="dimension mapping records in filename that get loaded at runtime",
         dsg_internal=True,
+        default=[],
     )
 
     @validator("filename")
@@ -54,7 +68,19 @@ class AssociationTableModel(DimensionMappingBaseModel):
         """Add records from the file."""
         if records:
             raise ValueError("records should not be defined in the dimension mapping config")
-        return read_dataframe(values["filename"], cache=True, read_with_spark=False)
+
+        records = []
+        filename = Path(values["filename"])
+        if filename.name.endswith(".csv"):
+            with open(filename) as f_in:
+                reader = csv.DictReader(f_in)
+                for row in reader:
+                    record = AssociationTableRecordModel(**row)
+                    records.append(record)
+        else:
+            raise ValueError(f"only CSV is supported: {filename}")
+
+        return records
 
     def dict(self, by_alias=True, exclude=None):
         if exclude is None:
@@ -67,6 +93,10 @@ class AssociationTableModel(DimensionMappingBaseModel):
 class AssociationTableConfig(ConfigWithDataFilesBase):
     """Provides an interface to an AssociationTableModel"""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._dataframe = None
+
     @staticmethod
     def config_filename():
         return "dimension_mapping.toml"
@@ -78,3 +108,25 @@ class AssociationTableConfig(ConfigWithDataFilesBase):
     @staticmethod
     def model_class():
         return AssociationTableModel
+
+    def get_unique_from_ids(self):
+        """Return the unique from IDs in a dimension's records.
+
+        Returns
+        -------
+        set
+            set of str
+
+        """
+        return {x.from_id for x in self.model.records}
+
+    def get_unique_to_ids(self):
+        """Return the unique to IDs in a dimension's records.
+
+        Returns
+        -------
+        set
+            set of str
+
+        """
+        return {x.to_id for x in self.model.records}

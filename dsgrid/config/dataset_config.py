@@ -17,10 +17,66 @@ from .dimensions import (
 from dsgrid.data_models import DSGBaseModel
 
 
-LOAD_DATA_FILENAME = "load_data.parquet"
-LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
+ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv")
+ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
+    "load_data_lookup.parquet",
+    "load_data_lookup.csv",
+    "load_data_lookup.json",
+)
 
 logger = logging.getLogger(__name__)
+
+
+def check_load_data_filename(path: Path):
+    """Return the load data filename in path. Supports Parquet and CSV.
+
+    Parameters
+    ----------
+    path : Path
+
+    Returns
+    -------
+    Path
+
+    Raises
+    ------
+    ValueError
+        Raised if no supported load data filename exists.
+
+    """
+    for allowed_name in ALLOWED_LOAD_DATA_FILENAMES:
+        filename = path / allowed_name
+        if filename.exists():
+            return filename
+
+    # Use ValueError because this gets called in Pydantic model validation.
+    raise ValueError(f"no load_data file exists in {path}")
+
+
+def check_load_data_lookup_filename(path: Path):
+    """Return the load data lookup filename in path. Supports Parquet, CSV, and JSON.
+
+    Parameters
+    ----------
+    path : Path
+
+    Returns
+    -------
+    Path
+
+    Raises
+    ------
+    ValueError
+        Raised if no supported load data lookup filename exists.
+
+    """
+    for allowed_name in ALLOWED_LOAD_DATA_LOOKUP_FILENAMES:
+        filename = path / allowed_name
+        if filename.exists():
+            return filename
+
+    # Use ValueError because this gets called in Pydantic model validation.
+    raise ValueError(f"no load_data lookup file exists in {path}")
 
 
 class InputDatasetType(Enum):
@@ -175,13 +231,8 @@ class DatasetConfigModel(DSGBaseModel):
             if not local_path.exists():
                 raise ValueError(f"{local_path} does not exist for InputDataset")
 
-        load_data_path = local_path / LOAD_DATA_FILENAME
-        if not load_data_path.exists():
-            raise ValueError(f"{local_path} does not contain {LOAD_DATA_FILENAME}")
-
-        load_data_lookup_path = local_path / LOAD_DATA_LOOKUP_FILENAME
-        if not os.path.exists(load_data_lookup_path):
-            raise ValueError(f"{local_path} does not contain {LOAD_DATA_LOOKUP_FILENAME}")
+        check_load_data_filename(local_path)
+        check_load_data_lookup_filename(local_path)
 
         # TODO: check dataset_dimension_mapping (optional) if exists
         # TODO: check project_dimension_mapping (optional) if exists

@@ -1,4 +1,5 @@
 import abc
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -6,6 +7,10 @@ from pathlib import Path
 from dsgrid.data_models import serialize_model
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import dump_data
+from dsgrid.utils.spark import models_to_dataframe
+
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigBase(abc.ABC):
@@ -95,6 +100,15 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._src_dir = None
+        self._records_dataframe = None
+
+    def get_records_dataframe(self):
+        """Return the records in a spark dataframe. Cached on first call."""
+        if self._records_dataframe is None:
+            self._records_dataframe = models_to_dataframe(self.model.records, cache=True)
+            logger.debug("Loaded %s records dataframe", self.config_id)
+
+        return self._records_dataframe
 
     @classmethod
     def load(cls, config_file):

@@ -6,29 +6,29 @@ from pyspark.sql import SparkSession
 from dsgrid.project import Project
 from dsgrid.dataset import Dataset
 from dsgrid.exceptions import DSGValueNotRegistered
+from dsgrid.tests.common import TEST_REGISTRY
 
 
-LOCAL_DATA_DIRECTORY = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", ".")
-if "test_efs_comstock" in os.listdir(LOCAL_DATA_DIRECTORY):
-    PROJECT_ID = "test_efs"
-    DATASET_ID = "test_efs_comstock"
-else:
-    PROJECT_ID = "test"
-    DATASET_ID = "efs_comstock"
+PROJECT_ID = "test_efs"
+DATASET_ID = "test_efs_comstock"
 
 
 def test_project_load():
-    project = Project.load(PROJECT_ID, offline_mode=True)
+    project = Project.load(PROJECT_ID, offline_mode=True, registry_path=TEST_REGISTRY)
     assert isinstance(project, Project)
-    project = Project.load(PROJECT_ID, version="1.0.0", offline_mode=True)
+    project = Project.load(
+        PROJECT_ID, version="1.0.0", offline_mode=True, registry_path=TEST_REGISTRY
+    )
     assert isinstance(project, Project)
     with pytest.raises(DSGValueNotRegistered):
-        project = Project.load(PROJECT_ID, version="0.0.0", offline_mode=True)
+        project = Project.load(
+            PROJECT_ID, version="0.0.0", offline_mode=True, registry_path=TEST_REGISTRY
+        )
         assert isinstance(project, Project)
 
 
 def test_dataset_load():
-    project = Project.load(PROJECT_ID, offline_mode=True)
+    project = Project.load(PROJECT_ID, offline_mode=True, registry_path=TEST_REGISTRY)
     project.load_dataset(DATASET_ID)
     dataset = project.get_dataset(DATASET_ID)
     assert isinstance(dataset, Dataset)

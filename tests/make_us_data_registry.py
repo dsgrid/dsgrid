@@ -10,10 +10,10 @@ import click
 
 from dsgrid.loggers import setup_logging, check_log_file_size
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import create_local_test_registry, LOCAL_DATA_DIRECTORY
+from dsgrid.tests.common import create_local_test_registry, TEST_DATASET_DIRECTORY
 from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.utils.files import load_data, dump_data
-from dsgrid.tests.common import replace_dimension_uuids_from_registry
+from dsgrid.tests.common import replace_dimension_uuids_from_registry, TEST_PROJECT_REPO
 from dsgrid.tests.common import replace_dimension_mapping_uuids_from_registry
 
 
@@ -32,11 +32,13 @@ def make_test_data_registry(
     src_dir : Path
         Path containing source config files
     dataset_path : Path | None
-        If None, use "LOCAL_DATA_DIRECTORY" env variable.
+        If None, use "DSGRID_LOCAL_DATA_DIRECTORY" env variable.
     include_datasets : bool
         If False, do not register any datasets.
 
     """
+    if dataset_path is None:
+        dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
     project_dimension_mapping_config = src_dir / "dimension_mappings.toml"
@@ -84,15 +86,7 @@ def make_test_data_registry(
     return manager
 
 
-def replace_dataset_path(dataset_config_file, dataset_path=None):
-    if dataset_path is None:
-        if LOCAL_DATA_DIRECTORY is None:
-            print(
-                "You must define the environment DSGRID_LOCAL_DATA_DIRECTORY with the path to your "
-                "copy of datasets."
-            )
-            sys.exit(1)
-        dataset_path = LOCAL_DATA_DIRECTORY
+def replace_dataset_path(dataset_config_file, dataset_path):
     config = load_data(dataset_config_file)
     src_data = Path(dataset_path) / config["dataset_id"]
     config["path"] = str(src_data)
@@ -113,14 +107,21 @@ def replace_dataset_path(dataset_config_file, dataset_path=None):
 @click.option(
     "-p",
     "--project-dir",
-    envvar="TEST_PROJECT_REPO",
+    default=TEST_PROJECT_REPO,
     required=True,
-    help="path to dsgrid-project-EFS registry. Override with the environment variable TEST_PROJECT_REPO",
+    help="path to a project repository",
+)
+@click.option(
+    "-d",
+    "--dataset-dir",
+    default=TEST_DATASET_DIRECTORY,
+    required=True,
+    help="path to your local datasets",
 )
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def run(registry_path, force, project_dir, verbose):
+def run(registry_path, force, project_dir, dataset_dir, verbose):
     """Creates a local registry from a dsgrid project source directory for testing."""
     level = logging.DEBUG if verbose else logging.INFO
     log_file = Path("test_dsgrid_project.log")
@@ -136,7 +137,7 @@ def run(registry_path, force, project_dir, verbose):
     if tmp_project_dir.exists():
         shutil.rmtree(tmp_project_dir)
     shutil.copytree(project_dir, tmp_project_dir)
-    make_test_data_registry(registry_path, tmp_project_dir / "dsgrid_project")
+    make_test_data_registry(registry_path, tmp_project_dir / "dsgrid_project", dataset_dir)
     timer_stats_collector.log_stats()
 
 

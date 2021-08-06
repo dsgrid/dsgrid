@@ -72,7 +72,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         path = Path(config.model.path)
         load_data = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
-        logger.error("load_data=%s load_data_lookup=%s", id(load_data), id(load_data_lookup))
         with Timer(timer_stats_collector, "check_lookup_data_consistency"):
             self._check_lookup_data_consistency(config, load_data_lookup)
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):

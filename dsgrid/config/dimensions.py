@@ -22,7 +22,7 @@ from dsgrid.dimension.time import (
     TimezoneType,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
-from dsgrid.utils.files import compute_file_hash, load_data
+from dsgrid.utils.files import compute_file_hash, compute_hash, load_data
 from dsgrid.utils.spark import create_dataframe, read_dataframe
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -66,6 +66,12 @@ class DimensionBaseModel(DSGBaseModel):
         description="A description of the dimension records that is helpful, memorable, and "
         "identifiable; this description will get stored in the dimension record registry",
         alias="description",
+    )
+    # Keep this last for validation purposes.
+    model_hash: Optional[str] = Field(
+        title="model_hash",
+        description="Hash of the contents of the model",
+        dsg_internal=True,
     )
 
     @validator("name")
@@ -132,6 +138,15 @@ class DimensionBaseModel(DSGBaseModel):
             importlib.import_module(values["module"]),
             values["class_name"],
         )
+
+    @validator("model_hash")
+    def compute_model_hash(cls, model_hash, values):
+        # Always re-compute because the user may have changed something.
+        text = ""
+        for key, val in sorted(values.items()):
+            if key != "dimension_id":
+                text += str(val)
+        return compute_hash(text.encode())
 
 
 class DimensionModel(DimensionBaseModel):

@@ -78,6 +78,16 @@ def test_register_project_and_dataset(make_test_project_dir):
             dimension_mgr.register(dim_config_file, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
+            # Time dimension doesn't have records and duplicates are only based on fields.
+            dimension_models = load_data(make_test_project_dir / "dimensions.toml")["dimensions"]
+            time_models = [x for x in dimension_models if x["type"] == "time"]
+            assert len(time_models) == 1
+            new_models = {"dimensions": time_models}
+            new_file = make_test_project_dir / "time_dimension.toml"
+            dump_data(new_models, new_file)
+            dimension_mgr.register(new_file, user, log_message)
+
+        with pytest.raises(DSGDuplicateValueRegistered):
             dset_dir = Path("datasets/sector_models/comstock")
             dimension_mapping_config = make_test_project_dir / dset_dir / "dimension_mappings.toml"
             dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)

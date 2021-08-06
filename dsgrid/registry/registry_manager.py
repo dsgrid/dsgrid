@@ -413,15 +413,9 @@ def get_registry_path(registry_path=None):
     if not os.path.exists(registry_path):
         raise ValueError(
             f"Registry path {registry_path} does not exist. To create the registry, "
-            "run the following commands:\n"
+            "run the following command:\n"
             "  dsgrid registry create $DSGRID_REGISTRY_PATH\n"
-            "  dsgrid registry register-project $TEST_PROJECT_REPO/dsgrid_project/project.toml\n"
-            "  dsgrid registry submit-dataset "
-            "$TEST_PROJECT_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "
-            "-p test -l initial_submission\n"
-            "where $TEST_PROJECT_REPO points to the location of the dsgrid-project-EFS "
-            "repository on your system. If you would prefer a different location, "
-            "set the DSGRID_REGISTRY_PATH environment variable before running the commands."
+            "Then register dimensions, dimension mappings, projects, and datasets."
         )
     return registry_path
 

@@ -28,45 +28,52 @@ pre-commit install
 
 ## Run Tests
 
-In addition to grabbing the branch of dsgrid you want to test and making sure
-you've activated an environment with dsgrid installed per the above, you'll
-need to set up dsgrid for testing by selecting a dataset and setting
-environment variables.
+From your local dsgrid repository:
+```
+pytest tests
+```
 
-There are two datasets available:
-
-1. https://github.com/dsgrid/dsgrid-test-data (Recommended for unit tests.)
-   This is a stripped-down version of the EFS project and datasets. It is
-   optimized for testing the dsgrid code, not for queries.
-
-2. https://github.com/dsgrid/dsgrid-project-EFS (Recommended for queries.)
-   This is the full version of the EFS project. The datasets must be
-   downloaded from AWS.
-   You can run most unit tests against this data. However, it is slow because
-   the data is large.
-   Some unit tests require specific files from the dsgrid-test-data and will
-   be skipped if you run them on this data.
+If you want to include AWS tests:
 
 ```
-# Point to your checkout of a project repository (adjusting the path as needed).
-export TEST_PROJECT_REPO=$HOME/dsgrid-test-data/test_efs
-# or
-export TEST_PROJECT_REPO=$HOME/dsgrid-project-EFS
+pytest
+```
 
-# Point to your local dsgrid registry path.
-# Feel free to use a different path for storing your test registry--this is just
-# an example.
-export DSGRID_REGISTRY_PATH=$HOME/.dsgrid-test-registry
+The test setup code will clone [minimal test project and dataset](https://github.com/dsgrid/dsgrid-test-data.git)
+to `./dsgrid-test-data`. It is a minimal version of the EFS project and dataset.
 
-# Point to your local directory of datasets. This data will be registered in the
-# registry.
-# Minimal test data
-export DSGRID_LOCAL_DATA_DIRECTORY=$HOME/dsgrid-test-data/datasets
-# Pre-downloaded EFS data 
-export DSGRID_LOCAL_DATA_DIRECTORY=$HOME/.dsgrid-data
+If you want to change the data branch being used, edit the constant `TEST_DATA_BRANCH` in
+`tests/conftest.py`.
 
-# This is what that directory should contain:
-tree $DSGRID_LOCAL_DATA_DIRECTORY
+It will also create a local registry for testing in `./dsgrid-test-data/registry`.
+
+The test code will not automatically update the data branch if is it already the correct branch.
+You can update it manually or delete the directory and let the tests set it up again.
+
+pytest options that may be helpful:
+
+option flag           | effect
+--------------------- | ------
+--log-cli-level=DEBUG | emits log messages to the console. level can be set to DEBUG, INFO, WARN, ERROR
+
+
+## Testing/exploring with the EFS project repository
+
+You can create a local registry with the [EFS project repository](https://github.com/dsgrid/dsgrid-project-EFS)
+and use it for testing and exploration.
+
+Clone the repository to your system.
+```
+git clone https://github.com/dsgrid/dsgrid-project-EFS $HOME/dsgrid-project-EFS
+```
+
+Download the EFS datasets from AWS or Eagle (`/projects/dsgrid/efs_datasets/converted_output/commercial`)
+to a local path and set an environment variable for it.
+
+This is what that directory should contain:
+
+```
+tree ~/.dsgrid-data
 .dsgrid-data
 └── efs_comstock
     ├── convert_dsg.log
@@ -94,23 +101,19 @@ tree $DSGRID_LOCAL_DATA_DIRECTORY
     └── time.csv
 ```
 
-and then running:
-```
-python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH
-```
 
-After that you can run the tests:
-
+Set environment variables to point to the registry and datasets.
 ```
-cd dsgrid
-pytest tests
+export DSGRID_REGISTRY_PATH=./local-registry
+export DSGRID_LOCAL_DATA_DIRECTORY=~/.dsgrid-data
 ```
 
-pytest options that may be helpful:
+Create and populate the registry.
+```
+python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH -p $HOME/dsgrid-project-EFS -d $DSGRID_LOCAL_DATA_DIRECTORY
+```
 
-option flag           | effect
---------------------- | ------
---log-cli-level=DEBUG | emits log messages to the console. level can be set to DEBUG, INFO, WARN, ERROR
+Now your can run any `dsgrid registry` command.
 
 ## Interactive Exploration
 

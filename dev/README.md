@@ -39,15 +39,15 @@ If you want to include AWS tests:
 pytest
 ```
 
-The test setup code will clone [minimal test project and dataset](https://github.com/dsgrid/dsgrid-test-data.git)
-to `./dsgrid-test-data`. It is a minimal version of the EFS project and dataset.
+The test setup code will clone the [test data repository](https://github.com/dsgrid/dsgrid-test-data.git)
+to `./dsgrid-test-data`. It is a minimal version of the EFS project and datasets.
 
 If you want to change the data branch being used, edit the constant `TEST_DATA_BRANCH` in
 `tests/conftest.py`.
 
 It will also create a local registry for testing in `./dsgrid-test-data/registry`.
 
-The test code will not automatically update the data branch if is it already the correct branch.
+The test code will not automatically update the data if is it already the correct branch.
 You can update it manually or delete the directory and let the tests set it up again.
 
 pytest options that may be helpful:
@@ -113,7 +113,7 @@ Create and populate the registry.
 python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH -p $HOME/dsgrid-project-EFS -d $DSGRID_LOCAL_DATA_DIRECTORY
 ```
 
-Now your can run any `dsgrid registry` command.
+Now you can run any `dsgrid registry` command.
 
 ## Interactive Exploration
 

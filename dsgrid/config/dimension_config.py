@@ -6,12 +6,14 @@ import shutil
 from pathlib import Path
 
 import pytz
+import pandas as pd
 
 from .config_base import ConfigWithDataFilesBase
 from .dimensions import (
     TimeDimensionModel,
     DimensionModel,
     DimensionType,
+    TimeDimensionType,
 )
 from dsgrid.data_models import serialize_model, ExtendedJSONEncoder
 from dsgrid.dimension.time import DatetimeRange, AnnualTimeRange, TimezoneType, make_time_range
@@ -55,6 +57,23 @@ class DimensionConfig(DimensionBaseConfig):
 class TimeDimensionConfig(DimensionBaseConfig):
     """Provides an interface to a TimeDimensionModel."""
 
+    TIMEZONE_TO_TZINFO = {
+        TimezoneType.NONE: None,
+        TimezoneType.UTC: datetime.timezone(datetime.timedelta()),
+        TimezoneType.HST: datetime.timezone(datetime.timedelta(hours=-10)),
+        TimezoneType.AST: datetime.timezone(datetime.timedelta(hours=-9)),
+        TimezoneType.APT: pytz.timezone("US/Alaska"),
+        TimezoneType.PST: datetime.timezone(datetime.timedelta(hours=-8)),
+        TimezoneType.PPT: pytz.timezone("US/Pacific"),
+        TimezoneType.MST: datetime.timezone(datetime.timedelta(hours=-7)),
+        TimezoneType.MPT: pytz.timezone("US/Mountain"),
+        TimezoneType.CST: datetime.timezone(datetime.timedelta(hours=-6)),
+        TimezoneType.CPT: pytz.timezone("US/Central"),
+        TimezoneType.EST: datetime.timezone(datetime.timedelta(hours=-5)),
+        TimezoneType.EPT: pytz.timezone("US/Eastern"),
+        # TimezoneType.LOCAL: None,  # TODO: needs handling: DSGRID-171
+    }
+
     @staticmethod
     def model_class():
         return TimeDimensionModel
@@ -79,14 +98,16 @@ class TimeDimensionConfig(DimensionBaseConfig):
         ranges = []
         tz = self.get_tzinfo()
         for time_range in self.model.ranges:
+
             start = datetime.datetime.strptime(time_range.start, self.model.str_format)
+            start = pd.Timestamp(start, tz=tz)
             end = datetime.datetime.strptime(time_range.end, self.model.str_format)
+            end = pd.Timestamp(end, tz=tz)
             ranges.append(
                 make_time_range(
-                    start=start.replace(tzinfo=tz),
-                    end=end.replace(tzinfo=tz),
+                    start=start,
+                    end=end,
                     frequency=self.model.frequency,
-                    period=self.model.period,
                     leap_day_adjustment=self.model.leap_day_adjustment,
                 )
             )
@@ -120,9 +141,27 @@ class TimeDimensionConfig(DimensionBaseConfig):
         return self.model.timezone.tz
 
 
+class AnnualTimeDimensionConfig(DimensionBaseConfig):
+    """Provides an interface to an AnnualTimeDimensionModel."""
+
+    @staticmethod
+    def model_class():
+        return AnnualTimeDimensionModel
+
+    def serialize(self, path, force=False):
+        model_data = serialize_model(self.model, exclude={"dimension_cls"})
+        filename = path / self.config_filename()
+        if filename.exists() and not force:
+            raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
+        dump_data(model_data, filename)
+        return filename
+
+
 def get_dimension_config(model, src_dir):
     if isinstance(model, TimeDimensionModel):
         return TimeDimensionConfig(model)
+    if isinstance(model, AnnualTimeDimensionModel):
+        return AnnualTimeDimensionConfig(model)
     elif isinstance(model, DimensionModel):
         config = DimensionConfig(model)
         config.src_dir = src_dir
@@ -133,5 +172,12 @@ def get_dimension_config(model, src_dir):
 def load_dimension_config(filename):
     data = load_data(filename)
     if data["type"] == DimensionType.TIME:
-        return TimeDimensionConfig.load(filename)
+        if data["time_type"] == TimeDimensionType.DATETIME:
+            return TimeDimensionConfig.load(filename)
+        elif data["time_type"] == TimeDimensionType.ANNUAL:
+            return AnnualTimeDimensionConfig.load(filename)
+        else:
+            raise ValueError(
+                f"time_type={data['time_type']} not supported, valid options: datetime, annual"
+            )
     return DimensionConfig.load(filename)

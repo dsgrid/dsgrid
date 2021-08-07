@@ -14,12 +14,13 @@ from pyspark.sql import DataFrame, Row, SparkSession
 from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncoder
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, TimeDimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeInvervalType,
     TimeValueMeasurement,
     TimezoneType,
+    IncludeLeapDayType,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, compute_hash, load_data
@@ -275,6 +276,17 @@ class TimeRangeModel(DSGBaseModel):
 class TimeDimensionModel(DimensionBaseModel):
     """Defines a time dimension"""
 
+    # TODO: what is this intended purpose?
+    #       The time dimension may not consist real timestamps,
+    #       the weekday association is dictated by weather_year.
+    time_type: TimeDimensionType = Field(
+        title="time_type",
+        default="datetime",
+        description="""
+        Type of time dimension. Accepted: 
+            datetime, annual, representative_period (not supported yet)
+        """,
+    )
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y-%m-%d %H:%M:%s",
@@ -314,13 +326,25 @@ class TimeDimensionModel(DimensionBaseModel):
     )
     timezone: TimezoneType = Field(
         title="timezone",
-        description="Timezone of data",
-        options=TimezoneType.format_descriptions_for_docs(),
+        description="""
+        Timezone of data. Accepted: 
+            UTC, 
+            HawaiiAleutianStandard, 
+            AlaskaStandard, AlaskaPrevailing,
+            PacificStandard, PacificPrevailing, 
+            MountainStandard, MountainPrevailing, 
+            CentralStandard, CentralPrevailing, 
+            EasternStandard, EasternPrevailing,
+            LOCAL 
+        """,
     )
     value_representation: TimeValueMeasurement = Field(
         title="value_representation",
         default="mean",
-        description="How the value is measured",  # TODO: @ET help with this description
+        description="""
+        What the value associated with a timestamp represent. Accepted: 
+            mean, min, max, measured, total 
+        """,  # TODO: @ET help with this description
         options=TimeValueMeasurement.format_descriptions_for_docs(),
     )
 
@@ -361,6 +385,39 @@ class TimeDimensionModel(DimensionBaseModel):
         return data
 
 
+class AnnualTimeDimensionModel(DimensionBaseModel):
+    """Defines an annual time dimension"""
+
+    time_type: TimeDimensionType = Field(
+        title="time_type",
+        default="annual",
+        description="""
+        Type of time dimension. Accepted: 
+            datetime, annual, representative_period (not supported yet)
+        """,
+    )
+    include_leap_day: IncludeLeapDayType = Field(
+        title="include_leap_day",
+        default="no",
+        description="""
+        Whether annual time includes leap day. Accepted: 
+            yes, no
+        """,
+    )
+    # TODO: is this a project-level time dimension config?
+    value_representation: TimeValueMeasurement = Field(
+        title="value_representation",
+        default="mean",
+        description="""
+        What the value associated with a year represent. Accepted: 
+            mean, min, max, measured, total 
+        """,
+    )
+
+
+# TODO: a DimensionModel for Representative_period (DSGRID-165)
+
+
 class DimensionReferenceModel(DSGBaseModel):
     """Reference to a dimension stored in the registry"""
 
@@ -393,7 +450,14 @@ class DimensionReferenceModel(DSGBaseModel):
         return handle_version_or_str(version)
 
 
-DimensionUnionModel = List[Union[DimensionModel, DimensionReferenceModel, TimeDimensionModel]]
+DimensionUnionModel = List[
+    Union[
+        DimensionModel,
+        DimensionReferenceModel,
+        TimeDimensionModel,
+        AnnualTimeDimensionModel,
+    ]
+]
 
 
 def handle_dimension_union(value):
@@ -406,7 +470,14 @@ def handle_dimension_union(value):
 
     # NOTE: Errors inside DimensionModel or TimeDimensionModel will be duplicated by Pydantic
     if value["type"] == DimensionType.TIME.value:
-        val = TimeDimensionModel(**value)
+        if value["time_type"] == TimeDimensionType.DATETIME.value:
+            val = TimeDimensionModel(**value)
+        elif value["time_type"] == TimeDimensionType.ANNUAL.value:
+            val = AnnualTimeDimensionModel(**value)
+        else:
+            raise ValueError(
+                f"{value['time_type']} not supported, valid options: 'datetime', 'annual'"
+            )
     elif sorted(value.keys()) == ["dimension_id", "type", "version"]:
         val = DimensionReferenceModel(**value)
     else:

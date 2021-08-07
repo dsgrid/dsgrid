@@ -8,6 +8,9 @@ if TEST_PROJECT_REPO is None:
     )
     sys.exit(1)
 
+import os
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 PROJECT_CONFIG_FILE = os.path.join(TEST_PROJECT_REPO, "dsgrid_project", "project.toml")
 DIMENSION_CONFIG_FILE = os.path.join(TEST_PROJECT_REPO, "dsgrid_project", "dimensions.toml")

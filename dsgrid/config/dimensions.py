@@ -20,7 +20,6 @@ from dsgrid.dimension.time import (
     TimeInvervalType,
     TimeValueMeasurement,
     TimezoneType,
-    IncludeLeapDayType,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, compute_hash, load_data
@@ -396,12 +395,12 @@ class AnnualTimeDimensionModel(DimensionBaseModel):
             datetime, annual, representative_period (not supported yet)
         """,
     )
-    include_leap_day: IncludeLeapDayType = Field(
+    include_leap_day: bool = Field(
         title="include_leap_day",
-        default="no",
+        default="false",
         description="""
         Whether annual time includes leap day. Accepted: 
-            yes, no
+            true, false
         """,
     )
     # TODO: is this a project-level time dimension config?

@@ -148,11 +148,6 @@ class TimezoneType(DSGEnum):
     )
 
 
-class IncludeLeapDayType(Enum):
-    WITH_LEAP_DAY = "yes"
-    WITHOUT_LEAP_DAY = "no"
-
-
 class DatetimeRange:
     def __init__(self, start, end, frequency, leap_day_adjustment: LeapDayAdjustmentType):
         # TODO: period doesn't get used when generating the time range, should we remove?

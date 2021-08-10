@@ -139,7 +139,7 @@ class Season(TimeDimensionModel):
 
 
 class AnnualTime(AnnualTimeDimensionModel):
-    """Annul Time attributes"""
+    """Annual Time attributes"""
 
 
 # ---------------------------

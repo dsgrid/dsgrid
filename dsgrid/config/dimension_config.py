@@ -14,6 +14,7 @@ from .dimensions import (
     DimensionModel,
     DimensionType,
     TimeDimensionType,
+    AnnualTimeDimensionModel,
 )
 from dsgrid.data_models import serialize_model, ExtendedJSONEncoder
 from dsgrid.dimension.time import DatetimeRange, AnnualTimeRange, TimezoneType, make_time_range
@@ -114,7 +115,7 @@ class TimeDimensionConfig(DimensionBaseConfig):
 
         return ranges
 
-    def list_time_range(self, time_range: [DatetimeRange, AnnualTimeRange]):
+    def list_time_range(self, time_range: DatetimeRange):
         """Return a list of datetimes for a time range.
 
         Parameters

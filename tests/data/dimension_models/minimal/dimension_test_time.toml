@@ -53,7 +53,7 @@ description = """Annual time"""
 module = "dsgrid.dimension.standard"
 name = "Annual-time-with-leap-year"
 value_representation = "mean"
-include_leap_day = "yes"
+include_leap_day = "true"
 type = "time"
 time_type = "annual"
 

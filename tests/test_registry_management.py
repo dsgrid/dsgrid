@@ -22,7 +22,11 @@ from dsgrid.registry.common import DatasetRegistryStatus, VersionUpdateType
 from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.project_registry_manager import ProjectRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
+from dsgrid.tests.common import (
+    create_local_test_registry,
+    make_test_project_dir,
+    TEST_DATASET_DIRECTORY,
+)
 from dsgrid.utils.files import dump_data, load_data
 from dsgrid.tests.common import (
     replace_dimension_mapping_uuids_from_registry,
@@ -34,7 +38,7 @@ from tests.make_us_data_registry import make_test_data_registry, replace_dataset
 def test_register_project_and_dataset(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
-        manager = make_test_data_registry(base_dir, make_test_project_dir)
+        manager = make_test_data_registry(base_dir, make_test_project_dir, TEST_DATASET_DIRECTORY)
         project_mgr = manager.project_manager
         dataset_mgr = manager.dataset_manager
         dimension_mgr = manager.dimension_manager
@@ -78,6 +82,16 @@ def test_register_project_and_dataset(make_test_project_dir):
             dimension_mgr.register(dim_config_file, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
+            # Time dimension doesn't have records and duplicates are only based on fields.
+            dimension_models = load_data(make_test_project_dir / "dimensions.toml")["dimensions"]
+            time_models = [x for x in dimension_models if x["type"] == "time"]
+            assert len(time_models) == 1
+            new_models = {"dimensions": time_models}
+            new_file = make_test_project_dir / "time_dimension.toml"
+            dump_data(new_models, new_file)
+            dimension_mgr.register(new_file, user, log_message)
+
+        with pytest.raises(DSGDuplicateValueRegistered):
             dset_dir = Path("datasets/sector_models/comstock")
             dimension_mapping_config = make_test_project_dir / dset_dir / "dimension_mappings.toml"
             dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
@@ -102,7 +116,7 @@ def test_register_project_and_dataset(make_test_project_dir):
 def test_auto_updates(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
-        mgr = make_test_data_registry(base_dir, make_test_project_dir)
+        mgr = make_test_data_registry(base_dir, make_test_project_dir, TEST_DATASET_DIRECTORY)
         project_mgr = mgr.project_manager
         dataset_mgr = mgr.dataset_manager
         dimension_mgr = mgr.dimension_manager

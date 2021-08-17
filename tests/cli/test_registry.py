@@ -5,7 +5,11 @@ from tempfile import TemporaryDirectory, gettempdir
 
 from dsgrid.utils.run_command import check_run_command, run_command
 from dsgrid.utils.files import load_data
-from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
+from dsgrid.tests.common import (
+    create_local_test_registry,
+    make_test_project_dir,
+    TEST_DATASET_DIRECTORY,
+)
 from dsgrid.tests.common import (
     replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
@@ -48,7 +52,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         project_id = load_data(project_config)["project_id"]
         dataset_config = make_test_project_dir / dataset_dir / "dataset.toml"
         dataset_id = load_data(dataset_config)["dataset_id"]
-        replace_dataset_path(dataset_config)
+        replace_dataset_path(dataset_config, TEST_DATASET_DIRECTORY)
         replace_dimension_mapping_uuids_from_registry(
             path, (project_config, dimension_mapping_refs)
         )

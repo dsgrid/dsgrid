@@ -4,6 +4,7 @@ from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
 from dsgrid.config.project_config import ProjectConfigModel
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
+from dsgrid.tests.common import TEST_REGISTRY
 from tests.data.dimension_models.minimal.models import PROJECT_CONFIG_FILE
 
 
@@ -14,7 +15,7 @@ def config_as_dict():
 
 @pytest.fixture
 def dimension_manager():
-    registry = RegistryManager.load(get_registry_path(), offline_mode=True)
+    registry = RegistryManager.load(TEST_REGISTRY, offline_mode=True)
     return registry.dimension_manager
 
 

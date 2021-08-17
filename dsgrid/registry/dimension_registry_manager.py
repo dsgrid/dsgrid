@@ -67,12 +67,47 @@ class DimensionRegistryManager(RegistryManagerBase):
     def registry_class():
         return DimensionRegistry
 
+    def check_unique_model_fields(self, config: DimensionsConfig, warn_only=False):
+        """Check if any new dimension record files have identical contents as any existing files.
+
+        Parameters
+        ----------
+        config : DimensionConfig
+        warn_only: bool
+            If True, log a warning instead of raising an exception.
+
+        Raises
+        ------
+        DSGDuplicateValueRegistered
+            Raised if there are duplicates and warn_only is False.
+
+        """
+        hashes = {}
+        for dimension_id, registry_config in self._registry_configs.items():
+            dimension = self.get_by_id(dimension_id, registry_config.model.version)
+            hashes[dimension.model.model_hash] = dimension_id
+
+        duplicates = []
+        for dimension in config.model.dimensions:
+            if dimension.model_hash in hashes:
+                duplicates.append((dimension.dimension_id, hashes[dimension.model_hash]))
+
+        if duplicates:
+            for dup in duplicates:
+                logger.error(
+                    "%s has duplicate content with existing dimension ID %s", dup[0], dup[1]
+                )
+            if not warn_only:
+                raise DSGDuplicateValueRegistered(
+                    f"There are {len(duplicates)} dimensions with duplicate definitions."
+                )
+
     def check_unique_records(self, config: DimensionsConfig, warn_only=False):
         """Check if any new dimension record files have identical contents as any existing files.
 
         Parameters
         ----------
-        config : DimensionMappingConfig
+        config : DimensionConfig
         warn_only: bool
             If True, log a warning instead of raising an exception.
 
@@ -191,6 +226,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         config = DimensionsConfig.load(config_file)
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)
+        self.check_unique_model_fields(config, warn_only=force)
         # TODO: check that id does not already exist in .dsgrid-registry
 
         registration = make_initial_config_registration(submitter, log_message)

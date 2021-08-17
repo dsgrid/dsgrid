@@ -20,6 +20,7 @@ class LeapDayAdjustmentType(DSGEnum):
         value="drop_jan1",
         description="To adjust for leap years, January 1st gets dropped",
     )
+    NONE = EnumValue(value=None, description="No leap day adjustment made.")
 
 
 class Period(DSGEnum):
@@ -35,8 +36,9 @@ class Period(DSGEnum):
     )
     PERIOD_BEGINNING = EnumValue(
         value="period_beginning",
-        description="A time period that is period beginning is coded by the beginning time. E.g., "
-        "2pm (with freq=1h) represents a period of time between 2-3pm. This is the dsgrid default.",
+        description="A time period that is period beginning is coded by the beginning time. E.g.,"
+        " 2pm (with freq=01:00:00) represents a period of time between 2-3pm. This is the dsgrid"
+        " default.",
     )
     INSTANTANEOUS = EnumValue(
         value="instantaneous",

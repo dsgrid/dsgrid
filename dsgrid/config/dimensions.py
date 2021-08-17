@@ -51,19 +51,7 @@ class DimensionBaseModel(DSGBaseModel):
         title="module",
         description="Python module with the dimension class",
         default="dsgrid.dimension.standard",
-        optional=True,
-        requirements=(
-            "Custom user-defined modules are not supported if running dsgrid in 'online mode'."
-            "To supply a custom module, dsgrid must be pointing to a custom registry or be"
-            " working in `offline_mode`.",
-            "If a user supplied module is provided then the module must be importable in the"
-            " user's python environment",
-        ),
-        notes=(
-            "dsgrid (in online-mode) only supports the :mod:`dsgrid.dimension.standard` module.",
-            # TODO: we need to fail if it comes from another module && offline_mode is False.
-            #   @DT - where does this fit into the code?
-        ),
+        # TODO: we need to fail if it comes from another module && offline_mode is False.
     )
     class_name: str = Field(
         title="class_name",
@@ -125,6 +113,11 @@ class DimensionBaseModel(DSGBaseModel):
                 f" Dimension name '{name}' is not descriptive enough for a dimension record name. Please be more descriptive in your naming. Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable, identifiable, and reusable for other datasets and projects. e.g., 'time-2012-est-houlry-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name."
             )
         return name
+
+    @validator("module", always=True)
+    def check_module(cls, module):
+        if module != "dsgrid.dimension.standard":
+            raise ValueError("Only dsgrid.dimension.standard is supported as a dimension module.")
 
     @validator("class_name", always=True)
     def get_dimension_class_name(cls, class_name, values):
@@ -258,26 +251,24 @@ class TimeDimensionModel(DimensionBaseModel):
 
     ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
-        description="Defines the continuous ranges of time in the data.",  # Alternative description: List of start and end times.
+        description="Defines the continuous ranges of time in the data.",
     )
-    # TODO: what is this intended purpose?
-    #       originally i thought it was to interpret start/end, but
-    #       the year here is unimportant because it will be based on
-    #       the weather_year
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y-%m-%d %H:%M:%s",
         description="Timestamp string format",
         notes=(
-            "The string format is used to parse the timestamps provided in the time ranges",
-            # TODO: are there are any other purposes for the string format? How else do we use it? Is it used to parse the data in the load_data.parquet?
-            "Cheatsheet reference: https://strftime.org/",
+            "The string format is used to parse the timestamps provided in the time ranges."
+            "Cheatsheet reference: `<https://strftime.org/>`_.",
         ),
     )
     frequency: timedelta = Field(
         title="frequency",
         description="Resolution of the timestamps",
-        # TODO: add note/link for how to get timedeltas;
+        notes=(
+            "Reference: `Datetime timedelta objects"
+            " <https://docs.python.org/3/library/datetime.html#timedelta-objects>`_",
+        ),
     )
     includes_dst: bool = Field(
         title="includes_dst",
@@ -366,7 +357,7 @@ class DimensionReferenceModel(DSGBaseModel):
             "The version string must be in semver format (e.g., '1.0.0') and it must be "
             " a valid/existing version in the registry.",
         ),
-        # TODO: add notes about warnings for outdated versions? @DT - are these outdated version warnings implemented yet?
+        # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
 
     @validator("version")

@@ -103,8 +103,8 @@ class DatasetConfigModel(DSGBaseModel):
         requirements=(
             "When registering a dataset to a project, the dataset_id must match the expected ID "
             "defined in the project config.",
-            "For posterity, dataset_id cannot be the same as the model name (e.g., dataset cannot"
-            " be 'ComStock')",
+            "For posterity, dataset_id cannot be the same as the ``data_source``"
+            " (e.g., dataset cannot be 'ComStock')",
         ),
     )
     dataset_type: InputDatasetType = Field(

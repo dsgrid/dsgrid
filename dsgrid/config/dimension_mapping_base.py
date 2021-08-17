@@ -60,12 +60,13 @@ class DimensionMappingReferenceModel(DSGBaseModel):
     version: Union[str, VersionInfo] = Field(
         title="version",
         description="Version of the dimension",
-        # TODO: copy notes about version
+        # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
     required_for_validation: Optional[bool] = Field(
         title="version",
         description="Set to False if a given base-to-base dimension mapping is NOT required for input dataset validation; default is True",
         default=True,
+        # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
 
     @validator("version")
@@ -79,9 +80,7 @@ class DimensionMappingReferenceModel(DSGBaseModel):
 
 
 class DimensionMappingReferenceListModel(DSGBaseModel):
-    """List of dimension mapping references"""
-
-    # TODO: for our own sakes, I think we should provide an explanation of when this model is used
+    """List of dimension mapping references used by the dimensions.toml config"""
 
     references: List[DimensionMappingReferenceModel] = Field(
         title="references",

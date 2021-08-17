@@ -18,7 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class DimensionsConfigModel(DSGBaseModel):
-    """Represents multiple dimension models. For user input purposes"""  # TODO: is this the right docstring? For user input purposes?
+    """Represents multiple dimension models.
+
+    Used when registering multiple dimensions in one command.
+    """
 
     dimensions: List[Union[DimensionModel, TimeDimensionModel]] = Field(
         title="dimensions",

@@ -56,7 +56,7 @@ class DimensionsModel(DSGBaseModel):
         description="List of registry references for a project's supplemental dimensions.",
         requirements=(
             "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType`"
-            " are allowed for supplemental dimension refrences (i.e., multiple `Geography` types"
+            " are allowed for supplemental dimension references (i.e., multiple `Geography` types"
             " are allowed).",
         ),
         notes=(
@@ -114,16 +114,19 @@ class InputDatasetModel(DSGBaseModel):
         description="Dataset type.",
         options=InputDatasetType.format_for_docs(),
     )
-    version: Union[str, VersionInfo] = Field(
+    version: Optional[Union[str, None, VersionInfo]] = Field(
         title="version",
         description="Version of the registered dataset",
-        default="1.0.0",  # TODO: convert to VersionInfo type?
+        default=None,
         requirements=(
+            # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
+            # TODO: need to assume the latest version. DSGRID-190
+            "The version specification is optional. If no version is supplied, then the latest"
+            " version in the registry is assumed.",
             "The version string must be in semver format (e.g., '1.0.0') and it must be a valid/"
             "existing version in the registry.",
         ),
-        # TODO: add notes about warnings for outdated versions?
-        # TODO: Maybe version needs to be Optional at first.
+        # TODO: add notes about warnings for outdated versions? DSGRID-189.
     )
     status: Optional[DatasetRegistryStatus] = Field(
         title="status",
@@ -155,11 +158,6 @@ class InputDatasetsModel(DSGBaseModel):
         title="datasets",
         description="List of project input datasets",
     )
-
-    # TODO:
-    #   - Check for unique dataset IDs
-    #   - check model_name, model_sector, sectors are all expected and align
-    #   with the dimension records
 
 
 class DimensionMappingsModel(DSGBaseModel):
@@ -200,7 +198,7 @@ class DimensionMappingsModel(DSGBaseModel):
             " mappings are only supplied if a dataset's dimensions do not match the project's"
             " dimension. ",
         ),
-        # TODO: need to document missing dimensoin records, fill values, etc.
+        # TODO: need to document missing dimension records, fill values, etc. DSGRID-191.
     )
 
 
@@ -223,7 +221,7 @@ class ProjectConfigModel(DSGBaseModel):
         notes=(
             "The description will get stored in the project registry and may be used for"
             " searching",
-        ),  # TODO: is this true about all fields here?
+        ),
     )
     status: Optional[ProjectRegistryStatus] = Field(
         title="status",

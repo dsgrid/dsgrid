@@ -13,7 +13,7 @@ from dsgrid.registry.registry_manager import RegistryManager
 TEST_PROJECT_PATH = Path("dsgrid-test-data").absolute()
 TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_efs"
 TEST_DATASET_DIRECTORY = TEST_PROJECT_PATH / "datasets"
-TEST_REGISTRY = TEST_PROJECT_PATH / "registry"
+TEST_REGISTRY = Path("tests/data/registry")
 
 
 @pytest.fixture

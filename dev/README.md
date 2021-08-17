@@ -26,35 +26,108 @@ pre-commit install
 
 - [Pandoc](https://pandoc.org/installing.html)
 
-## Run Tests
+## Tests
 
-From your local dsgrid repository:
+### Setup
+The tests use the [test data repository](https://github.com/dsgrid/dsgrid-test-data.git)
+as a git submodule in `./dsgrid-test-data`. It is a minimal version of the EFS project and
+datasets. You must initialize this submodule and keep it updated.
+
+Initialize the submodule:
 ```
-pytest tests
+git submodule init
+git submodule update
 ```
 
-If you want to include AWS tests:
+Update the submodule when there are new changes in the test data repository:
+```
+git submodule update --remote --merge
+```
 
+### Run tests
+
+To run all tests, including AWS tests:
 ```
 pytest
 ```
 
-The test setup code will clone the [test data repository](https://github.com/dsgrid/dsgrid-test-data.git)
-to `./dsgrid-test-data`. It is a minimal version of the EFS project and datasets.
+If you want to exclude AWS tests:
+```
+pytest tests
+```
 
-If you want to change the data branch being used, edit the constant `TEST_DATA_BRANCH` in
-`tests/conftest.py`.
+If you only want to run AWS tests:
+```
+pytest tests_aws
+```
 
-It will also create a local registry for testing in `./dsgrid-test-data/registry`.
+### Workflow for developing a feature that changes code and data
 
-The test code will not automatically update the data if is it already the correct branch.
-You can update it manually or delete the directory and let the tests set it up again.
+If you are developing a feature that requires changing code and data then you will need to keep
+the submodule synchronized. Here is an example workflow:
 
-pytest options that may be helpful:
+1. Create a dsgrid branch.
+```
+git checkout -b feature-x
+```
+
+2. Create a data branch inside the submodule.
+```
+cd dsgrid-test-data
+git checkout -b feature-x
+cd ..
+```
+
+3. Implement and test your feature.
+
+4. Commit your code and data changes in each repository.
+
+5. Update the dsgrid repo to point to the correct data commit.
+```
+git submodule set-branch -b feature-x dsgrid-test-data
+git add .gitmodules dsgrid-test-data
+git commit -m "Point dsgrid-test-data to feature-x branch"
+```
+
+6. Push both branches to GitHub. **Note**: Using a forked data repository is not supported.
+
+7. Open two pull requests.
+
+8. Address comments, if needed. If you make new commits to the data branch then you must update
+the dsgrid branch before pushing back to GitHub.
+```
+git add dsgrid-test-data
+git commit -m "Update dsgrid-test-data"
+```
+
+9. Merge the data pull request.
+
+10. Update the dsgrid branch to point back to the `main` data branch.
+```
+cd dsgrid-test-data
+git checkout main
+git pull origin main
+# The feature branch is now in main. Delete it.
+git branch -d feature-x
+cd ..
+git submodule set-branch -b main dsgrid-test-data
+git add .gitmodules dsgrid-test-data
+git commit -m "Point dsgrid-test-data to main branch"
+git push origin feature-x
+```
+
+11. After CI passes, merge the dsgrid pull request.
+
+### Test registry
+The setup code creates a local registry for testing in `./tests/data/registry`. This only happens
+once in order to save time on repeated runs. If you make a change to code or data then you may
+need to manually delete the directory.
+
+### Pytest options
 
 option flag           | effect
 --------------------- | ------
---log-cli-level=DEBUG | emits log messages to the console. level can be set to DEBUG, INFO, WARN, ERROR
+--log-cli-level=debug | emits log messages to the console. level can be set to debug, info, warn, error
 
 
 ## Testing/exploring with the EFS project repository

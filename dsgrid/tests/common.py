@@ -10,7 +10,7 @@ import pytest
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
 from dsgrid.registry.registry_manager import RegistryManager
 
-TEST_PROJECT_PATH = Path("dsgrid-test-data").absolute()
+TEST_PROJECT_PATH = Path(__file__).absolute().parent.parent.parent / "dsgrid-test-data"
 TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_efs"
 TEST_DATASET_DIRECTORY = TEST_PROJECT_PATH / "datasets"
 TEST_REGISTRY = Path("tests/data/registry")

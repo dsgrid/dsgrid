@@ -11,7 +11,11 @@ from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dataset_config import (
+    DatasetConfig,
+    check_load_data_filename,
+    check_load_data_lookup_filename,
+)
 from dsgrid.data_models import serialize_model
 from dsgrid.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
@@ -65,10 +69,9 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _check_dataset_consistency(self, config: DatasetConfig):
         spark = SparkSession.getActiveSession()
-        load_data = read_dataframe(Path(config.model.path) / Dataset.DATA_FILENAME)
-        load_data_lookup = read_dataframe(
-            Path(config.model.path) / Dataset.LOOKUP_FILENAME, cache=True
-        )
+        path = Path(config.model.path)
+        load_data = read_dataframe(check_load_data_filename(path))
+        load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
         with Timer(timer_stats_collector, "check_lookup_data_consistency"):
             self._check_lookup_data_consistency(config, load_data_lookup)
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
@@ -94,7 +97,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         for dimension_type in dimension_types:
             name = dimension_type.value
             dimension = config.get_dimension(dimension_type)
-            dim_records = {x.id for x in dimension.model.records.select("id").collect()}
+            dim_records = dimension.get_unique_ids()
             lookup_records = get_unique_values(load_data_lookup, name)
             if dim_records != lookup_records:
                 logger.error(
@@ -114,25 +117,15 @@ class DatasetRegistryManager(RegistryManagerBase):
         time_range = time_ranges[0]
         # TODO: need to support validation of multiple time ranges: DSGRID-173
 
-        expected_times = time_dim.list_time_range(time_range)
+        expected_timestamps = time_dim.list_time_range(time_range)
         actual_timestamps = [
             x.timestamp.astimezone().astimezone(tz)
             for x in load_data.select("timestamp").distinct().sort("timestamp").collect()
         ]
-        if expected_times != actual_timestamps:
-            mismatch = sorted(set(expected_times).difference(set(actual_timestamps)))
+        if expected_timestamps != actual_timestamps:
+            mismatch = sorted(set(expected_timestamps).difference(set(actual_timestamps)))
             raise DSGInvalidDataset(
                 f"load_data timestamps do not match expected times. mismatch={mismatch}"
-            )
-        dataset_start = actual_timestamps[0]
-        dataset_end = actual_timestamps[-1]
-        if dataset_start != time_ranges[0].start:
-            raise DSGInvalidDimension(
-                f"Mismatch between dataset start time ({dataset_start} and dimension start time ({time_ranges[0].start}"
-            )
-        if dataset_end != time_ranges[-1].end:
-            raise DSGInvalidDimension(
-                f"Mismatch between dataset end time ({dataset_end} and dimension end time: {time_ranges[-1].end}"
             )
 
         timestamps_by_id = (
@@ -141,9 +134,9 @@ class DatasetRegistryManager(RegistryManagerBase):
             .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
         )
         for row in timestamps_by_id.collect():
-            if row.distinct_timestamps != len(expected_times):
+            if row.distinct_timestamps != len(expected_timestamps):
                 raise DSGInvalidDataset(
-                    f"load_data ID={row.id} doesn't have {len(expected_times)} timestamps: actual={row.countDistinct}"
+                    f"load_data ID={row.id} does not have {len(expected_timestamps)} timestamps: actual={row.distinct_timestamps}"
                 )
 
     def _check_dataset_internal_consistency(
@@ -158,6 +151,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         lookup_data_ids = []
         for row in load_data_lookup.select("id").distinct().sort("id").collect():
             if row.id is None:
+                logger.error("load_data_lookup=%s", load_data_lookup.collect())
                 raise DSGInvalidDataset(
                     f"load_data_lookup for dataset {config.config_id} has a null data ID"
                 )
@@ -170,7 +164,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     def _check_load_data_columns(self, config: DatasetConfig, load_data):
         dim_type = config.model.load_data_column_dimension
         dimension = config.get_dimension(dim_type)
-        dimension_records = get_unique_values(dimension.model.records, "id")
+        dimension_records = dimension.get_unique_ids()
 
         found_id = False
         dim_columns = set()

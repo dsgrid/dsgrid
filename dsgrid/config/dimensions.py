@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
+import pandas as pd
 from pydantic import validator
 from pydantic import Field
 from pyspark.sql import DataFrame, Row, SparkSession
@@ -21,7 +22,7 @@ from dsgrid.dimension.time import (
     TimezoneType,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
-from dsgrid.utils.files import compute_file_hash, load_data
+from dsgrid.utils.files import compute_file_hash, compute_hash, load_data
 from dsgrid.utils.spark import create_dataframe, read_dataframe
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -83,6 +84,12 @@ class DimensionBaseModel(DSGBaseModel):
             "The description will get stored in the dimension record registry and may be used"
             " when searching the registry.",
         ),
+    )
+    # Keep this last for validation purposes.
+    model_hash: Optional[str] = Field(
+        title="model_hash",
+        description="Hash of the contents of the model",
+        dsg_internal=True,
     )
 
     @validator("name")
@@ -155,6 +162,18 @@ class DimensionBaseModel(DSGBaseModel):
             values["class_name"],
         )
 
+    @validator("model_hash")
+    def compute_model_hash(cls, model_hash, values):
+        # Always re-compute because the user may have changed something.
+        text = ""
+        for key, val in sorted(values.items()):
+            # dimension_id is auto-generated; don't check for that
+            # Don't let users create a dimension where the only difference
+            # is the records. They need to change something else.
+            if key not in ("dimension_id", "file_hash"):
+                text += str(val)
+        return compute_hash(text.encode())
+
 
 class DimensionModel(DimensionBaseModel):
     """Defines a non-time dimension"""
@@ -169,18 +188,17 @@ class DimensionModel(DimensionBaseModel):
         description="Hash of the contents of the file",
         dsg_internal=True,
     )
-    association_table: Optional[str] = Field(  # TODO: delete this? -- ??
+    association_table: Optional[str] = Field(  # TODO: delete this? -- ???
         title="association_table",
         description="Optional table that provides mappings of foreign keys",
-        dsg_internal=True,  # -- is this internal? Or is field outdated and should be removed?
+        dsg_internal=True,  # -- @DT is this internal? Or is field outdated and should be removed?
     )
-
-    # TODO: Currently this is commented out because .schema isn't able to parse DataFrame
-    # records: Optional[DataFrame] = Field(
-    #     title="records",
-    #     description="Dimension records in filename that get loaded at runtime",
-    #     dsg_internal=True,
-    # )
+    records: Optional[List] = Field(
+        title="records",
+        description="Dimension records in filename that get loaded at runtime",
+        dsg_internal=True,
+        default=[],
+    )
 
     @validator("filename")
     def check_file(cls, filename):
@@ -199,23 +217,36 @@ class DimensionModel(DimensionBaseModel):
             return None
         return file_hash or compute_file_hash(values["filename"])
 
-    # @validator("records", always=True)
-    # def add_records(cls, records, values):
-    #     """Add records from the file."""
-    #     prereqs = ("name", "filename", "cls")
-    #     for req in prereqs:
-    #         if values.get(req) is None:
-    #             return records
+    @validator("records", always=True)
+    def add_records(cls, records, values):
+        """Add records from the file."""
+        prereqs = ("name", "filename", "cls")
+        for req in prereqs:
+            if values.get(req) is None:
+                return records
 
-    #     filename = Path(values["filename"])
-    #     dim_class = values["cls"]
-    #     assert not str(filename).startswith("s3://"), "records must exist in the local filesystem"
+        filename = Path(values["filename"])
+        dim_class = values["cls"]
+        assert not str(filename).startswith("s3://"), "records must exist in the local filesystem"
 
-    #     if records:
-    #         raise ValueError("records should not be defined in the dimension config")
+        if records:
+            raise ValueError("records should not be defined in the dimension config")
 
-    #     # The trick in DSGBaseModel.load where we change directories doesn't work with Spark.
-    #     return read_dataframe(filename, cache=True, require_unique=["id"], read_with_spark=False)
+        records = []
+        if filename.name.endswith(".csv"):
+            with open(filename) as f_in:
+                ids = set()
+                reader = csv.DictReader(f_in)
+                for row in reader:
+                    record = dim_class(**row)
+                    if record.id in ids:
+                        raise ValueError(f"{record.id} is listed multiple times")
+                    ids.add(record.id)
+                    records.append(record)
+        else:
+            raise ValueError(f"only CSV is supported: {filename}")
+
+        return records
 
     def dict(self, by_alias=True, **kwargs):
         exclude = {"cls", "records"}

@@ -5,6 +5,8 @@ from pathlib import Path
 
 from pyspark.sql import SparkSession
 
+from dsgrid.config.dataset_config import check_load_data_filename, check_load_data_lookup_filename
+from dsgrid.utils.spark import read_dataframe
 
 logger = logging.getLogger(__name__)
 
@@ -12,8 +14,6 @@ logger = logging.getLogger(__name__)
 class Dataset:
     """Contains metadata and data for a sector."""
 
-    DATA_FILENAME = "load_data.parquet"
-    LOOKUP_FILENAME = "load_data_lookup.parquet"
     VIEW_NAMES = ("load_data_lookup", "load_data")
 
     def __init__(self, config, load_data_lookup, data):
@@ -40,10 +40,10 @@ class Dataset:
         """
         spark = SparkSession.getActiveSession()
         path = Path(config.model.path)
-        load_data_lookup = spark.read.parquet(str(path / cls.LOOKUP_FILENAME))
-        data = spark.read.parquet(str(path / cls.DATA_FILENAME))
+        load_data = read_dataframe(check_load_data_filename(path))
+        load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
         logger.debug("Loaded Dataset from %s", path)
-        dataset = cls(config, load_data_lookup, data)
+        dataset = cls(config, load_data_lookup, load_data)
         return dataset
 
     def _make_view_name(self, name):

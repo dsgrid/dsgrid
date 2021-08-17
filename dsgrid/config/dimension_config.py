@@ -40,6 +40,17 @@ class DimensionConfig(DimensionBaseConfig):
     def model_class():
         return DimensionModel
 
+    def get_unique_ids(self):
+        """Return the unique IDs in a dimension's records.
+
+        Returns
+        -------
+        set
+            set of str
+
+        """
+        return {x.id for x in self.model.records}
+
 
 class TimeDimensionConfig(DimensionBaseConfig):
     """Provides an interface to a TimeDimensionModel."""
@@ -47,7 +58,7 @@ class TimeDimensionConfig(DimensionBaseConfig):
     # TODO: this needs to come from the enum itself
     TIMEZONE_TO_TZINFO = {
         TimezoneType.UTC: datetime.timezone(datetime.timedelta()),
-        TimezoneType.HST: datetime.timedelta(hours=-10),
+        TimezoneType.HST: datetime.timezone(datetime.timedelta(hours=-10)),
         TimezoneType.AST: datetime.timezone(datetime.timedelta(hours=-9)),
         TimezoneType.APT: pytz.timezone("US/Alaska"),
         TimezoneType.PST: datetime.timezone(datetime.timedelta(hours=-8)),

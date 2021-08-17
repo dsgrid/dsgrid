@@ -70,9 +70,12 @@ Click Group Definitions
 def registry(ctx, path, remote_path, offline, dry_run):
     """Manage a registry."""
     no_prompts = ctx.parent.params["no_prompts"]
-    ctx.obj = RegistryManager.load(
-        path, remote_path, offline_mode=offline, dry_run_mode=dry_run, no_prompts=no_prompts
-    )
+    if "--help" in sys.argv:
+        ctx.obj = None
+    else:
+        ctx.obj = RegistryManager.load(
+            path, remote_path, offline_mode=offline, dry_run_mode=dry_run, no_prompts=no_prompts
+        )
 
 
 @click.group()

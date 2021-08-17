@@ -2,10 +2,11 @@ import pytest
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
 from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.tests.common import TEST_REGISTRY
 
 
 registry_manager = RegistryManager.load(
-    path=get_registry_path(),
+    path=TEST_REGISTRY,
     remote_path=REMOTE_REGISTRY,
     offline_mode=True,
     dry_run_mode=False,

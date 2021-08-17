@@ -33,8 +33,6 @@ from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingR
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
 
-LOAD_DATA_FILENAME = "load_data.parquet"
-LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
 
 logger = logging.getLogger(__name__)
 
@@ -365,9 +363,7 @@ class ProjectConfig(ConfigBase):
             if dim_key.type == DimensionType.TIME:
                 continue
             dim = self.base_dimensions[dim_key]
-            project_dimension_ids = {
-                x.id for x in dim.model.records.select("id").distinct().collect()
-            }
+            project_dimension_ids = {x.id for x in dim.model.records}
             found = False
             for mapping_ref in references:
                 if mapping_ref.to_dimension_type != dim_key.type:
@@ -380,9 +376,7 @@ class ProjectConfig(ConfigBase):
                         raise DSGInvalidDimensionMapping(
                             f"There are multiple mappings to {dim_key}"
                         )
-                    dataset_dimension_ids = {
-                        x.to_id for x in mapping.model.records.select("to_id").distinct().collect()
-                    }
+                    dataset_dimension_ids = mapping.get_unique_to_ids()
                     missing = project_dimension_ids.difference(dataset_dimension_ids)
                     if missing:
                         raise DSGMissingDimensionMapping(

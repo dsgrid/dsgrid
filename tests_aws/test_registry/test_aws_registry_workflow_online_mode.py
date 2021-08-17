@@ -17,7 +17,6 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
 
-PROJECT_REPO = os.environ.get("TEST_PROJECT_REPO")
 S3_PROFILE_NAME = "nrel-aws-dsgrid"
 TEST_REGISTRY = "s3://nrel-dsgrid-registry-test"
 

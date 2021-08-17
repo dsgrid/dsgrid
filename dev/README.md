@@ -26,28 +26,127 @@ pre-commit install
 
 - [Pandoc](https://pandoc.org/installing.html)
 
-## Run Tests
+## Tests
 
-In addition to grabbing the branch of dsgrid you want to test and making you've
-activated an environment with dsgrid installed per the above, you'll need to set
-up dsgrid for testing by setting environment variables:
+### Setup
+The tests use the [test data repository](https://github.com/dsgrid/dsgrid-test-data.git)
+as a git submodule in `./dsgrid-test-data`. It is a minimal version of the EFS project and
+datasets. You must initialize this submodule and keep it updated.
+
+Initialize the submodule:
+```
+git submodule init
+git submodule update
+```
+
+Update the submodule when there are new changes in the test data repository:
+```
+git submodule update --remote --merge
+```
+
+### Run tests
+
+To run all tests, including AWS tests:
+```
+pytest
+```
+
+If you want to exclude AWS tests:
+```
+pytest tests
+```
+
+If you only want to run AWS tests:
+```
+pytest tests_aws
+```
+
+### Workflow for developing a feature that changes code and data
+
+If you are developing a feature that requires changing code and data then you will need to keep
+the submodule synchronized. Here is an example workflow:
+
+1. Create a dsgrid branch.
+```
+git checkout -b feature-x
+```
+
+2. Create a data branch inside the submodule.
+```
+cd dsgrid-test-data
+git checkout -b feature-x
+cd ..
+```
+
+3. Implement and test your feature.
+
+4. Commit your code and data changes in each repository.
+
+5. Update the dsgrid repo to point to the correct data commit.
+```
+git submodule set-branch -b feature-x dsgrid-test-data
+git add .gitmodules dsgrid-test-data
+git commit -m "Point dsgrid-test-data to feature-x branch"
+```
+
+6. Push both branches to GitHub. **Note**: Using a forked data repository is not supported.
+
+7. Open two pull requests.
+
+8. Address comments, if needed. If you make new commits to the data branch then you must update
+the dsgrid branch before pushing back to GitHub.
+```
+git add dsgrid-test-data
+git commit -m "Update dsgrid-test-data"
+```
+
+9. Merge the data pull request.
+
+10. Update the dsgrid branch to point back to the `main` data branch.
+```
+cd dsgrid-test-data
+git checkout main
+git pull origin main
+# The feature branch is now in main. Delete it.
+git branch -d feature-x
+cd ..
+git submodule set-branch -b main dsgrid-test-data
+git add .gitmodules dsgrid-test-data
+git commit -m "Point dsgrid-test-data to main branch"
+git push origin feature-x
+```
+
+11. After CI passes, merge the dsgrid pull request.
+
+### Test registry
+The setup code creates a local registry for testing in `./tests/data/registry`. This only happens
+once in order to save time on repeated runs. If you make a change to code or data then you may
+need to manually delete the directory.
+
+### Pytest options
+
+option flag           | effect
+--------------------- | ------
+--log-cli-level=debug | emits log messages to the console. level can be set to debug, info, warn, error
+
+
+## Testing/exploring with the EFS project repository
+
+You can create a local registry with the [EFS project repository](https://github.com/dsgrid/dsgrid-project-EFS)
+and use it for testing and exploration.
+
+Clone the repository to your system.
+```
+git clone https://github.com/dsgrid/dsgrid-project-EFS $HOME/dsgrid-project-EFS
+```
+
+Download the EFS datasets from AWS or Eagle (`/projects/dsgrid/efs_datasets/converted_output/commercial`)
+to a local path and set an environment variable for it.
+
+This is what that directory should contain:
 
 ```
-# Point to your checkout of the dsgrid-project-EFS repository which is
-# what we are currently using for tests (adjusting the path as needed).
-export TEST_PROJECT_REPO=$HOME/dsgrid-project-EFS
-
-# Point to your local dsgrid registry path.
-# Feel free to use a different path for storing your test registry--this is just
-# an example.
-export DSGRID_REGISTRY_PATH=$HOME/.dsgrid-test-registry
-
-# Point to your local directory of datasets. This data will be registered in the
-# registry.
-export DSGRID_LOCAL_DATA_DIRECTORY=$HOME/.dsgrid-data
-
-# This is what that directory should contain:
-tree $DSGRID_LOCAL_DATA_DIRECTORY
+tree ~/.dsgrid-data
 .dsgrid-data
 └── efs_comstock
     ├── convert_dsg.log
@@ -75,23 +174,19 @@ tree $DSGRID_LOCAL_DATA_DIRECTORY
     └── time.csv
 ```
 
-and then running:
-```
-python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH
-```
 
-After that you can run the tests:
-
+Set environment variables to point to the registry and datasets.
 ```
-cd dsgrid
-pytest tests
+export DSGRID_REGISTRY_PATH=./local-registry
+export DSGRID_LOCAL_DATA_DIRECTORY=~/.dsgrid-data
 ```
 
-pytest options that may be helpful:
+Create and populate the registry.
+```
+python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH -p $HOME/dsgrid-project-EFS -d $DSGRID_LOCAL_DATA_DIRECTORY
+```
 
-option flag           | effect
---------------------- | ------
---log-cli-level=DEBUG | emits log messages to the console. level can be set to DEBUG, INFO, WARN, ERROR
+Now you can run any `dsgrid registry` command.
 
 ## Interactive Exploration
 

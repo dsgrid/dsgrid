@@ -107,12 +107,12 @@ class Project:
         for dimension in self.config.dimensions.base_dimensions:
             yield dimension
 
-    def _iter_input_datasets(self):
-        for dataset in self.config.input_datasets.datasets:
+    def _iter_datasets(self):
+        for dataset in self.config.datasets:
             yield dataset
 
-    def list_input_datasets(self):
-        return [x.dataset_id for x in self._iter_input_datasets()]
+    def list_datasets(self):
+        return [x.dataset_id for x in self._iter_datasets()]
 
     def get_project_dimension(self, dimension_type):
         for dimension in self._iter_base_dimensions():
@@ -121,7 +121,7 @@ class Project:
         raise DSGInvalidField(f"{dimension_type} is not stored")
 
     def get_input_dataset(self, dataset_id):
-        for dataset in self._iter_input_datasets():
+        for dataset in self._iter_datasets():
             if dataset.dataset_id == dataset_id:
                 return dataset
         raise DSGInvalidField(f"{dataset_id} is not stored")

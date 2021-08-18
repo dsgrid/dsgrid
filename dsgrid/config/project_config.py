@@ -140,13 +140,19 @@ class InputDatasetModel(DSGBaseModel):
         # helpful to query at some point which datasets have not yet been registered. Dataset_id may
         # not be all that descriptive, but the data_source is. We may also want the metric_type here too.
         title="model_sector",
-        description="Model sector ID, required only if dataset type is ``sector_model``.",  # TODO: add validator
+        description="Model sector ID, required only if dataset type is ``sector_model``.",
         optional=True,
     )
 
     @validator("version")
     def check_version(cls, version):
         return handle_version_or_str(version)
+
+    @validator("model_sector")
+    def check_model_sector(cls, model_sector, values):
+        if not values["dataset_type"] == InputDatasetType.SECTOR_MODEL:
+            raise ValueError("model_sector is only required if dataset_type is 'sector_model'")
+        return model_sector
 
 
 class InputDatasetsModel(DSGBaseModel):
@@ -392,7 +398,7 @@ class ProjectConfig(ConfigBase):
 
     def get_dataset(self, dataset_id):
         """Return a dataset by ID."""
-        for dataset in self.model.input_datasets.datasets:
+        for dataset in self.model.datasets:
             if dataset.dataset_id == dataset_id:
                 return dataset
 
@@ -419,11 +425,11 @@ class ProjectConfig(ConfigBase):
         return False
 
     def iter_datasets(self):
-        for dataset in self.model.input_datasets.datasets:
+        for dataset in self.model.datasets:
             yield dataset
 
     def iter_dataset_ids(self):
-        for dataset in self.model.input_datasets.datasets:
+        for dataset in self.model.datasets:
             yield dataset.dataset_id
 
     def list_registered_dataset_ids(self):

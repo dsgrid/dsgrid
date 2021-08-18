@@ -108,7 +108,7 @@ class SubmitDataset(DSGBaseModel):
         project_config = cls.get_config("project", values["project_version"])
         dataset_config = cls.get_config("dataset", values["dataset_version"])
 
-        for dataset in project_config.input_datasets.datasets:
+        for dataset in project_config.datasets:
             if dataset.dataset_id == dataset_config.dataset_id:
                 fields = ["dataset_type", "model_name", "model_sector"]
                 for field in fields:

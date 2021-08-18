@@ -19,7 +19,7 @@ from dsgrid.config.dataset_config import (
 from dsgrid.data_models import serialize_model
 from dsgrid.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
-from dsgrid.dimension.time import Period
+from dsgrid.dimension.time import TimeInvervalType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimension, DSGInvalidDataset
 from dsgrid.registry.common import (
     make_initial_config_registration,

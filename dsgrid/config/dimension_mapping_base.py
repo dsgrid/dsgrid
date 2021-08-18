@@ -80,7 +80,7 @@ class DimensionMappingReferenceModel(DSGBaseModel):
 
 
 class DimensionMappingReferenceListModel(DSGBaseModel):
-    """List of dimension mapping references used by the dimensions.toml config"""
+    """List of dimension mapping references used by the dimensions_mappings.toml config"""
 
     references: List[DimensionMappingReferenceModel] = Field(
         title="references",

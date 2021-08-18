@@ -6,10 +6,6 @@ Tutorial
 Submit a dataset
 ****************
 
-Step 1: Review Project requirements
-
-
-
 Step 1: Register dimensions
 ---------------------------
 Before creating dimension csv files, the dataset contributor should review the project dimensions to determine which match their dataset directly and which ones are different and need to be registered.

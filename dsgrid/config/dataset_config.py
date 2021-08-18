@@ -1,4 +1,3 @@
-from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Dict
 import os
@@ -78,7 +77,7 @@ def check_load_data_lookup_filename(path: Path):
     raise ValueError(f"no load_data lookup file exists in {path}")
 
 
-class InputDatasetType(Enum):
+class InputDatasetType(DSGEnum):
     SECTOR_MODEL = "sector_model"
     HISTORICAL = "historical"
     BENCHMARK = "benchmark"

@@ -17,7 +17,7 @@ from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncode
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
-    Period,
+    TimeInvervalType,
     TimeValueMeasurement,
     TimezoneType,
 )
@@ -121,10 +121,11 @@ class DimensionBaseModel(DSGBaseModel):
             )
         return name
 
-    @validator("module", always=True)
-    def check_module(cls, module):
-        if module != "dsgrid.dimension.standard":
-            raise ValueError("Only dsgrid.dimension.standard is supported as a dimension module.")
+    # @validator("module", always=True)
+    # def check_module(cls, module):
+    #     if not module.startswith("dsgrid"):
+    #         raise ValueError("Only dsgrid modules are supported as a dimension module.")
+    #     return module
 
     @validator("class_name", always=True)
     def get_dimension_class_name(cls, class_name, values):
@@ -280,10 +281,6 @@ class TimeRangeModel(DSGBaseModel):
 class TimeDimensionModel(DimensionBaseModel):
     """Defines a time dimension"""
 
-    ranges: List[TimeRangeModel] = Field(
-        title="time_ranges",
-        description="Defines the continuous ranges of time in the data.",
-    )
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y-%m-%d %H:%M:%s",
@@ -301,9 +298,9 @@ class TimeDimensionModel(DimensionBaseModel):
             " <https://docs.python.org/3/library/datetime.html#timedelta-objects>`_",
         ),
     )
-    includes_dst: bool = Field(
-        title="includes_dst",
-        description="Includes daylight savings time",
+    ranges: List[TimeRangeModel] = Field(
+        title="time_ranges",
+        description="Defines the continuous ranges of time in the data.",
     )
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
         title="leap_day_adjustment",
@@ -316,10 +313,10 @@ class TimeDimensionModel(DimensionBaseModel):
             "Adjustments are made to leap years only.",
         ),
     )
-    period: Period = Field(
-        title="period",
-        description="The range of time that the value represents",  # TODO @ET help with this description
-        options=Period.format_descriptions_for_docs(),
+    time_interval: TimeInvervalType = Field(
+        title="time_interval",
+        description="The range of time that the value represents",
+        options=TimeInvervalType.format_descriptions_for_docs(),
     )
     timezone: TimezoneType = Field(
         title="timezone",
@@ -331,8 +328,6 @@ class TimeDimensionModel(DimensionBaseModel):
         default="mean",
         description="How the value is measured",  # TODO: @ET help with this description
         options=TimeValueMeasurement.format_descriptions_for_docs(),
-        # requirements=(" ",),
-        # notes=(" ",),  # TODO:
     )
 
     @validator("ranges", pre=True)

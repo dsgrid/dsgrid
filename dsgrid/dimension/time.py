@@ -23,20 +23,20 @@ class LeapDayAdjustmentType(DSGEnum):
     NONE = EnumValue(value=None, description="No leap day adjustment made.")
 
 
-class Period(DSGEnum):
-    """Time period enum types"""
+class TimeInvervalType(DSGEnum):
+    """Time interval enum types"""
 
     # TODO: R2PD uses a different set; do we want to align?
     # https://github.com/Smart-DS/R2PD/blob/master/R2PD/tshelpers.py#L15
 
     PERIOD_ENDING = EnumValue(
         value="period_ending",
-        description="A time period that is period ending is coded by the end time. E.g., 2pm (with"
+        description="A time interval that is period ending is coded by the end time. E.g., 2pm (with"
         " freq=1h) represents a period of time between 1-2pm.",
     )
     PERIOD_BEGINNING = EnumValue(
         value="period_beginning",
-        description="A time period that is period beginning is coded by the beginning time. E.g.,"
+        description="A time interval that is period beginning is coded by the beginning time. E.g.,"
         " 2pm (with freq=01:00:00) represents a period of time between 2-3pm. This is the dsgrid"
         " default.",
     )
@@ -153,12 +153,14 @@ class DatetimeRange:
         self.end = end
         self.frequency = frequency
 
-    def iter_time_range(self, period: Period, leap_day_adjustment: LeapDayAdjustmentType):
+    def iter_time_range(
+        self, time_interval: TimeInvervalType, leap_day_adjustment: LeapDayAdjustmentType
+    ):
         """Return a generator of datetimes for a time range.
 
         Parameters
         ----------
-        period : Period
+        time_interval : TimeInvervalType
         leap_day_adjustment : LeapDayAdjustmentType
 
         Yields
@@ -167,7 +169,9 @@ class DatetimeRange:
 
         """
         cur = self.start
-        end = self.end + self.frequency if period == period.PERIOD_ENDING else self.end
+        end = (
+            self.end + self.frequency if time_interval == time_interval.PERIOD_ENDING else self.end
+        )
         while cur < end:
             if not (
                 leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
@@ -177,12 +181,14 @@ class DatetimeRange:
                 yield cur
             cur += self.frequency
 
-    def list_time_range(self, period: Period, leap_day_adjustment: LeapDayAdjustmentType):
+    def list_time_range(
+        self, time_interval: TimeInvervalType, leap_day_adjustment: LeapDayAdjustmentType
+    ):
         """Return a list of datetimes for a time range.
 
         Parameters
         ----------
-        period : Period
+        time_interval : TimeInvervalType
         leap_day_adjustment : LeapDayAdjustmentType
 
         Returns
@@ -191,4 +197,4 @@ class DatetimeRange:
             list of datetime
 
         """
-        return list(self.iter_time_range(period, leap_day_adjustment))
+        return list(self.iter_time_range(time_interval, leap_day_adjustment))

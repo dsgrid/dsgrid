@@ -110,7 +110,7 @@ class SubsectorOrm(BaseOrm):
     sector = Column(String(255), nullable=False)
     abbr = Column(String(255), nullable=False)
 
-    model = relationship(
+    data_source = relationship(
         "DataSourceOrm",
         secondary=model_subsector_association,
         back_populates="subsector",
@@ -130,7 +130,7 @@ class EndUseOrm(BaseOrm):
     fuel_id = Column(String(255), nullable=False)
     units = Column(String(255), nullable=False)
 
-    model = relationship(
+    data_source = relationship(
         "DataSourceOrm",
         secondary=enduse_model_association,
         back_populates="enduse",
@@ -153,20 +153,6 @@ class DataSourceOrm(BaseOrm):
         "SubsectorOrm",
         secondary=model_subsector_association,
         back_populates="data_source",
-    )
-
-
-# Which DataSourceORM do we keep?
-class DataSourceOrm(BaseOrm):
-    __tablename__ = "DataSource"
-
-    id = Column(String(255), primary_key=True, nullable=False)
-    name = Column(String(255), nullable=False)
-
-    subsector = relationship(
-        "SubsectorOrm",
-        secondary=model_subsector_association,
-        back_populates="model",
     )
 
 

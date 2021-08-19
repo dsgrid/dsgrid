@@ -13,10 +13,6 @@ from sqlalchemy import (
     select,
     text,  # Integer, Text, DateTime,
 )
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from dsgrid.config.dimensions import TimeDimensionModel
 from dsgrid.dimension.base_models import (
@@ -99,27 +95,10 @@ class EnergyEndUse(MetricDimensionBaseModel):
     unit: str
 
 
-class EnergyEndUseOrm(BaseOrm):
-    __tablename__ = "EnergyEndUse"
-
-    id = Column(String(255), primary_key=True, nullable=False)
-    name = Column(String(255), nullable=False)
-    unit = Column(String(255), nullable=False)
-    fuel_id = Column(String(255), nullable=False)
-
-
 class EnergyServiceEndUse(MetricDimensionBaseModel):
     """Energy Service Demand End Use attributes"""
 
     unit: str
-
-
-class EnergyServiceEndUseOrm(BaseOrm):
-    __tablename__ = "EnergyServiceEndUse"
-
-    id = Column(String(255), primary_key=True, nullable=False)
-    name = Column(String(255), nullable=False)
-    unit = Column(String(255), nullable=False)
 
 
 class Population(MetricDimensionBaseModel):
@@ -128,40 +107,16 @@ class Population(MetricDimensionBaseModel):
     unit: str
 
 
-class PopulationOrm(BaseOrm):
-    __tablename__ = "Population"
-
-    id = Column(String(255), primary_key=True, nullable=False)
-    name = Column(String(255), nullable=False)
-    unit = Column(String(255), nullable=False)
-
-
 class Stock(MetricDimensionBaseModel):
     """Stock attributes - includes GDP, building stock, equipment"""
 
     unit: str
 
 
-class StockOrm(BaseOrm):
-    __tablename__ = "Stock"
-
-    id = Column(String(255), primary_key=True, nullable=False)
-    name = Column(String(255), nullable=False)
-    unit = Column(String(255), nullable=False)
-
-
 class EnergyEfficiency(MetricDimensionBaseModel):
     """Energy Efficiency of building stock or equipment"""
 
     unit: str
-
-
-class EnergyEfficiencyOrm(BaseOrm):
-    __tablename__ = "EnergyEfficiency"
-
-    id = Column(String(255), primary_key=True, nullable=False)
-    name = Column(String(255), nullable=False)
-    unit = Column(String(255), nullable=False)
 
 
 # ---------------------------

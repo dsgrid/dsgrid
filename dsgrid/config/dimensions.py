@@ -52,7 +52,6 @@ class DimensionBaseModel(DSGBaseModel):
         title="module",
         description="Python module with the dimension class",
         default="dsgrid.dimension.standard",
-        # TODO: we need to fail if it comes from another module && offline_mode is False.
     )
     class_name: str = Field(
         title="class_name",

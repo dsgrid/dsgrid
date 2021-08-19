@@ -114,7 +114,6 @@ class TimeDimensionConfig(DimensionBaseConfig):
         tzinfo
 
         """
-        assert self.model.timezone in TimezoneType, self.model.timezone
         assert self.model.timezone is not TimezoneType.LOCAL
         return self.model.timezone.tz
 

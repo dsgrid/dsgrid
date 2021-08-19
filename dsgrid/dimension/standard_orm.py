@@ -175,3 +175,44 @@ class ScenarioOrm(BaseOrm):
 
     id = Column(String(255), primary_key=True, nullable=False)
     name = Column(String(255), nullable=False)
+
+
+class EnergyEndUseOrm(BaseOrm):
+    __tablename__ = "EnergyEndUse"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
+    fuel_id = Column(String(255), nullable=False)
+
+
+class EnergyServiceEndUseOrm(BaseOrm):
+    __tablename__ = "EnergyServiceEndUse"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
+
+
+class PopulationOrm(BaseOrm):
+    __tablename__ = "Population"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
+
+
+class StockOrm(BaseOrm):
+    __tablename__ = "Stock"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)
+
+
+class EnergyEfficiencyOrm(BaseOrm):
+    __tablename__ = "EnergyEfficiency"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+    unit = Column(String(255), nullable=False)

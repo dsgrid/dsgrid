@@ -43,14 +43,8 @@ extensions = [
     "sphinx.ext.napoleon",
     "sphinx.ext.autosectionlabel",
     "sphinxarg.ext",
-    # "sphinx.ext.autosummary",
-    # "sphinx_click.ext",
-    # "sphinx.ext.ifconfig",
     "sphinx.ext.todo",
-    # "sphinxcontrib.plantuml",
     "sphinxcontrib.programoutput",
-    # 'sphinxemoji.sphinxemoji'
-    # "sphinx_togglebutton",
 ]
 
 # Add any paths that contain templates here, relative to this directory.

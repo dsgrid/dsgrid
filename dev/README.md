@@ -249,17 +249,6 @@ make github
 make.bat html
 ```
 
-Then run the github-related commands by hand:
-
-```
-git branch -D gh-pages
-git push origin --delete gh-pages
-ghp-import -n -b gh-pages -m "Update documentation" ./_build/html
-git checkout gh-pages
-git push origin gh-pages
-git checkout main # or whatever branch you were on
-```
-
 ## Release on pypi
 
 *Not yet available*

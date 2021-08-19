@@ -83,6 +83,7 @@ class DSGEnum(Enum):
 
     def __new__(cls, *args):
         obj = object.__new__(cls)
+        assert len(args) in (1, 2)
         if isinstance(args[0], EnumValue):
             obj._value_ = args[0].value
             obj.description = args[0].description

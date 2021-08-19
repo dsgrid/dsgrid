@@ -300,7 +300,7 @@ class TimeDimensionModel(DimensionBaseModel):
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
         title="leap_day_adjustment",
         description="Leap day adjustment method applied to time data",
-        default=None,
+        default=LeapDayAdjustmentType.NONE,
         optional=True,
         options=LeapDayAdjustmentType.format_descriptions_for_docs(),
         notes=(
@@ -336,7 +336,7 @@ class TimeDimensionModel(DimensionBaseModel):
 
     @validator("leap_day_adjustment")
     def check_leap_day_adjustment(cls, value):
-        if value is not None:
+        if value != LeapDayAdjustmentType.NONE:
             # TODO: DSGRID-172
             raise ValueError("leap_day_adjustment is not yet supported")
         return value

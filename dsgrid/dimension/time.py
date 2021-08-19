@@ -20,7 +20,7 @@ class LeapDayAdjustmentType(DSGEnum):
         value="drop_jan1",
         description="To adjust for leap years, January 1st gets dropped",
     )
-    NONE = EnumValue(value=None, description="No leap day adjustment made.")
+    NONE = EnumValue(value="none", description="No leap day adjustment made.")
 
 
 class TimeInvervalType(DSGEnum):

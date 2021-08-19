@@ -29,6 +29,12 @@ enduse_model_association = Table(
 )
 # FIXME: @dtom should this be data_source or datasource? Repeat fix.
 
+metric_model_association = Table(
+    "metric_model",
+    BaseOrm.metadata,
+    Column("metric", String(255), ForeignKey("Metric.id")),
+    Column("data_source", String(255), ForeignKey("DataSource.id")),
+)
 
 model_subsector_association = Table(
     "model_subsector",
@@ -131,6 +137,7 @@ class EndUseOrm(BaseOrm):
     )
 
 
+# Which DataSourceORM do we keep?
 class DataSourceOrm(BaseOrm):
     __tablename__ = "DataSource"
 
@@ -146,6 +153,20 @@ class DataSourceOrm(BaseOrm):
         "SubsectorOrm",
         secondary=model_subsector_association,
         back_populates="data_source",
+    )
+
+
+# Which DataSourceORM do we keep?
+class DataSourceOrm(BaseOrm):
+    __tablename__ = "DataSource"
+
+    id = Column(String(255), primary_key=True, nullable=False)
+    name = Column(String(255), nullable=False)
+
+    subsector = relationship(
+        "SubsectorOrm",
+        secondary=model_subsector_association,
+        back_populates="model",
     )
 
 

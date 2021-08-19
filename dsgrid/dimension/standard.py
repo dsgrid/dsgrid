@@ -30,31 +30,6 @@ from dsgrid.dimension.base_models import (
     WeatherYearDimensionBaseModel,
 )
 
-BaseOrm = declarative_base()
-
-
-metric_model_association = Table(
-    "metric_model",
-    BaseOrm.metadata,
-    Column("metric", String(255), ForeignKey("Metric.id")),
-    Column("data_source", String(255), ForeignKey("DataSource.id")),
-)
-
-
-model_subsector_association = Table(
-    "model_subsector",
-    BaseOrm.metadata,
-    Column("data_source", String(255), ForeignKey("DataSource.id")),
-    Column("subsector", String(255), ForeignKey("Subsector.id")),
-)
-
-
-subsector_sector_association = Table(
-    "subsector_sector",
-    BaseOrm.metadata,
-    Column("subsector", String(255), ForeignKey("Subsector.id")),
-    Column("sector", String(255), ForeignKey("Sector.id")),
-)
 
 # ---------------------------
 # GEOGRAPHIC DIMENSIONS
@@ -221,19 +196,6 @@ class ModelYear(ModelYearDimensionBaseModel):
 
 class DataSource(DataSourceDimensionBaseModel):
     """DataSource attributes"""
-
-
-class DataSourceOrm(BaseOrm):
-    __tablename__ = "DataSource"
-
-    id = Column(String(255), primary_key=True, nullable=False)
-    name = Column(String(255), nullable=False)
-
-    subsector = relationship(
-        "SubsectorOrm",
-        secondary=model_subsector_association,
-        back_populates="model",
-    )
 
 
 class Scenario(ScenarioDimensionBaseModel):

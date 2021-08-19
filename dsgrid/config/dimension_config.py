@@ -55,22 +55,6 @@ class DimensionConfig(DimensionBaseConfig):
 class TimeDimensionConfig(DimensionBaseConfig):
     """Provides an interface to a TimeDimensionModel."""
 
-    TIMEZONE_TO_TZINFO = {
-        TimezoneType.UTC: datetime.timezone(datetime.timedelta()),
-        TimezoneType.HST: datetime.timezone(datetime.timedelta(hours=-10)),
-        TimezoneType.AST: datetime.timezone(datetime.timedelta(hours=-9)),
-        TimezoneType.APT: pytz.timezone("US/Alaska"),
-        TimezoneType.PST: datetime.timezone(datetime.timedelta(hours=-8)),
-        TimezoneType.PPT: pytz.timezone("US/Pacific"),
-        TimezoneType.MST: datetime.timezone(datetime.timedelta(hours=-7)),
-        TimezoneType.MPT: pytz.timezone("US/Mountain"),
-        TimezoneType.CST: datetime.timezone(datetime.timedelta(hours=-6)),
-        TimezoneType.CPT: pytz.timezone("US/Central"),
-        TimezoneType.EST: datetime.timezone(datetime.timedelta(hours=-5)),
-        TimezoneType.EPT: pytz.timezone("US/Eastern"),
-        # TimezoneType.LOCAL: None,  # TODO: needs handling: DSGRID-171
-    }
-
     @staticmethod
     def model_class():
         return TimeDimensionModel
@@ -120,7 +104,7 @@ class TimeDimensionConfig(DimensionBaseConfig):
             list of datetime
 
         """
-        return time_range.list_time_range(self.model.period, self.model.leap_day_adjustment)
+        return time_range.list_time_range(self.model.time_interval, self.model.leap_day_adjustment)
 
     def get_tzinfo(self):
         """Return a tzinfo instance for this dimension.
@@ -130,8 +114,8 @@ class TimeDimensionConfig(DimensionBaseConfig):
         tzinfo
 
         """
-        assert self.model.timezone in self.TIMEZONE_TO_TZINFO, self.model.timezone
-        return self.TIMEZONE_TO_TZINFO[self.model.timezone]
+        assert self.model.timezone is not TimezoneType.LOCAL
+        return self.model.timezone.tz
 
 
 def get_dimension_config(model, src_dir):

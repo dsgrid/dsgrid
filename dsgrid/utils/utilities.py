@@ -6,6 +6,8 @@ import inspect
 import json
 import os
 
+from enum import Enum
+
 from dsgrid.exceptions import DSGJSONError
 
 logger = logging.getLogger(__name__)
@@ -84,3 +86,8 @@ def check_uniqueness(iterable, tag):
         if item in values:
             raise ValueError(f"duplicate {tag}: {item}")
         values.add(item)
+
+
+def list_enum_values(enum: Enum):
+    """Returns list enum values."""
+    return [e.value for e in enum]

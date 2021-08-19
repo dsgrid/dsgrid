@@ -27,14 +27,15 @@ class RegistryBaseModel(DSGBaseModel):
 
     version: Union[str, VersionInfo] = Field(
         title="version",
-        description="dimension version",
+        description="Dimension version",
     )
     description: Optional[str] = Field(
-        title="description", description="description of what is stored"
+        title="description",
+        description="Description of what is stored",
     )
     registration_history: Optional[List[ConfigRegistrationModel]] = Field(
         title="registration_history",
-        description="history of all registration updates",
+        description="History of all registration updates",
         default=[],
     )
 

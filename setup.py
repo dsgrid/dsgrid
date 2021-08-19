@@ -20,7 +20,14 @@ dev_requires = ["black", "pre-commit", "devtools"]
 
 test_requires = ["pytest", "pytest-cov"]
 
-doc_requires = ["ghp-import", "numpydoc", "pandoc", "sphinx", "sphinx_rtd_theme"]
+doc_requires = [
+    "ghp-import",
+    "numpydoc",
+    "pandoc",
+    "sphinx",
+    "sphinx_rtd_theme",
+    "sphinx_argparse",
+]
 
 release_requires = ["twine", "setuptools", "wheel"]
 

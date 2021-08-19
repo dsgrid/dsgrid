@@ -1,5 +1,3 @@
-from enum import Enum
-import datetime
 from pathlib import Path
 from typing import List, Optional, Dict
 import os
@@ -14,7 +12,7 @@ from .config_base import ConfigBase
 from .dimensions import (
     DimensionReferenceModel,
 )
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 
 
 ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv")
@@ -79,15 +77,53 @@ def check_load_data_lookup_filename(path: Path):
     raise ValueError(f"no load_data lookup file exists in {path}")
 
 
-class InputDatasetType(Enum):
+class InputDatasetType(DSGEnum):
     SECTOR_MODEL = "sector_model"
     HISTORICAL = "historical"
     BENCHMARK = "benchmark"
 
 
-class DSGDatasetParquetType(Enum):
-    LOAD_DATA = "load_data"  # required
-    LOAD_DATA_LOOKUP = "load_data_lookup"  # required
+class DSGDatasetParquetType(DSGEnum):
+    """Dataset parquet types."""
+
+    LOAD_DATA = EnumValue(
+        value="load_data",
+        description="Load data file with id, timestamp, and load value columns",
+    )
+    LOAD_DATA_LOOKUP = EnumValue(
+        value="load_data_lookup",
+        description="Load data file with dimension metadata and and ID which maps to load_data"
+        "file",
+    )
+    # # These are not currently supported by dsgrid but may be needed in the near future
+    # DATASET_DIMENSION_MAPPING = EnumValue(
+    #     value="dataset_dimension_mapping",
+    #     description="",
+    # )  # optional
+    # PROJECT_DIMENSION_MAPPING = EnumValue(
+    #     value="project_dimension_mapping",
+    #     description="",
+    # )  # optional
+
+
+class DataClassificationType(DSGEnum):
+    """Data risk classification type.
+
+    See https://uit.stanford.edu/guide/riskclassifications for more information.
+    """
+
+    # TODO: can we get NREL/DOE definitions for these instead of standford's?
+
+    LOW = EnumValue(
+        value="low",
+        description="Low risk data that does not require special data management",
+    )
+    MODERATE = EnumValue(
+        value="moderate",
+        description=(
+            "The moderate class includes all data under an NDA, data classified as business sensitive, data classification as Critical Energy Infrastructure Infromation (CEII), or data with Personal Identifiable Information (PII)."
+        ),
+    )
 
 
 # TODO will need to rename this as it really should be more generic inputs
@@ -103,57 +139,50 @@ class InputSectorDataset(DSGBaseModel):
         title="data_type",
         alias="type",
         description="DSG parquet input dataset type",
+        options=DSGDatasetParquetType.format_for_docs(),
     )
     directory: str = Field(
         title="directory",
-        description="directory with parquet files",
+        description="Directory with parquet files",
     )
-
-    # TODO:
-    #   1. validate data matches dimensions specified in dataset config;
-    #   2. check that all required dimensions exist in the data or partitioning
-    #   3. check expected counts of things
-    #   4. check for required tables accounted for;
-    #   5. any specific scaling factor checks?
-
-
-class DataClassificationType(Enum):
-    """Data risk classification type
-
-    The moderate class includes all data under an NDA, data classified as business sensitive,
-    data classification as Critical Energy Infrastructure Infromation (CEII), or data with
-    Personal Identifiable Information (PII).
-
-    See https://uit.stanford.edu/guide/riskclassifications for more information.
-    """
-
-    LOW = "low"
-    MODERATE = "moderate"
 
 
 class DatasetConfigModel(DSGBaseModel):
-    """Represents model dataset configurations"""
+    """Represents dataset configurations."""
 
     dataset_id: str = Field(
         title="dataset_id",
-        description="dataset identifier",
+        description="Unique dataset identifier.",
+        requirements=(
+            "When registering a dataset to a project, the dataset_id must match the expected ID "
+            "defined in the project config.",
+            "For posterity, dataset_id cannot be the same as the ``data_source``"
+            " (e.g., dataset cannot be 'ComStock')",
+        ),
     )
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
-        description="DSG defined input dataset type",
+        description="Input dataset type.",
+        options=f"{InputDatasetType.format_for_docs()}",
     )
     # TODO: This must be validated against the project's dimension records for data_source
+    # TODO: This must also be validated against the project_config
     data_source: str = Field(
         title="data_source",
-        description="data source name, e.g. 'ComStock'",
+        description="Data source name, e.g. 'ComStock'.",
+        requirements=(
+            "When registering a dataset to a project, the `data_source` field must match one of "
+            "the dimension ID records defined by the project's base data source dimension.",
+        ),
+        # TODO: it would be nice to extend the description here with a CLI example of how to list the project's data source IDs.
     )
     path: str = Field(
         title="path",
-        description="path containing data",
+        description="Local path containing data to be registered on the remote registry.",
     )
     description: str = Field(
         title="description",
-        description="describe dataset in details",
+        description="A detailed description of the dataset.",
     )
     origin_creator: str = Field(
         title="origin_creator",
@@ -189,6 +218,7 @@ class DatasetConfigModel(DSGBaseModel):
     data_classification: DataClassificationType = Field(
         title="data_classification",
         description="Data security classification (e.g., low, moderate, high)",
+        options=DataClassificationType.format_for_docs(),
     )
     tags: Optional[List[str]] = Field(
         title="source",
@@ -201,7 +231,14 @@ class DatasetConfigModel(DSGBaseModel):
     )
     dimensions: List[DimensionReferenceModel] = Field(
         title="dimensions",
-        description="dimensions defined by the dataset",
+        description="List of registered dimension references that make up the dimensions of dataset.",
+        requirements=(
+            "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined",
+            "* Only one dimension reference per type is allowed",
+            "* Each reference is to an existing registered dimension.",
+        )
+        # TODO: Add to notes - link to registering dimensions page
+        # TODO: Add to notes - link to example of how to list dimensions to find existing registered dimensions
     )
     user_defined_metadata: Optional[Dict] = Field(
         title="user_defined_metadata",
@@ -209,9 +246,6 @@ class DatasetConfigModel(DSGBaseModel):
         default={},
         required=False,
     )
-
-    # TODO: if local path provided, we want to upload to S3 and set the path
-    #   in the toml file back to S3 path --> does this happen in DatasetConfig instead?
 
     @validator("dataset_id")
     def check_dataset_id(cls, dataset_id):
@@ -238,14 +272,6 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: check project_dimension_mapping (optional) if exists
 
         return str(local_path)
-
-    @validator("origin_project", "origin_version")
-    def check_optional_origin_fields(cls, val, values):
-        """Require optional origin metadata fields if the dataset type is sector model"""
-        if values.get("dataset_type") == InputDatasetType.SECTOR_MODEL:
-            if not val:
-                raise ValueError(f"{val} must be defined if the dataset_type is sector_model")
-        return val
 
 
 class DatasetConfig(ConfigBase):
@@ -303,14 +329,3 @@ class DatasetConfig(ConfigBase):
             if key.type == dimension_type:
                 return dim_config
         assert False, key
-
-    # TODO:
-    #   - check binning/partitioning / file size requirements?
-    #   - check unique files
-    #   - add similar validators as project_config Dimensions
-    # NOTE: project_config.Dimensions has a lot of the
-    #       validators we want here however, its unclear to me how we can
-    #       apply them in both classes because they are root valitors and
-    #       also because Dimensions includes project_dimension and
-    #       supplemental_dimensions which are not required at the dataset
-    #       level.

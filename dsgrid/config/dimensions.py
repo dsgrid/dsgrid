@@ -17,7 +17,7 @@ from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncode
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
-    Period,
+    TimeInvervalType,
     TimeValueMeasurement,
     TimezoneType,
 )
@@ -33,11 +33,14 @@ class DimensionBaseModel(DSGBaseModel):
     name: str = Field(
         title="name",
         description="Dimension name",
+        note="Dimension names should be descriptive, memorable, identifiable, and reusable for "
+        "other datasets and projects",
     )
     dimension_type: DimensionType = Field(
         title="dimension_type",
         alias="type",
         description="Type of the dimension",
+        options=DimensionType.format_for_docs(),
     )
     dimension_id: Optional[str] = Field(
         title="dimension_id",
@@ -47,13 +50,24 @@ class DimensionBaseModel(DSGBaseModel):
     )
     module: Optional[str] = Field(
         title="module",
-        description="Dimension module",
+        description="Python module with the dimension class",
         default="dsgrid.dimension.standard",
     )
     class_name: str = Field(
         title="class_name",
         description="Dimension record model class name",
         alias="class",
+        notes=(
+            "The dimension class defines the expected and allowable fields (and their data types)"
+            " for the dimension records file.",
+            "All dimension records must have a 'id' and 'name' field."
+            "Some dimension classes support additional fields that can be used for mapping,"
+            " querying, display, etc.",
+            "dsgrid in online-mode only supports dimension classes defined in the"
+            " :mod:`dsgrid.dimension.standard` module. If dsgrid does not currently support a"
+            " dimension class that you require, please contact the dsgrid-coordination team to"
+            " request a new class feature",
+        ),
     )
     cls: Optional[Any] = Field(
         title="cls",
@@ -64,8 +78,11 @@ class DimensionBaseModel(DSGBaseModel):
     description: str = Field(
         title="description",
         description="A description of the dimension records that is helpful, memorable, and "
-        "identifiable; this description will get stored in the dimension record registry",
-        alias="description",
+        "identifiable",
+        notes=(
+            "The description will get stored in the dimension record registry and may be used"
+            " when searching the registry.",
+        ),
     )
     # Keep this last for validation purposes.
     model_hash: Optional[str] = Field(
@@ -102,6 +119,12 @@ class DimensionBaseModel(DSGBaseModel):
                 f" Dimension name '{name}' is not descriptive enough for a dimension record name. Please be more descriptive in your naming. Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable, identifiable, and reusable for other datasets and projects. e.g., 'time-2012-est-houlry-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name."
             )
         return name
+
+    @validator("module", always=True)
+    def check_module(cls, module):
+        if not module.startswith("dsgrid"):
+            raise ValueError("Only dsgrid modules are supported as a dimension module.")
+        return module
 
     @validator("class_name", always=True)
     def get_dimension_class_name(cls, class_name, values):
@@ -165,32 +188,6 @@ class DimensionModel(DimensionBaseModel):
         description="Hash of the contents of the file",
         dsg_internal=True,
     )
-    # TODO: I think we may remove mappings altogether in favor of associations
-    # TODO: I think we need to add the association table to
-    #   dimensions.associations.base_dimensions in the config
-    association_table: Optional[str] = Field(
-        title="association_table",
-        description="Optional table that provides mappings of foreign keys",
-    )
-    # TODO: some of the dimensions will enforce dimension mappings while
-    #   others may not
-    # TODO: I really don't think we need these mappings at this stage.
-    #   I think association tables are fine.
-    # one_to_many_mappings: Optional[List[OneToManyMapping]] = Field(
-    #     title="one_to_many_mappings",
-    #     description="Defines one-to-many mappings for this dimension",
-    #     default=[],
-    # )
-    # many_to_one_mappings: Optional[List[ManyToOneMapping]] = Field(
-    #     title="many_to_one_mappings",
-    #     description="Defines many-to-one mappings for this dimension",
-    #     default=[],
-    # )
-    # many_to_many_mappings: Optional[List[ManyToManyMapping]] = Field(
-    #     title="many_to_many_mappings",
-    #     description="Defines many-to-many mappings for this dimension",
-    #     default=[],
-    # )
     records: Optional[List] = Field(
         title="records",
         description="Dimension records in filename that get loaded at runtime",
@@ -214,26 +211,6 @@ class DimensionModel(DimensionBaseModel):
             # This seems to work, but something is broken.
             return None
         return file_hash or compute_file_hash(values["filename"])
-
-    # TODO: is this what we want?
-    # @validator(
-    #     "one_to_many_mappings",
-    #     "many_to_one_mappings",
-    #     "many_to_many_mappings",
-    #     each_item=True,
-    # )
-    # def add_mapping_dimension_types(cls, val, values):
-    #     """Find the dimension mappings types and add them."""
-    #     module = importlib.import_module(values["module"])
-    #     val.from_dimension_cls = getattr(module, val.from_dimension, None)
-    #     if val.from_dimension_cls is None:
-    #         raise ValueError(f"{module} does not define {val.from_dimension}")
-
-    #     val.to_dimension_cls = getattr(module, val.to_dimension, None)
-    #     if val.to_dimension_cls is None:
-    #         raise ValueError(f"{module} does not define {val.to_dimension}")
-
-    #     return val
 
     @validator("records", always=True)
     def add_records(cls, records, values):
@@ -298,41 +275,53 @@ class TimeRangeModel(DSGBaseModel):
 class TimeDimensionModel(DimensionBaseModel):
     """Defines a time dimension"""
 
-    # TODO: what is this intended purpose?
-    #       originally i thought it was to interpret start/end, but
-    #       the year here is unimportant because it will be based on
-    #       the weather_year
     str_format: Optional[str] = Field(
         title="str_format",
-        default="%Y-%m-%d %H:%M:%s-%z",
-        description="Timestamp format",
+        default="%Y-%m-%d %H:%M:%s",
+        description="Timestamp string format",
+        notes=(
+            "The string format is used to parse the timestamps provided in the time ranges."
+            "Cheatsheet reference: `<https://strftime.org/>`_.",
+        ),
+    )
+    frequency: timedelta = Field(
+        title="frequency",
+        description="Resolution of the timestamps",
+        notes=(
+            "Reference: `Datetime timedelta objects"
+            " <https://docs.python.org/3/library/datetime.html#timedelta-objects>`_",
+        ),
     )
     ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
         description="Defines the continuous ranges of time in the data.",
     )
-    frequency: timedelta = Field(
-        title="frequency",
-        description="Resolution of the timestamps",
-    )
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
         title="leap_day_adjustment",
-        default=None,
-        description="TODO",
+        description="Leap day adjustment method applied to time data",
+        default=LeapDayAdjustmentType.NONE,
+        optional=True,
+        options=LeapDayAdjustmentType.format_descriptions_for_docs(),
+        notes=(
+            "The dsgrid default is None, i.e., no adjustment made to leap years.",
+            "Adjustments are made to leap years only.",
+        ),
     )
-    period: Period = Field(
-        title="period",
-        description="TODO",
+    time_interval: TimeInvervalType = Field(
+        title="time_interval",
+        description="The range of time that the value represents",
+        options=TimeInvervalType.format_descriptions_for_docs(),
     )
     timezone: TimezoneType = Field(
         title="timezone",
         description="Timezone of data",
+        options=TimezoneType.format_descriptions_for_docs(),
     )
-    # TODO: is this a project-level time dimension config?
     value_representation: TimeValueMeasurement = Field(
         title="value_representation",
         default="mean",
-        description="TODO",
+        description="How the value is measured",  # TODO: @ET help with this description
+        options=TimeValueMeasurement.format_descriptions_for_docs(),
     )
 
     @validator("ranges", pre=True)
@@ -341,12 +330,12 @@ class TimeDimensionModel(DimensionBaseModel):
             # make sure start and end time parse
             datetime.strptime(time_range["start"], values["str_format"])
             datetime.strptime(time_range["end"], values["str_format"])
-            # TODO: validate consistency between start, end, frequency
+            # TODO: validate consistency between start, end, frequency. End time should always be an interval of the frequency. So, for example, if frequency is 1 hour, and start time starts at 00:00, then end time cannot be 23:59.
         return ranges
 
     @validator("leap_day_adjustment")
     def check_leap_day_adjustment(cls, value):
-        if value is not None:
+        if value != LeapDayAdjustmentType.NONE:
             # TODO: DSGRID-172
             raise ValueError("leap_day_adjustment is not yet supported")
         return value
@@ -371,14 +360,24 @@ class DimensionReferenceModel(DSGBaseModel):
         title="dimension_type",
         alias="type",
         description="Type of the dimension",
+        options=DimensionType.format_for_docs(),
     )
     dimension_id: str = Field(
         title="dimension_id",
-        description="Unique ID of the dimension",
+        description="Unique ID of the dimension in the registry",
+        notes=(
+            "The dimension ID is generated by dsgrid when a dimension is registered and it is a"
+            " concatenation of the user-provided dimension name and a auto-generated UUID.",
+        ),
     )
     version: Union[str, VersionInfo] = Field(
         title="version",
         description="Version of the dimension",
+        requirements=(
+            "The version string must be in semver format (e.g., '1.0.0') and it must be "
+            " a valid/existing version in the registry.",
+        ),
+        # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
 
     @validator("version")

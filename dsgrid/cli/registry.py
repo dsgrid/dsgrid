@@ -12,7 +12,6 @@ from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import VersionUpdateType
 
-# from dsgrid.filesystem import aws
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.filters import ACCEPTED_OPS
 

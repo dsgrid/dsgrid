@@ -166,7 +166,7 @@ def test_auto_updates(make_test_project_dir):
                 found = True
         assert found
 
-        assert project.model.input_datasets.datasets[0].version == VersionInfo.parse("1.1.0")
+        assert project.model.datasets[0].version == VersionInfo.parse("1.1.0")
         assert project_mgr.get_current_version(project_id) == VersionInfo.parse("1.2.0")
         assert dataset_mgr.get_current_version(dataset_id) == VersionInfo.parse("1.1.0")
 

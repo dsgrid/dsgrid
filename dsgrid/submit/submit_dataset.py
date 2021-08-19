@@ -56,17 +56,17 @@ class SubmitDataset(DSGBaseModel):
 
     project_version: str = Field(
         title="project_version",
-        description="project version",
+        description="Project version",
     )
     dataset_version: str = Field(
         title="dataset_version",
-        description="dataset version",
+        description="Dataset version",
     )
     # TODO: we may call this a dataset_to_project_dimension_mapping?
     # TODO make type pydantic model
     association_tables: Optional[List[Dict]] = Field(
         title="association_tables",
-        description="association tables that map from dataset to project",
+        description="Association tables that map from dataset to project",
     )
 
     # TODO: do these 2 get functions live here or in a wrapper?
@@ -108,7 +108,7 @@ class SubmitDataset(DSGBaseModel):
         project_config = cls.get_config("project", values["project_version"])
         dataset_config = cls.get_config("dataset", values["dataset_version"])
 
-        for dataset in project_config.input_datasets.datasets:
+        for dataset in project_config.datasets:
             if dataset.dataset_id == dataset_config.dataset_id:
                 fields = ["dataset_type", "model_name", "model_sector"]
                 for field in fields:

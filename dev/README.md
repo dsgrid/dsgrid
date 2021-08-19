@@ -223,15 +223,14 @@ python ../dev/md_to_rst.py md_files.txt
 ### Refresh API Documentation
 
 - Make sure dsgrid is installed or is in your PYTHONPATH
-- Delete the contents of `api`.
-- Run `sphinx-apidoc -o api ..` from the `doc` folder.
-- Compare `api/modules.rst` to `api.rst`. Delete `setup.rst` and references to it.
+- Delete the contents of `source/api`.
+- Run `sphinx-apidoc -o source/api ../dsgrid` from the `docs` folder.
 - 'git push' changes to the documentation source code as needed.
 - Make the documentation per below
 
 ### Building HTML Docs
 
-Run `make html` for Mac and Linux; `make.bat html` for Windows.
+From the `docs/` folder, run `make html` for Mac and Linux; `make.bat html` for Windows.
 
 ### Pushing to GitHub Pages
 
@@ -248,17 +247,6 @@ make github
 
 ```
 make.bat html
-```
-
-Then run the github-related commands by hand:
-
-```
-git branch -D gh-pages
-git push origin --delete gh-pages
-ghp-import -n -b gh-pages -m "Update documentation" ./_build/html
-git checkout gh-pages
-git push origin gh-pages
-git checkout main # or whatever branch you were on
 ```
 
 ## Release on pypi

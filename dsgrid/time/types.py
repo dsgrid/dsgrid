@@ -1,16 +1,16 @@
 """Types related to time"""
 
-from enum import Enum
+from dsgrid.data_models import DSGEnum
 
 
-class DayType(Enum):
+class DayType(DSGEnum):
     """Day types"""
 
     WEEKEND = "weekend"
     WEEKDAY = "weekday"
 
 
-class Season(Enum):
+class Season(DSGEnum):
     """Seasons"""
 
     WINTER = "winter"

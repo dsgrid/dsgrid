@@ -18,11 +18,14 @@ logger = logging.getLogger(__name__)
 
 
 class DimensionsConfigModel(DSGBaseModel):
-    """Represents multiple dimension models. For user input purposes"""
+    """Represents multiple dimension models.
+
+    Used when registering multiple dimensions in one command.
+    """
 
     dimensions: List[Union[DimensionModel, TimeDimensionModel]] = Field(
         title="dimensions",
-        description="dimensions for submission to the dimension registry",
+        description="Dimensions for submission to the dimension registry",
     )
 
     @validator("dimensions")

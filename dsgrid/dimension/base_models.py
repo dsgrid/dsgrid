@@ -1,15 +1,13 @@
 """Dimension types for dsgrid"""
 
-from enum import Enum
-
 from pydantic import Field
 
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, DSGEnum
 from dsgrid.utils.utilities import check_uniqueness
 
 
-class DimensionType(Enum):
+class DimensionType(DSGEnum):
     """Dimension types"""
 
     METRIC = "metric"
@@ -26,13 +24,14 @@ class DimensionType(Enum):
 class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 
+    # TODO: add support/links for docs
     id: str = Field(
         title="ID",
-        description="unique identifier within a dimension",
+        description="Unique identifier within a dimension",
     )
     name: str = Field(
         title="name",
-        description="user-defined name",
+        description="User-defined name",
     )
 
 

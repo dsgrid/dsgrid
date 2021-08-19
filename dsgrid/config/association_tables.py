@@ -37,11 +37,11 @@ class AssociationTableModel(DimensionMappingBaseModel):
     filename: str = Field(
         title="filename",
         alias="file",
-        description="filename containing association table records",
+        description="Filename containing association table records.",
     )
     file_hash: Optional[str] = Field(
         title="file_hash",
-        description="hash of the contents of the file, computed by dsgrid",
+        description="Hash of the contents of the file, computed by dsgrid.",
         dsg_internal=True,
     )
     records: Optional[List] = Field(

@@ -41,6 +41,10 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.githubpages",
     "sphinx.ext.napoleon",
+    "sphinx.ext.autosectionlabel",
+    "sphinxarg.ext",
+    "sphinx.ext.todo",
+    "sphinxcontrib.programoutput",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -59,6 +63,9 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 #
 html_theme = "sphinx_rtd_theme"
 html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+
+# The name of the Pygments (syntax highlighting) style to use.
+# pygments_style = "sphinx"
 
 # Theme options are theme-specific and customize the look and feel of a theme
 # further.  For a list of options available for each theme, see the
@@ -82,3 +89,16 @@ autoclass_content = "both"
 autodoc_member_order = "bysource"
 # autodoc_special_members = ['__getitem__', '__setitem__','__iter__']
 numpy_show_class_member = True
+todo_include_todos = True
+
+
+# CSS styling
+rst_prolog = """
+.. include:: /special.rst
+
+"""
+
+html_css_files = ["style.css"]
+
+autosectionlabel_prefix_document = True
+autosectionlabel_maxdepth = 100

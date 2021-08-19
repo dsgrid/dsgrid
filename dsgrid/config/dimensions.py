@@ -121,11 +121,11 @@ class DimensionBaseModel(DSGBaseModel):
             )
         return name
 
-    # @validator("module", always=True)
-    # def check_module(cls, module):
-    #     if not module.startswith("dsgrid"):
-    #         raise ValueError("Only dsgrid modules are supported as a dimension module.")
-    #     return module
+    @validator("module", always=True)
+    def check_module(cls, module):
+        if not module.startswith("dsgrid"):
+            raise ValueError("Only dsgrid modules are supported as a dimension module.")
+        return module
 
     @validator("class_name", always=True)
     def get_dimension_class_name(cls, class_name, values):
@@ -188,11 +188,6 @@ class DimensionModel(DimensionBaseModel):
         title="file_hash",
         description="Hash of the contents of the file",
         dsg_internal=True,
-    )
-    association_table: Optional[str] = Field(  # TODO: delete this? -- ???
-        title="association_table",
-        description="Optional table that provides mappings of foreign keys",
-        dsg_internal=True,  # -- @DT is this internal? Or is field outdated and should be removed?
     )
     records: Optional[List] = Field(
         title="records",

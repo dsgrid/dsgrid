@@ -17,7 +17,6 @@ from dsgrid.config.dimensions import DimensionModel, TimeDimensionModel
 from dsgrid.config.project_config import (
     DimensionsModel,
     InputDatasetModel,
-    InputDatasetsModel,
     DimensionMappingsModel,
     ProjectConfigModel,
 )

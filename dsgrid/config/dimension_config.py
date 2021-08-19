@@ -55,22 +55,22 @@ class DimensionConfig(DimensionBaseConfig):
 class TimeDimensionConfig(DimensionBaseConfig):
     """Provides an interface to a TimeDimensionModel."""
 
-    # TODO: this needs to come from the enum itself
-    TIMEZONE_TO_TZINFO = {
-        TimezoneType.UTC: datetime.timezone(datetime.timedelta()),
-        TimezoneType.HST: datetime.timezone(datetime.timedelta(hours=-10)),
-        TimezoneType.AST: datetime.timezone(datetime.timedelta(hours=-9)),
-        TimezoneType.APT: pytz.timezone("US/Alaska"),
-        TimezoneType.PST: datetime.timezone(datetime.timedelta(hours=-8)),
-        TimezoneType.PPT: pytz.timezone("US/Pacific"),
-        TimezoneType.MST: datetime.timezone(datetime.timedelta(hours=-7)),
-        TimezoneType.MPT: pytz.timezone("US/Mountain"),
-        TimezoneType.CST: datetime.timezone(datetime.timedelta(hours=-6)),
-        TimezoneType.CPT: pytz.timezone("US/Central"),
-        TimezoneType.EST: datetime.timezone(datetime.timedelta(hours=-5)),
-        TimezoneType.EPT: pytz.timezone("US/Eastern"),
-        # TimezoneType.LOCAL: None,  # TODO: needs handling: DSGRID-171
-    }
+    # # TODO: this needs to come from the enum itself
+    # TIMEZONE_TO_TZINFO = {
+    #     TimezoneType.UTC: datetime.timezone(datetime.timedelta()),
+    #     TimezoneType.HST: datetime.timezone(datetime.timedelta(hours=-10)),
+    #     TimezoneType.AST: datetime.timezone(datetime.timedelta(hours=-9)),
+    #     TimezoneType.APT: pytz.timezone("US/Alaska"),
+    #     TimezoneType.PST: datetime.timezone(datetime.timedelta(hours=-8)),
+    #     TimezoneType.PPT: pytz.timezone("US/Pacific"),
+    #     TimezoneType.MST: datetime.timezone(datetime.timedelta(hours=-7)),
+    #     TimezoneType.MPT: pytz.timezone("US/Mountain"),
+    #     TimezoneType.CST: datetime.timezone(datetime.timedelta(hours=-6)),
+    #     TimezoneType.CPT: pytz.timezone("US/Central"),
+    #     TimezoneType.EST: datetime.timezone(datetime.timedelta(hours=-5)),
+    #     TimezoneType.EPT: pytz.timezone("US/Eastern"),
+    #     # TimezoneType.LOCAL: None,  # TODO: needs handling: DSGRID-171
+    # }
 
     @staticmethod
     def model_class():
@@ -131,9 +131,9 @@ class TimeDimensionConfig(DimensionBaseConfig):
         tzinfo
 
         """
-        assert self.model.timezone in self.TIMEZONE_TO_TZINFO, self.model.timezone
-        return self.TIMEZONE_TO_TZINFO[self.model.timezone]
-        return self.model.timezone
+        assert self.model.timezone in TimezoneType, self.model.timezone
+        return TimezoneType[self.model.timezone]
+        # return self.model.timezone
 
 
 def get_dimension_config(model, src_dir):

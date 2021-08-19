@@ -95,7 +95,7 @@ def replace_dataset_path(dataset_config_file, dataset_path):
 
 
 @click.command()
-@click.argument("registry-path", type=Path, default="$HOME/.dsgrid-test-registry")
+@click.argument("registry-path", type=Path, default=f"{Path.home()}/.dsgrid-test-registry")
 @click.option(
     "-f",
     "--force",

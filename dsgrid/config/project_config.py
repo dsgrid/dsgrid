@@ -155,15 +155,6 @@ class InputDatasetModel(DSGBaseModel):
         return model_sector
 
 
-class InputDatasetsModel(DSGBaseModel):
-    """Defines all input datasets for a project"""
-
-    datasets: List[InputDatasetModel] = Field(
-        title="datasets",
-        description="List of project input datasets",
-    )
-
-
 class DimensionMappingsModel(DSGBaseModel):
     """Defines all dimension mappings associated with a dsgrid project, including base-to-base, base-to-supplemental, and dataset-to-project mappings."""
 
@@ -236,7 +227,6 @@ class ProjectConfigModel(DSGBaseModel):
     datasets: List[InputDatasetModel] = Field(
         title="datasets",
         description="List of input datasets for the project.",
-        # TODO: can include
     )
     dimensions: DimensionsModel = Field(
         title="dimensions",

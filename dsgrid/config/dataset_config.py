@@ -308,6 +308,7 @@ class DatasetConfig(ConfigBase):
 
         """
         self._dimensions.update(dimension_manager.load_dimensions(self.model.dimensions))
+        # TODO: load trivial dimensions
 
     @property
     def dimensions(self):

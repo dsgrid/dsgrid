@@ -154,8 +154,8 @@ class DimensionBaseModel(DSGBaseModel):
             # An error occurred with name. Ignore everything else.
             return None
 
-        if dim_class is not None:
-            raise ValueError(f"cls={dim_class} should not be set")
+        # if dim_class is not None:
+        #     raise ValueError(f"cls={dim_class} should not be set")
 
         return getattr(
             importlib.import_module(values["module"]),

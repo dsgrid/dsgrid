@@ -58,7 +58,7 @@ Data Tables
 ::
 
    +---------+--------------------+-----------------+-------+
-   |geography|           subsector|     scale_factor|data_id|
+   |geography|           subsector|     scale_factor|   id  |
    +---------+--------------------+-----------------+-------+
    |    53061|com__FullServiceR...|9.035293579101562|      1|
    |    53053|com__FullServiceR...|9.035293579101562|      2|

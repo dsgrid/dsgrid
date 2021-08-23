@@ -8,15 +8,13 @@ if TEST_PROJECT_REPO is None:
     )
     sys.exit(1)
 
-import os
+print(f"\n>>> TEST_PROJECT_REPO:{TEST_PROJECT_REPO}\n")
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
+dir_path = os.path.dirname(os.path.abspath(__file__))
 
 PROJECT_CONFIG_FILE = os.path.join(TEST_PROJECT_REPO, "dsgrid_project", "project.toml")
 DIMENSION_CONFIG_FILE = os.path.join(TEST_PROJECT_REPO, "dsgrid_project", "dimensions.toml")
-DIMENSION_CONFIG_FILE_TIME = os.path.join(
-    TEST_PROJECT_REPO, "dsgrid_project", "dimension_test_time.toml"
-)
+DIMENSION_CONFIG_FILE_TIME = os.path.join(dir_path, "dimension_test_time.toml")
 DIMENSION_MAPPINGS_CONFIG_FILE = os.path.join(
     TEST_PROJECT_REPO, "dsgrid_project", "dimension_mappings.toml"
 )

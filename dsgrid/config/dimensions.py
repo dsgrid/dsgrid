@@ -280,11 +280,12 @@ class TimeDimensionModel(DimensionBaseModel):
     #       the weekday association is dictated by weather_year.
     time_type: TimeDimensionType = Field(
         title="time_type",
-        default="datetime",
+        default=TimeDimensionType.DATETIME.value,
         description="""
         Type of time dimension. Accepted: 
             datetime, annual, representative_period (not supported yet)
         """,
+        options=DimensionType.format_for_docs(),
     )
     str_format: Optional[str] = Field(
         title="str_format",
@@ -339,7 +340,7 @@ class TimeDimensionModel(DimensionBaseModel):
     )
     value_representation: TimeValueMeasurement = Field(
         title="value_representation",
-        default="mean",
+        default=TimeValueMeasurement.MEAN,
         description="""
         What the value associated with a timestamp represent. Accepted: 
             mean, min, max, measured, total 
@@ -397,7 +398,7 @@ class AnnualTimeDimensionModel(DimensionBaseModel):
     )
     include_leap_day: bool = Field(
         title="include_leap_day",
-        default="false",
+        default=False,
         description="""
         Whether annual time includes leap day. Accepted: 
             true, false

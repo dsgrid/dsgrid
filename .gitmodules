@@ -1,4 +1,9 @@
 [submodule "dsgrid-test-data"]
-	path = dsgrid-test-data
+	path = ../dsgrid-test-data
 	url = https://github.com/dsgrid/dsgrid-test-data
 	branch = ll/annual_time_class
+
+[submodule "dsgrid-project-EFS"]
+	path = ../dsgrid-project-EFS
+	url = https://github.com/dsgrid/dsgrid-project-EFS
+	branch = ll/annual_time

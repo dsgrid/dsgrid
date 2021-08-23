@@ -8,9 +8,17 @@ from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE_TIME
 from dsgrid.config.dimension_config import TimeDimensionConfig
-from dsgrid.dimension.time import Period
 import os
 
+### TBD
+file = DIMENSION_CONFIG_FILE_TIME
+print(file)
+config_as_dict = load_data(file)
+model = DimensionsConfigModel(**config_as_dict)
+time_dimension_model1 = model.dimensions[0]
+
+
+###
 
 logger = logging.getLogger(__name__)
 
@@ -23,28 +31,28 @@ def time_dimension_model1():
     yield model.dimensions[0]  # TimeDimensionModel (8760 period-beginning)
 
 
-@pytest.fixture
-def time_dimension_model2():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[1]  # TimeDimensionModel (annual)
+# @pytest.fixture
+# def time_dimension_model2():
+#     file = DIMENSION_CONFIG_FILE_TIME
+#     config_as_dict = load_data(file)
+#     model = DimensionsConfigModel(**config_as_dict)
+#     yield model.dimensions[1]  # TimeDimensionModel (annual)
 
 
-@pytest.fixture
-def time_dimension_model3():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[2]  # TimeDimensionModel (8760 period-ending)
+# @pytest.fixture
+# def time_dimension_model3():
+#     file = DIMENSION_CONFIG_FILE_TIME
+#     config_as_dict = load_data(file)
+#     model = DimensionsConfigModel(**config_as_dict)
+#     yield model.dimensions[2]  # TimeDimensionModel (8760 period-ending)
 
 
-@pytest.fixture
-def annual_time_dimension_model():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[3]  # AnnualTimeDimensionModel
+# @pytest.fixture
+# def annual_time_dimension_model():
+#     file = DIMENSION_CONFIG_FILE_TIME
+#     config_as_dict = load_data(file)
+#     model = DimensionsConfigModel(**config_as_dict)
+#     yield model.dimensions[3]  # AnnualTimeDimensionModel
 
 
 def check_date_range_creation(time_dimension_model):
@@ -100,19 +108,20 @@ def test_time_dimension_model1(time_dimension_model1):
     check_date_range_creation(time_dimension_model1)
 
 
-def test_time_dimension_model2(time_dimension_model2):
-    check_date_range_creation(time_dimension_model2)
-    check_validation_error_366_days(time_dimension_model2)
+# def test_time_dimension_model2(time_dimension_model2):
+#     check_date_range_creation(time_dimension_model2)
+#     check_validation_error_366_days(time_dimension_model2)
 
 
-def test_time_dimension_model3(time_dimension_model3):
-    check_date_range_creation(time_dimension_model3)
+# def test_time_dimension_model3(time_dimension_model3):
+#     check_date_range_creation(time_dimension_model3)
 
 
-def test_time_dimension_model4(annual_time_dimension_model):
-    check_register_annual_time(annual_time_dimension_model)
+# def test_time_dimension_model4(annual_time_dimension_model):
+#     check_register_annual_time(annual_time_dimension_model)
 
 
+### additional ###
 # lead_day_adjustment not supported yet
 # def test_time_dimension_model1_lead_day_adjustment(time_dimension_model1):
 #     time_dimension_model1.leap_day_adjustment = "drop_feb29"

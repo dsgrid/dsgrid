@@ -21,7 +21,7 @@ class DimensionType(DSGEnum):
     DATA_SOURCE = "data_source"
 
 
-class TimeDimensionType(Enum):
+class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"

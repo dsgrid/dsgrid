@@ -1,7 +1,7 @@
 """Dimensions related to time"""
 import datetime
 import pytz
-from enum import Enum # maybe
+from enum import Enum  # maybe
 
 from dsgrid.data_models import DSGEnum, EnumValue
 
@@ -140,6 +140,11 @@ class TimezoneType(DSGEnum):
         " shifts during DST times.",
         tz=pytz.timezone("US/Eastern"),
     )
+    NONE = EnumValue(
+        value="none",
+        description="No timezone, suitable for temporally aggregated data",
+        tz=None,
+    )
     LOCAL = EnumValue(
         value="LOCAL",
         description="Local time. Implies that the geography's timezone will be dynamically applied"
@@ -150,7 +155,6 @@ class TimezoneType(DSGEnum):
 
 class DatetimeRange:
     def __init__(self, start, end, frequency, leap_day_adjustment: LeapDayAdjustmentType):
-        # TODO: period doesn't get used when generating the time range, should we remove?
         self.start = start
         self.end = end
         self.frequency = frequency
@@ -164,10 +168,10 @@ class DatetimeRange:
         )
 
     def __str__(self):
-        return self.list_time_range()
+        return self.show_range()
 
     def show_range(self, n_show=5):
-        output = self.__str__()
+        output = self.list_time_range()
         n_show = min(len(output) // 2, n_show)
         n_head = ", ".join([str(x) for x in output[:n_show]])
         n_tail = ", ".join([str(x) for x in output[-n_show:]])
@@ -182,7 +186,6 @@ class DatetimeRange:
         """
         cur = self.start
         end = self.end + self.frequency
-        end = end + self.frequency if self.time_interval == time_interval.PERIOD_ENDING else end
 
         while cur < end:
             if not (
@@ -214,11 +217,11 @@ class AnnualTimeRange(DatetimeRange):
 
 def make_time_range(start, end, frequency, leap_day_adjustment):
     """
-    factor function that decides which TimeRange func to use based on frequency
+    factory function that decides which TimeRange func to use based on frequency
     """
-    if frequency == timedelta(days=365):
+    if frequency == datetime.timedelta(days=365):
         return AnnualTimeRange(start, end, frequency, leap_day_adjustment)
-    elif frequency == timedelta(days=366):
+    elif frequency == datetime.timedelta(days=366):
         raise ValueError(
             "366 days not allowed for frequency, use 365 days to specify annual frequency."
         )

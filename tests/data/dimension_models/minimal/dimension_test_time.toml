@@ -30,31 +30,31 @@ time_type = "datetime"
 value_representation = "total"
 
 
-# [[dimensions]] #[3]
-# class = "Time"
-# description = """
-# Time dimension, 2012 hourly EPT, period-ending, no Leap Day Adjustment, total value
-# """
-# frequency = "01:00:00"
-# name = "Time-2012-EPT-hourly-periodEnding-noLeapDayAdjustment-total"
-# time_interval = "period_ending"
-# ranges = [{start = "2012-01-01 01:00:00", end = "2013-01-01 00:00:00"}]
-# str_format = "%Y-%m-%d %H:%M:%S"
-# timezone = "EasternPrevailing"
-# # leap_day_adjustment = "none" #"drop_feb29"
-# type = "time"
-# time_type = "datetime"
-# value_representation = "max"
+[[dimensions]] #[3]
+class = "Time"
+description = """
+Time dimension, 2012 hourly EPT, period-ending, no Leap Day Adjustment, total value
+"""
+frequency = "01:00:00"
+name = "Time-2012-EPT-hourly-periodEnding-noLeapDayAdjustment-total"
+time_interval = "period_ending"
+ranges = [{start = "2012-01-01 01:00:00", end = "2013-01-01 00:00:00"}]
+str_format = "%Y-%m-%d %H:%M:%S"
+timezone = "EasternPrevailing"
+leap_day_adjustment = "none"
+type = "time"
+time_type = "datetime"
+value_representation = "max"
 
 
-# [[dimensions]] #[4]
-# class = "AnnualTime"
-# description = """Annual time"""
-# module = "dsgrid.dimension.standard"
-# name = "Annual-time-with-leap-year"
-# value_representation = "mean"
-# include_leap_day = true
-# type = "time"
-# time_type = "annual"
+[[dimensions]] #[4]
+class = "AnnualTime"
+description = """Annual time"""
+module = "dsgrid.dimension.standard"
+name = "Annual-time-with-leap-year"
+value_representation = "mean"
+include_leap_day = true
+type = "time"
+time_type = "annual"
 
 

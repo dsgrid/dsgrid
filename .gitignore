@@ -150,3 +150,6 @@ dmypy.json
 credentials/
 
 poetry.lock
+running_cluster_id.txt
+
+emr/code/*

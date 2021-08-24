@@ -272,12 +272,9 @@ class TimeRangeModel(DSGBaseModel):
     )
 
 
-class TimeDimensionModel(DimensionBaseModel):
-    """Defines a time dimension"""
+class BaseTimeDimensionModel(DimensionBaseModel):
+    """Defines a base model to that TimeDimensionModel and AnnualTimeDimensionModel inherit from"""
 
-    # TODO: what is this intended purpose?
-    #       The time dimension may not consist real timestamps,
-    #       the weekday association is dictated by weather_year.
     time_type: TimeDimensionType = Field(
         title="time_type",
         default=TimeDimensionType.DATETIME.value,
@@ -287,6 +284,24 @@ class TimeDimensionModel(DimensionBaseModel):
         """,
         options=DimensionType.format_for_docs(),
     )
+    value_representation: TimeValueMeasurement = Field(
+        title="value_representation",
+        default=TimeValueMeasurement.MEAN,
+        description="""
+        What the value associated with a timestamp represent. Accepted: 
+            mean, min, max, measured, total 
+        """,  # TODO: @ET help with this description
+        options=TimeValueMeasurement.format_descriptions_for_docs(),
+    )
+
+
+class TimeDimensionModel(BaseTimeDimensionModel):
+    """Defines a time dimension"""
+
+    # TODO: what is this intended purpose?
+    #       The time dimension may not consist real timestamps,
+    #       the weekday association is dictated by weather_year.
+
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y-%m-%d %H:%M:%s",
@@ -338,15 +353,6 @@ class TimeDimensionModel(DimensionBaseModel):
             LOCAL 
         """,
     )
-    value_representation: TimeValueMeasurement = Field(
-        title="value_representation",
-        default=TimeValueMeasurement.MEAN,
-        description="""
-        What the value associated with a timestamp represent. Accepted: 
-            mean, min, max, measured, total 
-        """,  # TODO: @ET help with this description
-        options=TimeValueMeasurement.format_descriptions_for_docs(),
-    )
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
@@ -385,32 +391,15 @@ class TimeDimensionModel(DimensionBaseModel):
         return data
 
 
-class AnnualTimeDimensionModel(DimensionBaseModel):
+class AnnualTimeDimensionModel(BaseTimeDimensionModel):
     """Defines an annual time dimension"""
 
-    time_type: TimeDimensionType = Field(
-        title="time_type",
-        default="annual",
-        description="""
-        Type of time dimension. Accepted: 
-            datetime, annual, representative_period (not supported yet)
-        """,
-    )
     include_leap_day: bool = Field(
         title="include_leap_day",
         default=False,
         description="""
         Whether annual time includes leap day. Accepted: 
-            true, false
-        """,
-    )
-    # TODO: is this a project-level time dimension config?
-    value_representation: TimeValueMeasurement = Field(
-        title="value_representation",
-        default="mean",
-        description="""
-        What the value associated with a year represent. Accepted: 
-            mean, min, max, measured, total 
+            True, False
         """,
     )
 

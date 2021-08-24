@@ -148,3 +148,5 @@ dmypy.json
 .pyre/
 
 credentials/
+
+poetry.lock

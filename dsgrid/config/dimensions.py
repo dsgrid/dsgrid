@@ -272,12 +272,12 @@ class TimeRangeModel(DSGBaseModel):
     )
 
 
-class BaseTimeDimensionModel(DimensionBaseModel):
+class TimeDimensionBaseModel(DimensionBaseModel):
     """Defines a base model to that TimeDimensionModel and AnnualTimeDimensionModel inherit from"""
 
     time_type: TimeDimensionType = Field(
         title="time_type",
-        default=TimeDimensionType.DATETIME.value,
+        default=TimeDimensionType.DATETIME,
         description="""
         Type of time dimension. Accepted: 
             datetime, annual, representative_period (not supported yet)
@@ -295,12 +295,8 @@ class BaseTimeDimensionModel(DimensionBaseModel):
     )
 
 
-class TimeDimensionModel(BaseTimeDimensionModel):
+class TimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension"""
-
-    # TODO: what is this intended purpose?
-    #       The time dimension may not consist real timestamps,
-    #       the weekday association is dictated by weather_year.
 
     str_format: Optional[str] = Field(
         title="str_format",
@@ -391,7 +387,7 @@ class TimeDimensionModel(BaseTimeDimensionModel):
         return data
 
 
-class AnnualTimeDimensionModel(BaseTimeDimensionModel):
+class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     """Defines an annual time dimension"""
 
     include_leap_day: bool = Field(

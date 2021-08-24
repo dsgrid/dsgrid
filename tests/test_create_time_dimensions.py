@@ -54,8 +54,7 @@ def check_date_range_creation(time_dimension_model):
     df = pd.DataFrame()
     df["dim_dt"] = time_range[0].list_time_range()
 
-    print(str(time_range))
-    print(time_range[0].show_range(5))
+    str(time_range)
     logger.info("Date range created: ", time_range[0].show_range(5))  # show first and last 5
 
     # create date range using pandas
@@ -72,15 +71,11 @@ def check_date_range_creation(time_dimension_model):
     else:
         freq = f"{int(hours)}h"
     tz = config.get_tzinfo()
-    print("--->>")
-    print(pd.date_range(start, end, freq=freq, tz=tz))
     df["pd_dt"] = pd.date_range(start, end, freq=freq, tz=tz)
 
     # compare two date range creation
     df["delta"] = df["pd_dt"] - df["dim_dt"]
     num_ts_diff = (df["delta"] != datetime.timedelta(0)).sum()
-
-    print(df)
 
     assert num_ts_diff == 0
 

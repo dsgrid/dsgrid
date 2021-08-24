@@ -108,7 +108,7 @@ pyarrow \
 s3fs \
 boto3 \
 conda-pack \
-tornado=5 \
+tornado=6 \
 pandas \
 pytz \
 fastparquet \
@@ -129,44 +129,6 @@ conda pack -q -o $HOME/environment.tar.gz # TODO: can probably get this from dsg
 # -----------------------------------------------------------------------------
 echo "Packages installed in the worker environment:"
 conda list
-
-
-# -----------------------------------------------------------------------------
-# 6. Configure Dask
-#
-# This isn't necessary, but for this particular bootstrap script it will make a
-# few things easier:
-#
-# - Configure the cluster's dashboard link to show the proxied version through
-#   jupyter-server-proxy. This allows access to the dashboard with only an ssh
-#   tunnel to the notebook.
-#
-# - Specify the pre-packaged python environment, so users don't have to
-#
-# - Set the default deploy-mode to local, so the dashboard proxying works
-#
-# - Specify the location of the native libhdfs library so pyarrow can find it
-#   on the workers and the client (if submitting applications).
-# ------------------------------------------------------------------------------
-echo "Configuring Dask"
-mkdir -p $HOME/.config/dask
-cat <<EOT >> $HOME/.config/dask/config.yaml
-distributed:
-  dashboard:
-    link: "/proxy/{port}/status"
-yarn:
-  environment: /home/hadoop/environment.tar.gz
-  deploy-mode: local
-  worker:
-    env:
-      ARROW_LIBHDFS_DIR: /usr/lib/hadoop/lib/native/
-  client:
-    env:
-      ARROW_LIBHDFS_DIR: /usr/lib/hadoop/lib/native/
-EOT
-# Also set ARROW_LIBHDFS_DIR in ~/.bashrc so it's set for the local user
-echo -e '\nexport ARROW_LIBHDFS_DIR=/usr/lib/hadoop/lib/native' >> $HOME/.bashrc
-
 
 # -----------------------------------------------------------------------------
 # 7. If Jupyter isn't requested, we're done
@@ -196,7 +158,6 @@ if [[ "$JUPYTER" == "true" ]]; then
     -q \
     notebook \
     ipywidgets \
-    jupyter-server-proxy \
     jupyter_contrib_nbextensions \
 
     jupyter nbextension enable execute_time/ExecuteTime

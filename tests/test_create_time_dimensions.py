@@ -3,12 +3,13 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 import logging
+import os
 
 from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE_TIME
 from dsgrid.config.dimension_config import TimeDimensionConfig
-import os
+from dsgrid.dimension.time import LeapDayAdjustmentType
 
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,14 @@ def time_dimension_model1():
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
     yield model.dimensions[0]  # TimeDimensionModel (8760 period-beginning)
+
+
+@pytest.fixture
+def time_dimension_model():
+    file = DIMENSION_CONFIG_FILE_TIME
+    config_as_dict = load_data(file)
+    # model = DimensionsConfigModel(**config_as_dict)
+    yield config_as_dict  # TimeDimensionModel (8760 period-beginning)
 
 
 @pytest.fixture
@@ -71,7 +80,45 @@ def check_date_range_creation(time_dimension_model):
     else:
         freq = f"{int(hours)}h"
     tz = config.get_tzinfo()
-    df["pd_dt"] = pd.date_range(start, end, freq=freq, tz=tz)
+    ts = pd.date_range(start, end, freq=freq, tz=tz)
+
+    # make necessary adjustments for leap_day_adjustment
+    years = set(ts.year)
+    ts_to_drop = []
+    for yr in years:
+        if time_dimension_model.leap_day_adjustment == LeapDayAdjustmentType.NONE:
+            pass
+        elif time_dimension_model.leap_day_adjustment == LeapDayAdjustmentType.DROP_JAN1:
+            ts_to_drop = (
+                ts_to_drop
+                + pd.date_range(
+                    start=f"{yr}-01-01", freq=freq, periods=24 / hours, tz=tz
+                ).to_list()
+            )
+        elif time_dimension_model.leap_day_adjustment == LeapDayAdjustmentType.DROP_DEC31:
+            ts_to_drop = (
+                ts_to_drop
+                + pd.date_range(
+                    start=f"{yr}-12-31", freq=freq, periods=24 / hours, tz=tz
+                ).to_list()
+            )
+        elif time_dimension_model.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29:
+            if yr % 4 == 0:
+                ts_to_drop = (
+                    ts_to_drop
+                    + pd.date_range(
+                        start=f"{yr}-02-29", freq=freq, periods=24 / hours, tz=tz
+                    ).to_list()
+                )
+            else:
+                logger.info(f" {yr} is not a leap year, no Feb 29 to drop")
+        else:
+            assert False
+
+    print("--->")
+    print(ts_to_drop)
+    print()
+    df["pd_dt"] = ts.drop(ts_to_drop)
 
     # compare two date range creation
     df["delta"] = df["pd_dt"] - df["dim_dt"]
@@ -105,3 +152,12 @@ def test_time_dimension_model3(time_dimension_model3):
 
 def test_time_dimension_model4(annual_time_dimension_model):
     check_register_annual_time(annual_time_dimension_model)
+
+
+def test_time_dimension_model_lead_day_adj(time_dimension_model1):
+    time_dimension_model1.leap_day_adjustment = LeapDayAdjustmentType.DROP_DEC31
+    check_date_range_creation(time_dimension_model1)
+    time_dimension_model1.leap_day_adjustment = LeapDayAdjustmentType.DROP_JAN1
+    check_date_range_creation(time_dimension_model1)
+    time_dimension_model1.leap_day_adjustment = LeapDayAdjustmentType.DROP_FEB29
+    check_date_range_creation(time_dimension_model1)

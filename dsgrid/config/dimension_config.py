@@ -17,7 +17,7 @@ from .dimensions import (
     AnnualTimeDimensionModel,
 )
 from dsgrid.data_models import serialize_model, ExtendedJSONEncoder
-from dsgrid.dimension.time import DatetimeRange, AnnualTimeRange, TimezoneType, make_time_range
+from dsgrid.dimension.time import DatetimeRange, AnnualTimeRange, TimeZone, make_time_range
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import dump_data, load_data
 
@@ -121,7 +121,7 @@ class TimeDimensionConfig(DimensionBaseConfig):
         tzinfo
 
         """
-        assert self.model.timezone is not TimezoneType.LOCAL
+        assert self.model.timezone is not TimeZone.LOCAL
         return self.model.timezone.tz
 
 

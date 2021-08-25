@@ -19,7 +19,7 @@ from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeInvervalType,
     TimeValueMeasurement,
-    TimezoneType,
+    TimeZone,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, compute_hash, load_data
@@ -279,18 +279,18 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         title="time_type",
         default=TimeDimensionType.DATETIME,
         description="""
-        Type of time dimension. Accepted: 
+        Type of time dimension: 
             datetime, annual, representative_period (not supported yet)
         """,
         options=DimensionType.format_for_docs(),
     )
-    value_representation: TimeValueMeasurement = Field(
-        title="value_representation",
+    measurement_type: TimeValueMeasurement = Field(
+        title="measurement_type",
         default=TimeValueMeasurement.MEAN,
         description="""
-        What the value associated with a timestamp represent. Accepted: 
+        The type of measurement represented by a value associated with a timestamp: 
             mean, min, max, measured, total 
-        """,  # TODO: @ET help with this description
+        """,
         options=TimeValueMeasurement.format_descriptions_for_docs(),
     )
 
@@ -330,15 +330,15 @@ class TimeDimensionModel(TimeDimensionBaseModel):
             "Adjustments are made to leap years only.",
         ),
     )
-    time_interval: TimeInvervalType = Field(
+    time_interval_type: TimeInvervalType = Field(
         title="time_interval",
-        description="The range of time that the value represents, e.g., period-beginning",
+        description="The range of time that the value associated with a timestamp represents, e.g., period-beginning",
         options=TimeInvervalType.format_descriptions_for_docs(),
     )
-    timezone: TimezoneType = Field(
+    timezone: TimeZone = Field(
         title="timezone",
         description="""
-        Timezone of data. Accepted: 
+        Time zone of data:
             UTC, 
             HawaiiAleutianStandard, 
             AlaskaStandard, AlaskaPrevailing,
@@ -359,12 +359,12 @@ class TimeDimensionModel(TimeDimensionBaseModel):
             # TODO: validate consistency between start, end, frequency. End time should always be an interval of the frequency. So, for example, if frequency is 1 hour, and start time starts at 00:00, then end time cannot be 23:59.
         return ranges
 
-    @validator("leap_day_adjustment")
-    def check_leap_day_adjustment(cls, value):
-        if value != LeapDayAdjustmentType.NONE:
-            # TODO: DSGRID-172
-            raise ValueError("leap_day_adjustment is not yet supported")
-        return value
+    # @validator("leap_day_adjustment")
+    # def check_leap_day_adjustment(cls, value):
+    #     if value != LeapDayAdjustmentType.NONE:
+    #         # TODO: DSGRID-172
+    #         raise ValueError("leap_day_adjustment is not yet supported")
+    #     return value
 
     @validator("frequency")
     def check_frequency(cls, value):

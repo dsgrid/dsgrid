@@ -1,7 +1,6 @@
 """Dimensions related to time"""
 import datetime
 import pytz
-from enum import Enum  # maybe
 
 from dsgrid.data_models import DSGEnum, EnumValue
 
@@ -72,8 +71,8 @@ class TimeValueMeasurement(DSGEnum):
     )
 
 
-class TimezoneType(DSGEnum):
-    """Timezone enum types"""
+class TimeZone(DSGEnum):
+    """Time zone enum types"""
 
     UTC = EnumValue(
         value="UTC",
@@ -193,7 +192,17 @@ class DatetimeRange:
                 and cur.month == 2
                 and cur.day == 29
             ):
-                yield cur
+                if not (
+                    self.leap_day_adjustment == LeapDayAdjustmentType.DROP_DEC31
+                    and cur.month == 12
+                    and cur.day == 31
+                ):
+                    if not (
+                        self.leap_day_adjustment == LeapDayAdjustmentType.DROP_JAN1
+                        and cur.month == 1
+                        and cur.day == 1
+                    ):
+                        yield cur
             cur += self.frequency
 
     def list_time_range(self):

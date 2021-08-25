@@ -177,14 +177,15 @@ class DatetimeRange:
         return n_head + ",\n ... , \n" + n_tail
 
     def iter_timestamps(self):
-        """Return a generator of datetimes for a time range.
+        """Return a generator of datetimes for a time range ('start' and 'end' times are inclusive).
+
         Yields
         ------
         datetime
 
         """
         cur = self.start
-        end = self.end + self.frequency
+        end = self.end + self.frequency  # to make end time inclusive
 
         while cur < end:
             if not (

@@ -17,6 +17,7 @@ def test_convert_datetime_to_season():
     assert convert_datetime_to_season(datetime(2020, 4, 5)) == "spring"
     assert convert_datetime_to_season(datetime(2020, 7, 5)) == "summer"
     assert convert_datetime_to_season(datetime(2020, 11, 5)) == "autumn"
+    assert convert_datetime_to_season(datetime(2020, 12, 30)) == "winter"
 
 
 def test_interpret_datetime():

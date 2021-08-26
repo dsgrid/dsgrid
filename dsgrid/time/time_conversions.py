@@ -38,8 +38,9 @@ def convert_datetime_to_season(timestamp):
 
     """
     # TODO: dates do change slightly every year. Is this close enough?
+    # dates also change by region, it's weather driven.
     year = timestamp.year
-    if timestamp < datetime(year, 3, 20):
+    if timestamp < datetime(year, 3, 20) or timestamp > datetime(year, 12, 21):
         season = Season.WINTER.value
     elif timestamp < datetime(year, 6, 20):
         season = Season.SPRING.value

@@ -7,6 +7,7 @@ from pydantic import validator
 from .config_base import ConfigBase
 from .dimensions import (
     TimeDimensionModel,
+    AnnualTimeDimensionModel,
     DimensionModel,
     handle_dimension_union,
 )
@@ -23,7 +24,7 @@ class DimensionsConfigModel(DSGBaseModel):
     Used when registering multiple dimensions in one command.
     """
 
-    dimensions: List[Union[DimensionModel, TimeDimensionModel]] = Field(
+    dimensions: List[Union[DimensionModel, TimeDimensionModel, AnnualTimeDimensionModel]] = Field(
         title="dimensions",
         description="Dimensions for submission to the dimension registry",
     )

@@ -18,7 +18,7 @@ from dsgrid.dimension.base_models import DimensionType, TimeDimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeInvervalType,
-    TimeValueMeasurement,
+    MeasurementType,
     TimeZone,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
@@ -284,14 +284,14 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         """,
         options=DimensionType.format_for_docs(),
     )
-    measurement_type: TimeValueMeasurement = Field(
+    measurement_type: MeasurementType = Field(
         title="measurement_type",
-        default=TimeValueMeasurement.MEAN,
+        default=MeasurementType.MEAN,
         description="""
         The type of measurement represented by a value associated with a timestamp: 
             mean, min, max, measured, total 
         """,
-        options=TimeValueMeasurement.format_descriptions_for_docs(),
+        options=MeasurementType.format_descriptions_for_docs(),
     )
 
 
@@ -348,6 +348,7 @@ class TimeDimensionModel(TimeDimensionBaseModel):
             EasternStandard, EasternPrevailing,
             LOCAL 
         """,
+        options=TimeZone.format_descriptions_for_docs(),
     )
 
     @validator("ranges", pre=True)
@@ -358,13 +359,6 @@ class TimeDimensionModel(TimeDimensionBaseModel):
             datetime.strptime(time_range["end"], values["str_format"])
             # TODO: validate consistency between start, end, frequency. End time should always be an interval of the frequency. So, for example, if frequency is 1 hour, and start time starts at 00:00, then end time cannot be 23:59.
         return ranges
-
-    # @validator("leap_day_adjustment")
-    # def check_leap_day_adjustment(cls, value):
-    #     if value != LeapDayAdjustmentType.NONE:
-    #         # TODO: DSGRID-172
-    #         raise ValueError("leap_day_adjustment is not yet supported")
-    #     return value
 
     @validator("frequency")
     def check_frequency(cls, value):

@@ -46,7 +46,7 @@ class TimeInvervalType(DSGEnum):
     )
 
 
-class TimeValueMeasurement(DSGEnum):
+class MeasurementType(DSGEnum):
     """Time value measurement enum types"""
 
     MEAN = EnumValue(
@@ -178,6 +178,7 @@ class DatetimeRange:
 
     def iter_timestamps(self):
         """Return a generator of datetimes for a time range ('start' and 'end' times are inclusive).
+        TODO: for future-selves, test functionality of LeapDayAdjustmentType in relation to TimeIntervalType to make sure drop behavior is expected.
 
         Yields
         ------

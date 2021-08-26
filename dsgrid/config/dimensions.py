@@ -282,7 +282,7 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         Type of time dimension: 
             datetime, annual, representative_period (not supported yet)
         """,
-        options=DimensionType.format_for_docs(),
+        options=TimeDimensionType.format_for_docs(),
     )
     measurement_type: MeasurementType = Field(
         title="measurement_type",
@@ -291,7 +291,7 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         The type of measurement represented by a value associated with a timestamp: 
             mean, min, max, measured, total 
         """,
-        options=MeasurementType.format_descriptions_for_docs(),
+        options=MeasurementType.format_for_docs(),
     )
 
 

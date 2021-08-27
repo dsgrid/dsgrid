@@ -215,7 +215,7 @@ class DatetimeRange:
             list of datetime
 
         """
-        return list(self.iter_timestamps())
+        return list(x.to_pydatetime() for x in self.iter_timestamps())
 
 
 class AnnualTimeRange(DatetimeRange):

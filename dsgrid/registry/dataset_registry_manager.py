@@ -164,7 +164,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             )
 
     def _check_load_data_columns(self, config: DatasetConfig, load_data):
-        dim_type = config.model.load_data_column_dimension
+        dim_type = config.model.data_schema.load_data_column_dimension
         dimension = config.get_dimension(dim_type)
         dimension_records = dimension.get_unique_ids()
 

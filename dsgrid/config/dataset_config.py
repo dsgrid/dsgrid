@@ -83,6 +83,10 @@ class InputDatasetType(DSGEnum):
     BENCHMARK = "benchmark"
 
 
+class DataSchemaType(DSGEnum):
+    STANDARD = "standard"
+
+
 class DSGDatasetParquetType(DSGEnum):
     """Dataset parquet types."""
 
@@ -160,6 +164,13 @@ class DatasetConfigModel(DSGBaseModel):
             " (e.g., dataset cannot be 'ComStock')",
         ),
     )
+    data_schema: DataSchemaType = Field(
+        title="data_schema",
+        default=DataSchemaType.STANDARD,
+        description="What schema to use when defining data dimensions",
+        options=f"{DataSchemaType.format_for_docs()}",
+    )
+
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
         description="Input dataset type.",

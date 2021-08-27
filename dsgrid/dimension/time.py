@@ -154,8 +154,8 @@ class TimeZone(DSGEnum):
 
 class DatetimeRange:
     def __init__(self, start, end, frequency, leap_day_adjustment: LeapDayAdjustmentType):
-        self.start = start
-        self.end = end
+        self.start = start.to_pydatetime()
+        self.end = end.to_pydatetime()
         self.frequency = frequency
         self.leap_day_adjustment = leap_day_adjustment
 
@@ -208,19 +208,19 @@ class DatetimeRange:
             cur += self.frequency
 
     def list_time_range(self):
-        """Return a list of datetimes for a time range.
+        """Return a list of timestamps (datetime obj) for a time range.
         Returns
         -------
         list
             list of datetime
 
         """
-        return list(x.to_pydatetime() for x in self.iter_timestamps())
+        return list(self.iter_timestamps())
 
 
 class AnnualTimeRange(DatetimeRange):
     def iter_timestamps(self):
-        """Return a list of years in the form of datetimes on Jan 1st"""
+        """Return a list of years (datetime obj) on Jan 1st"""
         tz = self.start.tzinfo
         for year in range(self.start.year, self.end.year + 1):
             yield datetime.datetime(year=year, month=1, day=1, tzinfo=tz)

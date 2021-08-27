@@ -123,7 +123,9 @@ class DatasetRegistryManager(RegistryManagerBase):
             for x in load_data.select("timestamp").distinct().sort("timestamp").collect()
         ]
         if expected_timestamps != actual_timestamps:
-            mismatch = sorted(set(expected_timestamps).difference(set(actual_timestamps)))
+            mismatch = sorted(
+                set(expected_timestamps).symmetric_difference(set(actual_timestamps))
+            )
             raise DSGInvalidDataset(
                 f"load_data timestamps do not match expected times. mismatch={mismatch}"
             )

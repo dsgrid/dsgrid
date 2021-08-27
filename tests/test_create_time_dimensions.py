@@ -24,14 +24,6 @@ def time_dimension_model1():
 
 
 @pytest.fixture
-def time_dimension_model():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    # model = DimensionsConfigModel(**config_as_dict)
-    yield config_as_dict  # TimeDimensionModel (8760 period-beginning)
-
-
-@pytest.fixture
 def time_dimension_model2():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)

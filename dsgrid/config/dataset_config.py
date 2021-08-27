@@ -84,7 +84,15 @@ class InputDatasetType(DSGEnum):
 
 
 class DataSchemaType(DSGEnum):
-    STANDARD = "standard"
+    """Data schema types."""
+
+    STANDARD = EnumValue(
+        value="standard",
+        description="""
+        Standard data schema, applicable to datasets/projects where 
+        the data is provided in full, OTHER FEATURES TO DESCRIBE HERE...
+        """,
+    )
 
 
 class DSGDatasetParquetType(DSGEnum):
@@ -170,7 +178,6 @@ class DatasetConfigModel(DSGBaseModel):
         description="What schema to use when defining data dimensions",
         options=f"{DataSchemaType.format_for_docs()}",
     )
-
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
         description="Input dataset type.",

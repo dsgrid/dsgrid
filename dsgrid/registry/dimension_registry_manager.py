@@ -148,7 +148,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_type = self._id_to_type[config_id]
         if version is None:
             version = self._registry_configs[config_id].model.version
-        key = DimensionKey(dimension_type, config_id, version)
+        key = DimensionKey(dimension_type, config_id, version, None)
         return self.get_by_key(key)
 
     def get_by_key(self, key):
@@ -212,7 +212,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         """
         dimensions = {}
         for dim in dimension_references:
-            key = DimensionKey(dim.dimension_type, dim.dimension_id, dim.version)
+            key = DimensionKey(dim.dimension_type, dim.dimension_id, dim.version, dim.trivial)
             dimensions[key] = self.get_by_key(key)
 
         return dimensions

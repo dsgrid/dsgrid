@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Set
 import os
 import logging
 
@@ -13,7 +13,7 @@ from .dimensions import (
     DimensionReferenceModel,
 )
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
-
+from dsgrid.exceptions import DSGInvalidDimension
 
 ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv")
 ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
@@ -308,7 +308,6 @@ class DatasetConfig(ConfigBase):
 
         """
         self._dimensions.update(dimension_manager.load_dimensions(self.model.dimensions))
-        # TODO: load trivial dimensions
 
     @property
     def dimensions(self):
@@ -330,3 +329,29 @@ class DatasetConfig(ConfigBase):
             if key.type == dimension_type:
                 return dim_config
         assert False, key
+
+    def get_trivial_dimensions(self, config):
+        """
+        Get dict of trivial 1-element data dimensions.
+
+        Returns
+        -------
+        dict: trivial dimension dictionary; {"dimension name": dimension id}
+        """
+        trivial_dimensions = {}
+        for key in self.model.dimensions:
+            if key.dimension_type != DimensionType.TIME:
+                if key.trivial:
+                    for d in config.dimensions:
+                        if config.dimensions[d].config_id == key.dimension_id:
+                            self._check_trivial_record_length(config.dimensions[d].model.records)
+                            val = config.dimensions[d].model.records[0].id
+                            trivial_dimensions[key.dimension_type.value] = val
+        return trivial_dimensions
+
+    def _check_trivial_record_length(self, records):
+        """Check that trivial dimensions have only 1 record."""
+        if len(records) > 1:
+            raise DSGInvalidDimension(
+                f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
+            )

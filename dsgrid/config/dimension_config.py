@@ -118,7 +118,7 @@ class TimeDimensionConfig(DimensionBaseConfig):
         return self.model.timezone.tz
 
 
-def get_dimension_config(model, src_dir):
+def get_dimension_config(model, src_dir):  # , trivial):
     if isinstance(model, TimeDimensionModel):
         return TimeDimensionConfig(model)
     elif isinstance(model, DimensionModel):

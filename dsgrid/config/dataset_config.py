@@ -89,8 +89,8 @@ class DataSchemaType(DSGEnum):
     STANDARD = EnumValue(
         value="standard",
         description="""
-        Standard data schema, applicable to datasets/projects where 
-        the data is provided in full, OTHER FEATURES TO DESCRIBE HERE...
+        Standard data schema with load_data and load_data_lookup tables. 
+        Applies to datasets for which the data are provided in full.
         """,
     )
 
@@ -179,11 +179,6 @@ class DatasetConfigModel(DSGBaseModel):
             " (e.g., dataset cannot be 'ComStock')",
         ),
     )
-    data_schema_type: DataSchemaType = Field(
-        title="data_schema_type",
-        description="Schema (list of fields) to use when defining data dimensions",
-        options=DataSchemaType.format_for_docs(),
-    )
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
         description="Input dataset type.",
@@ -249,9 +244,14 @@ class DatasetConfigModel(DSGBaseModel):
         description="List of data tags",
         required=False,
     )
+    data_schema_type: DataSchemaType = Field(
+        title="data_schema_type",
+        description="Discriminator for data schema",
+        options=DataSchemaType.format_for_docs(),
+    )
     data_schema: StandardDataSchemaModel = Field(
         title="data_schema",
-        description="Data schema to use for load_data_column_dimension",
+        description="Schema (table layouts) used for writing out the dataset",
     )  # Once we have another schema type this will become Union[StandardDataSchemaModel, OtherSchemaModel]
     dimensions: List[DimensionReferenceModel] = Field(
         title="dimensions",

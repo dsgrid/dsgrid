@@ -84,6 +84,18 @@ class InputDatasetType(DSGEnum):
     BENCHMARK = "benchmark"
 
 
+class DataSchemaType(DSGEnum):
+    """Data schema types."""
+
+    STANDARD = EnumValue(
+        value="standard",
+        description="""
+        Standard data schema with load_data and load_data_lookup tables. 
+        Applies to datasets for which the data are provided in full.
+        """,
+    )
+
+
 class DSGDatasetParquetType(DSGEnum):
     """Dataset parquet types."""
 
@@ -148,6 +160,13 @@ class InputSectorDataset(DSGBaseModel):
     )
 
 
+class StandardDataSchemaModel(DSGBaseModel):
+    load_data_column_dimension: DimensionType = Field(
+        title="load_data_column_dimension",
+        description="Columns in the load_data table are records of this dimension type.",
+    )
+
+
 class DatasetConfigModel(DSGBaseModel):
     """Represents dataset configurations."""
 
@@ -164,7 +183,7 @@ class DatasetConfigModel(DSGBaseModel):
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
         description="Input dataset type.",
-        options=f"{InputDatasetType.format_for_docs()}",
+        options=InputDatasetType.format_for_docs(),
     )
     # TODO: This must be validated against the project's dimension records for data_source
     # TODO: This must also be validated against the project_config
@@ -226,10 +245,15 @@ class DatasetConfigModel(DSGBaseModel):
         description="List of data tags",
         required=False,
     )
-    load_data_column_dimension: DimensionType = Field(
-        title="load_data_column_dimension",
-        description="Columns in the load_data table are records of this dimension type.",
+    data_schema_type: DataSchemaType = Field(
+        title="data_schema_type",
+        description="Discriminator for data schema",
+        options=DataSchemaType.format_for_docs(),
     )
+    data_schema: StandardDataSchemaModel = Field(
+        title="data_schema",
+        description="Schema (table layouts) used for writing out the dataset",
+    )  # Once we have another schema type this will become Union[StandardDataSchemaModel, OtherSchemaModel]
     dimensions: List[DimensionReferenceModel] = Field(
         title="dimensions",
         description="List of registered dimension references that make up the dimensions of dataset.",
@@ -257,6 +281,18 @@ class DatasetConfigModel(DSGBaseModel):
             " columns. Instead they are added by dsgrid as an alias column.",
         ),
     )
+
+    @validator("data_schema", pre=True)
+    def check_data_schema(cls, schema, values):
+        """Check and deserialize model for data_schema"""
+        # placeholder for when there's more data_schema_type
+        if values["data_schema_type"] == DataSchemaType.STANDARD:
+            schema = StandardDataSchemaModel(**schema)
+        else:
+            raise ValueError(
+                f'Cannot load data_schema model for data_schema_type={values["data_schema_type"]}'
+            )
+        return schema
 
     @validator("dataset_id")
     def check_dataset_id(cls, dataset_id):

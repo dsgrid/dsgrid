@@ -141,7 +141,9 @@ class DatasetRegistryManager(RegistryManagerBase):
             for x in load_data.select("timestamp").distinct().sort("timestamp").collect()
         ]
         if expected_timestamps != actual_timestamps:
-            mismatch = sorted(set(expected_timestamps).difference(set(actual_timestamps)))
+            mismatch = sorted(
+                set(expected_timestamps).symmetric_difference(set(actual_timestamps))
+            )
             raise DSGInvalidDataset(
                 f"load_data timestamps do not match expected times. mismatch={mismatch}"
             )
@@ -180,7 +182,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             )
 
     def _check_load_data_columns(self, config: DatasetConfig, load_data):
-        dim_type = config.model.load_data_column_dimension
+        dim_type = config.model.data_schema.load_data_column_dimension
         dimension = config.get_dimension(dim_type)
         dimension_records = dimension.get_unique_ids()
 

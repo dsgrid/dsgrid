@@ -14,12 +14,12 @@ from pyspark.sql import DataFrame, Row, SparkSession
 from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncoder
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, TimeDimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeInvervalType,
-    TimeValueMeasurement,
-    TimezoneType,
+    MeasurementType,
+    TimeZone,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, compute_hash, load_data
@@ -273,7 +273,30 @@ class TimeRangeModel(DSGBaseModel):
     )
 
 
-class TimeDimensionModel(DimensionBaseModel):
+class TimeDimensionBaseModel(DimensionBaseModel):
+    """Defines a base model to that TimeDimensionModel and AnnualTimeDimensionModel inherit from"""
+
+    time_type: TimeDimensionType = Field(
+        title="time_type",
+        default=TimeDimensionType.DATETIME,
+        description="""
+        Type of time dimension: 
+            datetime, annual, representative_period (not supported yet)
+        """,
+        options=TimeDimensionType.format_for_docs(),
+    )
+    measurement_type: MeasurementType = Field(
+        title="measurement_type",
+        default=MeasurementType.MEAN,
+        description="""
+        The type of measurement represented by a value associated with a timestamp: 
+            mean, min, max, measured, total 
+        """,
+        options=MeasurementType.format_for_docs(),
+    )
+
+
+class TimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension"""
 
     str_format: Optional[str] = Field(
@@ -308,21 +331,25 @@ class TimeDimensionModel(DimensionBaseModel):
             "Adjustments are made to leap years only.",
         ),
     )
-    time_interval: TimeInvervalType = Field(
+    time_interval_type: TimeInvervalType = Field(
         title="time_interval",
-        description="The range of time that the value represents",
+        description="The range of time that the value associated with a timestamp represents, e.g., period-beginning",
         options=TimeInvervalType.format_descriptions_for_docs(),
     )
-    timezone: TimezoneType = Field(
+    timezone: TimeZone = Field(
         title="timezone",
-        description="Timezone of data",
-        options=TimezoneType.format_descriptions_for_docs(),
-    )
-    value_representation: TimeValueMeasurement = Field(
-        title="value_representation",
-        default="mean",
-        description="How the value is measured",  # TODO: @ET help with this description
-        options=TimeValueMeasurement.format_descriptions_for_docs(),
+        description="""
+        Time zone of data:
+            UTC, 
+            HawaiiAleutianStandard, 
+            AlaskaStandard, AlaskaPrevailing,
+            PacificStandard, PacificPrevailing, 
+            MountainStandard, MountainPrevailing, 
+            CentralStandard, CentralPrevailing, 
+            EasternStandard, EasternPrevailing,
+            LOCAL 
+        """,
+        options=TimeZone.format_descriptions_for_docs(),
     )
 
     @validator("ranges", pre=True)
@@ -334,11 +361,12 @@ class TimeDimensionModel(DimensionBaseModel):
             # TODO: validate consistency between start, end, frequency. End time should always be an interval of the frequency. So, for example, if frequency is 1 hour, and start time starts at 00:00, then end time cannot be 23:59.
         return ranges
 
-    @validator("leap_day_adjustment")
-    def check_leap_day_adjustment(cls, value):
-        if value != LeapDayAdjustmentType.NONE:
-            # TODO: DSGRID-172
-            raise ValueError("leap_day_adjustment is not yet supported")
+    @validator("frequency")
+    def check_frequency(cls, value):
+        if value == timedelta(days=366):
+            raise ValueError(
+                "366 days not allowed for frequency, use 365 days to specify annual frequency."
+            )
         return value
 
     def dict(self, by_alias=True, **kwargs):
@@ -352,6 +380,22 @@ class TimeDimensionModel(DimensionBaseModel):
         data["dimension_class"] = None
         _convert_for_serialization(data)
         return data
+
+
+class AnnualTimeDimensionModel(TimeDimensionBaseModel):
+    """Defines an annual time dimension"""
+
+    include_leap_day: bool = Field(
+        title="include_leap_day",
+        default=False,
+        description="""
+        Whether annual time includes leap day. Accepted: 
+            True, False
+        """,
+    )
+
+
+# TODO: a DimensionModel for Representative_period (DSGRID-165)
 
 
 class DimensionReferenceModel(DSGBaseModel):
@@ -386,7 +430,14 @@ class DimensionReferenceModel(DSGBaseModel):
         return handle_version_or_str(version)
 
 
-DimensionUnionModel = List[Union[DimensionModel, DimensionReferenceModel, TimeDimensionModel]]
+DimensionUnionModel = List[
+    Union[
+        DimensionModel,
+        DimensionReferenceModel,
+        TimeDimensionModel,
+        AnnualTimeDimensionModel,
+    ]
+]
 
 
 def handle_dimension_union(value):
@@ -399,7 +450,14 @@ def handle_dimension_union(value):
 
     # NOTE: Errors inside DimensionModel or TimeDimensionModel will be duplicated by Pydantic
     if value["type"] == DimensionType.TIME.value:
-        val = TimeDimensionModel(**value)
+        if value["time_type"] == TimeDimensionType.DATETIME.value:
+            val = TimeDimensionModel(**value)
+        elif value["time_type"] == TimeDimensionType.ANNUAL.value:
+            val = AnnualTimeDimensionModel(**value)
+        else:
+            raise ValueError(
+                f"{value['time_type']} not supported, valid options: 'datetime', 'annual'"
+            )
     elif sorted(value.keys()) == ["dimension_id", "type", "version"]:
         val = DimensionReferenceModel(**value)
     else:

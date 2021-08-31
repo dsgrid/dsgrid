@@ -21,6 +21,12 @@ class DimensionType(DSGEnum):
     DATA_SOURCE = "data_source"
 
 
+class TimeDimensionType(DSGEnum):
+    DATETIME = "datetime"
+    ANNUAL = "annual"
+    REPRESENTATIVE_PERIOD = "representative_period"
+
+
 class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 
@@ -63,10 +69,6 @@ class SubsectorDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all subsector dimensions"""
 
 
-class TimeDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all time dimensions"""
-
-
 class WeatherYearDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for weather year dimensions"""
 
@@ -76,7 +78,6 @@ _DIMENSION_TO_MODEL = {
     DimensionType.GEOGRAPHY: GeographyDimensionBaseModel,
     DimensionType.SECTOR: SectorDimensionBaseModel,
     DimensionType.SUBSECTOR: SubsectorDimensionBaseModel,
-    DimensionType.TIME: TimeDimensionBaseModel,
     DimensionType.WEATHER_YEAR: WeatherYearDimensionBaseModel,
     DimensionType.MODEL_YEAR: ModelYearDimensionBaseModel,
     DimensionType.SCENARIO: ScenarioDimensionBaseModel,

@@ -84,6 +84,7 @@ class DimensionBaseModel(DSGBaseModel):
             " when searching the registry.",
         ),
     )
+
     # Keep this last for validation purposes.
     model_hash: Optional[str] = Field(
         title="model_hash",

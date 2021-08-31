@@ -4,9 +4,15 @@ import logging
 from pathlib import Path
 
 from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
 
-from dsgrid.config.dataset_config import check_load_data_filename, check_load_data_lookup_filename
+from dsgrid.config.dataset_config import (
+    DatasetConfig,
+    check_load_data_filename,
+    check_load_data_lookup_filename,
+)
 from dsgrid.utils.spark import read_dataframe
+
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +48,7 @@ class Dataset:
         path = Path(config.model.path)
         load_data = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
+        load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
         logger.debug("Loaded Dataset from %s", path)
         dataset = cls(config, load_data_lookup, load_data)
         return dataset

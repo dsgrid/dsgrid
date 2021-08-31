@@ -61,14 +61,6 @@ class DatasetRegistryManager(RegistryManagerBase):
     def registry_class():
         return DatasetRegistry
 
-    def _add_trivial_dimensions(self, load_data_lookup, config: DatasetConfig):
-        # TODO: @DT where should this function live? Currently it lives in 2 places
-        """Add trivial 1-element dimensions to load_data_lookup."""
-        trivial = config.get_trivial_dimensions(config)
-        for dim, dim_id in trivial.items():
-            load_data_lookup = load_data_lookup.withColumn(dim, F.lit(dim_id))
-        return load_data_lookup
-
     def _run_checks(self, config: DatasetConfig):
         self._check_if_already_registered(config.model.dataset_id)
         check_required_dimensions(config.model.dimensions, "dataset dimensions")
@@ -80,7 +72,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         path = Path(config.model.path)
         load_data = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
-        load_data_lookup = self._add_trivial_dimensions(load_data_lookup, config)
+        load_data_lookup = config._add_trivial_dimensions(load_data_lookup)
         with Timer(timer_stats_collector, "check_lookup_data_consistency"):
             self._check_lookup_data_consistency(config, load_data_lookup)
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
@@ -106,7 +98,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         # TODO: some of this logic will change based on the data table schema type
         load_data_dimensions = (DimensionType.TIME, config.model.load_data_column_dimension)
         expected_dimensions = [d for d in DimensionType if d not in load_data_dimensions]
-        if len(dimension_types) != expected_dimensions:
+        if len(dimension_types) != len(expected_dimensions):
             raise DSGInvalidDataset(
                 f"load_data_lookup does not have the correct number of dimensions specified between trivial and non-trivial dimensions."
             )

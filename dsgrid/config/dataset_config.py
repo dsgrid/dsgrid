@@ -1,7 +1,8 @@
 from pathlib import Path
-from typing import List, Optional, Dict, Set
+from typing import List, Optional, Dict
 import os
 import logging
+import pyspark.sql.functions as F
 
 from pydantic import Field
 from pydantic import validator
@@ -246,6 +247,16 @@ class DatasetConfigModel(DSGBaseModel):
         default={},
         required=False,
     )
+    trivial_dimensions: Optional[List[DimensionType]] = Field(
+        title="trivial_dimensions",
+        default=False,
+        description="List of trivial dimensions (i.e., 1-element dimensions) that"
+        " do not exist in the load_data_lookup. List the dimensions by dimension type.",
+        notes=(
+            "Trivial dimensions are 1-element dimensions that are not present in the parquet data"
+            " columns. Instead they are added by dsgrid as an alias column.",
+        ),
+    )
 
     @validator("dataset_id")
     def check_dataset_id(cls, dataset_id):
@@ -330,24 +341,15 @@ class DatasetConfig(ConfigBase):
                 return dim_config
         assert False, key
 
-    def get_trivial_dimensions(self, config):
-        """
-        Get dict of trivial 1-element data dimensions.
-
-        Returns
-        -------
-        dict: trivial dimension dictionary; {"dimension name": dimension id}
-        """
-        trivial_dimensions = {}
-        for key in self.model.dimensions:
-            if key.dimension_type != DimensionType.TIME:
-                if key.trivial:
-                    for d in config.dimensions:
-                        if config.dimensions[d].config_id == key.dimension_id:
-                            self._check_trivial_record_length(config.dimensions[d].model.records)
-                            val = config.dimensions[d].model.records[0].id
-                            trivial_dimensions[key.dimension_type.value] = val
-        return trivial_dimensions
+    def _add_trivial_dimensions(self, load_data_lookup):
+        """Add trivial 1-element dimensions to load_data_lookup."""
+        for dim in self._dimensions:
+            if self._dimensions[dim].model.dimension_type in self.model.trivial_dimensions:
+                self._check_trivial_record_length(self._dimensions[dim].model.records)
+                val = self._dimensions[dim].model.records[0].id
+                col = self._dimensions[dim].model.dimension_type.value
+                load_data_lookup = load_data_lookup.withColumn(col, F.lit(val))
+        return load_data_lookup
 
     def _check_trivial_record_length(self, records):
         """Check that trivial dimensions have only 1 record."""

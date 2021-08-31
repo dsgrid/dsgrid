@@ -48,18 +48,10 @@ class Dataset:
         path = Path(config.model.path)
         load_data = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
-        load_data_lookup = cls._add_trivial_dimensions(load_data_lookup, config)
+        load_data_lookup = config._add_trivial_dimensions(load_data_lookup)
         logger.debug("Loaded Dataset from %s", path)
         dataset = cls(config, load_data_lookup, load_data)
         return dataset
-
-    def _add_trivial_dimensions(self, load_data_lookup, config: DatasetConfig):
-        # TODO: @DT where should this function live? Currently it lives in 2 places
-        """Add trivial 1-element dimensions to load_data_lookup."""
-        trivial = config.get_trivial_dimensions(config)
-        for dim, dim_id in trivial.items():
-            load_data_lookup = load_data_lookup.withColumn(dim, F.lit(dim_id))
-        return load_data_lookup
 
     def _make_view_name(self, name):
         return f"{self._id}__{name}"

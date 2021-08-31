@@ -81,7 +81,7 @@ class VersionUpdateType(DSGEnum):
 # The DimensionKey is useful for comparing whether a project and
 # dataset have the same dimension.
 ConfigKey = namedtuple("ConfigKey", ["id", "version"])
-DimensionKey = namedtuple("DimensionKey", ["type", "id", "version", "trivial"])
+DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 
 # Convenience container to be shared among the registry managers.
 # Obviates the need to pass parameters to many constructors.

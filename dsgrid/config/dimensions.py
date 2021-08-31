@@ -84,6 +84,7 @@ class DimensionBaseModel(DSGBaseModel):
             " when searching the registry.",
         ),
     )
+
     # Keep this last for validation purposes.
     model_hash: Optional[str] = Field(
         title="model_hash",
@@ -379,16 +380,16 @@ class DimensionReferenceModel(DSGBaseModel):
         ),
         # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
-    trivial: Optional[bool] = Field(
-        title="trivial",
-        default=False,
-        description="Boolean flag for if the dimension is trivial (i.e., 1-element dimension) and"
-        " does not exist in the load_data_lookup",
-        notes=(
-            "Trivial dimensions are 1-element dimensions that are not present in the parquet data"
-            " columns. Instead they are added by dsgrid as an alias column.",
-        ),
-    )
+    # trivial: Optional[bool] = Field(
+    #     title="trivial",
+    #     default=False,
+    #     description="Boolean flag for if the dimension is trivial (i.e., 1-element dimension) and"
+    #     " does not exist in the load_data_lookup",
+    #     notes=(
+    #         "Trivial dimensions are 1-element dimensions that are not present in the parquet data"
+    #         " columns. Instead they are added by dsgrid as an alias column.",
+    #     ),
+    # )
 
     @validator("version")
     def check_version(cls, version):

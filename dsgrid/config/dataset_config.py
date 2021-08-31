@@ -284,6 +284,15 @@ class DatasetConfigModel(DSGBaseModel):
 
         return str(local_path)
 
+    @validator("trivial_dimensions")
+    def check_time_not_trivial(cls, trivial_dimensions):
+        for dim in trivial_dimensions:
+            if dim == DimensionType.TIME:
+                raise ValueError(
+                    "The time dimension is currently not a dsgrid supported trivial dimension."
+                )
+        return trivial_dimensions
+
 
 class DatasetConfig(ConfigBase):
     """Provides an interface to a DatasetConfigModel."""

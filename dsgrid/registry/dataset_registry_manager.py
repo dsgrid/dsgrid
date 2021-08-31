@@ -72,7 +72,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         path = Path(config.model.path)
         load_data = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
-        load_data_lookup = config._add_trivial_dimensions(load_data_lookup)
+        load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
         with Timer(timer_stats_collector, "check_lookup_data_consistency"):
             self._check_lookup_data_consistency(config, load_data_lookup)
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
@@ -96,17 +96,17 @@ class DatasetRegistryManager(RegistryManagerBase):
             raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
 
         # TODO: some of this logic will change based on the data table schema type
-        load_data_dimensions = (DimensionType.TIME, config.model.load_data_column_dimension)
+        load_data_dimensions = (
+            DimensionType.TIME,
+            config.model.data_schema.load_data_column_dimension,
+        )
         expected_dimensions = [d for d in DimensionType if d not in load_data_dimensions]
         if len(dimension_types) != len(expected_dimensions):
             raise DSGInvalidDataset(
                 f"load_data_lookup does not have the correct number of dimensions specified between trivial and non-trivial dimensions."
             )
 
-        missing_dimensions = []
-        for dim in expected_dimensions:
-            if dim not in dimension_types:
-                missing_dimensions.append(dim)
+        missing_dimensions = set(expected_dimensions).difference(dimension_types)
         if len(missing_dimensions) != 0:
             raise DSGInvalidDataset(
                 f"load_data_lookup is missing dimensions: {missing_dimensions}. If these are trivial dimensions, make sure to specify them in the Dataset Config."

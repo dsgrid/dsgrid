@@ -273,7 +273,7 @@ class DatasetConfigModel(DSGBaseModel):
     )
     trivial_dimensions: Optional[List[DimensionType]] = Field(
         title="trivial_dimensions",
-        default=False,
+        default=[],
         description="List of trivial dimensions (i.e., 1-element dimensions) that"
         " do not exist in the load_data_lookup. List the dimensions by dimension type.",
         notes=(
@@ -386,13 +386,13 @@ class DatasetConfig(ConfigBase):
                 return dim_config
         assert False, key
 
-    def _add_trivial_dimensions(self, load_data_lookup):
+    def add_trivial_dimensions(self, load_data_lookup):
         """Add trivial 1-element dimensions to load_data_lookup."""
-        for dim in self._dimensions:
-            if self._dimensions[dim].model.dimension_type in self.model.trivial_dimensions:
-                self._check_trivial_record_length(self._dimensions[dim].model.records)
-                val = self._dimensions[dim].model.records[0].id
-                col = self._dimensions[dim].model.dimension_type.value
+        for dim in self._dimensions.values():
+            if dim.model.dimension_type in self.model.trivial_dimensions:
+                self._check_trivial_record_length(dim.model.records)
+                val = dim.model.records[0].id
+                col = dim.model.dimension_type.value
                 load_data_lookup = load_data_lookup.withColumn(col, F.lit(val))
         return load_data_lookup
 

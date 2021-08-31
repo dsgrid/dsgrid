@@ -48,7 +48,7 @@ class Dataset:
         path = Path(config.model.path)
         load_data = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
-        load_data_lookup = config._add_trivial_dimensions(load_data_lookup)
+        load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
         logger.debug("Loaded Dataset from %s", path)
         dataset = cls(config, load_data_lookup, load_data)
         return dataset

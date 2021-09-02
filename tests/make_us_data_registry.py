@@ -1,8 +1,6 @@
-import getpass
 import logging
 import os
 import shutil
-import sys
 import tempfile
 from pathlib import Path
 
@@ -56,21 +54,30 @@ def make_test_data_registry(
         dim_mgr = manager.dimension_manager
         dim_mgr.register(dim_config_file, user, log_message)
 
-    replace_dimension_uuids_from_registry(
-        path, (project_dimension_mapping_config, dimension_mapping_config)
-    )
+    # dsgrid-project-EFS shares project subsectors.
+    # dsgrid-test-data has custom subsectors that need to be mapped.
+    # This also applies to dimension_mapping_refs below.
+    needs_replacements = [project_dimension_mapping_config]
+    if dimension_mapping_config.exists():
+        needs_replacements.append(dimension_mapping_config)
+    replace_dimension_uuids_from_registry(path, needs_replacements)
     dim_mapping_mgr = manager.dimension_mapping_manager
     dim_mapping_mgr.register(project_dimension_mapping_config, user, log_message)
-    dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
+    if dimension_mapping_config.exists():
+        dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
 
     project_config_file = src_dir / "project.toml"
     project_id = load_data(project_config_file)["project_id"]
     dataset_config_file = src_dir / dataset_dir / "dataset.toml"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
     replace_dataset_path(dataset_config_file, dataset_path=dataset_path)
-    replace_dimension_mapping_uuids_from_registry(
-        path, (project_config_file, dimension_mapping_refs)
-    )
+    needs_replacements = [project_config_file]
+    if dimension_mapping_refs.exists():
+        mapping_refs = [dimension_mapping_refs]
+        needs_replacements += mapping_refs
+    else:
+        mapping_refs = []
+    replace_dimension_mapping_uuids_from_registry(path, needs_replacements)
     replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
 
     manager.project_manager.register(project_config_file, user, log_message)
@@ -79,7 +86,7 @@ def make_test_data_registry(
         manager.project_manager.submit_dataset(
             project_id,
             dataset_id,
-            [dimension_mapping_refs],
+            mapping_refs,
             user,
             log_message,
         )

@@ -218,7 +218,7 @@ The documentation is built with [Sphinx](http://sphinx-doc.org/index.html). Ther
 
 2. Line length limit: 99 characters
 
-3. Indentation: 4 spaces unless the text follows a bullet or a Sphinx directive.
+3. Indentation: 4 spaces unless the text follows a bullet or continues a Sphinx directive.
 
 ```
 # 4 spaces

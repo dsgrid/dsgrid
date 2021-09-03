@@ -28,8 +28,8 @@ Registration entries are stored on S3.
 
 - ``project.toml``:
 
-   - Defines project requirements and any mapping required to map.
-     datasets to Base Dimensions
+   - Defines project requirements and any mapping required to map
+     datasets to Base Dimensions.
    - For mapping options, select from ``no mapping``,
      ``association table``, or
      ``association table with a scaling factor``
@@ -135,8 +135,21 @@ Metadata option for scaling factors still valid?
    factors of similar nature
 -  Can be looked up by xxx
 
+Time Formats
+============
+
+DateTime
+--------
+Load data contains one or more ranges of time series data with a fixed frequency.
+All time arrays within the load data must have identical ranges.
+
+::
+
+    # Hourly data for one year
+    [01-01-2020 00:00:00, 01-01-2020 01:00:00, 01-01-2020 02:00:00, ... 12-31-2020 11:45:00]
+
 Time zones
-----------
+^^^^^^^^^^
 Both time-zone-aware and time-zone-unaware timestamps should be converted to UTC when written to
 the Parquet files.
 
@@ -148,42 +161,38 @@ If you do use Spark, note the following:
   The setting is ``spark.sql.session.timeZone``.
 
 Time zone aware timestamps
---------------------------
-``dsgrid`` can interpret the proper time by looking up the time dimension.
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+``dsgrid`` can convert timestamps in data tables to the proper time zone looking up the time
+dimension.
 
 Time zone unaware timestamps
 ----------------------------
 Time-zone-unaware timestamps that will be interpreted as local time should be written as UTC
 timestamps (i.e., 12pm with no time zone should be written as 12pm UTC).
 
-Time Formats
-============
-
-- ``DateTime``: Load data contains one or more ranges of time series data with a fixed frequency.
-  All time arrays within the load data must have identical ranges.
-
-::
-
-    # Hourly data for one year
-    [01-01-2020 00:00:00, 01-01-2020 01:00:00, 01-01-2020 02:00:00, ... 12-31-2020 11:45:00]
-
-- ``Annual``: Load data contains one value per year.
+Annual
+------
+Load data contains one value per model year.
 
 ::
 
     [2020, 2021, 2022]
 
-- ``Representative Period``: Load data contains timestamps that represent multiple periods. Dsgrid
+Representative Period
+---------------------
+Load data contains timestamps that represent multiple periods. Dsgrid
   supports the following formats:
 
-  - ``one_week_per_month_by_hour``: Each time array contains one week of hourly data that applies
-    to the entire month. The times should be interpreted as local time (no time zone, no DST
-    shifts).
+one_week_per_month_by_hour
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+Each time array contains one week of hourly data (24 hours per day) that
+applies to an entire month. The times represent local time (no time zone).
+There are no shifts for daylight savings time.
 
-    - All time columns must be integers.
-    - `month` is one-based, starting in January. ``Jan`` -> 1, ``Feb`` -> 2, etc.
-    - `day` is zero-based, starting on Monday. ``Mon`` -> 0, ``Tue`` -> 1, etc.
-    - `hour` is zero-based, starting at midnight.
+- All time columns must be integers.
+- `month` is one-based, starting in January. ``Jan`` -> 1, ``Feb`` -> 2, etc.
+- `day` is zero-based, starting on Monday. ``Mon`` -> 0, ``Tue`` -> 1, etc.
+- `hour` is zero-based, starting at midnight.
 
 ::
 
@@ -216,3 +225,6 @@ Time Formats
     |  1|    4|  0|  23|     1.0|
     |  1|    4|  1|   0|     1.0|
     +---+-----+---+----+--------+
+
+``dsgrid`` can add support for other period formats. Please submit requests as
+needed.

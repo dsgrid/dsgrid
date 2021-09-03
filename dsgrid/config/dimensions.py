@@ -417,7 +417,7 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
     )
     ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
-        description="Defines the continuous ranges of time in the data.",
+        description="Defines the continuous ranges of time in the data. Must match 'str_format'.",
     )
     time_interval_type: TimeInvervalType = Field(
         title="time_interval",

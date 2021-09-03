@@ -401,14 +401,6 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         title="format",
         description="Format of the timestamps in the load data",
     )
-    frequency: timedelta = Field(
-        title="frequency",
-        description="Resolution of the timestamps",
-        notes=(
-            "Reference: `Datetime timedelta objects"
-            " <https://docs.python.org/3/library/datetime.html#timedelta-objects>`_",
-        ),
-    )
     str_format: str = Field(
         title="str_format",
         description="Timestamp string format",
@@ -416,6 +408,12 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
             "The string format is used to parse the timestamps provided in the time ranges."
             "Cheatsheet reference: `<https://strftime.org/>`_.",
         ),
+    )
+    # TODO: This is a workaround for a bug.
+    frequency: Optional[timedelta] = Field(
+        title="frequency",
+        description="Placeholder: do not fill in",
+        default=timedelta(hours=1),
     )
     ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
@@ -429,7 +427,7 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
-        return _check_time_ranges(ranges, values["str_format"], values["frequency"])
+        return _check_time_ranges(ranges, values["str_format"], values["format"].frequency)
 
 
 class DimensionReferenceModel(DSGBaseModel):

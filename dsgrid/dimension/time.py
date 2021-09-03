@@ -16,7 +16,15 @@ class TimeDimensionType(DSGEnum):
 class RepresentativePeriodFormat(DSGEnum):
     """Defines the supported formats for representative period data."""
 
-    ONE_WEEK_PER_MONTH_BY_HOUR = "one_week_per_month_by_hour"
+    # All instances of this Enum must declare frequency.
+    # This Enum may be replaced by a generic implementation in order to support a large
+    # number of permutations (seasons, weekend day vs week day, sub-hour time, etc).
+
+    ONE_WEEK_PER_MONTH_BY_HOUR = EnumValue(
+        value="one_week_per_month_by_hour",
+        frequency=datetime.timedelta(hours=1),
+        description="load_data columns use 'month', 'day_of_week', 'hour' to specify time",
+    )
 
 
 class LeapDayAdjustmentType(DSGEnum):

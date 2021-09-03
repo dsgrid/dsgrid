@@ -155,6 +155,7 @@ the Parquet files.
 
 We recommend that you use Spark to create the Parquet files, but that is not required.
 If you do use Spark, note the following:
+
 - Spark implicitly interprets timestamps in the time zone of the current SQL session and converts
   them to UTC when writing dataframes to Parquet.
 - You can override the SQL session time zone programmatically or in your Spark configuration file.
@@ -191,40 +192,40 @@ There are no shifts for daylight savings time.
 
 - All time columns must be integers.
 - `month` is one-based, starting in January. ``Jan`` -> 1, ``Feb`` -> 2, etc.
-- `day` is zero-based, starting on Monday. ``Mon`` -> 0, ``Tue`` -> 1, etc.
+- `day_of_week` is zero-based, starting on Monday. ``Mon`` -> 0, ``Tue`` -> 1, etc.
 - `hour` is zero-based, starting at midnight.
 
 ::
 
-    +---+-----+---+----+--------+
-    | id|month|day|hour|dim_col1|
-    +---+-----+---+----+--------+
-    |  1|    4|  0|   0|     1.0|
-    |  1|    4|  0|   1|     1.0|
-    |  1|    4|  0|   2|     1.0|
-    |  1|    4|  0|   3|     1.0|
-    |  1|    4|  0|   4|     1.0|
-    |  1|    4|  0|   5|     1.0|
-    |  1|    4|  0|   6|     1.0|
-    |  1|    4|  0|   7|     1.0|
-    |  1|    4|  0|   8|     1.0|
-    |  1|    4|  0|   9|     1.0|
-    |  1|    4|  0|  10|     1.0|
-    |  1|    4|  0|  11|     1.0|
-    |  1|    4|  0|  12|     1.0|
-    |  1|    4|  0|  13|     1.0|
-    |  1|    4|  0|  14|     1.0|
-    |  1|    4|  0|  15|     1.0|
-    |  1|    4|  0|  16|     1.0|
-    |  1|    4|  0|  17|     1.0|
-    |  1|    4|  0|  18|     1.0|
-    |  1|    4|  0|  19|     1.0|
-    |  1|    4|  0|  20|     1.0|
-    |  1|    4|  0|  21|     1.0|
-    |  1|    4|  0|  22|     1.0|
-    |  1|    4|  0|  23|     1.0|
-    |  1|    4|  1|   0|     1.0|
-    +---+-----+---+----+--------+
+    +---+-----+-----------+----+--------+
+    | id|month|day_of_week|hour|dim_col1|
+    +---+-----+-----------+----+--------+
+    |  1|    4|          0|   0|     1.0|
+    |  1|    4|          0|   1|     1.0|
+    |  1|    4|          0|   2|     1.0|
+    |  1|    4|          0|   3|     1.0|
+    |  1|    4|          0|   4|     1.0|
+    |  1|    4|          0|   5|     1.0|
+    |  1|    4|          0|   6|     1.0|
+    |  1|    4|          0|   7|     1.0|
+    |  1|    4|          0|   8|     1.0|
+    |  1|    4|          0|   9|     1.0|
+    |  1|    4|          0|  10|     1.0|
+    |  1|    4|          0|  11|     1.0|
+    |  1|    4|          0|  12|     1.0|
+    |  1|    4|          0|  13|     1.0|
+    |  1|    4|          0|  14|     1.0|
+    |  1|    4|          0|  15|     1.0|
+    |  1|    4|          0|  16|     1.0|
+    |  1|    4|          0|  17|     1.0|
+    |  1|    4|          0|  18|     1.0|
+    |  1|    4|          0|  19|     1.0|
+    |  1|    4|          0|  20|     1.0|
+    |  1|    4|          0|  21|     1.0|
+    |  1|    4|          0|  22|     1.0|
+    |  1|    4|          0|  23|     1.0|
+    |  1|    4|          1|   0|     1.0|
+    +---+-----+-----------+----+--------+
 
 ``dsgrid`` can add support for other period formats. Please submit requests as
 needed.

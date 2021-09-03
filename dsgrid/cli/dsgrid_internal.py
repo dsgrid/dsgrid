@@ -1,6 +1,9 @@
 """Main CLI command for dsgrid."""
 
 import logging
+import shutil
+import sys
+from pathlib import Path
 
 import click
 
@@ -24,8 +27,17 @@ def cli(log_file, verbose):
 
 @click.command()
 @click.argument("registry_path")
-def create_registry(registry_path):
+@click.option(
+    "-f", "--force", is_flag=True, default=False, help="Delete registry_path if it already exists."
+)
+def create_registry(registry_path, force):
     """Create a new registry."""
+    if Path(registry_path).exists():
+        if force:
+            shutil.rmtree(registry_path)
+        else:
+            print(f"{registry_path} already exists. Set --force to overwrite.", file=sys.stderr)
+            sys.exit(1)
     RegistryManager.create(registry_path)
 
 

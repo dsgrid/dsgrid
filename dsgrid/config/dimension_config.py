@@ -8,13 +8,14 @@ from pathlib import Path
 import pytz
 import pandas as pd
 
-from .config_base import ConfigWithDataFilesBase
+from .config_base import ConfigBase, ConfigWithDataFilesBase
 from .dimensions import (
     TimeDimensionModel,
     DimensionModel,
     DimensionType,
     TimeDimensionType,
     AnnualTimeDimensionModel,
+    RepresentativePeriodTimeDimensionModel,
 )
 from dsgrid.data_models import serialize_model, ExtendedJSONEncoder
 from dsgrid.dimension.time import DatetimeRange, AnnualTimeRange, TimeZone, make_time_range
@@ -24,7 +25,7 @@ from dsgrid.utils.files import dump_data, load_data
 logger = logging.getLogger(__name__)
 
 
-class DimensionBaseConfig(ConfigWithDataFilesBase, abc.ABC):
+class DimensionBaseConfigWithFiles(ConfigWithDataFilesBase, abc.ABC):
     """Base class for dimension configs"""
 
     @staticmethod
@@ -36,7 +37,19 @@ class DimensionBaseConfig(ConfigWithDataFilesBase, abc.ABC):
         return self.model.dimension_id
 
 
-class DimensionConfig(DimensionBaseConfig):
+class DimensionBaseConfigWithoutFiles(ConfigBase, abc.ABC):
+    """Base class for dimension configs"""
+
+    @staticmethod
+    def config_filename():
+        return "dimension.toml"
+
+    @property
+    def config_id(self):
+        return self.model.dimension_id
+
+
+class DimensionConfig(DimensionBaseConfigWithFiles):
     """Provides an interface to a DimensionModel."""
 
     @staticmethod
@@ -55,20 +68,16 @@ class DimensionConfig(DimensionBaseConfig):
         return {x.id for x in self.model.records}
 
 
-class TimeDimensionConfig(DimensionBaseConfig):
+class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles):
+    """Base class for all time dimension configs"""
+
+
+class TimeDimensionConfig(TimeDimensionBaseConfig):
     """Provides an interface to a TimeDimensionModel."""
 
     @staticmethod
     def model_class():
         return TimeDimensionModel
-
-    def serialize(self, path, force=False):
-        model_data = serialize_model(self.model, exclude={"dimension_cls"})
-        filename = path / self.config_filename()
-        if filename.exists() and not force:
-            raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
-        dump_data(model_data, filename)
-        return filename
 
     def get_time_ranges(self):
         """Return time ranges with timezone applied.
@@ -125,20 +134,20 @@ class TimeDimensionConfig(DimensionBaseConfig):
         return self.model.timezone.tz
 
 
-class AnnualTimeDimensionConfig(DimensionBaseConfig):
+class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     """Provides an interface to an AnnualTimeDimensionModel."""
 
     @staticmethod
     def model_class():
         return AnnualTimeDimensionModel
 
-    def serialize(self, path, force=False):
-        model_data = serialize_model(self.model, exclude={"dimension_cls"})
-        filename = path / self.config_filename()
-        if filename.exists() and not force:
-            raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
-        dump_data(model_data, filename)
-        return filename
+
+class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
+    """Provides an interface to an RepresentativePeriodTimeDimensionModel."""
+
+    @staticmethod
+    def model_class():
+        return RepresentativePeriodTimeDimensionModel
 
 
 def get_dimension_config(model, src_dir):
@@ -146,6 +155,8 @@ def get_dimension_config(model, src_dir):
         return TimeDimensionConfig(model)
     if isinstance(model, AnnualTimeDimensionModel):
         return AnnualTimeDimensionConfig(model)
+    if isinstance(model, RepresentativePeriodTimeDimensionModel):
+        return RepresentativePeriodTimeDimensionConfig(model)
     elif isinstance(model, DimensionModel):
         config = DimensionConfig(model)
         config.src_dir = src_dir
@@ -154,14 +165,26 @@ def get_dimension_config(model, src_dir):
 
 
 def load_dimension_config(filename):
+    """Loads a dimension config file before the exact type is known.
+
+    Parameters
+    ----------
+    filename : Path
+
+    Returns
+    -------
+    DimensionBaseConfig
+
+    """
     data = load_data(filename)
-    if data["type"] == DimensionType.TIME:
-        if data["time_type"] == TimeDimensionType.DATETIME:
+    if data["type"] == DimensionType.TIME.value:
+        if data["time_type"] == TimeDimensionType.DATETIME.value:
             return TimeDimensionConfig.load(filename)
-        elif data["time_type"] == TimeDimensionType.ANNUAL:
+        elif data["time_type"] == TimeDimensionType.ANNUAL.value:
             return AnnualTimeDimensionConfig.load(filename)
+        elif data["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
+            return RepresentativePeriodTimeDimensionConfig.load(filename)
         else:
-            raise ValueError(
-                f"time_type={data['time_type']} not supported, valid options: datetime, annual"
-            )
+            raise ValueError(f"time_type={data['time_type']} not supported")
+
     return DimensionConfig.load(filename)

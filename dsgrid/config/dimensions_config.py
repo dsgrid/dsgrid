@@ -8,6 +8,7 @@ from .config_base import ConfigBase
 from .dimensions import (
     TimeDimensionModel,
     AnnualTimeDimensionModel,
+    RepresentativePeriodTimeDimensionModel,
     DimensionModel,
     handle_dimension_union,
 )
@@ -24,7 +25,14 @@ class DimensionsConfigModel(DSGBaseModel):
     Used when registering multiple dimensions in one command.
     """
 
-    dimensions: List[Union[DimensionModel, TimeDimensionModel, AnnualTimeDimensionModel]] = Field(
+    dimensions: List[
+        Union[
+            DimensionModel,
+            TimeDimensionModel,
+            AnnualTimeDimensionModel,
+            RepresentativePeriodTimeDimensionModel,
+        ]
+    ] = Field(
         title="dimensions",
         description="Dimensions for submission to the dimension registry",
     )

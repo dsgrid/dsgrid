@@ -14,7 +14,11 @@ from pyspark.sql import DataFrame, Row, SparkSession
 from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncoder
-from dsgrid.dimension.base_models import DimensionType, TimeDimensionType
+from dsgrid.dimension.base_models import (
+    DimensionType,
+    TimeDimensionType,
+    RepresentativePeriodFormat,
+)
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeInvervalType,
@@ -274,7 +278,7 @@ class TimeRangeModel(DSGBaseModel):
 
 
 class TimeDimensionBaseModel(DimensionBaseModel):
-    """Defines a base model to that TimeDimensionModel and AnnualTimeDimensionModel inherit from"""
+    """Defines a base model common to all time dimensions."""
 
     time_type: TimeDimensionType = Field(
         title="time_type",
@@ -294,6 +298,18 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         """,
         options=MeasurementType.format_for_docs(),
     )
+
+    def dict(self, by_alias=True, **kwargs):
+        exclude = {"cls"}
+        if "exclude" in kwargs and kwargs["exclude"] is not None:
+            kwargs["exclude"].union(exclude)
+        else:
+            kwargs["exclude"] = exclude
+        data = super().dict(by_alias=by_alias, **kwargs)
+        data["module"] = str(data["module"])
+        data["dimension_class"] = None
+        _convert_for_serialization(data)
+        return data
 
 
 class TimeDimensionModel(TimeDimensionBaseModel):
@@ -354,12 +370,7 @@ class TimeDimensionModel(TimeDimensionBaseModel):
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
-        for time_range in ranges:
-            # make sure start and end time parse
-            datetime.strptime(time_range["start"], values["str_format"])
-            datetime.strptime(time_range["end"], values["str_format"])
-            # TODO: validate consistency between start, end, frequency. End time should always be an interval of the frequency. So, for example, if frequency is 1 hour, and start time starts at 00:00, then end time cannot be 23:59.
-        return ranges
+        return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
     @validator("frequency")
     def check_frequency(cls, value):
@@ -368,18 +379,6 @@ class TimeDimensionModel(TimeDimensionBaseModel):
                 "366 days not allowed for frequency, use 365 days to specify annual frequency."
             )
         return value
-
-    def dict(self, by_alias=True, **kwargs):
-        exclude = {"cls"}
-        if "exclude" in kwargs and kwargs["exclude"] is not None:
-            kwargs["exclude"].union(exclude)
-        else:
-            kwargs["exclude"] = exclude
-        data = super().dict(by_alias=by_alias, **kwargs)
-        data["module"] = str(data["module"])
-        data["dimension_class"] = None
-        _convert_for_serialization(data)
-        return data
 
 
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):
@@ -395,7 +394,42 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     )
 
 
-# TODO: a DimensionModel for Representative_period (DSGRID-165)
+class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
+    """Defines a representative time dimension"""
+
+    format: RepresentativePeriodFormat = Field(
+        title="format",
+        description="Format of the timestamps in the load data",
+    )
+    frequency: timedelta = Field(
+        title="frequency",
+        description="Resolution of the timestamps",
+        notes=(
+            "Reference: `Datetime timedelta objects"
+            " <https://docs.python.org/3/library/datetime.html#timedelta-objects>`_",
+        ),
+    )
+    str_format: str = Field(
+        title="str_format",
+        description="Timestamp string format",
+        notes=(
+            "The string format is used to parse the timestamps provided in the time ranges."
+            "Cheatsheet reference: `<https://strftime.org/>`_.",
+        ),
+    )
+    ranges: List[TimeRangeModel] = Field(
+        title="time_ranges",
+        description="Defines the continuous ranges of time in the data.",
+    )
+    time_interval_type: TimeInvervalType = Field(
+        title="time_interval",
+        description="The range of time that the value associated with a timestamp represents",
+        options=TimeInvervalType.format_descriptions_for_docs(),
+    )
+
+    @validator("ranges", pre=True)
+    def check_times(cls, ranges, values):
+        return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
 
 class DimensionReferenceModel(DSGBaseModel):
@@ -430,16 +464,6 @@ class DimensionReferenceModel(DSGBaseModel):
         return handle_version_or_str(version)
 
 
-DimensionUnionModel = List[
-    Union[
-        DimensionModel,
-        DimensionReferenceModel,
-        TimeDimensionModel,
-        AnnualTimeDimensionModel,
-    ]
-]
-
-
 def handle_dimension_union(value):
     """
     Validate dimension type work around for pydantic Union bug
@@ -454,10 +478,11 @@ def handle_dimension_union(value):
             val = TimeDimensionModel(**value)
         elif value["time_type"] == TimeDimensionType.ANNUAL.value:
             val = AnnualTimeDimensionModel(**value)
+        elif value["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
+            val = RepresentativePeriodTimeDimensionModel(**value)
         else:
-            raise ValueError(
-                f"{value['time_type']} not supported, valid options: 'datetime', 'annual'"
-            )
+            options = [x.value for x in TimeDimensionType]
+            raise ValueError(f"{value['time_type']} not supported, valid options: {options}")
     elif sorted(value.keys()) == ["dimension_id", "type", "version"]:
         val = DimensionReferenceModel(**value)
     else:
@@ -469,3 +494,19 @@ def _convert_for_serialization(data):
     for key, val in data.items():
         if isinstance(val, enum.Enum):
             data[key] = val.value
+
+
+def _check_time_ranges(ranges: list, str_format: str, frequency: timedelta):
+    assert isinstance(frequency, timedelta)
+    for time_range in ranges:
+        # Make sure start and end time parse.
+        start = datetime.strptime(time_range["start"], str_format)
+        end = datetime.strptime(time_range["end"], str_format)
+        if str_format == "%Y":
+            if frequency != timedelta(days=365):
+                raise ValueError(f"str_format={str_format} is inconsistent with {frequency}")
+        # There may be other special cases to handle.
+        elif (end - start) % frequency != timedelta(0):
+            raise ValueError(f"time range {time_range} is inconsistent with {frequency}")
+
+    return ranges

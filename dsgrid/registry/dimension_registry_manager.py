@@ -19,6 +19,7 @@ from dsgrid.config.dimensions import (
     DimensionBaseModel,
     DimensionModel,
     TimeDimensionModel,
+    TimeDimensionBaseModel,
 )
 from dsgrid.data_models import serialize_model
 from dsgrid.exceptions import (
@@ -120,7 +121,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         hashes = {}
         for dimension_id, registry_config in self._registry_configs.items():
             dimension = self.get_by_id(dimension_id, registry_config.model.version)
-            if isinstance(dimension.model, TimeDimensionModel):
+            if isinstance(dimension.model, TimeDimensionBaseModel):
                 continue
             hashes[dimension.model.file_hash] = {
                 "dimension_id": dimension_id,
@@ -129,7 +130,7 @@ class DimensionRegistryManager(RegistryManagerBase):
 
         duplicates = []
         for dimension in config.model.dimensions:
-            if not isinstance(dimension, TimeDimensionModel) and dimension.file_hash in hashes:
+            if not isinstance(dimension, TimeDimensionBaseModel) and dimension.file_hash in hashes:
                 if dimension.dimension_type == hashes[dimension.file_hash]["dimension_type"]:
                     duplicates.append((dimension.dimension_id, hashes[dimension.file_hash]))
 
@@ -159,14 +160,9 @@ class DimensionRegistryManager(RegistryManagerBase):
         if dimension is not None:
             return dimension
 
-        if key.type == DimensionType.TIME:
-            cls = TimeDimensionModel
-        else:
-            cls = DimensionModel
         src_dir = self._path / key.type.value / key.id / str(key.version)
         filename = src_dir / self.registry_class().config_filename()
-        model = cls.load(filename)
-        config = get_dimension_config(model, src_dir)
+        config = load_dimension_config(filename)
         self._dimensions[key] = config
         return config
 

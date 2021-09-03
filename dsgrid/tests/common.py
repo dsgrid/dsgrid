@@ -12,19 +12,32 @@ from dsgrid.registry.registry_manager import RegistryManager
 
 TEST_PROJECT_PATH = Path(__file__).absolute().parent.parent.parent / "dsgrid-test-data"
 TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_efs"
+TEST_STANDARD_SCENARIOS_PROJECT_REPO = TEST_PROJECT_PATH / "standard_scenarios_2021"
 TEST_DATASET_DIRECTORY = TEST_PROJECT_PATH / "datasets"
 TEST_REGISTRY = Path("tests/data/registry")
 
 
 @pytest.fixture
 def make_test_project_dir():
-    tmpdir = Path(gettempdir()) / "test_us_data"
+    tmpdir = _make_project_dir(TEST_PROJECT_REPO)
+    yield tmpdir / "dsgrid_project"
+    shutil.rmtree(tmpdir)
+
+
+@pytest.fixture
+def make_standard_scenarios_project_dir():
+    tmpdir = _make_project_dir(TEST_STANDARD_SCENARIOS_PROJECT_REPO)
+    yield tmpdir / "dsgrid_project"
+    shutil.rmtree(tmpdir)
+
+
+def _make_project_dir(project):
+    tmpdir = Path(gettempdir()) / "test_project"
     if os.path.exists(tmpdir):
         shutil.rmtree(tmpdir)
     os.mkdir(tmpdir)
-    shutil.copytree(TEST_PROJECT_REPO / "dsgrid_project", tmpdir / "dsgrid_project")
-    yield tmpdir / "dsgrid_project"
-    shutil.rmtree(tmpdir)
+    shutil.copytree(project / "dsgrid_project", tmpdir / "dsgrid_project")
+    return tmpdir
 
 
 @pytest.fixture

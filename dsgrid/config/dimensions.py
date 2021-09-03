@@ -16,14 +16,14 @@ from semver import VersionInfo
 from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncoder
 from dsgrid.dimension.base_models import (
     DimensionType,
-    TimeDimensionType,
-    RepresentativePeriodFormat,
 )
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeInvervalType,
     MeasurementType,
     TimeZone,
+    TimeDimensionType,
+    RepresentativePeriodFormat,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, compute_hash, load_data

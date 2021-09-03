@@ -21,20 +21,6 @@ class DimensionType(DSGEnum):
     DATA_SOURCE = "data_source"
 
 
-class TimeDimensionType(DSGEnum):
-    """Defines the supported time formats in the load data."""
-
-    DATETIME = "datetime"
-    ANNUAL = "annual"
-    REPRESENTATIVE_PERIOD = "representative_period"
-
-
-class RepresentativePeriodFormat(DSGEnum):
-    """Defines the supported formats for representative period data."""
-
-    ONE_WEEK_PER_MONTH_BY_HOUR = "one_week_per_month_by_hour"
-
-
 class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 

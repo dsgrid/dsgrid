@@ -13,12 +13,17 @@ from .dimensions import (
     TimeDimensionModel,
     DimensionModel,
     DimensionType,
-    TimeDimensionType,
     AnnualTimeDimensionModel,
     RepresentativePeriodTimeDimensionModel,
 )
 from dsgrid.data_models import serialize_model, ExtendedJSONEncoder
-from dsgrid.dimension.time import DatetimeRange, AnnualTimeRange, TimeZone, make_time_range
+from dsgrid.dimension.time import (
+    DatetimeRange,
+    AnnualTimeRange,
+    TimeZone,
+    TimeDimensionType,
+    make_time_range,
+)
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import dump_data, load_data
 

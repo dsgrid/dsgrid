@@ -25,17 +25,22 @@ class DimensionsConfigModel(DSGBaseModel):
     Used when registering multiple dimensions in one command.
     """
 
-    dimensions: List[
-        Union[
-            DimensionModel,
-            TimeDimensionModel,
-            AnnualTimeDimensionModel,
-            RepresentativePeriodTimeDimensionModel,
-        ]
-    ] = Field(
+    dimensions: List = Field(
         title="dimensions",
         description="Dimensions for submission to the dimension registry",
     )
+    # Pydantic doesn't cleanly handle this list of a Union of types.
+    # They will eventually fix it. Refer to https://github.com/samuelcolvin/pydantic/issues/619
+    # We tried to implement workarounds but always eventually hit cases where Pydantic
+    # would try to construct the wrong type and raise ValueError.
+    # Until they implement the feature we will use an untyped list and handle each of our types
+    # manually.
+        #Union[
+        #    DimensionModel,
+        #    TimeDimensionModel,
+        #    AnnualTimeDimensionModel,
+        #    RepresentativePeriodTimeDimensionModel,
+        #]
 
     @validator("dimensions")
     def check_files(cls, values: dict) -> dict:

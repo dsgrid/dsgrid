@@ -409,12 +409,6 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
             "Cheatsheet reference: `<https://strftime.org/>`_.",
         ),
     )
-    # TODO: This is a workaround for a bug.
-    frequency: Optional[timedelta] = Field(
-        title="frequency",
-        description="Placeholder: do not fill in",
-        default=timedelta(hours=1),
-    )
     ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
         description="Defines the continuous ranges of time in the data. Must match 'str_format'.",
@@ -463,10 +457,6 @@ class DimensionReferenceModel(DSGBaseModel):
 
 
 def handle_dimension_union(value):
-    """
-    Validate dimension type work around for pydantic Union bug
-    related to: https://github.com/samuelcolvin/pydantic/issues/619
-    """
     if isinstance(value, DimensionBaseModel):
         return value
 

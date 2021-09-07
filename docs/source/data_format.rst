@@ -188,7 +188,7 @@ one_week_per_month_by_hour
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
 Each time array contains one week of hourly data (24 hours per day) that
 applies to an entire month. The times represent local time (no time zone).
-There are no shifts for daylight savings time.
+There are no shifts, missing hours, or extra hours for daylight savings time.
 
 - All time columns must be integers.
 - `month` is one-based, starting in January. ``Jan`` -> 1, ``Feb`` -> 2, etc.

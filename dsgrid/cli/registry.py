@@ -228,14 +228,6 @@ def update_dimension(
     )
 
 
-@click.command(name="remove")
-@click.argument("dimension-id")
-@click.pass_obj
-def remove_dimension(registry_manager, dimension_id):
-    """Remove a dimension from the dsgrid repository."""
-    registry_manager.dimension_manager.remove(dimension_id)
-
-
 """
 Dimension Mapping Commands
 """
@@ -366,14 +358,6 @@ def update_dimension_mapping(
         log_message,
         version,
     )
-
-
-@click.command(name="remove")
-@click.argument("dimension-mapping-id")
-@click.pass_obj
-def remove_dimension_mapping(registry_manager, dimension_mapping_id):
-    """Remove a dimension mapping from the dsgrid repository."""
-    registry_manager.dimension_mapping_manager.remove(dimension_mapping_id)
 
 
 """
@@ -529,14 +513,6 @@ def update_project(
     )
 
 
-@click.command(name="remove")
-@click.argument("project-id")
-@click.pass_obj
-def remove_project(registry_manager, project_id):
-    """Remove a project from the dsgrid repository."""
-    registry_manager.project_manager.remove(project_id)
-
-
 """
 Dataset Commands
 """
@@ -631,14 +607,6 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
     manager.update_from_file(dataset_config_file, submitter, update_type, log_message)
 
 
-@click.command(name="remove")
-@click.argument("dataset-id")
-@click.pass_obj
-def remove_dataset(registry_manager, dataset_id):
-    """Remove a dataset from the dsgrid repository."""
-    registry_manager.dataset_manager.remove(dataset_id)
-
-
 @click.command()
 @click.pass_obj
 def sync(registry_manager):
@@ -646,32 +614,26 @@ def sync(registry_manager):
     # aws.sync(REMOTE_REGISTRY, registry_manager.path)
 
 
-# remove commands are disabled until DSGRID-147 is implemented
-
 dimensions.add_command(list_dimensions)
 dimensions.add_command(register_dimensions)
 dimensions.add_command(dump_dimension)
 dimensions.add_command(update_dimension)
-# dimensions.add_command(remove_dimension)
 
 dimension_mappings.add_command(list_dimension_mappings)
 dimension_mappings.add_command(register_dimension_mappings)
 dimension_mappings.add_command(dump_dimension_mapping)
 dimension_mappings.add_command(update_dimension_mapping)
-# dimension_mappings.add_command(remove_dimension_mapping)
 
 projects.add_command(list_projects)
 projects.add_command(register_project)
 projects.add_command(submit_dataset)
 projects.add_command(dump_project)
 projects.add_command(update_project)
-# projects.add_command(remove_project)
 
 datasets.add_command(list_datasets)
 datasets.add_command(register_dataset)
 datasets.add_command(dump_dataset)
 datasets.add_command(update_dataset)
-# datasets.add_command(remove_dataset)
 
 registry.add_command(list_)
 registry.add_command(dimensions)

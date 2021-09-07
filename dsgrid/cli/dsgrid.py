@@ -1,7 +1,6 @@
 """Main CLI command for dsgrid."""
 
 import logging
-import os
 from pathlib import Path
 
 import click

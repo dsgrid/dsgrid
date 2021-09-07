@@ -35,12 +35,12 @@ class DimensionsConfigModel(DSGBaseModel):
     # would try to construct the wrong type and raise ValueError.
     # Until they implement the feature we will use an untyped list and handle each of our types
     # manually.
-        #Union[
-        #    DimensionModel,
-        #    TimeDimensionModel,
-        #    AnnualTimeDimensionModel,
-        #    RepresentativePeriodTimeDimensionModel,
-        #]
+    # Union[
+    #    DimensionModel,
+    #    TimeDimensionModel,
+    #    AnnualTimeDimensionModel,
+    #    RepresentativePeriodTimeDimensionModel,
+    # ]
 
     @validator("dimensions")
     def check_files(cls, values: dict) -> dict:

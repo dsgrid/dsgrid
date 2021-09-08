@@ -181,8 +181,8 @@ Load data contains one value per model year.
 
 Representative Period
 ---------------------
-Load data contains timestamps that represent multiple periods. Dsgrid
-  supports the following formats:
+Load data contains timestamps that represent multiple periods. Dsgrid supports
+the following formats:
 
 one_week_per_month_by_hour
 ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -227,5 +227,5 @@ There are no shifts, missing hours, or extra hours for daylight savings time.
     |  1|    4|          1|   0|     1.0|
     +---+-----+-----------+----+--------+
 
-``dsgrid`` can add support for other period formats. Please submit requests as
+Dsgrid can add support for other period formats. Please submit requests as
 needed.

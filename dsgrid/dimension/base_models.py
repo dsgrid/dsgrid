@@ -21,12 +21,6 @@ class DimensionType(DSGEnum):
     DATA_SOURCE = "data_source"
 
 
-class TimeDimensionType(DSGEnum):
-    DATETIME = "datetime"
-    ANNUAL = "annual"
-    REPRESENTATIVE_PERIOD = "representative_period"
-
-
 class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 

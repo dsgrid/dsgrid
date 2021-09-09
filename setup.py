@@ -45,7 +45,7 @@ setup(
     entry_points={
         "console_scripts": [
             "dsgrid=dsgrid.cli.dsgrid:cli",
-            "dsgrid-internal=dsgrid.cli.dsgrid_internal:cli",
+            "dsgrid-admin=dsgrid.cli.dsgrid_admin:cli",
         ],
     },
     include_package_data=True,

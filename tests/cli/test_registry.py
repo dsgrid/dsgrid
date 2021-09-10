@@ -1,3 +1,4 @@
+import os
 import re
 from pathlib import Path
 from tempfile import TemporaryDirectory, gettempdir
@@ -19,8 +20,8 @@ from tests.make_us_data_registry import replace_dataset_path
 
 def test_register_project_and_dataset(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
-        base_dir = Path(tmpdir)
-        path = create_local_test_registry(base_dir)
+        path = Path(tmpdir) / "registry"
+        check_run_command(f"dsgrid-admin create-registry {path}")
         dataset_dir = Path("datasets/sector_models/comstock")
         project_dimension_mapping_config = make_test_project_dir / "dimension_mappings.toml"
         dimension_mapping_config = make_test_project_dir / dataset_dir / "dimension_mappings.toml"
@@ -74,3 +75,18 @@ def test_register_project_and_dataset(make_test_project_dir):
         regex_dataset = re.compile(fr"{dataset_id}.*1\.0\.0")
         assert regex_project.search(output["stdout"]) is not None, output["stdout"]
         assert regex_dataset.search(output["stdout"]) is not None, output["stdout"]
+        dim_map_id = next((path / "configs" / "dimension_mappings").iterdir()).name
+        dim_id = next((path / "configs" / "dimensions" / "geography").iterdir()).name
+
+        check_run_command(
+            f"dsgrid-admin registry --path={path} --offline projects remove {project_id}"
+        )
+        check_run_command(
+            f"dsgrid-admin registry --path={path} --offline datasets remove {dataset_id}"
+        )
+        check_run_command(
+            f"dsgrid-admin registry --path={path} --offline dimension-mappings remove {dim_map_id}"
+        )
+        check_run_command(
+            f"dsgrid-admin registry --path={path} --offline dimensions remove {dim_id}"
+        )

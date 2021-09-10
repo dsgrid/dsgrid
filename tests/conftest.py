@@ -16,7 +16,6 @@ from dsgrid.tests.common import (
 def pytest_sessionstart(session):
     if not os.listdir(TEST_PROJECT_PATH):
         print(
-              "Please run these commands:")
             "The dsgrid-test-data submodule has not been initialized. "
             "Please run these commands:"
         )

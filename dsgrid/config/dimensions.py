@@ -37,6 +37,8 @@ class DimensionBaseModel(DSGBaseModel):
         "other datasets and projects",
         notes=(
             "Only alphanumeric characters and dashes are supported (no underscores or spaces).",
+            "The :meth:`~dsgrid.config.dimensions.check_name` validator is used to enforce valid"
+            " dimension names.",
         ),
     )
     dimension_type: DimensionType = Field(

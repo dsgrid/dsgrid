@@ -119,9 +119,9 @@ git push origin feature-x
 11. After CI passes, merge the dsgrid pull request.
 
 ### Test registry
-The setup code creates a local registry for testing in `./tests/data/registry`. This only happens
-once in order to save time on repeated runs. If you make a change to code or data then you may
-need to manually delete the directory.
+The setup code creates a local registry for testing in `./tests/data/registry`.
+In order to save time on repeated runs it will not re-create the registry on
+repeated runs as long as there are no new commits.
 
 ### Pytest options
 

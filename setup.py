@@ -27,6 +27,7 @@ doc_requires = [
     "sphinx",
     "sphinx_rtd_theme",
     "sphinx_argparse",
+    "sphinxcontrib.programoutput",
 ]
 
 release_requires = ["twine", "setuptools", "wheel"]

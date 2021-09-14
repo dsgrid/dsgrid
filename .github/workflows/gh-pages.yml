@@ -19,6 +19,8 @@ jobs:
           python -m pip install '.[admin]'
       - name: build documentation
         run: |
+          git submodule init
+          git submodule update
           cd docs
           make clean
           make html

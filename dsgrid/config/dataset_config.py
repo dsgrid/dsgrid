@@ -1,11 +1,12 @@
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 import os
 import logging
 import pyspark.sql.functions as F
 
 from pydantic import Field
 from pydantic import validator
+from semver import VersionInfo
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.common import check_config_id_strict
@@ -199,6 +200,10 @@ class DatasetConfigModel(DSGBaseModel):
     path: str = Field(
         title="path",
         description="Local path containing data to be registered on the remote registry.",
+    )
+    dataset_version: Optional[Union[VersionInfo, str]] = Field(
+        title="dataset_version",
+        description="The version of the dataset.",
     )
     description: str = Field(
         title="description",

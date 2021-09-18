@@ -263,6 +263,8 @@ class DatasetRegistryManager(RegistryManagerBase):
             registration_history=[registration],
         )
         registry_config = DatasetRegistry(registry_model)
+        # The dataset_version starts the same as the config but can change later.
+        config.model.dataset_version = registration.version
         registry_dir = self.get_registry_directory(config.model.dataset_id)
         data_dir = registry_dir / str(registration.version)
 
@@ -271,10 +273,14 @@ class DatasetRegistryManager(RegistryManagerBase):
         registry_filename = registry_dir / REGISTRY_FILENAME
         registry_config.serialize(registry_filename, force=True)
         config.serialize(self.get_config_directory(config.config_id, registry_config.version))
-        dataset_path = self.get_registry_data_directory(config.config_id)
-        if self.fs_interface.exists(dataset_path):
-            raise DSGInvalidDataset(f"path already exists: {dataset_path}")
+
+        dataset_registry_dir = self.get_registry_data_directory(config.config_id)
+        dataset_registry_filename = dataset_registry_dir / REGISTRY_FILENAME
+        dataset_path = dataset_registry_dir / str(registry_config.version)
+        dataset_registry_dir.mkdir()
+        registry_config.serialize(dataset_registry_filename)
         self.fs_interface.copy_tree(config.model.path, dataset_path)
+
         self._update_registry_cache(config.model.dataset_id, registry_config)
 
         if not self.offline_mode:

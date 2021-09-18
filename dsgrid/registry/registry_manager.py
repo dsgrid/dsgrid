@@ -92,6 +92,8 @@ class RegistryManager:
 
         fs_interface = make_filesystem_interface(path)
         fs_interface.mkdir(path)
+        fs_interface.mkdir(path / "configs")
+        fs_interface.mkdir(path / "data")
         fs_interface.mkdir(path / DatasetRegistry.registry_path())
         fs_interface.mkdir(path / ProjectRegistry.registry_path())
         fs_interface.mkdir(path / DimensionRegistry.registry_path())

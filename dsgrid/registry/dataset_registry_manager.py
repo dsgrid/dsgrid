@@ -243,7 +243,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._register(config_file, submitter, log_message, force=force)
 
     def _register(self, config_file, submitter, log_message, force=False):
-        config = DatasetConfig.load(config_file, self._dimension_mgr)
+        config = DatasetConfig.load(Path(config_file), self._dimension_mgr)
         with Timer(timer_stats_collector, "run_dataset_checks"):
             self._run_checks(config)
         registration = make_initial_config_registration(submitter, log_message)
@@ -263,18 +263,39 @@ class DatasetRegistryManager(RegistryManagerBase):
             registration_history=[registration],
         )
         registry_config = DatasetRegistry(registry_model)
+        # The dataset_version starts the same as the config but can change later.
+        config.model.dataset_version = registration.version
         registry_dir = self.get_registry_directory(config.model.dataset_id)
-        data_dir = registry_dir / str(registration.version)
+        registry_config_path = registry_dir / str(registration.version)
+
+        dataset_registry_dir = self.get_registry_data_directory(config.config_id)
+        dataset_registry_filename = dataset_registry_dir / REGISTRY_FILENAME
+        dataset_path = dataset_registry_dir / str(registry_config.version)
+        self.fs_interface.mkdir(dataset_registry_dir)
+        registry_config.serialize(dataset_registry_filename)
+        self.fs_interface.mkdir(registry_config_path)
+        self.fs_interface.copy_tree(config.model.path, dataset_path)
+
+        # The following logic is unfortunately a bit ugly.
+        # We have to record the path to the data tables as relative to the location of the
+        # dataset config file so that Pydantic validation will work.
+        data_parts = list(dataset_path.parts)
+        config_parts = registry_config_path.parts
+        if data_parts[0] != config_parts[0]:
+            raise Exception(f"paths have different roots: {dataset_path} {registry_config_path}")
+        rel_path = Path(*[".."] * (len(config_parts) - 1) + data_parts[1:])
+        cwd = os.getcwd()
+        os.chdir(registry_config_path)
+        try:
+            config.model.path = str(rel_path)
+        finally:
+            os.chdir(cwd)
 
         # Serialize the registry file as well as the updated DatasetConfig to the registry.
-        self.fs_interface.mkdir(data_dir)
         registry_filename = registry_dir / REGISTRY_FILENAME
         registry_config.serialize(registry_filename, force=True)
         config.serialize(self.get_config_directory(config.config_id, registry_config.version))
-        dataset_path = self.get_registry_data_directory(config.config_id)
-        if self.fs_interface.exists(dataset_path):
-            raise DSGInvalidDataset(f"path already exists: {dataset_path}")
-        self.fs_interface.copy_tree(config.model.path, dataset_path)
+
         self._update_registry_cache(config.model.dataset_id, registry_config)
 
         if not self.offline_mode:

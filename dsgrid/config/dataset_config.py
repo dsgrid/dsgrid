@@ -1,11 +1,12 @@
 from pathlib import Path
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Union
 import os
 import logging
 import pyspark.sql.functions as F
 
 from pydantic import Field
 from pydantic import validator
+from semver import VersionInfo
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.common import check_config_id_strict
@@ -15,6 +16,7 @@ from .dimensions import (
 )
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
+
 
 ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv")
 ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
@@ -200,6 +202,10 @@ class DatasetConfigModel(DSGBaseModel):
         title="path",
         description="Local path containing data to be registered on the remote registry.",
     )
+    dataset_version: Optional[Union[VersionInfo, str]] = Field(
+        title="dataset_version",
+        description="The version of the dataset.",
+    )
     description: str = Field(
         title="description",
         description="A detailed description of the dataset.",
@@ -336,6 +342,7 @@ class DatasetConfig(ConfigBase):
     def __init__(self, model):
         super().__init__(model)
         self._dimensions = {}
+        self._src_dir = None
 
     @staticmethod
     def config_filename():
@@ -352,8 +359,30 @@ class DatasetConfig(ConfigBase):
     @classmethod
     def load(cls, config_file, dimension_manager):
         config = cls._load(config_file)
+        config.src_dir = config_file.parent
         config.load_dimensions(dimension_manager)
         return config
+
+    @property
+    def src_dir(self):
+        """Return the directory containing the config file. Data files inside the config file
+        are relative to this.
+
+        """
+        return self._src_dir
+
+    @src_dir.setter
+    def src_dir(self, src_dir):
+        """Set the source directory. Must be the directory containing the config file."""
+        self._src_dir = Path(src_dir)
+
+    @property
+    def load_data_path(self):
+        return check_load_data_filename(self._src_dir / self.model.path)
+
+    @property
+    def load_data_lookup_path(self):
+        return check_load_data_lookup_filename(self._src_dir / self.model.path)
 
     def load_dimensions(self, dimension_manager):
         """Load all dataset dimensions.

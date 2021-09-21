@@ -113,13 +113,14 @@ Registry Commands
 )
 def create_registry(registry_path, force):
     """Create a new registry."""
-    if Path(registry_path).exists():
+    path = Path(registry_path)
+    if path.exists():
         if force:
-            shutil.rmtree(registry_path)
+            shutil.rmtree(path)
         else:
             print(f"{registry_path} already exists. Set --force to overwrite.", file=sys.stderr)
             sys.exit(1)
-    RegistryManager.create(registry_path)
+    RegistryManager.create(path)
 
 
 """

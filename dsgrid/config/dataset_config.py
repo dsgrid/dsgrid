@@ -17,6 +17,7 @@ from .dimensions import (
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
 
+
 ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv")
 ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.parquet",
@@ -341,6 +342,7 @@ class DatasetConfig(ConfigBase):
     def __init__(self, model):
         super().__init__(model)
         self._dimensions = {}
+        self._src_dir = None
 
     @staticmethod
     def config_filename():
@@ -357,8 +359,30 @@ class DatasetConfig(ConfigBase):
     @classmethod
     def load(cls, config_file, dimension_manager):
         config = cls._load(config_file)
+        config.src_dir = config_file.parent
         config.load_dimensions(dimension_manager)
         return config
+
+    @property
+    def src_dir(self):
+        """Return the directory containing the config file. Data files inside the config file
+        are relative to this.
+
+        """
+        return self._src_dir
+
+    @src_dir.setter
+    def src_dir(self, src_dir):
+        """Set the source directory. Must be the directory containing the config file."""
+        self._src_dir = Path(src_dir)
+
+    @property
+    def load_data_path(self):
+        return check_load_data_filename(self._src_dir / self.model.path)
+
+    @property
+    def load_data_lookup_path(self):
+        return check_load_data_lookup_filename(self._src_dir / self.model.path)
 
     def load_dimensions(self, dimension_manager):
         """Load all dataset dimensions.

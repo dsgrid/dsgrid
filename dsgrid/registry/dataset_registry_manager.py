@@ -300,6 +300,7 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         if not self.offline_mode:
             self.sync_push(registry_dir)
+            self.sync_push(dataset_registry_dir)
 
         logger.info(
             "%s Registered dataset %s with version=%s",

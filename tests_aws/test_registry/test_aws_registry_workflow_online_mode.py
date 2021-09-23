@@ -7,7 +7,6 @@ from pathlib import Path
 from tempfile import TemporaryDirectory, gettempdir
 import getpass
 import uuid
-import pytest
 
 
 from dsgrid.tests.common import (
@@ -73,7 +72,6 @@ def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data
         clean_remote_registry(s3_cloud_storage._s3_filesystem)
 
 
-@pytest.mark.skip
 def check_configs_dimensions(s3):
     for dim_type in DimensionType:
         dimtype = dim_type.value
@@ -90,7 +88,6 @@ def check_configs_dimensions(s3):
             )
 
 
-@pytest.mark.skip
 def check_configs_dimension_mappings(s3):
     path = "configs/dimension_mappings"
     folders = s3.listdir(path)
@@ -107,7 +104,6 @@ def check_configs_dimension_mappings(s3):
                         assert extension in ("csv", "toml")
 
 
-@pytest.mark.skip
 def check_configs_projects_and_datasets(s3):
     paths = ("configs/projects", "configs/datasets")
     for path in paths:
@@ -128,7 +124,6 @@ def check_configs_projects_and_datasets(s3):
                             assert extension in ("toml")
 
 
-@pytest.mark.skip
 def check_data(s3):
     path = "data/"
     folders = s3.listdir(path)

@@ -451,6 +451,16 @@ class ProjectConfig(ConfigBase):
             if dataset.status == status:
                 yield dataset
 
+    def are_all_datasets_submitted(self):
+        """Return True if all datasets have been submitted.
+
+        Returns
+        -------
+        bool
+
+        """
+        return not self.list_unregistered_dataset_ids()
+
     def set_status(self, status):
         """Set the project status to the given value.
 

@@ -10,6 +10,7 @@ from dsgrid.registry.common import (
     make_initial_config_registration,
     ConfigKey,
     DatasetRegistryStatus,
+    ProjectRegistryStatus,
 )
 from .common import VersionUpdateType
 from .dataset_registry_manager import DatasetRegistryManager
@@ -213,6 +214,11 @@ class ProjectRegistryManager(RegistryManagerBase):
             return
 
         dataset.status = DatasetRegistryStatus.REGISTERED
+        if project_config.are_all_datasets_submitted():
+            new_status = ProjectRegistryStatus.COMPLETE
+        else:
+            new_status = ProjectRegistryStatus.IN_PROGRESS
+        project_config.set_status(new_status)
         version = self._update(project_config, submitter, VersionUpdateType.MINOR, log_message)
 
         if not self.offline_mode:

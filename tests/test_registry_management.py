@@ -15,7 +15,7 @@ from dsgrid.exceptions import (
     DSGInvalidOperation,
     DSGValueNotRegistered,
 )
-from dsgrid.registry.common import DatasetRegistryStatus, VersionUpdateType
+from dsgrid.registry.common import DatasetRegistryStatus, ProjectRegistryStatus, VersionUpdateType
 from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.project_registry_manager import ProjectRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
@@ -56,6 +56,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         log_message = "intial registration"
 
         project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.1.0"))
+        assert project_config.model.status == ProjectRegistryStatus.COMPLETE
         dataset = project_config.get_dataset(dataset_id)
         assert dataset.status == DatasetRegistryStatus.REGISTERED
 

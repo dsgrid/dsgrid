@@ -9,7 +9,11 @@ import click
 
 from dsgrid.loggers import setup_logging, check_log_file_size
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import create_local_test_registry, TEST_DATASET_DIRECTORY
+from dsgrid.tests.common import (
+    create_local_test_registry,
+    TEST_DATASET_DIRECTORY,
+    TEST_REMOTE_REGISTRY,
+)
 from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.utils.files import load_data, dump_data
 from dsgrid.tests.common import replace_dimension_uuids_from_registry, TEST_PROJECT_REPO
@@ -20,7 +24,11 @@ logger = logging.getLogger(__name__)
 
 
 def make_test_data_registry(
-    registry_path, src_dir, dataset_path=None, include_datasets=True
+    registry_path,
+    src_dir,
+    dataset_path=None,
+    include_datasets=True,
+    offline_mode=True,
 ) -> RegistryManager:
     """Creates a local registry from a dsgrid project source directory for testing.
 
@@ -34,7 +42,8 @@ def make_test_data_registry(
         If None, use "DSGRID_LOCAL_DATA_DIRECTORY" env variable.
     include_datasets : bool
         If False, do not register any datasets.
-
+    offline_mode : bool
+        If False, use the test remote registry.
     """
     if dataset_path is None:
         dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
@@ -46,7 +55,12 @@ def make_test_data_registry(
 
     user = getpass.getuser()
     log_message = "Initial registration"
-    manager = RegistryManager.load(path, offline_mode=True)
+    if offline_mode:
+        manager = RegistryManager.load(path, offline_mode=offline_mode)
+    else:
+        manager = RegistryManager.load(
+            path, remote_path=TEST_REMOTE_REGISTRY, offline_mode=offline_mode
+        )
 
     for dim_config_file in (
         src_dir / "dimensions.toml",

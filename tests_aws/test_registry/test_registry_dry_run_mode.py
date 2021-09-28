@@ -8,12 +8,14 @@ import uuid
 
 from .common import clean_remote_registry
 
-from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
+from dsgrid.tests.common import (
+    create_local_test_registry,
+    make_test_project_dir,
+    AWS_PROFILE_NAME,
+    TEST_REMOTE_REGISTRY,
+)
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
-
-S3_PROFILE_NAME = "nrel-aws-dsgrid"
-TEST_REGISTRY = "s3://nrel-dsgrid-registry-test"
 
 
 def test_dry_run_mode(make_test_project_dir):
@@ -25,10 +27,10 @@ def test_dry_run_mode(make_test_project_dir):
             log_message = "test"
             s3_cloud_storage = S3StorageInterface(
                 local_path=base_dir,
-                remote_path=TEST_REGISTRY,
+                remote_path=TEST_REMOTE_REGISTRY,
                 user=submitter,
                 uuid=str(uuid.uuid4()),
-                profile=S3_PROFILE_NAME,
+                profile=AWS_PROFILE_NAME,
             )
             path = create_local_test_registry(base_dir)
             assert LocalFilesystem().listdir(path)
@@ -36,7 +38,7 @@ def test_dry_run_mode(make_test_project_dir):
             clean_remote_registry(s3_cloud_storage._s3_filesystem)
             manager = RegistryManager.load(
                 path=path,
-                remote_path=TEST_REGISTRY,
+                remote_path=TEST_REMOTE_REGISTRY,
                 user=submitter,
                 no_prompts=True,
                 dry_run_mode=True,

@@ -15,6 +15,8 @@ TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_efs"
 TEST_STANDARD_SCENARIOS_PROJECT_REPO = TEST_PROJECT_PATH / "standard_scenarios_2021"
 TEST_DATASET_DIRECTORY = TEST_PROJECT_PATH / "datasets"
 TEST_REGISTRY = Path("tests/data/registry")
+AWS_PROFILE_NAME = "nrel-aws-dsgrid"
+TEST_REMOTE_REGISTRY = "s3://nrel-dsgrid-registry-test"
 
 
 @pytest.fixture

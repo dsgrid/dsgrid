@@ -186,6 +186,7 @@ class RegistryManager:
 
             if sync:
                 logger.info("Sync from remote registry.")
+                # NOTE: currently only /configs are pulled. /data is not being pulled with this sync_pull command.
                 cloud_interface.sync_pull(
                     remote_path + "/configs",
                     str(path) + "/configs",

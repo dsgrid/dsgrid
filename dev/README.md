@@ -202,6 +202,59 @@ In [2]: dataset = dataset_manager.get_by_id("efs_comstock")
 In [3]: debug(dataset.model)
 ```
 
+## Use existing Spark cluster
+
+If you set the environment variable `SPARK_CLUSTER` to a cluster's address then dsgrid will attach
+to it rather than run create a new driver and run from it.
+
+```
+$ export SPARK_CLUSTER=spark://<hostname>:<port>
+```
+
+## Spark Standalone Cluster
+
+This may be a statement based on a lack of understanding of how to properly configure and start Spark in a
+Python process, but it appears that you can achieve better performance when running on a local system by
+creating a standalone cluster with the driver and executor configured to use the maxmimum amount of CPU
+and memory available.
+
+Note that while most unit tests work with a standalone cluster the tests in
+`tests/cli/test_registry.py` do not. It's likely because that test will attempt to create multiple
+clusters on the same system.
+
+The full instructions to create a cluster are at http://spark.apache.org/docs/latest/spark-standalone.html.
+The rest of this section documents a limited set that should work on your system.
+
+Install Spark locally rather than rely on the pyspark installation from pip.
+Refer to https://spark.apache.org/docs/latest/ for installation instructions.
+
+Here is one way to configure and start a cluster.
+
+1. Ensure that the environment variable `SPARK_HOME` is set to your installation directory.
+2. Set these values in `$SPARK_HOME/conf/spark-defaults.conf` to the maxmimum amount you can
+afford.
+
+```
+spark.driver.memory 16g
+spark.executor.memory 16g
+```
+
+3. Start the master with this command:
+```
+$SPARK_HOME/sbin/start-master.sh
+```
+
+4. Open http://localhost:8080/ in your browser and copy the cluster URL and port. It will be
+something like `spark://hostname:7077`.
+
+5. Start a worker with this command:
+```
+$SPARK_HOME/sbin/start-worker.sh spark://<hostname>:<port>
+```
+
+Monitor cluster tasks in your browser.
+
+
 ## Publish Documentation
 
 The documentation is built with [Sphinx](http://sphinx-doc.org/index.html). There are several steps to creating and publishing the documentation:

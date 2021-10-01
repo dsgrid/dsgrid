@@ -3,9 +3,11 @@
 import csv
 import logging
 import multiprocessing
+import os
 from pathlib import Path
 
 from pyspark.sql import DataFrame, Row, SparkSession
+from pyspark import SparkConf, SparkContext
 
 from dsgrid.exceptions import DSGInvalidField
 from dsgrid.utils.files import load_data
@@ -20,6 +22,20 @@ def init_spark(name, mem="5gb", num_cpus=None):
     if num_cpus is None:
         num_cpus = multiprocessing.cpu_count()
 
+    cluster = os.environ.get("SPARK_CLUSTER")
+    if cluster is not None:
+        logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
+        conf = SparkConf().setAppName(name).setMaster(cluster)
+        sc = SparkContext(conf=conf)
+        spark = (
+            SparkSession.builder.config(conf=conf)
+            .config("spark.executor.memory", mem)
+            .config("spark.cores.max", str(num_cpus))
+            .getOrCreate()
+        )
+        return spark
+
+    logger.info("Create SparkSession %s in new cluster", name)
     return (
         SparkSession.builder.master("local")
         .appName(name)

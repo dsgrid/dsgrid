@@ -8,9 +8,13 @@ Submit a dataset
 
 Step 1: Register dimensions
 ---------------------------
-Before creating dimension csv files, the dataset contributor should review the project dimensions to determine which match their dataset directly and which ones are different and need to be registered.
+Before creating dimension csv files, the dataset contributor should review the 
+project dimensions to determine which match their dataset directly and which ones 
+are different and need to be registered.
 
-If new dimensions need to be registered that are different from the project, go ahead and create the dimension csv files (in the project repository) and fill out the dimension.toml file. Once these are ready to go, we can register them.
+If new dimensions need to be registered that are different from the project, go 
+ahead and create the dimension csv files (in a project repository) and fill out 
+the dimension.toml file. Once these are ready to go, we can register them.
 
 Test it in dry run mode first:
 

@@ -10,11 +10,11 @@ dsgrid requires python=3.8 or later. If you do not already have a python environ
 Steps to make a dsgrid Conda environment:
 
 1. `Download and install Conda <https://conda.io/projects/conda/en/latest/user-guide/install/index.html#regular-installation>`_ if it is not already installed.
-2. Clone the `dsgrid environment <https://github.com/dsgrid/dsgrid/blob/main/environment.yml>`_:
+2. Create a suitable environment.
 
 .. code-block:: bash
         
-    conda env create -f environment.yml
+    conda create -n dsgrid python=3.8
 
 3. Activate the environment:
 

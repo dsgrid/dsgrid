@@ -65,7 +65,6 @@ setup(
         "awscli",
         "boto3",
         "click>=8",
-        "findspark",
         "numpy",
         "pandas",
         "prettytable",

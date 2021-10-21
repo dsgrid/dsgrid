@@ -7,7 +7,16 @@ Python API for accessing demand-side grid model (dsgrid) datasets.
 
 ## Install
 
-[Dependencies](#dependencies) | [from PIPY/pip](#from-pipypip) | [from pip+git](#from-pipgit) | [from cloned repository](#from-cloned-repository)
+[Virtual environment](#virtual-environment) | [Dependencies](#dependencies) | [from PIPY/pip](#from-pipypip) | [from pip+git](#from-pipgit) | [from cloned repository](#from-cloned-repository)
+
+### Virtual environment
+
+Create a virtual environment in which to install dsgrid. Miniconda is recommended.
+
+```
+conda create -n dsgrid python=3.8
+conda activate dsgrid
+```
 
 ### Dependencies
 dsgrid uses [Apache Spark](#https://spark.apache.org/) to manage big data. 
@@ -65,18 +74,6 @@ pip install -e .
 pip install -e '.[dev]'
 ```
 
-**Conda:** 
-```
-conda env create -f environment.yml
-# conda activate?
-
-pip install -e .
-
-# or
-
-pip install -e '.[dev]'
-```
-
 ## Usage
 
 dsgrid is primarily a command-line interface (CLI) tool. To see the available commands:
@@ -90,7 +87,7 @@ dsgrid --help
 pip uninstall dsgrid
 ```
 
-Or, if you are using a conda environment
+If you are using a conda environment
 ```
-conda deactivate ???
+conda deactivate
 ```

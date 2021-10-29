@@ -1,4 +1,6 @@
-# dsgrid Developer Readme
+# dsgrid Developer README
+
+[Dependencies](#developer-dependencies) | [Tests](#tests) | [EFS Project Repository](#testingexploring-with-the-efs-project-repository) | [Interactive Exploration](#interactive-exploration) | [Existing Spark Cluster](#use-existing-spark-cluster) | [Spark Standalone Cluster](#spark-standalone-cluster) | [Publish Documentation](#publish-documentation)
 
 ## Developer Dependencies
 

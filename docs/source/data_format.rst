@@ -1,5 +1,7 @@
+.. _dsgrid Data Structure 
+
 *********************
-Dsgrid Data Structure
+dsgrid Data Structure
 *********************
 
 Distrbuted Data Format
@@ -42,7 +44,7 @@ Registration entries are stored on S3.
    - Defines ``association table`` to map dataset to Base Dimensions.
 
 
-Dsgrid Standard Format
+dsgrid Standard Format
 ======================
 The standard format requires the user to supply all data tables in the format described below.
 
@@ -181,7 +183,7 @@ Load data contains one value per model year.
 
 Representative Period
 ---------------------
-Load data contains timestamps that represent multiple periods. Dsgrid supports
+Load data contains timestamps that represent multiple periods. dsgrid supports
 the following formats:
 
 one_week_per_month_by_hour
@@ -227,5 +229,5 @@ There are no shifts, missing hours, or extra hours for daylight savings time.
     |  1|    4|          1|   0|     1.0|
     +---+-----+-----------+----+--------+
 
-Dsgrid can add support for other period formats. Please submit requests as
+dsgrid can add support for other period formats. Please submit requests as
 needed.

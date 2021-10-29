@@ -235,7 +235,7 @@ def get_row(i, field, fields, field_items, cls, indent_level=1):
             for row in get_subfield_rows(field_items_list, class_name_list, fields, indent_level):
                 rows.append(f"{t}{row}")
         else:
-            rows.append(f"{t1}{t}:{field}: {field_items[field]}{n}")
+            rows.append(f"{t1}{t}:{field}: {str(field_items[field]).strip()}{n}")
     return rows
 
 
@@ -243,7 +243,7 @@ def get_row(i, field, fields, field_items, cls, indent_level=1):
 @click.option(
     "-o",
     "--output",
-    default="source/_build/config_rsts",
+    default="_build/config_rsts",
     show_default=True,
     help="output directory",
     callback=_get_output,
@@ -255,6 +255,7 @@ def make_config_rst(output):
         ProjectConfigModel,  # project.toml
         DatasetConfigModel,  # dataset.toml
         DimensionsModel,  # dimensions.toml
+        DimensionModel,
         TimeDimensionModel,
         DimensionMappingBaseModel,  # dimension mapping toml
         DimensionMappingReferenceListModel,  # dimension mapping references toml
@@ -262,7 +263,6 @@ def make_config_rst(output):
         # AssociationTableModel,
         # DimensionMappingBaseModel,
         # DimensionMappingReferenceModel,
-        # DimensionsModel,
     ):
         output_file = output / (cls.__name__ + ".rst")
         with open(output_file, "w") as f_out:

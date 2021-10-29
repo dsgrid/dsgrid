@@ -1,6 +1,6 @@
-#######
-Configs
-#######
+###############################################
+Dimension, Dataset, Project and Related Configs
+###############################################
 
 .. contents::
    :local:

@@ -1,7 +1,9 @@
 # dsgrid
 [![Documentation](https://img.shields.io/badge/docs-ready-blue.svg)](https://dsgrid.github.io/dsgrid)
 
-Python API for accessing demand-side grid model (dsgrid) datasets. 
+Python API for contributing to and accessing demand-side grid model (dsgrid) datasets. 
+
+⚠️ **dsgrid is under active development and does not yet have a formal package release.** Details listed here are subject to change. Please reach out to the dsgrid coordination team with any questions or other feedback. ⚠️
 
 [Install](#install) | [Usage](#usage) | [Uninstall](#uninstall)
 

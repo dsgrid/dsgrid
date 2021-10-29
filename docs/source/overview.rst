@@ -53,7 +53,18 @@ in the dataset .parquet files, however, they must be declared as trivial dimensi
 
 Datasets are fully documented via the dimensions they use, as well as the 
 dimension and dataset config files. Datasets are submitted to and stored by 
-dsgrid in specific schemas that use the .parquet data format.
+dsgrid in specific schemas that use the .parquet data format (See :ref:`dsgrid Data Structure`).
+
+There are three types of dsgrid datasets:
+
+1. ``Benchmark``
+2. ``Historical``
+3. ``Sector Model``
+
+Datasets can be registered outside of a project, however, to be used by a project, they must be 
+submitted to the project and pass all project validations/meet all project expectations.
+
+
 
 
 .. _Dimension Overview:

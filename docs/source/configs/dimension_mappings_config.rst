@@ -1,3 +1,5 @@
+.. _Dimension Mappings Config:
+
 *************************
 Dimension Mappings Config
 *************************

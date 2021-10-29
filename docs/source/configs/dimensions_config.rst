@@ -1,3 +1,5 @@
+.. _Dimensions Config:
+
 ****************
 Dimension Config
 ****************

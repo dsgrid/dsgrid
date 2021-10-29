@@ -1,3 +1,5 @@
+.. _Dataset Config:
+
 **************
 Dataset Config
 **************

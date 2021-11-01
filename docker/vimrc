@@ -1,0 +1,18 @@
+set nocompatible
+filetype plugin indent on
+syntax on
+set incsearch
+set hlsearch
+set ignorecase smartcase
+set cindent
+set cino+=(0
+set ruler
+set laststatus=2
+set wildmenu
+set wildmode=longest,full
+set wildignore+=*/.git/*,*/.hg/*,*/.svn/*
+
+" These are for Python. You can set them for Python files only if you want.
+set tabstop=4
+set shiftwidth=4
+set expandtab

@@ -1,14 +1,17 @@
 # USAGE:
-# docker build --secret id=access_token,env=ACCESS_TOKEN --tag dsgrid --build-arg VERSION=x.y.z .
-# where ACCESS_TOKEN is a GitHub token that can clone the dsgrid repository
+# docker build --tag dsgrid --build-arg VERSION=x.y.z .
 
 # This container can be converted to a Singularity container on Eagle with these commands:
+# Save and upload the docker image to Eagle.
+# $ docker save -o dsgrid_vx.y.z.tar dsgrid
+# $ scp dsgrid_vx.y.z.tar <username>@eagle.hpc.nrel.gov:/projects/dsgrid/containers
 # Acquire a compute node.
 # $ export SINGULARITY_TMPDIR=/tmp/scratch
 # $ module load singularity-container
-# Writable image for testing and development:
+# Create writable image for testing and development or read-only image for production.
+# Writable
 # $ singularity build --sandbox dsgrid docker-archive://dsgrid_v0.1.0.tar
-# Read-only image for production:
+# Read-only
 # $ singularity build dsgrid_v0.1.0.sif docker-archive://disco_v0.1.0.tar
 
 FROM python:3.8-slim
@@ -38,9 +41,6 @@ COPY docker/vimrc /data/vimrc
 
 RUN echo "$VERSION" > /repos/version.txt
 
-RUN --mount=type=secret,id=access_token ACCESS_TOKEN=$(cat /run/secrets/access_token) \
-    && git config --global url."https://${ACCESS_TOKEN}:@github.com/".insteadOf "https://github.com/"
-
 WORKDIR /repos
 # TODO: Find out how to install proper certificates.
 RUN wget --no-check-certificate https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/${FULL_STR}.tgz \
@@ -54,7 +54,7 @@ RUN wget --no-check-certificate https://dlcdn.apache.org/spark/spark-${SPARK_VER
 
 RUN git clone https://github.com/dsgrid/dsgrid.git
 RUN pip install -e /repos/dsgrid
-RUN pip install ipython
+RUN pip install ipython jupyter pip "dask[complete]"
 
 RUN touch $HOME/.profile \
     && rm -rf $HOME/.cache

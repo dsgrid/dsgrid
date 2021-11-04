@@ -1,4 +1,5 @@
 # USAGE:
+# Do not run this while connected to the VPN. You may get a certificate error while downloading spark.
 # docker build --tag dsgrid --build-arg VERSION=x.y.z .
 
 # This container can be converted to a Singularity container on Eagle with these commands:
@@ -27,7 +28,7 @@ RUN if [ -z "$VERSION" ]; then echo "VERSION must be specified"; exit 1; fi
 USER root
 
 RUN apt-get update \
-    && apt-get install -y jq git nano openjdk-11-jdk sysstat tmux tree vim wget zsh \
+    && apt-get install -y ca-certificates jq git nano openjdk-11-jdk sysstat tmux tree vim wget zsh \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /data
@@ -42,8 +43,7 @@ COPY docker/vimrc /data/vimrc
 RUN echo "$VERSION" > /repos/version.txt
 
 WORKDIR /repos
-# TODO: Find out how to install proper certificates.
-RUN wget --no-check-certificate https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/${FULL_STR}.tgz \
+RUN wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/${FULL_STR}.tgz \
 	&& tar -xzf ${FULL_STR}.tgz \
 	&& rm ${FULL_STR}.tgz \
 	&& echo "export PATH=$PATH:/repos/${FULL_STR}/bin:/repos/${FULL_STR}/sbin" >> /root/.bashrc \

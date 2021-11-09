@@ -21,14 +21,13 @@ ARG VERSION
 ARG SPARK_VERSION=3.2.0
 ARG HADOOP_VERSION=3.2
 ARG FULL_STR=spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}
-ARG SPARK_HOME=/repos/${FULL_STR}
 
 RUN if [ -z "$VERSION" ]; then echo "VERSION must be specified"; exit 1; fi
 
 USER root
 
 RUN apt-get update \
-    && apt-get install -y ca-certificates jq git nano openjdk-11-jdk sysstat tmux tree vim wget zsh \
+    && apt-get install -y ca-certificates jq git nano default-jdk procps sysstat tmux tree vim wget zsh \
     && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /data
@@ -47,14 +46,16 @@ RUN wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/${FULL_STR}.tgz \
 	&& tar -xzf ${FULL_STR}.tgz \
 	&& rm ${FULL_STR}.tgz \
 	&& echo "export PATH=$PATH:/repos/${FULL_STR}/bin:/repos/${FULL_STR}/sbin" >> /root/.bashrc \
-	&& echo "export SPARK_HOME=/repos/${FULL_STR}" >> /root/.bashrc \
 	&& cp /repos/${FULL_STR}/conf/spark-defaults.conf.template /repos/${FULL_STR}/conf/spark-defaults.conf \
 	&& cp /repos/${FULL_STR}/conf/spark-env.sh.template /repos/${FULL_STR}/conf/spark-env.sh \
 	&& chmod +x /repos/${FULL_STR}/conf/spark-env.sh
 
 RUN git clone https://github.com/dsgrid/dsgrid.git
 RUN pip install -e /repos/dsgrid
-RUN pip install ipython jupyter pip "dask[complete]"
+RUN pip install ipython jupyter "dask[complete]"
+
+ENV SPARK_HOME=/repos/${FULL_STR}
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
 
 RUN touch $HOME/.profile \
     && rm -rf $HOME/.cache

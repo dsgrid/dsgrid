@@ -204,21 +204,12 @@ In [2]: dataset = dataset_manager.get_by_id("efs_comstock")
 In [3]: debug(dataset.model)
 ```
 
-## Use existing Spark cluster
-
-If you set the environment variable `SPARK_CLUSTER` to a cluster's address then dsgrid will attach
-to it rather than run create a new driver and run from it.
-
-```
-$ export SPARK_CLUSTER=spark://<hostname>:<port>
-```
-
 ## Spark Standalone Cluster
 
-This may be a statement based on a lack of understanding of how to properly configure and start Spark in a
-Python process, but it appears that you can achieve better performance when running on a local system by
-creating a standalone cluster with the driver and executor configured to use the maxmimum amount of CPU
-and memory available.
+It can be advantageous to create a standalone cluster instead of starting Spark from within a
+Python process for these reasons:
+- Easier to tune Spark parameters for performance and monitoring.
+- Use the Spark web UI to inspect job details.
 
 Note that while most unit tests work with a standalone cluster the tests in
 `tests/cli/test_registry.py` do not. It's likely because that test will attempt to create multiple
@@ -233,13 +224,7 @@ Refer to https://spark.apache.org/docs/latest/ for installation instructions.
 Here is one way to configure and start a cluster.
 
 1. Ensure that the environment variable `SPARK_HOME` is set to your installation directory.
-2. Set these values in `$SPARK_HOME/conf/spark-defaults.conf` to the maxmimum amount you can
-afford.
-
-```
-spark.driver.memory 16g
-spark.executor.memory 16g
-```
+2. Customize values in `$SPARK_HOME/conf/spark-defaults.conf` and/or `$SPARK_HOME/conf/spark-env.sh`.
 
 3. Start the master with this command:
 ```
@@ -249,12 +234,105 @@ $SPARK_HOME/sbin/start-master.sh
 4. Open http://localhost:8080/ in your browser and copy the cluster URL and port. It will be
 something like `spark://hostname:7077`.
 
-5. Start a worker with this command:
+5. Start a worker with this command. Give the worker as much memory as you can afford. You can also
+configure this in step #2.
 ```
-$SPARK_HOME/sbin/start-worker.sh spark://<hostname>:<port>
+$SPARK_HOME/sbin/start-worker.sh -m 16g spark://<hostname>:<port>
 ```
 
 Monitor cluster tasks in your browser.
+
+## Use existing Spark cluster
+
+If you set the environment variable `SPARK_CLUSTER` to a cluster's address then dsgrid will attach
+to it rather than run create a new driver and run from it.
+
+```
+$ export SPARK_CLUSTER=spark://<hostname>:<port>
+```
+
+## Running a Spark cluster on Eagle
+
+This section describes how you can run scripts on any number of Eagle compute nodes. You can use
+JADE to
+- Allocate compute nodes.
+- Create a Spark cluster on those nodes.
+- Run one or more scripts on the cluster.
+- Collect resource utilization metrics from each node.
+
+1. Install JADE. Requires at least v0.6.0. JADE documentation is here: https://nrel.github.io/jade/index.html
+
+```
+$ pip install jade
+```
+
+2. Put your scripts in a text file like this:
+
+```
+$ cat commands.txt
+python /projects/dsgrid/efs_datasets/query_tests/query.py
+```
+
+3. Create the JADE configuration
+
+```
+$ jade config create commands.txt
+Created configuration with 1 jobs.
+Dumped configuration to config.json.
+```
+
+4. Create an HPC configuration file. The default behavior is to allocate a single node. You can edit
+the resulting file to use more nodes.
+
+```
+jade config hpc -c hpc_config.toml -t slurm -a <your-allocation> --partition=debug --walltime=01:00:00
+Created HPC config file hpc_config.toml
+```
+
+5. Add a Spark configuration. The `-c` option specifies the path to a Singularity container on Eagle.
+This container includes Spark and dsgrid as well as other tools like jupyter.
+
+```
+jade config spark -c /projects/dsgrid/containers/dsgrid  --update-config-file=config.json
+```
+
+6. Optionally, customize Spark configuration parameters in the `spark/conf` folder created in the
+previous step.
+
+7. Submit the jobs to SLURM. You will likely want to include resource monitoring as shown here.
+
+```
+jade submit-jobs config.json -R periodic -r1
+```
+
+8. Monitor log files as needed:
+
+- `<output-dir>/*.o` contains stdout.
+- `<output-dir>/*.e` contains stderr.
+- Refer to https://nrel.github.io/jade/tutorial.html#job-status for help with JADE status checking.
+- After all jobs finish `<output-dir>/spark_logs` will contain Spark log files.
+- After all jobs finish `<output-dir>/stats` will interactive resource utilization plots.
+- In the future we will have Spark metrics recorded in JSON files.
+
+### Executing scripts
+There are two basic ways to submit scripts to a Spark cluster.
+
+1. Connect to a SparkSession from within Python. Here is an example. Refer to the Spark
+documentation for other options.
+
+```
+    from pyspark.sql import SparkSession
+    from pyspark import SparkConf, SparkContext
+    conf = SparkConf().setAppName("my_app").setMaster("spark://<node_name>:7077")
+    sc = SparkContext(conf=conf)
+    spark = (
+            SparkSession.builder.config(conf=conf)
+            .getOrCreate()
+        )
+```
+
+2. Submit your script with `pyspark`. It will create the SparkSession automatically based on the
+CLI inputs. Refer to its help.
 
 
 ## Publish Documentation

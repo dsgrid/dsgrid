@@ -17,7 +17,7 @@ from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 logger = logging.getLogger(__name__)
 
 
-def init_spark(name, mem="5gb", num_cpus=None):
+def init_spark(name, mem="5g", num_cpus=None):
     """Initialize a SparkSession."""
     if num_cpus is None:
         num_cpus = multiprocessing.cpu_count()
@@ -29,8 +29,6 @@ def init_spark(name, mem="5gb", num_cpus=None):
         sc = SparkContext(conf=conf)
         spark = (
             SparkSession.builder.config(conf=conf)
-            .config("spark.executor.memory", mem)
-            .config("spark.cores.max", str(num_cpus))
             .getOrCreate()
         )
         return spark
@@ -39,7 +37,7 @@ def init_spark(name, mem="5gb", num_cpus=None):
     return (
         SparkSession.builder.master("local")
         .appName(name)
-        .config("spark.executor.memory", mem)
+        .config("spark.driver.memory", mem)
         .config("spark.cores.max", str(num_cpus))
         .getOrCreate()
     )

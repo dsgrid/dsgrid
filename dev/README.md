@@ -260,10 +260,10 @@ JADE to
 - Run one or more scripts on the cluster.
 - Collect resource utilization metrics from each node.
 
-1. Install JADE. Requires at least v0.6.0. JADE documentation is here: https://nrel.github.io/jade/index.html
+1. Install JADE. Requires at least v0.6.1. JADE documentation is here: https://nrel.github.io/jade/index.html
 
 ```
-$ pip install jade
+$ pip install NREL-jade
 ```
 
 2. Put your scripts in a text file like this:

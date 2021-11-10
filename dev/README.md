@@ -289,8 +289,8 @@ jade config hpc -c hpc_config.toml -t slurm -a <your-allocation> --partition=deb
 Created HPC config file hpc_config.toml
 ```
 
-5. Add a Spark configuration. The `-c` option specifies the path to a Singularity container on Eagle.
-This container includes Spark and dsgrid as well as other tools like jupyter.
+5. Add a Spark configuration. The `-c` option specifies the path to the dsgrid Singularity
+container on Eagle.
 
 ```
 jade config spark -c /projects/dsgrid/containers/dsgrid  --update-config-file=config.json
@@ -334,6 +334,33 @@ documentation for other options.
 2. Submit your script with `pyspark`. It will create the SparkSession automatically based on the
 CLI inputs. Refer to its help.
 
+## dsgrid container
+
+The dsgrid team maintains a Docker container built with the Dockerfile in the root of this
+repository. It includes the dsgrid software, Spark, as well as secondary tools like Jupyter. This
+can be used to run dsgrid software on any computer (local, Eagle, or the cloud). The team converts
+the container to Singularity so that it can be used on Eagle. The container image is located at
+`/projects/dsgrid/containers/dsgrid`. Here's how to start a shell with important directories
+mounted:
+
+```
+$ module load singularity-container
+$ singularity shell \
+    -B /scratch:/scratch \
+    -B /projects:/projects \
+    /projects/dsgrid/containers/dsgrid
+```
+
+Here's how to run a script in the container:
+
+```
+$ module load singularity-container
+$ singularity exec \
+    -B /scratch:/scratch \
+    -B /projects:/projects \
+    /projects/dsgrid/containers/dsgrid \
+    my-script.sh
+```
 
 ## Publish Documentation
 

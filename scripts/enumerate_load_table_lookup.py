@@ -10,6 +10,7 @@ import math
 import logging
 import functools
 import time
+import pandas as pd
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 def init_spark1(name, mem="5gb", num_cpus=None):
-    """ Initialize a SparkSession. """
+    """ Initialize a SparkSession on local machine """
     if num_cpus is None:
         num_cpus = multiprocessing.cpu_count()
 
@@ -54,7 +55,7 @@ def init_spark2(
     # mem="10gb",
     num_cpus=None,
 ):
-    """Initialize a SparkSession."""
+    """Initialize a SparkSession on the HPC"""
     cluster = "spark://r103u21.ib0.cm.hpc.nrel.gov:7077"
     conf = SparkConf().setAppName(name).setMaster(cluster)
     sc = SparkContext(conf=conf)
@@ -69,13 +70,14 @@ def init_spark2(
 
 def init_spark_main(name):
     """ choose which version of init_spark to use here """
-    spark = init_spark1(name, mem="5gb", num_cpus=None)
-    # spark = init_spark2(name, num_cpus=None)
+    spark = init_spark1(name, mem="5gb", num_cpus=None)  # for local machine
+    # spark = init_spark2(name, num_cpus=None) #HPC
 
     return spark
 
 
 ####################################################################
+# LOGGER FUNCS
 
 
 def timed_info(func):
@@ -118,7 +120,6 @@ def get_time_duration_string(seconds):
         val = "0 s"
     else:
         val = "{:.3f} ns".format(seconds * 1000000000)
-
     return val
 
 
@@ -136,6 +137,10 @@ def setup_logging(filename, file_level=logging.INFO, console_level=logging.INFO)
     # add the handlers to the logger
     logger.addHandler(fh)
     logger.addHandler(ch)
+
+
+####################################################################
+# MODEL FUNCS
 
 
 def copydirectory(src, dst, override=False):
@@ -171,7 +176,6 @@ def relocate_original_file(lookup_file):
 
     # execute
     copydirectory(lookup_file, relocated_file, override=False)
-
     return relocated_file
 
 
@@ -186,7 +190,6 @@ def enumerate_lookup_by_keys(df_lookup, keys):
         df_lookup_full = df_lookup_full.join(df_lookup, keys, "left").sort(["id"] + keys)
     else:
         df_lookup_full = df_lookup
-
     return df_lookup_full
 
 
@@ -220,28 +223,97 @@ def assertion_checks(df_lookup_full, df_lookup, keys):
     assert N_enumerations == N_df_lookup_full
 
 
+def get_data_size(df, bytes_per_cell=64):
+    """ approximate dataset size """
+    n_rows = df.count()
+    n_cols = len(df.columns)
+    data_MB = n_rows * n_cols * bytes_per_cell / 1e6  # MiB
+    return n_rows, n_cols, data_MB
+
+
 @timed_info
-def get_number_of_buckets(df_lookup_full):
-    """ approximate dataset size and calculate n_buckets """
-    fraction = 0.001
-    sample = df_lookup_full.sample(fraction=fraction).toPandas()
-    data_MB = sample.memory_usage(index=False, deep=False).sum() / 1e6 / fraction  # MiB
-    n_buckets = math.ceil(data_MB / 128)
+def get_optimal_number_of_files(df, MB_per_file=128):
+    """ calculate *optimal* number of files """
+    _, _, data_MB = get_data_size(df)
+    n_files = math.ceil(data_MB / MB_per_file)
 
     logger.info(
-        f"load_data_lookup is approximately {data_MB:.02f} MB in size, expecting {n_buckets} bucket(s) at 128 MB each."
+        f"load_data_lookup is approximately {data_MB:.02f} MB in size, ideal to split into {n_files} file(s) at 128 MB each."
     )
-
-    return n_buckets
+    return n_files
 
 
 @timed_info
-def save_file(df, n_buckets, output_file):
-    df.repartition(n_buckets, "id").write.bucketBy(n_buckets, "id").mode("overwrite").option(
-        "path", output_file
-    ).saveAsTable("load_data_lookup", format="parquet")
+def file_size_if_partition_by(df, key):
+    n_rows, n_cols, data_MB = get_data_size(df)
+    n_partitions = df.select(key).distinct().count()
+    avg_MB = round(data_MB / n_partitions, 2)
+
+    n_rows_largest_part = df.groupBy(key).count().orderBy("count", ascending=False).first()[1]
+    n_rows_smallest_part = df.groupBy(key).count().orderBy("count", ascending=True).first()[1]
+
+    largest_MB = round(data_MB / n_rows * n_rows_largest_part, 2)
+    smallest_MB = round(data_MB / n_rows * n_rows_smallest_part, 2)
+
+    report = (
+        f'Partitioning by "{key}" will yield: \n'
+        + f"  - # of partitions: {n_partitions} \n"
+        + f"  - avg partition size: {avg_MB} MB \n"
+        + f"  - largest partition: {largest_MB} MB \n"
+        + f"  - smallest partition: {smallest_MB} MB \n"
+    )
+
+    logger.info(report)
+
+    output = pd.DataFrame(
+        {key: [n_partitions, avg_MB, largest_MB, smallest_MB]},
+        index=["n_partitions", "avg_partition_MB", "max_partition_MB", "min_partition_MB"],
+    )
+    return output
 
 
+@timed_info
+def save_file(df, filepath, n_files=None, repartition_by=None):
+    """
+    n_files: number of target sharded files
+    repartition_by: col to repartition by
+
+    Note:
+        - Not available for load_data_lookup: df.write.partitionBy().bucketBy()
+        - df.coalesce(n): combine without shuffling, will not go larger than current_n_files
+        - df.repartition(n): shuffle and try to evenly distribute, if n > # of unique rows, some partitions will be empty
+        - df.repartition(col): shuffle and create partitions by unique record in col + 1 empty/very small partition
+        - df.repartition(n, col): shufffle, number partitions = min(n, unique record in col)
+    """
+
+    current_n_parts = df.rdd.getNumPartitions()
+
+    if n_files != None and repartition_by != None:
+        df_out = df.repartition(n_files, repartition_by)
+    elif n_files == None and repartition_by != None:
+        df_out = df.repartition(repartition_by)
+    elif n_files != None and repartition_by == None:
+        df_out = df.repartition(n_files)
+    else:
+        df_out = df
+
+    # for reporting out:
+    if repartition_by != None:
+        n_out_files = df.select(repartition_by).distinct().count() + 1
+        ext = f", repartitioned by {repartition_by}"
+    else:
+        n_out_files = current_n_parts
+        ext = ""
+    n_out_files = min(n_out_files, df_out.rdd.getNumPartitions())
+    logger.info(f"Saving {current_n_parts} partitions --> {n_out_files} file(s){ext}...")
+
+    df_out.write.mode("overwrite").option("path", filepath).saveAsTable(
+        "load_data_lookup", format="parquet"
+    )
+
+
+####################################################################
+# MAIN FUNCS
 @timed_info
 def run(relocated_file, lookup_file):
     """ read from relocated_file, replace lookup_file with new output """
@@ -264,8 +336,19 @@ def run(relocated_file, lookup_file):
     assertion_checks(df_lookup_full, df_lookup, keys)
 
     # 5. save
-    n_buckets = get_number_of_buckets(df_lookup_full)
-    save_file(df_lookup_full, n_buckets, lookup_file)
+    # 5.1. explore partitioning options
+    df_cols = df_lookup_full.columns
+
+    partition_stats = []
+    for key in df_cols:
+        report = file_size_if_partition_by(df_lookup_full, key)
+        partition_stats.append(report)
+
+    partition_stats = pd.concat(partition_stats, axis=1)
+
+    # 5.2. save to file by controling n_files
+    n_files = get_optimal_number_of_files(df_lookup_full)
+    save_file(df_lookup_full, lookup_file, n_files, repartition_by=None)
 
 
 def main(lookup_file):
@@ -284,7 +367,7 @@ def main(lookup_file):
 if __name__ == "__main__":
     """
     Usaage:
-    python enumerate_load_table_lookup path_to_lookup_file
+    python enumerate_load_table_lookup.py path_to_lookup_file
     """
 
     if len(sys.argv) != 2:

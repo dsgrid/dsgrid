@@ -270,7 +270,7 @@ $ pip install NREL-jade
 
 ```
 $ cat commands.txt
-python /projects/dsgrid/efs_datasets/query_tests/query.py
+python my_script.py
 ```
 
 3. Create the JADE configuration
@@ -320,10 +320,14 @@ There are two basic ways to submit scripts to a Spark cluster.
 1. Connect to a SparkSession from within Python. Here is an example. Refer to the Spark
 documentation for other options.
 
+Be sure to set the executor memory to an appropriate value for your application.
+
 ```
     from pyspark.sql import SparkSession
     from pyspark import SparkConf, SparkContext
-    conf = SparkConf().setAppName("my_app").setMaster("spark://<node_name>:7077")
+    conf = SparkConf().setAppName("my_app") \
+        .setMaster("spark://<node_name>:7077") \
+	.set("spark.executor.memory", "20G")
     sc = SparkContext(conf=conf)
     spark = (
             SparkSession.builder.config(conf=conf)
@@ -361,6 +365,24 @@ $ singularity exec \
     /projects/dsgrid/containers/dsgrid \
     my-script.sh
 ```
+
+## Attach to a Spark cluster from a conda environment
+
+There are cases where you may want to run scripts against a Spark cluster from your own conda
+environment. For example, you may have new code in a dsgrid branch that is not in the container.
+
+Ensure that you have Java installed in your conda environment. Most people already have Java
+installed on their personal computers, so this is typically only a problem on Eagle or the cloud.
+
+```
+$ conda install openjdk
+```
+
+Verify the installation by checking that this environment variable is set:
+```
+$ echo $JAVA_HOME
+```
+
 
 ## Publish Documentation
 

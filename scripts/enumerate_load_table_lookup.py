@@ -148,7 +148,7 @@ def copydirectory(src, dst, override=False):
     Copy directory from src to dst, with option to override.
     override=True will clear dst before copying
     """
-    if (override == False) & (os.path.exists(dst)):
+    if not override and os.path.exists(dst):
         logger.info(f'"{dst}" already exists, passing...')
         pass
 

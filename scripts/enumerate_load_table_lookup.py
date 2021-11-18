@@ -150,7 +150,6 @@ def copydirectory(src, dst, override=False):
     """
     if not override and os.path.exists(dst):
         logger.info(f'"{dst}" already exists, passing...')
-        pass
 
     else:
         if os.path.exists(dst):

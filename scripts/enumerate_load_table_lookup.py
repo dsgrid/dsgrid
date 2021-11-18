@@ -297,7 +297,7 @@ def save_file(df, filepath, n_files=None, repartition_by=None):
         df_out = df
 
     # for reporting out:
-    if repartition_by != None:
+    if repartition_by is not None:
         n_out_files = df.select(repartition_by).distinct().count() + 1
         ext = f", repartitioned by {repartition_by}"
     else:

@@ -74,6 +74,7 @@ setup(
         "semver",
         "sqlalchemy",
         "toml",
+        "jupyter",
     ],
     extras_require={
         "test": test_requires,

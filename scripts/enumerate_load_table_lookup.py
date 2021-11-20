@@ -2,24 +2,24 @@ import sys
 import os
 import shutil, errno
 import logging
+
+import pyspark.sql.functions as F
 import pandas as pd
 
 from dsgrid.loggers import setup_logging
 from dsgrid.utils.timing import timed_info
 from dsgrid.utils.spark import init_spark
-from dsgrid.utils.spark_partition import Spark_Partition
+from dsgrid.utils.spark_partition import SparkPartition
 
-logger = None
+logger = logging.getLogger(__name__)
 
 ####################################################################
 # MODEL FUNCS
 
 
-class Enumerate_Table:
+class EnumerateTable:
     def __init__(self):
-        super().__init__()
-
-        self.partition = Spark_Partition()
+        self.partition = SparkPartition()
 
     def copydirectory(self, src, dst, override=False):
         """
@@ -82,12 +82,10 @@ class Enumerate_Table:
     def assertion_checks(self, df_lookup_full, df_lookup, keys):
 
         # 1) set of (data) id is the same before and after enumeration
-        df_lookup_ids = [x.id for x in df_lookup.select("id").distinct().collect()]
-        df_lookup_full_ids = [
-            x.id for x in df_lookup_full.select("id").distinct().collect() if x.id != None
-        ]
+        df_lookup_ids = df_lookup.agg(F.collect_list("id")).collect()[0][0]
+        df_lookup_full_ids = df_lookup_full.agg(F.collect_list("id")).collect()[0][0]
 
-        assert set(df_lookup_ids) == set(df_lookup_full_ids)
+        assert set(df_lookup_ids) == set(df_lookup_full_ids) - set([None])
 
         # 2) make sure N_df_lookup_full is the product of the nunique of each key
         N_df_lookup_full = df_lookup_full.count()
@@ -173,10 +171,10 @@ def main(lookup_file):
     base_dir = os.path.dirname(lookup_file)
 
     log_file = os.path.join(base_dir, "enumerate_load_table_output.log")
-    logger = setup_logging("DSG", log_file)
+    logger = setup_logging(__name__, log_file)
     logger.info("CLI args: %s", " ".join(sys.argv))
 
-    enumeration = Enumerate_Table()
+    enumeration = EnumerateTable()
     relocated_file = enumeration.relocate_original_file(lookup_file)
     logger.info("\n")
     enumeration.run(relocated_file, lookup_file)
@@ -187,6 +185,7 @@ if __name__ == "__main__":
     Usaage:
     python enumerate_load_table_lookup.py path_to_lookup_file
     """
+    __name__ = "DSG"  # rename for logger
 
     if len(sys.argv) != 2:
         logger.info(f"Usage: {sys.argv[0]} path_to_lookup_file")

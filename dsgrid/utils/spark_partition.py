@@ -1,14 +1,14 @@
 import logging
-import pandas as pd
 import math
+
 from dsgrid.utils.timing import timed_info
 
 logger = logging.getLogger(__name__)
 
 
-class Spark_Partition:
+class SparkPartition:
     def __init__(self):
-        super().__init__()
+        return
 
     def get_data_size(self, df, bytes_per_cell=64):
         """ approximate dataset size """
@@ -51,8 +51,13 @@ class Spark_Partition:
 
         logger.info(report)
 
-        output = pd.DataFrame(
-            {key: [n_partitions, avg_MB, largest_MB, smallest_MB]},
-            index=["n_partitions", "avg_partition_MB", "max_partition_MB", "min_partition_MB"],
-        )
+        output = {
+            key: {
+                "n_partitions": n_partitions,
+                "avg_partition_MB": avg_MB,
+                "max_partition_MB": largest_MB,
+                "min_partition_MB": smallest_MB,
+            }
+        }
+
         return output

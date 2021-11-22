@@ -82,8 +82,8 @@ class EnumerateTable:
     def assertion_checks(self, df_lookup_full, df_lookup, keys):
 
         # 1) set of (data) id is the same before and after enumeration
-        df_lookup_ids = df_lookup.agg(F.collect_list("id")).collect()[0][0]
-        df_lookup_full_ids = df_lookup_full.agg(F.collect_list("id")).collect()[0][0]
+        df_lookup_ids = df_lookup.agg(F.collect_set("id")).collect()[0][0]
+        df_lookup_full_ids = df_lookup_full.agg(F.collect_set("id")).collect()[0][0]
 
         assert set(df_lookup_ids) == set(df_lookup_full_ids) - set([None])
 

@@ -84,7 +84,7 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False):
+    def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False, cp=False):
         """Synchronize data from remote_path to local_path.
         If delete_local is True, this deletes any files in local_path that do not exist in remote_path.
 
@@ -94,12 +94,13 @@ class CloudStorageInterface(abc.ABC):
             Remote registry path
         local_path : str
             Local registry path
-        delete_local : bool
+        delete_local : bool, optional
             If true, this method deletes files and directories that exist in the local_path but not in the remote_path
         exclude : list, optional
             List of patterns to exclude, by default None.
             If excluding whole directories, the exclusion must end with /* , e.g. data/*
-
+        cp : bool, optional
+            Use the aws s3 cp command instead of sync (i.e., if only a single file needs to be copied). By default False.
         """
 
     @abc.abstractmethod

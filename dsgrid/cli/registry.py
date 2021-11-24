@@ -609,9 +609,39 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
 
 @click.command()
 @click.pass_obj
-def sync(registry_manager):
-    """Sync the official dsgrid registry to the local system."""
+@click.option(
+    "--project_id",
+    "-P",
+    type=str,
+    help="Sync latest dataset(s) version based on Project ID",
+)
+@click.option(
+    "--dataset_id",
+    "-D",
+    type=str,
+    help="Sync latest dataset version based on Dataset ID",
+)
+@click.option(
+    "--version",
+    "-V",
+    type=str,
+    help="Sync a specific dataset version. Must be called with the -D option.",
+)
+def data_sync(registry_manager, project_id, dataset_id):
+    """Sync the official dsgrid registry data to the local system."""
     # aws.sync(REMOTE_REGISTRY, registry_manager.path)
+    # no_prompts = registry_manager.no_prompts
+    print(f"Project_ID = {project_id}")
+    print(f"Dataset_ID = {dataset_id}")
+    registry_manager.data_sync(project_id, dataset_id)
+
+    # no_prompts = ctx.parent.params["no_prompts"]
+    # if "--help" in sys.argv:
+    #     ctx.obj = None
+    # else:
+    #     ctx.obj = RegistryManager.load(
+    #         path, remote_path, offline_mode=offline, dry_run_mode=dry_run, no_prompts=no_prompts
+    #     )
 
 
 dimensions.add_command(list_dimensions)
@@ -640,4 +670,4 @@ registry.add_command(dimensions)
 registry.add_command(dimension_mappings)
 registry.add_command(projects)
 registry.add_command(datasets)
-registry.add_command(sync)
+registry.add_command(data_sync)

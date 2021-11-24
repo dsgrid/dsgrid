@@ -185,8 +185,8 @@ class RegistryManager:
                 sync = True
 
             if sync:
-                logger.info("Sync from remote registry.")
-                # NOTE: currently only /configs are pulled. /data is not being pulled with this sync_pull command.
+                logger.info("Sync configs from remote registry.")
+                # NOTE: When creating a registry, only the /configs are pulled. To sync_pull /data, use the dsgrid registry data-sync CLI command.
                 cloud_interface.sync_pull(
                     remote_path + "/configs",
                     str(path) + "/configs",
@@ -220,6 +220,86 @@ class RegistryManager:
             dry_run_mode,
         )
         return cls(params)
+
+    def data_sync(self, project_id, dataset_id):
+        """Sync data from the remote dsgrid registry.
+
+        Parameters
+        ----------
+        project_id : str
+            Sync by project_id filter
+        dataset_id : str
+            Sync by dataset_id filter
+        """
+        # TODO: docstring
+        fs_interface = self._params.fs_interface
+        cloud_interface = self._params.cloud_interface
+        offline_mode = self._params.offline
+        dry_run_mode = self._params.dry_run
+        no_prompts = True  # TODO: how do we pass in no_prompts from registry cli parent?
+
+        if not offline_mode:
+            if project_id:
+                if self.project_manager.has_id(project_id):
+                    if dataset_id:
+                        # TODO: self.dataset_manager.has_id() gives us all datasets in the registry. We want all datasets associated with a project. This is an error at the moment.
+                        if self.dataset_manager.has_id(dataset_id):
+                            version = self.dataset_manager.get_current_version(dataset_id)
+                            datasets = [(dataset_id, version)]
+                        else:
+                            raise ValueError(
+                                f"No registered dataset ID = '{dataset_id}' registered to project ID = '{project_id}'"
+                            )
+                    else:
+                        datasets = []
+                        # TODO: self.dataset_manager.has_id() gives us all datasets in the registry. We want all datasets associated with a project. This is an error at the moment.
+                        for dataset in self.dataset_manager.list_ids():
+                            version = self.dataset_manager.get_current_version(dataset)
+                            datasets.append((dataset, str(version)))
+                else:
+                    raise ValueError(f"No registered project ID = '{project_id}'")
+
+            if dataset_id and not project_id:
+                if self.dataset_manager.has_id(dataset_id):
+                    version = self.dataset_manager.get_current_version(dataset_id)
+                    datasets = [(dataset_id, version)]
+                else:
+                    raise ValueError(f"No registered dataset ID = '{dataset_id}'")
+
+            lock_files = list(cloud_interface.get_lock_files())
+
+            for dataset, version in datasets:
+                # TODO: Add check for lock files below
+                # if lock_files:
+                #     for lock_file in lock_files:
+                #         if f"/data/{dataset_id}/{version}" in lock_file:
+                #             msg = msg + "\n\t" + f"- {lock_file}"
+                #             logger.log(msg)
+                if dry_run_mode == True:
+                    sync = False
+                else:
+                    sync = True
+                if sync:
+                    logger.info(
+                        f"Sync data from remote registry for {dataset}, version={version}."
+                    )
+                    cloud_interface.sync_pull(
+                        remote_path=self._params.remote_path + f"/data/{dataset}/{version}",
+                        local_path=str(self._params.base_path) + f"/data/{dataset}/{version}",
+                        exclude=SYNC_EXCLUDE_LIST,
+                        delete_local=True,
+                    )
+                    cloud_interface.sync_pull(
+                        remote_path=self._params.remote_path + f"/data/{dataset}/registry.toml",
+                        local_path=str(self._params.base_path) + f"/data/{dataset}/registry.toml",
+                        exclude=SYNC_EXCLUDE_LIST,
+                        delete_local=True,
+                        cp=True,
+                    )
+                else:
+                    logger.info(
+                        f"Skipping remote registry data sync for {dataset}, version={version}."
+                    )
 
     @property
     def path(self):

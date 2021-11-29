@@ -168,15 +168,21 @@ class DatasetRegistryManager(RegistryManagerBase):
             if row.id is None:
                 raise DSGInvalidDataset(f"load_data for dataset {config.config_id} has a null ID")
             data_ids.append(row.id)
-        lookup_data_ids = []
-        for row in load_data_lookup.select("id").distinct().sort("id").collect():
-            if row.id is None:
-                logger.error("load_data_lookup=%s", load_data_lookup.collect())
-                raise DSGInvalidDataset(
-                    f"load_data_lookup for dataset {config.config_id} has a null data ID"
-                )
-            lookup_data_ids.append(row.id)
+        lookup_data_ids = (
+            load_data_lookup.select("id")
+            .distinct()
+            .filter("id is not null")
+            .sort("id")
+            .agg(F.collect_list("id"))
+            .collect()[0][0]
+        )
         if data_ids != lookup_data_ids:
+            logger.error(
+                f"Data IDs for %s data/lookup are inconsistent: data=%s lookup=%s",
+                config.config_id,
+                data_ids,
+                lookup_data_ids,
+            )
             raise DSGInvalidDataset(
                 f"Data IDs for {config.config_id} data/lookup are inconsistent"
             )

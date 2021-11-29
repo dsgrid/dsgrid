@@ -69,7 +69,9 @@ Data Tables
     |2012-01-01 04:00:00|9106| 0.3872526947775441|                 0.0| 0.06622870555383997|
     +-------------------+----+-------------------+--------------------+--------------------+
 
-- ``load_data_lookup``: Contains mappings from time array index to other dimensions.
+- ``load_data_lookup``: Contains mappings from time array index to other dimensions. There must be
+  a row with a null ``id`` for every combination of dimensions that does not exist in the
+  load_data.
 
 ::
 

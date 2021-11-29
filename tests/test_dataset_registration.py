@@ -47,7 +47,6 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
             _setup_invalid_load_data_missing_timestamp,
             _setup_invalid_load_data_id_missing_timestamp,
             _setup_invalid_load_data_id_extra_timestamp,
-            _setup_invalid_load_data_lookup_null_id,
             _setup_invalid_load_data_lookup_mismatched_ids,
             _setup_invalid_load_data_extra_column,
         )
@@ -149,14 +148,6 @@ def _setup_invalid_load_data_null_id(data_dir):
 
     data_file.write_text("\n".join(lines))
     return DSGInvalidDataset, r"load_data .*has a null ID"
-
-
-def _setup_invalid_load_data_lookup_null_id(data_dir):
-    lookup_file = data_dir / "test_efs_comstock" / "load_data_lookup.json"
-    data = load_line_delimited_json(lookup_file)
-    data[0]["id"] = None
-    dump_line_delimited_json(data, lookup_file)
-    return DSGInvalidDataset, r"load_data_lookup for dataset .*has a null data ID"
 
 
 def _setup_invalid_load_data_lookup_mismatched_ids(data_dir):

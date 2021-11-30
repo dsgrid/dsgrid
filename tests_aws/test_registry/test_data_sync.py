@@ -38,7 +38,9 @@ def test_data_sync_project_id(s3_cloudinterface, local_registry_data_sync, remot
         registry_manager.data_sync(project_id, dataset_id)
 
         assert (
-            LocalFilesystem().listdir(local_registry_data_sync / "data", directories_only=True)
+            len(
+                LocalFilesystem().listdir(local_registry_data_sync / "data", directories_only=True)
+            )
             == 2
         ), "Datasets downloaded should be 2"
     finally:
@@ -62,7 +64,9 @@ def test_data_sync_dataset_id():
         registry_manager.data_sync(project_id, dataset_id)
 
         assert (
-            LocalFilesystem().listdir(local_registry_data_sync / "data", directories_only=True)
+            len(
+                LocalFilesystem().listdir(local_registry_data_sync / "data", directories_only=True)
+            )
             == 1
         ), "Datasets downloaded should be 1"
 
@@ -87,7 +91,9 @@ def test_data_sync_project_id_and_dataset_id():
         registry_manager.data_sync(project_id, dataset_id)
 
         assert (
-            LocalFilesystem().listdir(local_registry_data_sync / "data", directories_only=True)
+            len(
+                LocalFilesystem().listdir(local_registry_data_sync / "data", directories_only=True)
+            )
             == 1
         ), "Datasets downloaded should be 1"
 

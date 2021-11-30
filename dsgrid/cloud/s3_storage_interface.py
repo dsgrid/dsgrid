@@ -27,9 +27,9 @@ class S3StorageInterface(CloudStorageInterface):
         self._local_filesystem = LocalFilesystem()
         self._s3_filesystem = S3Filesystem(remote_path, profile)
 
-    def _sync(self, src, dst, exclude=None, cp=False):
+    def _sync(self, src, dst, exclude=None, is_file=False):
         start = time.time()
-        if cp:
+        if is_file:
             sync_command = f"aws s3 cp {src} {dst} --profile {self._s3_filesystem._profile}"
         else:
             sync_command = f"aws s3 sync {src} {dst} --profile {self._s3_filesystem._profile}"
@@ -121,7 +121,7 @@ class S3StorageInterface(CloudStorageInterface):
                 )
             filepath.unlink()
 
-    def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False, cp=False):
+    def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False, is_file=False):
         if delete_local:
             local_contents = self._local_filesystem.rglob(local_path)
             s3_contents = {
@@ -133,7 +133,7 @@ class S3StorageInterface(CloudStorageInterface):
                 if relcontent not in s3_contents:
                     self._local_filesystem.rm(content)
                     logger.info("delete: %s because it is not in %s", relcontent, remote_path)
-        self._sync(remote_path, local_path, exclude, cp)
+        self._sync(remote_path, local_path, exclude, is_file)
 
     def sync_push(self, remote_path, local_path, exclude=None):
         self._sync(local_path, remote_path, exclude)

@@ -608,6 +608,7 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
 
 
 @click.command()
+@click.pass_context
 @click.pass_obj
 @click.option(
     "--project_id",
@@ -627,13 +628,10 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
     type=str,
     help="Sync a specific dataset version. Must be called with the -D option.",
 )
-def data_sync(registry_manager, project_id, dataset_id):
+def data_sync(ctx, registry_manager, project_id, dataset_id):
     """Sync the official dsgrid registry data to the local system."""
-    # aws.sync(REMOTE_REGISTRY, registry_manager.path)
-    # no_prompts = registry_manager.no_prompts
-    print(f"Project_ID = {project_id}")
-    print(f"Dataset_ID = {dataset_id}")
-    registry_manager.data_sync(project_id, dataset_id)
+    no_prompts = ctx.parent.params["no_prompts"]
+    registry_manager.data_sync(project_id, dataset_id, no_prompts)
 
     # no_prompts = ctx.parent.params["no_prompts"]
     # if "--help" in sys.argv:

@@ -241,6 +241,11 @@ class ProjectConfigModel(DSGBaseModel):
         optional=True,
         notes=("`[dimension_mappings]` are optional at the project level.",),
     )
+    dimension_associations: List = Field(
+        title="dimension_associations",
+        description="List of tabular files that specify required dimension associations.",
+        default=[],
+    )
 
     @validator("project_id")
     def check_project_id_handle(cls, project_id):

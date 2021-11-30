@@ -27,10 +27,7 @@ def init_spark(name, mem="5g", num_cpus=None):
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf = SparkConf().setAppName(name).setMaster(cluster)
         sc = SparkContext(conf=conf)
-        spark = (
-            SparkSession.builder.config(conf=conf)
-            .getOrCreate()
-        )
+        spark = SparkSession.builder.config(conf=conf).getOrCreate()
         return spark
 
     logger.info("Create SparkSession %s in new cluster", name)

@@ -33,8 +33,14 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_lock_files(self):
-        """Returns a generator of lock files within the /.locks directory (non-recursive)."""
+    def get_lock_files(self, relative_path=None):
+        """Returns a generator of lock files within the /.locks directory (non-recursive).
+
+        Parameters
+        ----------
+        relative_path : str
+            Relative path to search for lock files in. By default, None.
+        """
 
     @abc.abstractmethod
     def has_lock_files(self):

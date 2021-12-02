@@ -67,15 +67,19 @@ class S3StorageInterface(CloudStorageInterface):
         if relative_path == Path("configs/.locks"):
             pass
         elif relative_path == Path("data/.locks"):
-            assert False, "Data locks are currently not supported."
+            pass
         else:
             DSGMakeLockError(
                 "Lock file path provided must have relative path of configs/.locks or data/.locks"
             )
         return True
 
-    def get_lock_files(self):
-        contents = self._s3_filesystem.path(".locks").glob(pattern="*")
+    def get_lock_files(self, relative_path=None):
+        contents = list(self._s3_filesystem.path(".locks").glob(pattern="*"))
+        if relative_path:
+            for path in contents:
+                if not path.relative_to(relative_path):
+                    contents.remove(path)
         return contents
 
     def has_lock_files(self):

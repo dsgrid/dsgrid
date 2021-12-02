@@ -622,24 +622,10 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
     type=str,
     help="Sync latest dataset version based on Dataset ID",
 )
-@click.option(
-    "--version",
-    "-V",
-    type=str,
-    help="Sync a specific dataset version. Must be called with the -D option.",
-)
 def data_sync(ctx, registry_manager, project_id, dataset_id):
     """Sync the official dsgrid registry data to the local system."""
     no_prompts = ctx.parent.params["no_prompts"]
     registry_manager.data_sync(project_id, dataset_id, no_prompts)
-
-    # no_prompts = ctx.parent.params["no_prompts"]
-    # if "--help" in sys.argv:
-    #     ctx.obj = None
-    # else:
-    #     ctx.obj = RegistryManager.load(
-    #         path, remote_path, offline_mode=offline, dry_run_mode=dry_run, no_prompts=no_prompts
-    #     )
 
 
 dimensions.add_command(list_dimensions)

@@ -234,83 +234,84 @@ class RegistryManager:
         no_prompts :  bool
             If no_prompts is False, the user will be prompted to continue sync pulling the registry if lock files exist. By default, True.
         """
-        fs_interface = self._params.fs_interface
+        if not project_id and not dataset_id:
+            raise ValueError("Must provide a dataset_id or project_id for dsgrid data-sync.")
+
+        if project_id:
+            if not self.project_manager.has_id(project_id):
+                raise ValueError(f"No registered project ID = '{project_id}'")
+            project_version = self.project_manager.get_current_version(project_id)
+            config_file = self.project_manager.get_config_file(project_id, project_version)
+            config = ProjectConfig.load(
+                config_file, self.dimension_manager, self.dimension_mapping_manager
+            )
+            if dataset_id:
+                if dataset_id not in config.list_registered_dataset_ids():
+                    raise ValueError(
+                        f"No registered dataset ID = '{dataset_id}' registered to project ID = '{project_id}'"
+                    )
+                datasets = [(dataset_id, str(config.get_dataset(dataset_id).version))]
+            else:
+                datasets = []
+                for dataset in config.list_registered_dataset_ids():
+                    datasets.append((dataset, str(config.get_dataset(dataset).version)))
+
+        if dataset_id and not project_id:
+            if not self.dataset_manager.has_id(dataset_id):
+                raise ValueError(f"No registered dataset ID = '{dataset_id}'")
+            version = self.dataset_manager.get_current_version(dataset_id)
+            datasets = [(dataset_id, version)]
+
+        for dataset, version in datasets:
+            self._data_sync(dataset, version, no_prompts)
+
+    def _data_sync(self, dataset_id, version, no_prompts=True):
         cloud_interface = self._params.cloud_interface
         offline_mode = self._params.offline
         dry_run_mode = self._params.dry_run
 
-        if not offline_mode:
-            if project_id:
-                if self.project_manager.has_id(project_id):
-                    project_version = self.project_manager.get_current_version(project_id)
-                    config_file = self.project_manager.get_config_file(project_id, project_version)
-                    config = ProjectConfig.load(
-                        config_file, self.dimension_manager, self.dimension_mapping_manager
-                    )
-                    if dataset_id:
-                        if dataset_id in config.list_registered_dataset_ids():
-                            datasets = [(dataset_id, str(config.get_dataset(dataset_id).version))]
-                        else:
-                            raise ValueError(
-                                f"No registered dataset ID = '{dataset_id}' registered to project ID = '{project_id}'"
-                            )
-                    else:
-                        datasets = []
-                        for dataset in config.list_registered_dataset_ids():
-                            datasets.append((dataset, str(config.get_dataset(dataset).version)))
-                else:
-                    raise ValueError(f"No registered project ID = '{project_id}'")
+        if offline_mode:
+            raise ValueError("dsgrid data-sync only works in online mode.")
+        if dry_run_mode == True:
+            sync = False
+        else:
+            sync = True
 
-            if dataset_id and not project_id:
-                if self.dataset_manager.has_id(dataset_id):
-                    version = self.dataset_manager.get_current_version(dataset_id)
-                    datasets = [(dataset_id, version)]
-                else:
-                    raise ValueError(f"No registered dataset ID = '{dataset_id}'")
-
-            lock_files = list(cloud_interface.get_lock_files())
-            if lock_files:
-                msg = f"There are {len(lock_files)} lock files in the registry:"
-                for lock_file in lock_files:
-                    msg = msg + "\n\t" + f"- {lock_file}"
-                logger.log(msg)
-                if not no_prompts:
-                    msg = (
-                        msg
-                        + "\n... Do you want to continue syncing the registry contents? [Y] >>> "
-                    )
-                    val = input(msg)
-                    if val == "" or val.lower() == "y":
-                        sync = True
-                    else:
-                        logger.info("Skipping remote registry sync.")
-
-            for dataset, version in datasets:
-                if dry_run_mode == True:
-                    sync = False
-                else:
+        lock_files = list(
+            cloud_interface.get_lock_files(
+                relative_path=f"s3:/{cloud_interface._s3_filesystem._bucket}/configs/datasets/{dataset_id}"
+            )
+        )
+        if lock_files:
+            msg = f"There are {len(lock_files)} lock files in the registry:"
+            for lock_file in lock_files:
+                msg = msg + "\n\t" + f"- {lock_file}"
+            logger.log(msg)
+            if not no_prompts:
+                msg = msg + "\n... Do you want to continue syncing the registry contents? [Y] >>> "
+                val = input(msg)
+                if val == "" or val.lower() == "y":
                     sync = True
-                if sync:
-                    logger.info(
-                        f"Sync data from remote registry for {dataset}, version={version}."
-                    )
-                    cloud_interface.sync_pull(
-                        remote_path=self._params.remote_path + f"/data/{dataset}/{version}",
-                        local_path=str(self._params.base_path) + f"/data/{dataset}/{version}",
-                        exclude=SYNC_EXCLUDE_LIST,
-                        delete_local=True,
-                    )
-                    cloud_interface.sync_pull(
-                        remote_path=self._params.remote_path + f"/data/{dataset}/registry.toml",
-                        local_path=str(self._params.base_path) + f"/data/{dataset}/registry.toml",
-                        exclude=SYNC_EXCLUDE_LIST,
-                        delete_local=True,
-                        is_file=True,
-                    )
                 else:
-                    logger.info(
-                        f"Skipping remote registry data sync for {dataset}, version={version}."
-                    )
+                    logger.info("Skipping remote registry sync.")
+
+        if sync:
+            logger.info(f"Sync data from remote registry for {dataset_id}, version={version}.")
+            cloud_interface.sync_pull(
+                remote_path=self._params.remote_path + f"/data/{dataset_id}/{version}",
+                local_path=str(self._params.base_path) + f"/data/{dataset_id}/{version}",
+                exclude=SYNC_EXCLUDE_LIST,
+                delete_local=True,
+            )
+            cloud_interface.sync_pull(
+                remote_path=self._params.remote_path + f"/data/{dataset_id}/registry.toml",
+                local_path=str(self._params.base_path) + f"/data/{dataset_id}/registry.toml",
+                exclude=SYNC_EXCLUDE_LIST,
+                delete_local=True,
+                is_file=True,
+            )
+        else:
+            logger.info(f"Skipping remote registry data sync for {dataset_id}, version={version}.")
 
     @property
     def path(self):

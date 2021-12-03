@@ -20,6 +20,7 @@ from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.utils.spark import init_spark
 from .common import (
@@ -171,7 +172,7 @@ class RegistryManager:
                 msg = f"There are {len(lock_files)} lock files in the registry:"
                 for lock_file in lock_files:
                     msg = msg + "\n\t" + f"- {lock_file}"
-                logger.log(msg)
+                logger.info(msg)
                 if not no_prompts:
                     msg = (
                         msg
@@ -180,8 +181,8 @@ class RegistryManager:
                     val = input(msg)
                     if val == "" or val.lower() == "y":
                         sync = True
-                    else:
-                        logger.info("Skipping remote registry sync.")
+                else:
+                    logger.info("Skipping remote registry sync.")
             else:
                 sync = True
 
@@ -239,7 +240,7 @@ class RegistryManager:
 
         if project_id:
             if not self.project_manager.has_id(project_id):
-                raise ValueError(f"No registered project ID = '{project_id}'")
+                raise DSGValueNotRegistered(f"No registered project ID = '{project_id}'")
             project_version = self.project_manager.get_current_version(project_id)
             config_file = self.project_manager.get_config_file(project_id, project_version)
             config = ProjectConfig.load(
@@ -247,7 +248,7 @@ class RegistryManager:
             )
             if dataset_id:
                 if dataset_id not in config.list_registered_dataset_ids():
-                    raise ValueError(
+                    raise DSGValueNotRegistered(
                         f"No registered dataset ID = '{dataset_id}' registered to project ID = '{project_id}'"
                     )
                 datasets = [(dataset_id, str(config.get_dataset(dataset_id).version))]
@@ -258,7 +259,7 @@ class RegistryManager:
 
         if dataset_id and not project_id:
             if not self.dataset_manager.has_id(dataset_id):
-                raise ValueError(f"No registered dataset ID = '{dataset_id}'")
+                raise DSGValueNotRegistered(f"No registered dataset ID = '{dataset_id}'")
             version = self.dataset_manager.get_current_version(dataset_id)
             datasets = [(dataset_id, version)]
 
@@ -279,7 +280,7 @@ class RegistryManager:
 
         lock_files = list(
             cloud_interface.get_lock_files(
-                relative_path=f"s3:/{cloud_interface._s3_filesystem._bucket}/configs/datasets/{dataset_id}"
+                relative_path=f"{cloud_interface._s3_filesystem._bucket}/configs/datasets/{dataset_id}"
             )
         )
         if lock_files:
@@ -294,19 +295,18 @@ class RegistryManager:
                     sync = True
                 else:
                     logger.info("Skipping remote registry sync.")
+                    sync = False
 
         if sync:
             logger.info(f"Sync data from remote registry for {dataset_id}, version={version}.")
             cloud_interface.sync_pull(
                 remote_path=self._params.remote_path + f"/data/{dataset_id}/{version}",
                 local_path=str(self._params.base_path) + f"/data/{dataset_id}/{version}",
-                exclude=SYNC_EXCLUDE_LIST,
                 delete_local=True,
             )
             cloud_interface.sync_pull(
                 remote_path=self._params.remote_path + f"/data/{dataset_id}/registry.toml",
                 local_path=str(self._params.base_path) + f"/data/{dataset_id}/registry.toml",
-                exclude=SYNC_EXCLUDE_LIST,
                 delete_local=True,
                 is_file=True,
             )

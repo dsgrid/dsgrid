@@ -75,11 +75,20 @@ class S3StorageInterface(CloudStorageInterface):
         return True
 
     def get_lock_files(self, relative_path=None):
-        contents = list(self._s3_filesystem.path(".locks").glob(pattern="*"))
         if relative_path:
-            for path in contents:
-                if not path.relative_to(relative_path):
-                    contents.remove(path)
+            contents = self._s3_filesystem.path(
+                f"{self._s3_filesystem._bucket}/{relative_path}"
+            ).glob(pattern="**/*.locks")
+        else:
+            contents = self._s3_filesystem.path(self._s3_filesystem._bucket).glob(
+                pattern="**/*.locks"
+            )
+        # if relative_path:
+        #     relative_contents = []
+        #     for path in contents:
+        #         if str(path).startswith(relative_path):
+        #             relative_contents.append(path)
+        #     return relative_contents
         return contents
 
     def has_lock_files(self):

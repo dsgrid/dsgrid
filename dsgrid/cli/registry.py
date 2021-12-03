@@ -611,13 +611,13 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
 @click.pass_context
 @click.pass_obj
 @click.option(
-    "--project_id",
+    "--project-id",
     "-P",
     type=str,
     help="Sync latest dataset(s) version based on Project ID",
 )
 @click.option(
-    "--dataset_id",
+    "--dataset-id",
     "-D",
     type=str,
     help="Sync latest dataset version based on Dataset ID",

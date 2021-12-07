@@ -283,6 +283,7 @@ class RegistryManager:
                 relative_path=f"{cloud_interface._s3_filesystem._bucket}/configs/datasets/{dataset_id}"
             )
         )
+        assert len(lock_files) == 1
         if lock_files:
             msg = f"There are {len(lock_files)} lock files in the registry:"
             for lock_file in lock_files:

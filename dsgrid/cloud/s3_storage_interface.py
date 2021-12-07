@@ -30,9 +30,9 @@ class S3StorageInterface(CloudStorageInterface):
     def _sync(self, src, dst, exclude=None, is_file=False):
         start = time.time()
         if is_file:
-            sync_command = f"aws s3 cp {src} {dst} --profile {self._s3_filesystem._profile}"
+            sync_command = f"aws s3 cp {src} {dst} --profile {self._s3_filesystem.profile}"
         else:
-            sync_command = f"aws s3 sync {src} {dst} --profile {self._s3_filesystem._profile}"
+            sync_command = f"aws s3 sync {src} {dst} --profile {self._s3_filesystem.profile}"
         if exclude:
             for x in exclude:
                 sync_command = sync_command + f" --exclude {x}"
@@ -77,18 +77,12 @@ class S3StorageInterface(CloudStorageInterface):
     def get_lock_files(self, relative_path=None):
         if relative_path:
             contents = self._s3_filesystem.path(
-                f"{self._s3_filesystem._bucket}/{relative_path}"
+                f"{self._s3_filesystem.bucket}/{relative_path}"
             ).glob(pattern="**/*.locks")
         else:
-            contents = self._s3_filesystem.path(self._s3_filesystem._bucket).glob(
+            contents = self._s3_filesystem.path(self._s3_filesystem.bucket).glob(
                 pattern="**/*.locks"
             )
-        # if relative_path:
-        #     relative_contents = []
-        #     for path in contents:
-        #         if str(path).startswith(relative_path):
-        #             relative_contents.append(path)
-        #     return relative_contents
         return contents
 
     def has_lock_files(self):

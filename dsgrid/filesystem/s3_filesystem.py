@@ -28,6 +28,14 @@ class S3Filesystem(CloudFilesystemInterface):
 
         register_configuration_parameter(S3Path("/"), resource=self._session.resource("s3"))
 
+    @property
+    def profile(self):
+        return self._profile
+
+    @property
+    def bucket(self):
+        return self._bucket
+
     def _Key(self, path):
         """Get formatted S3 key from provided path for S3Path module"""
         if not path:

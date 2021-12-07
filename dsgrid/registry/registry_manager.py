@@ -239,13 +239,7 @@ class RegistryManager:
             raise ValueError("Must provide a dataset_id or project_id for dsgrid data-sync.")
 
         if project_id:
-            if not self.project_manager.has_id(project_id):
-                raise DSGValueNotRegistered(f"No registered project ID = '{project_id}'")
-            project_version = self.project_manager.get_current_version(project_id)
-            config_file = self.project_manager.get_config_file(project_id, project_version)
-            config = ProjectConfig.load(
-                config_file, self.dimension_manager, self.dimension_mapping_manager
-            )
+            config = self.project_manager.get_by_id(project_id)
             if dataset_id:
                 if dataset_id not in config.list_registered_dataset_ids():
                     raise DSGValueNotRegistered(
@@ -283,8 +277,8 @@ class RegistryManager:
                 relative_path=f"{cloud_interface._s3_filesystem._bucket}/configs/datasets/{dataset_id}"
             )
         )
-        assert len(lock_files) == 1
-        if lock_files:
+        if lock_files and not dry_run_mode:
+            assert len(lock_files) == 1
             msg = f"There are {len(lock_files)} lock files in the registry:"
             for lock_file in lock_files:
                 msg = msg + "\n\t" + f"- {lock_file}"

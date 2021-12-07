@@ -27,9 +27,12 @@ class S3StorageInterface(CloudStorageInterface):
         self._local_filesystem = LocalFilesystem()
         self._s3_filesystem = S3Filesystem(remote_path, profile)
 
-    def _sync(self, src, dst, exclude=None):
+    def _sync(self, src, dst, exclude=None, is_file=False):
         start = time.time()
-        sync_command = f"aws s3 sync {src} {dst} --profile {self._s3_filesystem._profile}"
+        if is_file:
+            sync_command = f"aws s3 cp {src} {dst} --profile {self._s3_filesystem.profile}"
+        else:
+            sync_command = f"aws s3 sync {src} {dst} --profile {self._s3_filesystem.profile}"
         if exclude:
             for x in exclude:
                 sync_command = sync_command + f" --exclude {x}"
@@ -64,15 +67,22 @@ class S3StorageInterface(CloudStorageInterface):
         if relative_path == Path("configs/.locks"):
             pass
         elif relative_path == Path("data/.locks"):
-            assert False, "Data locks are currently not supported."
+            pass
         else:
             DSGMakeLockError(
                 "Lock file path provided must have relative path of configs/.locks or data/.locks"
             )
         return True
 
-    def get_lock_files(self):
-        contents = self._s3_filesystem.path(".locks").glob(pattern="*")
+    def get_lock_files(self, relative_path=None):
+        if relative_path:
+            contents = self._s3_filesystem.path(
+                f"{self._s3_filesystem.bucket}/{relative_path}"
+            ).glob(pattern="**/*.locks")
+        else:
+            contents = self._s3_filesystem.path(self._s3_filesystem.bucket).glob(
+                pattern="**/*.locks"
+            )
         return contents
 
     def has_lock_files(self):
@@ -118,7 +128,7 @@ class S3StorageInterface(CloudStorageInterface):
                 )
             filepath.unlink()
 
-    def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False):
+    def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False, is_file=False):
         if delete_local:
             local_contents = self._local_filesystem.rglob(local_path)
             s3_contents = {
@@ -130,7 +140,7 @@ class S3StorageInterface(CloudStorageInterface):
                 if relcontent not in s3_contents:
                     self._local_filesystem.rm(content)
                     logger.info("delete: %s because it is not in %s", relcontent, remote_path)
-        self._sync(remote_path, local_path, exclude)
+        self._sync(remote_path, local_path, exclude, is_file)
 
     def sync_push(self, remote_path, local_path, exclude=None):
         self._sync(local_path, remote_path, exclude)

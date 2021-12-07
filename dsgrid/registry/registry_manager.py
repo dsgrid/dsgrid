@@ -18,7 +18,9 @@ from dsgrid.config.association_tables import AssociationTableConfig
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.utils.spark import init_spark
 from .common import (
@@ -170,7 +172,7 @@ class RegistryManager:
                 msg = f"There are {len(lock_files)} lock files in the registry:"
                 for lock_file in lock_files:
                     msg = msg + "\n\t" + f"- {lock_file}"
-                logger.log(msg)
+                logger.info(msg)
                 if not no_prompts:
                     msg = (
                         msg
@@ -179,14 +181,14 @@ class RegistryManager:
                     val = input(msg)
                     if val == "" or val.lower() == "y":
                         sync = True
-                    else:
-                        logger.info("Skipping remote registry sync.")
+                else:
+                    logger.info("Skipping remote registry sync.")
             else:
                 sync = True
 
             if sync:
-                logger.info("Sync from remote registry.")
-                # NOTE: currently only /configs are pulled. /data is not being pulled with this sync_pull command.
+                logger.info("Sync configs from remote registry.")
+                # NOTE: When creating a registry, only the /configs are pulled. To sync_pull /data, use the dsgrid registry data-sync CLI command.
                 cloud_interface.sync_pull(
                     remote_path + "/configs",
                     str(path) + "/configs",
@@ -220,6 +222,91 @@ class RegistryManager:
             dry_run_mode,
         )
         return cls(params)
+
+    def data_sync(self, project_id, dataset_id, no_prompts=True):
+        """Sync data from the remote dsgrid registry.
+
+        Parameters
+        ----------
+        project_id : str
+            Sync by project_id filter
+        dataset_id : str
+            Sync by dataset_id filter
+        no_prompts :  bool
+            If no_prompts is False, the user will be prompted to continue sync pulling the registry if lock files exist. By default, True.
+        """
+        if not project_id and not dataset_id:
+            raise ValueError("Must provide a dataset_id or project_id for dsgrid data-sync.")
+
+        if project_id:
+            config = self.project_manager.get_by_id(project_id)
+            if dataset_id:
+                if dataset_id not in config.list_registered_dataset_ids():
+                    raise DSGValueNotRegistered(
+                        f"No registered dataset ID = '{dataset_id}' registered to project ID = '{project_id}'"
+                    )
+                datasets = [(dataset_id, str(config.get_dataset(dataset_id).version))]
+            else:
+                datasets = []
+                for dataset in config.list_registered_dataset_ids():
+                    datasets.append((dataset, str(config.get_dataset(dataset).version)))
+
+        if dataset_id and not project_id:
+            if not self.dataset_manager.has_id(dataset_id):
+                raise DSGValueNotRegistered(f"No registered dataset ID = '{dataset_id}'")
+            version = self.dataset_manager.get_current_version(dataset_id)
+            datasets = [(dataset_id, version)]
+
+        for dataset, version in datasets:
+            self._data_sync(dataset, version, no_prompts)
+
+    def _data_sync(self, dataset_id, version, no_prompts=True):
+        cloud_interface = self._params.cloud_interface
+        offline_mode = self._params.offline
+        dry_run_mode = self._params.dry_run
+
+        if offline_mode:
+            raise ValueError("dsgrid data-sync only works in online mode.")
+        if dry_run_mode == True:
+            sync = False
+        else:
+            sync = True
+
+        lock_files = list(
+            cloud_interface.get_lock_files(
+                relative_path=f"{cloud_interface._s3_filesystem._bucket}/configs/datasets/{dataset_id}"
+            )
+        )
+        if lock_files and not dry_run_mode:
+            assert len(lock_files) == 1
+            msg = f"There are {len(lock_files)} lock files in the registry:"
+            for lock_file in lock_files:
+                msg = msg + "\n\t" + f"- {lock_file}"
+            logger.log(msg)
+            if not no_prompts:
+                msg = msg + "\n... Do you want to continue syncing the registry contents? [Y] >>> "
+                val = input(msg)
+                if val == "" or val.lower() == "y":
+                    sync = True
+                else:
+                    logger.info("Skipping remote registry sync.")
+                    sync = False
+
+        if sync:
+            logger.info(f"Sync data from remote registry for {dataset_id}, version={version}.")
+            cloud_interface.sync_pull(
+                remote_path=self._params.remote_path + f"/data/{dataset_id}/{version}",
+                local_path=str(self._params.base_path) + f"/data/{dataset_id}/{version}",
+                delete_local=True,
+            )
+            cloud_interface.sync_pull(
+                remote_path=self._params.remote_path + f"/data/{dataset_id}/registry.toml",
+                local_path=str(self._params.base_path) + f"/data/{dataset_id}/registry.toml",
+                delete_local=True,
+                is_file=True,
+            )
+        else:
+            logger.info(f"Skipping remote registry data sync for {dataset_id}, version={version}.")
 
     @property
     def path(self):

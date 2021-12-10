@@ -608,8 +608,8 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
 
 
 @click.command()
-@click.pass_context
 @click.pass_obj
+@click.pass_context
 @click.option(
     "--project-id",
     "-P",
@@ -624,7 +624,7 @@ def update_dataset(registry_manager, dataset_config_file, log_message, update_ty
 )
 def data_sync(ctx, registry_manager, project_id, dataset_id):
     """Sync the official dsgrid registry data to the local system."""
-    no_prompts = ctx.parent.params["no_prompts"]
+    no_prompts = ctx.parent.parent.params["no_prompts"]
     registry_manager.data_sync(project_id, dataset_id, no_prompts)
 
 

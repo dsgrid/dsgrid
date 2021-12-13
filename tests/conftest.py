@@ -43,8 +43,6 @@ def pytest_sessionstart(session):
             sys.exit(1)
         commit_file.write_text(latest_commit + "\n")
 
-    init_spark("dsgrid-test")
-
 
 def _get_latest_commit():
     output = {}

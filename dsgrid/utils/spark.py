@@ -17,27 +17,22 @@ from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 logger = logging.getLogger(__name__)
 
 
-def init_spark(name, mem="5g", num_cpus=None):
+def init_spark(name="dsgrid"):
     """Initialize a SparkSession."""
-    if num_cpus is None:
-        num_cpus = multiprocessing.cpu_count()
-
     cluster = os.environ.get("SPARK_CLUSTER")
     if cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf = SparkConf().setAppName(name).setMaster(cluster)
         sc = SparkContext(conf=conf)
         spark = SparkSession.builder.config(conf=conf).getOrCreate()
-        return spark
-
-    logger.info("Create SparkSession %s in new cluster", name)
-    return (
-        SparkSession.builder.master("local")
-        .appName(name)
-        .config("spark.driver.memory", mem)
-        .config("spark.cores.max", str(num_cpus))
-        .getOrCreate()
-    )
+    else:
+        logger.info("Create SparkSession %s in local-mode cluster", name)
+        spark = SparkSession.builder.master("local") \
+            .appName(name) \
+            .getOrCreate()
+        
+    logger.info("Spark conf: %s", str(spark.sparkContext.getConf().getAll()))
+    return spark
 
 
 @track_timing(timer_stats_collector)

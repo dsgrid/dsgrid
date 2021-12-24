@@ -259,3 +259,14 @@ def make_time_range(start, end, frequency, leap_day_adjustment):
             "366 days not allowed for frequency, use 365 days to specify annual frequency."
         )
     return DatetimeRange(start, end, frequency, leap_day_adjustment)
+
+
+def find_time_delta(from_tz, to_tz):
+    """
+    find datetime.timedelta between two time zones
+    """
+
+    utcnow = datetime.datetime.utcnow()
+    time_delta = utcnow.replace(tzinfo=to_tz) - utcnow.replace(tzinfo=from_tz)
+
+    return time_delta

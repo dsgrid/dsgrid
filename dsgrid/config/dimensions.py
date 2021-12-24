@@ -339,7 +339,22 @@ class TimeDimensionModel(TimeDimensionBaseModel):
     )
     ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
-        description="Defines the continuous ranges of time in the data.",
+        description="Defines the continuous ranges of time common for all sets of data series in the dataset.",
+    )
+    ranges_timezone: TimeZone = Field(
+        title="timezone_for_time_ranges",
+        description="""
+        Time zone of the ranges specified:
+            UTC, 
+            HawaiiAleutianStandard, 
+            AlaskaStandard, AlaskaPrevailing,
+            PacificStandard, PacificPrevailing, 
+            MountainStandard, MountainPrevailing, 
+            CentralStandard, CentralPrevailing, 
+            EasternStandard, EasternPrevailing,
+            LOCAL
+            """,
+        options=TimeZone.format_descriptions_for_docs(),
     )
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
         title="leap_day_adjustment",

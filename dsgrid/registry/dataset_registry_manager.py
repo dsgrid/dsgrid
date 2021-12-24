@@ -9,6 +9,7 @@ from datetime import timedelta
 
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
+import pyspark.sql.types as T
 
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_config import (
@@ -34,6 +35,7 @@ from .dataset_registry import (
     DatasetRegistryModel,
 )
 from .registry_manager_base import RegistryManagerBase
+from dsgrid.dimension.time import TimeZone, find_time_delta
 
 
 logger = logging.getLogger(__name__)
@@ -129,17 +131,78 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _check_dataset_time_consistency(self, config: DatasetConfig, load_data):
         time_dim = config.get_dimension(DimensionType.TIME)
-        tz = time_dim.get_tzinfo()
+        data_tz = time_dim.get_data_tzinfo()
         time_ranges = time_dim.get_time_ranges()
+        time_ranges_tz = time_dim.get_tzinfo()
+
         assert len(time_ranges) == 1, len(time_ranges)
         time_range = time_ranges[0]
         # TODO: need to support validation of multiple time ranges: DSGRID-173
 
         expected_timestamps = time_dim.list_time_range(time_range)
-        actual_timestamps = [
-            x.timestamp.astimezone().astimezone(tz)
-            for x in load_data.select("timestamp").distinct().sort("timestamp").collect()
-        ]
+
+        #### Need to test this entire block ####
+        if data_tz != time_ranges_tz:
+            # convert data timestamps to time_ranges_tz and compare to expected_timestamps
+            if time_ranges_tz == TimeZone.LOCAL:
+                # load map as spark df and raise error if not found, make sure to_id is in proper tz_info type
+                tz_map  # FIXME #models_to_dataframe #spark.read.option("header",True).csv(filename)
+            else:
+                # create a map based on time_ranges_tz
+                tz_map = load_data_lookup.select(
+                    F.col("geography").alias("from_id"), F.lit(time_ranges_tz).alias("to_id")
+                )
+
+            timestamps_by_geography = load_data.join(
+                load_data_lookup.join(
+                    tz_map, load_data_lookup.geography == tz_map.from_id, "left"
+                ),
+                "id",
+                "left",
+            ).select(
+                "id",
+                "geography",
+                "timestamp",
+                F.lit(data_tz).alias("from_timezone"),
+                F.col("to_id").alias("to_timezone"),
+            )
+            udf_find_time_delta = F.udf(lambda fm, to: find_time_delta(fm, to), T.DateType())
+            timestamps_by_geography = timestamps_by_geography.withColumn(
+                "time_delta",
+                udf_find_time_delta(
+                    timestamps_by_geography.from_timezone, timestamps_by_geography.to_timezone
+                ),
+            )
+            timestamps_by_geography = timestamps_by_geography.select(
+                "id", "geography", F.sum("timestamp", "time_delta").alias("timestamp")
+            )  # converted to time_ranges_tz
+
+            actual_timestamps = [
+                x.timestamp.astimezone().astimezone(time_ranges_tz)
+                for x in timestamps_by_geography.select("timestamp")
+                .distinct()
+                .sort("timestamp")
+                .collect()
+            ]
+
+            timestamps_by_id = (
+                timestamps_by_geography.select("timestamp", "id")
+                .groupby("id")
+                .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
+            )
+
+        else:
+            actual_timestamps = [
+                x.timestamp.astimezone().astimezone(data_tz)
+                for x in load_data.select("timestamp").distinct().sort("timestamp").collect()
+            ]
+
+            timestamps_by_id = (
+                load_data.select("timestamp", "id")
+                .groupby("id")
+                .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
+            )
+
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(
                 set(expected_timestamps).symmetric_difference(set(actual_timestamps))
@@ -148,11 +211,6 @@ class DatasetRegistryManager(RegistryManagerBase):
                 f"load_data timestamps do not match expected times. mismatch={mismatch}"
             )
 
-        timestamps_by_id = (
-            load_data.select("timestamp", "id")
-            .groupby("id")
-            .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
-        )
         for row in timestamps_by_id.collect():
             if row.distinct_timestamps != len(expected_timestamps):
                 raise DSGInvalidDataset(

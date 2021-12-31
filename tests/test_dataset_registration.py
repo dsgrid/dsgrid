@@ -16,7 +16,7 @@ from dsgrid.exceptions import (
 )
 from dsgrid.tests.common import make_test_project_dir, make_test_data_dir, TEST_DATASET_DIRECTORY
 from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json
-from tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
+from dsgrid.tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
 
 
 def test_invalid_datasets(make_test_project_dir, make_test_data_dir):

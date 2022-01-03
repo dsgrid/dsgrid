@@ -66,21 +66,16 @@ def local_registry(make_test_project_dir):
         yield base_dir
 
 
-@pytest.fixture
-def s3_cloudinterface(local_registry):
-    s3_cloudinterface = S3StorageInterface(
-        remote_path=TEST_REMOTE_REGISTRY,
-        local_path=local_registry,
-        user="Test",
-        uuid=str(uuid.uuid4()),
-        profile=AWS_PROFILE_NAME,
-    )
-    return s3_cloudinterface
-
-
-def test_data_sync_project_id(s3_cloudinterface, local_registry):
+def test_data_sync_project_id(local_registry):
     with TemporaryDirectory() as local_registry_data_sync:
         try:
+            s3_cloudinterface = S3StorageInterface(
+                remote_path=TEST_REMOTE_REGISTRY,
+                local_path=local_registry,
+                user="Test",
+                uuid=str(uuid.uuid4()),
+                profile=AWS_PROFILE_NAME,
+            )
             s3_cloudinterface.sync_push(
                 local_path=local_registry,
                 remote_path=TEST_REMOTE_REGISTRY,
@@ -111,9 +106,16 @@ def test_data_sync_project_id(s3_cloudinterface, local_registry):
             clean_remote_registry(s3_cloudinterface._s3_filesystem)
 
 
-def test_data_sync_dataset_id(s3_cloudinterface, local_registry):
+def test_data_sync_dataset_id(local_registry):
     with TemporaryDirectory() as local_registry_data_sync:
         try:
+            s3_cloudinterface = S3StorageInterface(
+                remote_path=TEST_REMOTE_REGISTRY,
+                local_path=local_registry,
+                user="Test",
+                uuid=str(uuid.uuid4()),
+                profile=AWS_PROFILE_NAME,
+            )
             s3_cloudinterface.sync_push(
                 local_path=local_registry,
                 remote_path=TEST_REMOTE_REGISTRY,
@@ -145,9 +147,16 @@ def test_data_sync_dataset_id(s3_cloudinterface, local_registry):
             clean_remote_registry(s3_cloudinterface._s3_filesystem)
 
 
-def test_data_sync_project_id_and_dataset_id(s3_cloudinterface, local_registry):
+def test_data_sync_project_id_and_dataset_id(local_registry):
     with TemporaryDirectory() as local_registry_data_sync:
         try:
+            s3_cloudinterface = S3StorageInterface(
+                remote_path=TEST_REMOTE_REGISTRY,
+                local_path=local_registry,
+                user="Test",
+                uuid=str(uuid.uuid4()),
+                profile=AWS_PROFILE_NAME,
+            )
             s3_cloudinterface.sync_push(
                 local_path=local_registry,
                 remote_path=TEST_REMOTE_REGISTRY,
@@ -179,9 +188,16 @@ def test_data_sync_project_id_and_dataset_id(s3_cloudinterface, local_registry):
             clean_remote_registry(s3_cloudinterface._s3_filesystem)
 
 
-def test_data_sync_bad_project_id(s3_cloudinterface, local_registry):
+def test_data_sync_bad_project_id(local_registry):
     with TemporaryDirectory() as local_registry_data_sync:
         try:
+            s3_cloudinterface = S3StorageInterface(
+                remote_path=TEST_REMOTE_REGISTRY,
+                local_path=local_registry,
+                user="Test",
+                uuid=str(uuid.uuid4()),
+                profile=AWS_PROFILE_NAME,
+            )
             s3_cloudinterface.sync_push(
                 local_path=local_registry,
                 remote_path=TEST_REMOTE_REGISTRY,
@@ -205,9 +221,16 @@ def test_data_sync_bad_project_id(s3_cloudinterface, local_registry):
             clean_remote_registry(s3_cloudinterface._s3_filesystem)
 
 
-def test_data_sync_bad_dataset_id(s3_cloudinterface, local_registry):
+def test_data_sync_bad_dataset_id(local_registry):
     with TemporaryDirectory() as local_registry_data_sync:
         try:
+            s3_cloudinterface = S3StorageInterface(
+                remote_path=TEST_REMOTE_REGISTRY,
+                local_path=local_registry,
+                user="Test",
+                uuid=str(uuid.uuid4()),
+                profile=AWS_PROFILE_NAME,
+            )
             s3_cloudinterface.sync_push(
                 local_path=local_registry,
                 remote_path=TEST_REMOTE_REGISTRY,
@@ -231,9 +254,16 @@ def test_data_sync_bad_dataset_id(s3_cloudinterface, local_registry):
             clean_remote_registry(s3_cloudinterface._s3_filesystem)
 
 
-def test_data_sync_project_id_and_bad_dataset_id(s3_cloudinterface, local_registry):
+def test_data_sync_project_id_and_bad_dataset_id(local_registry):
     with TemporaryDirectory() as local_registry_data_sync:
         try:
+            s3_cloudinterface = S3StorageInterface(
+                remote_path=TEST_REMOTE_REGISTRY,
+                local_path=local_registry,
+                user="Test",
+                uuid=str(uuid.uuid4()),
+                profile=AWS_PROFILE_NAME,
+            )
             s3_cloudinterface.sync_push(
                 local_path=local_registry,
                 remote_path=TEST_REMOTE_REGISTRY,
@@ -257,9 +287,16 @@ def test_data_sync_project_id_and_bad_dataset_id(s3_cloudinterface, local_regist
             clean_remote_registry(s3_cloudinterface._s3_filesystem)
 
 
-def test_data_sync_project_id(s3_cloudinterface, local_registry):
+def test_data_sync_project_id(local_registry):
     with TemporaryDirectory() as local_registry_data_sync:
         try:
+            s3_cloudinterface = S3StorageInterface(
+                remote_path=TEST_REMOTE_REGISTRY,
+                local_path=local_registry,
+                user="Test",
+                uuid=str(uuid.uuid4()),
+                profile=AWS_PROFILE_NAME,
+            )
             s3_cloudinterface.sync_push(
                 local_path=local_registry,
                 remote_path=TEST_REMOTE_REGISTRY,
@@ -290,10 +327,17 @@ def test_data_sync_project_id(s3_cloudinterface, local_registry):
             clean_remote_registry(s3_cloudinterface._s3_filesystem)
 
 
-def test_data_sync_bad_project_id_with_dataset_lock(s3_cloudinterface, local_registry):
+def test_data_sync_bad_project_id_with_dataset_lock(local_registry):
     with TemporaryDirectory() as local_registry_data_sync:
         try:
             clean_remote_registry(s3_cloudinterface._s3_filesystem)
+            s3_cloudinterface = S3StorageInterface(
+                remote_path=TEST_REMOTE_REGISTRY,
+                local_path=local_registry,
+                user="Test",
+                uuid=str(uuid.uuid4()),
+                profile=AWS_PROFILE_NAME,
+            )
             s3_cloudinterface.sync_push(
                 local_path=local_registry,
                 remote_path=TEST_REMOTE_REGISTRY,

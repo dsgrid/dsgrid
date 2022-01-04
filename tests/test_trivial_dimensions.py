@@ -7,7 +7,7 @@ from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
 from dsgrid.utils.files import load_data, dump_data
 from dsgrid.tests.common import make_test_project_dir, make_test_data_dir, TEST_DATASET_DIRECTORY
-from tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
+from dsgrid.tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
 
 from pathlib import Path
 from tempfile import TemporaryDirectory

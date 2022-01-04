@@ -34,7 +34,7 @@ def pytest_sessionstart(session):
         if TEST_REGISTRY.exists():
             shutil.rmtree(TEST_REGISTRY)
         ret = run_command(
-            f"python tests/make_us_data_registry.py {TEST_REGISTRY} -p {TEST_PROJECT_REPO} "
+            f"python dsgrid/tests/make_us_data_registry.py {TEST_REGISTRY} -p {TEST_PROJECT_REPO} "
             f"-d {TEST_DATASET_DIRECTORY}"
         )
         if ret != 0:

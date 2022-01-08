@@ -94,22 +94,36 @@ class MeasurementType(DSGEnum):
 
 
 class TimeZone(DSGEnum):
-    """Time zone enum types"""
+    """
+    Time zone enum types
+    Caveats:
+    # Arizona, except tribal area is always in PST
+    # Indiana has two timezones (Central and Eastern)
+
+    pytz list of timezones:
+    Pacific/Honolulu (HST)
+    America/Anchorage (APT)
+    America/Phoenix (PST)
+    America/Los_Angeles (PPT)
+    America/Denver (MPT)
+    America/Chicago (CPT)
+    America/New_York (EPT)
+    """
 
     UTC = EnumValue(
         value="UTC",
         description="Coordinated Universal Time",
-        tz=datetime.timezone(datetime.timedelta()),
+        tz=pytz.timezone("UTC"),  # datetime.timezone(datetime.timedelta()),
     )
     HST = EnumValue(
         value="HawaiiAleutianStandard",
         description="Hawaii Standard Time (UTC=-10). Does not include DST shifts.",
-        tz=datetime.timedelta(hours=-10),
+        tz=pytz.timezone("US/Hawaii"),  # datetime.timedelta(hours=-10), # same as "Etc/GMT+10"
     )
     AST = EnumValue(
         value="AlaskaStandard",
         description="Alaskan Standard Time (UTC=-9). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-9)),
+        tz=pytz.timezone("Etc/GMT+9"),  # datetime.timezone(datetime.timedelta(hours=-9)),
     )
     APT = EnumValue(
         value="AlaskaPrevailing",
@@ -120,7 +134,7 @@ class TimeZone(DSGEnum):
     PST = EnumValue(
         value="PacificStandard",
         description="Pacific Standard Time (UTC=-8). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-8)),
+        tz=pytz.timezone("Etc/GMT+8"),  # datetime.timezone(datetime.timedelta(hours=-8)),
     )
     PPT = EnumValue(
         value="PacificPrevailing",
@@ -131,7 +145,7 @@ class TimeZone(DSGEnum):
     MST = EnumValue(
         value="MountainStandard",
         description="Mountain Standard Time (UTC=-7). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-7)),
+        tz=pytz.timezone("Etc/GMT+7"),  # datetime.timezone(datetime.timedelta(hours=-7)),
     )
     MPT = EnumValue(
         value="MountainPrevailing",
@@ -142,7 +156,7 @@ class TimeZone(DSGEnum):
     CST = EnumValue(
         value="CentralStandard",
         description="Central Standard Time (UTC=-6). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-6)),
+        tz=pytz.timezone("Etc/GMT+6"),  # datetime.timezone(datetime.timedelta(hours=-6)),
     )
     CPT = EnumValue(
         value="CentralPrevailing",
@@ -153,7 +167,7 @@ class TimeZone(DSGEnum):
     EST = EnumValue(
         value="EasternStandard",
         description="Eastern Standard Time (UTC=-5). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-5)),
+        tz=pytz.timezone("Etc/GMT+5"),  # datetime.timezone(datetime.timedelta(hours=-5)),
     )
     EPT = EnumValue(
         value="EasternPrevailing",
@@ -261,12 +275,14 @@ def make_time_range(start, end, frequency, leap_day_adjustment):
     return DatetimeRange(start, end, frequency, leap_day_adjustment)
 
 
-def find_time_delta(from_tz, to_tz):
+def find_time_delta(timestamp, from_tz: str, to_tz: str):
     """
-    find datetime.timedelta between two time zones
+    find datetime.timedelta (in seconds) between two time zones
+    output: integer (sec)
     """
 
-    utcnow = datetime.datetime.utcnow()
-    time_delta = utcnow.replace(tzinfo=to_tz) - utcnow.replace(tzinfo=from_tz)
+    time_delta = timestamp.replace(tzinfo=TimeZone(from_tz).tz) - timestamp.replace(
+        tzinfo=TimeZone(to_tz).tz
+    )
 
-    return time_delta
+    return time_delta.total_seconds()

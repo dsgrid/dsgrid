@@ -23,14 +23,26 @@ def init_spark(name="dsgrid"):
     if cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf = SparkConf().setAppName(name).setMaster(cluster)
-        sc = SparkContext(conf=conf)
-        spark = SparkSession.builder.config(conf=conf).getOrCreate()
+        # sc = SparkContext(conf=conf)
+        spark = (
+            SparkSession.builder.config(conf=conf)
+            .config("spark.sql.session.timeZone", "UTC")
+            .config("spark.driver.extraJavaOptions", "-Duser.timezone=UTC")
+            .config("spark.executor.extraJavaOptions", "-Duser.timezone=UTC")
+            .getOrCreate()
+        )
     else:
         logger.info("Create SparkSession %s in local-mode cluster", name)
-        spark = SparkSession.builder.master("local") \
-            .appName(name) \
+        spark = (
+            SparkSession.builder.master("local")
+            .config("spark.sql.session.timeZone", "UTC")
+            .config("spark.driver.extraJavaOptions", "-Duser.timezone=UTC")
+            .config("spark.executor.extraJavaOptions", "-Duser.timezone=UTC")
+            .appName(name)
             .getOrCreate()
-        
+        )
+
+    print("\nSpark conf: %s\n", str(spark.sparkContext.getConf().getAll()))
     logger.info("Spark conf: %s", str(spark.sparkContext.getConf().getAll()))
     return spark
 

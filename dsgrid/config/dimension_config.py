@@ -128,18 +128,18 @@ class TimeDimensionConfig(TimeDimensionBaseConfig):
         return time_range.list_time_range()
 
     def get_tzinfo(self):
-        """Return a tzinfo instance for the range specified in this dimension.
+        """Return a tzinfo instance for the range specified for this dimension.
 
         Returns
         -------
         tzinfo
 
         """
-        assert self.model.ranges_timezone is not TimeZone.LOCAL
+        # assert self.model.ranges_timezone is not TimeZone.LOCAL
         return self.model.ranges_timezone.tz
 
     def get_data_tzinfo(self):
-        """Return an actual tzinfo instance for this dimension.
+        """Return the tzinfo for this dimension as it appears in the data.
 
         Returns
         -------

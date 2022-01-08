@@ -130,6 +130,12 @@ class DatasetRegistryManager(RegistryManagerBase):
                 )
 
     def _check_dataset_time_consistency(self, config: DatasetConfig, load_data):
+        """
+        Note:
+        - datetime obj are stored on disk in UTC time, if tz-unaware, pyspark session timezone is assigned before converting to UTC,
+        - datetime obj are displayed in pyspark session timezone, (which can be set by e.g., .config("spark.sql.session.timeZone", "UTC"))
+        - datetime obj are converted to pyspark session timezone if .collect() is used.
+        """
         time_dim = config.get_dimension(DimensionType.TIME)
         data_tz = time_dim.get_data_tzinfo()
         time_ranges = time_dim.get_time_ranges()
@@ -141,54 +147,95 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         expected_timestamps = time_dim.list_time_range(time_range)
 
-        #### Need to test this entire block ####
         if data_tz != time_ranges_tz:
             # convert data timestamps to time_ranges_tz and compare to expected_timestamps
-            if time_ranges_tz == TimeZone.LOCAL:
-                # load map as spark df and raise error if not found, make sure to_id is in proper tz_info type
-                tz_map  # FIXME #models_to_dataframe #spark.read.option("header",True).csv(filename)
+            if time_ranges_tz == None:  # TimeZone.LOCAL has no tzinfo
+                # load map as spark df and raise error if not found
+                tz_map = read_dataframe(
+                    filename, cache=False
+                )  # FIXME #models_to_dataframe #spark.read.option("header",True).csv(filename)
+                tz_map = tz_map.select(
+                    F.col("from_id").alias("geography"),
+                    F.udf(lambda x: str(TimeZone(x).tz))(F.col("to_id")).alias(
+                        "convert_to_timezone"
+                    ),
+                ).cache()
+
             else:
                 # create a map based on time_ranges_tz
                 tz_map = load_data_lookup.select(
-                    F.col("geography").alias("from_id"), F.lit(time_ranges_tz).alias("to_id")
+                    "geography", F.lit(time_ranges_tz).alias("convert_to_timezone")
                 )
 
-            timestamps_by_geography = load_data.join(
+            # Show time
+            timestamps = load_data.select(
+                "id",
+                F.col("timestamp").alias(
+                    "timestamp_utc"
+                ),  # all time is stored on disk in UTC, but when loaded, displayed in pyspark session tz
+                F.from_utc_timestamp("timestamp", str(data_tz)).alias("timestamp_data_tz"),
+            )  # show in data_tz
+            # Join tz map to data
+            timestamps = timestamps.join(
                 load_data_lookup.join(
-                    tz_map, load_data_lookup.geography == tz_map.from_id, "left"
+                    tz_map, load_data_lookup.geography == tz_map.geography, "left"
                 ),
                 "id",
                 "left",
             ).select(
                 "id",
-                "geography",
-                "timestamp",
-                F.lit(data_tz).alias("from_timezone"),
-                F.col("to_id").alias("to_timezone"),
+                load_data_lookup.geography,
+                "timestamp_data_tz",
+                "timestamp_utc",
+                "convert_to_timezone",
             )
-            udf_find_time_delta = F.udf(lambda fm, to: find_time_delta(fm, to), T.DateType())
-            timestamps_by_geography = timestamps_by_geography.withColumn(
-                "time_delta",
-                udf_find_time_delta(
-                    timestamps_by_geography.from_timezone, timestamps_by_geography.to_timezone
+
+            # convert time based on map
+            timestamps = timestamps.select(
+                "*",
+                F.from_utc_timestamp("timestamp_utc", F.col("convert_to_timezone")).alias(
+                    "timestamp_converted"
                 ),
-            )
-            timestamps_by_geography = timestamps_by_geography.select(
-                "id", "geography", F.sum("timestamp", "time_delta").alias("timestamp")
-            )  # converted to time_ranges_tz
+            )  # tz=UTC
+
+            # timestamps_by_geography = load_data.select("id", F.col("timestamp").alias("timestamp_data")).join(
+            #     load_data_lookup.join(
+            #         tz_map, load_data_lookup.geography == tz_map.from_id, "left"
+            #     ),
+            #     "id",
+            #     "left",
+            # ).select(
+            #     "id",
+            #     "geography",
+            #     "timestamp_data",
+            #     F.lit(str(data_tz)).alias("from_timezone"),
+            #     F.col("to_id").alias("to_timezone"),
+            # )
+            # udf_find_time_delta = F.udf(lambda ts, fmtz, totz: find_time_delta(ts, fmtz, totz), T.DecimalType())
+            # timestamps_by_geography = timestamps_by_geography.withColumn(
+            #     "time_delta_sec",
+            #     udf_find_time_delta(
+            #         F.col("timestamp_data"), F.col("from_timezone"), F.col("to_timezone")
+            #     ),
+            # )
+            # timestamps_by_geography = timestamps_by_geography.select(
+            #     "*", (F.unix_timestamp("timestamp_data") + F.col("time_delta_sec")).cast('timestamp').alias("timestamp")
+            # )  # generate converted_timestamp
+
+            # Note: x.timestamp.astimezone().astimezone(data_tz): converts to pyspark session time!!!, which is another setting from spark.sql.session.timeZone
 
             actual_timestamps = [
-                x.timestamp.astimezone().astimezone(time_ranges_tz)
-                for x in timestamps_by_geography.select("timestamp")
+                x.timestamp.astimezone(TimeZone.UTC.tz).replace(tzinfo=None)
+                for x in timestamps.select(F.col("timestamp_converted").alias("timestamp"))
                 .distinct()
-                .sort("timestamp")
+                .sort("timestamp_converted")
                 .collect()
-            ]
+            ]  # check this against EFS comstock test data.
 
             timestamps_by_id = (
-                timestamps_by_geography.select("timestamp", "id")
+                timestamps.select("timestamp_converted", "id")
                 .groupby("id")
-                .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
+                .agg(F.countDistinct("timestamp_converted").alias("distinct_timestamps"))
             )
 
         else:

@@ -337,25 +337,6 @@ class TimeDimensionModel(TimeDimensionBaseModel):
             " <https://docs.python.org/3/library/datetime.html#timedelta-objects>`_",
         ),
     )
-    ranges: List[TimeRangeModel] = Field(
-        title="time_ranges",
-        description="Defines the continuous ranges of time common for all sets of data series in the dataset.",
-    )
-    ranges_timezone: TimeZone = Field(
-        title="timezone_for_time_ranges",
-        description="""
-        Time zone of the ranges specified:
-            UTC, 
-            HawaiiAleutianStandard, 
-            AlaskaStandard, AlaskaPrevailing,
-            PacificStandard, PacificPrevailing, 
-            MountainStandard, MountainPrevailing, 
-            CentralStandard, CentralPrevailing, 
-            EasternStandard, EasternPrevailing,
-            LOCAL
-            """,
-        options=TimeZone.format_descriptions_for_docs(),
-    )
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
         title="leap_day_adjustment",
         description="Leap day adjustment method applied to time data",
@@ -387,6 +368,26 @@ class TimeDimensionModel(TimeDimensionBaseModel):
         """,
         options=TimeZone.format_descriptions_for_docs(),
     )
+    ranges: List[TimeRangeModel] = Field(
+        title="time_ranges",
+        description="Defines the continuous ranges of time common for all sets of data series in the dataset.",
+    )
+    ranges_timezone: Optional[TimeZone] = Field(
+        title="timezone_for_time_ranges",
+        default=None,
+        description="""
+        Time zone of the ranges specified:
+            UTC, 
+            HawaiiAleutianStandard, 
+            AlaskaStandard, AlaskaPrevailing,
+            PacificStandard, PacificPrevailing, 
+            MountainStandard, MountainPrevailing, 
+            CentralStandard, CentralPrevailing, 
+            EasternStandard, EasternPrevailing,
+            LOCAL
+            """,
+        options=TimeZone.format_descriptions_for_docs(),
+    )
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
@@ -399,6 +400,12 @@ class TimeDimensionModel(TimeDimensionBaseModel):
                 "366 days not allowed for frequency, use 365 days to specify annual frequency."
             )
         return value
+
+    @validator("ranges_timezone")
+    def check_ranges_timezone(cls, ranges_timezone, values):
+        if ranges_timezone is None:
+            return values["timezone"]
+        return ranges_timezone
 
 
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):

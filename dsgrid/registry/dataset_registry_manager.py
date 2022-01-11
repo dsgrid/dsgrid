@@ -164,7 +164,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             else:
                 # create a map based on time_ranges_tz
                 tz_map = load_data_lookup.select(
-                    "geography", F.lit(time_ranges_tz).alias("convert_to_timezone")
+                    "geography", F.lit(str(time_ranges_tz)).alias("convert_to_timezone")
                 )
 
             # Show time
@@ -178,13 +178,15 @@ class DatasetRegistryManager(RegistryManagerBase):
             # Join tz map to data
             timestamps = timestamps.join(
                 load_data_lookup.join(
-                    tz_map, load_data_lookup.geography == tz_map.geography, "left"
+                    tz_map,
+                    "geography",
+                    "left",  # load_data_lookup.geography == tz_map.geography, "left"
                 ),
                 "id",
                 "left",
             ).select(
                 "id",
-                load_data_lookup.geography,
+                "geography",  # load_data_lookup.geography,
                 "timestamp_data_tz",
                 "timestamp_utc",
                 "convert_to_timezone",

@@ -1,10 +1,13 @@
 """Manages the registry for dimension projects"""
 import getpass
+import itertools
 import logging
 
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
 from dsgrid.config.project_config import ProjectConfig
+from dsgrid.dataset import Dataset
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.registry.common import (
     make_initial_config_registration,
@@ -12,6 +15,7 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     ProjectRegistryStatus,
 )
+from dsgrid.utils.spark import models_to_dataframe
 from .common import VersionUpdateType
 from .dataset_registry_manager import DatasetRegistryManager
 from .dimension_registry_manager import DimensionRegistryManager
@@ -189,8 +193,8 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         self._check_if_not_registered(project_config.config_id)
         dataset_config = self._dataset_mgr.get_by_id(dataset_id)
-        dataset = project_config.get_dataset(dataset_id)
-        if dataset.status == DatasetRegistryStatus.REGISTERED:
+        dataset_model = project_config.get_dataset(dataset_id)
+        if dataset_model.status == DatasetRegistryStatus.REGISTERED:
             raise DSGDuplicateValueRegistered(
                 f"dataset={dataset_id} has already been submitted to project={project_config.config_id}"
             )
@@ -203,6 +207,9 @@ class ProjectRegistryManager(RegistryManagerBase):
                 mapping_references.append(ref)
 
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
+        dataset = Dataset.load(dataset_config)
+        # TODO: does this function need mapping_references?
+        self.check_dataset_base_to_base_mappings(project_config, dataset_config, dataset)
 
         if self.dry_run_mode:
             logger.info(
@@ -213,7 +220,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             )
             return
 
-        dataset.status = DatasetRegistryStatus.REGISTERED
+        dataset_model.status = DatasetRegistryStatus.REGISTERED
         if project_config.are_all_datasets_submitted():
             new_status = ProjectRegistryStatus.COMPLETE
         else:
@@ -231,6 +238,37 @@ class ProjectRegistryManager(RegistryManagerBase):
             version,
             project_config.config_id,
         )
+
+    def check_dataset_base_to_base_mappings(self, project_config, dataset_config, dataset):
+        """Check that the dataset contains all mappings of base dimensions.
+
+        Parameters
+        ----------
+        project_config : ProjectConfig
+        dataset_config : DatasetConfig
+        dataset : Dataset
+
+        Raises
+        ------
+        DSGInvalidDimensionMapping
+            Raised if a requirement is violated.
+
+        """
+        needs_full_join = set()
+        types = [x for x in DimensionType if x != DimensionType.TIME]
+        for type1, type2 in itertools.product(types, types):
+            if type1 != type2:
+                needs_full_join.add((type1, type2))
+
+        for mapping_ref in project_config.model.dimension_mappings.base_to_base:
+            from_dimension = mapping_ref.from_dimension_type
+            to_dimension = mapping_ref.to_dimension_type
+            needs_full_join.remove((from_dimension, to_dimension))
+            mapping_config = self._dimension_mapping_mgr.get_by_id(mapping_ref.mapping_id)
+            mapping_records = models_to_dataframe(mapping_config.model.records)
+            # TODO perform checks across mapping_records, dataset.load_data, dataset.load_data_lookup
+
+        # TODO Perform checks on all from-to dimensions in needs_full_join.
 
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version

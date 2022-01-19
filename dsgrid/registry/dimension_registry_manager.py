@@ -8,17 +8,14 @@ from pathlib import Path
 from prettytable import PrettyTable
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.dimension_config import (
-    DimensionConfig,
-    get_dimension_config,
-    load_dimension_config,
-)
+from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_config_factory import get_dimension_config, load_dimension_config
 from dsgrid.config.dimensions_config import DimensionsConfig
 from dsgrid.config.dimensions import (
     DimensionType,
     DimensionBaseModel,
     DimensionModel,
-    TimeDimensionModel,
+    DateTimeDimensionModel,
     TimeDimensionBaseModel,
 )
 from dsgrid.data_models import serialize_model

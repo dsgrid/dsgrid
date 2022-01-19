@@ -13,7 +13,7 @@ from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
     DimensionMappingReferenceListModel,
 )
-from dsgrid.config.dimensions import DimensionModel, TimeDimensionModel
+from dsgrid.config.dimensions import DimensionModel, DateTimeDimensionModel
 from dsgrid.config.project_config import (
     DimensionsModel,
     InputDatasetModel,
@@ -107,7 +107,7 @@ def get_field_details(cls):
             if cls.__name__ == "DimensionsModel":
                 dtype = (
                     ":class:`~dsgrid.config.dimensions.DimensionModel`, "
-                    ":class:`~dsgrid.config.dimensions.TimeDimensionModel`".replace(
+                    ":class:`~dsgrid.config.dimensions.DateTimeDimensionModel`".replace(
                         "[", ""
                     ).replace("]", "")
                 )
@@ -197,13 +197,13 @@ def get_row(i, field, fields, field_items, cls, indent_level=1):
             f"{t1}{t}:{field}: The config sub-fields depends on the "
             f":class:`dsgrid.dimensions.base_model.DimensionType`{n}"
             f"{n}{t1}{t}{t}* if ``dimension.type`` != Time "
-            "(:class:`~dsgrid.config.dimensions.TimeDimensionModel`), "
+            "(:class:`~dsgrid.config.dimensions.DateTimeDimensionModel`), "
             f"the config field requirements include:{n}"
             # TODO: find alternative way to not hardcode this path
             f"{n}{t1}{t}{t}{t}.. include:: ../../_build/config_rsts/DimensionModel.rst{n}"
             f"{n}{t1}{t}{t}* if ``dimension.type`` == Time (:class:`~dsgrid.config.dimensions."
-            f"TimeDimensionModel`), the config field requirements include:{n}"
-            f"{n}{t1}{t}{t}{t}.. include:: ../../_build/config_rsts/TimeDimensionModel.rst{n}"
+            f"DateTimeDimensionModel`), the config field requirements include:{n}"
+            f"{n}{t1}{t}{t}{t}.. include:: ../../_build/config_rsts/DateTimeDimensionModel.rst{n}"
         )
 
     elif field_items[field]:
@@ -256,7 +256,7 @@ def make_config_rst(output):
         DatasetConfigModel,  # dataset.toml
         DimensionsModel,  # dimensions.toml
         DimensionModel,
-        TimeDimensionModel,
+        DateTimeDimensionModel,
         DimensionMappingBaseModel,  # dimension mapping toml
         DimensionMappingReferenceListModel,  # dimension mapping references toml
         # TODO: @DT please confirm whether these models below are being used directly by the user or not. If not, I do not think we need to create .rst docs explaining the fields. Do you agree?

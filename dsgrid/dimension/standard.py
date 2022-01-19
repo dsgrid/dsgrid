@@ -14,7 +14,7 @@ from sqlalchemy import (
     text,  # Integer, Text, DateTime,
 )
 
-from dsgrid.config.dimensions import TimeDimensionModel, AnnualTimeDimensionModel
+from dsgrid.config.dimensions import DateTimeDimensionModel, AnnualTimeDimensionModel
 from dsgrid.dimension.base_models import (
     MetricDimensionBaseModel,
     GeographyDimensionBaseModel,
@@ -122,19 +122,19 @@ class EnergyEfficiency(MetricDimensionBaseModel):
 # ---------------------------
 # TIME DIMENSIONS
 # ---------------------------
-class Time(TimeDimensionModel):
+class Time(DateTimeDimensionModel):
     """Time attributes"""
 
 
-class Timezone(TimeDimensionModel):
+class Timezone(DateTimeDimensionModel):
     """Timezone attributes"""
 
 
-class DayType(TimeDimensionModel):
+class DayType(DateTimeDimensionModel):
     """Day Type attributes"""
 
 
-class Season(TimeDimensionModel):
+class Season(DateTimeDimensionModel):
     """Season attributes"""
 
 

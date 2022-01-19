@@ -8,7 +8,7 @@ import os
 from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE_TIME
-from dsgrid.config.dimension_config import TimeDimensionConfig
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dimension.time import LeapDayAdjustmentType
 
 
@@ -20,7 +20,7 @@ def time_dimension_model1():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[0]  # TimeDimensionModel (8760 period-beginning)
+    yield model.dimensions[0]  # DateTimeDimensionModel (8760 period-beginning)
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def time_dimension_model2():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[1]  # TimeDimensionModel (annual)
+    yield model.dimensions[1]  # DateTimeDimensionModel (annual)
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def time_dimension_model3():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[2]  # TimeDimensionModel (8760 period-ending)
+    yield model.dimensions[2]  # DateTimeDimensionModel (8760 period-ending)
 
 
 @pytest.fixture
@@ -48,7 +48,7 @@ def annual_time_dimension_model():
 
 
 def check_date_range_creation(time_dimension_model):
-    config = TimeDimensionConfig(time_dimension_model)  # TimeDimensionConfig
+    config = DateTimeDimensionConfig(time_dimension_model)  # TimeDimensionConfig
     time_range = config.get_time_ranges()
 
     # create date range for time dimension

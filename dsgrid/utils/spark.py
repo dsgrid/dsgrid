@@ -27,10 +27,8 @@ def init_spark(name="dsgrid"):
         spark = SparkSession.builder.config(conf=conf).getOrCreate()
     else:
         logger.info("Create SparkSession %s in local-mode cluster", name)
-        spark = SparkSession.builder.master("local") \
-            .appName(name) \
-            .getOrCreate()
-        
+        spark = SparkSession.builder.master("local").appName(name).getOrCreate()
+
     logger.info("Spark conf: %s", str(spark.sparkContext.getConf().getAll()))
     return spark
 

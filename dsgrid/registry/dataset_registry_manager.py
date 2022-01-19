@@ -92,10 +92,8 @@ class DatasetRegistryManager(RegistryManagerBase):
             load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
             with Timer(timer_stats_collector, "check_lookup_data_consistency"):
                 self._check_lookup_data_consistency(config, load_data_lookup)
-            with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-                self._check_dataset_time_consistency(config, load_data)
-            with Timer(timer_stats_collector, "check_dataset_time_consistency_by_id"):
-                self._check_dataset_time_consistency_by_id(config, load_data)
+            with Timer(timer_stats_collector, "check_dataset_time_consistency_standard"):
+                self._check_dataset_time_consistency_standard(config, load_data)
             with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
                 self._check_dataset_internal_consistency(config, load_data, load_data_lookup)
         elif data_schema_type == DataSchemaType.ONE_TABLE:
@@ -258,16 +256,19 @@ class DatasetRegistryManager(RegistryManagerBase):
                 raise DSGInvalidDataset(
                     f"load_data timestamps do not match expected times. mismatch={mismatch}"
                 )
+            else:
+                return expected_timestamps
 
-    def _check_dataset_time_consistency_by_id(self, config: DatasetConfig, load_data):
+    def _check_dataset_time_consistency_standard(self, config: DatasetConfig, load_data):
         """
         Additional time check for StandardDataSchemaModel only.
         Only check time by id if it's not ANNUAL time type
         """
         time_dim = config.get_dimension(DimensionType.TIME)
-        expected_timestamps = time_dim.list_time_range(time_range)
-
         if time_dim.model.time_type != TimeDimensionType.ANNUAL:
+
+            expected_timestamps = self._check_dataset_time_consistency(config, load_data)
+
             timestamps_by_id = (
                 load_data.select("timestamp", "id")
                 .groupby("id")

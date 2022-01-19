@@ -60,3 +60,131 @@ class DimensionConfig(DimensionBaseConfigWithFiles):
 
         """
         return {x.id for x in self.model.records}
+
+#### need to move below elsewhere per Dan's PR ####
+
+class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles):
+    """Base class for all time dimension configs"""
+
+
+class TimeDimensionConfig(TimeDimensionBaseConfig):
+    """Provides an interface to a TimeDimensionModel."""
+
+    @staticmethod
+    def model_class():
+        return TimeDimensionModel
+
+    def get_time_ranges(self):
+        """Return time ranges with timezone applied.
+
+        Returns
+        -------
+        list
+            list of DatetimeRange
+
+        """
+        ranges = []
+        tz = self.get_tzinfo()
+        for time_range in self.model.ranges:
+
+            start = datetime.datetime.strptime(time_range.start, self.model.str_format)
+            start = pd.Timestamp(start, tz=tz)
+            end = datetime.datetime.strptime(time_range.end, self.model.str_format)
+            end = pd.Timestamp(end, tz=tz)
+            ranges.append(
+                make_time_range(
+                    start=start,
+                    end=end,
+                    frequency=self.model.frequency,
+                    leap_day_adjustment=self.model.leap_day_adjustment,
+                )
+            )
+
+        return ranges
+
+    def list_time_range(self, time_range: DatetimeRange):
+        """Return a list of datetimes for a time range.
+
+        Parameters
+        ----------
+        time_range : DatetimeRange
+
+        Returns
+        -------
+        list
+            list of datetime
+
+        """
+        return time_range.list_time_range()
+
+    def get_tzinfo(self):
+        """Return a tzinfo instance for this dimension.
+
+        Returns
+        -------
+        tzinfo
+
+        """
+        assert self.model.timezone is not TimeZone.LOCAL
+        return self.model.timezone.tz
+
+
+class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
+    """
+    Provides an interface to an AnnualTimeDimensionModel.
+    AnnualTimeDimension is primarily for constant annual growth factors
+    """
+
+    @staticmethod
+    def model_class():
+        return AnnualTimeDimensionModel
+
+
+class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
+    """Provides an interface to an RepresentativePeriodTimeDimensionModel."""
+
+    @staticmethod
+    def model_class():
+        return RepresentativePeriodTimeDimensionModel
+
+
+def get_dimension_config(model, src_dir):
+    if isinstance(model, TimeDimensionModel):
+        return TimeDimensionConfig(model)
+    if isinstance(model, AnnualTimeDimensionModel):
+        return AnnualTimeDimensionConfig(model)
+    if isinstance(model, RepresentativePeriodTimeDimensionModel):
+        return RepresentativePeriodTimeDimensionConfig(model)
+    elif isinstance(model, DimensionModel):
+        config = DimensionConfig(model)
+        config.src_dir = src_dir
+        return config
+    assert False, type(model)
+
+
+def load_dimension_config(filename):
+    """Loads a dimension config file before the exact type is known.
+
+    Parameters
+    ----------
+    filename : Path
+
+    Returns
+    -------
+    DimensionBaseConfig
+
+    """
+    data = load_data(filename)
+    if data["type"] == DimensionType.TIME.value:
+        if data["time_type"] == TimeDimensionType.DATETIME.value:
+            return TimeDimensionConfig.load(filename)
+        elif data["time_type"] == TimeDimensionType.ANNUAL.value:
+            return AnnualTimeDimensionConfig.load(filename)
+        elif data["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
+            return RepresentativePeriodTimeDimensionConfig.load(filename)
+        else:
+            raise ValueError(f"time_type={data['time_type']} not supported")
+
+    return DimensionConfig.load(filename)
+
+#### need to move above elsewhere per Dan's PR ####

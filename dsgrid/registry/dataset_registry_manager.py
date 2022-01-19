@@ -6,6 +6,7 @@ import logging
 import os
 from pathlib import Path
 from datetime import timedelta
+import pandas as pd
 
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
@@ -15,11 +16,13 @@ from dsgrid.config.dataset_config import (
     DatasetConfig,
     check_load_data_filename,
     check_load_data_lookup_filename,
+    check_load_data_one_table_filename,
+    DataSchemaType,
 )
 from dsgrid.data_models import serialize_model
 from dsgrid.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
-from dsgrid.dimension.time import TimeInvervalType
+from dsgrid.dimension.time import TimeInvervalType, TimeDimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimension, DSGInvalidDataset
 from dsgrid.registry.common import (
     make_initial_config_registration,
@@ -70,6 +73,8 @@ class DatasetRegistryManager(RegistryManagerBase):
     def _check_dataset_consistency(self, config: DatasetConfig):
         spark = SparkSession.getActiveSession()
         path = Path(config.model.path)
+
+#### Dan's change ###
         load_data_df = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
         load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
@@ -79,6 +84,32 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._check_dataset_time_consistency(config, load_data_df)
         with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
             self._check_dataset_internal_consistency(config, load_data_df, load_data_lookup)
+#### my change ####
+        data_schema_type = config.model.data_schema_type
+        if data_schema_type == DataSchemaType.STANDARD:
+            load_data = read_dataframe(check_load_data_filename(path))
+            load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
+            load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
+            with Timer(timer_stats_collector, "check_lookup_data_consistency"):
+                self._check_lookup_data_consistency(config, load_data_lookup)
+            with Timer(timer_stats_collector, "check_dataset_time_consistency"):
+                self._check_dataset_time_consistency(config, load_data)
+            with Timer(timer_stats_collector, "check_dataset_time_consistency_by_id"):
+                self._check_dataset_time_consistency_by_id(config, load_data)
+            with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
+                self._check_dataset_internal_consistency(config, load_data, load_data_lookup)
+        elif data_schema_type == DataSchemaType.ONE_TABLE:
+            load_data_one_table = read_dataframe(
+                check_load_data_one_table_filename(path), cache=True
+            )
+            load_data_one_table = config.add_trivial_dimensions(load_data_one_table)
+            with Timer(timer_stats_collector, "check_one_table_data_consistency"):
+                self._check_one_table_data_consistency(config, load_data_one_table)
+            with Timer(timer_stats_collector, "check_dataset_time_consistency"):
+                self._check_dataset_time_consistency(config, load_data_one_table)
+        # else:
+        #     raise ValueError(f'data_schema_type={data_schema_type} not supported.')
+#### ####
 
     def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
         found_id = False
@@ -127,9 +158,126 @@ class DatasetRegistryManager(RegistryManagerBase):
                     f"load_data_lookup records do not match dimension records for {name}"
                 )
 
+#### Dan's change ####
     def _check_dataset_time_consistency(self, config: DatasetConfig, load_data_df):
         time_dim = config.get_dimension(DimensionType.TIME)
         time_dim.check_dataset_time_consistency(load_data_df)
+#### my change ####
+    def _check_one_table_data_consistency(self, config: DatasetConfig, load_data_one_table):
+        """
+        Check all data dimensions, including Metric records.
+        For Time, only check that time_col_name = timestamp
+        """
+        dimension_types = []
+        metric_cols = []
+
+        for col in load_data_one_table.columns:
+            if col.lower() == "time":
+                raise ValueError(
+                    f"col_name={col} for the time dimension is not supported, used col_name='timestamp' instead."
+                )
+            else:
+                try:
+                    dimension_types.append(DimensionType(col))
+                except ValueError:
+                    if col != "timestamp":
+                        metric_cols.append(col)
+
+        dimension_types.append(DimensionType.METRIC)  # add metric type
+
+        # check dim outside of metric and time
+        expected_dimensions = [d for d in DimensionType if d != DimensionType.TIME]
+        if len(dimension_types) != len(expected_dimensions):
+            raise DSGInvalidDataset(
+                f"load_data_one_table does not have the correct number of dimensions specified between trivial and non-trivial dimensions."
+            )
+
+        missing_dimensions = set(expected_dimensions).difference(dimension_types)
+        if len(missing_dimensions) != 0:
+            raise DSGInvalidDataset(
+                f"load_data_one_table is missing dimensions: {missing_dimensions}. If these are trivial dimensions, make sure to specify them in the Dataset Config."
+            )
+
+        dimension_types = [
+            d for d in dimension_types if d != DimensionType.TIME
+        ]  # remove time type
+        for dimension_type in dimension_types:
+            name = dimension_type.value
+            dimension = config.get_dimension(dimension_type)
+            dim_records = dimension.get_unique_ids()
+            if dimension_type == DimensionType.METRIC:
+                data_records = set(metric_cols)
+            else:
+                data_records = get_unique_values(load_data_one_table, name)
+            if dim_records != data_records:
+                logger.error(
+                    "Mismatch in load_data_one_table records. dimension=%s mismatched=%s",
+                    name,
+                    data_records.symmetric_difference(dim_records),
+                )
+                raise DSGInvalidDataset(
+                    f"load_data_one_table records do not match dimension records for {name}"
+                )
+#### ####
+
+    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data):
+        """
+        Common time check.
+        Only check time if it's not ANNUAL time type
+        """
+        time_dim = config.get_dimension(DimensionType.TIME)
+
+        if time_dim.model.time_type != TimeDimensionType.ANNUAL:
+            tz = time_dim.get_tzinfo()
+            time_ranges = time_dim.get_time_ranges()
+            assert len(time_ranges) == 1, len(time_ranges)
+            time_range = time_ranges[0]
+            # TODO: need to support validation of multiple time ranges: DSGRID-173
+
+            expected_timestamps = time_dim.list_time_range(time_range)
+            actual_timestamps = [
+                x.timestamp
+                for x in load_data.select("timestamp").distinct().sort("timestamp").collect()
+            ]
+            try:
+                actual_timestamps = [x.astimezone().astimezone(tz) for x in actual_timestamps]
+            except AttributeError:
+                if tz == None:
+                    actual_timestamps = [
+                        pd.Timestamp(str(x)).to_pydatetime() for x in actual_timestamps
+                    ]  # tz=tz does not work here when tz=None
+                else:
+                    actual_timestamps = [
+                        pd.Timestamp(str(x).to_pydatetime(), tz=tz) for x in actual_timestamps
+                    ]
+
+            if expected_timestamps != actual_timestamps:
+                mismatch = sorted(
+                    set(expected_timestamps).symmetric_difference(set(actual_timestamps))
+                )
+                raise DSGInvalidDataset(
+                    f"load_data timestamps do not match expected times. mismatch={mismatch}"
+                )
+
+    def _check_dataset_time_consistency_by_id(self, config: DatasetConfig, load_data):
+        """
+        Additional time check for StandardDataSchemaModel only.
+        Only check time by id if it's not ANNUAL time type
+        """
+        time_dim = config.get_dimension(DimensionType.TIME)
+        expected_timestamps = time_dim.list_time_range(time_range)
+
+        if time_dim.model.time_type != TimeDimensionType.ANNUAL:
+            timestamps_by_id = (
+                load_data.select("timestamp", "id")
+                .groupby("id")
+                .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
+            )
+            for row in timestamps_by_id.collect():
+                if row.distinct_timestamps != len(expected_timestamps):
+                    raise DSGInvalidDataset(
+                        f"load_data ID={row.id} does not have {len(expected_timestamps)} timestamps: actual={row.distinct_timestamps}"
+                    )
 
     def _check_dataset_internal_consistency(
         self, config: DatasetConfig, load_data_df, load_data_lookup

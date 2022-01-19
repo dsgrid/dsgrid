@@ -24,12 +24,13 @@ ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.csv",
     "load_data_lookup.json",
 )
+ALLOWED_LOAD_DATA_ONE_TABLE_FILENAMES = ("load_data_one_table.parquet", "load_data_one_table.csv")
 
 logger = logging.getLogger(__name__)
 
 
 def check_load_data_filename(path: Path):
-    """Return the load data filename in path. Supports Parquet and CSV.
+    """Return the load_data filename in path. Supports Parquet and CSV.
 
     Parameters
     ----------
@@ -55,7 +56,7 @@ def check_load_data_filename(path: Path):
 
 
 def check_load_data_lookup_filename(path: Path):
-    """Return the load data lookup filename in path. Supports Parquet, CSV, and JSON.
+    """Return the load_data_lookup filename in path. Supports Parquet, CSV, and JSON.
 
     Parameters
     ----------
@@ -77,7 +78,18 @@ def check_load_data_lookup_filename(path: Path):
             return filename
 
     # Use ValueError because this gets called in Pydantic model validation.
-    raise ValueError(f"no load_data lookup file exists in {path}")
+    raise ValueError(f"no load_data_lookup file exists in {path}")
+
+
+def check_load_data_one_table_filename(path: Path):
+    """Return the load_data_one_table filename in path. Supports Parquet and CSV."""
+    for allowed_name in ALLOWED_LOAD_DATA_ONE_TABLE_FILENAMES:
+        filename = path / allowed_name
+        if filename.exists():
+            return filename
+
+    # Use ValueError because this gets called in Pydantic model validation.
+    raise ValueError(f"no load_data_one_table file exists in {path}")
 
 
 class InputDatasetType(DSGEnum):
@@ -96,6 +108,13 @@ class DataSchemaType(DSGEnum):
         Applies to datasets for which the data are provided in full.
         """,
     )
+    ONE_TABLE = EnumValue(
+        value="one_table",
+        description="""
+        One_table data schema with load_data_one_table table. 
+        Applies to small, non-timeseries datasets.
+        """,
+    )
 
 
 class DSGDatasetParquetType(DSGEnum):
@@ -103,12 +122,16 @@ class DSGDatasetParquetType(DSGEnum):
 
     LOAD_DATA = EnumValue(
         value="load_data",
-        description="Load data file with id, timestamp, and load value columns",
+        description="load_data file with id, timestamp, and load value columns",
     )
     LOAD_DATA_LOOKUP = EnumValue(
         value="load_data_lookup",
-        description="Load data file with dimension metadata and and ID which maps to load_data"
+        description="load_data_lookup file with dimension metadata and and ID which maps to load_data"
         "file",
+    )
+    LOAD_DATA_ONE_TABLE = EnumValue(
+        value="load_data_one_table",
+        description="load_data_one_table file with timestamp, load value, and metadata columns",
     )
     # # These are not currently supported by dsgrid but may be needed in the near future
     # DATASET_DIMENSION_MAPPING = EnumValue(
@@ -169,6 +192,10 @@ class StandardDataSchemaModel(DSGBaseModel):
     )
 
 
+class OneTableDataSchemaModel(DSGBaseModel):
+    """ data schema model for one table load data format """
+
+
 class DatasetConfigModel(DSGBaseModel):
     """Represents dataset configurations."""
 
@@ -197,6 +224,15 @@ class DatasetConfigModel(DSGBaseModel):
             "the dimension ID records defined by the project's base data source dimension.",
         ),
         # TODO: it would be nice to extend the description here with a CLI example of how to list the project's data source IDs.
+    )
+    data_schema_type: DataSchemaType = Field(
+        title="data_schema_type",
+        description="Discriminator for data schema",
+        options=DataSchemaType.format_for_docs(),
+    )
+    data_schema: Union[StandardDataSchemaModel, OneTableDataSchemaModel] = Field(
+        title="data_schema",
+        description="Schema (table layouts) used for writing out the dataset",
     )
     path: str = Field(
         title="path",
@@ -251,15 +287,6 @@ class DatasetConfigModel(DSGBaseModel):
         description="List of data tags",
         required=False,
     )
-    data_schema_type: DataSchemaType = Field(
-        title="data_schema_type",
-        description="Discriminator for data schema",
-        options=DataSchemaType.format_for_docs(),
-    )
-    data_schema: StandardDataSchemaModel = Field(
-        title="data_schema",
-        description="Schema (table layouts) used for writing out the dataset",
-    )  # Once we have another schema type this will become Union[StandardDataSchemaModel, OtherSchemaModel]
     dimensions: List[DimensionReferenceModel] = Field(
         title="dimensions",
         description="List of registered dimension references that make up the dimensions of dataset.",
@@ -294,6 +321,8 @@ class DatasetConfigModel(DSGBaseModel):
         # placeholder for when there's more data_schema_type
         if values["data_schema_type"] == DataSchemaType.STANDARD:
             schema = StandardDataSchemaModel(**schema)
+        elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
+            schema = OneTableDataSchemaModel(**schema)
         else:
             raise ValueError(
                 f'Cannot load data_schema model for data_schema_type={values["data_schema_type"]}'
@@ -307,7 +336,7 @@ class DatasetConfigModel(DSGBaseModel):
         return dataset_id
 
     @validator("path")
-    def check_path(cls, path):
+    def check_path(cls, path, values):
         """Check dataset parquet path"""
         # TODO S3: This requires downloading data to the local system.
         # Can we perform all validation on S3 with an EC2 instance?
@@ -318,8 +347,13 @@ class DatasetConfigModel(DSGBaseModel):
             if not local_path.exists():
                 raise ValueError(f"{local_path} does not exist for InputDataset")
 
-        check_load_data_filename(local_path)
-        check_load_data_lookup_filename(local_path)
+        if values["data_schema_type"] == DataSchemaType.STANDARD:
+            check_load_data_filename(local_path)
+            check_load_data_lookup_filename(local_path)
+        elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
+            check_load_data_one_table_filename(local_path)
+        # else:
+        #     raise ValueError(f'data_schema_type={values["data_schema_type"]} not supported.')
 
         # TODO: check dataset_dimension_mapping (optional) if exists
         # TODO: check project_dimension_mapping (optional) if exists
@@ -383,6 +417,10 @@ class DatasetConfig(ConfigBase):
     @property
     def load_data_lookup_path(self):
         return check_load_data_lookup_filename(self._src_dir / self.model.path)
+
+    @property
+    def load_data_one_table_path(self):
+        return check_load_data_one_table_filename(self._src_dir / self.model.path)
 
     def load_dimensions(self, dimension_manager):
         """Load all dataset dimensions.

@@ -60,5 +60,3 @@ class DimensionConfig(DimensionBaseConfigWithFiles):
 
         """
         return {x.id for x in self.model.records}
-
-    return DimensionConfig.load(filename)

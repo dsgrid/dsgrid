@@ -282,6 +282,22 @@ class TimeRangeModel(DSGBaseModel):
     )
 
 
+class MonthRangeModel(DSGBaseModel):
+    """Defines a continuous range of time."""
+
+    # This uses str instead of datetime because this object doesn't have the ability
+    # to serialize/deserialize by itself (no str-format).
+    # We use the DatetimeRange object during processing.
+    start: int = Field(
+        title="start",
+        description="First month in the data (January is 1, December is 12)",
+    )
+    end: int = Field(
+        title="end",
+        description="Last month in the data (inclusive)",
+    )
+
+
 class TimeDimensionBaseModel(DimensionBaseModel):
     """Defines a base model common to all time dimensions."""
 
@@ -317,8 +333,8 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         return data
 
 
-class TimeDimensionModel(TimeDimensionBaseModel):
-    """Defines a time dimension"""
+class DateTimeDimensionModel(TimeDimensionBaseModel):
+    """Defines a time dimension where timestamps translate to datetime objects."""
 
     str_format: Optional[str] = Field(
         title="str_format",
@@ -387,7 +403,7 @@ class TimeDimensionModel(TimeDimensionBaseModel):
 
 
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):
-    """Defines an annual time dimension"""
+    """Defines an annual time dimension where timestamps are years."""
 
     include_leap_day: bool = Field(
         title="include_leap_day",
@@ -400,33 +416,21 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
 
 
 class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
-    """Defines a representative time dimension"""
+    """Defines a representative time dimension."""
 
     format: RepresentativePeriodFormat = Field(
         title="format",
         description="Format of the timestamps in the load data",
     )
-    str_format: str = Field(
-        title="str_format",
-        description="Timestamp string format",
-        notes=(
-            "The string format is used to parse the timestamps provided in the time ranges."
-            "Cheatsheet reference: `<https://strftime.org/>`_.",
-        ),
-    )
-    ranges: List[TimeRangeModel] = Field(
-        title="time_ranges",
-        description="Defines the continuous ranges of time in the data. Must match 'str_format'.",
+    ranges: List[MonthRangeModel] = Field(
+        title="ranges",
+        description="Defines the continuous ranges of time in the data.",
     )
     time_interval_type: TimeInvervalType = Field(
         title="time_interval",
         description="The range of time that the value associated with a timestamp represents",
         options=TimeInvervalType.format_descriptions_for_docs(),
     )
-
-    @validator("ranges", pre=True)
-    def check_times(cls, ranges, values):
-        return _check_time_ranges(ranges, values["str_format"], values["format"].frequency)
 
 
 class DimensionReferenceModel(DSGBaseModel):
@@ -466,10 +470,10 @@ def handle_dimension_union(value):
     if isinstance(value, DimensionBaseModel):
         return value
 
-    # NOTE: Errors inside DimensionModel or TimeDimensionModel will be duplicated by Pydantic
+    # NOTE: Errors inside DimensionModel or DateTimeDimensionModel will be duplicated by Pydantic
     if value["type"] == DimensionType.TIME.value:
         if value["time_type"] == TimeDimensionType.DATETIME.value:
-            val = TimeDimensionModel(**value)
+            val = DateTimeDimensionModel(**value)
         elif value["time_type"] == TimeDimensionType.ANNUAL.value:
             val = AnnualTimeDimensionModel(**value)
         elif value["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:

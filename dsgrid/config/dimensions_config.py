@@ -6,7 +6,7 @@ from pydantic import validator
 
 from .config_base import ConfigBase
 from .dimensions import (
-    TimeDimensionModel,
+    DateTimeDimensionModel,
     AnnualTimeDimensionModel,
     RepresentativePeriodTimeDimensionModel,
     DimensionModel,
@@ -37,7 +37,7 @@ class DimensionsConfigModel(DSGBaseModel):
     # manually.
     # Union[
     #    DimensionModel,
-    #    TimeDimensionModel,
+    #    DateTimeDimensionModel,
     #    AnnualTimeDimensionModel,
     #    RepresentativePeriodTimeDimensionModel,
     # ]

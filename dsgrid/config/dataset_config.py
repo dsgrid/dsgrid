@@ -413,7 +413,7 @@ class DatasetConfig(ConfigBase):
         for key, dim_config in self.dimensions.items():
             if key.type == dimension_type:
                 return dim_config
-        assert False, key
+        assert False, dimension_type
 
     def add_trivial_dimensions(self, load_data_lookup):
         """Add trivial 1-element dimensions to load_data_lookup."""

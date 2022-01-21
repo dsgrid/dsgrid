@@ -70,15 +70,15 @@ class DatasetRegistryManager(RegistryManagerBase):
     def _check_dataset_consistency(self, config: DatasetConfig):
         spark = SparkSession.getActiveSession()
         path = Path(config.model.path)
-        load_data = read_dataframe(check_load_data_filename(path))
+        load_data_df = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
         load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
         with Timer(timer_stats_collector, "check_lookup_data_consistency"):
             self._check_lookup_data_consistency(config, load_data_lookup)
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(config, load_data)
+            self._check_dataset_time_consistency(config, load_data_df)
         with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
-            self._check_dataset_internal_consistency(config, load_data, load_data_lookup)
+            self._check_dataset_internal_consistency(config, load_data_df, load_data_lookup)
 
     def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
         found_id = False
@@ -127,44 +127,16 @@ class DatasetRegistryManager(RegistryManagerBase):
                     f"load_data_lookup records do not match dimension records for {name}"
                 )
 
-    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data):
+    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data_df):
         time_dim = config.get_dimension(DimensionType.TIME)
-        tz = time_dim.get_tzinfo()
-        time_ranges = time_dim.get_time_ranges()
-        assert len(time_ranges) == 1, len(time_ranges)
-        time_range = time_ranges[0]
-        # TODO: need to support validation of multiple time ranges: DSGRID-173
-
-        expected_timestamps = time_dim.list_time_range(time_range)
-        actual_timestamps = [
-            x.timestamp.astimezone().astimezone(tz)
-            for x in load_data.select("timestamp").distinct().sort("timestamp").collect()
-        ]
-        if expected_timestamps != actual_timestamps:
-            mismatch = sorted(
-                set(expected_timestamps).symmetric_difference(set(actual_timestamps))
-            )
-            raise DSGInvalidDataset(
-                f"load_data timestamps do not match expected times. mismatch={mismatch}"
-            )
-
-        timestamps_by_id = (
-            load_data.select("timestamp", "id")
-            .groupby("id")
-            .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
-        )
-        for row in timestamps_by_id.collect():
-            if row.distinct_timestamps != len(expected_timestamps):
-                raise DSGInvalidDataset(
-                    f"load_data ID={row.id} does not have {len(expected_timestamps)} timestamps: actual={row.distinct_timestamps}"
-                )
+        time_dim.check_dataset_time_consistency(load_data_df)
 
     def _check_dataset_internal_consistency(
-        self, config: DatasetConfig, load_data, load_data_lookup
+        self, config: DatasetConfig, load_data_df, load_data_lookup
     ):
-        self._check_load_data_columns(config, load_data)
+        self._check_load_data_columns(config, load_data_df)
         data_ids = []
-        for row in load_data.select("id").distinct().sort("id").collect():
+        for row in load_data_df.select("id").distinct().sort("id").collect():
             if row.id is None:
                 raise DSGInvalidDataset(f"load_data for dataset {config.config_id} has a null ID")
             data_ids.append(row.id)
@@ -176,6 +148,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             .agg(F.collect_list("id"))
             .collect()[0][0]
         )
+
         if data_ids != lookup_data_ids:
             logger.error(
                 f"Data IDs for %s data/lookup are inconsistent: data=%s lookup=%s",
@@ -187,18 +160,20 @@ class DatasetRegistryManager(RegistryManagerBase):
                 f"Data IDs for {config.config_id} data/lookup are inconsistent"
             )
 
-    def _check_load_data_columns(self, config: DatasetConfig, load_data):
+    def _check_load_data_columns(self, config: DatasetConfig, load_data_df):
         dim_type = config.model.data_schema.load_data_column_dimension
         dimension = config.get_dimension(dim_type)
         dimension_records = dimension.get_unique_ids()
+        time_dim = config.get_dimension(DimensionType.TIME)
+        time_columns = set(time_dim.get_timestamp_load_data_columns())
 
         found_id = False
         dim_columns = set()
-        for col in load_data.columns:
+        for col in load_data_df.columns:
             if col == "id":
                 found_id = True
                 continue
-            if col == "timestamp":
+            if col in time_columns:
                 continue
             dim_columns.add(col)
 

@@ -209,7 +209,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
         dataset = Dataset.load(dataset_config)
         # TODO: does this function need mapping_references?
-        self.check_dataset_base_to_base_mappings(project_config, dataset_config, dataset)
+        self.check_dataset_base_to_project_base_mappings(project_config, dataset_config, dataset)
 
         if self.dry_run_mode:
             logger.info(
@@ -239,7 +239,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_config.config_id,
         )
 
-    def check_dataset_base_to_base_mappings(self, project_config, dataset_config, dataset):
+    def check_dataset_base_to_project_base_mappings(self, project_config, dataset_config, dataset):
         """Check that the dataset contains all mappings of base dimensions.
 
         Parameters

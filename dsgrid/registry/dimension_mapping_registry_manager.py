@@ -10,7 +10,11 @@ from prettytable import PrettyTable
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.association_tables import AssociationTableConfig
 from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
-from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
+from dsgrid.exceptions import (
+    DSGInvalidDimensionMapping,
+    DSGValueNotRegistered,
+    DSGDuplicateValueRegistered,
+)
 from dsgrid.data_models import serialize_model
 from dsgrid.registry.common import ConfigKey, make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import dump_data
@@ -68,7 +72,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def registry_class():
         return DimensionMappingRegistry
 
-    def check_unique_records(self, config: DimensionMappingsConfig, warn_only=False):
+    def _check_unique_records(self, config: DimensionMappingsConfig, warn_only=False):
         """Check if any new mapping files have identical contents as any existing files.
 
         Parameters
@@ -101,6 +105,27 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             if not warn_only:
                 raise DSGDuplicateValueRegistered(
                     f"There are {len(duplicates)} dimension mappings with duplicate content (data files)."
+                )
+
+    def _check_records_against_dimension_records(self, config):
+        for mapping in config.model.mappings:
+            actual_from_records = {x.from_id for x in mapping.records}
+            actual_to_records = {x.to_id for x in mapping.records}
+            from_dimension = self._dimension_mgr.get_by_id(mapping.from_dimension.dimension_id)
+            allowed_from_records = from_dimension.get_unique_ids()
+            diff = actual_from_records.difference(allowed_from_records)
+            if diff:
+                dim_id = from_dimension.model.dimension_id
+                raise DSGInvalidDimensionMapping(
+                    f"Dimension mapping has invalid 'from' records: dimension_id={dim_id} {diff}"
+                )
+            to_dimension = self._dimension_mgr.get_by_id(mapping.to_dimension.dimension_id)
+            allowed_to_records = to_dimension.get_unique_ids()
+            diff = actual_to_records.difference(allowed_to_records)
+            if diff:
+                dim_id = from_dimension.model.dimension_id
+                raise DSGInvalidDimensionMapping(
+                    f"Dimension mapping has invalid 'to' records: dimension_id={dim_id} {diff}"
                 )
 
     def validate_records(self, config: DimensionMappingsConfig, warn_only=False):
@@ -164,7 +189,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def _register(self, config_file, submitter, log_message, force=False):
         config = DimensionMappingsConfig.load(config_file)
         config.assign_ids()
-        self.check_unique_records(config, warn_only=force)
+        self._check_unique_records(config, warn_only=force)
+        self._check_records_against_dimension_records(config)
         self.validate_records(config, warn_only=force)
 
         registration = make_initial_config_registration(submitter, log_message)

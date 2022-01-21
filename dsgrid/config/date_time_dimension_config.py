@@ -48,26 +48,27 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         )
         distinct_counts = timestamps_by_id.select("distinct_timestamps").distinct()
         expected_count = len(expected_timestamps)
-        if distinct_counts.count() == 1:
-            val = distinct_counts.collect()[0].distinct_timestamps
-            if val != expected_count:
-                raise DSGInvalidDataset(
-                    f"load_data arrays do not have {len(expected_timestamps)} timestamps: actual={row.distinct_timestamps}"
-                )
-            return
+        if distinct_counts.count() != 1:
+            for row in timestamps_by_id.collect():
+                if row.distinct_timestamps != len(expected_timestamps):
+                    logger.error(
+                        "load_data ID=%s does not have %s timestamps: actual=%s",
+                        row.id,
+                        len(expected_timestamps),
+                        row.distinct_timestamps,
+                    )
 
-        for row in timestamps_by_id.collect():
-            if row.distinct_timestamps != len(expected_timestamps):
-                logger.error(
-                    "load_data ID=%s does not have %s timestamps: actual=%s",
-                    row.id,
-                    len(expected_timestamps),
-                    row.distinct_timestamps,
-                )
+            raise DSGInvalidDataset(
+                f"One or more arrays do not have {len(expected_timestamps)} timestamps"
+            )
 
-        raise DSGInvalidDataset(
-            f"One or more arrays do not have {len(expected_timestamps)} timestamps"
-        )
+        val = distinct_counts.collect()[0].distinct_timestamps
+        if val != expected_count:
+            raise DSGInvalidDataset(
+                f"load_data arrays do not have {len(expected_timestamps)} "  \
+                "timestamps: actual={row.distinct_timestamps}"
+            )
+
 
     def convert_dataframe(self, df):
         return df

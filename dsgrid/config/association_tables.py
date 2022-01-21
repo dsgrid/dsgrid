@@ -110,7 +110,7 @@ class AssociationTableConfig(ConfigWithDataFilesBase):
         return AssociationTableModel
 
     def get_unique_from_ids(self):
-        """Return the unique from IDs in a dimension's records.
+        """Return the unique from IDs in an association table's records.
 
         Returns
         -------
@@ -121,7 +121,7 @@ class AssociationTableConfig(ConfigWithDataFilesBase):
         return {x.from_id for x in self.model.records}
 
     def get_unique_to_ids(self):
-        """Return the unique to IDs in a dimension's records.
+        """Return the unique to IDs in an association table's records.
 
         Returns
         -------

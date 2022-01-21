@@ -129,15 +129,15 @@ class Time(DateTimeDimensionModel):
 # It is unclear if we need the next few classes. They would need model definitions in
 # order to be used.
 
-#class Timezone(TimeDimensionBaseModel):
+# class Timezone(TimeDimensionBaseModel):
 #    """Timezone attributes"""
 #
 #
-#class DayType(TimeDimensionModel):
+# class DayType(TimeDimensionModel):
 #    """Day Type attributes"""
 #
 #
-#class Season(TimeDimensionModel):
+# class Season(TimeDimensionModel):
 #    """Season attributes"""
 
 

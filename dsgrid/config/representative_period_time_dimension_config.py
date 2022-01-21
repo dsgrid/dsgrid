@@ -126,14 +126,14 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
 
     def check_dataset_time_consistency(self, expected_timestamps, load_data_df):
         assert False, "not supported yet"
-        #actual_timestamps = [
+        # actual_timestamps = [
         #    OneWeekPerMonthByHourType(month=x.month, day_of_week=x.day_of_week, hour=x.hour)
         #    for x in load_data_df.select("month", "day_of_week", "hour")
         #    .distinct()
         #    .sort("month", "day_of_week", "hour")
         #    .collect()
-        #]
-        #if expected_timestamps != actual_timestamps:
+        # ]
+        # if expected_timestamps != actual_timestamps:
         #    mismatch = sorted(
         #        set(expected_timestamps).symmetric_difference(set(actual_timestamps))
         #    )
@@ -141,21 +141,21 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
         #        f"load_data timestamps do not match expected times. mismatch={mismatch}"
         #    )
 
-        #timestamps_by_id = (
+        # timestamps_by_id = (
         #    load_data_df.select("month", "day_of_week", "hour", "id")
         #    .groupby("id")
         #    .agg(F.countDistinct("month", "day_of_week", "hour").alias("distinct_timestamps"))
-        #)
-        #lengths = timestamps_by_id.select("distinct_timestamps").distinct()
-        #count = lengths.count()
-        #if count != 1:
+        # )
+        # lengths = timestamps_by_id.select("distinct_timestamps").distinct()
+        # count = lengths.count()
+        # if count != 1:
         #    raise DSGInvalidDataset(
         #        f"All time arrays must have the same times: unique times={count}"
         #    )
 
-        #expected_len = len(expected_timestamps)
-        #actual = lengths.collect()[0].distinct_timestamps
-        #if actual != expected_len:
+        # expected_len = len(expected_timestamps)
+        # actual = lengths.collect()[0].distinct_timestamps
+        # if actual != expected_len:
         #    raise DSGInvalidDataset(
         #        f"Length of time arrays is incorrect: actual={actual} expected={expected_len}"
         #    )
@@ -166,7 +166,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     def get_expected_timestamps(self, ranges):
         assert False, "not supported yet"
         timestamps = []
-        #for model in ranges:
+        # for model in ranges:
         #    for month in range(model.start, model.end + 1):
         #        for day_of_week in range(7):
         #            for hour in range(24):

@@ -65,10 +65,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         val = distinct_counts.collect()[0].distinct_timestamps
         if val != expected_count:
             raise DSGInvalidDataset(
-                f"load_data arrays do not have {len(expected_timestamps)} "  \
+                f"load_data arrays do not have {len(expected_timestamps)} "
                 "timestamps: actual={row.distinct_timestamps}"
             )
-
 
     def convert_dataframe(self, df):
         return df

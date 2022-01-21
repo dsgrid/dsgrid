@@ -24,7 +24,6 @@ ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.csv",
     "load_data_lookup.json",
 )
-ALLOWED_LOAD_DATA_ONE_TABLE_FILENAMES = ("load_data_one_table.parquet", "load_data_one_table.csv")
 
 logger = logging.getLogger(__name__)
 
@@ -81,17 +80,6 @@ def check_load_data_lookup_filename(path: Path):
     raise ValueError(f"no load_data_lookup file exists in {path}")
 
 
-def check_load_data_one_table_filename(path: Path):
-    """Return the load_data_one_table filename in path. Supports Parquet and CSV."""
-    for allowed_name in ALLOWED_LOAD_DATA_ONE_TABLE_FILENAMES:
-        filename = path / allowed_name
-        if filename.exists():
-            return filename
-
-    # Use ValueError because this gets called in Pydantic model validation.
-    raise ValueError(f"no load_data_one_table file exists in {path}")
-
-
 class InputDatasetType(DSGEnum):
     SECTOR_MODEL = "sector_model"
     HISTORICAL = "historical"
@@ -111,10 +99,13 @@ class DataSchemaType(DSGEnum):
     ONE_TABLE = EnumValue(
         value="one_table",
         description="""
-        One_table data schema with load_data_one_table table. 
+        One_table data schema with load_data table. 
         Applies to small, non-timeseries datasets.
         """,
     )
+
+
+## schema_handler
 
 
 class DSGDatasetParquetType(DSGEnum):
@@ -122,16 +113,16 @@ class DSGDatasetParquetType(DSGEnum):
 
     LOAD_DATA = EnumValue(
         value="load_data",
-        description="load_data file with id, timestamp, and load value columns",
+        description="""
+        In STANDARD data_schema_type, load_data is a file with id, timestamp, and load value columns. 
+        In ONE_TABLE data_schema_type, load_data is a file with timestamp, load value, and metadata columns.
+        """,
     )
     LOAD_DATA_LOOKUP = EnumValue(
         value="load_data_lookup",
-        description="load_data_lookup file with dimension metadata and and ID which maps to load_data"
-        "file",
-    )
-    LOAD_DATA_ONE_TABLE = EnumValue(
-        value="load_data_one_table",
-        description="load_data_one_table file with timestamp, load value, and metadata columns",
+        description="""
+        load_data is a file with dimension metadata and and ID which maps to load_data file
+        """,
     )
     # # These are not currently supported by dsgrid but may be needed in the near future
     # DATASET_DIMENSION_MAPPING = EnumValue(
@@ -351,7 +342,7 @@ class DatasetConfigModel(DSGBaseModel):
             check_load_data_filename(local_path)
             check_load_data_lookup_filename(local_path)
         elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
-            check_load_data_one_table_filename(local_path)
+            check_load_data_filename(local_path)
         # else:
         #     raise ValueError(f'data_schema_type={values["data_schema_type"]} not supported.')
 
@@ -417,10 +408,6 @@ class DatasetConfig(ConfigBase):
     @property
     def load_data_lookup_path(self):
         return check_load_data_lookup_filename(self._src_dir / self.model.path)
-
-    @property
-    def load_data_one_table_path(self):
-        return check_load_data_one_table_filename(self._src_dir / self.model.path)
 
     def load_dimensions(self, dimension_manager):
         """Load all dataset dimensions.

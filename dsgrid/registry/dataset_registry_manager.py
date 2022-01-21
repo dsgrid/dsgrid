@@ -16,7 +16,6 @@ from dsgrid.config.dataset_config import (
     DatasetConfig,
     check_load_data_filename,
     check_load_data_lookup_filename,
-    check_load_data_one_table_filename,
     DataSchemaType,
 )
 from dsgrid.data_models import serialize_model
@@ -64,6 +63,15 @@ class DatasetRegistryManager(RegistryManagerBase):
     def registry_class():
         return DatasetRegistry
 
+    @staticmethod
+    def make_dataset_schema_handler(config):
+        if config.model.data_schema_type == DataSchemaType.STANDARD:
+            return StandardDataSchemaHandler(config)
+        elif config.model.data_schema_type == DataSchemaType.ONE_TABLE:
+            return OneTableDataSchemaHandler(config)
+        else:
+            assert False
+
     def _run_checks(self, config: DatasetConfig):
         self._check_if_already_registered(config.model.dataset_id)
         check_required_dimensions(config.model.dimensions, "dataset dimensions")
@@ -74,7 +82,10 @@ class DatasetRegistryManager(RegistryManagerBase):
         spark = SparkSession.getActiveSession()
         path = Path(config.model.path)
 
-#### Dan's change ###
+        schema_handler = make_dataset_schema_handler(config)
+        schema_handler.check_consistency()
+
+        #### Dan's change ###
         load_data_df = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
         load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
@@ -84,7 +95,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._check_dataset_time_consistency(config, load_data_df)
         with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
             self._check_dataset_internal_consistency(config, load_data_df, load_data_lookup)
-#### my change ####
+        #### my change ####
         data_schema_type = config.model.data_schema_type
         if data_schema_type == DataSchemaType.STANDARD:
             load_data = read_dataframe(check_load_data_filename(path))
@@ -107,7 +118,8 @@ class DatasetRegistryManager(RegistryManagerBase):
                 self._check_dataset_time_consistency(config, load_data_one_table)
         # else:
         #     raise ValueError(f'data_schema_type={data_schema_type} not supported.')
-#### ####
+
+    #### ####
 
     def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
         found_id = False
@@ -156,11 +168,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                     f"load_data_lookup records do not match dimension records for {name}"
                 )
 
-#### Dan's change ####
-    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data_df):
-        time_dim = config.get_dimension(DimensionType.TIME)
-        time_dim.check_dataset_time_consistency(load_data_df)
-#### my change ####
+    #### my change ####
     def _check_one_table_data_consistency(self, config: DatasetConfig, load_data_one_table):
         """
         Check all data dimensions, including Metric records.
@@ -216,7 +224,13 @@ class DatasetRegistryManager(RegistryManagerBase):
                 raise DSGInvalidDataset(
                     f"load_data_one_table records do not match dimension records for {name}"
                 )
-#### ####
+
+    #### ####
+
+    #### Dan's change ####
+    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data_df):
+        time_dim = config.get_dimension(DimensionType.TIME)
+        time_dim.check_dataset_time_consistency(load_data_df)
 
     def _check_dataset_time_consistency(self, config: DatasetConfig, load_data):
         """

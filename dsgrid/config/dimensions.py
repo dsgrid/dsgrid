@@ -126,7 +126,13 @@ class DimensionBaseModel(DSGBaseModel):
         prohibited_names = prohibited_names + [x + "s" for x in prohibited_names]
         if name.lower().replace(" ", "-") in prohibited_names:
             raise ValueError(
-                f" Dimension name '{name}' is not descriptive enough for a dimension record name. Please be more descriptive in your naming. Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable, identifiable, and reusable for other datasets and projects. e.g., 'time-2012-est-houlry-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name."
+                f"""
+                 Dimension name '{name}' is not descriptive enough for a dimension record name. 
+                 Please be more descriptive in your naming. 
+                 Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable, 
+                 identifiable, and reusable for other datasets and projects. 
+                 e.g., 'time-2012-est-houlry-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name.
+                 """
             )
         return name
 

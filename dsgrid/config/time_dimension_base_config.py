@@ -23,7 +23,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
     @abc.abstractmethod
     def convert_dataframe(self, df):
-        """Convert a dataframe to standard timestamps.
+        """Convert a dataframe to use standard datetime timestamps.
 
         Parameters
         ----------

@@ -209,7 +209,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
         dataset = Dataset.load(dataset_config)
         # TODO: does this function need mapping_references?
-        self.check_dataset_base_to_project_base_mappings(project_config, dataset_config, dataset)
+        #self.check_dataset_base_to_project_base_mappings(project_config, dataset_config, dataset)
 
         if self.dry_run_mode:
             logger.info(
@@ -239,36 +239,36 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_config.config_id,
         )
 
-    def check_dataset_base_to_project_base_mappings(self, project_config, dataset_config, dataset):
-        """Check that the dataset contains all mappings of base dimensions.
+    #def check_dataset_base_to_project_base_mappings(self, project_config, dataset_config, dataset):
+    #    """Check that the dataset contains all mappings of base dimensions.
 
-        Parameters
-        ----------
-        project_config : ProjectConfig
-        dataset_config : DatasetConfig
-        dataset : Dataset
+    #    Parameters
+    #    ----------
+    #    project_config : ProjectConfig
+    #    dataset_config : DatasetConfig
+    #    dataset : Dataset
 
-        Raises
-        ------
-        DSGInvalidDimensionMapping
-            Raised if a requirement is violated.
+    #    Raises
+    #    ------
+    #    DSGInvalidDimensionMapping
+    #        Raised if a requirement is violated.
 
-        """
-        needs_full_join = set()
-        types = [x for x in DimensionType if x != DimensionType.TIME]
-        for type1, type2 in itertools.product(types, types):
-            if type1 != type2:
-                needs_full_join.add((type1, type2))
+    #    """
+    #    needs_full_join = set()
+    #    types = [x for x in DimensionType if x != DimensionType.TIME]
+    #    for type1, type2 in itertools.product(types, types):
+    #        if type1 != type2:
+    #            needs_full_join.add((type1, type2))
 
-        for mapping_ref in project_config.model.dimension_mappings.base_to_base:
-            from_dimension = mapping_ref.from_dimension_type
-            to_dimension = mapping_ref.to_dimension_type
-            needs_full_join.remove((from_dimension, to_dimension))
-            mapping_config = self._dimension_mapping_mgr.get_by_id(mapping_ref.mapping_id)
-            mapping_records = models_to_dataframe(mapping_config.model.records)
-            # TODO perform checks across mapping_records, dataset.load_data, dataset.load_data_lookup
+    #    for mapping_ref in project_config.model.dimension_mappings.base_to_base:
+    #        from_dimension = mapping_ref.from_dimension_type
+    #        to_dimension = mapping_ref.to_dimension_type
+    #        needs_full_join.remove((from_dimension, to_dimension))
+    #        mapping_config = self._dimension_mapping_mgr.get_by_id(mapping_ref.mapping_id)
+    #        mapping_records = models_to_dataframe(mapping_config.model.records)
+    #        # TODO perform checks across mapping_records, dataset.load_data, dataset.load_data_lookup
 
-        # TODO Perform checks on all from-to dimensions in needs_full_join.
+    #    # TODO Perform checks on all from-to dimensions in needs_full_join.
 
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version

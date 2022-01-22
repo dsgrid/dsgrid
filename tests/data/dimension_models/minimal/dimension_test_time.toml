@@ -17,7 +17,7 @@ measurement_type = "total"
 [[dimensions]] #[2] # this should err out
 type = "time"
 class = "Time"
-time_type = "annual"
+time_type = "datetime"
 description = """
 Annual time 2018-2050
 """

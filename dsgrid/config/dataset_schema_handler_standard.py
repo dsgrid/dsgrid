@@ -1,3 +1,7 @@
+from pathlib import Path
+
+import pyspark.sql.functions as F
+
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     check_load_data_filename,
@@ -5,24 +9,27 @@ from dsgrid.config.dataset_config import (
 )
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, Timer
+from dsgrid.config.dataset_schema_handler_base import DatasetSchemaHandlerBase
+from dsgrid.dimension.base_models import DimensionType
 
 
-class StandardDataSchemaHandler(DatasetSchemaHandlerBase):
+class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     """ define interface/required behaviors for STANDARD dataset schema """
 
     def __init__(self, config):
         self._config = config
 
     def check_consistency(self):
+        path = Path(self._config.model.path)
         load_data_df = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
-        load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
+        load_data_lookup = self._config.add_trivial_dimensions(load_data_lookup)
         with Timer(timer_stats_collector, "check_lookup_data_consistency"):
-            self._check_lookup_data_consistency(config, load_data_lookup)
+            self._check_lookup_data_consistency(self._config, load_data_lookup)
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(config, load_data_df)
+            self._check_dataset_time_consistency(self._config, load_data_df)
         with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
-            self._check_dataset_internal_consistency(config, load_data_df, load_data_lookup)
+            self._check_dataset_internal_consistency(self._config, load_data_df, load_data_lookup)
 
     def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
         found_id = False
@@ -78,7 +85,12 @@ class StandardDataSchemaHandler(DatasetSchemaHandlerBase):
 
     def _check_dataset_time_consistency_by_id(self, time_dim, load_data):
 
-        expected_timestamps = time_dim.list_time_range(time_range)
+        time_ranges = time_dim.get_time_ranges()
+        assert len(time_ranges) == 1, len(time_ranges)
+        time_range = time_ranges[0]
+        # TODO: need to support validation of multiple time ranges: DSGRID-173
+
+        expected_timestamps = time_range.list_time_range()
         expected_count = len(expected_timestamps)
 
         timestamps_by_id = (

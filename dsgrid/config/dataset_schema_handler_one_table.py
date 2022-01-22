@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     check_load_data_filename,
@@ -5,21 +7,24 @@ from dsgrid.config.dataset_config import (
 )
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, Timer
+from dsgrid.config.dataset_schema_handler_base import DatasetSchemaHandlerBase
+from dsgrid.dimension.base_models import DimensionType
 
 
-class OneTableDataSchemaHandler(DatasetSchemaHandlerBase):
-    """ define interface/required behaviors for ONETABLE dataset schema """
+class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
+    """ define interface/required behaviors for ONE_TABLE dataset schema """
 
     def __init__(self, config):
         self._config = config
 
     def check_consistency(self):
+        path = Path(self._config.model.path)
         load_data_df = read_dataframe(check_load_data_filename(path), cache=True)
-        load_data_df = config.add_trivial_dimensions(load_data_df)
+        load_data_df = self._config.add_trivial_dimensions(load_data_df)
         with Timer(timer_stats_collector, "check_one_table_data_consistency"):
-            self._check_one_table_data_consistency(config, load_data_df)
+            self._check_one_table_data_consistency(self._config, load_data_df)
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(config, load_data_df)
+            self._check_dataset_time_consistency(self._config, load_data_df)
 
     def _check_one_table_data_consistency(self, config: DatasetConfig, load_data):
         dimension_types = []

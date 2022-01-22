@@ -397,13 +397,18 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
+        print("\n-->")
+        print(values)
+        print(values["frequency"])
+        print()
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
     @validator("frequency")
     def check_frequency(cls, value):
-        if value == timedelta(days=366):
+        if value in [timedelta(days=365), timedelta(days=366)]:
             raise ValueError(
-                "366 days not allowed for frequency, use 365 days to specify annual frequency."
+                "365/366 days not allowed for frequency, ",
+                'use class="AnnualTime", time_type="annual" to specify a year series..',
             )
         return value
 
@@ -411,6 +416,19 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     """Defines an annual time dimension where timestamps are years."""
 
+    str_format: Optional[str] = Field(
+        title="str_format",
+        default="%Y",
+        description="Timestamp string format",
+        notes=(
+            "The string format is used to parse the timestamps provided in the time ranges."
+            "Cheatsheet reference: `<https://strftime.org/>`_.",
+        ),
+    )
+    ranges: List[TimeRangeModel] = Field(
+        title="time_ranges",
+        description="Defines the continuous ranges of time in the data.",
+    )
     include_leap_day: bool = Field(
         title="include_leap_day",
         default=False,
@@ -419,6 +437,10 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
             True, False
         """,
     )
+
+    @validator("ranges", pre=True)
+    def check_times(cls, ranges, values):
+        return _check_time_ranges(ranges, values["str_format"], timedelta(days=365))
 
 
 class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):

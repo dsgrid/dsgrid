@@ -2,6 +2,7 @@ import csv
 import logging
 import os
 import shutil
+from collections import namedtuple
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
@@ -11,6 +12,7 @@ from pyspark.sql import DataFrame, Row, SparkSession
 from .config_base import ConfigWithDataFilesBase
 from .dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.data_models import serialize_model_data, DSGBaseModel
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import compute_file_hash, dump_data
 
@@ -104,6 +106,14 @@ class AssociationTableConfig(ConfigWithDataFilesBase):
     @property
     def config_id(self):
         return self.model.mapping_id
+
+    @staticmethod
+    def data_file_fields():
+        return ["filename"]
+
+    @staticmethod
+    def data_files_fields():
+        return []
 
     @staticmethod
     def model_class():

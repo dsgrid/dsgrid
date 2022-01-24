@@ -27,6 +27,10 @@ class Dataset:
         # queries based on dataset ID.
         # TODO: do we need a DimensionStore here?
 
+    @property
+    def dataset_id(self):
+        return self._id
+
     @classmethod
     def load(cls, config):
         """Load a dataset from a store.

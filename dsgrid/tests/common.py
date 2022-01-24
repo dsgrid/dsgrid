@@ -80,7 +80,7 @@ def read_dimension_mapping_uuid_mapping(registry_dir):
     )
     path = dir_name / "dimension_mappings"
     for item in fs_intf.listdir(path, directories_only=True, exclude_hidden=True):
-        assert os.path.isdir(path / item), str(path / item)
+        assert (path / item).is_dir(), str(path / item)
         match = regex.search(item)
         assert match, item
         data = match.groupdict()

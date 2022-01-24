@@ -1,12 +1,14 @@
 """Spark helper functions"""
 
 import csv
+import itertools
 import logging
 import multiprocessing
 import os
 from pathlib import Path
 
 from pyspark.sql import DataFrame, Row, SparkSession
+from pyspark.sql.types import StructType, StringType
 from pyspark import SparkConf, SparkContext
 
 from dsgrid.exceptions import DSGInvalidField
@@ -167,6 +169,31 @@ def models_to_dataframe(models, cache=False):
         rows.append(row)
 
     df = SparkSession.getActiveSession().createDataFrame(rows)
+    if cache:
+        df.cache()
+    return df
+
+
+@track_timing(timer_stats_collector)
+def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True):
+    """Return a DataFrame created from the IDs of dimension_types.
+
+    Parameters
+    ----------
+    records : sequence
+        Iterable of lists of record IDs
+    dimension_types : tuple
+    cache : If True, cache the DataFrame.
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    """
+    schema = StructType()
+    for dimension_type in dimension_types:
+        schema.add(dimension_type.value, StringType(), nullable=False)
+    df = SparkSession.getActiveSession().createDataFrame(records, schema=schema)
     if cache:
         df.cache()
     return df

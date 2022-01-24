@@ -202,6 +202,12 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_references : list
             iterable of DimensionReferenceModel instances
 
+
+        Returns
+        -------
+        dict
+            DimensionKey to DimensionConfig
+
         """
         dimensions = {}
         for dim in dimension_references:

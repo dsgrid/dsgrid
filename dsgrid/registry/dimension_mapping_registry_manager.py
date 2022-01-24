@@ -171,13 +171,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         Returns
         -------
         dict
-            ConfigKey to DimensionMappingModel
+            ConfigKey to DimensionMappingConfig
 
         """
         mappings = {}
         for ref in dimension_mapping_references:
-            key = ConfigKey(ref.id, ref.version)
-            mappings[key] = self.get_by_key(key).model
+            key = ConfigKey(ref.mapping_id, ref.version)
+            mappings[key] = self.get_by_key(key)
 
         return mappings
 

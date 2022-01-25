@@ -46,7 +46,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if not found_id:
             raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
 
-        # TODO: some of this logic will change based on the data table schema type
         load_data_dimensions = (
             DimensionType.TIME,
             config.model.data_schema.load_data_column_dimension,

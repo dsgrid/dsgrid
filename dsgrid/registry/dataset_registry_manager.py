@@ -71,7 +71,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         elif config.model.data_schema_type == DataSchemaType.ONE_TABLE:
             return OneTableDatasetSchemaHandler(config)
         else:
-            assert False
+            assert False, config.model.data_schema_type
 
     def _run_checks(self, config: DatasetConfig):
         self._check_if_already_registered(config.model.dataset_id)

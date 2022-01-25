@@ -44,14 +44,14 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         dimension_types.append(DimensionType.METRIC)  # add metric type
 
         # check dim outside of metric and time
-        expected_dimensions = set([d for d in DimensionType if d != DimensionType.TIME])
+        expected_dimensions = {d for d in DimensionType if d != DimensionType.TIME}
         if len(dimension_types) != len(expected_dimensions):
             raise DSGInvalidDataset(
                 f"load_data does not have the correct number of dimensions specified between trivial and non-trivial dimensions."
             )
 
         missing_dimensions = expected_dimensions.difference(dimension_types)
-        if len(missing_dimensions) != 0:
+        if missing_dimensions:
             raise DSGInvalidDataset(
                 f"load_data is missing dimensions: {missing_dimensions}. If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )

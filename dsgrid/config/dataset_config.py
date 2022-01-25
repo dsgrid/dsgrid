@@ -105,9 +105,6 @@ class DataSchemaType(DSGEnum):
     )
 
 
-## schema_handler
-
-
 class DSGDatasetParquetType(DSGEnum):
     """Dataset parquet types."""
 
@@ -343,8 +340,8 @@ class DatasetConfigModel(DSGBaseModel):
             check_load_data_lookup_filename(local_path)
         elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
             check_load_data_filename(local_path)
-        # else:
-        #     raise ValueError(f'data_schema_type={values["data_schema_type"]} not supported.')
+        else:
+            raise ValueError(f'data_schema_type={values["data_schema_type"]} not supported.')
 
         # TODO: check dataset_dimension_mapping (optional) if exists
         # TODO: check project_dimension_mapping (optional) if exists

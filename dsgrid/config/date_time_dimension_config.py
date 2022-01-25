@@ -1,17 +1,12 @@
-import logging
 from datetime import datetime
 
 import pandas as pd
-import pyspark.sql.functions as F
 
 from dsgrid.dimension.time import TimeZone
 from dsgrid.dimension.time import TimeZone, make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
-
-
-logger = logging.getLogger(__name__)
 
 
 class DateTimeDimensionConfig(TimeDimensionBaseConfig):

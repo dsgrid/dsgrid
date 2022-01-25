@@ -1,5 +1,9 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 
+import pandas as pd
+
+from dsgrid.dimension.time import make_time_range
+from dsgrid.exceptions import DSGInvalidDataset
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -16,11 +20,10 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         assert len(time_ranges) == 1, len(time_ranges)
         time_range = time_ranges[0]
         # TODO: need to support validation of multiple time ranges: DSGRID-173
-
         expected_timestamps = time_range.list_time_range()
         actual_timestamps = [
-            pd.Timestamp(str(x)).to_pydatetime()
-            for x in load_data_df.select("timestamp").distinct().sort("timestamp").collect()
+            pd.Timestamp(str(x.year)).to_pydatetime()
+            for x in load_data_df.select("year").distinct().sort("year").collect()
         ]
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(
@@ -38,6 +41,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_time_ranges(self):
         ranges = []
+        frequency = self.get_frequency()
         for time_range in self.model.ranges:
             start = datetime.strptime(time_range.start, self.model.str_format)
             start = pd.Timestamp(start)
@@ -47,8 +51,8 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 make_time_range(
                     start=start,
                     end=end,
-                    frequency=self.model.frequency,
-                    leap_day_adjustment=self.model.leap_day_adjustment,
+                    frequency=frequency,
+                    leap_day_adjustment=None,
                 )
             )
 

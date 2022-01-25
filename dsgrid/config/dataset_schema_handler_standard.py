@@ -1,4 +1,5 @@
 from pathlib import Path
+import logging
 
 import pyspark.sql.functions as F
 
@@ -11,6 +12,12 @@ from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, Timer
 from dsgrid.config.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import (
+    DSGInvalidDataset,
+    DSGInvalidDimension,
+)
+
+logger = logging.getLogger(__name__)
 
 
 class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):

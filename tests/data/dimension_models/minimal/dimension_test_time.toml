@@ -1,6 +1,6 @@
-[[dimensions]] #[1]
+[[dimensions]] #[1] 8760
 type = "time"
-class = "Time"
+class_name = "Time"
 time_type = "datetime"
 description = """
 Time dimension, 2012 hourly EST, period-beginning, no DST, no Leap Day Adjustment, total value
@@ -14,33 +14,33 @@ timezone = "EasternStandard"
 measurement_type = "total"
 
 
-[[dimensions]] #[2] # this should err out
+[[dimensions]] #[2] # daily
 type = "time"
-class = "Time"
+class_name = "Time"
 time_type = "datetime"
 description = """
 Annual time 2018-2050
 """
-frequency = "P365D"
-name = "annual_time_2018_to_2050"
+frequency = "P1D" #"P365D"
+name = "annual_time_2018_to_2020"
 time_interval_type = "instantaneous"
-ranges = [{start = "2018", end = "2050"}]
-str_format = "%Y"
+ranges = [{start = "2018-01-01", end = "2020-01-01"}]
+str_format = "%Y-%m-%d"
 timezone = "none"
 measurement_type = "total"
 
 
 [[dimensions]] #[3]
 type = "time"
-class = "Time"
+class_name = "Time"
 time_type = "datetime"
 description = """
-Time dimension, 2012 hourly EPT, period-ending, no Leap Day Adjustment, total value
+Time dimension, 2016 hourly EPT, period-ending, no Leap Day Adjustment, total value
 """
-frequency = "01:00:00"
-name = "Time-2012-EPT-hourly-periodEnding-noLeapDayAdjustment-total"
+frequency = "06:00:00"
+name = "Time-2016-EPT-hourly-periodEnding-noLeapDayAdjustment-total"
 time_interval_type = "period_ending"
-ranges = [{start = "2012-01-01 01:00:00", end = "2013-01-01 00:00:00"}]
+ranges = [{start = "2016-01-01 00:00:00", end = "2017-01-01 00:00:00"}]
 str_format = "%Y-%m-%d %H:%M:%S"
 timezone = "EasternPrevailing"
 leap_day_adjustment = "none"
@@ -49,12 +49,13 @@ measurement_type = "max"
 
 [[dimensions]] #[4]
 type = "time"
-class = "AnnualTime"
+class_name = "AnnualTime"
 time_type = "annual"
 description = """Annual time"""
 module = "dsgrid.dimension.standard"
 name = "Annual-time-with-leap-year"
-ranges = [{start = "2012", end = "2020"}]
+ranges = [{start = "2020", end = "2050"}]
+str_format = "%Y"
 include_leap_day = true
 measurement_type = "mean"
 

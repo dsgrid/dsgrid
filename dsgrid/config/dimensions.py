@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
-from pydantic import validator
+from pydantic import validator, root_validator
 from pydantic import Field
 from pyspark.sql import DataFrame, Row, SparkSession
 from semver import VersionInfo
@@ -361,7 +361,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     )
     ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
-        description="Defines the continuous ranges of time in the data.",
+        description="Defines the continuous ranges of time in the data, inclusive of start and end time.",
     )
     leap_day_adjustment: Optional[LeapDayAdjustmentType] = Field(
         title="leap_day_adjustment",
@@ -395,27 +395,41 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         options=TimeZone.format_descriptions_for_docs(),
     )
 
+    @root_validator(pre=False)  # TODO: modify as model works with more time_type schema
+    def check_time_type(cls, values):
+        if (
+            values["class_name"] == "Time" and values["time_type"] == TimeDimensionType.DATETIME
+        ) or (
+            values["class_name"] == "AnnualTime"
+            and values["time_type"] == TimeDimensionType.ANNUAL
+        ):
+            pass
+        else:
+            raise ValueError(
+                f'time_type={values["time_type"].value} does not match class_name={values["class_name"]}. \n'
+                " * For class=Time, use time_type=datetime. \n"
+                " * For class=AnnualTime, use time_type=annual."
+            )
+        return values
+
+    @root_validator(pre=False)
+    def check_frequency(cls, values):
+        if values["frequency"] in [timedelta(days=365), timedelta(days=366)]:
+            raise ValueError(
+                f'frequency={values["frequency"]}, 365 or 366 days not allowed, '
+                "use class=AnnualTime, time_type=annual to specify a year series."
+            )
+        return values
+
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
-        print("\n-->")
-        print(values)
-        print(values["frequency"])
-        print()
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
-
-    @validator("frequency")
-    def check_frequency(cls, value):
-        if value in [timedelta(days=365), timedelta(days=366)]:
-            raise ValueError(
-                "365/366 days not allowed for frequency, ",
-                'use class="AnnualTime", time_type="annual" to specify a year series..',
-            )
-        return value
 
 
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     """Defines an annual time dimension where timestamps are years."""
 
+    time_type: TimeDimensionType = Field(default=TimeDimensionType.ANNUAL)
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y",
@@ -427,16 +441,30 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     )
     ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
-        description="Defines the continuous ranges of time in the data.",
+        description="Defines the contiguous ranges of time in the data, inclusive of start and end time.",
     )
     include_leap_day: bool = Field(
         title="include_leap_day",
         default=False,
-        description="""
-        Whether annual time includes leap day. Accepted: 
-            True, False
-        """,
+        description="Whether annual time includes leap day.",
     )
+
+    @root_validator(pre=False)  # TODO: modify as model works with more time_type schema
+    def check_time_type(cls, values):
+        if (
+            values["class_name"] == "Time" and values["time_type"] == TimeDimensionType.DATETIME
+        ) or (
+            values["class_name"] == "AnnualTime"
+            and values["time_type"] == TimeDimensionType.ANNUAL
+        ):
+            pass
+        else:
+            raise ValueError(
+                f'time_type={values["time_type"].value} does not match class_name={values["class_name"]}. \n'
+                " * For class=Time, use time_type=datetime. \n"
+                " * For class=AnnualTime, use time_type=annual."
+            )
+        return values
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
@@ -452,7 +480,7 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
     )
     ranges: List[MonthRangeModel] = Field(
         title="ranges",
-        description="Defines the continuous ranges of time in the data.",
+        description="Defines the continuous ranges of time in the data, inclusive of start and end time.",
     )
     time_interval_type: TimeInvervalType = Field(
         title="time_interval",

@@ -57,5 +57,6 @@ class ConfigUpdateCheckerBase(abc.ABC):
             Raised if a precondition is violated.
 
         """
+        self.check_preconditions()
         self._check_common()
         self.handle_postconditions()

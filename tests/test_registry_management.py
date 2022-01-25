@@ -54,7 +54,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         assert dimension_mapping_ids
         dimension_mapping_id = dimension_mapping_ids[0]
         user = getpass.getuser()
-        log_message = "intial registration"
+        log_message = "initial registration"
 
         project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.1.0"))
         assert project_config.model.status == ProjectRegistryStatus.COMPLETE
@@ -104,6 +104,9 @@ def test_register_project_and_dataset(make_test_project_dir):
         check_config_update(
             dim_dir, dimension_mapping_mgr, dimension_mapping_id, user, VersionInfo.parse("1.0.0")
         )
+
+        check_update_project_dimension(base_dir, manager)
+        # Note that the dataset is now unregistered.
 
         # Test removals.
         check_config_remove(project_mgr, project_id)
@@ -241,20 +244,6 @@ def register_dataset(dataset_mgr, config_file, dataset_id, user, log_message):
     assert dataset_mgr.list_ids() == [dataset_id]
 
 
-def submit_dataset(
-    project_mgr, project_config, dataset_config, dimension_mapping_refs, user, log_message
-):
-    project_id = project_config.config_id
-    dataset_id = dataset_config.config_id
-    project_mgr.submit_dataset(
-        project_id,
-        dataset_id,
-        dimension_mapping_refs,
-        user,
-        log_message,
-    )
-
-
 def check_config_update(tmpdir, mgr, config_id, user, version):
     """Runs basic positive and negative update tests for the config. Also tests dump."""
     config_file = Path(tmpdir) / mgr.registry_class().config_filename()
@@ -299,6 +288,56 @@ def check_config_update(tmpdir, mgr, config_id, user, version):
     finally:
         if config_file.exists():
             os.remove(config_file)
+
+
+def check_update_project_dimension(tmpdir, manager):
+    """Verify that updating a project's dimension causes all datasets to go unregistered."""
+    project_mgr = manager.project_manager
+    project_id = project_mgr.list_ids()[0]
+    dimension_mgr = manager.dimension_manager
+    dimension_id = dimension_mgr.list_ids()[0]
+    user = getpass.getuser()
+    msg = "update registration"
+
+    dim_dir = Path(tmpdir) / "new_dimension"
+    dim_config_file = dim_dir / dimension_mgr.registry_class().config_filename()
+    dimension_mgr.dump(dimension_id, dim_dir, force=True)
+    dim_data = load_data(dim_config_file)
+    dim_data["description"] += "; updated description"
+    dump_data(dim_data, dim_config_file)
+    dimension_mgr.update_from_file(
+        dim_config_file,
+        dimension_id,
+        user,
+        VersionUpdateType.PATCH,
+        "update to description",
+        dimension_mgr.get_current_version(dimension_id),
+    )
+    project_dir = Path(tmpdir) / "new_project"
+    project_config_file = project_dir / project_mgr.registry_class().config_filename()
+    project_mgr.dump(project_id, project_dir, force=True)
+    project_data = load_data(project_config_file)
+    new_version = dimension_mgr.get_current_version(dimension_id)
+    for dim in project_data["dimensions"]["base_dimensions"]:
+        if dim["dimension_id"] == dimension_id:
+            dim["version"] = str(new_version)
+    dump_data(project_data, project_config_file)
+    project_mgr.update_from_file(
+        project_config_file,
+        project_id,
+        user,
+        VersionUpdateType.PATCH,
+        "update dimension",
+        project_mgr.get_current_version(project_id),
+    )
+    _check_dataset_statuses(project_mgr, project_id, DatasetRegistryStatus.UNREGISTERED)
+
+
+def _check_dataset_statuses(project_mgr, project_id, expected_status):
+    config = project_mgr.get_by_id(project_id)
+    assert config.model.datasets
+    for dataset in config.model.datasets:
+        assert dataset.status == expected_status
 
 
 def check_config_remove(mgr, config_id):

@@ -33,6 +33,7 @@ from dsgrid.registry.common import (
 from dsgrid.utils.spark import create_dataframe_from_dimension_ids
 from dsgrid.utils.timing import track_timing, timer_stats_collector, Timer
 from .common import VersionUpdateType
+from .project_update_checker import ProjectUpdateChecker
 from .dataset_registry_manager import DatasetRegistryManager
 from .dimension_registry_manager import DimensionRegistryManager
 from .project_registry import ProjectRegistry, ProjectRegistryModel
@@ -380,12 +381,12 @@ class ProjectRegistryManager(RegistryManagerBase):
             submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(config.config_id)
         with self.cloud_interface.make_lock_file(lock_file_path):
-            # TODO DSGRID-81: Adding new dimensions or dimension mappings requires
-            # re-validation of registered datasets.
-            # TODO: When/how does the project status get updated?
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
+        old_config = self.get_by_id(config.config_id)
+        checker = ProjectUpdateChecker(old_config.model, config.model)
+        result = checker.run()
         self._run_checks(config)
         registry = self.get_registry_config(config.config_id)
         old_key = ConfigKey(config.config_id, registry.version)

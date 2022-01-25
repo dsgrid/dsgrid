@@ -18,6 +18,7 @@ from dsgrid.config.dimensions import (
     DateTimeDimensionModel,
     TimeDimensionBaseModel,
 )
+from .dimension_update_checker import DimensionUpdateChecker
 from dsgrid.data_models import serialize_model
 from dsgrid.exceptions import (
     DSGValueNotRegistered,
@@ -364,6 +365,9 @@ class DimensionRegistryManager(RegistryManagerBase):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
+        old_config = self.get_by_id(config.config_id)
+        checker = DimensionUpdateChecker(old_config.model, config.model)
+        checker.run()
         registry = self.get_registry_config(config.config_id)
         old_key = DimensionKey(config.model.dimension_type, config.config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)

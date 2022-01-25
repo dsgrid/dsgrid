@@ -24,6 +24,7 @@ from dsgrid.exceptions import (
     DSGInvalidDimensionAssociation,
     DSGInvalidDimensionMapping,
     DSGInvalidOperation,
+    DSGInvalidRegistryState,
     DSGMissingDimensionMapping,
 )
 from dsgrid.data_models import DSGBaseModel, serialize_model
@@ -114,11 +115,13 @@ class InputDatasetModel(DSGBaseModel):
     dataset_id: str = Field(
         title="dataset_id",
         description="Unique dataset identifier.",
+        updateable=False,
     )
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
         description="Dataset type.",
         options=InputDatasetType.format_for_docs(),
+        updateable=False,
     )
     version: Union[str, None, VersionInfo] = Field(
         title="version",
@@ -132,6 +135,7 @@ class InputDatasetModel(DSGBaseModel):
             "The version string must be in semver format (e.g., '1.0.0') and it must be a valid/"
             "existing version in the registry.",
         ),
+        updateable=False,
         # TODO: add notes about warnings for outdated versions? DSGRID-189.
     )
     mapping_references: List[DimensionMappingReferenceModel] = Field(
@@ -145,6 +149,7 @@ class InputDatasetModel(DSGBaseModel):
         default=DatasetRegistryStatus.UNREGISTERED,
         dsg_internal=True,
         notes=("status is "),
+        updateable=False,
     )
     # TODO this model_sector must be validated in the dataset_config
     # TODO: this is only necessary for input_model types
@@ -155,6 +160,7 @@ class InputDatasetModel(DSGBaseModel):
         title="model_sector",
         description="Model sector ID, required only if dataset type is ``sector_model``.",
         optional=True,
+        updateable=False,
     )
 
     @validator("version")
@@ -189,6 +195,7 @@ class DimensionMappingsModel(DSGBaseModel):
             " mappings are only supplied if a dataset's dimensions do not match the project's"
             " dimension. ",
         ),
+        updateable=False,
         # TODO: need to document missing dimension records, fill values, etc. DSGRID-191.
     )
 
@@ -207,6 +214,7 @@ class ProjectConfigModel(DSGBaseModel):
         description="A unique project identifier that is project-specific (e.g., "
         "'standard-scenarios-2021').",
         requirements=("Must not contain any dashes (`-`)",),
+        updateable=False,
     )
     name: str = Field(
         title="name",
@@ -225,6 +233,7 @@ class ProjectConfigModel(DSGBaseModel):
         description="project registry status",
         default=ProjectRegistryStatus.INITIAL_REGISTRATION,
         dsg_internal=True,
+        updateable=False,
     )
     datasets: List[InputDatasetModel] = Field(
         title="datasets",

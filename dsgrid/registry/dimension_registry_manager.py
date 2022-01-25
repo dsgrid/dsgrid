@@ -374,6 +374,10 @@ class DimensionRegistryManager(RegistryManagerBase):
         new_key = DimensionKey(config.model.dimension_type, config.config_id, version)
         self._dimensions.pop(old_key, None)
         self._dimensions[new_key] = config
+
+        if not self.offline_mode:
+            self.sync_push(self._path)
+
         return version
 
     def remove(self, config_id):

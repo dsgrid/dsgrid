@@ -394,6 +394,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         new_key = ConfigKey(config.config_id, version)
         self._projects.pop(old_key, None)
         self._projects[new_key] = config
+
+        if not self.offline_mode:
+            self.sync_push(self.get_registry_directory(config.config_id))
+
         return version
 
     def remove(self, config_id):

@@ -121,6 +121,7 @@ class InputDatasetModel(DSGBaseModel):
         title="dataset_type",
         description="Dataset type.",
         options=InputDatasetType.format_for_docs(),
+        updateable=False,
     )
     version: Union[str, None, VersionInfo] = Field(
         title="version",
@@ -134,6 +135,7 @@ class InputDatasetModel(DSGBaseModel):
             "The version string must be in semver format (e.g., '1.0.0') and it must be a valid/"
             "existing version in the registry.",
         ),
+        updateable=False,
         # TODO: add notes about warnings for outdated versions? DSGRID-189.
     )
     mapping_references: List[DimensionMappingReferenceModel] = Field(
@@ -158,6 +160,7 @@ class InputDatasetModel(DSGBaseModel):
         title="model_sector",
         description="Model sector ID, required only if dataset type is ``sector_model``.",
         optional=True,
+        updateable=False,
     )
 
     @validator("version")

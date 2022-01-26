@@ -22,7 +22,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def __init__(self, config):
         self._config = config
 
-    def _get_pivot_dimension_columns(self):
+    def get_pivot_dimension_columns(self):
         """ get cols for the dimension that is pivoted in load_data. """
         dim_type = self._config.model.data_schema.load_data_column_dimension
         return self._config.get_dimension(dim_type).get_unique_ids()
@@ -43,7 +43,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         time_dim = config.get_dimension(DimensionType.TIME)
         time_columns = set(time_dim.get_timestamp_load_data_columns())
         pivot_dim = config.model.data_schema.load_data_column_dimension
-        expected_pivot_columns = self._get_pivot_dimension_columns()
+        expected_pivot_columns = self.get_pivot_dimension_columns()
 
         for col in load_data.columns:
             if col in time_columns:

@@ -11,7 +11,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def _get_pivot_dimension_columns(self):
+    def get_pivot_dimension_columns(self):
         """
         get cols for the dimension that is pivoted in load_data.
 

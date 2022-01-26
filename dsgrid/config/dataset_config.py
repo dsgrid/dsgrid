@@ -100,7 +100,7 @@ class DataSchemaType(DSGEnum):
         value="one_table",
         description="""
         One_table data schema with load_data table. 
-        Applies to small, non-timeseries datasets.
+        Typically appropriate for small, low-temporal resolution datasets.
         """,
     )
 
@@ -111,14 +111,14 @@ class DSGDatasetParquetType(DSGEnum):
     LOAD_DATA = EnumValue(
         value="load_data",
         description="""
-        In STANDARD data_schema_type, load_data is a file with id, timestamp, and load value columns. 
-        In ONE_TABLE data_schema_type, load_data is a file with timestamp, load value, and metadata columns.
+        In STANDARD data_schema_type, load_data is a file with ID, timestamp, and load value columns. 
+        In ONE_TABLE data_schema_type, load_data is a file with multiple data dimension, timestamp, and load value columns.
         """,
     )
     LOAD_DATA_LOOKUP = EnumValue(
         value="load_data_lookup",
         description="""
-        load_data is a file with dimension metadata and and ID which maps to load_data file
+        load_data is a file with multiple data dimension columns and an ID column that maps to load_data file.
         """,
     )
     # # These are not currently supported by dsgrid but may be needed in the near future
@@ -176,12 +176,17 @@ class InputSectorDataset(DSGBaseModel):
 class StandardDataSchemaModel(DSGBaseModel):
     load_data_column_dimension: DimensionType = Field(
         title="load_data_column_dimension",
-        description="Columns in the load_data table are records of this dimension type.",
+        description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
     )
 
 
 class OneTableDataSchemaModel(DSGBaseModel):
     """ data schema model for one table load data format """
+
+    load_data_column_dimension: DimensionType = Field(
+        title="load_data_column_dimension",
+        description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
+    )
 
 
 class DatasetConfigModel(DSGBaseModel):

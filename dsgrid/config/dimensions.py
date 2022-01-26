@@ -395,22 +395,9 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         options=TimeZone.format_descriptions_for_docs(),
     )
 
-    @root_validator(pre=False)  # TODO: modify as model works with more time_type schema
-    def check_time_type(cls, values):
-        if (
-            values["class_name"] == "Time" and values["time_type"] == TimeDimensionType.DATETIME
-        ) or (
-            values["class_name"] == "AnnualTime"
-            and values["time_type"] == TimeDimensionType.ANNUAL
-        ):
-            pass
-        else:
-            raise ValueError(
-                f'time_type={values["time_type"].value} does not match class_name={values["class_name"]}. \n'
-                " * For class=Time, use time_type=datetime. \n"
-                " * For class=AnnualTime, use time_type=annual."
-            )
-        return values
+    @root_validator(pre=False)
+    def check_time_type_and_class_consistency(cls, values):
+        return _check_time_type_and_class_consistency(values)
 
     @root_validator(pre=False)
     def check_frequency(cls, values):
@@ -450,21 +437,8 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     )
 
     @root_validator(pre=False)  # TODO: modify as model works with more time_type schema
-    def check_time_type(cls, values):
-        if (
-            values["class_name"] == "Time" and values["time_type"] == TimeDimensionType.DATETIME
-        ) or (
-            values["class_name"] == "AnnualTime"
-            and values["time_type"] == TimeDimensionType.ANNUAL
-        ):
-            pass
-        else:
-            raise ValueError(
-                f'time_type={values["time_type"].value} does not match class_name={values["class_name"]}. \n'
-                " * For class=Time, use time_type=datetime. \n"
-                " * For class=AnnualTime, use time_type=annual."
-            )
-        return values
+    def check_time_type_and_class_consistency(cls, values):
+        return _check_time_type_and_class_consistency(values)
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
@@ -564,3 +538,18 @@ def _check_time_ranges(ranges: list, str_format: str, frequency: timedelta):
             raise ValueError(f"time range {time_range} is inconsistent with {frequency}")
 
     return ranges
+
+
+# TODO: modify as model works with more time_type schema
+def _check_time_type_and_class_consistency(values):
+    if (values["class_name"] == "Time" and values["time_type"] == TimeDimensionType.DATETIME) or (
+        values["class_name"] == "AnnualTime" and values["time_type"] == TimeDimensionType.ANNUAL
+    ):
+        pass
+    else:
+        raise ValueError(
+            f'time_type={values["time_type"].value} does not match class_name={values["class_name"]}. \n'
+            " * For class=Time, use time_type=datetime. \n"
+            " * For class=AnnualTime, use time_type=annual."
+        )
+    return values

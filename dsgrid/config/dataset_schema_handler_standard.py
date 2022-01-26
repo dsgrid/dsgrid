@@ -89,7 +89,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         time_dim.check_dataset_time_consistency(load_data_df)
         self._check_dataset_time_consistency_by_id(time_dim, load_data_df)
 
-    def _check_dataset_time_consistency_by_id(self, time_dim, load_data):
+    def _check_dataset_time_consistency_by_id(self, time_dim, load_data_df):
 
         time_ranges = time_dim.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
@@ -100,30 +100,31 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         expected_count = len(expected_timestamps)
 
         timestamps_by_id = (
-            load_data.select("timestamp", "id")
+            load_data_df.select("timestamp", "id")
             .groupby("id")
             .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
         )
         distinct_counts = timestamps_by_id.select("distinct_timestamps").distinct()
-        if distinct_counts.count() == 1:
-            val = distinct_counts.collect()[0].distinct_timestamps
-            if val != expected_count:
-                raise DSGInvalidDataset(
-                    f"load_data arrays do not have {len(expected_timestamps)} timestamps: actual={row.distinct_timestamps}"
-                )
-            return
+        if distinct_counts.count() != 1:
+            for row in timestamps_by_id.collect():
+                if row.distinct_timestamps != len(expected_timestamps):
+                    logger.error(
+                        "load_data ID=%s does not have %s timestamps: actual=%s",
+                        row.id,
+                        len(expected_timestamps),
+                        row.distinct_timestamps,
+                    )
 
-        for row in timestamps_by_id.collect():
-            if row.distinct_timestamps != len(expected_timestamps):
-                logger.error(
-                    "load_data ID=%s does not have %s timestamps: actual=%s",
-                    row.id,
-                    len(expected_timestamps),
-                    row.distinct_timestamps,
-                )
-                raise DSGInvalidDataset(
-                    f"One or more arrays do not have {len(expected_timestamps)} timestamps"
-                )
+            raise DSGInvalidDataset(
+                f"One or more arrays do not have {len(expected_timestamps)} timestamps"
+            )
+
+        val = distinct_counts.collect()[0].distinct_timestamps
+        if val != expected_count:
+            raise DSGInvalidDataset(
+                f"load_data arrays do not have {len(expected_timestamps)} "
+                "timestamps: actual={row.distinct_timestamps}"
+            )
 
     def _check_dataset_internal_consistency(
         self, config: DatasetConfig, load_data_df, load_data_lookup

@@ -1,10 +1,8 @@
-import copy
 import getpass
 import logging
 import os
 import shutil
 import sys
-from datetime import timedelta
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from tempfile import gettempdir
@@ -12,10 +10,6 @@ from tempfile import gettempdir
 import pandas as pd
 import pytest
 
-from dsgrid.exceptions import (
-    DSGInvalidDataset,
-    DSGInvalidDimension,
-)
 from dsgrid.tests.common import (
     TEST_PROJECT_PATH,
     make_test_data_dir,

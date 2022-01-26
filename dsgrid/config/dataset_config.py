@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, Optional, Dict, Union
+from typing import List, Optional, Dict, Union, Any
 import os
 import logging
 import pyspark.sql.functions as F
@@ -223,7 +223,7 @@ class DatasetConfigModel(DSGBaseModel):
         description="Discriminator for data schema",
         options=DataSchemaType.format_for_docs(),
     )
-    data_schema: Union[StandardDataSchemaModel, OneTableDataSchemaModel] = Field(
+    data_schema: Any = Field(
         title="data_schema",
         description="Schema (table layouts) used for writing out the dataset",
     )

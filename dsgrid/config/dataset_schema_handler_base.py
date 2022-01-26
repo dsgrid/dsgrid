@@ -15,8 +15,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         get cols for the dimension that is pivoted in load_data.
 
-        return:
-
-        list of column names
+        Returns
+        -------
+        List
+            List of column names.
 
         """

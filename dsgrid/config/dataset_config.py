@@ -111,14 +111,14 @@ class DSGDatasetParquetType(DSGEnum):
     LOAD_DATA = EnumValue(
         value="load_data",
         description="""
-        In STANDARD data_schema_type, load_data is a file with ID, timestamp, and load value columns. 
-        In ONE_TABLE data_schema_type, load_data is a file with multiple data dimension, timestamp, and load value columns.
+        In STANDARD data_schema_type, load_data is a file with ID, timestamp, and metric value columns. 
+        In ONE_TABLE data_schema_type, load_data is a file with multiple data dimension and metric value columns.
         """,
     )
     LOAD_DATA_LOOKUP = EnumValue(
         value="load_data_lookup",
         description="""
-        load_data is a file with multiple data dimension columns and an ID column that maps to load_data file.
+        load_data_lookup is a file with multiple data dimension columns and an ID column that maps to load_data file.
         """,
     )
     # # These are not currently supported by dsgrid but may be needed in the near future

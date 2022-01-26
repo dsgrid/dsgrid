@@ -37,41 +37,34 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             self._check_dataset_time_consistency(self._config, load_data_df)
 
     def _check_one_table_data_consistency(self, config: DatasetConfig, load_data):
-        dimension_types = set()
+        dimension_types = []
         pivot_cols = []
 
         time_dim = config.get_dimension(DimensionType.TIME)
         time_columns = set(time_dim.get_timestamp_load_data_columns())
         pivot_dim = config.model.data_schema.load_data_column_dimension
         expected_pivot_columns = self.get_pivot_dimension_columns()
-
+        pivot_dim_found = False
         for col in load_data.columns:
             if col in time_columns:
-                dimension_types.add(DimensionType.TIME)
+                dimension_types.append(DimensionType.TIME)
             elif col in expected_pivot_columns:
-                dimension_types.add(pivot_dim)
+                pivot_dim_found = True
                 pivot_cols.append(col)
             else:
                 try:
-                    dimension_types.add(DimensionType(col))
+                    dimension_types.append(DimensionType(col))
                 except ValueError:
                     raise DSGInvalidDimension(
                         f"load_data column={col} is not expected or of a known dimension type."
                     )
 
-        # check for duplicated values in pivot_cols
-        pivot_cols_dup = [x for x, n in collections.Counter(pivot_cols).items() if n > 1]
-        if len(pivot_cols_dup) > 0:
-            raise DSGInvalidDataset(
-                f"load_data contains duplicated column name(s)={pivot_cols_dup}."
-            )
+        if pivot_dim_found:
+            dimension_types.append(pivot_dim)
 
+        dimension_types = self._check_for_duplicates_in_cols(dimension_types, "load_data")
+        pivot_cols = self._check_for_duplicates_in_cols(pivot_cols, "load_data")
         expected_dimensions = {d for d in DimensionType}
-        if len(dimension_types) != len(expected_dimensions):
-            raise DSGInvalidDataset(
-                f"load_data does not have the correct number of dimensions specified between trivial and non-trivial dimensions."
-            )
-
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
             raise DSGInvalidDataset(
@@ -101,3 +94,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def _check_dataset_time_consistency(self, config: DatasetConfig, load_data_df):
         time_dim = config.get_dimension(DimensionType.TIME)
         time_dim.check_dataset_time_consistency(load_data_df)
+
+    def _check_for_duplicates_in_cols(self, lst: list, table_name: str):
+        dups = [x for x, n in collections.Counter(lst).items() if n > 1]
+        if len(dups) > 0:
+            raise DSGInvalidDataset(f"{table_name} contains duplicated column name(s)={dups}.")
+
+        return set(lst)

@@ -1,5 +1,6 @@
 from pathlib import Path
 import logging
+import collections
 
 import pyspark.sql.functions as F
 
@@ -53,23 +54,21 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             try:
                 dimension_types.append(DimensionType(col))
             except ValueError:
-                raise DSGInvalidDimension(f"load_data_lookup column={col} is not a dimension type")
+                raise DSGInvalidDimension(
+                    f"load_data_lookup column={col} is not expected or of a known dimension type."
+                )
 
         if not found_id:
             raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
 
+        dimension_types = self._check_for_duplicates_in_cols(dimension_types, "load_data_lookup")
         load_data_dimensions = (
             DimensionType.TIME,
             config.model.data_schema.load_data_column_dimension,
         )
-        expected_dimensions = [d for d in DimensionType if d not in load_data_dimensions]
-        if len(dimension_types) != len(expected_dimensions):
-            raise DSGInvalidDataset(
-                f"load_data_lookup does not have the correct number of dimensions specified between trivial and non-trivial dimensions."
-            )
-
-        missing_dimensions = set(expected_dimensions).difference(dimension_types)
-        if len(missing_dimensions) != 0:
+        expected_dimensions = {d for d in DimensionType if d not in load_data_dimensions}
+        missing_dimensions = expected_dimensions.difference(dimension_types)
+        if missing_dimensions:
             raise DSGInvalidDataset(
                 f"load_data_lookup is missing dimensions: {missing_dimensions}. If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
@@ -95,7 +94,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_dataset_time_consistency_by_id(time_dim, load_data_df)
 
     def _check_dataset_time_consistency_by_id(self, time_dim, load_data_df):
-
         time_ranges = time_dim.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
         time_range = time_ranges[0]
@@ -168,20 +166,29 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         time_columns = set(time_dim.get_timestamp_load_data_columns())
 
         found_id = False
-        dim_columns = set()
+        pivot_cols = []
         for col in load_data_df.columns:
             if col == "id":
                 found_id = True
                 continue
             if col in time_columns:
                 continue
-            dim_columns.add(col)
+            pivot_cols.append(col)
 
         if not found_id:
             raise DSGInvalidDataset("load_data does not include an 'id' column")
 
-        if dimension_records != dim_columns:
-            mismatch = dimension_records.symmetric_difference(dim_columns)
+        pivot_cols = self._check_for_duplicates_in_cols(pivot_cols, "load_data")
+
+        if dimension_records != pivot_cols:
+            mismatch = dimension_records.symmetric_difference(pivot_cols)
             raise DSGInvalidDataset(
                 f"Mismatch between load data columns and dimension={dim_type.value} records. Mismatched={mismatch}"
             )
+
+    def _check_for_duplicates_in_cols(self, lst: list, table_name: str):
+        dups = [x for x, n in collections.Counter(lst).items() if n > 1]
+        if len(dups) > 0:
+            raise DSGInvalidDataset(f"{table_name} contains duplicated column name(s)={dups}.")
+
+        return set(lst)

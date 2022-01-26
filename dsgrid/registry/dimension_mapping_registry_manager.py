@@ -113,7 +113,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             actual_to_records = {x.to_id for x in mapping.records}
             from_dimension = self._dimension_mgr.get_by_id(mapping.from_dimension.dimension_id)
             allowed_from_records = from_dimension.get_unique_ids()
-            diff = actual_from_records.difference(allowed_from_records)
+            diff = actual_from_records.symmetric_difference(allowed_from_records)
             if diff:
                 dim_id = from_dimension.model.dimension_id
                 raise DSGInvalidDimensionMapping(
@@ -121,7 +121,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 )
             to_dimension = self._dimension_mgr.get_by_id(mapping.to_dimension.dimension_id)
             allowed_to_records = to_dimension.get_unique_ids()
-            diff = actual_to_records.difference(allowed_to_records)
+            diff = actual_to_records.symmetric_difference(allowed_to_records)
             if diff:
                 dim_id = from_dimension.model.dimension_id
                 raise DSGInvalidDimensionMapping(

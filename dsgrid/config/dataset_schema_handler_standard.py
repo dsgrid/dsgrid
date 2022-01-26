@@ -26,6 +26,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def __init__(self, config):
         self._config = config
 
+    def _get_pivot_dimension_columns(self):
+        """ get cols for the dimension that is pivoted in load_data. """
+        dim_type = self._config.model.data_schema.load_data_column_dimension
+        return self._config.get_dimension(dim_type).get_unique_ids()
+
     def check_consistency(self):
         path = Path(self._config.model.path)
         load_data_df = read_dataframe(check_load_data_filename(path))
@@ -158,8 +163,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def _check_load_data_columns(self, config: DatasetConfig, load_data_df):
         dim_type = config.model.data_schema.load_data_column_dimension
-        dimension = config.get_dimension(dim_type)
-        dimension_records = dimension.get_unique_ids()
+        dimension_records = self._get_pivot_dimension_columns()
         time_dim = config.get_dimension(DimensionType.TIME)
         time_columns = set(time_dim.get_timestamp_load_data_columns())
 

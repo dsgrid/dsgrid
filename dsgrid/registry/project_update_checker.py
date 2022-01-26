@@ -29,8 +29,14 @@ class ProjectUpdateChecker(ConfigUpdateCheckerBase):
             )
 
     def handle_postconditions(self):
-        if set(self._REQUIRES_DATASET_UNREGISTRATION).intersection(self._changed_fields):
+        changes = set(self._REQUIRES_DATASET_UNREGISTRATION).intersection(self._changed_fields)
+        if changes:
             for dataset in self._new_model.datasets:
                 if dataset.status == DatasetRegistryStatus.REGISTERED:
                     dataset.status = DatasetRegistryStatus.UNREGISTERED
-            logger.info("Set all datasets in %s to unregistered", self._new_model.project_id)
+            logger.warning(
+                "Set all datasets in %s to unregistered because of changes=%s. "
+                "They must be re-submitted.",
+                self._new_model.project_id,
+                changes,
+            )

@@ -14,6 +14,7 @@ class ProjectUpdateChecker(ConfigUpdateCheckerBase):
     _ALLOWED_UPDATE_STATUSES = (
         ProjectRegistryStatus.INITIAL_REGISTRATION,
         ProjectRegistryStatus.IN_PROGRESS,
+        ProjectRegistryStatus.COMPLETE,
     )
     _REQUIRES_DATASET_UNREGISTRATION = (
         "dimensions",
@@ -24,7 +25,7 @@ class ProjectUpdateChecker(ConfigUpdateCheckerBase):
     def check_preconditions(self):
         if self._old_model.status not in self._ALLOWED_UPDATE_STATUSES:
             raise DSGInvalidRegistryState(
-                f"project status must be one of {self._ALLOWED_UPDATE_STATUSES} in order to update"
+                f"project status={self._old_model.status} must be one of {self._ALLOWED_UPDATE_STATUSES} in order to update"
             )
 
     def handle_postconditions(self):

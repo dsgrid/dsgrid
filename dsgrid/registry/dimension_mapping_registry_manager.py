@@ -117,7 +117,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             if diff:
                 dim_id = from_dimension.model.dimension_id
                 raise DSGInvalidDimensionMapping(
-                    f"Dimension mapping has invalid 'from' records: dimension_id={dim_id} {diff}"
+                    f"Dimension mapping 'from' records are not symmetric with dimension_id={dim_id}: invalid={diff}"
                 )
             to_dimension = self._dimension_mgr.get_by_id(mapping.to_dimension.dimension_id)
             allowed_to_records = to_dimension.get_unique_ids()
@@ -125,7 +125,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             if diff:
                 dim_id = from_dimension.model.dimension_id
                 raise DSGInvalidDimensionMapping(
-                    f"Dimension mapping has invalid 'to' records: dimension_id={dim_id} {diff}"
+                    f"Dimension mapping 'to' records are not symmetric with dimension_id={dim_id}: invalid={diff}"
                 )
 
     def validate_records(self, config: DimensionMappingsConfig, warn_only=False):

@@ -74,8 +74,8 @@ class GrowthRateDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 )
 
     def _check_metric_units(self, config: DatasetConfig):
-        metric_records = config.get_dimension(DimensionType.METRIC).get_records()
-        metric_units = {x["unit"] for x in metric_records}
+        metric_records = config.get_dimension(DimensionType.METRIC).model.records
+        metric_units = {x.unit for x in metric_records}
 
         if len(metric_units) > 1:
             error = True

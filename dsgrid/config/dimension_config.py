@@ -60,14 +60,3 @@ class DimensionConfig(DimensionBaseConfigWithFiles):
 
         """
         return {x.id for x in self.model.records}
-
-    def get_records(self):
-        """Return all records in a dimension
-
-        Returns
-        -------
-        list
-            list of records in dict form
-
-        """
-        return [x.dict() for x in self.model.records]

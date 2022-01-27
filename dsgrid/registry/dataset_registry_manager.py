@@ -14,12 +14,10 @@ import pyspark.sql.functions as F
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_config import (
     DatasetConfig,
-    check_load_data_filename,
-    check_load_data_lookup_filename,
     DataSchemaType,
 )
 from dsgrid.data_models import serialize_model
-from dsgrid.dataset import Dataset
+from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
 from dsgrid.dimension.time import TimeInvervalType, TimeDimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimension, DSGInvalidDataset
@@ -36,9 +34,9 @@ from .dataset_registry import (
     DatasetRegistryModel,
 )
 from .registry_manager_base import RegistryManagerBase
-from dsgrid.config.dataset_schema_handler_standard import StandardDatasetSchemaHandler
-from dsgrid.config.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
-from dsgrid.config.dataset_schema_handler_growth_rate import GrowthRateDatasetSchemaHandler
+from dsgrid.dataset.dataset_schema_handler_standard import StandardDatasetSchemaHandler
+from dsgrid.dataset.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
+from dsgrid.dataset.dataset_schema_handler_growth_rate import GrowthRateDatasetSchemaHandler
 
 logger = logging.getLogger(__name__)
 

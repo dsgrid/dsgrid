@@ -8,7 +8,7 @@ from dsgrid.config.dataset_config import (
 )
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, Timer
-from dsgrid.config.dataset_schema_handler_base import DatasetSchemaHandlerBase
+from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 

@@ -11,6 +11,7 @@ class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
+    TRIVIAL = "trivial"
 
 
 class RepresentativePeriodFormat(DSGEnum):

@@ -38,6 +38,7 @@ from .dataset_registry import (
 from .registry_manager_base import RegistryManagerBase
 from dsgrid.config.dataset_schema_handler_standard import StandardDatasetSchemaHandler
 from dsgrid.config.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
+from dsgrid.config.dataset_schema_handler_growth_rate import GrowthRateDatasetSchemaHandler
 
 logger = logging.getLogger(__name__)
 
@@ -70,6 +71,8 @@ class DatasetRegistryManager(RegistryManagerBase):
             return StandardDatasetSchemaHandler(config)
         elif config.model.data_schema_type == DataSchemaType.ONE_TABLE:
             return OneTableDatasetSchemaHandler(config)
+        elif config.model.data_schema_type == DataSchemaType.GROWTH_RATE:
+            return GrowthRateDatasetSchemaHandler(config)
         else:
             assert False, config.model.data_schema_type
 

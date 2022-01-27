@@ -312,18 +312,9 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         default=TimeDimensionType.DATETIME,
         description="""
         Type of time dimension: 
-            datetime, annual, representative_period (not supported yet)
+            datetime, annual, representative_period, trivial
         """,
         options=TimeDimensionType.format_for_docs(),
-    )
-    measurement_type: MeasurementType = Field(
-        title="measurement_type",
-        default=MeasurementType.MEAN,
-        description="""
-        The type of measurement represented by a value associated with a timestamp: 
-            mean, min, max, measured, total 
-        """,
-        options=MeasurementType.format_for_docs(),
     )
 
     def dict(self, by_alias=True, **kwargs):
@@ -342,6 +333,15 @@ class TimeDimensionBaseModel(DimensionBaseModel):
 class DateTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps translate to datetime objects."""
 
+    measurement_type: MeasurementType = Field(
+        title="measurement_type",
+        default=MeasurementType.TOTAL,
+        description="""
+        The type of measurement represented by a value associated with a timestamp: 
+            mean, min, max, measured, total 
+        """,
+        options=MeasurementType.format_for_docs(),
+    )
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y-%m-%d %H:%M:%s",
@@ -417,6 +417,15 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     """Defines an annual time dimension where timestamps are years."""
 
     time_type: TimeDimensionType = Field(default=TimeDimensionType.ANNUAL)
+    measurement_type: MeasurementType = Field(
+        title="measurement_type",
+        default=MeasurementType.TOTAL,
+        description="""
+        The type of measurement represented by a value associated with a timestamp: 
+            mean, min, max, measured, total 
+        """,
+        options=MeasurementType.format_for_docs(),
+    )
     str_format: Optional[str] = Field(
         title="str_format",
         default="%Y",
@@ -436,7 +445,7 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
         description="Whether annual time includes leap day.",
     )
 
-    @root_validator(pre=False)  # TODO: modify as model works with more time_type schema
+    @root_validator(pre=False)
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
 
@@ -448,6 +457,15 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
 class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a representative time dimension."""
 
+    measurement_type: MeasurementType = Field(
+        title="measurement_type",
+        default=MeasurementType.TOTAL,
+        description="""
+        The type of measurement represented by a value associated with a timestamp: 
+            mean, min, max, measured, total 
+        """,
+        options=MeasurementType.format_for_docs(),
+    )
     format: RepresentativePeriodFormat = Field(
         title="format",
         description="Format of the timestamps in the load data",
@@ -461,6 +479,16 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         description="The range of time that the value associated with a timestamp represents",
         options=TimeInvervalType.format_descriptions_for_docs(),
     )
+
+
+class TrivialTimeDimensionModel(TimeDimensionBaseModel):
+    """Defines a trivial time dimension."""
+
+    time_type: TimeDimensionType = Field(default=TimeDimensionType.TRIVIAL)
+
+    @root_validator(pre=False)
+    def check_time_type_and_class_consistency(cls, values):
+        return _check_time_type_and_class_consistency(values)
 
 
 class DimensionReferenceModel(DSGBaseModel):
@@ -508,6 +536,8 @@ def handle_dimension_union(value):
             val = AnnualTimeDimensionModel(**value)
         elif value["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
             val = RepresentativePeriodTimeDimensionModel(**value)
+        elif value["time_type"] == TimeDimensionType.TRIVIAL.value:
+            val = TrivialTimeDimensionModel(**value)
         else:
             options = [x.value for x in TimeDimensionType]
             raise ValueError(f"{value['time_type']} not supported, valid options: {options}")
@@ -542,14 +572,23 @@ def _check_time_ranges(ranges: list, str_format: str, frequency: timedelta):
 
 # TODO: modify as model works with more time_type schema
 def _check_time_type_and_class_consistency(values):
-    if (values["class_name"] == "Time" and values["time_type"] == TimeDimensionType.DATETIME) or (
-        values["class_name"] == "AnnualTime" and values["time_type"] == TimeDimensionType.ANNUAL
+    if (
+        (values["class_name"] == "Time" and values["time_type"] == TimeDimensionType.DATETIME)
+        or (
+            values["class_name"] == "AnnualTime"
+            and values["time_type"] == TimeDimensionType.ANNUAL
+        )
+        or (
+            values["class_name"] == "TrivialTime"
+            and values["time_type"] == TimeDimensionType.TRIVIAL
+        )
     ):
         pass
     else:
         raise ValueError(
             f'time_type={values["time_type"].value} does not match class_name={values["class_name"]}. \n'
             " * For class=Time, use time_type=datetime. \n"
-            " * For class=AnnualTime, use time_type=annual."
+            " * For class=AnnualTime, use time_type=annual. \n"
+            " * For class=TrivialTime, use time_type=trivial. "
         )
     return values

@@ -93,8 +93,6 @@ def test_aeo_datasets(make_test_project_dir, make_test_data_dir):
         sys.exit(1)
 
     datasets = os.listdir(make_test_data_dir / "test_aeo_data")
-    datasets = [datasets[0]]  # <-- test only End Uses for now
-    # TODO: End Use Growth Factors will be tested in another PR
     for i, dataset in enumerate(datasets, 1):
         print(f">> Registering: {i}. {dataset}...")
         data_dir = make_test_data_dir / "test_aeo_data" / dataset

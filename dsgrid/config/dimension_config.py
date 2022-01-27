@@ -60,3 +60,35 @@ class DimensionConfig(DimensionBaseConfigWithFiles):
 
         """
         return {x.id for x in self.model.records}
+
+    def get_records(self):
+        """Return all records in a dimension
+
+        Returns
+        -------
+        list
+            list of records in dict form
+
+        """
+        return [x.dict() for x in self.model.records]
+
+
+class MetricDimensionConfig(DimensionConfig):
+    """Provides an interface to MetricDimensionModel."""
+
+    @staticmethod
+    def model_class():
+        return DimensionModel
+
+    def get_unique_units(self):
+        """Return the unique units in a dimension's records.
+
+        Returns
+        -------
+        set
+            set of str
+
+        """
+        return {x.unit for x in self.model.records}
+
+    # TODO: add get func for fuel_id when metric is EnergyEndUse

@@ -1,6 +1,7 @@
 import abc
 import collections
 import logging
+import re
 
 import pyspark.sql.functions as F
 
@@ -111,18 +112,3 @@ class DatasetSchemaHandlerBase(abc.ABC):
         for key in keys:
             dct_selected.append(dct[key])
         return dict(zip(keys, dct_selected))
-
-    @staticmethod
-    def _check_for_duplicates_in_cols(lst: list, table_name: str):
-        """Check list for duplicates
-
-        Returns
-        -------
-        Set: Input list in set form if no duplicates found.
-
-        """
-        dups = [x for x, n in collections.Counter(lst).items() if n > 1]
-        if len(dups) > 0:
-            raise DSGInvalidDataset(f"{table_name} contains duplicated column name(s)={dups}.")
-
-        return set(lst)

@@ -469,6 +469,11 @@ class DatasetConfig(ConfigBase):
                 load_data_lookup = load_data_lookup.withColumn(col, F.lit(val))
         return load_data_lookup
 
+    def remove_trivial_dimensions(self, load_data_lookup):
+        trivial_cols = {d.value for d in self.model.trivial_dimensions}
+        select_cols = [col for col in load_data_lookup.columns if col not in trivial_cols]
+        return load_data_lookup[select_cols]
+
     def _check_trivial_record_length(self, records):
         """Check that trivial dimensions have only 1 record."""
         if len(records) > 1:

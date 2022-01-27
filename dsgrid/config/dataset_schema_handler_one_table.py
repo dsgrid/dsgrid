@@ -24,15 +24,16 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def check_consistency(self):
         path = Path(self._config.model.path)
         load_data_df = read_dataframe(check_load_data_filename(path), cache=True)
-        with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(self._config, load_data_df)
         load_data_df = self._config.add_trivial_dimensions(load_data_df)
         with Timer(timer_stats_collector, "check_one_table_data_consistency"):
             self._check_one_table_data_consistency(self._config, load_data_df)
+        load_data_df = self._config.remove_trivial_dimensions(load_data_df)
+        with Timer(timer_stats_collector, "check_dataset_time_consistency"):
+            self._check_dataset_time_consistency(self._config, load_data_df)
 
     def _check_one_table_data_consistency(self, config: DatasetConfig, load_data):
-        dimension_types = []
-        pivot_cols = []
+        dimension_types = set()
+        pivot_cols = set()
 
         time_dim = config.get_dimension(DimensionType.TIME)
         time_columns = time_dim.get_timestamp_load_data_columns()
@@ -41,18 +42,16 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         pivot_dim_found = False
         for col in load_data.columns:
             if col in time_columns:
-                dimension_types.append(DimensionType.TIME)
+                dimension_types.add(DimensionType.TIME)
             elif col in expected_pivot_columns:
                 pivot_dim_found = True
-                pivot_cols.append(col)
+                pivot_cols.add(col)
             else:
-                dimension_types.append(DimensionType.from_column(col))
+                dimension_types.add(DimensionType.from_column(col))
 
         if pivot_dim_found:
-            dimension_types.append(pivot_dim)
+            dimension_types.add(pivot_dim)
 
-        dimension_types = self._check_for_duplicates_in_cols(dimension_types, "load_data")
-        pivot_cols = self._check_for_duplicates_in_cols(pivot_cols, "load_data")
         expected_dimensions = {d for d in DimensionType}
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:

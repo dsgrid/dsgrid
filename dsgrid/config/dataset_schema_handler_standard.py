@@ -12,7 +12,7 @@ from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, Timer
 from dsgrid.config.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +37,16 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
         found_id = False
-        dimension_types = []
+        dimension_types = set()
         for col in load_data_lookup.columns:
             if col == "id":
                 found_id = True
                 continue
-            dimension_types.append(DimensionType.from_column(col))
+            dimension_types.add(DimensionType.from_column(col))
 
         if not found_id:
             raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
 
-        dimension_types = self._check_for_duplicates_in_cols(dimension_types, "load_data_lookup")
         load_data_dimensions = (
             DimensionType.TIME,
             config.model.data_schema.load_data_column_dimension,
@@ -111,22 +110,23 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         time_columns = set(time_dim.get_timestamp_load_data_columns())
 
         found_id = False
-        pivot_cols = []
+        pivot_cols = set()
         for col in load_data_df.columns:
             if col == "id":
                 found_id = True
                 continue
             if col in time_columns:
                 continue
-            pivot_cols.append(col)
+            if col in dimension_records:
+                pivot_cols.add(col)
+            else:
+                raise DSGInvalidDataset(f"column={col} is not expected in load_data.")
 
         if not found_id:
             raise DSGInvalidDataset("load_data does not include an 'id' column")
 
-        pivot_cols = self._check_for_duplicates_in_cols(pivot_cols, "load_data")
-
         if dimension_records != pivot_cols:
-            mismatch = dimension_records.symmetric_difference(pivot_cols)
+            missing = dimension_records.difference(pivot_cols)
             raise DSGInvalidDataset(
-                f"Mismatch between load data columns and dimension={dim_type.value} records. Mismatched={mismatch}"
+                f"load_data is missing {missing} columns for dimension={dim_type.value} based on records."
             )

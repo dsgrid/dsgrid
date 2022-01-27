@@ -25,15 +25,15 @@ class GrowthRateDatasetSchemaHandler(DatasetSchemaHandlerBase):
         path = Path(self._config.model.path)
         load_data_df = read_dataframe(check_load_data_filename(path), cache=True)
         load_data_df = self._config.add_trivial_dimensions(load_data_df)
-        with Timer(timer_stats_collector, "check_one_table_data_consistency"):
-            self._check_one_table_data_consistency(self._config, load_data_df)
+        with Timer(timer_stats_collector, "check_growth_rate_data_consistency"):
+            self._check_growth_rate_data_consistency(self._config, load_data_df)
         with Timer(timer_stats_collector, "check_metric_units"):
             self._check_metric_units(self._config)
 
-    def _check_one_table_data_consistency(self, config: DatasetConfig, load_data):
+    def _check_growth_rate_data_consistency(self, config: DatasetConfig, load_data):
         """ does not check for time. """
-        dimension_types = []
-        pivot_cols = []
+        dimension_types = set()
+        pivot_cols = set()
 
         pivot_dim = config.model.data_schema.load_data_column_dimension
         expected_pivot_columns = self.get_pivot_dimension_columns()
@@ -41,15 +41,13 @@ class GrowthRateDatasetSchemaHandler(DatasetSchemaHandlerBase):
         for col in load_data.columns:
             if col in expected_pivot_columns:
                 pivot_dim_found = True
-                pivot_cols.append(col)
+                pivot_cols.add(col)
             else:
-                dimension_types.append(DimensionType.from_column(col))
+                dimension_types.add(DimensionType.from_column(col))
 
         if pivot_dim_found:
-            dimension_types.append(pivot_dim)
+            dimension_types.add(pivot_dim)
 
-        dimension_types = self._check_for_duplicates_in_cols(dimension_types, "load_data")
-        pivot_cols = self._check_for_duplicates_in_cols(pivot_cols, "load_data")
         expected_dimensions = {d for d in DimensionType if d != DimensionType.TIME}
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:

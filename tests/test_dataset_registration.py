@@ -10,10 +10,7 @@ from tempfile import TemporaryDirectory
 import pandas as pd
 import pytest
 
-from dsgrid.exceptions import (
-    DSGInvalidDataset,
-    DSGInvalidDimension,
-)
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.tests.common import make_test_project_dir, make_test_data_dir, TEST_DATASET_DIRECTORY
 from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json
 from dsgrid.tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
@@ -73,7 +70,7 @@ def _setup_invalid_load_data_lookup_column_name(data_dir):
     for item in data:
         item["invalid_dimension"] = item.pop("subsector")
     dump_line_delimited_json(data, lookup_file)
-    return DSGInvalidDimension, r"column.*is not expected or of a known dimension type."
+    return DSGInvalidDimension, r"column.*is not expected or of a known dimension type"
 
 
 def _setup_invalid_load_data_lookup_no_id(data_dir):
@@ -168,4 +165,4 @@ def _setup_invalid_load_data_extra_column(data_dir):
             f_out.write(line)
             f_out.write(",0\n")
 
-    return DSGInvalidDataset, r"Mismatch between load data columns and dimension.*records"
+    return DSGInvalidDataset, r"column.*is not expected in load_data"

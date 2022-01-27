@@ -4,8 +4,7 @@ import os
 import shutil
 import sys
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from tempfile import gettempdir
+from tempfile import TemporaryDirectory, gettempdir
 
 import pandas as pd
 import pytest
@@ -18,6 +17,7 @@ from dsgrid.tests.common import (
 )
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.files import load_data, dump_data
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 
 
 logger = logging.getLogger()
@@ -86,8 +86,8 @@ def replace_dataset_path(dataset_config_file, dataset_path):
     logger.info("Replaced dataset path in %s with %s", dataset_config_file, src_data)
 
 
-### set up test for AEO data ###
-def test_aeo_datasets(make_test_project_dir, make_test_data_dir):
+### set up tests for AEO data ###
+def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
     if "test_aeo_data" not in os.listdir(make_test_data_dir):
         print("test_invalid_datasets requires the dsgrid-test-data repository")
         sys.exit(1)
@@ -96,13 +96,78 @@ def test_aeo_datasets(make_test_project_dir, make_test_data_dir):
     for i, dataset in enumerate(datasets, 1):
         print(f">> Registering: {i}. {dataset}...")
         data_dir = make_test_data_dir / "test_aeo_data" / dataset
-        with TemporaryDirectory() as tmpdir:
-            base_dir = Path(tmpdir)
-            print(f"temp_registry created: {base_dir}")
-            manager = make_registry_for_aeo(
-                base_dir,
-                make_test_project_dir,
-                dataset,
-                dataset_path=data_dir,
-                include_datasets=False,
-            )
+
+        shutil.copyfile(data_dir / "load_data.csv", data_dir / "load_data_original.csv")
+
+        print("1. normal registration: ")
+        _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+        print("2. with unexpected col: ")
+        _duplicate_col_in_data_file(data_dir, col_name=None, export_index=True)
+        with pytest.raises(
+            DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
+        ):
+            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+        print("3. with a duplicated dimension: ")
+        _duplicate_col_in_data_file(data_dir, col_name="subsector", export_index=False)
+        with pytest.raises((ValueError, DSGInvalidDimension)):
+            # (ValueError,  match=r"*is not a valid DimensionType"),
+            # (DSGInvalidDimension,  match=r"column.*is not expected or of a known dimension type")
+            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+        print("4. with a duplicated pivot col: ")
+        _duplicate_col_in_data_file(data_dir, col_name="elec_heating", export_index=False)
+        with pytest.raises(
+            DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
+        ):
+            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+        if "Growth_Factors" in dataset:
+            print("5. test metric unit check for Growth_Factors dataset: ")
+            shutil.copyfile(data_dir / "load_data_original.csv", data_dir / "load_data.csv")
+            _test_metric_check_for_growth_rate(make_test_project_dir, dataset)
+            with pytest.raises(
+                DSGInvalidDimension, match=r"Dimension.*is expected to be unitless"
+            ):
+                _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+
+def _test_dataset_registration(make_test_project_dir, data_dir, dataset):
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        print(f"temp_registry created: {base_dir}")
+        manager = make_registry_for_aeo(
+            base_dir,
+            make_test_project_dir,
+            dataset,
+            dataset_path=data_dir,
+            include_datasets=False,
+        )
+
+
+def _duplicate_col_in_data_file(data_dir, col_name=None, export_index=False):
+    df_data = pd.read_csv(data_dir / "load_data_original.csv")
+
+    if col_name is not None:
+        df_data[f"{col_name}_dup"] = df_data[col_name]
+        df_data = df_data.rename(columns={f"{col_name}_dup": col_name})
+    if export_index:
+        df_data.reset_index(inplace=True)
+    print(df_data)
+    df_data.to_csv(data_dir / "load_data.csv", index=False)
+
+
+def _test_metric_check_for_growth_rate(src_dir, dataset_name):
+    dataset_dir = Path(f"datasets/benchmark/{dataset_name}")
+    dim_config = src_dir / dataset_dir / "dimensions.toml"
+    for dim in load_data(dim_config)["dimensions"]:
+        if dim["type"] == "metric":
+            metric_file = dim["file"]
+        else:
+            continue
+
+    metric_file = src_dir / dataset_dir / metric_file
+    df_metric = pd.read_csv(metric_file)
+    df_metric.loc[0, "unit"] = "kWh"
+    df_metric.to_csv(metric_file, index=False)

@@ -28,7 +28,7 @@ def time_dimension_model2():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[1]  # DateTimeDimensionModel (annual)
+    yield model.dimensions[1]  # DateTimeDimensionModel (daily time)
 
 
 @pytest.fixture
@@ -44,7 +44,7 @@ def annual_time_dimension_model():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[3]  # AnnualTimeDimensionModel
+    yield model.dimensions[3]  # AnnualTimeDimensionModel (annual time, correct format)
 
 
 def check_date_range_creation(time_dimension_model):
@@ -119,9 +119,12 @@ def check_date_range_creation(time_dimension_model):
     assert num_ts_diff == 0
 
 
-def check_validation_error_366_days(time_dimension_model):
+def check_validation_error_365_days(time_dimension_model):
     with pytest.raises(ValidationError):
-        time_dimension_model.frequency = datetime.timedelta(days=366)
+        time_dimension_model.ranges[0].start = "2018"
+        time_dimension_model.ranges[0].end = "2050"
+        time_dimension_model.str_format = "%Y"
+        time_dimension_model.frequency = datetime.timedelta(days=365)
 
 
 def check_register_annual_time(annual_time_dimension_model):
@@ -135,7 +138,7 @@ def test_time_dimension_model1(time_dimension_model1):
 
 def test_time_dimension_model2(time_dimension_model2):
     check_date_range_creation(time_dimension_model2)
-    check_validation_error_366_days(time_dimension_model2)
+    check_validation_error_365_days(time_dimension_model2)
 
 
 def test_time_dimension_model3(time_dimension_model3):

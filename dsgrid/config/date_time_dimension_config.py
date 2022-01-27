@@ -1,17 +1,12 @@
-import logging
 from datetime import datetime
 
 import pandas as pd
-import pyspark.sql.functions as F
 
 from dsgrid.dimension.time import TimeZone
 from dsgrid.dimension.time import TimeZone, make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
-
-
-logger = logging.getLogger(__name__)
 
 
 class DateTimeDimensionConfig(TimeDimensionBaseConfig):
@@ -39,34 +34,6 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             )
             raise DSGInvalidDataset(
                 f"load_data timestamps do not match expected times. mismatch={mismatch}"
-            )
-
-        timestamps_by_id = (
-            load_data_df.select("timestamp", "id")
-            .groupby("id")
-            .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
-        )
-        distinct_counts = timestamps_by_id.select("distinct_timestamps").distinct()
-        expected_count = len(expected_timestamps)
-        if distinct_counts.count() != 1:
-            for row in timestamps_by_id.collect():
-                if row.distinct_timestamps != len(expected_timestamps):
-                    logger.error(
-                        "load_data ID=%s does not have %s timestamps: actual=%s",
-                        row.id,
-                        len(expected_timestamps),
-                        row.distinct_timestamps,
-                    )
-
-            raise DSGInvalidDataset(
-                f"One or more arrays do not have {len(expected_timestamps)} timestamps"
-            )
-
-        val = distinct_counts.collect()[0].distinct_timestamps
-        if val != expected_count:
-            raise DSGInvalidDataset(
-                f"load_data arrays do not have {len(expected_timestamps)} "
-                "timestamps: actual={row.distinct_timestamps}"
             )
 
     def convert_dataframe(self, df):

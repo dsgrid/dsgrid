@@ -1,5 +1,7 @@
-[[dimensions]] #[1]
-class = "Time"
+[[dimensions]] #[1] 8760
+type = "time"
+class_name = "Time"
+time_type = "datetime"
 description = """
 Time dimension, 2012 hourly EST, period-beginning, no DST, no Leap Day Adjustment, total value
 """
@@ -9,52 +11,52 @@ time_interval_type = "period_beginning"
 ranges = [{start = "2012-01-01 00:00:00", end = "2012-12-31 23:00:00"}]
 str_format = "%Y-%m-%d %H:%M:%S"
 timezone = "EasternStandard"
-type = "time"
-time_type = "datetime"
 measurement_type = "total"
 
 
-[[dimensions]] #[2]
-class = "Time"
+[[dimensions]] #[2] # daily
+type = "time"
+class_name = "Time"
+time_type = "datetime"
 description = """
 Annual time 2018-2050
 """
-frequency = "P365D"
-name = "annual_time_2018_to_2050"
+frequency = "P1D" #"P365D"
+name = "annual_time_2018_to_2020"
 time_interval_type = "instantaneous"
-ranges = [{start = "2018", end = "2050"}]
-str_format = "%Y"
+ranges = [{start = "2018-01-01", end = "2020-01-01"}]
+str_format = "%Y-%m-%d"
 timezone = "none"
-type = "time"
-time_type = "datetime"
 measurement_type = "total"
 
 
 [[dimensions]] #[3]
-class = "Time"
+type = "time"
+class_name = "Time"
+time_type = "datetime"
 description = """
-Time dimension, 2012 hourly EPT, period-ending, no Leap Day Adjustment, total value
+Time dimension, 2016 hourly EPT, period-ending, no Leap Day Adjustment, total value
 """
-frequency = "01:00:00"
-name = "Time-2012-EPT-hourly-periodEnding-noLeapDayAdjustment-total"
+frequency = "06:00:00"
+name = "Time-2016-EPT-hourly-periodEnding-noLeapDayAdjustment-total"
 time_interval_type = "period_ending"
-ranges = [{start = "2012-01-01 01:00:00", end = "2013-01-01 00:00:00"}]
+ranges = [{start = "2016-01-01 00:00:00", end = "2017-01-01 00:00:00"}]
 str_format = "%Y-%m-%d %H:%M:%S"
 timezone = "EasternPrevailing"
 leap_day_adjustment = "none"
-type = "time"
-time_type = "datetime"
 measurement_type = "max"
 
 
 [[dimensions]] #[4]
-class = "AnnualTime"
+type = "time"
+class_name = "AnnualTime"
+time_type = "annual"
 description = """Annual time"""
 module = "dsgrid.dimension.standard"
 name = "Annual-time-with-leap-year"
-measurement_type = "mean"
+ranges = [{start = "2020", end = "2050"}]
+str_format = "%Y"
 include_leap_day = true
-type = "time"
-time_type = "annual"
+measurement_type = "mean"
 
 

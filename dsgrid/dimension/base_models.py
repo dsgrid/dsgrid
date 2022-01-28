@@ -20,6 +20,15 @@ class DimensionType(DSGEnum):
     SCENARIO = "scenario"
     DATA_SOURCE = "data_source"
 
+    @classmethod
+    def from_column(cls, column):
+        try:
+            return cls(column)
+        except ValueError:
+            raise DSGInvalidDimension(
+                f"column={column} is not expected or of a known dimension type."
+            )
+
 
 class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""

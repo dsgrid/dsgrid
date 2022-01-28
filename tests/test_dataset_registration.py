@@ -73,7 +73,7 @@ def _setup_invalid_load_data_lookup_column_name(data_dir):
     for item in data:
         item["invalid_dimension"] = item.pop("subsector")
     dump_line_delimited_json(data, lookup_file)
-    return DSGInvalidDimension, r"column.*is not a dimension type"
+    return DSGInvalidDimension, r"column.*is not expected or of a known dimension type."
 
 
 def _setup_invalid_load_data_lookup_no_id(data_dir):

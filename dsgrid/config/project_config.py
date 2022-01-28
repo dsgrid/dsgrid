@@ -12,6 +12,7 @@ from semver import VersionInfo
 from .config_base import ConfigWithDataFilesBase
 from .dataset_config import InputDatasetType
 from .dataset_config import DatasetConfig
+from .dimension_associations import DimensionAssociations
 from .dimension_mapping_base import DimensionMappingReferenceModel
 from .dimensions import (
     DimensionReferenceModel,
@@ -270,7 +271,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
         self._dimension_mapping_mgr = None
         self._base_to_base_mappings = {}
         self._base_to_supplemental_mappings = {}
-        self._dimension_associations = {}
+        self._dimension_associations = None
 
     @staticmethod
     def model_class():
@@ -297,6 +298,10 @@ class ProjectConfig(ConfigWithDataFilesBase):
         config.load_dimensions(dimension_manager)
         config.load_dimension_mappings(dimension_mapping_manager)
         return config
+
+    @property
+    def dimension_associations(self):
+        return self._dimension_associations
 
     @property
     def dimension_mapping_manager(self):
@@ -399,49 +404,14 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return True
         return False
 
-    def get_dimension_association_records(self, *args):
-        """Return the records for this dimension association.
-
-        Parameters
-        ----------
-        args : tuple
-            Any number of DimensionType
-
-        Returns
-        -------
-        list
-            List of AssociationTableRecordModel
-
-        """
-        records = self._dimension_associations.get(args)
-        if records is None:
-            raise DSGInvalidDimensionAssociation(f"{args}")
-        return records
-
-    def has_dimension_association(self, *args):
-        """Return True if the config has these dimension associations.
-
-        Parameters
-        ----------
-        args : tuple
-            Any number of DimensionType
-
-        Returns
-        -------
-        bool
-
-        """
-        return args in self._dimension_associations
-
     def load_dimension_associations(self):
         """Load all dimension associations."""
-        for association in self.model.dimension_associations:
-            records = read_dataframe(self.src_dir / association, cache=True)
-            types = tuple(DimensionType(x) for x in records.columns)
-            self._dimension_associations[types] = records
-            logger.debug(
-                "Loaded association table records for %s %s", self.config_id, records.columns
-            )
+        # Find out what dimension have no associations which means that all dimension recrods from
+        # the project must be used
+        self._dimension_associations = DimensionAssociations.load(
+            self.src_dir,
+            self.model.dimension_associations,
+        )
 
     def load_dimensions(self, dimension_manager: DimensionRegistryManager):
         """Load all Base Dimensions.

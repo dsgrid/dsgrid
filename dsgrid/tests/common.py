@@ -100,6 +100,8 @@ def replace_dimension_mapping_uuids(filename, uuids):
     )
     with fileinput.input(files=[filename], inplace=True) as f:
         for line in f:
+            if line.strip().startswith("#"):
+                continue
             match = regex.search(line)
             if match is None:
                 print(line, end="")
@@ -140,6 +142,8 @@ def replace_dimension_uuids(filename, uuids):
     regex = re.compile(r"^dimension_id = \"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)\"")
     with fileinput.input(files=[filename], inplace=True) as f:
         for line in f:
+            if line.strip().startswith("#"):
+                continue
             match = regex.search(line)
             if match is None:
                 print(line, end="")

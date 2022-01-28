@@ -1,35 +1,26 @@
 """Manages the registry for dimension projects"""
 from dsgrid.utils.timing import track_timing
 import getpass
-import io
-import itertools
 import logging
-from contextlib import redirect_stdout
-
-import pyspark.sql.functions as F
 
 from dsgrid import timer_stats_collector
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
-from dsgrid.config.dataset_config import DatasetConfig, DataSchemaType
+from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
+from dsgrid.config.dataset_dimension_checker import check_dataset_dimensions_against_project
 from dsgrid.dataset import Dataset
-from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset, DSGValueNotRegistered, DSGDuplicateValueRegistered
+from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.registry.common import (
     make_initial_config_registration,
     ConfigKey,
     DatasetRegistryStatus,
     ProjectRegistryStatus,
 )
-from dsgrid.utils.spark import models_to_dataframe, create_dataframe_from_dimension_ids
 from .common import VersionUpdateType
 from .dataset_registry_manager import DatasetRegistryManager
 from .dimension_registry_manager import DimensionRegistryManager
-from .project_registry import (
-    ProjectRegistry,
-    ProjectRegistryModel,
-)
+from .project_registry import ProjectRegistry, ProjectRegistryModel
 from .registry_manager_base import RegistryManagerBase
 
 
@@ -196,7 +187,12 @@ class ProjectRegistryManager(RegistryManagerBase):
             )
 
     def _submit_dataset(
-        self, project_config, dataset_id, dimension_mapping_files, submitter, log_message
+        self,
+        project_config: ProjectConfig,
+        dataset_id,
+        dimension_mapping_files,
+        submitter,
+        log_message,
     ):
         self._check_if_not_registered(project_config.config_id)
         dataset_config = self._dataset_mgr.get_by_id(dataset_id)
@@ -214,9 +210,12 @@ class ProjectRegistryManager(RegistryManagerBase):
                 mapping_references.append(ref)
 
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
-        dataset = Dataset.load(dataset_config)
-        self.check_dataset_base_to_project_base_mappings(
-            project_config, dataset_config, dataset, mapping_references
+        check_dataset_dimensions_against_project(
+            project_config,
+            dataset_config,
+            mapping_references,
+            self._dimension_mgr,
+            self._dimension_mapping_mgr,
         )
 
         if self.dry_run_mode:
@@ -269,62 +268,6 @@ class ProjectRegistryManager(RegistryManagerBase):
             Raised if a requirement is violated.
 
         """
-        # TODO: Handle this polymorphically when PR #99 is merged.
-        exclude_dims = set([DimensionType.TIME])
-        if dataset_config.model.data_schema_type == DataSchemaType.STANDARD:
-            exclude_dims.add(dataset_config.model.data_schema.load_data_column_dimension)
-        else:
-            raise Exception(f"not supported yet: {dataset_config.model.data_schema}")
-
-        needs_full_join = set()
-        types = [x for x in DimensionType if x not in exclude_dims]
-        for type1, type2 in itertools.product(types, types):
-            if type1 != type2:
-                needs_full_join.add((type1, type2))
-
-        for type1, type2 in needs_full_join:
-            if project_config.has_dimension_association(type1, type2):
-                records = project_config.get_dimension_association_records(type1, type2)
-            else:
-                pdim1 = project_config.get_base_dimension(type1)
-                pdim1_ids = pdim1.get_unique_ids()
-                pdim2 = project_config.get_base_dimension(type2)
-                pdim2_ids = pdim2.get_unique_ids()
-                records = itertools.product(pdim1_ids, pdim2_ids)
-                records = create_dataframe_from_dimension_ids(
-                    records, pdim1.model.dimension_type, pdim2.model.dimension_type
-                )
-            lookup = self._remap_dimension_columns(dataset.load_data_lookup, mapping_references)
-            count = next(
-                iter(
-                    records.join(lookup, on=[type1.value, type2.value])
-                    .agg(F.count_distinct(type1.value, type2.value))
-                    .collect()[0]
-                    .asDict()
-                    .values()
-                )
-            )
-            if count != records.count():
-                # There is probably a better way to print the rows dropped from the join above.
-                exclude = exclude_dims.union(set((type1, type2)))
-                null_dim = next(iter(set(DimensionType).difference(exclude))).value
-                table = (
-                    records.join(lookup, on=[type1.value, type2.value], how="outer")
-                    .filter(f"{null_dim} is NULL")
-                    .select(type1.value, type2.value)
-                )
-
-                with io.StringIO() as buf, redirect_stdout(buf):
-                    table.show(n=table.count())
-                    logger.error(
-                        "Dataset %s is missing records for %s:\n%s",
-                        dataset.dataset_id,
-                        (type1, type2),
-                        buf.getvalue(),
-                    )
-                raise DSGInvalidDataset(
-                    f"Dataset {dataset.dataset_id} is missing records for {(type1, type2)}"
-                )
 
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
@@ -358,22 +301,3 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._remove(config_id)
         for key in [x for x in self._projects if x.id == config_id]:
             self._projects.pop(key)
-
-    def _remap_dimension_columns(self, df, mapping_references):
-        # This will likely become a common activity when running queries.
-        # May need to cache the result. But that will likely be in Project, not here.
-        # This method could be moved elsewhere.
-        for ref in mapping_references:
-            column = ref.from_dimension_type.value
-            if column in df.columns:
-                mapping_config = self._dimension_mapping_mgr.get_by_id(
-                    ref.mapping_id, version=ref.version
-                )
-                records = models_to_dataframe(mapping_config.model.records)
-                df = (
-                    df.join(records, getattr(df, column) == records.from_id)
-                    .drop("from_id")
-                    .drop(column)
-                    .withColumnRenamed("to_id", column)
-                )
-        return df

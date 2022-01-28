@@ -1,0 +1,15 @@
+sector,subsector
+com,FullServiceRestaurant
+com,Hospital
+com,LargeHotel
+com,LargeOffice
+com,MediumOffice
+com,Outpatient
+com,PrimarySchool
+com,QuickServiceRestaurant
+com,SmallHotel
+com,SmallOffice
+com,StandaloneRetail
+com,StripMall
+com,Warehouse
+res,MidriseApartment

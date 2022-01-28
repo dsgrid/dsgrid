@@ -1,0 +1,14 @@
+scenario,subsector
+baseline,FullServiceRestaurant
+baseline,Hospital
+baseline,LargeHotel
+baseline,LargeOffice
+baseline,MediumOffice
+baseline,Outpatient
+baseline,PrimarySchool
+baseline,QuickServiceRestaurant
+baseline,StandaloneRetail
+baseline,StripMall
+baseline,SmallHotel
+baseline,SmallOffice
+baseline,Warehouse

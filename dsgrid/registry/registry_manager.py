@@ -62,7 +62,10 @@ class RegistryManager:
             self._dimension_mgr,
         )
         self._dataset_mgr = DatasetRegistryManager.load(
-            params.base_path / DatasetRegistry.registry_path(), params, self._dimension_mgr
+            params.base_path / DatasetRegistry.registry_path(),
+            params,
+            self._dimension_mgr,
+            self._dimension_mapping_dimension_mgr,
         )
         self._project_mgr = ProjectRegistryManager.load(
             params.base_path / ProjectRegistry.registry_path(),

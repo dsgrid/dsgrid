@@ -4,7 +4,6 @@ import logging
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     check_load_data_filename,
-    check_load_data_lookup_filename,
 )
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, Timer
@@ -18,28 +17,33 @@ logger = logging.getLogger(__name__)
 class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     """ define interface/required behaviors for ONE_TABLE dataset schema """
 
-    def __init__(self, config):
-        self._config = config
+    def __init__(self, load_data_df, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._load_data = load_data_df
+
+    @classmethod
+    def load(cls, config: DatasetConfig, *args, **kwargs):
+        path = Path(config.model.path)
+        load_data_df = read_dataframe(check_load_data_filename(path))
+        load_data_df = config.add_trivial_dimensions(load_data_df)
+        return cls(load_data_df, config, *args, **kwargs)
 
     def check_consistency(self):
-        path = Path(self._config.model.path)
-        load_data_df = read_dataframe(check_load_data_filename(path), cache=True)
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(self._config, load_data_df)
-        load_data_df = self._config.add_trivial_dimensions(load_data_df)
+            self._check_dataset_time_consistency(self._load_data)
         with Timer(timer_stats_collector, "check_one_table_data_consistency"):
-            self._check_one_table_data_consistency(self._config, load_data_df)
+            self._check_one_table_data_consistency()
 
-    def _check_one_table_data_consistency(self, config: DatasetConfig, load_data):
+    def _check_one_table_data_consistency(self):
         dimension_types = []
         pivot_cols = []
 
-        time_dim = config.get_dimension(DimensionType.TIME)
+        time_dim = self._config.get_dimension(DimensionType.TIME)
         time_columns = time_dim.get_timestamp_load_data_columns()
-        pivot_dim = config.model.data_schema.load_data_column_dimension
+        pivot_dim = self._config.model.data_schema.load_data_column_dimension
         expected_pivot_columns = self.get_pivot_dimension_columns()
         pivot_dim_found = False
-        for col in load_data.columns:
+        for col in self._load_data.columns:
             if col in time_columns:
                 dimension_types.append(DimensionType.TIME)
             elif col in expected_pivot_columns:
@@ -64,12 +68,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if dimension_type == DimensionType.TIME:
                 continue
             name = dimension_type.value
-            dimension = config.get_dimension(dimension_type)
+            dimension = self._config.get_dimension(dimension_type)
             dim_records = dimension.get_unique_ids()
             if dimension_type == pivot_dim:
                 data_records = set(pivot_cols)
             else:
-                data_records = get_unique_values(load_data, name)
+                data_records = get_unique_values(self._load_data, name)
             if dim_records != data_records:
                 logger.error(
                     "Mismatch in load_data records. dimension=%s mismatched=%s",
@@ -79,3 +83,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 raise DSGInvalidDataset(
                     f"load_data records do not match dimension records for {name}"
                 )
+
+    def make_dimension_table(self, mapping_references):
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        time_cols = set(time_dim.get_timestamp_load_data_columns())
+        pivoted_cols = set(self.get_pivot_dimension_columns())
+        exclude = time_cols.union(pivoted_cols)
+        dim_cols = [x for x in self._load_data.columns if x not in exclude]
+        df = self._load_data.select(*dim_cols).distinct()
+        return self._remap_dimension_columns(df, mapping_references)

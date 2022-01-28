@@ -1,0 +1,10 @@
+data_source,metric
+comstock,cooling
+comstock,heating
+comstock,water_systems
+comstock,exterior_lighting
+comstock,fans
+comstock,heat_rejection
+comstock,interior_equipment
+comstock,interior_lighting
+comstock,pumps

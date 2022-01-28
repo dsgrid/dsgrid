@@ -1,0 +1,10 @@
+scenario,metric
+baseline,cooling
+baseline,heating
+baseline,water_systems
+baseline,exterior_lighting
+baseline,fans
+baseline,heat_rejection
+baseline,interior_equipment
+baseline,interior_lighting
+baseline,pumps

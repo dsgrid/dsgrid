@@ -1,12 +1,16 @@
 import abc
 import collections
 import logging
+import os
+from typing import List
 
 import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.utils.spark import models_to_dataframe
+from .dimension_mapping_base import DimensionMappingReferenceModel
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +18,66 @@ logger = logging.getLogger(__name__)
 class DatasetSchemaHandlerBase(abc.ABC):
     """ define interface/required behaviors per dataset schema """
 
+    def __init__(self, config, dimension_mgr, dimension_mapping_mgr):
+        self._config = config
+        self._dimension_mgr = dimension_mgr
+        self._dimension_mapping_mgr = dimension_mapping_mgr
+
+    @classmethod
+    @abc.abstractmethod
+    def load(cls, config: DatasetConfig):
+        """Create a dataset schema handler by loading the data tables from files.
+
+        Parameters
+        ----------
+        config: DatasetConfig
+
+        Returns
+        -------
+        DatasetSchemaHandlerBase
+
+        """
+
     @abc.abstractmethod
     def check_consistency(self):
         """
         Check all data consistencies, including data columns, dataset to dimension records, and time
         """
+
+    @abc.abstractmethod
+    def make_dimension_table(self, mapping_references):
+        """Return a dataframe containing all dimensions that have been remapped to the project.
+
+        Parameters
+        ----------
+        mapping_references : List[DimensionMappingReferenceModel]
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+
+    @property
+    def config(self):
+        """Returns the DatasetConfig.
+
+        Returns
+        -------
+        DatasetConfig
+
+        """
+        return self._config
+
+    def get_pivot_dimension_type(self):
+        """Return the DimensionType of the columns pivoted in the load_data table.
+
+        Returns
+        -------
+        DimensionType
+
+        """
+        return self._config.model.data_schema.load_data_column_dimension
 
     def get_pivot_dimension_columns(self):
         """Get cols for the dimension that is pivoted in load_data.
@@ -30,6 +89,35 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         dim_type = self._config.model.data_schema.load_data_column_dimension
         return sorted(list(self._config.get_dimension(dim_type).get_unique_ids()))
+
+    def get_pivot_dimension_columns_mapped_to_project(self, mapping_references):
+        """Get cols for the dimension that is pivoted in load_data.
+
+        Returns
+        -------
+        dict
+            Mapping of pivoted dimension column names to project record names.
+
+        """
+        columns = set(self.get_pivot_dimension_columns())
+        dim_type = self.get_pivot_dimension_type()
+        for ref in mapping_references:
+            if ref.from_dimension_type.value == dim_type:
+                mapping_config = self._dimension_mapping_mgr.get_by_id(
+                    ref.mapping_id, version=ref.version
+                )
+                mapping = {
+                    x[record.from_id]: record.to_id
+                    for x in models_to_dataframe(mapping_config.model.records).collect()
+                }
+                diff = columns.symmetric_difference(mapping)
+                if diff:
+                    raise DSGInvalidDataset(
+                        f"Dataset pivoted dimension columns are not symmetrical with mapping: {diff}"
+                    )
+                return mapping
+
+        return {x: x for x in columns}
 
     def get_columns_for_unique_arrays(self, time_dim, load_data_df):
         """Returns the list of dimension columns aginst which the number of timestamps is checked.
@@ -45,13 +133,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return groupby_cols
 
-    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data_df):
+    def _check_dataset_time_consistency(self, load_data_df):
         """Check dataset time consistency such that:
         1. time range(s) match time config record;
         2. all dimension combinations return the same set of time range(s).
 
         """
-        time_dim = config.get_dimension(DimensionType.TIME)
+        if os.environ.get("__DSGRID_SKIP_DATASET_TIME_CONSISTENCY_CHECKS__"):
+            return
+
+        time_dim = self._config.get_dimension(DimensionType.TIME)
         time_dim.check_dataset_time_consistency(load_data_df)
         self._check_dataset_time_consistency_by_dimensions(time_dim, load_data_df)
 
@@ -126,3 +217,24 @@ class DatasetSchemaHandlerBase(abc.ABC):
             raise DSGInvalidDataset(f"{table_name} contains duplicated column name(s)={dups}.")
 
         return set(lst)
+
+    def _remap_dimension_columns(self, df, mapping_refs: List[DimensionMappingReferenceModel]):
+        # This will likely become a common activity when running queries.
+        # May need to cache the result. But that will likely be in Project, not here.
+        # This method could be moved elsewhere.
+        for ref in mapping_refs:
+            column = ref.from_dimension_type.value
+            if column in df.columns:
+                mapping_config = self._dimension_mapping_mgr.get_by_id(
+                    ref.mapping_id, version=ref.version
+                )
+                records = models_to_dataframe(mapping_config.model.records)
+                orig = df.count()
+                df = (
+                    df.join(records, df[column] == records.from_id)
+                    .drop("from_id")
+                    .drop(column)
+                    .withColumnRenamed("to_id", column)
+                )
+                assert df.count() == orig, f"count changed from {orig} to {df.count()}: {column}"
+        return df

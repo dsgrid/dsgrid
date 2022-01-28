@@ -3,6 +3,8 @@ import re
 import shutil
 import sys
 
+import pytest
+
 from dsgrid.utils.run_command import run_command, check_run_command
 from dsgrid.utils.spark import init_spark
 from dsgrid.tests.common import (
@@ -51,3 +53,10 @@ def _get_latest_commit():
     assert match, output
     commit = match.group(1)
     return commit
+
+
+@pytest.fixture
+def spark_session():
+    spark = init_spark("dsgrid_test")
+    yield spark
+    spark.stop()

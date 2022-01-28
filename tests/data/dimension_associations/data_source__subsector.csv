@@ -1,0 +1,15 @@
+data_source,subsector
+comstock,FullServiceRestaurant
+comstock,Hospital
+comstock,LargeHotel
+comstock,LargeOffice
+comstock,MediumOffice
+comstock,Outpatient
+comstock,PrimarySchool
+comstock,QuickServiceRestaurant
+comstock,StandaloneRetail
+comstock,StripMall
+comstock,SmallHotel
+comstock,SmallOffice
+comstock,Warehouse
+comstock,MidriseApartment

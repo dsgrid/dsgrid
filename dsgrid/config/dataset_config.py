@@ -5,7 +5,7 @@ import logging
 import pyspark.sql.functions as F
 
 from pydantic import Field
-from pydantic import validator
+from pydantic import validator, root_validator
 from semver import VersionInfo
 
 from dsgrid.dimension.base_models import DimensionType
@@ -84,6 +84,7 @@ class InputDatasetType(DSGEnum):
     SECTOR_MODEL = "sector_model"
     HISTORICAL = "historical"
     BENCHMARK = "benchmark"
+    GROWTH_RATE = "growth_rate"
 
 
 class DataSchemaType(DSGEnum):
@@ -190,6 +191,13 @@ class OneTableDataSchemaModel(DSGBaseModel):
 class DatasetConfigModel(DSGBaseModel):
     """Represents dataset configurations."""
 
+    dataset_type: InputDatasetType = Field(
+        title="dataset_type",
+        description="Input dataset type.",
+        options=InputDatasetType.format_for_docs(),
+    )
+    # TODO: This must be validated against the project's dimension records for data_source
+    # TODO: This must also be validated against the project_config
     dataset_id: str = Field(
         title="dataset_id",
         description="Unique dataset identifier.",
@@ -200,13 +208,6 @@ class DatasetConfigModel(DSGBaseModel):
             " (e.g., dataset cannot be 'ComStock')",
         ),
     )
-    dataset_type: InputDatasetType = Field(
-        title="dataset_type",
-        description="Input dataset type.",
-        options=InputDatasetType.format_for_docs(),
-    )
-    # TODO: This must be validated against the project's dimension records for data_source
-    # TODO: This must also be validated against the project_config
     data_source: str = Field(
         title="data_source",
         description="Data source name, e.g. 'ComStock'.",
@@ -306,6 +307,15 @@ class DatasetConfigModel(DSGBaseModel):
         ),
     )
 
+    # @validator("dataset_type", pre=True)
+    @root_validator(pre=True)
+    def check_dataset_type(cls, values):
+        if values["dataset_type"] == InputDatasetType.GROWTH_RATE.value:
+            val = GrowthRateDatasetConfigModel(**values)
+        else:
+            val = DatasetConfigModel(**values)
+        return val
+
     @validator("data_schema", pre=True)
     def check_data_schema(cls, schema, values):
         """Check and deserialize model for data_schema"""
@@ -359,6 +369,22 @@ class DatasetConfigModel(DSGBaseModel):
                     "The time dimension is currently not a dsgrid supported trivial dimension."
                 )
         return trivial_dimensions
+
+
+class GrowthRateType(DSGEnum):
+    EXPONENTIAL_ANNUAL = "exponential_annual"
+    EXPONENTIAL_MONTHLY = "exponential_monthly"
+
+
+class GrowthRateDatasetConfigModel(DatasetConfigModel):
+    """Represents dataset configuration for growth rate type data."""
+
+    dataset_type: InputDatasetType = Field(default="growth_rate")
+    growth_rate_type: GrowthRateType = Field(
+        title="growth_rate_type",
+        description="Type of growth rates, e.g., exponential_annual",
+        options=GrowthRateType.format_for_docs(),
+    )
 
 
 class DatasetConfig(ConfigBase):
@@ -461,3 +487,11 @@ class DatasetConfig(ConfigBase):
             raise DSGInvalidDimension(
                 f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
             )
+
+
+class GrowthRateDatasetConfig(DatasetConfig):
+    """Provides an interface to a GrowthRateDatasetConfigModel."""
+
+    @staticmethod
+    def model_class():
+        return GrowthRateDatasetConfigModel

@@ -17,7 +17,7 @@ from sqlalchemy import (
 from dsgrid.config.dimensions import (
     DateTimeDimensionModel,
     AnnualTimeDimensionModel,
-    TrivialTimeDimensionModel,
+    NoOpTimeDimensionModel,
 )
 from dsgrid.dimension.base_models import (
     MetricDimensionBaseModel,
@@ -149,8 +149,8 @@ class AnnualTime(AnnualTimeDimensionModel):
     """Annual Time attributes"""
 
 
-class TrivialTime(TrivialTimeDimensionModel):
-    """Trivial Time attributes"""
+class NoOpTime(NoOpTimeDimensionModel):
+    """NoOp Time attributes"""
 
 
 # ---------------------------

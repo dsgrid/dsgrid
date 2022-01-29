@@ -32,6 +32,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             self._check_dataset_time_consistency(self._config, load_data_df)
 
     def _check_one_table_data_consistency(self, config: DatasetConfig, load_data):
+        """ Dimension check in load_data, excludes time. """
         dimension_types = set()
         pivot_cols = set()
 
@@ -42,7 +43,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         pivot_dim_found = False
         for col in load_data.columns:
             if col in time_columns:
-                dimension_types.add(DimensionType.TIME)
+                continue
             elif col in expected_pivot_columns:
                 pivot_dim_found = True
                 pivot_cols.add(col)
@@ -52,16 +53,15 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if pivot_dim_found:
             dimension_types.add(pivot_dim)
 
-        expected_dimensions = {d for d in DimensionType}
+        expected_dimensions = {d for d in DimensionType if d != DimensionType.TIME}
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
             raise DSGInvalidDataset(
-                f"load_data is missing dimensions: {missing_dimensions}. If these are trivial dimensions, make sure to specify them in the Dataset Config."
+                f"load_data is missing dimensions: {missing_dimensions}. "
+                "If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
 
         for dimension_type in dimension_types:
-            if dimension_type == DimensionType.TIME:
-                continue
             name = dimension_type.value
             dimension = config.get_dimension(dimension_type)
             dim_records = dimension.get_unique_ids()

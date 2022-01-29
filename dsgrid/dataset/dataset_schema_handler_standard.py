@@ -36,6 +36,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             self._check_dataset_internal_consistency(self._config, load_data_df, load_data_lookup)
 
     def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
+        """ Dimension check in load_data_lookup, excludes time. """
         found_id = False
         dimension_types = set()
         for col in load_data_lookup.columns:
@@ -76,7 +77,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def _check_dataset_internal_consistency(
         self, config: DatasetConfig, load_data_df, load_data_lookup
     ):
-        """ check data columns and id series """
+        """ Check load_data dimensions and id series. """
         self._check_load_data_columns(config, load_data_df)
         data_ids = []
         for row in load_data_df.select("id").distinct().sort("id").collect():

@@ -103,12 +103,6 @@ class DataSchemaType(DSGEnum):
         Typically appropriate for small, low-temporal resolution datasets.
         """,
     )
-    GROWTH_RATE = EnumValue(
-        value="growth_rate",
-        description="""
-        One_table data schema with load_data table for unitless and temporally arbitrary data, such as growth rates.
-        """,
-    )
 
 
 class DSGDatasetParquetType(DSGEnum):
@@ -118,7 +112,7 @@ class DSGDatasetParquetType(DSGEnum):
         value="load_data",
         description="""
         In STANDARD data_schema_type, load_data is a file with ID, timestamp, and metric value columns. 
-        In ONE_TABLE or GROWTH_RATE data_schema_type, load_data is a file with multiple data dimension and metric value columns.
+        In ONE_TABLE data_schema_type, load_data is a file with multiple data dimension and metric value columns.
         """,
     )
     LOAD_DATA_LOOKUP = EnumValue(
@@ -187,17 +181,6 @@ class StandardDataSchemaModel(DSGBaseModel):
 
 
 class OneTableDataSchemaModel(DSGBaseModel):
-    """ data schema model for one table load data format """
-
-    load_data_column_dimension: DimensionType = Field(
-        title="load_data_column_dimension",
-        description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
-    )
-
-
-class GrowthRateDataSchemaModel(OneTableDataSchemaModel):
-    """ data schema model for growth rate format """
-
     load_data_column_dimension: DimensionType = Field(
         title="load_data_column_dimension",
         description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
@@ -331,8 +314,6 @@ class DatasetConfigModel(DSGBaseModel):
             schema = StandardDataSchemaModel(**schema)
         elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
             schema = OneTableDataSchemaModel(**schema)
-        elif values["data_schema_type"] == DataSchemaType.GROWTH_RATE:
-            schema = GrowthRateDataSchemaModel(**schema)
         else:
             raise ValueError(
                 f'Cannot load data_schema model for data_schema_type={values["data_schema_type"]}'
@@ -360,7 +341,7 @@ class DatasetConfigModel(DSGBaseModel):
         if values["data_schema_type"] == DataSchemaType.STANDARD:
             check_load_data_filename(local_path)
             check_load_data_lookup_filename(local_path)
-        elif values["data_schema_type"] in [DataSchemaType.ONE_TABLE, DataSchemaType.GROWTH_RATE]:
+        elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
             check_load_data_filename(local_path)
         else:
             raise ValueError(f'data_schema_type={values["data_schema_type"]} not supported.')

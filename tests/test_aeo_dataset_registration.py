@@ -93,7 +93,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
         sys.exit(1)
 
     datasets = os.listdir(make_test_data_dir / "test_aeo_data")
-    datasets = [datasets[1]]  # <---
+    # datasets = [datasets[1]]  # <---
     for i, dataset in enumerate(datasets, 1):
         print(f">> Registering: {i}. {dataset}...")
         data_dir = make_test_data_dir / "test_aeo_data" / dataset
@@ -124,15 +124,6 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
         ):
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
-        if "Growth_Factors" in dataset:
-            print("5. test metric unit check for Growth_Factors dataset: ")
-            shutil.copyfile(data_dir / "load_data_original.csv", data_dir / "load_data.csv")
-            _test_metric_check_for_growth_rate(make_test_project_dir, dataset)
-            with pytest.raises(
-                DSGInvalidDimension, match=r"Dimension.*is expected to be unitless"
-            ):
-                _test_dataset_registration(make_test_project_dir, data_dir, dataset)
-
 
 def _test_dataset_registration(make_test_project_dir, data_dir, dataset):
     with TemporaryDirectory() as tmpdir:
@@ -157,18 +148,3 @@ def _duplicate_col_in_data_file(data_dir, col_name=None, export_index=False):
         df_data.reset_index(inplace=True)
     print(df_data)
     df_data.to_csv(data_dir / "load_data.csv", index=False)
-
-
-def _test_metric_check_for_growth_rate(src_dir, dataset_name):
-    dataset_dir = Path(f"datasets/benchmark/{dataset_name}")
-    dim_config = src_dir / dataset_dir / "dimensions.toml"
-    for dim in load_data(dim_config)["dimensions"]:
-        if dim["type"] == "metric":
-            metric_file = dim["file"]
-        else:
-            continue
-
-    metric_file = src_dir / dataset_dir / metric_file
-    df_metric = pd.read_csv(metric_file)
-    df_metric.loc[0, "unit"] = "kWh"
-    df_metric.to_csv(metric_file, index=False)

@@ -312,7 +312,7 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         default=TimeDimensionType.DATETIME,
         description="""
         Type of time dimension: 
-            datetime, annual, representative_period, trivial
+            datetime, annual, representative_period, noop
         """,
         options=TimeDimensionType.format_for_docs(),
     )
@@ -481,10 +481,10 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
     )
 
 
-class TrivialTimeDimensionModel(TimeDimensionBaseModel):
-    """Defines a trivial time dimension."""
+class NoOpTimeDimensionModel(TimeDimensionBaseModel):
+    """Defines a NoOp time dimension."""
 
-    time_type: TimeDimensionType = Field(default=TimeDimensionType.TRIVIAL)
+    time_type: TimeDimensionType = Field(default=TimeDimensionType.NOOP)
 
     @root_validator(pre=False)
     def check_time_type_and_class_consistency(cls, values):
@@ -536,8 +536,8 @@ def handle_dimension_union(value):
             val = AnnualTimeDimensionModel(**value)
         elif value["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
             val = RepresentativePeriodTimeDimensionModel(**value)
-        elif value["time_type"] == TimeDimensionType.TRIVIAL.value:
-            val = TrivialTimeDimensionModel(**value)
+        elif value["time_type"] == TimeDimensionType.NOOP.value:
+            val = NoOpTimeDimensionModel(**value)
         else:
             options = [x.value for x in TimeDimensionType]
             raise ValueError(f"{value['time_type']} not supported, valid options: {options}")
@@ -578,10 +578,7 @@ def _check_time_type_and_class_consistency(values):
             values["class_name"] == "AnnualTime"
             and values["time_type"] == TimeDimensionType.ANNUAL
         )
-        or (
-            values["class_name"] == "TrivialTime"
-            and values["time_type"] == TimeDimensionType.TRIVIAL
-        )
+        or (values["class_name"] == "NoOpTime" and values["time_type"] == TimeDimensionType.NOOP)
     ):
         pass
     else:
@@ -589,6 +586,6 @@ def _check_time_type_and_class_consistency(values):
             f'time_type={values["time_type"].value} does not match class_name={values["class_name"]}. \n'
             " * For class=Time, use time_type=datetime. \n"
             " * For class=AnnualTime, use time_type=annual. \n"
-            " * For class=TrivialTime, use time_type=trivial. "
+            " * For class=NoOpTime, use time_type=noop. "
         )
     return values

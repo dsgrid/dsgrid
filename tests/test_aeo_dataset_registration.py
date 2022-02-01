@@ -93,7 +93,6 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
         sys.exit(1)
 
     datasets = os.listdir(make_test_data_dir / "test_aeo_data")
-    datasets = [datasets[1]]  # <---
     for i, dataset in enumerate(datasets, 1):
         print(f">> Registering: {i}. {dataset}...")
         data_dir = make_test_data_dir / "test_aeo_data" / dataset

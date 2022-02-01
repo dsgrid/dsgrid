@@ -148,7 +148,8 @@ class DataClassificationType(DSGEnum):
     MODERATE = EnumValue(
         value="moderate",
         description=(
-            "The moderate class includes all data under an NDA, data classified as business sensitive, data classification as Critical Energy Infrastructure Infromation (CEII), or data with Personal Identifiable Information (PII)."
+            "The moderate class includes all data under an NDA, data classified as business sensitive, "
+            "data classification as Critical Energy Infrastructure Infromation (CEII), or data with Personal Identifiable Information (PII)."
         ),
     )
 
@@ -188,16 +189,22 @@ class OneTableDataSchemaModel(DSGBaseModel):
     )
 
 
+class GrowthRateType(DSGEnum):
+    EXPONENTIAL_ANNUAL = "exponential_annual"
+    EXPONENTIAL_MONTHLY = "exponential_monthly"
+
+
+class GrowthRateModel(DSGBaseModel):
+    growth_rate_type: GrowthRateType = Field(
+        title="growth_rate_type",
+        description="Type of growth rates, e.g., exponential_annual",
+        options=GrowthRateType.format_for_docs(),
+    )
+
+
 class DatasetConfigModel(DSGBaseModel):
     """Represents dataset configurations."""
 
-    dataset_type: InputDatasetType = Field(
-        title="dataset_type",
-        description="Input dataset type.",
-        options=InputDatasetType.format_for_docs(),
-    )
-    # TODO: This must be validated against the project's dimension records for data_source
-    # TODO: This must also be validated against the project_config
     dataset_id: str = Field(
         title="dataset_id",
         description="Unique dataset identifier.",
@@ -207,6 +214,17 @@ class DatasetConfigModel(DSGBaseModel):
             "For posterity, dataset_id cannot be the same as the ``data_source``"
             " (e.g., dataset cannot be 'ComStock')",
         ),
+    )
+    dataset_type: InputDatasetType = Field(
+        title="dataset_type",
+        description="Input dataset type.",
+        options=InputDatasetType.format_for_docs(),
+    )
+    # TODO: This must be validated against the project's dimension records for data_source
+    # TODO: This must also be validated against the project_config
+    dataset_type_metadata: Optional[Any] = Field(
+        title="dataset_type_metadata",
+        description="Additional metadata to include related to dataset_type",
     )
     data_source: str = Field(
         title="data_source",
@@ -307,14 +325,21 @@ class DatasetConfigModel(DSGBaseModel):
         ),
     )
 
-    # @validator("dataset_type", pre=True)
-    @root_validator(pre=True)
-    def check_dataset_type(cls, values):
-        if values["dataset_type"] == InputDatasetType.GROWTH_RATE.value:
-            val = GrowthRateDatasetConfigModel(**values)
+    @validator("dataset_type_metadata", pre=True)
+    def check_dataset_type_metadata(cls, metadata, values):
+        if values["dataset_type"] in {
+            InputDatasetType.SECTOR_MODEL,
+            InputDatasetType.HISTORICAL,
+            InputDatasetType.BENCHMARK,
+        }:
+            pass
+        elif values["dataset_type"] == InputDatasetType.GROWTH_RATE:
+            metadata = GrowthRateModel(**metadata)
         else:
-            val = DatasetConfigModel(**values)
-        return val
+            raise ValueError(
+                f'Cannot load dataset_type_metadata model for dataset_type={values["dataset_type"]}'
+            )
+        return metadata
 
     @validator("data_schema", pre=True)
     def check_data_schema(cls, schema, values):
@@ -369,22 +394,6 @@ class DatasetConfigModel(DSGBaseModel):
                     "The time dimension is currently not a dsgrid supported trivial dimension."
                 )
         return trivial_dimensions
-
-
-class GrowthRateType(DSGEnum):
-    EXPONENTIAL_ANNUAL = "exponential_annual"
-    EXPONENTIAL_MONTHLY = "exponential_monthly"
-
-
-class GrowthRateDatasetConfigModel(DatasetConfigModel):
-    """Represents dataset configuration for growth rate type data."""
-
-    dataset_type: InputDatasetType = Field(default="growth_rate")
-    growth_rate_type: GrowthRateType = Field(
-        title="growth_rate_type",
-        description="Type of growth rates, e.g., exponential_annual",
-        options=GrowthRateType.format_for_docs(),
-    )
 
 
 class DatasetConfig(ConfigBase):
@@ -487,11 +496,3 @@ class DatasetConfig(ConfigBase):
             raise DSGInvalidDimension(
                 f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
             )
-
-
-class GrowthRateDatasetConfig(DatasetConfig):
-    """Provides an interface to a GrowthRateDatasetConfigModel."""
-
-    @staticmethod
-    def model_class():
-        return GrowthRateDatasetConfigModel

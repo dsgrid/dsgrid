@@ -107,8 +107,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     ref.mapping_id, version=ref.version
                 )
                 mapping = {
-                    x[record.from_id]: record.to_id
-                    for x in models_to_dataframe(mapping_config.model.records).collect()
+                    x.from_id: x.to_id for x in mapping_config.model.records if x.to_id is not None
                 }
                 diff = columns.symmetric_difference(mapping)
                 if diff:

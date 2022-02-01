@@ -61,7 +61,12 @@ def make_registry_for_aeo(
     if dataset_path is None:
         dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
     path = create_local_test_registry(registry_path)
-    dataset_dir = Path(f"datasets/benchmark/{dataset_name}")
+
+    if "Growth_Factors" in dataset_name:
+        dataset_type = "growth_rate"
+    else:
+        dataset_type = "benchmark"
+    dataset_dir = Path(f"datasets/{dataset_type}/{dataset_name}")
     user = getpass.getuser()
     log_message = "Initial registration"
     manager = RegistryManager.load(path, offline_mode=True)

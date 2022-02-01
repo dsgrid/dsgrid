@@ -119,13 +119,17 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 raise DSGInvalidDimensionMapping(
                     f"Dimension mapping 'from' records are not symmetric with dimension_id={dim_id}: invalid={diff}"
                 )
+
+            # Note: this code cannot complete verify 'to' records. A dataset may be registering a
+            # mapping to a project's dimension for a specific data source, but that information
+            # is not available here.
             to_dimension = self._dimension_mgr.get_by_id(mapping.to_dimension.dimension_id)
             allowed_to_records = to_dimension.get_unique_ids()
-            diff = actual_to_records.symmetric_difference(allowed_to_records)
+            diff = actual_to_records.difference(allowed_to_records)
             if diff:
                 dim_id = from_dimension.model.dimension_id
                 raise DSGInvalidDimensionMapping(
-                    f"Dimension mapping 'to' records are not symmetric with dimension_id={dim_id}: invalid={diff}"
+                    f"Dimension mapping 'to' records are are invalid for dimension_id={dim_id}: invalid={diff}"
                 )
 
     def validate_records(self, config: DimensionMappingsConfig, warn_only=False):

@@ -129,20 +129,28 @@ def _post_process_dataframe(df, cache=False, require_unique=None):
                     raise DSGInvalidField(f"DataFrame has duplicate entries for {column}")
 
 
-def get_unique_values(df, column):
-    """Return the unique values of a dataframe in one column.
+def get_unique_values(df, columns: [str, list]):
+    """Return the unique values of a dataframe in one column or a list of columns.
 
     Parameters
     ----------
     df : pyspark.sql.DataFrame
-    column : str
+    column : str or list of str
 
     Returns
     -------
     set
 
     """
-    return {getattr(x, column) for x in df.select(column).distinct().collect()}
+    dfc = df.select(columns).distinct().collect()
+    if type(columns) == list:
+        values = set()
+        for row in dfc:
+            values.add(tuple(getattr(row, col) for col in columns))
+    else:
+        values = {getattr(x, columns) for x in dfc}
+
+    return values
 
 
 @track_timing(timer_stats_collector)

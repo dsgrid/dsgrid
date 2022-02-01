@@ -1,5 +1,6 @@
 from pathlib import Path
 import logging
+import itertools
 
 import pyspark.sql.functions as F
 
@@ -36,7 +37,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             self._check_dataset_internal_consistency(self._config, load_data_df, load_data_lookup)
 
     def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
-        """ Dimension check in load_data_lookup, excludes time. """
+        """Dimension check in load_data_lookup, excludes time:
+        * check that data matches record for each dimension.
+        * check that all data dimension combinations exist. Time is handled separately.
+        """
         found_id = False
         dimension_types = set()
         for col in load_data_lookup.columns:
@@ -59,6 +63,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 f"load_data_lookup is missing dimensions: {missing_dimensions}. If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
 
+        dim_records_list = []
+        dim_names = []
         for dimension_type in dimension_types:
             name = dimension_type.value
             dimension = config.get_dimension(dimension_type)
@@ -73,6 +79,21 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 raise DSGInvalidDataset(
                     f"load_data_lookup records do not match dimension records for {name}"
                 )
+            dim_records_list.append(dim_records)
+            dim_names.append(name)
+
+        dim_records_combo = set(itertools.product(*dim_records_list))
+        data_records_combo = get_unique_values(load_data_lookup, dim_names)
+        if dim_records_combo != data_records_combo:
+            missing = dim_records_combo.difference(data_records_combo)
+            logger.error(
+                "load_data_lookup is missing %s dimension combination(s): \n%s",
+                len(missing),
+                missing,
+            )
+            raise DSGInvalidDataset(
+                f"load_data_lookup records do not match dimension records for dimension combinations = {dim_names}"
+            )
 
     def _check_dataset_internal_consistency(
         self, config: DatasetConfig, load_data_df, load_data_lookup

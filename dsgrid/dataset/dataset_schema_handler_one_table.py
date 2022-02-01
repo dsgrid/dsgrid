@@ -1,5 +1,6 @@
 from pathlib import Path
 import logging
+import itertools
 
 from dsgrid.config.dataset_config import (
     DatasetConfig,
@@ -23,7 +24,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def check_consistency(self):
         path = Path(self._config.model.path)
-        load_data_df = read_dataframe(check_load_data_filename(path), cache=True)
+        load_data_df = read_dataframe(check_load_data_filename(path))
         load_data_df = self._config.add_trivial_dimensions(load_data_df)
         with Timer(timer_stats_collector, "check_one_table_data_consistency"):
             self._check_one_table_data_consistency(self._config, load_data_df)
@@ -31,8 +32,11 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
             self._check_dataset_time_consistency(self._config, load_data_df)
 
-    def _check_one_table_data_consistency(self, config: DatasetConfig, load_data):
-        """ Dimension check in load_data, excludes time. """
+    def _check_one_table_data_consistency(self, config: DatasetConfig, load_data_df):
+        """Dimension check in load_data, excludes time:
+        * check that data matches record for each dimension.
+        * check that all data dimension combinations exist. Time is handled separately.
+        """
         dimension_types = set()
         pivot_cols = set()
 
@@ -41,7 +45,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         pivot_dim = config.model.data_schema.load_data_column_dimension
         expected_pivot_columns = self.get_pivot_dimension_columns()
         pivot_dim_found = False
-        for col in load_data.columns:
+        for col in load_data_df.columns:
             if col in time_columns:
                 continue
             elif col in expected_pivot_columns:
@@ -61,6 +65,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 "If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
 
+        dim_records_list = []
+        dim_names = []
         for dimension_type in dimension_types:
             name = dimension_type.value
             dimension = config.get_dimension(dimension_type)
@@ -68,7 +74,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if dimension_type == pivot_dim:
                 data_records = set(pivot_cols)
             else:
-                data_records = get_unique_values(load_data, name)
+                data_records = get_unique_values(load_data_df, name)
+                dim_records_list.append(dim_records)
+                dim_names.append(name)
             if dim_records != data_records:
                 logger.error(
                     "Mismatch in load_data records. dimension=%s mismatched=%s",
@@ -78,3 +86,15 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 raise DSGInvalidDataset(
                     f"load_data records do not match dimension records for {name}"
                 )
+        dim_records_combo = set(itertools.product(*dim_records_list))
+        data_records_combo = get_unique_values(load_data_df, dim_names)
+        if dim_records_combo != data_records_combo:
+            missing = dim_records_combo.difference(data_records_combo)
+            logger.error(
+                "load_data is missing %s dimension combination(s): \n%s",
+                len(missing),
+                missing,
+            )
+            raise DSGInvalidDataset(
+                f"load_data records do not match dimension records for dimension combinations = {dim_names}"
+            )

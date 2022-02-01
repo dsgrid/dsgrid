@@ -108,24 +108,41 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
         _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
         print("2. with unexpected col: ")
-        _duplicate_col_in_data_file(data_dir, col_name=None, export_index=True)
+        _modify_data_file(data_dir, export_index=True)
         with pytest.raises(
             DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
         ):
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
         print("3. with a duplicated dimension: ")
-        _duplicate_col_in_data_file(data_dir, col_name="subsector", export_index=False)
+        _modify_data_file(data_dir, duplicate_col="subsector")
         with pytest.raises((ValueError, DSGInvalidDimension)):
             # (ValueError,  match=r"*is not a valid DimensionType"),
             # (DSGInvalidDimension,  match=r"column.*is not expected or of a known dimension type")
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
         print("4. with a duplicated pivot col: ")
-        _duplicate_col_in_data_file(data_dir, col_name="elec_heating", export_index=False)
+        _modify_data_file(data_dir, duplicate_col="elec_heating")
         with pytest.raises(
             DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
         ):
+            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+        print("5. missing (non-time) dimension combo: ")
+        _modify_data_file(data_dir, remove_geography_subsector=("pacific", "warehouse"))
+        with pytest.raises(
+            DSGInvalidDataset,
+            match=r"load_data records do not match dimension records for dimension combinations",
+        ):
+            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+        print("6. missing time/dimension combo: ")
+        _modify_data_file(data_dir, drop_first_row=True)
+        if "Growth_Factors" in dataset:
+            msg = r"load_data records do not match dimension records for dimension combinations"
+        else:
+            msg = r"One or more arrays do not have.*timestamps"
+        with pytest.raises(DSGInvalidDataset, match=msg):
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
 
@@ -142,12 +159,31 @@ def _test_dataset_registration(make_test_project_dir, data_dir, dataset):
         )
 
 
-def _duplicate_col_in_data_file(data_dir, col_name=None, export_index=False):
+def _modify_data_file(
+    data_dir,
+    duplicate_col=None,
+    drop_first_row=False,
+    remove_geography_subsector=None,
+    export_index=False,
+):
     df_data = pd.read_csv(data_dir / "load_data_original.csv")
 
-    if col_name is not None:
-        df_data[f"{col_name}_dup"] = df_data[col_name]
-        df_data = df_data.rename(columns={f"{col_name}_dup": col_name})
+    if duplicate_col is not None:
+        df_data[f"{duplicate_col}_dup"] = df_data[duplicate_col]
+        df_data = df_data.rename(columns={f"{duplicate_col}_dup": duplicate_col})
+    if remove_geography_subsector is not None:
+        if type(remove_geography_subsector) != tuple:
+            raise ValueError(
+                "remove_geography_subsector=%s needs to be a tuple", remove_geography_subsector
+            )
+        else:
+            (geography, subsector) = remove_geography_subsector
+            to_drop = df_data[
+                (df_data["geography"] == geography) & (df_data["subsector"] == subsector)
+            ].index
+            df_data = df_data.drop(to_drop).reset_index(drop=True)
+    if drop_first_row:
+        df_data = df_data.iloc[1:]
     if export_index:
         df_data.reset_index(inplace=True)
     print(df_data)

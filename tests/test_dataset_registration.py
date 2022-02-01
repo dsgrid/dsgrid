@@ -46,6 +46,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
             _setup_invalid_load_data_id_extra_timestamp,
             _setup_invalid_load_data_lookup_mismatched_ids,
             _setup_invalid_load_data_extra_column,
+            _setup_invalid_load_data_lookup_missing_dimension_combo,
         )
         # This is arranged in this way to avoid having to re-create the registry every time,
         # which is quite slow. There is one downside: if one test is able to register the
@@ -54,6 +55,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
             try:
                 # Create a new directory because there are collisions with cached
                 # Spark load_data_lookup dataframes.
+                print(f"> test {i}...")
                 test_dir = base_dir / f"test_data_dir_{i}"
                 replace_dataset_path(dataset_config_file, dataset_path=test_dir)
                 shutil.copytree(make_test_data_dir, test_dir)
@@ -77,7 +79,8 @@ def _setup_invalid_load_data_lookup_no_id(data_dir):
     lookup_file = data_dir / "test_efs_comstock" / "load_data_lookup.json"
     data = load_line_delimited_json(lookup_file)
     for item in data:
-        item.pop("id")
+        if "id" in item:
+            item.pop("id")
     dump_line_delimited_json(data, lookup_file)
     return DSGInvalidDataset, r"load_data_lookup does not include an .id. column"
 
@@ -166,3 +169,13 @@ def _setup_invalid_load_data_extra_column(data_dir):
             f_out.write(",0\n")
 
     return DSGInvalidDataset, r"column.*is not expected in load_data"
+
+
+def _setup_invalid_load_data_lookup_missing_dimension_combo(data_dir):
+    lookup_file = data_dir / "test_efs_comstock" / "load_data_lookup.json"
+    data = load_line_delimited_json(lookup_file)
+    dump_line_delimited_json(data[:-1], lookup_file)
+    return (
+        DSGInvalidDataset,
+        r"load_data_lookup records do not match dimension records for dimension combinations",
+    )

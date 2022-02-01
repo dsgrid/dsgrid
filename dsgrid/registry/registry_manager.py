@@ -461,10 +461,6 @@ class RegistryManager:
             return
         for project in self.project_manager.iter_configs():
             updated = False
-            for mapping_ref in project.model.dimension_mappings.base_to_base:
-                if mapping_ref.mapping_id in updated_mappings:
-                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
-                    updated = True
             for mapping_ref in project.model.dimension_mappings.base_to_supplemental:
                 if mapping_ref.mapping_id in updated_mappings:
                     mapping_ref.version = updated_mappings[mapping_ref.mapping_id]

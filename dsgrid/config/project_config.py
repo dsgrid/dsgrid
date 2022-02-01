@@ -166,20 +166,6 @@ class InputDatasetModel(DSGBaseModel):
 class DimensionMappingsModel(DSGBaseModel):
     """Defines all dimension mappings associated with a dsgrid project, including base-to-base, base-to-supplemental, and dataset-to-project mappings."""
 
-    base_to_base: List[DimensionMappingReferenceModel] = Field(
-        title="base_to_base",
-        description="Base dimension to base dimension mappings (e.g., sector to subsector) that "
-        "define the project dimension expectations for input datasets and allowable queries.",
-        default=[],
-        # TODO: DSGRID-186
-        # notes=(
-        #     "At the project-level, base-to-base mappings are optional. If no base-to-base"
-        #     " dimension mapping is provided, dsgrid assumes a full-join of all base dimension"
-        #     " records. For example, if a full-join is assumed for the sector dimension, then all"
-        #     " sectors will map to all subsectors, they will also map to all geographies, all"
-        #     " model years, and so forth.",
-        # ),
-    )
     base_to_supplemental: List[DimensionMappingReferenceModel] = Field(
         title="base_to_supplemental",
         description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
@@ -200,6 +186,12 @@ class DimensionMappingsModel(DSGBaseModel):
         ),
         # TODO: need to document missing dimension records, fill values, etc. DSGRID-191.
     )
+
+    @root_validator(pre=True)
+    def pre_process(cls, values):
+        # Some projects were registered with this field. Keep backwards compatibility.
+        values.pop("base_to_base", None)
+        return values
 
 
 class ProjectConfigModel(DSGBaseModel):
@@ -269,7 +261,6 @@ class ProjectConfig(ConfigWithDataFilesBase):
         self._base_dimensions = {}
         self._supplemental_dimensions = {}
         self._dimension_mapping_mgr = None
-        self._base_to_base_mappings = {}
         self._base_to_supplemental_mappings = {}
         self._dimension_associations = None
 
@@ -342,31 +333,6 @@ class ProjectConfig(ConfigWithDataFilesBase):
         """
         return [v for k, v in self.supplemental_dimensions.items() if k.type == dimension]
 
-    def get_base_to_base_dimension_mapping_by_types(
-        self, from_dimension: DimensionType, to_dimension: DimensionType
-    ):
-        """Return the base-to-base dimension mapping matching the dimension types.
-
-        Parameters
-        ----------
-        from_dimension : DimensionType
-        to_dimension : DimensionType
-
-        Returns
-        -------
-        DimensionMappingConfig
-
-        """
-        for config in self._base_to_base_mappings.values():
-            if (
-                config.model.from_dimension.dimension_type == from_dimension
-                and config.model.to_dimension.dimension_type == to_dimension
-            ):
-                return config
-        raise DSGInvalidDimensionMapping(
-            f"mappings are not stored: from={from_dimension} to={to_dimension}"
-        )
-
     def get_base_to_supplemental_dimension_mappings_by_types(self, dimension: DimensionType):
         """Return the base-to-supplemental dimension mappings for the dimension (if any).
 
@@ -385,10 +351,6 @@ class ProjectConfig(ConfigWithDataFilesBase):
             for x in self._base_to_supplemental_mappings.values()
             if x.model.from_dimension.dimension_type == dimension
         ]
-
-    def has_base_to_base_dimension_mapping_types(self, from_dimension, to_dimension):
-        """Return True if the config has these base-to-base mappings."""
-        return self._has_mapping(from_dimension, to_dimension, self._base_to_base_mappings)
 
     def has_base_to_supplemental_dimension_mapping_types(self, dimension):
         """Return True if the config has these base-to-supplemental mappings."""
@@ -440,14 +402,10 @@ class ProjectConfig(ConfigWithDataFilesBase):
         dimension_mapping_manager: DimensionMappingRegistryManager
 
         """
-        base_to_base = dimension_mapping_manager.load_dimension_mappings(
-            self.model.dimension_mappings.base_to_base
-        )
         base_to_supp = dimension_mapping_manager.load_dimension_mappings(
             self.model.dimension_mappings.base_to_supplemental
         )
 
-        self._base_to_base_mappings.update(base_to_base)
         self._base_to_supplemental_mappings.update(base_to_supp)
         # TODO: Once we start using these we may need to store by (from, to) as key instead.
 

@@ -28,19 +28,6 @@ def test_project_load():
     assert dim.model.dimension_type == DimensionType.GEOGRAPHY
     supp_dims = config.get_supplemental_dimensions(DimensionType.GEOGRAPHY)
     assert len(supp_dims) == 3
-    assert config.has_base_to_base_dimension_mapping_types(
-        DimensionType.SECTOR, DimensionType.SUBSECTOR
-    )
-    assert config.has_base_to_base_dimension_mapping_types(
-        DimensionType.SECTOR, DimensionType.SUBSECTOR
-    )
-    mapping = config.get_base_to_base_dimension_mapping_by_types(
-        DimensionType.SECTOR, DimensionType.SUBSECTOR
-    )
-    assert isinstance(mapping, AssociationTableConfig)
-    assert not config.has_base_to_base_dimension_mapping_types(
-        DimensionType.SECTOR, DimensionType.GEOGRAPHY
-    )
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.GEOGRAPHY)
     mappings = config.get_base_to_supplemental_dimension_mappings_by_types(DimensionType.GEOGRAPHY)
     assert len(mappings) == 3

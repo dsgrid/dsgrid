@@ -30,7 +30,7 @@ def test_dimension_associations_three_dims(spark_session):
         new_file = dst / "sector__subsector__model_year.csv"
         lines = old_file.read_text().splitlines()
         lines[0] += ",model_year"
-        for i, line in enumerate(lines[1:]):
+        for i, _ in enumerate(lines[1:]):
             lines[i + 1] += ",2012"
         new_file.write_text("\n".join(lines))
         old_file.unlink()

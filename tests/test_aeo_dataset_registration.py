@@ -79,7 +79,7 @@ def make_registry_for_aeo(
     replace_dimension_uuids_from_registry(path, (dataset_config_file,))
 
     manager.dataset_manager.register(dataset_config_file, user, log_message)
-    print(f"dataset={dataset_name} registered successfully!\n")
+    logger.info(f"dataset={dataset_name} registered successfully!\n")
     return manager
 
 
@@ -94,41 +94,41 @@ def replace_dataset_path(dataset_config_file, dataset_path):
 ### set up tests for AEO data ###
 def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
     if "test_aeo_data" not in os.listdir(make_test_data_dir):
-        print("test_invalid_datasets requires the dsgrid-test-data repository")
+        logger.info("test_invalid_datasets requires the dsgrid-test-data repository")
         sys.exit(1)
 
     datasets = os.listdir(make_test_data_dir / "test_aeo_data")
     for i, dataset in enumerate(datasets, 1):
-        print(f">> Registering: {i}. {dataset}...")
+        logger.info(f">> Registering: {i}. {dataset}...")
         data_dir = make_test_data_dir / "test_aeo_data" / dataset
 
         shutil.copyfile(data_dir / "load_data.csv", data_dir / "load_data_original.csv")
 
-        print("1. normal registration: ")
+        logger.info("1. normal registration: ")
         _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
-        print("2. with unexpected col: ")
+        logger.info("2. with unexpected col: ")
         _modify_data_file(data_dir, export_index=True)
         with pytest.raises(
             DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
         ):
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
-        print("3. with a duplicated dimension: ")
+        logger.info("3. with a duplicated dimension: ")
         _modify_data_file(data_dir, duplicate_col="subsector")
         with pytest.raises((ValueError, DSGInvalidDimension)):
             # (ValueError,  match=r"*is not a valid DimensionType"),
             # (DSGInvalidDimension,  match=r"column.*is not expected or of a known dimension type")
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
-        print("4. with a duplicated pivot col: ")
+        logger.info("4. with a duplicated pivot col: ")
         _modify_data_file(data_dir, duplicate_col="elec_heating")
         with pytest.raises(
             DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
         ):
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
-        print("5. missing (non-time) dimension combo: ")
+        logger.info("5. missing (non-time) dimension combo: ")
         _modify_data_file(data_dir, remove_geography_subsector=("pacific", "warehouse"))
         with pytest.raises(
             DSGInvalidDataset,
@@ -136,7 +136,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
         ):
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
-        print("6. missing time/dimension combo: ")
+        logger.info("6. missing time/dimension combo: ")
         _modify_data_file(data_dir, drop_first_row=True)
         if "Growth_Factors" in dataset:
             msg = r"load_data records do not match dimension records for dimension combinations"
@@ -149,7 +149,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
 def _test_dataset_registration(make_test_project_dir, data_dir, dataset):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
-        print(f"temp_registry created: {base_dir}")
+        logger.info(f"temp_registry created: {base_dir}")
         manager = make_registry_for_aeo(
             base_dir,
             make_test_project_dir,
@@ -186,5 +186,5 @@ def _modify_data_file(
         df_data = df_data.iloc[1:]
     if export_index:
         df_data.reset_index(inplace=True)
-    print(df_data)
+    logger.info(df_data)
     df_data.to_csv(data_dir / "load_data.csv", index=False)

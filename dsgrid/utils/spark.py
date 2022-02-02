@@ -143,7 +143,7 @@ def get_unique_values(df, columns: [str, list]):
 
     """
     dfc = df.select(columns).distinct().collect()
-    if type(columns) == list:
+    if isinstance(columns, list):
         values = set()
         for row in dfc:
             values.add(tuple(getattr(row, col) for col in columns))

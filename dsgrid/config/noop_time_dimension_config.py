@@ -6,7 +6,7 @@ from .time_dimension_base_config import TimeDimensionBaseConfig
 
 
 class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
-    """Provides an interface to an TrivialTimeDimensionModel."""
+    """Provides an interface to an NoOpTimeDimensionModel."""
 
     @staticmethod
     def model_class():
@@ -32,7 +32,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
             )
         ]
 
-        return ranges  # [[]]
+        return ranges
 
     def get_timestamp_load_data_columns(self):
         return []

@@ -10,7 +10,7 @@ class SparkPartition:
     def __init__(self):
         return
 
-    def get_data_size(self, df, bytes_per_cell=64):
+    def get_data_size(self, df, bytes_per_cell=8):
         """ approximate dataset size """
         n_rows = df.count()
         n_cols = len(df.columns)
@@ -18,13 +18,29 @@ class SparkPartition:
         return n_rows, n_cols, data_MB
 
     @timed_info
-    def get_optimal_number_of_files(self, df, MB_per_file=128):
-        """ calculate *optimal* number of files """
+    def get_optimal_number_of_files(self, df, MB_per_cmp_file=128, cmp_ratio=0.18):
+        """calculate *optimal* number of files
+        Parameters
+        ----------
+        df : DataFrame
+        MB_per_cmp_file : float
+            Size of compressed file in MB
+        cmp_ratio : float
+            Ratio of file size after and before compression
+
+        Returns
+        -------
+        n_files : int
+            Number of files
+        """
         _, _, data_MB = self.get_data_size(df)
+        MB_per_file = MB_per_cmp_file / cmp_ratio
         n_files = math.ceil(data_MB / MB_per_file)
 
         logger.info(
-            f"load_data_lookup is approximately {data_MB:.02f} MB in size, ideal to split into {n_files} file(s) at {MB_per_file} MB each."
+            f"load_data_lookup is approximately {data_MB:.02f} MB in size, "
+            f"ideal to split into {n_files} file(s) at {MB_per_file:.1f} MB compressed. "
+            f"({MB_per_file:.1f} MB uncompressed, {cmp_ratio} compression ratio)."
         )
         return n_files
 

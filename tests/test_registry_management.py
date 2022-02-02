@@ -217,7 +217,7 @@ def test_invalid_dimension_mapping(make_test_project_dir):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Valid
-        record_file.write_text(orig_text)
+        record_file.write_text(orig_text.replace("CO", ""))
         dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
 

@@ -19,6 +19,12 @@ class DimensionAssociations:
         # The keys are sorted by DimensionType so that the caller's order doesn't matter.
         self._associations = associations
 
+    def __bool__(self):
+        return bool(self._associations)
+
+    def __len__(self):
+        return len(self._associations)
+
     @classmethod
     def load(cls, path: Path, association_files):
         """Load dimension associations from a path.
@@ -152,3 +158,8 @@ class DimensionAssociations:
 
         """
         return self.get_associations(*dimensions) is not None
+
+    def iter_associations(self):
+        """Yields the stored dimension types with their association tables as a tuple."""
+        for dimensions, table in self._associations.items():
+            yield dimensions, table

@@ -1,5 +1,6 @@
 """Manages the registry for dimension projects"""
 
+from dsgrid.config.dimension_associations import DimensionAssociations
 import getpass
 import io
 import itertools
@@ -8,7 +9,12 @@ from contextlib import redirect_stdout
 from typing import List
 
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset, DSGValueNotRegistered, DSGDuplicateValueRegistered
+from dsgrid.exceptions import (
+    DSGInvalidDataset,
+    DSGInvalidDimensionAssociation,
+    DSGValueNotRegistered,
+    DSGDuplicateValueRegistered,
+)
 from dsgrid import timer_stats_collector
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
@@ -122,6 +128,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     def _register(self, config, submitter, log_message, force=False):
         self._check_if_already_registered(config.model.project_id)
+        self._run_checks(config)
 
         registration = make_initial_config_registration(submitter, log_message)
 
@@ -161,6 +168,25 @@ class ProjectRegistryManager(RegistryManagerBase):
             config.model.project_id,
             registration.version,
         )
+
+    def _run_checks(self, config: ProjectConfig):
+        self._check_dimension_associations(config)
+
+    def _check_dimension_associations(self, config: ProjectConfig):
+        if not config.dimension_associations:
+            return
+
+        for dimension_types, table in config.dimension_associations.iter_associations():
+            for dimension_type in dimension_types:
+                dim = config.get_base_dimension(dimension_type)
+                record_ids = dim.get_unique_ids()
+                col = dimension_type.value
+                assoc_ids = {getattr(x, col) for x in table.select(col).distinct().collect()}
+                diff = assoc_ids.difference(record_ids)
+                if diff:
+                    raise DSGInvalidDimensionAssociation(
+                        f"Dimension association for {col} has invalid records: {diff}"
+                    )
 
     def submit_dataset(
         self, project_id, dataset_id, dimension_mapping_files, submitter, log_message
@@ -340,6 +366,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
+        self._run_checks(config)
         registry = self.get_registry_config(config.config_id)
         old_key = ConfigKey(config.config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)

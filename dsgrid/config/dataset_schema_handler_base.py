@@ -45,8 +45,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def make_dimension_table(self, mapping_references):
-        """Return a dataframe containing all dimensions that have been remapped to the project.
+    def get_unique_dimension_rows(self, mapping_references):
+        """Return a dataframe containing unique dimension combinations that exist in the rows of
+        the data table.
 
         Parameters
         ----------

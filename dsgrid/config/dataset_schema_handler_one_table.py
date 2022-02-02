@@ -84,7 +84,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     f"load_data records do not match dimension records for {name}"
                 )
 
-    def make_dimension_table(self, mapping_references):
+    def get_unique_dimension_rows(self, mapping_references):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_cols = set(time_dim.get_timestamp_load_data_columns())
         pivoted_cols = set(self.get_pivot_dimension_columns())

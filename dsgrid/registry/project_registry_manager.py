@@ -292,15 +292,12 @@ class ProjectRegistryManager(RegistryManagerBase):
         )
         pivot_dimension = handler.get_pivot_dimension_type()
         exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension])
-        dimension_pairs = set()
         types = [x for x in DimensionType if x not in exclude_dims]
-        for type1, type2 in itertools.product(types, types):
-            if type1 != type2:
-                dimension_pairs.add(tuple(sorted((type1, type2))))
+        dimension_pairs = [tuple(sorted((x, y))) for x, y in itertools.combinations(types, 2)]
 
         data_source = dataset_config.model.data_source
         associations = project_config.dimension_associations
-        dim_table = handler.make_dimension_table(mapping_references)
+        dim_table = handler.get_unique_dimension_rows(mapping_references)
         for type1, type2 in dimension_pairs:
             records = associations.get_associations_by_data_source(data_source, type1, type2)
             if records is None:

@@ -1,5 +1,6 @@
 import copy
 import getpass
+import logging
 import os
 import shutil
 import sys
@@ -15,10 +16,12 @@ from dsgrid.tests.common import make_test_project_dir, make_test_data_dir, TEST_
 from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json
 from dsgrid.tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
 
+logger = logging.getLogger()
+
 
 def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
     if "test_efs_comstock" not in os.listdir(make_test_data_dir):
-        print("test_invalid_datasets requires the dsgrid-test-data repository")
+        logger.info("test_invalid_datasets requires the dsgrid-test-data repository")
         sys.exit(1)
 
     with TemporaryDirectory() as tmpdir:
@@ -54,7 +57,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
             try:
                 # Create a new directory because there are collisions with cached
                 # Spark load_data_lookup dataframes.
-                print(f"> test {i}...")
+                logger.info(f"> test {i}...")
                 test_dir = base_dir / f"test_data_dir_{i}"
                 replace_dataset_path(dataset_config_file, dataset_path=test_dir)
                 shutil.copytree(make_test_data_dir, test_dir)

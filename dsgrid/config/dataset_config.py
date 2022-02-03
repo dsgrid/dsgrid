@@ -189,7 +189,7 @@ class OneTableDataSchemaModel(DSGBaseModel):
 
 
 class DatasetQualifierType(DSGEnum):
-    INDEPENDENT = "independent"
+    QUANTITY = "quantity"
     GROWTH_RATE = "growth_rate"
 
 
@@ -228,11 +228,11 @@ class DatasetConfigModel(DSGBaseModel):
     # TODO: This must also be validated against the project_config
     dataset_qualifier: DatasetQualifierType = Field(
         title="dataset_qualifier",
-        description="What type of values the dataset represents (e.g., growth_rate)",
+        description="What type of values the dataset represents (e.g., growth_rate, quantity)",
         options=DatasetQualifierType.format_for_docs(),
-        default="independent",
+        default="quantity",
     )
-    dataset_qualifier_metadata: Optional[Any] = Field(
+    dataset_qualifier_metadata: Optional[GrowthRateModel] = Field(
         title="dataset_qualifier_metadata",
         description="Additional metadata to include related to the dataset_qualifier",
     )
@@ -337,8 +337,8 @@ class DatasetConfigModel(DSGBaseModel):
 
     @validator("dataset_qualifier_metadata", pre=True)
     def check_dataset_qualifier_metadata(cls, metadata, values):
-        if values["dataset_qualifier"] == DatasetQualifierType.INDEPENDENT:
-            pass
+        if values["dataset_qualifier"] == DatasetQualifierType.QUANTITY:
+            metadata = None
         elif values["dataset_qualifier"] == DatasetQualifierType.GROWTH_RATE:
             metadata = GrowthRateModel(**metadata)
         else:

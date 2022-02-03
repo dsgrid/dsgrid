@@ -92,7 +92,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return sorted(list(self._config.get_dimension(dim_type).get_unique_ids()))
 
     def get_pivot_dimension_columns_mapped_to_project(self, mapping_references):
-        """Get cols for the dimension that is pivoted in load_data.
+        """Get columns for the dimension that is pivoted in load_data and remap them to the
+        project's record names.
 
         Returns
         -------

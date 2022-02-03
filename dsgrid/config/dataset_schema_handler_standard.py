@@ -41,9 +41,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
             self._check_dataset_internal_consistency()
 
-    def get_unique_dimension_rows(self, mapping_references):
+    def get_unique_dimension_rows(self, mapping_refs):
         path = Path(self._config.model.path)
-        return self._remap_dimension_columns(self._load_data_lookup, mapping_references)
+        return self._remap_dimension_columns(self._load_data_lookup, mapping_refs).distinct()
 
     def _check_lookup_data_consistency(self):
         found_id = False

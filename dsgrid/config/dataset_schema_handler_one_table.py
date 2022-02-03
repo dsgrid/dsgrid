@@ -91,4 +91,4 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         exclude = time_cols.union(pivoted_cols)
         dim_cols = [x for x in self._load_data.columns if x not in exclude]
         df = self._load_data.select(*dim_cols).distinct()
-        return self._remap_dimension_columns(df, mapping_references)
+        return self._remap_dimension_columns(df, mapping_references).distinct()

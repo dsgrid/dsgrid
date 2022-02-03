@@ -11,7 +11,25 @@ class SparkPartition:
         return
 
     def get_data_size(self, df, bytes_per_cell=8):
-        """ approximate dataset size """
+        """approximate dataset size
+        Parameters
+        ----------
+        df : DataFrame
+        bytes_per_cell : [float, int]
+            Estimated number of bytes per cell in a dataframe.
+            * 4-bytes = 32-bit = Single-precision Float = pyspark.sql.types.FloatType,
+            * 8-bytes = 64-bit = Double-precision float = pyspark.sql.types.DoubleType,
+
+        Returns
+        -------
+        n_rows : int
+            Number of rows in df
+        n_cols : int
+            Number of columns in df
+        data_MB : float
+            Estimated size of df in memory in MB
+
+        """
         n_rows = df.count()
         n_cols = len(df.columns)
         data_MB = n_rows * n_cols * bytes_per_cell / 1e6  # MB
@@ -24,7 +42,7 @@ class SparkPartition:
         ----------
         df : DataFrame
         MB_per_cmp_file : float
-            Size of compressed file in MB
+            Desired size of compressed file on disk in MB
         cmp_ratio : float
             Ratio of file size after and before compression
 
@@ -38,9 +56,9 @@ class SparkPartition:
         n_files = math.ceil(data_MB / MB_per_file)
 
         logger.info(
-            f"load_data_lookup is approximately {data_MB:.02f} MB in size, "
-            f"ideal to split into {n_files} file(s) at {MB_per_file:.1f} MB compressed. "
-            f"({MB_per_file:.1f} MB uncompressed, {cmp_ratio} compression ratio)."
+            f"Dataframe is approximately {data_MB:.02f} MB in size, "
+            f"ideal to split into {n_files} file(s) at {MB_per_file:.1f} MB compressed on disk. "
+            f"({MB_per_file:.1f} MB uncompressed in memory, {cmp_ratio} compression ratio)."
         )
         return n_files
 

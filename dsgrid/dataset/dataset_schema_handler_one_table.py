@@ -65,8 +65,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 "If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
 
-        dim_records_list = []
-        dim_names = []
         for dimension_type in dimension_types:
             name = dimension_type.value
             dimension = config.get_dimension(dimension_type)
@@ -75,8 +73,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 data_records = set(pivot_cols)
             else:
                 data_records = get_unique_values(load_data_df, name)
-                dim_records_list.append(dim_records)
-                dim_names.append(name)
             if dim_records != data_records:
                 logger.error(
                     "Mismatch in load_data records. dimension=%s mismatched=%s",
@@ -86,15 +82,3 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 raise DSGInvalidDataset(
                     f"load_data records do not match dimension records for {name}"
                 )
-        dim_records_combo = set(itertools.product(*dim_records_list))
-        data_records_combo = get_unique_values(load_data_df, dim_names)
-        if dim_records_combo != data_records_combo:
-            missing = dim_records_combo.difference(data_records_combo)
-            logger.error(
-                "load_data is missing %s dimension combination(s): \n%s",
-                len(missing),
-                missing,
-            )
-            raise DSGInvalidDataset(
-                f"load_data records do not match dimension records for dimension combinations = {dim_names}"
-            )

@@ -61,12 +61,7 @@ def make_registry_for_aeo(
     if dataset_path is None:
         dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
     path = create_local_test_registry(registry_path)
-
-    if "Growth_Factors" in dataset_name:
-        dataset_type = "growth_rate"
-    else:
-        dataset_type = "benchmark"
-    dataset_dir = Path(f"datasets/{dataset_type}/{dataset_name}")
+    dataset_dir = Path(f"datasets/benchmark/{dataset_name}")
     user = getpass.getuser()
     log_message = "Initial registration"
     manager = RegistryManager.load(path, offline_mode=True)
@@ -128,22 +123,13 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
         ):
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
-        logger.info("5. missing (non-time) dimension combo: ")
-        _modify_data_file(data_dir, remove_geography_subsector=("pacific", "warehouse"))
-        with pytest.raises(
-            DSGInvalidDataset,
-            match=r"load_data records do not match dimension records for dimension combinations",
-        ):
-            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
-
-        logger.info("6. missing time/dimension combo: ")
-        _modify_data_file(data_dir, drop_first_row=True)
-        if "Growth_Factors" in dataset:
-            msg = r"load_data records do not match dimension records for dimension combinations"
-        else:
-            msg = r"One or more arrays do not have.*timestamps"
-        with pytest.raises(DSGInvalidDataset, match=msg):
-            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+        logger.info("5. End Uses dataset only - missing time ")
+        if "End_Uses" in dataset:
+            _modify_data_file(data_dir, drop_first_row=True)
+            with pytest.raises(
+                DSGInvalidDataset, match=r"One or more arrays do not have.*timestamps"
+            ):
+                _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
 
 def _test_dataset_registration(make_test_project_dir, data_dir, dataset):
@@ -172,16 +158,11 @@ def _modify_data_file(
         df_data[f"{duplicate_col}_dup"] = df_data[duplicate_col]
         df_data = df_data.rename(columns={f"{duplicate_col}_dup": duplicate_col})
     if remove_geography_subsector is not None:
-        if type(remove_geography_subsector) != tuple:
-            raise ValueError(
-                "remove_geography_subsector=%s needs to be a tuple", remove_geography_subsector
-            )
-        else:
-            (geography, subsector) = remove_geography_subsector
-            to_drop = df_data[
-                (df_data["geography"] == geography) & (df_data["subsector"] == subsector)
-            ].index
-            df_data = df_data.drop(to_drop).reset_index(drop=True)
+        (geography, subsector) = remove_geography_subsector
+        to_drop = df_data[
+            (df_data["geography"] == geography) & (df_data["subsector"] == subsector)
+        ].index
+        df_data = df_data.drop(to_drop).reset_index(drop=True)
     if drop_first_row:
         df_data = df_data.iloc[1:]
     if export_index:

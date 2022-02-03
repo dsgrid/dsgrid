@@ -84,7 +84,6 @@ class InputDatasetType(DSGEnum):
     SECTOR_MODEL = "sector_model"
     HISTORICAL = "historical"
     BENCHMARK = "benchmark"
-    GROWTH_RATE = "growth_rate"
 
 
 class DataSchemaType(DSGEnum):
@@ -189,6 +188,11 @@ class OneTableDataSchemaModel(DSGBaseModel):
     )
 
 
+class DatasetQualifierType(DSGEnum):
+    INDEPENDENT = "independent"
+    GROWTH_RATE = "growth_rate"
+
+
 class GrowthRateType(DSGEnum):
     EXPONENTIAL_ANNUAL = "exponential_annual"
     EXPONENTIAL_MONTHLY = "exponential_monthly"
@@ -222,9 +226,15 @@ class DatasetConfigModel(DSGBaseModel):
     )
     # TODO: This must be validated against the project's dimension records for data_source
     # TODO: This must also be validated against the project_config
-    dataset_type_metadata: Optional[Any] = Field(
-        title="dataset_type_metadata",
-        description="Additional metadata to include related to dataset_type",
+    dataset_qualifier: DatasetQualifierType = Field(
+        title="dataset_qualifier",
+        description="What type of values the dataset represents (e.g., growth_rate)",
+        options=DatasetQualifierType.format_for_docs(),
+        default="independent",
+    )
+    dataset_qualifier_metadata: Optional[Any] = Field(
+        title="dataset_qualifier_metadata",
+        description="Additional metadata to include related to the dataset_qualifier",
     )
     data_source: str = Field(
         title="data_source",
@@ -325,19 +335,15 @@ class DatasetConfigModel(DSGBaseModel):
         ),
     )
 
-    @validator("dataset_type_metadata", pre=True)
-    def check_dataset_type_metadata(cls, metadata, values):
-        if values["dataset_type"] in {
-            InputDatasetType.SECTOR_MODEL,
-            InputDatasetType.HISTORICAL,
-            InputDatasetType.BENCHMARK,
-        }:
+    @validator("dataset_qualifier_metadata", pre=True)
+    def check_dataset_qualifier_metadata(cls, metadata, values):
+        if values["dataset_qualifier"] == DatasetQualifierType.INDEPENDENT:
             pass
-        elif values["dataset_type"] == InputDatasetType.GROWTH_RATE:
+        elif values["dataset_qualifier"] == DatasetQualifierType.GROWTH_RATE:
             metadata = GrowthRateModel(**metadata)
         else:
             raise ValueError(
-                f'Cannot load dataset_type_metadata model for dataset_type={values["dataset_type"]}'
+                f'Cannot load dataset_qualifier_metadata model for dataset_qualifier={values["dataset_qualifier"]}'
             )
         return metadata
 
@@ -475,20 +481,20 @@ class DatasetConfig(ConfigBase):
                 return dim_config
         assert False, dimension_type
 
-    def add_trivial_dimensions(self, load_data_lookup):
+    def add_trivial_dimensions(self, df):
         """Add trivial 1-element dimensions to load_data_lookup."""
         for dim in self._dimensions.values():
             if dim.model.dimension_type in self.model.trivial_dimensions:
                 self._check_trivial_record_length(dim.model.records)
                 val = dim.model.records[0].id
                 col = dim.model.dimension_type.value
-                load_data_lookup = load_data_lookup.withColumn(col, F.lit(val))
-        return load_data_lookup
+                df = df.withColumn(col, F.lit(val))
+        return df
 
-    def remove_trivial_dimensions(self, load_data_lookup):
+    def remove_trivial_dimensions(self, df):
         trivial_cols = {d.value for d in self.model.trivial_dimensions}
-        select_cols = [col for col in load_data_lookup.columns if col not in trivial_cols]
-        return load_data_lookup[select_cols]
+        select_cols = [col for col in df.columns if col not in trivial_cols]
+        return df[select_cols]
 
     def _check_trivial_record_length(self, records):
         """Check that trivial dimensions have only 1 record."""

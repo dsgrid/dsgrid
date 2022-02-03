@@ -89,7 +89,13 @@ class Project:
                 f"dataset_id={dataset_id} is not registered in the project"
             )
         config = self._dataset_configs[dataset_id]
-        dataset = Dataset.load(config, self._dimension_mgr, self._dimension_mapping_mgr)
+        input_dataset = self._config.get_dataset(dataset_id)
+        dataset = Dataset.load(
+            config,
+            self._dimension_mgr,
+            self._dimension_mapping_mgr,
+            mapping_references=input_dataset.mapping_references,
+        )
         dataset.create_views()
         self._datasets[dataset_id] = dataset
 

@@ -31,7 +31,7 @@ class Dataset:
         return self._id
 
     @classmethod
-    def load(cls, config, dimension_mgr, dimension_mapping_mgr):
+    def load(cls, config, dimension_mgr, dimension_mapping_mgr, mapping_references=None):
         """Load a dataset from a store.
 
         Parameters
@@ -39,13 +39,19 @@ class Dataset:
         config : DatasetConfig
         dimension_mgr : DimensionRegistryManager
         dimension_mapping_mgr : DimensionMappingRegistryManager
+        mapping_references: None | List[DimensionMappingReferenceListModel]
+            This is required when loading a dataset for use in a project.
 
         Returns
         -------
         Dataset
 
         """
-        return cls(make_dataset_schema_handler(config, dimension_mgr, dimension_mapping_mgr))
+        return cls(
+            make_dataset_schema_handler(
+                config, dimension_mgr, dimension_mapping_mgr, mapping_references=mapping_references
+            )
+        )
 
     def _make_view_name(self, name):
         return f"{self._id}__{name}"

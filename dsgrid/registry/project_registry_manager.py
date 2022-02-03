@@ -251,9 +251,6 @@ class ProjectRegistryManager(RegistryManagerBase):
             mapping_references,
         )
 
-        # TODO: possible design problem: Projects need to load mapping references from a file
-        # in order to process datasets after registration.
-
         if self.dry_run_mode:
             logger.info(
                 "%s Dataset submission to project validated dataset_id=%s project_id=%s",
@@ -263,6 +260,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             )
             return
 
+        dataset_model.mapping_references = mapping_references
         dataset_model.status = DatasetRegistryStatus.REGISTERED
         if project_config.are_all_datasets_submitted():
             new_status = ProjectRegistryStatus.COMPLETE

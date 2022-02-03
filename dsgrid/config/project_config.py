@@ -134,6 +134,11 @@ class InputDatasetModel(DSGBaseModel):
         ),
         # TODO: add notes about warnings for outdated versions? DSGRID-189.
     )
+    mapping_references: List[DimensionMappingReferenceModel] = Field(
+        title="mapping_references",
+        description="Defines how to map the dataset dimensions to the project.",
+        default=[],
+    )
     status: DatasetRegistryStatus = Field(
         title="status",
         description="Registration status of the dataset, added by dsgrid.",

@@ -5,6 +5,7 @@ import logging
 import multiprocessing
 import os
 from pathlib import Path
+from typing import AnyStr, List, Union
 
 from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark import SparkConf, SparkContext
@@ -129,7 +130,7 @@ def _post_process_dataframe(df, cache=False, require_unique=None):
                     raise DSGInvalidField(f"DataFrame has duplicate entries for {column}")
 
 
-def get_unique_values(df, columns: [str, list]):
+def get_unique_values(df, columns: Union[AnyStr, List]):
     """Return the unique values of a dataframe in one column or a list of columns.
 
     Parameters

@@ -125,9 +125,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             # is not available here.
             to_dimension = self._dimension_mgr.get_by_id(mapping.to_dimension.dimension_id)
             allowed_to_records = to_dimension.get_unique_ids()
-            for val in (None, ""):
-                if val in actual_to_records:
-                    actual_to_records.remove(val)
+            if None in actual_to_records:
+                actual_to_records.remove(None)
             diff = actual_to_records.difference(allowed_to_records)
             if diff:
                 dim_id = from_dimension.model.dimension_id

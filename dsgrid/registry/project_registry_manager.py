@@ -339,7 +339,13 @@ class ProjectRegistryManager(RegistryManagerBase):
             handler.get_pivot_dimension_columns_mapped_to_project(mapping_refs).values()
         )
         p_dim_ids = project_config.get_base_dimension(dim_type).get_unique_ids()
-        diff = d_dim_ids.difference(p_dim_ids)
+        associations = project_config.dimension_associations
+        table = associations.get_associations(DimensionType.DATA_SOURCE, dim_type)
+        if table is not None:
+            p_dim_ids = {
+                getattr(x, dim_type.value) for x in table.select(dim_type.value).collect()
+            }
+        diff = d_dim_ids.symmetric_difference(p_dim_ids)
         if diff:
             raise DSGInvalidDataset(f"load data pivoted columns have invalid values: {diff}")
 

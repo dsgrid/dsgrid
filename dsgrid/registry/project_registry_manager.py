@@ -251,6 +251,9 @@ class ProjectRegistryManager(RegistryManagerBase):
             mapping_references,
         )
 
+        # TODO: possible design problem: Projects need to load mapping references from a file
+        # in order to process datasets after registration.
+
         if self.dry_run_mode:
             logger.info(
                 "%s Dataset submission to project validated dataset_id=%s project_id=%s",
@@ -288,7 +291,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         """Check that a dataset has all project-required dimension records."""
         handler = make_dataset_schema_handler(
-            dataset_config, self._dimension_mgr, self._dimension_mapping_mgr
+            dataset_config, self._dimension_mgr, self._dimension_mapping_mgr, mapping_references
         )
         pivot_dimension = handler.get_pivot_dimension_type()
         exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension])
@@ -297,7 +300,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         data_source = dataset_config.model.data_source
         associations = project_config.dimension_associations
-        dim_table = handler.get_unique_dimension_rows(mapping_references)
+        dim_table = handler.get_unique_dimension_rows()
         for type1, type2 in dimension_pairs:
             records = associations.get_associations_by_data_source(data_source, type1, type2)
             if records is None:
@@ -320,9 +323,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 raise DSGInvalidDataset(
                     f"Dataset {dataset_id} is missing records for {(type1, type2)}"
                 )
-        self._check_pivot_dimension_columns(
-            project_config, handler, pivot_dimension, mapping_references
-        )
+        self._check_pivot_dimension_columns(project_config, handler, pivot_dimension)
 
     @staticmethod
     def _get_project_dimensions_table(project_config, type1, type2):
@@ -334,14 +335,13 @@ class ProjectRegistryManager(RegistryManagerBase):
         return create_dataframe_from_dimension_ids(records, type1, type2)
 
     @staticmethod
-    def _check_pivot_dimension_columns(project_config, handler, dim_type, mapping_refs):
-        d_dim_ids = set(
-            handler.get_pivot_dimension_columns_mapped_to_project(mapping_refs).values()
-        )
-        p_dim_ids = project_config.get_base_dimension(dim_type).get_unique_ids()
+    def _check_pivot_dimension_columns(project_config, handler, dim_type):
+        d_dim_ids = set(handler.get_pivot_dimension_columns_mapped_to_project().values())
         associations = project_config.dimension_associations
         table = associations.get_associations(DimensionType.DATA_SOURCE, dim_type)
-        if table is not None:
+        if table is None:
+            p_dim_ids = project_config.get_base_dimension(dim_type).get_unique_ids()
+        else:
             p_dim_ids = {
                 getattr(x, dim_type.value) for x in table.select(dim_type.value).collect()
             }

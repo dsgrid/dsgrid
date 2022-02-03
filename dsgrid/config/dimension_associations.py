@@ -48,9 +48,11 @@ class DimensionAssociations:
             records = read_dataframe(filename, cache=True)
             for column in records.columns:
                 tmp = column + "tmp_name"
-                records = records.withColumn(tmp, records[column].cast(StringType())) \
-                    .drop(column) \
+                records = (
+                    records.withColumn(tmp, records[column].cast(StringType()))
+                    .drop(column)
                     .withColumnRenamed(tmp, column)
+                )
             types = tuple(DimensionType(x) for x in sorted(records.columns))
             associations[types] = records
             logger.debug("Loaded dimension associations from %s %s", path, records.columns)

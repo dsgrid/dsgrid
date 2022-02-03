@@ -18,10 +18,11 @@ logger = logging.getLogger(__name__)
 class DatasetSchemaHandlerBase(abc.ABC):
     """ define interface/required behaviors per dataset schema """
 
-    def __init__(self, config, dimension_mgr, dimension_mapping_mgr):
+    def __init__(self, config, dimension_mgr, dimension_mapping_mgr, mapping_references=None):
         self._config = config
         self._dimension_mgr = dimension_mgr
         self._dimension_mapping_mgr = dimension_mapping_mgr
+        self._mapping_references = mapping_references
 
     @classmethod
     @abc.abstractmethod
@@ -45,13 +46,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_unique_dimension_rows(self, mapping_references):
+    def get_unique_dimension_rows(self):
         """Return a dataframe containing unique dimension combinations that exist in the rows of
         the data table.
-
-        Parameters
-        ----------
-        mapping_references : List[DimensionMappingReferenceModel]
 
         Returns
         -------
@@ -91,9 +88,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         dim_type = self._config.model.data_schema.load_data_column_dimension
         return sorted(list(self._config.get_dimension(dim_type).get_unique_ids()))
 
-    def get_pivot_dimension_columns_mapped_to_project(self, mapping_references):
+    def get_pivot_dimension_columns_mapped_to_project(self):
         """Get columns for the dimension that is pivoted in load_data and remap them to the
-        project's record names.
+        project's record names. The returned dict will not include columns that the project does
+        not care about.
 
         Returns
         -------
@@ -103,7 +101,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         columns = set(self.get_pivot_dimension_columns())
         dim_type = self.get_pivot_dimension_type()
-        for ref in mapping_references:
+        for ref in self._mapping_references:
             if ref.from_dimension_type.value == dim_type:
                 mapping_config = self._dimension_mapping_mgr.get_by_id(
                     ref.mapping_id, version=ref.version
@@ -111,10 +109,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 mapping = {
                     x.from_id: x.to_id for x in mapping_config.model.records if x.to_id is not None
                 }
-                diff = columns.symmetric_difference(mapping)
+
+                diff = set(mapping.keys()).difference(columns)
                 if diff:
                     raise DSGInvalidDataset(
-                        f"Dataset pivoted dimension columns are not symmetrical with mapping: {diff}"
+                        f"Dataset pivoted dimension columns do not match mapping: {diff}"
                     )
                 return mapping
 
@@ -219,23 +218,23 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return set(lst)
 
-    def _remap_dimension_columns(self, df, mapping_refs: List[DimensionMappingReferenceModel]):
+    def _remap_dimension_columns(self, df):
         # This will likely become a common activity when running queries.
         # May need to cache the result. But that will likely be in Project, not here.
         # This method could be moved elsewhere.
-        for ref in mapping_refs:
+        for ref in self._mapping_references:
             column = ref.from_dimension_type.value
             if column in df.columns:
                 mapping_config = self._dimension_mapping_mgr.get_by_id(
                     ref.mapping_id, version=ref.version
                 )
-                records = models_to_dataframe(mapping_config.model.records)
-                orig = df.count()
+                records = models_to_dataframe(mapping_config.model.records).filter(
+                    "to_id is not NULL"
+                )
                 df = (
                     df.join(records, df[column] == records.from_id)
                     .drop("from_id")
                     .drop(column)
                     .withColumnRenamed("to_id", column)
                 )
-                assert df.count() == orig, f"count changed from {orig} to {df.count()}: {column}"
         return df

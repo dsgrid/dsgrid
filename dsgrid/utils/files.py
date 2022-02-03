@@ -72,7 +72,6 @@ def load_data(filename, **kwargs):
             data = mod.load(f_in)
         except Exception:
             logger.exception("Failed to load data from %s", filename)
-            breakpoint()
             raise
 
     logger.debug("Loaded data from %s", filename)

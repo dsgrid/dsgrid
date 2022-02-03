@@ -302,7 +302,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
     def dimension_mapping_manager(self, val: DimensionMappingRegistryManager):
         self._dimension_mapping_mgr = val
 
-    def get_base_dimension(self, dimension: DimensionType):
+    def get_base_dimension(self, dimension_type: DimensionType):
         """Return the base dimension matching dimension_type.
 
         Parameters
@@ -315,11 +315,11 @@ class ProjectConfig(ConfigWithDataFilesBase):
 
         """
         for key, dim_config in self.base_dimensions.items():
-            if key.type == dimension:
+            if key.type == dimension_type:
                 return dim_config
-        assert False, dimension
+        assert False, dimension_type
 
-    def get_supplemental_dimensions(self, dimension: DimensionType):
+    def get_supplemental_dimensions(self, dimension_type: DimensionType):
         """Return the supplemental dimensions matching dimension (if any).
 
         Parameters
@@ -331,9 +331,9 @@ class ProjectConfig(ConfigWithDataFilesBase):
         DimensionConfig
 
         """
-        return [v for k, v in self.supplemental_dimensions.items() if k.type == dimension]
+        return [v for k, v in self.supplemental_dimensions.items() if k.type == dimension_type]
 
-    def get_base_to_supplemental_dimension_mappings_by_types(self, dimension: DimensionType):
+    def get_base_to_supplemental_dimension_mappings_by_types(self, dimension_type: DimensionType):
         """Return the base-to-supplemental dimension mappings for the dimension (if any).
 
         Parameters
@@ -349,19 +349,23 @@ class ProjectConfig(ConfigWithDataFilesBase):
         return [
             x
             for x in self._base_to_supplemental_mappings.values()
-            if x.model.from_dimension.dimension_type == dimension
+            if x.model.from_dimension.dimension_type == dimension_type
         ]
 
-    def has_base_to_supplemental_dimension_mapping_types(self, dimension):
+    def has_base_to_supplemental_dimension_mapping_types(self, dimension_type):
         """Return True if the config has these base-to-supplemental mappings."""
-        return self._has_mapping(dimension, dimension, self._base_to_supplemental_mappings)
+        return self._has_mapping(
+            dimension_type,
+            dimension_type,
+            self._base_to_supplemental_mappings,
+        )
 
     @staticmethod
-    def _has_mapping(from_dimension, to_dimension, mapping):
+    def _has_mapping(from_dimension_type, to_dimension_type, mapping):
         for config in mapping.values():
             if (
-                config.model.from_dimension.dimension_type == from_dimension
-                and config.model.to_dimension.dimension_type == to_dimension
+                config.model.from_dimension.dimension_type == from_dimension_type
+                and config.model.to_dimension.dimension_type == to_dimension_type
             ):
                 return True
         return False

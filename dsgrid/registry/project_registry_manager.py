@@ -6,7 +6,7 @@ import logging
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
 from dsgrid.config.project_config import ProjectConfig
-from dsgrid.dataset import Dataset
+from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
 from dsgrid.registry.common import (

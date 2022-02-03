@@ -5,7 +5,7 @@ import logging
 import pyspark.sql.functions as F
 
 from pydantic import Field
-from pydantic import validator
+from pydantic import validator, root_validator
 from semver import VersionInfo
 
 from dsgrid.dimension.base_models import DimensionType
@@ -147,7 +147,8 @@ class DataClassificationType(DSGEnum):
     MODERATE = EnumValue(
         value="moderate",
         description=(
-            "The moderate class includes all data under an NDA, data classified as business sensitive, data classification as Critical Energy Infrastructure Infromation (CEII), or data with Personal Identifiable Information (PII)."
+            "The moderate class includes all data under an NDA, data classified as business sensitive, "
+            "data classification as Critical Energy Infrastructure Infromation (CEII), or data with Personal Identifiable Information (PII)."
         ),
     )
 
@@ -181,11 +182,27 @@ class StandardDataSchemaModel(DSGBaseModel):
 
 
 class OneTableDataSchemaModel(DSGBaseModel):
-    """ data schema model for one table load data format """
-
     load_data_column_dimension: DimensionType = Field(
         title="load_data_column_dimension",
         description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
+    )
+
+
+class DatasetQualifierType(DSGEnum):
+    QUANTITY = "quantity"
+    GROWTH_RATE = "growth_rate"
+
+
+class GrowthRateType(DSGEnum):
+    EXPONENTIAL_ANNUAL = "exponential_annual"
+    EXPONENTIAL_MONTHLY = "exponential_monthly"
+
+
+class GrowthRateModel(DSGBaseModel):
+    growth_rate_type: GrowthRateType = Field(
+        title="growth_rate_type",
+        description="Type of growth rates, e.g., exponential_annual",
+        options=GrowthRateType.format_for_docs(),
     )
 
 
@@ -209,6 +226,16 @@ class DatasetConfigModel(DSGBaseModel):
     )
     # TODO: This must be validated against the project's dimension records for data_source
     # TODO: This must also be validated against the project_config
+    dataset_qualifier: DatasetQualifierType = Field(
+        title="dataset_qualifier",
+        description="What type of values the dataset represents (e.g., growth_rate, quantity)",
+        options=DatasetQualifierType.format_for_docs(),
+        default="quantity",
+    )
+    dataset_qualifier_metadata: Optional[GrowthRateModel] = Field(
+        title="dataset_qualifier_metadata",
+        description="Additional metadata to include related to the dataset_qualifier",
+    )
     data_source: str = Field(
         title="data_source",
         description="Data source name, e.g. 'ComStock'.",
@@ -307,6 +334,18 @@ class DatasetConfigModel(DSGBaseModel):
             " columns. Instead they are added by dsgrid as an alias column.",
         ),
     )
+
+    @validator("dataset_qualifier_metadata", pre=True)
+    def check_dataset_qualifier_metadata(cls, metadata, values):
+        if values["dataset_qualifier"] == DatasetQualifierType.QUANTITY:
+            metadata = None
+        elif values["dataset_qualifier"] == DatasetQualifierType.GROWTH_RATE:
+            metadata = GrowthRateModel(**metadata)
+        else:
+            raise ValueError(
+                f'Cannot load dataset_qualifier_metadata model for dataset_qualifier={values["dataset_qualifier"]}'
+            )
+        return metadata
 
     @validator("data_schema", pre=True)
     def check_data_schema(cls, schema, values):
@@ -442,15 +481,20 @@ class DatasetConfig(ConfigBase):
                 return dim_config
         assert False, dimension_type
 
-    def add_trivial_dimensions(self, load_data_lookup):
+    def add_trivial_dimensions(self, df):
         """Add trivial 1-element dimensions to load_data_lookup."""
         for dim in self._dimensions.values():
             if dim.model.dimension_type in self.model.trivial_dimensions:
                 self._check_trivial_record_length(dim.model.records)
                 val = dim.model.records[0].id
                 col = dim.model.dimension_type.value
-                load_data_lookup = load_data_lookup.withColumn(col, F.lit(val))
-        return load_data_lookup
+                df = df.withColumn(col, F.lit(val))
+        return df
+
+    def remove_trivial_dimensions(self, df):
+        trivial_cols = {d.value for d in self.model.trivial_dimensions}
+        select_cols = [col for col in df.columns if col not in trivial_cols]
+        return df[select_cols]
 
     def _check_trivial_record_length(self, records):
         """Check that trivial dimensions have only 1 record."""

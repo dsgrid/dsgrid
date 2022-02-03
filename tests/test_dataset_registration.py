@@ -1,5 +1,6 @@
 import copy
 import getpass
+import logging
 import os
 import shutil
 import sys
@@ -10,18 +11,17 @@ from tempfile import TemporaryDirectory
 import pandas as pd
 import pytest
 
-from dsgrid.exceptions import (
-    DSGInvalidDataset,
-    DSGInvalidDimension,
-)
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.tests.common import make_test_project_dir, make_test_data_dir, TEST_DATASET_DIRECTORY
 from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json
 from dsgrid.tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
 
+logger = logging.getLogger()
+
 
 def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
     if "test_efs_comstock" not in os.listdir(make_test_data_dir):
-        print("test_invalid_datasets requires the dsgrid-test-data repository")
+        logger.info("test_invalid_datasets requires the dsgrid-test-data repository")
         sys.exit(1)
 
     with TemporaryDirectory() as tmpdir:
@@ -57,6 +57,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
             try:
                 # Create a new directory because there are collisions with cached
                 # Spark load_data_lookup dataframes.
+                logger.info(f"> test {i}...")
                 test_dir = base_dir / f"test_data_dir_{i}"
                 replace_dataset_path(dataset_config_file, dataset_path=test_dir)
                 shutil.copytree(make_test_data_dir, test_dir)
@@ -73,14 +74,15 @@ def _setup_invalid_load_data_lookup_column_name(data_dir):
     for item in data:
         item["invalid_dimension"] = item.pop("subsector")
     dump_line_delimited_json(data, lookup_file)
-    return DSGInvalidDimension, r"column.*is not expected or of a known dimension type."
+    return DSGInvalidDimension, r"column.*is not expected or of a known dimension type"
 
 
 def _setup_invalid_load_data_lookup_no_id(data_dir):
     lookup_file = data_dir / "test_efs_comstock" / "load_data_lookup.json"
     data = load_line_delimited_json(lookup_file)
     for item in data:
-        item.pop("id")
+        if "id" in item:
+            item.pop("id")
     dump_line_delimited_json(data, lookup_file)
     return DSGInvalidDataset, r"load_data_lookup does not include an .id. column"
 
@@ -168,4 +170,4 @@ def _setup_invalid_load_data_extra_column(data_dir):
             f_out.write(line)
             f_out.write(",0\n")
 
-    return DSGInvalidDataset, r"Mismatch between load data columns and dimension.*records"
+    return DSGInvalidDataset, r"column.*is not expected in load_data"

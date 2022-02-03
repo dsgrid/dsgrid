@@ -1,7 +1,8 @@
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.files import load_data
-from .annual_time_dimension_config import AnnualTimeDimensionConfig
 from .date_time_dimension_config import DateTimeDimensionConfig
+from .annual_time_dimension_config import AnnualTimeDimensionConfig
+from .noop_time_dimension_config import NoOpTimeDimensionConfig
 from .dimension_config import DimensionConfig
 from .representative_period_time_dimension_config import RepresentativePeriodTimeDimensionConfig
 from .dimensions import (
@@ -10,6 +11,7 @@ from .dimensions import (
     DimensionType,
     AnnualTimeDimensionModel,
     RepresentativePeriodTimeDimensionModel,
+    NoOpTimeDimensionModel,
 )
 
 
@@ -24,6 +26,8 @@ def get_dimension_config(model, src_dir):
         config = DimensionConfig(model)
         config.src_dir = src_dir
         return config
+    if isinstance(model, NoOpTimeDimensionModel):
+        return NoOpTimeDimensionConfig(model)
     assert False, type(model)
 
 
@@ -47,6 +51,8 @@ def load_dimension_config(filename):
             return AnnualTimeDimensionConfig.load(filename)
         elif data["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
             return RepresentativePeriodTimeDimensionConfig.load(filename)
+        elif data["time_type"] == TimeDimensionType.NOOP.value:
+            return NoOpTimeDimensionConfig.load(filename)
         else:
             raise ValueError(f"time_type={data['time_type']} not supported")
 

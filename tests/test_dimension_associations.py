@@ -13,7 +13,7 @@ def test_dimension_associations(spark_session):
     da = DimensionAssociations.load(Path("."), DATA_DIR.iterdir())
     assert da.has_associations(DimensionType.SECTOR, DimensionType.SUBSECTOR)
     assert not da.has_associations(DimensionType.SECTOR, DimensionType.TIME)
-    assert da.get_associations(DimensionType.SECTOR, DimensionType.SUBSECTOR).count() == 14
+    assert da.get_associations(DimensionType.SECTOR, DimensionType.SUBSECTOR).count() == 27
     assert (
         da.get_associations_by_data_source(
             "comstock", DimensionType.SECTOR, DimensionType.SUBSECTOR
@@ -39,7 +39,7 @@ def test_dimension_associations_three_dims(spark_session):
             da.get_associations(
                 DimensionType.MODEL_YEAR, DimensionType.SECTOR, DimensionType.SUBSECTOR
             ).count()
-            == 14
+            == 27
         )
         assert (
             da.get_associations_by_data_source(
@@ -49,7 +49,7 @@ def test_dimension_associations_three_dims(spark_session):
         )
 
         # Check asking for a subset of dimensions.
-        assert da.get_associations(DimensionType.SECTOR, DimensionType.SUBSECTOR).count() == 14
+        assert da.get_associations(DimensionType.SECTOR, DimensionType.SUBSECTOR).count() == 27
         assert (
             da.get_associations_by_data_source(
                 "comstock", DimensionType.SECTOR, DimensionType.SUBSECTOR

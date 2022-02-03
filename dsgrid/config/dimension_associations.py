@@ -3,6 +3,8 @@ import logging
 from pathlib import Path
 from typing import Dict
 
+from pyspark.sql.types import StringType
+
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDimensionAssociation
 from dsgrid.utils.spark import read_dataframe
@@ -44,6 +46,11 @@ class DimensionAssociations:
         for association_file in association_files:
             filename = path / association_file
             records = read_dataframe(filename, cache=True)
+            for column in records.columns:
+                tmp = column + "tmp_name"
+                records = records.withColumn(tmp, records[column].cast(StringType())) \
+                    .drop(column) \
+                    .withColumnRenamed(tmp, column)
             types = tuple(DimensionType(x) for x in sorted(records.columns))
             associations[types] = records
             logger.debug("Loaded dimension associations from %s %s", path, records.columns)

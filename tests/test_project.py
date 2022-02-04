@@ -4,7 +4,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from dsgrid.project import Project
-from dsgrid.dataset import Dataset
+from dsgrid.dataset.dataset import Dataset
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.tests.common import TEST_REGISTRY
 

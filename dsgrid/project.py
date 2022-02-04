@@ -5,7 +5,7 @@ import logging
 
 from pyspark.sql import SparkSession
 
-from dsgrid.dataset import Dataset
+from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType  # , MappingType
 from dsgrid.dimension.store import DimensionStore
 from dsgrid.exceptions import DSGInvalidField, DSGValueNotRegistered

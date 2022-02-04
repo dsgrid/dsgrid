@@ -14,7 +14,11 @@ from sqlalchemy import (
     text,  # Integer, Text, DateTime,
 )
 
-from dsgrid.config.dimensions import DateTimeDimensionModel, AnnualTimeDimensionModel
+from dsgrid.config.dimensions import (
+    DateTimeDimensionModel,
+    AnnualTimeDimensionModel,
+    NoOpTimeDimensionModel,
+)
 from dsgrid.dimension.base_models import (
     MetricDimensionBaseModel,
     GeographyDimensionBaseModel,
@@ -143,6 +147,10 @@ class Time(DateTimeDimensionModel):
 
 class AnnualTime(AnnualTimeDimensionModel):
     """Annual Time attributes"""
+
+
+class NoOpTime(NoOpTimeDimensionModel):
+    """NoOp Time attributes"""
 
 
 # ---------------------------

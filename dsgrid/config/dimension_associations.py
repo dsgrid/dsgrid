@@ -172,3 +172,21 @@ class DimensionAssociations:
         """Yields the stored dimension types with their association tables as a tuple."""
         for dimensions, table in self._associations.items():
             yield dimensions, table
+
+    def get_full_join_by_data_source(self, data_source):
+        tables = []
+        for dims, val in self._associations.items():
+            if DimensionType.DATA_SOURCE in dims:
+                continue
+            table = self.get_associations_by_data_source(data_source, *dims)
+            tables.append(table)
+
+        table = tables[0]
+        if len(tables) > 1:
+            for other in tables[1:]:
+                on_columns = list(set(other.columns).intersection(table.columns))
+                if on_columns:
+                    table = table.join(other, on=on_columns, how="cross")
+                else:
+                    table = table.join(other, how="cross")
+        return table

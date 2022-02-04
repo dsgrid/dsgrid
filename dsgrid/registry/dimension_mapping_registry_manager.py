@@ -109,7 +109,14 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
     def _check_records_against_dimension_records(self, config):
         for mapping in config.model.mappings:
-            actual_from_records = {x.from_id for x in mapping.records}
+            actual_from_records = set()
+            for record in mapping.records:
+                if record.from_id in actual_from_records:
+                    raise DSGInvalidDimensionMapping(
+                        f"{record.from_id} is listed twice in {mapping.filename}"
+                    )
+                actual_from_records.add(record.from_id)
+
             actual_to_records = {x.to_id for x in mapping.records}
             from_dimension = self._dimension_mgr.get_by_id(mapping.from_dimension.dimension_id)
             allowed_from_records = from_dimension.get_unique_ids()

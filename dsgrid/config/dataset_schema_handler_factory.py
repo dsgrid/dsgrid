@@ -1,6 +1,6 @@
+from dsgrid.dataset.dataset_schema_handler_standard import StandardDatasetSchemaHandler
+from dsgrid.dataset.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
 from .dataset_config import DataSchemaType
-from .dataset_schema_handler_standard import StandardDatasetSchemaHandler
-from .dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
 
 
 def make_dataset_schema_handler(

@@ -107,9 +107,6 @@ def check_date_range_creation(time_dimension_model):
         else:
             assert False
 
-    print("--->")
-    print(ts_to_drop)
-    print()
     df["pd_dt"] = ts.drop(ts_to_drop)
 
     # compare two date range creation

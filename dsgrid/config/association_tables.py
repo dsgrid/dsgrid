@@ -10,7 +10,7 @@ from pydantic import Field, validator
 from pyspark.sql import DataFrame, Row, SparkSession
 
 from .config_base import ConfigWithDataFilesBase
-from .dimension_mapping_base import DimensionMappingBaseModel
+from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.data_models import serialize_model_data, DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidOperation
@@ -69,9 +69,7 @@ class AssociationTableModel(DimensionMappingBaseModel):
     @validator("file_hash")
     def compute_file_hash(cls, file_hash, values):
         """Compute file hash."""
-        if file_hash is not None:
-            return file_hash
-        return Path(values.get("filename") or values.get("file"))
+        return file_hash or values.get("filename")
 
     @validator("records", always=True)
     def add_records(cls, records, values):
@@ -80,7 +78,7 @@ class AssociationTableModel(DimensionMappingBaseModel):
             raise ValueError("records should not be defined in the dimension mapping config")
 
         records = []
-        filename = Path(values.get("filename") or values.get("file"))
+        filename = Path(values["filename"])
         if filename.name.endswith(".csv"):
             with open(filename) as f_in:
                 reader = csv.DictReader(f_in)

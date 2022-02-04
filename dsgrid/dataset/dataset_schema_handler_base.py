@@ -1,6 +1,7 @@
 import abc
 import collections
 import logging
+import re
 import os
 from typing import List
 
@@ -9,8 +10,9 @@ import pyspark.sql.functions as F
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.spark import models_to_dataframe
-from .dimension_mapping_base import DimensionMappingReferenceModel
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 
 logger = logging.getLogger(__name__)
 
@@ -144,7 +146,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_dim.check_dataset_time_consistency(load_data_df)
-        self._check_dataset_time_consistency_by_dimensions(time_dim, load_data_df)
+        if time_dim.model.time_type != TimeDimensionType.NOOP:
+            self._check_dataset_time_consistency_by_dimensions(time_dim, load_data_df)
 
     def _check_dataset_time_consistency_by_dimensions(self, time_dim, load_data_df):
         """
@@ -154,7 +157,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         assert len(time_ranges) == 1, len(time_ranges)
         time_range = time_ranges[0]
         # TODO: need to support validation of multiple time ranges: DSGRID-173
-
         expected_timestamps = time_range.list_time_range()
         expected_count = len(expected_timestamps)
 
@@ -202,21 +204,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         for key in keys:
             dct_selected.append(dct[key])
         return dict(zip(keys, dct_selected))
-
-    @staticmethod
-    def _check_for_duplicates_in_cols(lst: list, table_name: str):
-        """Check list for duplicates
-
-        Returns
-        -------
-        Set: Input list in set form if no duplicates found.
-
-        """
-        dups = [x for x, n in collections.Counter(lst).items() if n > 1]
-        if len(dups) > 0:
-            raise DSGInvalidDataset(f"{table_name} contains duplicated column name(s)={dups}.")
-
-        return set(lst)
 
     def _remap_dimension_columns(self, df):
         # This will likely become a common activity when running queries.

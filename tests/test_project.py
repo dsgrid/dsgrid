@@ -4,7 +4,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from dsgrid.project import Project
-from dsgrid.dataset import Dataset
+from dsgrid.dataset.dataset import Dataset
 from dsgrid.config.association_tables import AssociationTableConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered

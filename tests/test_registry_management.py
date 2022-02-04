@@ -11,6 +11,7 @@ from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
     DSGInvalidDimension,
+    DSGInvalidDimensionMapping,
     DSGInvalidParameter,
     DSGInvalidOperation,
     DSGValueNotRegistered,
@@ -182,6 +183,47 @@ def test_auto_updates(make_test_project_dir):
         dataset_mgr.update(dataset, VersionUpdateType.PATCH, "test update")
         mgr.update_dependent_configs(dataset, VersionUpdateType.PATCH, "test update")
         assert project_mgr.get_current_version(project_id) == VersionInfo.parse("1.2.2")
+
+
+def test_invalid_dimension_mapping(make_test_project_dir):
+    with TemporaryDirectory() as tmpdir:
+        path = create_local_test_registry(Path(tmpdir))
+        user = getpass.getuser()
+        log_message = "Initial registration"
+        manager = RegistryManager.load(path, offline_mode=True)
+
+        dim_mgr = manager.dimension_manager
+        dim_mgr.register(make_test_project_dir / "dimensions.toml", user, log_message)
+        dim_mapping_mgr = manager.dimension_mapping_manager
+        dimension_mapping_file = make_test_project_dir / "dimension_mappings.toml"
+        replace_dimension_uuids_from_registry(path, [dimension_mapping_file])
+
+        record_file = (
+            make_test_project_dir
+            / "dimension_mappings"
+            / "base-to-supplemental"
+            / "lookup_county_to_state.csv"
+        )
+        orig_text = record_file.read_text()
+
+        # Invalid 'from' record
+        record_file.write_text(orig_text + "invalid county,CO\n")
+        with pytest.raises(DSGInvalidDimensionMapping):
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+
+        # Invalid 'to' record
+        record_file.write_text(orig_text.replace("CO", "Colorado"))
+        with pytest.raises(DSGInvalidDimensionMapping):
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+
+        # Duplicate 'from' record
+        record_file.write_text(orig_text + "\n08031,CO")
+        with pytest.raises(DSGInvalidDimensionMapping):
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+
+        # Valid
+        record_file.write_text(orig_text.replace("CO", ""))
+        dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
 
 def register_project(project_mgr, config_file, project_id, user, log_message):

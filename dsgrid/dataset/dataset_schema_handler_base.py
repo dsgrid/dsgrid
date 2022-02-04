@@ -169,7 +169,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         )
 
         distinct_counts = timestamps_by_dims.select("distinct_timestamps").distinct()
-        if distinct_counts.count() != 1:
+        if distinct_counts.count() > 1:
             for row in timestamps_by_dims.collect():
                 if row.distinct_timestamps != len(expected_timestamps):
                     logger.error(
@@ -180,16 +180,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         row.distinct_timestamps,
                     )
 
-            raise DSGInvalidDataset(
-                f"One or more arrays do not have {len(expected_timestamps)} timestamps"
-            )
-
-        val = distinct_counts.collect()[0].distinct_timestamps
-        if val != expected_count:
-            raise DSGInvalidDataset(
-                f"load_data arrays do not have {len(expected_timestamps)} "
-                "timestamps: actual={row.distinct_timestamps}"
-            )
+                    raise DSGInvalidDataset(
+                        f"One or more arrays do not have {len(expected_timestamps)} timestamps"
+                    )
+        else:
+            val = distinct_counts.collect()[0].distinct_timestamps
+            if val != expected_count:
+                raise DSGInvalidDataset(
+                    f"load_data arrays do not have {len(expected_timestamps)} timestamps: actual={val}"
+                )
 
     @staticmethod
     def _show_selected_keys_from_dict(dct, keys: list):

@@ -27,14 +27,13 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         path = Path(config.model.path)
         load_data_df = read_dataframe(check_load_data_filename(path))
         load_data_df = config.add_trivial_dimensions(load_data_df)
-        load_data_df = config.remove_trivial_dimensions(load_data_df)
         return cls(load_data_df, config, *args, **kwargs)
 
     def check_consistency(self):
-        with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(self._load_data)
         with Timer(timer_stats_collector, "check_one_table_data_consistency"):
             self._check_one_table_data_consistency()
+        with Timer(timer_stats_collector, "check_dataset_time_consistency"):
+            self._check_dataset_time_consistency(self._load_data)
 
     def _check_one_table_data_consistency(self):
         """Dimension check in load_data, excludes time:

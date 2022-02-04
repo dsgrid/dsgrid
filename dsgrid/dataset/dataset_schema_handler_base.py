@@ -187,7 +187,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             val = distinct_counts.collect()[0].distinct_timestamps
             if val != expected_count:
                 raise DSGInvalidDataset(
-                    f"load_data arrays do not have {len(expected_timestamps)} timestamps: actual={val}"
+                    f"load_data arrays do not have {len(expected_timestamps)} {time_col[0]}: actual={val}"
                 )
 
     @staticmethod

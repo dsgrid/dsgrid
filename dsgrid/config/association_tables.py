@@ -69,7 +69,9 @@ class AssociationTableModel(DimensionMappingBaseModel):
     @validator("file_hash")
     def compute_file_hash(cls, file_hash, values):
         """Compute file hash."""
-        return file_hash or compute_file_hash(values["filename"])
+        if file_hash is not None:
+            return file_hash
+        return Path(values.get("filename") or values.get("file"))
 
     @validator("records", always=True)
     def add_records(cls, records, values):
@@ -78,7 +80,7 @@ class AssociationTableModel(DimensionMappingBaseModel):
             raise ValueError("records should not be defined in the dimension mapping config")
 
         records = []
-        filename = Path(values["filename"])
+        filename = Path(values.get("filename") or values.get("file"))
         if filename.name.endswith(".csv"):
             with open(filename) as f_in:
                 reader = csv.DictReader(f_in)

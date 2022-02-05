@@ -292,8 +292,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimension_pairs = [tuple(sorted((x, y))) for x, y in itertools.combinations(types, 2)]
 
         data_source = dataset_config.model.data_source
+        dim_table = handler.get_unique_dimension_rows().drop("id")
         associations = project_config.dimension_associations
-        dim_table = handler.get_unique_dimension_rows()
+        # TODO: check a unified project table against dim_table
+        # project_table = self._make_single_table(project_config, data_source, pivot_dimension)
         for type1, type2 in dimension_pairs:
             records = associations.get_associations(type1, type2, data_source=data_source)
             if records is None:
@@ -317,6 +319,28 @@ class ProjectRegistryManager(RegistryManagerBase):
                     f"Dataset {dataset_id} is missing records for {(type1, type2)}"
                 )
         self._check_pivot_dimension_columns(project_config, handler, pivot_dimension)
+
+    def _make_single_table(self, config: ProjectConfig, data_source, pivot_dimension):
+        # TODO: prototype code from Meghan - needs testing
+        ds = DimensionType.DATA_SOURCE.value
+        table = config.dimension_associations.table.filter(f"{ds} = '{data_source}'").drop(
+            pivot_dimension.value
+        )
+        exclude = set((DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension))
+        all_dimensions = set(d.value for d in DimensionType if d not in exclude)
+        missing_dimensions = all_dimensions.difference(table.columns)
+        for dim in missing_dimensions:
+            table_count = table.count()
+            other = (
+                config.get_base_dimension(DimensionType(dim))
+                .get_records_dataframe()
+                .select("id")
+                .withColumnRenamed("id", dim)
+            )
+            table = table.crossJoin(other)
+            assert table.count() == other.count() * table_count
+
+        return table
 
     @staticmethod
     def _get_project_dimensions_table(project_config, type1, type2):

@@ -173,20 +173,15 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._check_dimension_associations(config)
 
     def _check_dimension_associations(self, config: ProjectConfig):
-        if not config.dimension_associations:
-            return
-
-        for dimension_types, table in config.dimension_associations.iter_associations():
-            for dimension_type in dimension_types:
-                dim = config.get_base_dimension(dimension_type)
-                record_ids = dim.get_unique_ids()
-                col = dimension_type.value
-                assoc_ids = {getattr(x, col) for x in table.select(col).distinct().collect()}
-                diff = assoc_ids.difference(record_ids)
-                if diff:
-                    raise DSGInvalidDimensionAssociation(
-                        f"Dimension association for {col} has invalid records: {diff}"
-                    )
+        for dimension_type in config.dimension_associations.dimension_types:
+            assoc_ids = config.dimension_associations.get_unique_ids(dimension_type)
+            dim = config.get_base_dimension(dimension_type)
+            dim_record_ids = dim.get_unique_ids()
+            diff = assoc_ids.difference(dim_record_ids)
+            if diff:
+                raise DSGInvalidDimensionAssociation(
+                    f"Dimension association for {dimension_type} has invalid records: {diff}"
+                )
 
     def submit_dataset(
         self, project_id, dataset_id, dimension_mapping_files, submitter, log_message
@@ -300,7 +295,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         associations = project_config.dimension_associations
         dim_table = handler.get_unique_dimension_rows()
         for type1, type2 in dimension_pairs:
-            records = associations.get_associations_by_data_source(data_source, type1, type2)
+            records = associations.get_associations(type1, type2, data_source=data_source)
             if records is None:
                 records = self._get_project_dimensions_table(project_config, type1, type2)
             columns = (type1.value, type2.value)

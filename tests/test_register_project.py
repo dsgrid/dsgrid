@@ -44,4 +44,4 @@ def _setup_invalid_dimension_associations(project_dir):
     association_file = project_dir / "dimension_associations" / "sector__subsector.csv"
     with open(association_file, "a") as f_out:
         f_out.write("invalid,invalid\n")
-    return DSGInvalidDimensionAssociation, r"Dimension association for .* has invalid records"
+    return DSGInvalidDimensionAssociation, r"Dropped records when joining by data_source"

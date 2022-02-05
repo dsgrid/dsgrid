@@ -150,7 +150,6 @@ reference,electricity_pool_pump
 reference,electricity_pumps
 reference,electricity_pumps_cooling
 reference,electricity_pumps_heating
-reference,electricity_pv
 reference,electricity_range_fan
 reference,electricity_recirc_pump
 reference,electricity_refrigeration

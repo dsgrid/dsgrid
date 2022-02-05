@@ -16,16 +16,12 @@ logger = logging.getLogger(__name__)
 class DimensionAssociations:
     """Interface to a project's dimension associations"""
 
-    def __init__(self, associations: Dict):
-        # This has the format {(DimensionType1, DimensionType2, ..., DimensionTypeN): df}
-        # The keys are sorted by DimensionType so that the caller's order doesn't matter.
-        self._associations = associations
-
-    def __bool__(self):
-        return bool(self._associations)
-
-    def __len__(self):
-        return len(self._associations)
+    def __init__(self, table):
+        self._table = table
+        if table is None:
+            self._dimensions = set()
+        else:
+            self._dimensions = set((DimensionType.from_column(x) for x in table.columns))
 
     @classmethod
     def load(cls, path: Path, association_files):
@@ -35,32 +31,68 @@ class DimensionAssociations:
         ----------
         path: Path
         association_files : list
-            List of filenames with paths relative to path
+            List of filenames with paths relative to path.
+            Every dimension given must provide an association with DimensionType.DATA_SOURCE.
 
         Returns
         -------
         DimensionAssociations
 
         """
+        if not association_files:
+            return cls(None)
+
+        all_dims = set()
+        dims_with_data_source = set()
         associations = {}
+        associations_by_data_source = {}
         for association_file in association_files:
             filename = path / association_file
-            records = read_dataframe(filename, cache=True)
-            for column in records.columns:
+            table = read_dataframe(filename, cache=True)
+            for column in table.columns:
                 tmp = column + "tmp_name"
-                records = (
-                    records.withColumn(tmp, records[column].cast(StringType()))
+                table = (
+                    table.withColumn(tmp, table[column].cast(StringType()))
                     .drop(column)
                     .withColumnRenamed(tmp, column)
                 )
-            types = tuple(DimensionType(x) for x in sorted(records.columns))
-            associations[types] = records
-            logger.debug("Loaded dimension associations from %s %s", path, records.columns)
+                table.cache()
+            dims = set((DimensionType.from_column(x) for x in table.columns))
+            all_dims.update(dims)
+            key = _make_key(dims)
+            if DimensionType.DATA_SOURCE in dims:
+                dims.remove(DimensionType.DATA_SOURCE)
+                dims_with_data_source.update(dims)
+                associations_by_data_source[key] = table
+            else:
+                associations[key] = table
+            logger.debug("Loaded dimension associations from %s %s", path, table.columns)
 
-        return cls(associations)
+        if len(dims_with_data_source) != len(all_dims) - 1:
+            raise DSGInvalidDimensionAssociation(
+                "Every supplied dimension must have an association with data_source. "
+                f"has_data_source = {dims_with_data_source} all = {all_dims}"
+            )
 
-    def get_associations(self, *dimensions):
-        """Return the records for this dimension association.
+        table = _join_associations_by_data_source(associations, associations_by_data_source)
+        return cls(table)
+
+    @property
+    def dimension_types(self):
+        """Return the stored dimension types.
+
+        Returns
+        -------
+        list
+            List of DimensionType
+
+        """
+        if self._table is None:
+            return []
+        return sorted(self._dimensions)
+
+    def get_associations(self, *dimensions, data_source=None):
+        """Return the records for the union of dimension associations associated with dimensions.
 
         Parameters
         ----------
@@ -73,87 +105,33 @@ class DimensionAssociations:
             Returns None if there is no table matching dimensions.
 
         """
-        # Try a direct match and then check for a subset.
-        table = self._associations.get(tuple(sorted(dimensions)))
-        if table is not None:
-            return table
-
-        caller_dims = set(dimensions)
-        for association_dims, table in self._associations.items():
-            if not caller_dims.difference(association_dims):
-                # This assumes that if there are multiple matches, all tables have the same data.
-                return table.select(*(x.value for x in dimensions))
-
-        return None
-
-    def get_filtered_associations(self, filter_dim, filter_value, *dimensions):
-        """Return the records for this dimension association filtered by another dimension with
-        a specific value.
-
-        Parameters
-        ----------
-        filter_dim: DimensionType
-        filter_value: DimensionType
-        dimensions : tuple
-            Any number of instances of DimensionType
-
-        Returns
-        -------
-        pyspark.sql.DataFrame | None
-
-        Examples
-        --------
-        >>> da = DimensionAssociations(Path("src_dir"), ["a1.csv", "a2.csv", "a3.csv"]
-        >>> da.get_filtered_associations(
-        ...     DimensionType.METRIC,
-        ...     DimensionType.SUBSECTOR,
-        ...     filter_dim=DimensionType.DATA_SOURCE,
-        ...     filter_value="comstock",
-        ... ).show(n=2)
-        +--------------------+------------+
-        |              metric|   subsector|
-        +--------------------+------------+
-        |district_cooling_...|   warehouse|
-        |district_cooling_...|small_office|
-        +--------------------+------------+
-
-        """
-        table = self.get_associations(*dimensions)
-        if table is None:
+        if not self._dimensions.issuperset(dimensions):
             return None
 
-        filter_col = filter_dim.value
-        for dimension in dimensions:
-            tmp = self.get_associations(filter_dim, dimension)
-            if tmp is None:
-                raise DSGInvalidDimensionAssociation(
-                    f"No association is stored for {filter_dim} and {dimension}"
-                )
-            table = (
-                table.join(tmp, dimension.value)
-                .filter(f"{filter_col} = '{filter_value}'")
-                .drop(filter_col)
-            )
-        return table
+        ds_column = DimensionType.DATA_SOURCE.value
+        columns = [ds_column] + [x.value for x in dimensions]
+        table = self._table.select(*columns)
+        if data_source is not None:
+            table = table.filter(f"{ds_column} = '{data_source}'")
+        return table.distinct()
 
-    def get_associations_by_data_source(self, data_source, *dimensions):
-        """Return the records for this dimension association filtered a data source.
+    def get_unique_ids(self, dimension):
+        """Return the unique record IDs for the dimension.
 
         Parameters
         ----------
-        data_source: str
-            Record for DimensionType.DATA_SOURCE
-        dimensions : tuple
-            Any number of instances of DimensionType
+        dimension : DimensionType
 
         Returns
         -------
-        pyspark.sql.DataFrame | None
+        set
+            Set of str
 
         """
-        return self.get_filtered_associations(DimensionType.DATA_SOURCE, data_source, *dimensions)
+        col = dimension.value
+        return {getattr(x, col) for x in self._table.select(col).distinct().collect()}
 
-    def has_associations(self, *dimensions):
+    def has_associations(self, *dimensions, data_source=None):
         """Return True if these dimension associations are stored.
 
         Parameters
@@ -166,27 +144,66 @@ class DimensionAssociations:
         bool
 
         """
-        return self.get_associations(*dimensions) is not None
+        return self.get_associations(*dimensions, data_source=data_source) is not None
 
-    def iter_associations(self):
-        """Yields the stored dimension types with their association tables as a tuple."""
-        for dimensions, table in self._associations.items():
-            yield dimensions, table
+    def list_data_sources(self):
+        """Return the stored data source values.
 
-    def get_full_join_by_data_source(self, data_source):
-        tables = []
-        for dims, val in self._associations.items():
-            if DimensionType.DATA_SOURCE in dims:
-                continue
-            table = self.get_associations_by_data_source(data_source, *dims)
-            tables.append(table)
+        Returns
+        -------
+        list
+            List of str
 
-        table = tables[0]
-        if len(tables) > 1:
-            for other in tables[1:]:
-                on_columns = list(set(other.columns).intersection(table.columns))
-                if on_columns:
-                    table = table.join(other, on=on_columns, how="cross")
-                else:
-                    table = table.join(other, how="cross")
-        return table
+        """
+        col = DimensionType.DATA_SOURCE.value
+        return sorted((getattr(x, col) for x in self._table.select(col).distinct().collect()))
+
+    @property
+    def table(self):
+        """Return the table containing the associations.
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+        return self._table
+
+
+def _make_key(dimensions):
+    return tuple(sorted(dimensions))
+
+
+def _get_column_distinct_counts(df, columns):
+    return {x: df.select(x).distinct().count() for x in columns}
+
+
+def _join_associations_by_data_source(associations, associations_by_data_source):
+    tables = []
+    for dims, table in associations.items():
+        table2 = table
+        for i, dim in enumerate(dims):
+            if i == 0:
+                on_columns = [dim.value]
+            else:
+                on_columns = [dim.value, DimensionType.DATA_SOURCE.value]
+            ds_table = associations_by_data_source[_make_key((dim, DimensionType.DATA_SOURCE))]
+            table2 = table2.join(ds_table, on=on_columns)
+            orig = table.distinct().count()
+            final = table2.select(table.columns).distinct().count()
+            if orig != final:
+                raise DSGInvalidDimensionAssociation(
+                    f"Dropped records when joining by data_source: {orig - final}"
+                )
+        tables.append(table2)
+
+    table = tables[0]
+    if len(tables) > 1:
+        for other in tables[1:]:
+            on_columns = list(set(other.columns).intersection(table.columns))
+            if on_columns:
+                table = table.join(other, on=on_columns, how="outer")
+            else:
+                table = table.crossJoin(other)
+
+    return table

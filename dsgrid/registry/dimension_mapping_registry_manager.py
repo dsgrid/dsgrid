@@ -118,7 +118,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 actual_from_records.add(record.from_id)
 
             if None in actual_from_records:
-                raise DSGInvalidDimensionMapping(f"'from' records cannot be null: {mapping.filename}")
+                raise DSGInvalidDimensionMapping(
+                    f"'from' records cannot be null: {mapping.filename}"
+                )
 
             actual_to_records = {x.to_id for x in mapping.records}
             from_dimension = self._dimension_mgr.get_by_id(mapping.from_dimension.dimension_id)

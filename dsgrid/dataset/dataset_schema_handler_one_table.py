@@ -1,5 +1,6 @@
 from pathlib import Path
 import logging
+import itertools
 
 from dsgrid.config.dataset_config import (
     DatasetConfig,
@@ -7,7 +8,7 @@ from dsgrid.config.dataset_config import (
 )
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, Timer
-from dsgrid.config.dataset_schema_handler_base import DatasetSchemaHandlerBase
+from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 
@@ -29,14 +30,18 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return cls(load_data_df, config, *args, **kwargs)
 
     def check_consistency(self):
-        with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(self._load_data)
         with Timer(timer_stats_collector, "check_one_table_data_consistency"):
             self._check_one_table_data_consistency()
+        with Timer(timer_stats_collector, "check_dataset_time_consistency"):
+            self._check_dataset_time_consistency(self._load_data)
 
     def _check_one_table_data_consistency(self):
-        dimension_types = []
-        pivot_cols = []
+        """Dimension check in load_data, excludes time:
+        * check that data matches record for each dimension.
+        * check that all data dimension combinations exist. Time is handled separately.
+        """
+        dimension_types = set()
+        pivot_cols = set()
 
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_columns = time_dim.get_timestamp_load_data_columns()
@@ -45,28 +50,25 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         pivot_dim_found = False
         for col in self._load_data.columns:
             if col in time_columns:
-                dimension_types.append(DimensionType.TIME)
+                continue
             elif col in expected_pivot_columns:
                 pivot_dim_found = True
-                pivot_cols.append(col)
+                pivot_cols.add(col)
             else:
-                dimension_types.append(DimensionType.from_column(col))
+                dimension_types.add(DimensionType.from_column(col))
 
         if pivot_dim_found:
-            dimension_types.append(pivot_dim)
+            dimension_types.add(pivot_dim)
 
-        dimension_types = self._check_for_duplicates_in_cols(dimension_types, "load_data")
-        pivot_cols = self._check_for_duplicates_in_cols(pivot_cols, "load_data")
-        expected_dimensions = {d for d in DimensionType}
+        expected_dimensions = {d for d in DimensionType if d != DimensionType.TIME}
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
             raise DSGInvalidDataset(
-                f"load_data is missing dimensions: {missing_dimensions}. If these are trivial dimensions, make sure to specify them in the Dataset Config."
+                f"load_data is missing dimensions: {missing_dimensions}. "
+                "If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
 
         for dimension_type in dimension_types:
-            if dimension_type == DimensionType.TIME:
-                continue
             name = dimension_type.value
             dimension = self._config.get_dimension(dimension_type)
             dim_records = dimension.get_unique_ids()

@@ -10,7 +10,7 @@ from pydantic import Field, validator
 from pyspark.sql import DataFrame, Row, SparkSession
 
 from .config_base import ConfigWithDataFilesBase
-from .dimension_mapping_base import DimensionMappingBaseModel
+from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.data_models import serialize_model_data, DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidOperation
@@ -69,7 +69,7 @@ class AssociationTableModel(DimensionMappingBaseModel):
     @validator("file_hash")
     def compute_file_hash(cls, file_hash, values):
         """Compute file hash."""
-        return file_hash or compute_file_hash(values["filename"])
+        return file_hash or values.get("filename")
 
     @validator("records", always=True)
     def add_records(cls, records, values):

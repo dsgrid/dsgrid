@@ -32,11 +32,11 @@ class AssociationTableRecordModel(DSGBaseModel):
         description="Destination mapping",
     )
 
-    @validator("to_id")
-    def check_to_id(cls, to_id):
-        if to_id == "":
+    @validator("from_id", "to_id")
+    def check_to_id(cls, val):
+        if val == "":
             return None
-        return to_id
+        return val
 
 
 class AssociationTableModel(DimensionMappingBaseModel):

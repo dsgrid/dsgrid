@@ -211,6 +211,11 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         with pytest.raises(DSGInvalidDimensionMapping):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
+        # Invalid 'from' record - nulls aren't allowd
+        record_file.write_text(orig_text + ",CO\n")
+        with pytest.raises(DSGInvalidDimensionMapping):
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+
         # Invalid 'to' record
         record_file.write_text(orig_text.replace("CO", "Colorado"))
         with pytest.raises(DSGInvalidDimensionMapping):

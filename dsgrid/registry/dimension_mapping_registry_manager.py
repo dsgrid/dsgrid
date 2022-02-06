@@ -313,6 +313,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         new_key = ConfigKey(config.config_id, version)
         self._mappings.pop(old_key, None)
         self._mappings[new_key] = config
+
+        if not self.offline_mode:
+            self.sync_push(self._path)
+
         return version
 
     def remove(self, config_id):

@@ -21,6 +21,7 @@ from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.project_registry_manager import ProjectRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
+    check_configs_update,
     create_local_test_registry,
     make_test_project_dir,
     TEST_DATASET_DIRECTORY,
@@ -95,16 +96,7 @@ def test_register_project_and_dataset(make_test_project_dir):
             dimension_mapping_config = make_test_project_dir / dset_dir / "dimension_mappings.toml"
             dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
 
-        # Test updates to all configs.
-        check_config_update(base_dir, project_mgr, project_id, user, VersionInfo.parse("1.1.0"))
-        check_config_update(base_dir, dataset_mgr, dataset_id, user, VersionInfo.parse("1.0.0"))
-        dim_dir = base_dir / "dimensions"
-        os.makedirs(dim_dir)
-        check_config_update(dim_dir, dimension_mgr, dimension_id, user, VersionInfo.parse("1.0.0"))
-        check_config_update(
-            dim_dir, dimension_mapping_mgr, dimension_mapping_id, user, VersionInfo.parse("1.0.0")
-        )
-
+        check_configs_update(base_dir, manager)
         check_update_project_dimension(base_dir, manager)
         # Note that the dataset is now unregistered.
 
@@ -242,52 +234,6 @@ def register_project(project_mgr, config_file, project_id, user, log_message):
 def register_dataset(dataset_mgr, config_file, dataset_id, user, log_message):
     dataset_mgr.register(config_file, user, log_message)
     assert dataset_mgr.list_ids() == [dataset_id]
-
-
-def check_config_update(tmpdir, mgr, config_id, user, version):
-    """Runs basic positive and negative update tests for the config. Also tests dump."""
-    config_file = Path(tmpdir) / mgr.registry_class().config_filename()
-    assert not config_file.exists()
-    try:
-        mgr.dump(config_id, tmpdir)
-        with pytest.raises(DSGInvalidOperation):
-            mgr.dump(config_id, tmpdir)
-        mgr.dump(config_id, tmpdir, force=True)
-        assert config_file.exists()
-        config_data = load_data(config_file)
-        config_data["description"] += "; updated description"
-        dump_data(config_data, config_file)
-        with pytest.raises(DSGInvalidParameter):
-            mgr.update_from_file(
-                config_file,
-                "invalid_config_id",
-                user,
-                VersionUpdateType.PATCH,
-                "update to description",
-                version,
-            )
-        with pytest.raises(DSGInvalidParameter):
-            mgr.update_from_file(
-                config_file,
-                config_id,
-                user,
-                VersionUpdateType.PATCH,
-                "update to description",
-                version.bump_patch(),
-            )
-
-        mgr.update_from_file(
-            config_file,
-            config_id,
-            user,
-            VersionUpdateType.PATCH,
-            "update to description",
-            version,
-        )
-        assert mgr.get_current_version(config_id) == version.bump_patch()
-    finally:
-        if config_file.exists():
-            os.remove(config_file)
 
 
 def check_update_project_dimension(tmpdir, manager):

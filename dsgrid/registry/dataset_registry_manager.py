@@ -193,6 +193,12 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._datasets.pop(old_key, None)
         self._datasets[new_key] = config
 
+        if not self.offline_mode:
+            self.sync_push(self.get_registry_directory(config.config_id))
+            self.sync_push(self.get_registry_data_directory(config.config_id))
+
+        return version
+
     def remove(self, config_id):
         self._remove(config_id)
         for key in [x for x in self._datasets if x.id == config_id]:

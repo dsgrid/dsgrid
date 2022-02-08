@@ -8,7 +8,7 @@ import os
 from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE_TIME
-from dsgrid.config.dimension_config import TimeDimensionConfig
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dimension.time import LeapDayAdjustmentType
 
 
@@ -20,7 +20,7 @@ def time_dimension_model1():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[0]  # TimeDimensionModel (8760 period-beginning)
+    yield model.dimensions[0]  # DateTimeDimensionModel (8760 period-beginning)
 
 
 @pytest.fixture
@@ -28,7 +28,7 @@ def time_dimension_model2():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[1]  # TimeDimensionModel (annual)
+    yield model.dimensions[1]  # DateTimeDimensionModel (daily time)
 
 
 @pytest.fixture
@@ -36,7 +36,7 @@ def time_dimension_model3():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[2]  # TimeDimensionModel (8760 period-ending)
+    yield model.dimensions[2]  # DateTimeDimensionModel (8760 period-ending)
 
 
 @pytest.fixture
@@ -44,11 +44,11 @@ def annual_time_dimension_model():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[3]  # AnnualTimeDimensionModel
+    yield model.dimensions[3]  # AnnualTimeDimensionModel (annual time, correct format)
 
 
 def check_date_range_creation(time_dimension_model):
-    config = TimeDimensionConfig(time_dimension_model)  # TimeDimensionConfig
+    config = DateTimeDimensionConfig(time_dimension_model)  # TimeDimensionConfig
     time_range = config.get_time_ranges()
 
     # create date range for time dimension
@@ -107,9 +107,6 @@ def check_date_range_creation(time_dimension_model):
         else:
             assert False
 
-    print("--->")
-    print(ts_to_drop)
-    print()
     df["pd_dt"] = ts.drop(ts_to_drop)
 
     # compare two date range creation
@@ -119,9 +116,12 @@ def check_date_range_creation(time_dimension_model):
     assert num_ts_diff == 0
 
 
-def check_validation_error_366_days(time_dimension_model):
+def check_validation_error_365_days(time_dimension_model):
     with pytest.raises(ValidationError):
-        time_dimension_model.frequency = datetime.timedelta(days=366)
+        time_dimension_model.ranges[0].start = "2018"
+        time_dimension_model.ranges[0].end = "2050"
+        time_dimension_model.str_format = "%Y"
+        time_dimension_model.frequency = datetime.timedelta(days=365)
 
 
 def check_register_annual_time(annual_time_dimension_model):
@@ -135,7 +135,7 @@ def test_time_dimension_model1(time_dimension_model1):
 
 def test_time_dimension_model2(time_dimension_model2):
     check_date_range_creation(time_dimension_model2)
-    check_validation_error_366_days(time_dimension_model2)
+    check_validation_error_365_days(time_dimension_model2)
 
 
 def test_time_dimension_model3(time_dimension_model3):

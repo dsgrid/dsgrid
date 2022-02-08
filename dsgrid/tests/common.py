@@ -137,7 +137,7 @@ def read_dimension_uuid_mapping(registry_dir):
 
 
 def replace_dimension_uuids(filename, uuids):
-    regex = re.compile(r"dimension_id = \"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)\"")
+    regex = re.compile(r"^dimension_id = \"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)\"")
     with fileinput.input(files=[filename], inplace=True) as f:
         for line in f:
             match = regex.search(line)

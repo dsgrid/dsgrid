@@ -5,7 +5,7 @@ import pytest
 from pydantic import BaseModel
 
 from dsgrid.time.types import DayType, Season
-from dsgrid.config.dimensions import TimeDimensionModel
+from dsgrid.config.dimensions import DateTimeDimensionModel
 from .data.dimension_models.minimal.models import *
 from dsgrid.dimension.standard import County, State, CensusDivision, CensusRegion, Time
 from dsgrid.dimension.store import DimensionStore
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 @pytest.mark.skip
 def test_dimension_store():
     assert store.list_dimension_classes()[:2] == [CensusDivision, CensusRegion]
-    assert store.list_dimension_classes(base_class=TimeDimensionModel) == [Time]
+    assert store.list_dimension_classes(base_class=DateTimeDimensionModel) == [Time]
 
 
 @pytest.mark.skip

@@ -5,6 +5,7 @@ import logging
 import multiprocessing
 import os
 from pathlib import Path
+from typing import AnyStr, List, Union
 
 from pyspark.sql import DataFrame, Row, SparkSession
 from pyspark import SparkConf, SparkContext
@@ -42,7 +43,6 @@ def init_spark(name="dsgrid"):
             .getOrCreate()
         )
 
-    print("\nSpark conf: %s\n", str(spark.sparkContext.getConf().getAll()))
     logger.info("Spark conf: %s", str(spark.sparkContext.getConf().getAll()))
     return spark
 
@@ -143,20 +143,26 @@ def _post_process_dataframe(df, cache=False, require_unique=None):
                     raise DSGInvalidField(f"DataFrame has duplicate entries for {column}")
 
 
-def get_unique_values(df, column):
-    """Return the unique values of a dataframe in one column.
+def get_unique_values(df, columns: Union[AnyStr, List]):
+    """Return the unique values of a dataframe in one column or a list of columns.
 
     Parameters
     ----------
     df : pyspark.sql.DataFrame
-    column : str
+    column : str or list of str
 
     Returns
     -------
     set
 
     """
-    return {getattr(x, column) for x in df.select(column).distinct().collect()}
+    dfc = df.select(columns).distinct().collect()
+    if isinstance(columns, list):
+        values = {tuple(getattr(row, col) for col in columns) for row in dfc}
+    else:
+        values = {getattr(x, columns) for x in dfc}
+
+    return values
 
 
 @track_timing(timer_stats_collector)

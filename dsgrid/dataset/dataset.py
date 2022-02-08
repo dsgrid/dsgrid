@@ -63,6 +63,14 @@ class Dataset:
         for view in self._make_view_names():
             self._spark.catalog.dropTempView(view)
 
+    @property
+    def load_data(self):
+        return self._load_data
+
+    @property
+    def load_data_lookup(self):
+        return self._load_data_lookup
+
     # TODO: this is likely throwaway code
 
     # def compute_sum_by_sector_id(self):

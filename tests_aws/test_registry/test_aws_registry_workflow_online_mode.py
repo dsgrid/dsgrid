@@ -23,7 +23,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
 
-from tests.make_us_data_registry import make_test_data_registry
+from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
 def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data_dir):

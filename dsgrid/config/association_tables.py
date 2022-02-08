@@ -25,10 +25,16 @@ class AssociationTableRecordModel(DSGBaseModel):
         title="from_id",
         description="Source mapping",
     )
-    to_id: str = Field(
+    to_id: Union[str, None] = Field(
         title="to_id",
         description="Destination mapping",
     )
+
+    @validator("to_id")
+    def check_to_id(cls, to_id):
+        if to_id == "":
+            return None
+        return to_id
 
 
 class AssociationTableModel(DimensionMappingBaseModel):
@@ -110,7 +116,7 @@ class AssociationTableConfig(ConfigWithDataFilesBase):
         return AssociationTableModel
 
     def get_unique_from_ids(self):
-        """Return the unique from IDs in a dimension's records.
+        """Return the unique from IDs in an association table's records.
 
         Returns
         -------
@@ -121,7 +127,7 @@ class AssociationTableConfig(ConfigWithDataFilesBase):
         return {x.from_id for x in self.model.records}
 
     def get_unique_to_ids(self):
-        """Return the unique to IDs in a dimension's records.
+        """Return the unique to IDs in an association table's records.
 
         Returns
         -------

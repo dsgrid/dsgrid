@@ -6,6 +6,7 @@ import logging
 import os
 from pathlib import Path
 from datetime import timedelta
+import pandas as pd
 
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
@@ -14,13 +15,12 @@ import pyspark.sql.types as T
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_config import (
     DatasetConfig,
-    check_load_data_filename,
-    check_load_data_lookup_filename,
+    DataSchemaType,
 )
 from dsgrid.data_models import serialize_model
-from dsgrid.dataset import Dataset
+from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
-from dsgrid.dimension.time import TimeInvervalType
+from dsgrid.dimension.time import TimeInvervalType, TimeDimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimension, DSGInvalidDataset
 from dsgrid.registry.common import (
     make_initial_config_registration,
@@ -35,8 +35,8 @@ from .dataset_registry import (
     DatasetRegistryModel,
 )
 from .registry_manager_base import RegistryManagerBase
-from dsgrid.dimension.time import TimeZone, find_time_delta
-
+from dsgrid.dataset.dataset_schema_handler_standard import StandardDatasetSchemaHandler
+from dsgrid.dataset.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,15 @@ class DatasetRegistryManager(RegistryManagerBase):
     def registry_class():
         return DatasetRegistry
 
+    @staticmethod
+    def make_dataset_schema_handler(config):
+        if config.model.data_schema_type == DataSchemaType.STANDARD:
+            return StandardDatasetSchemaHandler(config)
+        elif config.model.data_schema_type == DataSchemaType.ONE_TABLE:
+            return OneTableDatasetSchemaHandler(config)
+        else:
+            assert False, config.model.data_schema_type
+
     def _run_checks(self, config: DatasetConfig):
         self._check_if_already_registered(config.model.dataset_id)
         check_required_dimensions(config.model.dimensions, "dataset dimensions")
@@ -72,251 +81,8 @@ class DatasetRegistryManager(RegistryManagerBase):
     def _check_dataset_consistency(self, config: DatasetConfig):
         spark = SparkSession.getActiveSession()
         path = Path(config.model.path)
-        load_data = read_dataframe(check_load_data_filename(path))
-        load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
-        load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
-        with Timer(timer_stats_collector, "check_lookup_data_consistency"):
-            self._check_lookup_data_consistency(config, load_data_lookup)
-        with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(config, load_data)
-        with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
-            self._check_dataset_internal_consistency(config, load_data, load_data_lookup)
-
-    def _check_lookup_data_consistency(self, config: DatasetConfig, load_data_lookup):
-        found_id = False
-        dimension_types = []
-        for col in load_data_lookup.columns:
-            if col == "id":
-                found_id = True
-                continue
-            try:
-                dimension_types.append(DimensionType(col))
-            except ValueError:
-                raise DSGInvalidDimension(f"load_data_lookup column={col} is not a dimension type")
-
-        if not found_id:
-            raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
-
-        # TODO: some of this logic will change based on the data table schema type
-        load_data_dimensions = (
-            DimensionType.TIME,
-            config.model.data_schema.load_data_column_dimension,
-        )
-        expected_dimensions = [d for d in DimensionType if d not in load_data_dimensions]
-        if len(dimension_types) != len(expected_dimensions):
-            raise DSGInvalidDataset(
-                f"load_data_lookup does not have the correct number of dimensions specified between trivial and non-trivial dimensions."
-            )
-
-        missing_dimensions = set(expected_dimensions).difference(dimension_types)
-        if len(missing_dimensions) != 0:
-            raise DSGInvalidDataset(
-                f"load_data_lookup is missing dimensions: {missing_dimensions}. If these are trivial dimensions, make sure to specify them in the Dataset Config."
-            )
-
-        for dimension_type in dimension_types:
-            name = dimension_type.value
-            dimension = config.get_dimension(dimension_type)
-            dim_records = dimension.get_unique_ids()
-            lookup_records = get_unique_values(load_data_lookup, name)
-            if dim_records != lookup_records:
-                logger.error(
-                    "Mismatch in load_data_lookup records. dimension=%s mismatched=%s",
-                    name,
-                    lookup_records.symmetric_difference(dim_records),
-                )
-                raise DSGInvalidDataset(
-                    f"load_data_lookup records do not match dimension records for {name}"
-                )
-
-    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data):
-        """
-        Note:
-        - datetime obj are stored on disk in UTC time, if tz-unaware, pyspark session timezone is assigned before converting to UTC,
-        - datetime obj are displayed in pyspark session timezone, (which can be set by e.g., .config("spark.sql.session.timeZone", "UTC"))
-        - datetime obj are converted to pyspark session timezone if .collect() is used.
-        """
-        time_dim = config.get_dimension(DimensionType.TIME)
-        data_tz = time_dim.get_data_tzinfo()
-        time_ranges = time_dim.get_time_ranges()
-        time_ranges_tz = time_dim.get_tzinfo()
-
-        assert len(time_ranges) == 1, len(time_ranges)
-        time_range = time_ranges[0]
-        # TODO: need to support validation of multiple time ranges: DSGRID-173
-
-        expected_timestamps = time_dim.list_time_range(time_range)
-
-        if data_tz != time_ranges_tz:
-            # convert data timestamps to time_ranges_tz and compare to expected_timestamps
-            if time_ranges_tz == None:  # TimeZone.LOCAL has no tzinfo
-                # load map as spark df and raise error if not found
-                tz_map = read_dataframe(
-                    filename, cache=False
-                )  # FIXME #models_to_dataframe #spark.read.option("header",True).csv(filename)
-                tz_map = tz_map.select(
-                    F.col("from_id").alias("geography"),
-                    F.udf(lambda x: str(TimeZone(x).tz))(F.col("to_id")).alias(
-                        "convert_to_timezone"
-                    ),
-                ).cache()
-
-            else:
-                # create a map based on time_ranges_tz
-                tz_map = load_data_lookup.select(
-                    "geography", F.lit(str(time_ranges_tz)).alias("convert_to_timezone")
-                )
-
-            # Show time
-            timestamps = load_data.select(
-                "id",
-                F.col("timestamp").alias(
-                    "timestamp_utc"
-                ),  # all time is stored on disk in UTC, but when loaded, displayed in pyspark session tz
-                F.from_utc_timestamp("timestamp", str(data_tz)).alias("timestamp_data_tz"),
-            )  # show in data_tz
-            # Join tz map to data
-            timestamps = timestamps.join(
-                load_data_lookup.join(
-                    tz_map,
-                    "geography",
-                    "left",  # load_data_lookup.geography == tz_map.geography, "left"
-                ),
-                "id",
-                "left",
-            ).select(
-                "id",
-                "geography",  # load_data_lookup.geography,
-                "timestamp_data_tz",
-                "timestamp_utc",
-                "convert_to_timezone",
-            )
-
-            # convert time based on map
-            timestamps = timestamps.select(
-                "*",
-                F.from_utc_timestamp("timestamp_utc", F.col("convert_to_timezone")).alias(
-                    "timestamp_converted"
-                ),
-            )  # tz=UTC
-
-            # timestamps_by_geography = load_data.select("id", F.col("timestamp").alias("timestamp_data")).join(
-            #     load_data_lookup.join(
-            #         tz_map, load_data_lookup.geography == tz_map.from_id, "left"
-            #     ),
-            #     "id",
-            #     "left",
-            # ).select(
-            #     "id",
-            #     "geography",
-            #     "timestamp_data",
-            #     F.lit(str(data_tz)).alias("from_timezone"),
-            #     F.col("to_id").alias("to_timezone"),
-            # )
-            # udf_find_time_delta = F.udf(lambda ts, fmtz, totz: find_time_delta(ts, fmtz, totz), T.DecimalType())
-            # timestamps_by_geography = timestamps_by_geography.withColumn(
-            #     "time_delta_sec",
-            #     udf_find_time_delta(
-            #         F.col("timestamp_data"), F.col("from_timezone"), F.col("to_timezone")
-            #     ),
-            # )
-            # timestamps_by_geography = timestamps_by_geography.select(
-            #     "*", (F.unix_timestamp("timestamp_data") + F.col("time_delta_sec")).cast('timestamp').alias("timestamp")
-            # )  # generate converted_timestamp
-
-            # Note: x.timestamp.astimezone().astimezone(data_tz): converts to pyspark session time!!!, which is another setting from spark.sql.session.timeZone
-
-            actual_timestamps = [
-                x.timestamp.astimezone(TimeZone.UTC.tz).replace(tzinfo=None)
-                for x in timestamps.select(F.col("timestamp_converted").alias("timestamp"))
-                .distinct()
-                .sort("timestamp_converted")
-                .collect()
-            ]  # check this against EFS comstock test data.
-
-            timestamps_by_id = (
-                timestamps.select("timestamp_converted", "id")
-                .groupby("id")
-                .agg(F.countDistinct("timestamp_converted").alias("distinct_timestamps"))
-            )
-
-        else:
-            actual_timestamps = [
-                x.timestamp.astimezone().astimezone(data_tz)
-                for x in load_data.select("timestamp").distinct().sort("timestamp").collect()
-            ]
-
-            timestamps_by_id = (
-                load_data.select("timestamp", "id")
-                .groupby("id")
-                .agg(F.countDistinct("timestamp").alias("distinct_timestamps"))
-            )
-
-        if expected_timestamps != actual_timestamps:
-            mismatch = sorted(
-                set(expected_timestamps).symmetric_difference(set(actual_timestamps))
-            )
-            raise DSGInvalidDataset(
-                f"load_data timestamps do not match expected times. mismatch={mismatch}"
-            )
-
-        for row in timestamps_by_id.collect():
-            if row.distinct_timestamps != len(expected_timestamps):
-                raise DSGInvalidDataset(
-                    f"load_data ID={row.id} does not have {len(expected_timestamps)} timestamps: actual={row.distinct_timestamps}"
-                )
-
-    def _check_dataset_internal_consistency(
-        self, config: DatasetConfig, load_data, load_data_lookup
-    ):
-        self._check_load_data_columns(config, load_data)
-        data_ids = []
-        for row in load_data.select("id").distinct().sort("id").collect():
-            if row.id is None:
-                raise DSGInvalidDataset(f"load_data for dataset {config.config_id} has a null ID")
-            data_ids.append(row.id)
-        lookup_data_ids = (
-            load_data_lookup.select("id")
-            .distinct()
-            .filter("id is not null")
-            .sort("id")
-            .agg(F.collect_list("id"))
-            .collect()[0][0]
-        )
-        if data_ids != lookup_data_ids:
-            logger.error(
-                f"Data IDs for %s data/lookup are inconsistent: data=%s lookup=%s",
-                config.config_id,
-                data_ids,
-                lookup_data_ids,
-            )
-            raise DSGInvalidDataset(
-                f"Data IDs for {config.config_id} data/lookup are inconsistent"
-            )
-
-    def _check_load_data_columns(self, config: DatasetConfig, load_data):
-        dim_type = config.model.data_schema.load_data_column_dimension
-        dimension = config.get_dimension(dim_type)
-        dimension_records = dimension.get_unique_ids()
-
-        found_id = False
-        dim_columns = set()
-        for col in load_data.columns:
-            if col == "id":
-                found_id = True
-                continue
-            if col == "timestamp":
-                continue
-            dim_columns.add(col)
-
-        if not found_id:
-            raise DSGInvalidDataset("load_data does not include an 'id' column")
-
-        if dimension_records != dim_columns:
-            mismatch = dimension_records.symmetric_difference(dim_columns)
-            raise DSGInvalidDataset(
-                f"Mismatch between load data columns and dimension={dim_type.value} records. Mismatched={mismatch}"
-            )
+        schema_handler = self.make_dataset_schema_handler(config)
+        schema_handler.check_consistency()
 
     @property
     def dimension_manager(self):

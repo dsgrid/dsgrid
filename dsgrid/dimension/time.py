@@ -11,6 +11,7 @@ class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
+    NOOP = "noop"
 
 
 class RepresentativePeriodFormat(DSGEnum):
@@ -190,8 +191,8 @@ class TimeZone(DSGEnum):
 
 class DatetimeRange:
     def __init__(self, start, end, frequency, leap_day_adjustment: LeapDayAdjustmentType):
-        self.start = start.to_pydatetime()
-        self.end = end.to_pydatetime()
+        self.start = start
+        self.end = end
         self.frequency = frequency
         self.leap_day_adjustment = leap_day_adjustment
 
@@ -221,8 +222,9 @@ class DatetimeRange:
         datetime
 
         """
-        cur = self.start
-        end = self.end + self.frequency  # to make end time inclusive
+
+        cur = self.start.to_pydatetime()
+        end = self.end.to_pydatetime() + self.frequency  # to make end time inclusive
 
         while cur < end:
             if not (
@@ -257,9 +259,16 @@ class DatetimeRange:
 class AnnualTimeRange(DatetimeRange):
     def iter_timestamps(self):
         """Return a list of years (datetime obj) on Jan 1st"""
-        tz = self.start.tzinfo
-        for year in range(self.start.year, self.end.year + 1):
+        start = self.start.to_pydatetime()
+        end = self.end.to_pydatetime()
+        tz = start.tzinfo
+        for year in range(start.year, end.year + 1):
             yield datetime.datetime(year=year, month=1, day=1, tzinfo=tz)
+
+
+class NoOpTimeRange(DatetimeRange):
+    def iter_timestamps(self):
+        yield None
 
 
 def make_time_range(start, end, frequency, leap_day_adjustment):
@@ -268,10 +277,8 @@ def make_time_range(start, end, frequency, leap_day_adjustment):
     """
     if frequency == datetime.timedelta(days=365):
         return AnnualTimeRange(start, end, frequency, leap_day_adjustment)
-    elif frequency == datetime.timedelta(days=366):
-        raise ValueError(
-            "366 days not allowed for frequency, use 365 days to specify annual frequency."
-        )
+    elif frequency == datetime.timedelta(days=0):
+        return NoOpTimeRange(start, end, frequency, leap_day_adjustment)
     return DatetimeRange(start, end, frequency, leap_day_adjustment)
 
 

@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from dsgrid.dimension.time import make_time_range
+from dsgrid.dimension.time import TimeZone, make_time_range
 from .dimensions import NoOpTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -12,8 +12,8 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def model_class():
         return NoOpTimeDimensionModel
 
-    def check_dataset_time_consistency(self, load_data_df):
-        pass
+    def check_dataset_time_consistency(self, load_data_for_time_check):
+        return load_data_for_time_check
 
     def convert_dataframe(self, df):
         return df
@@ -38,4 +38,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
         return []
 
     def get_tzinfo(self):
-        return None
+        return TimeZone.NONE
+
+    def get_time_ranges_tzinfo(self):
+        return TimeZone.NONE

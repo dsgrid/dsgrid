@@ -47,18 +47,20 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return groupby_cols
 
-    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data_df):
+    def _check_dataset_time_consistency(self, config: DatasetConfig, load_data_for_time_check):
         """Check dataset time consistency such that:
         1. time range(s) match time config record;
         2. all dimension combinations return the same set of time range(s).
 
         """
         time_dim = config.get_dimension(DimensionType.TIME)
-        time_dim.check_dataset_time_consistency(load_data_df)
+        load_data_for_time_check = time_dim.check_dataset_time_consistency(
+            load_data_for_time_check
+        )
         if time_dim.model.time_type != TimeDimensionType.NOOP:
-            self._check_dataset_time_consistency_by_dimensions(time_dim, load_data_df)
+            self._check_dataset_time_consistency_by_dimensions(time_dim, load_data_for_time_check)
 
-    def _check_dataset_time_consistency_by_dimensions(self, time_dim, load_data_df):
+    def _check_dataset_time_consistency_by_dimensions(self, time_dim, load_data_for_time_check):
         """
         Check dataset time consistency such that all dimension combinations return the same set of time ranges.
         """
@@ -69,10 +71,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         expected_timestamps = time_range.list_time_range()
         expected_count = len(expected_timestamps)
 
-        groupby_cols = self.get_columns_for_unique_arrays(time_dim, load_data_df)
+        groupby_cols = self.get_columns_for_unique_arrays(time_dim, load_data_for_time_check)
         time_col = time_dim.get_timestamp_load_data_columns()
         timestamps_by_dims = (
-            load_data_df[time_col + groupby_cols]
+            load_data_for_time_check[time_col + groupby_cols]
             .groupby(groupby_cols)
             .agg(F.countDistinct(*time_col).alias("distinct_timestamps"))
         )

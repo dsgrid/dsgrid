@@ -47,7 +47,10 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         return self._format_handler.get_timestamp_load_data_columns()
 
     def get_tzinfo(self):
-        return None
+        return TimeZone.NONE
+
+    def get_time_ranges_tzinfo(self):
+        return TimeZone.NONE
 
 
 class RepresentativeTimeFormatHandlerBase(abc.ABC):
@@ -105,15 +108,11 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
         """
 
     def get_tzinfo(self):
-        """Return a tzinfo instance for this dimension.
-
-        Returns
-        -------
-        tzinfo
-
-        """
         assert self.model.timezone is not TimeZone.LOCAL
-        return self.model.timezone.tz
+        return self.model.timezone
+
+    def get_time_ranges_tzinfo(self):
+        return self.model.ranges_timezone
 
 
 OneWeekPerMonthByHourType = namedtuple(

@@ -71,7 +71,7 @@ def check_date_range_creation(time_dimension_model):
         freq = "AS"
     else:
         freq = f"{int(hours)}h"
-    tz = config.get_tzinfo()
+    tz = config.get_tzinfo().tz
     ts = pd.date_range(start, end, freq=freq, tz=tz)
 
     # make necessary adjustments for leap_day_adjustment

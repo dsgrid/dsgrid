@@ -381,33 +381,13 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     )
     timezone: TimeZone = Field(
         title="timezone",
-        description="""
-        Time zone of data:
-            UTC, 
-            HawaiiAleutianStandard, 
-            AlaskaStandard, AlaskaPrevailing,
-            PacificStandard, PacificPrevailing, 
-            MountainStandard, MountainPrevailing, 
-            CentralStandard, CentralPrevailing, 
-            EasternStandard, EasternPrevailing,
-            LOCAL 
-        """,
+        description="Time zone of data",
         options=TimeZone.format_descriptions_for_docs(),
     )
-    ranges_timezone: Optional[TimeZone] = Field(
+    ranges_timezone: TimeZone = Field(
         title="timezone_for_time_ranges",
         default=None,
-        description="""
-        Time zone of the ranges specified:
-            UTC, 
-            HawaiiAleutianStandard, 
-            AlaskaStandard, AlaskaPrevailing,
-            PacificStandard, PacificPrevailing, 
-            MountainStandard, MountainPrevailing, 
-            CentralStandard, CentralPrevailing, 
-            EasternStandard, EasternPrevailing,
-            LOCAL
-            """,
+        description='Time zone for the time ranges specified if different from "timezone"',
         options=TimeZone.format_descriptions_for_docs(),
     )
 
@@ -428,7 +408,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     def check_times(cls, ranges, values):
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
-    @validator("ranges_timezone")
+    @validator("ranges_timezone", pre=True)
     def check_ranges_timezone(cls, ranges_timezone, values):
         if ranges_timezone is None:
             return values["timezone"]

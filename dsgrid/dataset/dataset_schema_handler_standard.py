@@ -29,10 +29,13 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         load_data_df = read_dataframe(check_load_data_filename(path))
         load_data_lookup = read_dataframe(check_load_data_lookup_filename(path), cache=True)
         load_data_lookup = self._config.add_trivial_dimensions(load_data_lookup)
+        load_data_for_time_check = load_data_df.join(
+            load_data_lookup[["id", "geography"]], "id", "left"
+        )
         with Timer(timer_stats_collector, "check_lookup_data_consistency"):
             self._check_lookup_data_consistency(self._config, load_data_lookup)
         with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(self._config, load_data_df)
+            self._check_dataset_time_consistency(self._config, load_data_for_time_check)
         with Timer(timer_stats_collector, "check_dataset_internal_consistency"):
             self._check_dataset_internal_consistency(self._config, load_data_df, load_data_lookup)
 

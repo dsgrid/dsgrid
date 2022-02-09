@@ -7,12 +7,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     """Base class for all time dimension configs"""
 
     @abc.abstractmethod
-    def check_dataset_time_consistency(self, load_data_df):
+    def check_dataset_time_consistency(self, load_data_for_time_check):
         """Check consistency of the load data with the time dimension.
 
         Parameters
         ----------
-        load_data_df : pyspark.sql.DataFrame
+        load_data_for_time_check : pyspark.sql.DataFrame
 
         Raises
         ------
@@ -68,10 +68,20 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
     @abc.abstractmethod
     def get_tzinfo(self):
-        """Return a tzinfo instance for this dimension.
+        """Return a TimeZone obj for the time dimension in data.
 
         Returns
         -------
-        tzinfo | None
+        TimeZone
+
+        """
+
+    @abc.abstractmethod
+    def get_time_ranges_tzinfo(self):
+        """Return a TimeZone obj for the time ranges specified in config.
+
+        Returns
+        -------
+        TimeZone
 
         """

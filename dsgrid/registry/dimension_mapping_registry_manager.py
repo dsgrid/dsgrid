@@ -4,8 +4,10 @@ import getpass
 import logging
 import os
 from pathlib import Path
+import collections
 
 from prettytable import PrettyTable
+import pyspark.sql.functions as F
 
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.association_tables import AssociationTableConfig
@@ -17,12 +19,13 @@ from dsgrid.exceptions import (
 )
 from dsgrid.data_models import serialize_model
 from dsgrid.registry.common import ConfigKey, make_initial_config_registration, ConfigKey
-from dsgrid.utils.files import dump_data
 from .dimension_mapping_registry import DimensionMappingRegistry, DimensionMappingRegistryModel
 from .dimension_registry_manager import DimensionRegistryManager
 from .registry_base import RegistryBaseModel
 from .registry_manager_base import RegistryManagerBase
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
+from dsgrid.utils.files import dump_data
+from dsgrid.utils.spark import models_to_dataframe
 
 
 logger = logging.getLogger(__name__)
@@ -108,16 +111,11 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 )
 
     def _check_records_against_dimension_records(self, config):
+        """
+        Check that records in mappings are subsets of from and to dimension records.
+        """
         for mapping in config.model.mappings:
-            actual_from_records = set()
-            for record in mapping.records:
-                if record.from_id in actual_from_records:
-                    raise DSGInvalidDimensionMapping(
-                        f"{record.from_id} is listed twice in {mapping.filename}"
-                    )
-                actual_from_records.add(record.from_id)
-
-            actual_to_records = {x.to_id for x in mapping.records}
+            actual_from_records = {x.from_id for x in mapping.records}
             from_dimension = self._dimension_mgr.get_by_id(mapping.from_dimension.dimension_id)
             allowed_from_records = from_dimension.get_unique_ids()
             diff = actual_from_records.difference(allowed_from_records)
@@ -130,6 +128,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             # Note: this code cannot complete verify 'to' records. A dataset may be registering a
             # mapping to a project's dimension for a specific data source, but that information
             # is not available here.
+            actual_to_records = {x.to_id for x in mapping.records}
             to_dimension = self._dimension_mgr.get_by_id(mapping.to_dimension.dimension_id)
             allowed_to_records = to_dimension.get_unique_ids()
             if None in actual_to_records:
@@ -147,8 +146,52 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         Check:
         - from_id and to_id column names
         - check for duplicate IDs and log a warning if they exist (sometimes we want them to exist if it is an aggregation)
+
+        Implemented:
+        - allow duplicates in from_id if fraction col is explicitly filled out, log warning when fraction sums > 1;
+        - duplicates in to_id is always allowed but logged when found.
         """
-        pass
+        for mapping in config.model.mappings:
+            actual_fractions = {x.fraction for x in mapping.records}
+            if len(actual_fractions) == 1 and None in actual_fractions:
+                allow_dup_from_records = False
+            else:
+                allow_dup_from_records = True
+
+            actual_from_records = [x.from_id for x in mapping.records]
+            self._check_for_duplicates_in_list(
+                actual_from_records, allow_dup_from_records, mapping.filename, "from_id"
+            )
+            actual_to_records = [x.to_id for x in mapping.records]
+            self._check_for_duplicates_in_list(actual_to_records, True, mapping.filename, "to_id")
+            # breakpoint()
+            if allow_dup_from_records:
+                mapping_df = models_to_dataframe(mapping.records)
+                mapping_sum_df = (
+                    mapping_df.groupBy("from_id")
+                    .agg(F.sum("fraction").alias("sum_fraction"))
+                    .sort(F.desc("sum_fraction"), "from_id")
+                )
+                large_sum_fracs = mapping_sum_df.filter(F.col("sum_fraction") > 1)
+                if large_sum_fracs.count() > 0:
+                    large_sum_from_id = {
+                        x.from_id for x in large_sum_fracs[["from_id"]].distinct().collect()
+                    }
+                    logger.info(
+                        f"WARNING: {mapping.filename} contains {large_sum_fracs.count()} from_id(s) whose fraction sum is greater than 1.\n from_id={large_sum_from_id}"
+                    )
+
+    @staticmethod
+    def _check_for_duplicates_in_list(lst: list, allow_dup, mapping_name, id_type="from_id"):
+        """Check list for duplicates"""
+        dups = [x for x, n in collections.Counter(lst).items() if n > 1]
+        if len(dups) > 0:
+            logger.info(f"WARNING: {mapping_name} contains duplicated {id_type} records={dups}.")
+            if not allow_dup:
+                raise DSGInvalidDimensionMapping(
+                    f"{mapping_name} contains duplicated {id_type} records={dups}. "
+                    'If duplicates are required, ensure that a "fraction" col is provided in the mapping.'
+                )
 
     def get_by_id(self, config_id, version=None):
         self._check_if_not_registered(config_id)

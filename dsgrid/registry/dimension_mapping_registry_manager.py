@@ -19,6 +19,7 @@ from dsgrid.data_models import serialize_model
 from dsgrid.registry.common import ConfigKey, make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import dump_data
 from .dimension_mapping_registry import DimensionMappingRegistry, DimensionMappingRegistryModel
+from .dimension_mapping_update_checker import DimensionMappingUpdateChecker
 from .dimension_registry_manager import DimensionRegistryManager
 from .registry_base import RegistryBaseModel
 from .registry_manager_base import RegistryManagerBase
@@ -303,12 +304,19 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
+        old_config = self.get_by_id(config.config_id)
+        checker = DimensionMappingUpdateChecker(old_config.model, config.model)
+        checker.run()
         registry = self.get_registry_config(config.config_id)
         old_key = ConfigKey(config.config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)
         new_key = ConfigKey(config.config_id, version)
         self._mappings.pop(old_key, None)
         self._mappings[new_key] = config
+
+        if not self.offline_mode:
+            self.sync_push(self._path)
+
         return version
 
     def remove(self, config_id):

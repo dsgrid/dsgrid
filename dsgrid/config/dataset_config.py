@@ -218,6 +218,7 @@ class DatasetConfigModel(DSGBaseModel):
             "For posterity, dataset_id cannot be the same as the ``data_source``"
             " (e.g., dataset cannot be 'ComStock')",
         ),
+        updateable=False,
     )
     dataset_type: InputDatasetType = Field(
         title="dataset_type",

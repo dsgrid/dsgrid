@@ -10,6 +10,7 @@ import uuid
 
 
 from dsgrid.tests.common import (
+    check_configs_update,
     create_local_test_registry,
     make_test_project_dir,
     make_test_data_dir,
@@ -67,7 +68,11 @@ def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data
             check_configs_dimension_mappings(s3)
             check_configs_projects_and_datasets(s3)
             check_data(s3)
-
+            updated_ids = check_configs_update(base_dir, manager)
+            check_dimension_version(s3, *updated_ids[0])
+            check_dimension_mapping_version(s3, *updated_ids[1])
+            check_dataset_version(s3, *updated_ids[2])
+            check_project_version(s3, *updated_ids[3])
     finally:
         clean_remote_registry(s3_cloud_storage._s3_filesystem)
 
@@ -113,15 +118,37 @@ def check_configs_projects_and_datasets(s3):
             for file in files:
                 if "projects" in path:
                     assert file in ("1.0.0", "1.1.0", "registry.toml")
+                    expected_file_count = 2  # project.toml and lookup_sector_to_subsector.csv
                 else:
                     assert file in ("1.0.0", "registry.toml")
+                    expected_file_count = 1  # dataset.toml
                 if file != "registry.toml":
                     files2 = s3.listdir(f"{path}/{folder}/{file}")
                     for file in files2:
-                        assert len(files2) == 1
+                        assert len(files2) == expected_file_count
                         extensions = [file.split(".")[-1] for file in files2]
                         for extension in extensions:
-                            assert extension in ("toml")
+                            assert extension in ("csv", "toml")
+
+
+def check_dimension_version(s3, config_id, dimension_type, version):
+    assert "dimension.toml" in s3.listdir(
+        f"configs/dimensions/{dimension_type.value}/{config_id}/{version}"
+    )
+
+
+def check_dimension_mapping_version(s3, config_id, version):
+    assert "dimension_mapping.toml" in s3.listdir(
+        f"configs/dimension_mappings/{config_id}/{version}"
+    )
+
+
+def check_dataset_version(s3, config_id, version):
+    assert "dataset.toml" in s3.listdir(f"configs/datasets/{config_id}/{version}")
+
+
+def check_project_version(s3, config_id, version):
+    assert "project.toml" in s3.listdir(f"configs/projects/{config_id}/{version}")
 
 
 def check_data(s3):

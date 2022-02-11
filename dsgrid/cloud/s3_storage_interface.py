@@ -12,6 +12,7 @@ from dsgrid.exceptions import DSGMakeLockError, DSGRegistryLockError
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
 from dsgrid.filesystem.s3_filesystem import S3Filesystem
 from dsgrid.utils.run_command import check_run_command
+from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,7 @@ class S3StorageInterface(CloudStorageInterface):
                 )
             filepath.unlink()
 
+    @track_timing(timer_stats_collector)
     def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False, is_file=False):
         if delete_local:
             local_contents = self._local_filesystem.rglob(local_path)
@@ -142,5 +144,6 @@ class S3StorageInterface(CloudStorageInterface):
                     logger.info("delete: %s because it is not in %s", relcontent, remote_path)
         self._sync(remote_path, local_path, exclude, is_file)
 
+    @track_timing(timer_stats_collector)
     def sync_push(self, remote_path, local_path, exclude=None):
         self._sync(local_path, remote_path, exclude)

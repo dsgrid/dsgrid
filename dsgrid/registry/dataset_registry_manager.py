@@ -1,41 +1,21 @@
 """Manages the registry for dimension datasets"""
 
-import datetime
 import getpass
 import logging
 import os
 from pathlib import Path
-from datetime import timedelta
-import pandas as pd
 
-from pyspark.sql import SparkSession
-import pyspark.sql.functions as F
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.dataset_config import (
-    DatasetConfig,
-    DataSchemaType,
-)
-from dsgrid.data_models import serialize_model
-from dsgrid.dataset.dataset import Dataset
-from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
-from dsgrid.dimension.time import TimeInvervalType, TimeDimensionType
-from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimension, DSGInvalidDataset
-from dsgrid.registry.common import (
-    make_initial_config_registration,
-    ConfigKey,
-    DatasetRegistryStatus,
-)
-from dsgrid.utils.files import dump_data, load_data
-from dsgrid.utils.spark import read_dataframe, get_unique_values
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
+from dsgrid.dimension.base_models import check_required_dimensions
+from dsgrid.exceptions import DSGValueNotRegistered
+from dsgrid.registry.common import make_initial_config_registration, ConfigKey
+from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import timer_stats_collector, Timer
-from .dataset_registry import (
-    DatasetRegistry,
-    DatasetRegistryModel,
-)
+from .dataset_registry import DatasetRegistry, DatasetRegistryModel
 from .registry_manager_base import RegistryManagerBase
-from dsgrid.dataset.dataset_schema_handler_standard import StandardDatasetSchemaHandler
-from dsgrid.dataset.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +27,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         super().__init__(path, fs_interface)
         self._datasets = {}  # ConfigKey to DatasetModel
         self._dimension_mgr = None
+        self._dimension_mapping_mgr = None
 
     @classmethod
-    def load(cls, path, params, dimension_manager):
+    def load(cls, path, params, dimension_manager, dimension_mapping_manager):
         mgr = cls._load(path, params)
         mgr.dimension_manager = dimension_manager
+        mgr.dimension_mapping_manager = dimension_mapping_manager
         return mgr
 
     @staticmethod
@@ -62,15 +44,6 @@ class DatasetRegistryManager(RegistryManagerBase):
     def registry_class():
         return DatasetRegistry
 
-    @staticmethod
-    def make_dataset_schema_handler(config):
-        if config.model.data_schema_type == DataSchemaType.STANDARD:
-            return StandardDatasetSchemaHandler(config)
-        elif config.model.data_schema_type == DataSchemaType.ONE_TABLE:
-            return OneTableDatasetSchemaHandler(config)
-        else:
-            assert False, config.model.data_schema_type
-
     def _run_checks(self, config: DatasetConfig):
         self._check_if_already_registered(config.model.dataset_id)
         check_required_dimensions(config.model.dimensions, "dataset dimensions")
@@ -78,9 +51,10 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._check_dataset_consistency(config)
 
     def _check_dataset_consistency(self, config: DatasetConfig):
-        spark = SparkSession.getActiveSession()
         path = Path(config.model.path)
-        schema_handler = self.make_dataset_schema_handler(config)
+        schema_handler = make_dataset_schema_handler(
+            config, self._dimension_mgr, self._dimension_mapping_mgr
+        )
         schema_handler.check_consistency()
 
     @property
@@ -90,6 +64,14 @@ class DatasetRegistryManager(RegistryManagerBase):
     @dimension_manager.setter
     def dimension_manager(self, val):
         self._dimension_mgr = val
+
+    @property
+    def dimension_mapping_manager(self):
+        return self._dimension_mapping_mgr
+
+    @dimension_mapping_manager.setter
+    def dimension_mapping_manager(self, val):
+        self._dimension_mapping_mgr = val
 
     def get_by_id(self, config_id, version=None):
         self._check_if_not_registered(config_id)
@@ -210,6 +192,12 @@ class DatasetRegistryManager(RegistryManagerBase):
         new_key = ConfigKey(config.config_id, version)
         self._datasets.pop(old_key, None)
         self._datasets[new_key] = config
+
+        if not self.offline_mode:
+            self.sync_push(self.get_registry_directory(config.config_id))
+            self.sync_push(self.get_registry_data_directory(config.config_id))
+
+        return version
 
     def remove(self, config_id):
         self._remove(config_id)

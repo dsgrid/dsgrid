@@ -27,6 +27,7 @@ def make_test_data_registry(
     registry_path,
     src_dir,
     dataset_path=None,
+    include_projects=True,
     include_datasets=True,
     offline_mode=True,
 ) -> RegistryManager:
@@ -40,13 +41,18 @@ def make_test_data_registry(
         Path containing source config files
     dataset_path : Path | None
         If None, use "DSGRID_LOCAL_DATA_DIRECTORY" env variable.
+    include_projects : bool
+        If False, do not register any projects.
     include_datasets : bool
         If False, do not register any datasets.
     offline_mode : bool
         If False, use the test remote registry.
     """
+    if not include_projects and include_datasets:
+        raise Exception("If include_datasets is True then include_projects must also be True.")
+
     if dataset_path is None:
-        dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
+        dataset_path = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY)
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
     project_dimension_mapping_config = src_dir / "dimension_mappings.toml"
@@ -95,7 +101,9 @@ def make_test_data_registry(
     replace_dimension_mapping_uuids_from_registry(path, needs_replacements)
     replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
 
-    manager.project_manager.register(project_config_file, user, log_message)
+    if include_projects:
+        manager.project_manager.register(project_config_file, user, log_message)
+
     if include_datasets:
         manager.dataset_manager.register(dataset_config_file, user, log_message)
         manager.project_manager.submit_dataset(

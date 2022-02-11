@@ -1,28 +1,42 @@
 """Manages the registry for dimension projects"""
+
+from dsgrid.config.dimension_associations import DimensionAssociations
 import getpass
+import io
 import itertools
 import logging
+from contextlib import redirect_stdout
+from typing import List
 
-from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
-from dsgrid.config.project_config import ProjectConfig
-from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGValueNotRegistered, DSGDuplicateValueRegistered
+from dsgrid.exceptions import (
+    DSGInvalidDataset,
+    DSGInvalidDimensionAssociation,
+    DSGValueNotRegistered,
+    DSGDuplicateValueRegistered,
+)
+from dsgrid import timer_stats_collector
+from dsgrid.common import REGISTRY_FILENAME
+from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dimension_mapping_base import (
+    DimensionMappingReferenceModel,
+    DimensionMappingReferenceListModel,
+)
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.registry.common import (
     make_initial_config_registration,
     ConfigKey,
     DatasetRegistryStatus,
     ProjectRegistryStatus,
 )
-from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.utils.spark import create_dataframe_from_dimension_ids
+from dsgrid.utils.timing import track_timing, timer_stats_collector, Timer
 from .common import VersionUpdateType
+from .project_update_checker import ProjectUpdateChecker
 from .dataset_registry_manager import DatasetRegistryManager
 from .dimension_registry_manager import DimensionRegistryManager
-from .project_registry import (
-    ProjectRegistry,
-    ProjectRegistryModel,
-)
+from .project_registry import ProjectRegistry, ProjectRegistryModel
 from .registry_manager_base import RegistryManagerBase
 
 
@@ -115,6 +129,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     def _register(self, config, submitter, log_message, force=False):
         self._check_if_already_registered(config.model.project_id)
+        self._run_checks(config)
 
         registration = make_initial_config_registration(submitter, log_message)
 
@@ -155,6 +170,20 @@ class ProjectRegistryManager(RegistryManagerBase):
             registration.version,
         )
 
+    def _run_checks(self, config: ProjectConfig):
+        self._check_dimension_associations(config)
+
+    def _check_dimension_associations(self, config: ProjectConfig):
+        for dimension_type in config.dimension_associations.dimension_types:
+            assoc_ids = config.dimension_associations.get_unique_ids(dimension_type)
+            dim = config.get_base_dimension(dimension_type)
+            dim_record_ids = dim.get_unique_ids()
+            diff = assoc_ids.difference(dim_record_ids)
+            if diff:
+                raise DSGInvalidDimensionAssociation(
+                    f"Dimension association for {dimension_type} has invalid records: {diff}"
+                )
+
     def submit_dataset(
         self, project_id, dataset_id, dimension_mapping_files, submitter, log_message
     ):
@@ -189,7 +218,12 @@ class ProjectRegistryManager(RegistryManagerBase):
             )
 
     def _submit_dataset(
-        self, project_config, dataset_id, dimension_mapping_files, submitter, log_message
+        self,
+        project_config: ProjectConfig,
+        dataset_id,
+        dimension_mapping_files,
+        submitter,
+        log_message,
     ):
         self._check_if_not_registered(project_config.config_id)
         dataset_config = self._dataset_mgr.get_by_id(dataset_id)
@@ -207,9 +241,11 @@ class ProjectRegistryManager(RegistryManagerBase):
                 mapping_references.append(ref)
 
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
-        dataset = Dataset.load(dataset_config)
-        # TODO: does this function need mapping_references?
-        # self.check_dataset_base_to_project_base_mappings(project_config, dataset_config, dataset)
+        self._check_dataset_base_to_project_base_mappings(
+            project_config,
+            dataset_config,
+            mapping_references,
+        )
 
         if self.dry_run_mode:
             logger.info(
@@ -220,6 +256,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             )
             return
 
+        dataset_model.mapping_references = mapping_references
         dataset_model.status = DatasetRegistryStatus.REGISTERED
         if project_config.are_all_datasets_submitted():
             new_status = ProjectRegistryStatus.COMPLETE
@@ -239,36 +276,96 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_config.config_id,
         )
 
-    # def check_dataset_base_to_project_base_mappings(self, project_config, dataset_config, dataset):
-    #    """Check that the dataset contains all mappings of base dimensions.
+    @track_timing(timer_stats_collector)
+    def _check_dataset_base_to_project_base_mappings(
+        self,
+        project_config: ProjectConfig,
+        dataset_config: DatasetConfig,
+        mapping_references: List[DimensionMappingReferenceModel],
+    ):
+        """Check that a dataset has all project-required dimension records."""
+        handler = make_dataset_schema_handler(
+            dataset_config, self._dimension_mgr, self._dimension_mapping_mgr, mapping_references
+        )
+        pivot_dimension = handler.get_pivot_dimension_type()
+        exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension])
+        types = [x for x in DimensionType if x not in exclude_dims]
+        dimension_pairs = [tuple(sorted((x, y))) for x, y in itertools.combinations(types, 2)]
 
-    #    Parameters
-    #    ----------
-    #    project_config : ProjectConfig
-    #    dataset_config : DatasetConfig
-    #    dataset : Dataset
+        data_source = dataset_config.model.data_source
+        dim_table = handler.get_unique_dimension_rows().drop("id")
+        associations = project_config.dimension_associations
+        # TODO: check a unified project table against dim_table
+        # project_table = self._make_single_table(project_config, data_source, pivot_dimension)
+        for type1, type2 in dimension_pairs:
+            records = associations.get_associations(type1, type2, data_source=data_source)
+            if records is None:
+                records = self._get_project_dimensions_table(project_config, type1, type2)
+            columns = (type1.value, type2.value)
+            with Timer(timer_stats_collector, "evaluate dimension record counts"):
+                record_count = records.count()
+                count = records.select(*columns).intersect(dim_table.select(*columns)).count()
+            if count != record_count:
+                table = records.select(*columns).exceptAll(dim_table.select(*columns))
+                dataset_id = dataset_config.model.dataset_id
+                with io.StringIO() as buf, redirect_stdout(buf):
+                    table.show(n=table.count())
+                    logger.error(
+                        "Dataset %s is missing records for %s:\n%s",
+                        dataset_id,
+                        (type1, type2),
+                        buf.getvalue(),
+                    )
+                raise DSGInvalidDataset(
+                    f"Dataset {dataset_id} is missing records for {(type1, type2)}"
+                )
+        self._check_pivot_dimension_columns(project_config, handler, pivot_dimension)
 
-    #    Raises
-    #    ------
-    #    DSGInvalidDimensionMapping
-    #        Raised if a requirement is violated.
+    def _make_single_table(self, config: ProjectConfig, data_source, pivot_dimension):
+        # TODO: prototype code from Meghan - needs testing
+        ds = DimensionType.DATA_SOURCE.value
+        table = config.dimension_associations.table.filter(f"{ds} = '{data_source}'").drop(
+            pivot_dimension.value
+        )
+        exclude = set((DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension))
+        all_dimensions = set(d.value for d in DimensionType if d not in exclude)
+        missing_dimensions = all_dimensions.difference(table.columns)
+        for dim in missing_dimensions:
+            table_count = table.count()
+            other = (
+                config.get_base_dimension(DimensionType(dim))
+                .get_records_dataframe()
+                .select("id")
+                .withColumnRenamed("id", dim)
+            )
+            table = table.crossJoin(other)
+            assert table.count() == other.count() * table_count
 
-    #    """
-    #    needs_full_join = set()
-    #    types = [x for x in DimensionType if x != DimensionType.TIME]
-    #    for type1, type2 in itertools.product(types, types):
-    #        if type1 != type2:
-    #            needs_full_join.add((type1, type2))
+        return table
 
-    #    for mapping_ref in project_config.model.dimension_mappings.base_to_base:
-    #        from_dimension = mapping_ref.from_dimension_type
-    #        to_dimension = mapping_ref.to_dimension_type
-    #        needs_full_join.remove((from_dimension, to_dimension))
-    #        mapping_config = self._dimension_mapping_mgr.get_by_id(mapping_ref.mapping_id)
-    #        mapping_records = models_to_dataframe(mapping_config.model.records)
-    #        # TODO perform checks across mapping_records, dataset.load_data, dataset.load_data_lookup
+    @staticmethod
+    def _get_project_dimensions_table(project_config, type1, type2):
+        pdim1 = project_config.get_base_dimension(type1)
+        pdim1_ids = pdim1.get_unique_ids()
+        pdim2 = project_config.get_base_dimension(type2)
+        pdim2_ids = pdim2.get_unique_ids()
+        records = itertools.product(pdim1_ids, pdim2_ids)
+        return create_dataframe_from_dimension_ids(records, type1, type2)
 
-    #    # TODO Perform checks on all from-to dimensions in needs_full_join.
+    @staticmethod
+    def _check_pivot_dimension_columns(project_config, handler, dim_type):
+        d_dim_ids = set(handler.get_pivot_dimension_columns_mapped_to_project().values())
+        associations = project_config.dimension_associations
+        table = associations.get_associations(DimensionType.DATA_SOURCE, dim_type)
+        if table is None:
+            p_dim_ids = project_config.get_base_dimension(dim_type).get_unique_ids()
+        else:
+            p_dim_ids = {
+                getattr(x, dim_type.value) for x in table.select(dim_type.value).collect()
+            }
+        diff = d_dim_ids.symmetric_difference(p_dim_ids)
+        if diff:
+            raise DSGInvalidDataset(f"load data pivoted columns have invalid values: {diff}")
 
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
@@ -284,18 +381,23 @@ class ProjectRegistryManager(RegistryManagerBase):
             submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(config.config_id)
         with self.cloud_interface.make_lock_file(lock_file_path):
-            # TODO DSGRID-81: Adding new dimensions or dimension mappings requires
-            # re-validation of registered datasets.
-            # TODO: When/how does the project status get updated?
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
+        old_config = self.get_by_id(config.config_id)
+        checker = ProjectUpdateChecker(old_config.model, config.model)
+        result = checker.run()
+        self._run_checks(config)
         registry = self.get_registry_config(config.config_id)
         old_key = ConfigKey(config.config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)
         new_key = ConfigKey(config.config_id, version)
         self._projects.pop(old_key, None)
         self._projects[new_key] = config
+
+        if not self.offline_mode:
+            self.sync_push(self.get_registry_directory(config.config_id))
+
         return version
 
     def remove(self, config_id):

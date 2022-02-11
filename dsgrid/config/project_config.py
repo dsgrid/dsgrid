@@ -1,14 +1,18 @@
 import itertools
 import logging
+import os
+import shutil
+from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from pydantic import Field
 from pydantic import root_validator, validator
 from semver import VersionInfo
 
-from .config_base import ConfigBase
+from .config_base import ConfigWithDataFilesBase
 from .dataset_config import InputDatasetType
 from .dataset_config import DatasetConfig
+from .dimension_associations import DimensionAssociations
 from .dimension_mapping_base import DimensionMappingReferenceModel
 from .dimensions import (
     DimensionReferenceModel,
@@ -16,10 +20,14 @@ from .dimensions import (
 )
 from dsgrid.exceptions import (
     DSGInvalidField,
+    DSGInvalidDimension,
+    DSGInvalidDimensionAssociation,
     DSGInvalidDimensionMapping,
+    DSGInvalidOperation,
+    DSGInvalidRegistryState,
     DSGMissingDimensionMapping,
 )
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, serialize_model
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.registry.common import (
     ProjectRegistryStatus,
@@ -30,6 +38,8 @@ from dsgrid.dimension.store import DimensionStore
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 
+from dsgrid.utils.files import dump_data
+from dsgrid.utils.spark import read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -49,7 +59,7 @@ class DimensionsModel(DSGBaseModel):
             " one dimension reference per type is allowed.",
         ),
     )
-    supplemental_dimensions: Optional[List[DimensionReferenceModel]] = Field(
+    supplemental_dimensions: List[DimensionReferenceModel] = Field(
         title="supplemental_dimensions",
         description="List of registry references for a project's supplemental dimensions.",
         requirements=(
@@ -63,7 +73,6 @@ class DimensionsModel(DSGBaseModel):
             "base data.",
         ),
         default=[],
-        optional=True,
     )
 
     @validator("base_dimensions")
@@ -106,13 +115,15 @@ class InputDatasetModel(DSGBaseModel):
     dataset_id: str = Field(
         title="dataset_id",
         description="Unique dataset identifier.",
+        updateable=False,
     )
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
         description="Dataset type.",
         options=InputDatasetType.format_for_docs(),
+        updateable=False,
     )
-    version: Optional[Union[str, None, VersionInfo]] = Field(
+    version: Union[str, None, VersionInfo] = Field(
         title="version",
         description="Version of the registered dataset",
         default=None,
@@ -124,14 +135,21 @@ class InputDatasetModel(DSGBaseModel):
             "The version string must be in semver format (e.g., '1.0.0') and it must be a valid/"
             "existing version in the registry.",
         ),
+        updateable=False,
         # TODO: add notes about warnings for outdated versions? DSGRID-189.
     )
-    status: Optional[DatasetRegistryStatus] = Field(
+    mapping_references: List[DimensionMappingReferenceModel] = Field(
+        title="mapping_references",
+        description="Defines how to map the dataset dimensions to the project.",
+        default=[],
+    )
+    status: DatasetRegistryStatus = Field(
         title="status",
         description="Registration status of the dataset, added by dsgrid.",
         default=DatasetRegistryStatus.UNREGISTERED,
         dsg_internal=True,
         notes=("status is "),
+        updateable=False,
     )
     # TODO this model_sector must be validated in the dataset_config
     # TODO: this is only necessary for input_model types
@@ -142,6 +160,7 @@ class InputDatasetModel(DSGBaseModel):
         title="model_sector",
         description="Model sector ID, required only if dataset type is ``sector_model``.",
         optional=True,
+        updateable=False,
     )
 
     @validator("version")
@@ -158,34 +177,17 @@ class InputDatasetModel(DSGBaseModel):
 class DimensionMappingsModel(DSGBaseModel):
     """Defines all dimension mappings associated with a dsgrid project, including base-to-base, base-to-supplemental, and dataset-to-project mappings."""
 
-    base_to_base: Optional[List[DimensionMappingReferenceModel]] = Field(
-        title="base_to_base",
-        description="Base dimension to base dimension mappings (e.g., sector to subsector) that "
-        "define the project dimension expectations for input datasets and allowable queries.",
-        default=[],
-        optional=True,
-        # TODO: DSGRID-186
-        # notes=(
-        #     "At the project-level, base-to-base mappings are optional. If no base-to-base"
-        #     " dimension mapping is provided, dsgrid assumes a full-join of all base dimension"
-        #     " records. For example, if a full-join is assumed for the sector dimension, then all"
-        #     " sectors will map to all subsectors, they will also map to all geographies, all"
-        #     " model years, and so forth.",
-        # ),
-    )
-    base_to_supplemental: Optional[List[DimensionMappingReferenceModel]] = Field(
+    base_to_supplemental: List[DimensionMappingReferenceModel] = Field(
         title="base_to_supplemental",
         description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
         " used to support various queries and dimension transformations.",
         default=[],
-        optional=True,
     )
-    dataset_to_project: Optional[Dict[str, List[DimensionMappingReferenceModel]]] = Field(
+    dataset_to_project: Dict[str, List[DimensionMappingReferenceModel]] = Field(
         title="dataset_to_project",
         description="Dataset-to-project mappings map dataset dimensions to project dimensions.",
         default={},
         dsg_internal=True,
-        optional=True,
         notes=(
             "Once a dataset is submitted to a project, dsgrid adds the dataset-to-project mappings"
             " to the project config",
@@ -193,8 +195,15 @@ class DimensionMappingsModel(DSGBaseModel):
             " mappings are only supplied if a dataset's dimensions do not match the project's"
             " dimension. ",
         ),
+        updateable=False,
         # TODO: need to document missing dimension records, fill values, etc. DSGRID-191.
     )
+
+    @root_validator(pre=True)
+    def pre_process(cls, values):
+        # Some projects were registered with this field. Keep backwards compatibility.
+        values.pop("base_to_base", None)
+        return values
 
 
 class ProjectConfigModel(DSGBaseModel):
@@ -205,6 +214,7 @@ class ProjectConfigModel(DSGBaseModel):
         description="A unique project identifier that is project-specific (e.g., "
         "'standard-scenarios-2021').",
         requirements=("Must not contain any dashes (`-`)",),
+        updateable=False,
     )
     name: str = Field(
         title="name",
@@ -218,11 +228,12 @@ class ProjectConfigModel(DSGBaseModel):
             " searching",
         ),
     )
-    status: Optional[ProjectRegistryStatus] = Field(
+    status: ProjectRegistryStatus = Field(
         title="status",
         description="project registry status",
-        default="Initial Registration",
+        default=ProjectRegistryStatus.INITIAL_REGISTRATION,
         dsg_internal=True,
+        updateable=False,
     )
     datasets: List[InputDatasetModel] = Field(
         title="datasets",
@@ -232,13 +243,12 @@ class ProjectConfigModel(DSGBaseModel):
         title="dimensions",
         description="List of `base` and `supplemental` dimensions.",
     )
-    dimension_mappings: Optional[DimensionMappingsModel] = Field(
+    dimension_mappings: DimensionMappingsModel = Field(
         title="dimension_mappings",
         description="List of project mappings. Initialized with base-to-base and"
         " base-to-supplemental mappings. dataset-to-project mappings are added by dsgrid as"
         " datasets get registered with the project.",
-        default=[],
-        optional=True,
+        default=DimensionMappingsModel(),
         notes=("`[dimension_mappings]` are optional at the project level.",),
     )
     dimension_associations: List = Field(
@@ -257,7 +267,7 @@ class ProjectConfigModel(DSGBaseModel):
         return project_id
 
 
-class ProjectConfig(ConfigBase):
+class ProjectConfig(ConfigWithDataFilesBase):
     """Provides an interface to a ProjectConfigModel."""
 
     def __init__(self, model):
@@ -265,6 +275,8 @@ class ProjectConfig(ConfigBase):
         self._base_dimensions = {}
         self._supplemental_dimensions = {}
         self._dimension_mapping_mgr = None
+        self._base_to_supplemental_mappings = {}
+        self._dimension_associations = None
 
     @staticmethod
     def model_class():
@@ -274,12 +286,27 @@ class ProjectConfig(ConfigBase):
     def config_filename():
         return "project.toml"
 
+    @staticmethod
+    def data_file_fields():
+        return []
+
+    @staticmethod
+    def data_files_fields():
+        return ["dimension_associations"]
+
     @classmethod
     def load(cls, config_file, dimension_manager, dimension_mapping_manager):
-        config = cls._load(config_file)
+        config = super().load(config_file)
+        config.src_dir = os.path.dirname(config_file)
         config.dimension_mapping_manager = dimension_mapping_manager
+        config.load_dimension_associations()
         config.load_dimensions(dimension_manager)
+        config.load_dimension_mappings(dimension_mapping_manager)
         return config
+
+    @property
+    def dimension_associations(self):
+        return self._dimension_associations
 
     @property
     def dimension_mapping_manager(self):
@@ -288,6 +315,83 @@ class ProjectConfig(ConfigBase):
     @dimension_mapping_manager.setter
     def dimension_mapping_manager(self, val: DimensionMappingRegistryManager):
         self._dimension_mapping_mgr = val
+
+    def get_base_dimension(self, dimension_type: DimensionType):
+        """Return the base dimension matching dimension_type.
+
+        Parameters
+        ----------
+        dimension_type : DimensionType
+
+        Returns
+        -------
+        DimensionConfig
+
+        """
+        for key, dim_config in self.base_dimensions.items():
+            if key.type == dimension_type:
+                return dim_config
+        assert False, dimension_type
+
+    def get_supplemental_dimensions(self, dimension_type: DimensionType):
+        """Return the supplemental dimensions matching dimension (if any).
+
+        Parameters
+        ----------
+        dimension_type : DimensionType
+
+        Returns
+        -------
+        DimensionConfig
+
+        """
+        return [v for k, v in self.supplemental_dimensions.items() if k.type == dimension_type]
+
+    def get_base_to_supplemental_dimension_mappings_by_types(self, dimension_type: DimensionType):
+        """Return the base-to-supplemental dimension mappings for the dimension (if any).
+
+        Parameters
+        ----------
+        dimension : DimensionType
+
+        Returns
+        -------
+        list
+            List of DimensionMappingConfig
+
+        """
+        return [
+            x
+            for x in self._base_to_supplemental_mappings.values()
+            if x.model.from_dimension.dimension_type == dimension_type
+        ]
+
+    def has_base_to_supplemental_dimension_mapping_types(self, dimension_type):
+        """Return True if the config has these base-to-supplemental mappings."""
+        return self._has_mapping(
+            dimension_type,
+            dimension_type,
+            self._base_to_supplemental_mappings,
+        )
+
+    @staticmethod
+    def _has_mapping(from_dimension_type, to_dimension_type, mapping):
+        for config in mapping.values():
+            if (
+                config.model.from_dimension.dimension_type == from_dimension_type
+                and config.model.to_dimension.dimension_type == to_dimension_type
+            ):
+                return True
+        return False
+
+    def load_dimension_associations(self):
+        """Load all dimension associations."""
+        # Find out what dimension have no associations which means that all dimension recrods from
+        # the project must be used
+        self._dimension_associations = DimensionAssociations.load(
+            self.src_dir,
+            self.model.dimension_associations,
+        )
 
     def load_dimensions(self, dimension_manager: DimensionRegistryManager):
         """Load all Base Dimensions.
@@ -307,6 +411,21 @@ class ProjectConfig(ConfigBase):
 
         self._base_dimensions.update(base_dimensions)
         self._supplemental_dimensions.update(supplemental_dimensions)
+
+    def load_dimension_mappings(self, dimension_mapping_manager: DimensionMappingRegistryManager):
+        """Load all dimension mappings.
+
+        Parameters
+        ----------
+        dimension_mapping_manager: DimensionMappingRegistryManager
+
+        """
+        base_to_supp = dimension_mapping_manager.load_dimension_mappings(
+            self.model.dimension_mappings.base_to_supplemental
+        )
+
+        self._base_to_supplemental_mappings.update(base_to_supp)
+        # TODO: Once we start using these we may need to store by (from, to) as key instead.
 
     def add_dataset_dimension_mappings(self, dataset_config, references):
         """Add a dataset's dimension mappings to the project.
@@ -416,7 +535,7 @@ class ProjectConfig(ConfigBase):
                     return True
                 return False
 
-        # TODO DT: what about benchmark and historical?
+        # TODO: what about benchmark and historical?
         return False
 
     def iter_datasets(self):

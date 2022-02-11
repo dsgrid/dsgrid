@@ -18,9 +18,12 @@ from dsgrid.tests.make_us_data_registry import make_test_data_registry, replace_
 
 logger = logging.getLogger()
 
+PROJECT_ID = "test_efs"
+DATASET_ID = "test_efs_comstock"
+
 
 def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
-    if "test_efs_comstock" not in os.listdir(make_test_data_dir):
+    if DATASET_ID not in os.listdir(make_test_data_dir):
         logger.info("test_invalid_datasets requires the dsgrid-test-data repository")
         sys.exit(1)
 
@@ -40,7 +43,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
 
         user = getpass.getuser()
         log_message = "test log message"
-        tests = (
+        register_tests = (
             _setup_invalid_load_data_lookup_column_name,
             _setup_invalid_load_data_lookup_no_id,
             _setup_invalid_load_data_lookup_mismatched_records,
@@ -53,7 +56,8 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
         # This is arranged in this way to avoid having to re-create the registry every time,
         # which is quite slow. There is one downside: if one test is able to register the
         # dataset (which would be a bug), later tests will fail even if they should pass.
-        for i, setup_test in enumerate(tests):
+        for i, setup_test in enumerate(register_tests):
+            test_dir = base_dir / f"test_data_dir_{i}"
             try:
                 # Create a new directory because there are collisions with cached
                 # Spark load_data_lookup dataframes.
@@ -65,7 +69,31 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
                 with pytest.raises(exc, match=match_msg):
                     manager.dataset_manager.register(dataset_config_file, user, log_message)
             finally:
-                shutil.rmtree(test_dir)
+                if test_dir.exists():
+                    shutil.rmtree(test_dir)
+
+        submit_tests = (_setup_invalid_load_data_lookup_missing_records,)
+        dimension_mapping_files = [dataset_dir / "dimension_mapping_references.toml"]
+        for i, setup_test in enumerate(submit_tests):
+            test_dir = base_dir / f"test_data_dir_{i}"
+            try:
+                # Create a new directory because there are collisions with cached
+                # Spark load_data_lookup dataframes.
+                replace_dataset_path(dataset_config_file, dataset_path=test_dir)
+                shutil.copytree(make_test_data_dir, test_dir)
+                exc, match_msg = setup_test(test_dir)
+                manager.dataset_manager.register(dataset_config_file, user, log_message)
+                with pytest.raises(exc, match=match_msg):
+                    manager.project_manager.submit_dataset(
+                        PROJECT_ID,
+                        DATASET_ID,
+                        dimension_mapping_files,
+                        user,
+                        log_message,
+                    )
+            finally:
+                if test_dir.exists():
+                    shutil.rmtree(test_dir)
 
 
 def _setup_invalid_load_data_lookup_column_name(data_dir):
@@ -92,6 +120,14 @@ def _setup_invalid_load_data_lookup_mismatched_records(data_dir):
     data = load_line_delimited_json(lookup_file)
     dump_line_delimited_json(data[:1], lookup_file)
     return DSGInvalidDataset, r"load_data_lookup records do not match dimension records"
+
+
+def _setup_invalid_load_data_lookup_missing_records(data_dir):
+    lookup_file = data_dir / "test_efs_comstock" / "load_data_lookup.json"
+    data = load_line_delimited_json(lookup_file)
+    bad_data = [x for x in data if x["id"] is not None]
+    dump_line_delimited_json(bad_data, lookup_file)
+    return DSGInvalidDataset, r"is missing records"
 
 
 def _setup_invalid_load_data_missing_timestamp(data_dir):

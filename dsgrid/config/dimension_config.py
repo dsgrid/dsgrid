@@ -30,6 +30,14 @@ class DimensionBaseConfigWithFiles(ConfigWithDataFilesBase, abc.ABC):
     def config_id(self):
         return self.model.dimension_id
 
+    @staticmethod
+    def data_file_fields():
+        return ["filename"]
+
+    @staticmethod
+    def data_files_fields():
+        return []
+
 
 class DimensionBaseConfigWithoutFiles(ConfigBase, abc.ABC):
     """Base class for dimension configs"""

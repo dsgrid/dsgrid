@@ -21,6 +21,7 @@ from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.project_registry_manager import ProjectRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
+    check_configs_update,
     create_local_test_registry,
     make_test_project_dir,
     TEST_DATASET_DIRECTORY,
@@ -54,7 +55,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         assert dimension_mapping_ids
         dimension_mapping_id = dimension_mapping_ids[0]
         user = getpass.getuser()
-        log_message = "intial registration"
+        log_message = "initial registration"
 
         project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.1.0"))
         assert project_config.model.status == ProjectRegistryStatus.COMPLETE
@@ -95,15 +96,9 @@ def test_register_project_and_dataset(make_test_project_dir):
             dimension_mapping_config = make_test_project_dir / dset_dir / "dimension_mappings.toml"
             dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
 
-        # Test updates to all configs.
-        check_config_update(base_dir, project_mgr, project_id, user, VersionInfo.parse("1.1.0"))
-        check_config_update(base_dir, dataset_mgr, dataset_id, user, VersionInfo.parse("1.0.0"))
-        dim_dir = base_dir / "dimensions"
-        os.makedirs(dim_dir)
-        check_config_update(dim_dir, dimension_mgr, dimension_id, user, VersionInfo.parse("1.0.0"))
-        check_config_update(
-            dim_dir, dimension_mapping_mgr, dimension_mapping_id, user, VersionInfo.parse("1.0.0")
-        )
+        check_configs_update(base_dir, manager)
+        check_update_project_dimension(base_dir, manager)
+        # Note that the dataset is now unregistered.
 
         # Test removals.
         check_config_remove(project_mgr, project_id)
@@ -211,6 +206,11 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         with pytest.raises(DSGInvalidDimensionMapping):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
+        # Invalid 'from' record - nulls aren't allowd
+        record_file.write_text(orig_text + ",CO\n")
+        with pytest.raises(DSGInvalidDimensionMapping):
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+
         # Invalid 'to' record
         record_file.write_text(orig_text.replace("CO", "Colorado"))
         with pytest.raises(DSGInvalidDimensionMapping):
@@ -241,64 +241,54 @@ def register_dataset(dataset_mgr, config_file, dataset_id, user, log_message):
     assert dataset_mgr.list_ids() == [dataset_id]
 
 
-def submit_dataset(
-    project_mgr, project_config, dataset_config, dimension_mapping_refs, user, log_message
-):
-    project_id = project_config.config_id
-    dataset_id = dataset_config.config_id
-    project_mgr.submit_dataset(
-        project_id,
-        dataset_id,
-        dimension_mapping_refs,
+def check_update_project_dimension(tmpdir, manager):
+    """Verify that updating a project's dimension causes all datasets to go unregistered."""
+    project_mgr = manager.project_manager
+    project_id = project_mgr.list_ids()[0]
+    dimension_mgr = manager.dimension_manager
+    dimension_id = dimension_mgr.list_ids()[0]
+    user = getpass.getuser()
+    msg = "update registration"
+
+    dim_dir = Path(tmpdir) / "new_dimension"
+    dim_config_file = dim_dir / dimension_mgr.registry_class().config_filename()
+    dimension_mgr.dump(dimension_id, dim_dir, force=True)
+    dim_data = load_data(dim_config_file)
+    dim_data["description"] += "; updated description"
+    dump_data(dim_data, dim_config_file)
+    dimension_mgr.update_from_file(
+        dim_config_file,
+        dimension_id,
         user,
-        log_message,
+        VersionUpdateType.PATCH,
+        "update to description",
+        dimension_mgr.get_current_version(dimension_id),
     )
+    project_dir = Path(tmpdir) / "new_project"
+    project_config_file = project_dir / project_mgr.registry_class().config_filename()
+    project_mgr.dump(project_id, project_dir, force=True)
+    project_data = load_data(project_config_file)
+    new_version = dimension_mgr.get_current_version(dimension_id)
+    for dim in project_data["dimensions"]["base_dimensions"]:
+        if dim["dimension_id"] == dimension_id:
+            dim["version"] = str(new_version)
+    dump_data(project_data, project_config_file)
+    project_mgr.update_from_file(
+        project_config_file,
+        project_id,
+        user,
+        VersionUpdateType.PATCH,
+        "update dimension",
+        project_mgr.get_current_version(project_id),
+    )
+    _check_dataset_statuses(project_mgr, project_id, DatasetRegistryStatus.UNREGISTERED)
 
 
-def check_config_update(tmpdir, mgr, config_id, user, version):
-    """Runs basic positive and negative update tests for the config. Also tests dump."""
-    config_file = Path(tmpdir) / mgr.registry_class().config_filename()
-    assert not config_file.exists()
-    try:
-        mgr.dump(config_id, tmpdir)
-        with pytest.raises(DSGInvalidOperation):
-            mgr.dump(config_id, tmpdir)
-        mgr.dump(config_id, tmpdir, force=True)
-        assert config_file.exists()
-        config_data = load_data(config_file)
-        config_data["description"] += "; updated description"
-        dump_data(config_data, config_file)
-        with pytest.raises(DSGInvalidParameter):
-            mgr.update_from_file(
-                config_file,
-                "invalid_config_id",
-                user,
-                VersionUpdateType.PATCH,
-                "update to description",
-                version,
-            )
-        with pytest.raises(DSGInvalidParameter):
-            mgr.update_from_file(
-                config_file,
-                config_id,
-                user,
-                VersionUpdateType.PATCH,
-                "update to description",
-                version.bump_patch(),
-            )
-
-        mgr.update_from_file(
-            config_file,
-            config_id,
-            user,
-            VersionUpdateType.PATCH,
-            "update to description",
-            version,
-        )
-        assert mgr.get_current_version(config_id) == version.bump_patch()
-    finally:
-        if config_file.exists():
-            os.remove(config_file)
+def _check_dataset_statuses(project_mgr, project_id, expected_status):
+    config = project_mgr.get_by_id(project_id)
+    assert config.model.datasets
+    for dataset in config.model.datasets:
+        assert dataset.status == expected_status
 
 
 def check_config_remove(mgr, config_id):

@@ -62,7 +62,10 @@ class RegistryManager:
             self._dimension_mgr,
         )
         self._dataset_mgr = DatasetRegistryManager.load(
-            params.base_path / DatasetRegistry.registry_path(), params, self._dimension_mgr
+            params.base_path / DatasetRegistry.registry_path(),
+            params,
+            self._dimension_mgr,
+            self._dimension_mapping_dimension_mgr,
         )
         self._project_mgr = ProjectRegistryManager.load(
             params.base_path / ProjectRegistry.registry_path(),
@@ -458,10 +461,6 @@ class RegistryManager:
             return
         for project in self.project_manager.iter_configs():
             updated = False
-            for mapping_ref in project.model.dimension_mappings.base_to_base:
-                if mapping_ref.mapping_id in updated_mappings:
-                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
-                    updated = True
             for mapping_ref in project.model.dimension_mappings.base_to_supplemental:
                 if mapping_ref.mapping_id in updated_mappings:
                     mapping_ref.version = updated_mappings[mapping_ref.mapping_id]

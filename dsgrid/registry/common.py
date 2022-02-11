@@ -62,6 +62,7 @@ class ProjectRegistryStatus(DSGEnum):
     INITIAL_REGISTRATION = "Initial Registration"
     IN_PROGRESS = "In Progress"
     COMPLETE = "Complete"
+    PUBLISHED = "Published"
     DEPRECATED = "Deprecated"
 
 

@@ -2,6 +2,7 @@ import csv
 import logging
 import os
 import shutil
+from collections import namedtuple
 from pathlib import Path
 from typing import Dict, List, Optional, Union
 
@@ -9,8 +10,9 @@ from pydantic import Field, validator
 from pyspark.sql import DataFrame, Row, SparkSession
 
 from .config_base import ConfigWithDataFilesBase
-from .dimension_mapping_base import DimensionMappingBaseModel
+from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.data_models import serialize_model_data, DSGBaseModel
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import compute_file_hash, dump_data
 
@@ -34,11 +36,11 @@ class AssociationTableRecordModel(DSGBaseModel):
         description="Fraction of from_id to map to to_id",
     )
 
-    @validator("to_id")
-    def check_to_id(cls, to_id):
-        if to_id == "":
+    @validator("from_id", "to_id")
+    def check_to_id(cls, val):
+        if val == "":
             return None
-        return to_id
+        return val
 
 
 class AssociationTableModel(DimensionMappingBaseModel):
@@ -71,7 +73,7 @@ class AssociationTableModel(DimensionMappingBaseModel):
     @validator("file_hash")
     def compute_file_hash(cls, file_hash, values):
         """Compute file hash."""
-        return file_hash or compute_file_hash(values["filename"])
+        return file_hash or values.get("filename")
 
     @validator("records", always=True)
     def add_records(cls, records, values):
@@ -114,6 +116,14 @@ class AssociationTableConfig(ConfigWithDataFilesBase):
     @property
     def config_id(self):
         return self.model.mapping_id
+
+    @staticmethod
+    def data_file_fields():
+        return ["filename"]
+
+    @staticmethod
+    def data_files_fields():
+        return []
 
     @staticmethod
     def model_class():

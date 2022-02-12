@@ -6,7 +6,7 @@ from pydantic import Field, validator
 from semver import VersionInfo
 
 from .dimensions import DimensionReferenceModel
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, DSGEnum
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -14,9 +14,34 @@ from dsgrid.utils.versioning import handle_version_or_str
 logger = logging.getLogger(__name__)
 
 
+class DimensionMappingArchetype(DSGEnum):
+    ONE_TO_ONE = "one_to_one"
+    ONE_TO_MANY = "one_to_many"
+    MANY_TO_ONE = "many_to_one"
+    MANY_TO_MANY = "many_to_many"
+
+
+class FractionSumType(DSGEnum):
+    EQUAL_TO_ONE = "equal_to_one"
+    LESS_THAN_ONE = "less_than_one"
+    GREATER_THAN_ONE = "greater_than_one"
+
+
 class DimensionMappingBaseModel(DSGBaseModel):
     """Base class for mapping dimensions"""
 
+    archetype: DimensionMappingArchetype = Field(
+        title="archetype",
+        description="Dimension mapping archetype, used to check whether duplicates are allowed in from and to dimension",
+        default="many_to_one",
+        options=DimensionMappingArchetype.format_for_docs(),
+    )
+    from_fraction_sum: FractionSumType = Field(
+        title="from_fraction_sum",
+        description="Specify whether sum of from_fraction should be =, <, or > 1 when group by from_id",
+        default="equal_to_one",
+        options=FractionSumType.format_for_docs(),
+    )
     from_dimension: DimensionReferenceModel = Field(
         title="from_dimension",
         description="From dimension",

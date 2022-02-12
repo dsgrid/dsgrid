@@ -202,7 +202,8 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         orig_text = record_file.read_text()
 
         # Invalid 'from' record
-        record_file.write_text(orig_text + "\ninvalid county,1,CO\n")
+        # record_file.write_text(orig_text + "\ninvalid county,1,CO\n")
+        record_file.write_text(orig_text + "\ninvalid county,CO\n")  # <---
         with pytest.raises(DSGInvalidDimensionMapping):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
@@ -217,13 +218,16 @@ def test_invalid_dimension_mapping(make_test_project_dir):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Duplicate 'from' record, invalid when without the fraction col
-        orig_text2 = orig_text.split(",")
-        orig_text2 = ",".join(orig_text2[::2])
-        record_file.write_text(orig_text2 + "\n08031,CO\n")
-        msg = (
-            r'If duplicates are required, ensure that a "fraction" col is provided in the mapping'
-        )
-        with pytest.raises(DSGInvalidDimensionMapping, match=msg):
+        # orig_text2 = orig_text.split(",")
+        # orig_text2 = ",".join(orig_text2[::2])
+        # record_file.write_text(orig_text2 + "\n08031,CO\n")
+        # msg = (
+        #     r'If duplicates are required, ensure that a "fraction" col is provided in the mapping'
+        # )
+        # with pytest.raises(DSGInvalidDimensionMapping, match=msg):
+
+        record_file.write_text(orig_text + "\n08031,CO")  # <---
+        with pytest.raises(DSGInvalidDimensionMapping):  # <---
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Valid - null value in "to" record (Only one valid test allowed in this test func)

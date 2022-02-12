@@ -210,17 +210,46 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # This method could be moved elsewhere.
         for ref in self._mapping_references:
             column = ref.from_dimension_type.value
-            if column in df.columns:
-                mapping_config = self._dimension_mapping_mgr.get_by_id(
-                    ref.mapping_id, version=ref.version
-                )
-                records = models_to_dataframe(mapping_config.model.records).filter(
-                    "to_id is not NULL"
-                )
-                df = (
-                    df.join(records, df[column] == records.from_id)
-                    .drop("from_id")
-                    .drop(column)
-                    .withColumnRenamed("to_id", column)
-                )
+            mapping_config = self._dimension_mapping_mgr.get_by_id(
+                ref.mapping_id, version=ref.version
+            )
+            records = mapping_config.model.records
+            df = self._map_and_reduce_dimension(df, column, records)
+
+        return df
+
+    def _map_and_reduce_dimension(self, df, column, records):
+        """ Map and reduce a dimension """
+        if column == self.get_pivot_dimension_type().value:
+            nonvalue_cols = list(
+                set(df.columns).difference(set(self.get_pivot_dimension_columns()))
+            )
+            to_ids = sorted(list({x.to_id for x in records}))
+            value_operations = []
+            for tid in to_ids:
+                from_ids = [x.from_id for x in records if x.to_id == tid]
+                fractions = [x.fraction for x in records if x.to_id == tid]
+                operation = "+".join(
+                    [f"{qty}*{frac}" for qty, frac in zip(from_ids, fractions)]
+                )  # assumes reduce by +
+                operation += f" AS {tid}"
+                value_operations.append(operation)
+
+            df = df.selectExpr(*nonvalue_cols, *value_operations)
+
+        elif column in df.columns:
+            ### for one_to_one and many_to_one
+            records = models_to_dataframe(records).filter("to_id is not NULL")
+            df = (
+                df.join(records, df[column] == records.from_id)
+                .drop("from_id")
+                .drop(column)
+                .withColumnRenamed("to_id", column)
+            )  # need to reduce after mapping.
+            # Reduction method will differ drastically between standard and one_table...
+            # imagine 5 subsectors in lookup being mapped to 2 subsectors... need to reassign id
+            # or combine to one_table, reduce and separate into two tables again
+
+            ### another op for duplication
+
         return df

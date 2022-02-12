@@ -31,9 +31,10 @@ class AssociationTableRecordModel(DSGBaseModel):
         title="to_id",
         description="Destination mapping",
     )
-    fraction: Optional[float] = Field(
+    fraction: float = Field(
         title="fraction",
         description="Fraction of from_id to map to to_id",
+        default=1,
     )
 
     @validator("from_id", "to_id")

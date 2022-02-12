@@ -153,11 +153,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         - duplicates in to_id is always allowed but logged when found.
         """
         for mapping in config.model.mappings:
-            actual_fractions = {x.fraction for x in mapping.records}
-            if len(actual_fractions) == 1 and None in actual_fractions:
+            fractions = {x.fraction for x in mapping.records}
+            if len(fractions) == 1 and None in fractions:  # <--- need to fix
                 allow_dup_from_records = False
             else:
                 allow_dup_from_records = True
+
+            allow_dup_from_records = False  # <--
 
             actual_from_records = [x.from_id for x in mapping.records]
             self._check_for_duplicates_in_list(
@@ -165,7 +167,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             )
             actual_to_records = [x.to_id for x in mapping.records]
             self._check_for_duplicates_in_list(actual_to_records, True, mapping.filename, "to_id")
-            # breakpoint()
+
             if allow_dup_from_records:
                 mapping_df = models_to_dataframe(mapping.records)
                 mapping_sum_df = (

@@ -27,6 +27,7 @@ from .registry_manager_base import RegistryManagerBase
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.config.dimension_mapping_base import DimensionMappingArchetype
 
 
 logger = logging.getLogger(__name__)
@@ -145,56 +146,84 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         """Validate dimension mapping records.
 
         Check:
-        - from_id and to_id column names
-        - check for duplicate IDs and log a warning if they exist (sometimes we want them to exist if it is an aggregation)
+        - duplicate records in from_id and to_id columns per mapping archetype
+        - sum of from_fraction by from_id per mapping archetype
 
-        Implemented:
-        - allow duplicates in from_id if fraction col is explicitly filled out, log warning when fraction sums > 1;
-        - duplicates in to_id is always allowed but logged when found.
         """
         for mapping in config.model.mappings:
-            fractions = {x.fraction for x in mapping.records}
-            if len(fractions) == 1 and None in fractions:  # <--- need to fix
+            if "one_to_one" in mapping.archetype.value:
                 allow_dup_from_records = False
-            else:
+                allow_dup_to_records = False
+            elif "one_to_many" in mapping.archetype.value:
                 allow_dup_from_records = True
-
-            allow_dup_from_records = False  # <--
+                allow_dup_to_records = False
+            elif "many_to_one" in mapping.archetype.value:
+                allow_dup_from_records = False
+                allow_dup_to_records = True
+            elif "many_to_many" in mapping.archetype.value:
+                allow_dup_from_records = True
+                allow_dup_to_records = True
 
             actual_from_records = [x.from_id for x in mapping.records]
             self._check_for_duplicates_in_list(
-                actual_from_records, allow_dup_from_records, mapping.filename, "from_id"
+                actual_from_records,
+                allow_dup_from_records,
+                "from_id",
+                mapping.filename,
+                mapping.mapping_type.value,
             )
             actual_to_records = [x.to_id for x in mapping.records]
-            self._check_for_duplicates_in_list(actual_to_records, True, mapping.filename, "to_id")
+            self._check_for_duplicates_in_list(
+                actual_to_records,
+                allow_dup_to_records,
+                "to_id",
+                mapping.filename,
+                mapping.mapping_type.value,
+            )
 
-            if allow_dup_from_records:
-                mapping_df = models_to_dataframe(mapping.records)
-                mapping_sum_df = (
-                    mapping_df.groupBy("from_id")
-                    .agg(F.sum("fraction").alias("sum_fraction"))
-                    .sort(F.desc("sum_fraction"), "from_id")
+            if "fraction_sum_eq1" in mapping.archetype.value:
+                self._check_fraction_sum(
+                    mapping.records, mapping.filename, mapping.mapping_type.value
                 )
-                large_sum_fracs = mapping_sum_df.filter(F.col("sum_fraction") > 1)
-                if large_sum_fracs.count() > 0:
-                    large_sum_from_id = {
-                        x.from_id for x in large_sum_fracs[["from_id"]].distinct().collect()
-                    }
-                    logger.info(
-                        f"WARNING: {mapping.filename} contains {large_sum_fracs.count()} from_id(s) whose fraction sum is greater than 1.\n from_id={large_sum_from_id}"
-                    )
 
     @staticmethod
-    def _check_for_duplicates_in_list(lst: list, allow_dup, mapping_name, id_type="from_id"):
+    def _check_for_duplicates_in_list(
+        lst: list, allow_dup: bool, id_type: str, mapping_name: str, mapping_type: str
+    ):
         """Check list for duplicates"""
         dups = [x for x, n in collections.Counter(lst).items() if n > 1]
-        if len(dups) > 0:
-            logger.info(f"WARNING: {mapping_name} contains duplicated {id_type} records={dups}.")
-            if not allow_dup:
-                raise DSGInvalidDimensionMapping(
-                    f"{mapping_name} contains duplicated {id_type} records={dups}. "
-                    'If duplicates are required, ensure that a "fraction" col is provided in the mapping.'
-                )
+        if len(dups) > 0 and not allow_dup:
+            raise DSGInvalidDimensionMapping(
+                f"{mapping_name} has mapping_type={mapping_type}, "
+                f"which does not allow duplicated {id_type} records. \nDuplicated {id_type}={dups}. "
+            )
+
+    @staticmethod
+    def _check_fraction_sum(mapping_records, mapping_name, mapping_type):
+        mapping_df = models_to_dataframe(mapping_records)
+        mapping_sum_df = (
+            mapping_df.groupBy("from_id")
+            .agg(F.sum("from_fraction").alias("sum_fraction"))
+            .sort(F.desc("sum_fraction"), "from_id")
+        )
+        fracs_greater_than_one = mapping_sum_df.filter(F.col("sum_fraction") > 1)
+        fracs_less_than_one = mapping_sum_df.filter(F.col("sum_fraction") < 1)
+        if fracs_greater_than_one.count() > 0:
+            id_greater_than_one = {
+                x.from_id for x in fracs_greater_than_one[["from_id"]].distinct().collect()
+            }
+            raise DSGInvalidDimensionMapping(
+                f"{mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
+                f"Mapping contains from_fraction sum greater than 1 for from_id={id_greater_than_one}. "
+            )
+        elif fracs_less_than_one.count() > 0:
+            id_less_than_one = {
+                x.from_id for x in fracs_less_than_one[["from_id"]].distinct().collect()
+            }
+            raise DSGInvalidDimensionMapping(
+                f"{mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
+                f"Mapping contains from_fraction sum less than 1 for from_id={id_less_than_one}. "
+            )
 
     def get_by_id(self, config_id, version=None):
         self._check_if_not_registered(config_id)

@@ -9,38 +9,62 @@ from .dimensions import DimensionReferenceModel
 from dsgrid.data_models import DSGBaseModel, DSGEnum
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.versioning import handle_version_or_str
+from dsgrid.exceptions import DSGInvalidDimensionMapping
 
 
 logger = logging.getLogger(__name__)
 
 
+class DimensionMappingType(DSGEnum):
+    # default from_fraction col, FRACTION_SUM_EQ1
+    ONE_TO_ONE = "one_to_one"  # includes rename, down-selection
+    MANY_TO_ONE_AGGREGATION = "many_to_one_aggregation"
+
+    # default from_fraction col, FRACTION_SUM_NOT_EQ1
+    DUPLICATION = "duplication"
+
+    # input from_fraction col, FRACTION_SUM_EQ1
+    MANY_TO_MANY_AGGREGATION = "many_to_many_aggregation"
+    ONE_TO_MANY_DISAGGREGATION = "one_to_many_disaggregation"
+    MANY_TO_MANY_DISAGGREGATION = "many_to_many_disaggregation"
+
+    # input from_fraction col, FRACTION_SUM_NOT_EQ1
+    ONE_TO_ONE_MULTIPLICATION = "one_to_one_multiplication"
+    ONE_TO_MANY_MULTIPLICATION = "one_to_many_multiplication"
+    MANY_TO_ONE_MULTIPLICATION = "many_to_one_multiplication"
+    MANY_TO_MANY_MULTIPLICATION = "many_to_many_multiplication"
+
+
 class DimensionMappingArchetype(DSGEnum):
-    ONE_TO_ONE = "one_to_one"
-    ONE_TO_MANY = "one_to_many"
-    MANY_TO_ONE = "many_to_one"
-    MANY_TO_MANY = "many_to_many"
+    """Dimension mapping archetype, used to check:
+    - whether duplicates are allowed in from and to dimension;
+    - whether sum of from_fraction should be =, <, or > 1 when group by from_id
+    """
 
+    ONE_TO_ONE_MAP_FRACTION_SUM_EQ1 = "one_to_one_map_fraction_sum_eq1"  # unique from and to
+    ONE_TO_MANY_MAP_FRACTION_SUM_EQ1 = "one_to_many_map_fraction_sum_eq1"  # dup from, unique to
+    MANY_TO_ONE_MAP_FRACTION_SUM_EQ1 = "many_to_one_map_fraction_sum_eq1"  # unique from, dup to
+    MANY_TO_MANY_MAP_FRACTION_SUM_EQ1 = "many_to_many_map_fraction_sum_eq1"  # dup from and to
 
-class FractionSumType(DSGEnum):
-    EQUAL_TO_ONE = "equal_to_one"
-    LESS_THAN_ONE = "less_than_one"
-    GREATER_THAN_ONE = "greater_than_one"
+    ONE_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1 = "one_to_one_map_fraction_sum_not_eq1"
+    ONE_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1 = "one_to_many_map_fraction_sum_not_eq1"
+    MANY_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1 = "many_to_one_map_fraction_sum_not_eq1"
+    MANY_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1 = "many_to_many_map_fraction_sum_not_eq1"
 
 
 class DimensionMappingBaseModel(DSGBaseModel):
     """Base class for mapping dimensions"""
 
-    archetype: DimensionMappingArchetype = Field(
-        title="archetype",
-        description="Dimension mapping archetype, used to check whether duplicates are allowed in from and to dimension",
-        default="many_to_one",
-        options=DimensionMappingArchetype.format_for_docs(),
+    mapping_type: DimensionMappingType = Field(
+        title="mapping_type",
+        description="Type/purpose of the dimension mapping",
+        default="many_to_one_aggregation",
+        options=DimensionMappingType.format_for_docs(),
     )
-    from_fraction_sum: FractionSumType = Field(
-        title="from_fraction_sum",
-        description="Specify whether sum of from_fraction should be =, <, or > 1 when group by from_id",
-        default="equal_to_one",
-        options=FractionSumType.format_for_docs(),
+    archetype: Optional[DimensionMappingArchetype] = Field(
+        title="archetype",
+        description="Dimension mapping archetype, determined based on mapping_type",
+        options=DimensionMappingArchetype.format_for_docs(),
     )
     from_dimension: DimensionReferenceModel = Field(
         title="from_dimension",
@@ -61,6 +85,47 @@ class DimensionMappingBaseModel(DSGBaseModel):
         dsg_internal=True,
         updateable=False,
     )
+
+    @validator("archetype")
+    def check_archetype(cls, archetype, values):
+        # default from_fraction col, FRACTION_SUM_EQ1
+        if values["mapping_type"] == DimensionMappingType.ONE_TO_ONE:
+            assigned_archetype = DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_EQ1
+        elif values["mapping_type"] == DimensionMappingType.MANY_TO_ONE_AGGREGATION:
+            assigned_archetype = DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1
+
+        # default from_fraction col, FRACTION_SUM_NOT_EQ1
+        elif values["mapping_type"] == DimensionMappingType.DUPLICATION:
+            assigned_archetype = DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1
+
+        # from_fraction col, FRACTION_SUM_EQ1
+        elif values["mapping_type"] == DimensionMappingType.MANY_TO_MANY_AGGREGATION:
+            assigned_archetype = DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1
+        elif values["mapping_type"] == DimensionMappingType.ONE_TO_MANY_DISAGGREGATION:
+            assigned_archetype = DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_EQ1
+        elif values["mapping_type"] == DimensionMappingType.MANY_TO_MANY_DISAGGREGATION:
+            assigned_archetype = DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1
+
+        # input from_fraction col, FRACTION_SUM_NOT_EQ1
+        elif values["mapping_type"] == DimensionMappingType.ONE_TO_ONE_MULTIPLICATION:
+            assigned_archetype = DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1
+        elif values["mapping_type"] == DimensionMappingType.ONE_TO_MANY_MULTIPLICATION:
+            assigned_archetype = DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1
+        elif values["mapping_type"] == DimensionMappingType.MANY_TO_ONE_MULTIPLICATION:
+            assigned_archetype = DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1
+        elif values["mapping_type"] == DimensionMappingType.MANY_TO_MANY_MULTIPLICATION:
+            assigned_archetype = DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1
+
+        if archetype == None:
+            archetype = assigned_archetype
+        else:
+            if archetype != assigned_archetype:
+                raise DSGInvalidDimensionMapping(
+                    '"mapping_type" and "archetype" are both defined. '
+                    'To assign archetype based on mapping_type, remove "archetype" from config. '
+                    f'Otherwise, mapping_type={values["mapping_type"]} should have archetype={assigned_archetype} '
+                )
+        return archetype
 
 
 class DimensionMappingReferenceModel(DSGBaseModel):

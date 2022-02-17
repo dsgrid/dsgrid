@@ -31,7 +31,7 @@ class AssociationTableRecordModel(DSGBaseModel):
         title="to_id",
         description="Destination mapping",
     )
-    from_fraction: float = Field(
+    from_fraction: Union[float, None] = Field(
         title="from_fraction",
         description="Fraction of from_id to map to to_id",
         default=1,

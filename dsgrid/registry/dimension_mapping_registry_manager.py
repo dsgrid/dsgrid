@@ -124,7 +124,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             if diff:
                 dim_id = from_dimension.model.dimension_id
                 raise DSGInvalidDimensionMapping(
-                    f"Dimension mapping has invalid 'from' records: dimension_id={dim_id} {diff}"
+                    f"Dimension mapping={mapping.filename} has invalid 'from_id' records: {diff}, "
+                    f"they are missing from dimension_id={dim_id}"
                 )
 
             # Note: this code cannot complete verify 'to' records. A dataset may be registering a
@@ -139,7 +140,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             if diff:
                 dim_id = from_dimension.model.dimension_id
                 raise DSGInvalidDimensionMapping(
-                    f"Dimension mapping has invalid 'to' records: dimension_id={dim_id} {diff}"
+                    f"Dimension mapping={mapping.filename} has invalid 'to_id' records: {diff}, "
+                    f"they are missing from dimension_id={dim_id}"
                 )
 
     def validate_records(self, config: DimensionMappingsConfig, warn_only=False):
@@ -194,7 +196,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         dups = [x for x, n in collections.Counter(lst).items() if n > 1]
         if len(dups) > 0 and not allow_dup:
             raise DSGInvalidDimensionMapping(
-                f"{mapping_name} has mapping_type={mapping_type}, "
+                f"dimension_mapping={mapping_name} has mapping_type={mapping_type}, "
                 f"which does not allow duplicated {id_type} records. \nDuplicated {id_type}={dups}. "
             )
 
@@ -213,7 +215,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 x.from_id for x in fracs_greater_than_one[["from_id"]].distinct().collect()
             }
             raise DSGInvalidDimensionMapping(
-                f"{mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
+                f"dimension_mapping={mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
                 f"Mapping contains from_fraction sum greater than 1 for from_id={id_greater_than_one}. "
             )
         elif fracs_less_than_one.count() > 0:

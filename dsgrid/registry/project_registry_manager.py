@@ -8,6 +8,8 @@ import logging
 from contextlib import redirect_stdout
 from typing import List
 
+import pyspark.sql.functions as F
+
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
@@ -294,19 +296,32 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         data_source = dataset_config.model.data_source
         dim_table = handler.get_unique_dimension_rows().drop("id")
+        for col in dim_table.columns:
+            assert dim_table.filter(F.col(col).isNull()).count() == 0
         associations = project_config.dimension_associations
         # TODO: check a unified project table against dim_table
         # project_table = self._make_single_table(project_config, data_source, pivot_dimension)
+
         for type1, type2 in dimension_pairs:
             records = associations.get_associations(type1, type2, data_source=data_source)
             if records is None:
                 records = self._get_project_dimensions_table(project_config, type1, type2)
+
             columns = (type1.value, type2.value)
             with Timer(timer_stats_collector, "evaluate dimension record counts"):
                 record_count = records.count()
-                count = records.select(*columns).intersect(dim_table.select(*columns)).count()
+                count = (
+                    records.select(*columns)
+                    .distinct()
+                    .intersect(dim_table.select(*columns).distinct())
+                    .count()
+                )
             if count != record_count:
-                table = records.select(*columns).exceptAll(dim_table.select(*columns))
+                table = (
+                    records.select(*columns)
+                    .distinct()
+                    .exceptAll(dim_table.select(*columns).distinct())
+                )
                 dataset_id = dataset_config.model.dataset_id
                 with io.StringIO() as buf, redirect_stdout(buf):
                     table.show(n=table.count())

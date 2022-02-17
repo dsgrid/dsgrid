@@ -20,8 +20,8 @@ from dsgrid.utils.files import compute_file_hash, dump_data
 logger = logging.getLogger(__name__)
 
 
-class AssociationTableRecordModel(DSGBaseModel):
-    """Represents one record in association table record files. Maps one dimension to another."""
+class MappingTableRecordModel(DSGBaseModel):  # AssociationTableRecordModel
+    """Represents one record in dimension mapping record files. Maps one dimension to another."""
 
     from_id: str = Field(
         title="from_id",
@@ -44,8 +44,8 @@ class AssociationTableRecordModel(DSGBaseModel):
         return val
 
 
-class AssociationTableModel(DimensionMappingBaseModel):
-    """Attributes for an association table"""
+class MappingTableModel(DimensionMappingBaseModel):  # AssociationTableModel
+    """Attributes for a dimension mapping table"""
 
     filename: str = Field(
         title="filename",
@@ -88,7 +88,7 @@ class AssociationTableModel(DimensionMappingBaseModel):
             with open(filename) as f_in:
                 reader = csv.DictReader(f_in)
                 for row in reader:
-                    record = AssociationTableRecordModel(**row)
+                    record = MappingTableRecordModel(**row)
                     records.append(record)
         else:
             raise ValueError(f"only CSV is supported: {filename}")
@@ -103,8 +103,8 @@ class AssociationTableModel(DimensionMappingBaseModel):
         return serialize_model_data(data)
 
 
-class AssociationTableConfig(ConfigWithDataFilesBase):
-    """Provides an interface to an AssociationTableModel"""
+class MappingTableConfig(ConfigWithDataFilesBase):  # AssociationTableConfig
+    """Provides an interface to an MappingTableModel"""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -128,7 +128,7 @@ class AssociationTableConfig(ConfigWithDataFilesBase):
 
     @staticmethod
     def model_class():
-        return AssociationTableModel
+        return MappingTableModel
 
     def get_unique_from_ids(self):
         """Return the unique from IDs in an association table's records.

@@ -175,7 +175,7 @@ class InputDatasetModel(DSGBaseModel):
 
 
 class DimensionMappingsModel(DSGBaseModel):
-    """Defines all dimension mappings associated with a dsgrid project, including base-to-base, base-to-supplemental, and dataset-to-project mappings."""
+    """Defines all dimension mappings associated with a dsgrid project, including dimension associations and base-to-supplemental dimension mappings."""
 
     base_to_supplemental: List[DimensionMappingReferenceModel] = Field(
         title="base_to_supplemental",

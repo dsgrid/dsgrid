@@ -14,7 +14,7 @@ from dsgrid.common import (
     SYNC_EXCLUDE_LIST,
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
-from dsgrid.config.association_tables import AssociationTableConfig
+from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
@@ -342,7 +342,7 @@ class RegistryManager:
         if isinstance(config, DimensionConfig):
             version = self.dimension_manager.get_current_version(config.config_id)
             self._update_dimension_users(config, version, update_type, log_message)
-        elif isinstance(config, AssociationTableConfig):
+        elif isinstance(config, MappingTableConfig):
             version = self.dimension_mapping_manager.get_current_version(config.config_id)
             self._update_dimension_mapping_users(config, version, update_type, log_message)
         elif isinstance(config, DatasetConfig):

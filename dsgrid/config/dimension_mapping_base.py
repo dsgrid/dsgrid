@@ -156,7 +156,7 @@ class DimensionMappingReferenceModel(DSGBaseModel):
     )
     required_for_validation: Optional[bool] = Field(
         title="version",
-        description="Set to False if a given base-to-base dimension mapping is NOT required for input dataset validation; default is True",  # outdated, FIXME
+        description="Set to False if a given dimension association is NOT required for input dataset validation; default is True",
         default=True,
         # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )

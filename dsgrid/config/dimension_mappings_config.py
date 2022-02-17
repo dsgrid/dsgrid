@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 from pydantic import Field, validator
 from semver import VersionInfo
 
-from .association_tables import AssociationTableModel
+from .mapping_tables import MappingTableModel
 from .config_base import ConfigBase
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import make_registry_id, check_config_id_loose
@@ -18,7 +18,7 @@ class DimensionMappingsConfigModel(DSGBaseModel):
     """Represents dimension mapping model configurations"""
 
     # This may eventually change to a Union if there are more subclasses.
-    mappings: List[AssociationTableModel] = Field(
+    mappings: List[MappingTableModel] = Field(
         title="mappings",
         description="dimension mappings between and within projects and datasets",
     )

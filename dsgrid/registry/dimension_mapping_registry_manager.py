@@ -10,7 +10,7 @@ from prettytable import PrettyTable
 import pyspark.sql.functions as F
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.association_tables import AssociationTableConfig
+from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
 from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
@@ -243,7 +243,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             return mapping
 
         filename = self.get_config_file(key.id, key.version)
-        config = AssociationTableConfig.load(filename)
+        config = MappingTableConfig.load(filename)
         self._mappings[key] = config
         return config
 
@@ -317,7 +317,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             registry_file = Path(os.path.dirname(dst_dir)) / REGISTRY_FILENAME
             registry_config.serialize(registry_file, force=True)
 
-            at_config = AssociationTableConfig(mapping)
+            at_config = MappingTableConfig(mapping)
             at_config.src_dir = src_dir
             at_config.serialize(dst_dir)
             self._id_to_type[mapping.mapping_id] = [
@@ -363,7 +363,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
     ):
-        config = AssociationTableConfig.load(config_file)
+        config = MappingTableConfig.load(config_file)
         self._check_update(config, config_id, version)
         self.update(config, update_type, log_message, submitter=submitter)
 

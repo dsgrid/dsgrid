@@ -217,7 +217,7 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         with pytest.raises(DSGInvalidDimensionMapping):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
-        # Duplicate 'from' record, invalid when without the fraction col
+        # Duplicate "from" record, invalid as mapping_type = one_to_one_multiplication
         orig_text2 = orig_text.split(",")
         orig_text2 = ",".join(orig_text2[::2])
         record_file.write_text(orig_text2 + "\n08031,CO\n")

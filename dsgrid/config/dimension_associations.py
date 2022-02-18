@@ -115,7 +115,7 @@ class DimensionAssociations:
             table = table.filter(f"{ds_column} = '{data_source}'")
         return table.distinct()
 
-    def get_unique_ids(self, dimension):
+    def get_unique_ids(self, dimension, data_source=None):
         """Return the unique record IDs for the dimension.
 
         Parameters
@@ -128,8 +128,20 @@ class DimensionAssociations:
             Set of str
 
         """
+        if dimension not in self.dimension_types:
+            return None
         col = dimension.value
-        return {getattr(x, col) for x in self._table.select(col).distinct().collect()}
+        if data_source is None:
+            return {getattr(x, col) for x in self._table.select(col).distinct().collect()}
+        else:
+            ds_column = DimensionType.DATA_SOURCE.value
+            return {
+                getattr(x, col)
+                for x in self._table.filter(f"{ds_column} = '{data_source}'")
+                .select(col)
+                .distinct()
+                .collect()
+            }
 
     def has_associations(self, *dimensions, data_source=None):
         """Return True if these dimension associations are stored.

@@ -299,6 +299,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
         config = super().load(config_file)
         config.src_dir = os.path.dirname(config_file)
         config.dimension_mapping_manager = dimension_mapping_manager
+        config.dimension_manager = dimension_manager
         config.load_dimension_associations()
         config.load_dimensions(dimension_manager)
         config.load_dimension_mappings(dimension_mapping_manager)
@@ -315,6 +316,14 @@ class ProjectConfig(ConfigWithDataFilesBase):
     @dimension_mapping_manager.setter
     def dimension_mapping_manager(self, val: DimensionMappingRegistryManager):
         self._dimension_mapping_mgr = val
+
+    @property
+    def dimension_manager(self):
+        return self._dimension_mgr
+
+    @dimension_manager.setter
+    def dimension_manager(self, val: DimensionRegistryManager):
+        self._dimension_mgr = val
 
     def get_base_dimension(self, dimension_type: DimensionType):
         """Return the base dimension matching dimension_type.
@@ -461,7 +470,9 @@ class ProjectConfig(ConfigWithDataFilesBase):
     def check_dataset_dimension_mappings(
         self, dataset_config: DatasetConfig, references: DimensionMappingReferenceModel
     ):
-        """Check that a dataset provides required mappings to the project.
+        """Check that dimension mappings to_id has all of project dimension record for the dataset.
+        PRETTY SURE THIS IS REDUNDANT AND NOT NEEDED SINCE IN project_registry_manager.py WE ALREADY
+        _check_dataset_base_to_project_base_mappings AFTER THE DATASET GETS REMAPPED BY THE DIMENSION_MAPPINGS.
 
         Parameters
         ----------
@@ -475,36 +486,32 @@ class ProjectConfig(ConfigWithDataFilesBase):
             Raised if a requirement is violated.
 
         """
-        # The dataset has to have each project dimension or provide a mapping.
-        project_keys = set(self.base_dimensions.keys())
-        dataset_keys = set(dataset_config.dimensions)
-        requires_mapping = project_keys.difference(dataset_keys)
-        for dim_key in requires_mapping:
-            if dim_key.type == DimensionType.TIME:
-                continue
-            dim = self.base_dimensions[dim_key]
-            project_dimension_ids = {x.id for x in dim.model.records}
-            found = False
-            for mapping_ref in references:
-                if mapping_ref.to_dimension_type != dim_key.type:
-                    continue
-                mapping = self.dimension_mapping_manager.get_by_id(mapping_ref.mapping_id)
-                if mapping.model.to_dimension.dimension_id == dim_key.id:
-                    if found:
-                        # TODO: this will be OK if aggregation is specified.
-                        # That is not implemented yet.
-                        raise DSGInvalidDimensionMapping(
-                            f"There are multiple mappings to {dim_key}"
-                        )
-                    dataset_dimension_ids = mapping.get_unique_to_ids()
-                    missing = project_dimension_ids.difference(dataset_dimension_ids)
-                    if missing:
-                        raise DSGMissingDimensionMapping(
-                            f"missing dimension mapping IDs: {dim_key}: {missing}"
-                        )
-                    found = True
-            if not found:
-                raise DSGMissingDimensionMapping(f"dimension mapping not provided: {dim_key}")
+
+        data_source_id = [
+            x.id for x in dataset_config.dimensions if x.type == DimensionType.DATA_SOURCE
+        ][0]
+        data_source = [
+            x.id for x in self.dimension_manager.get_by_id(data_source_id).model.records
+        ][
+            0
+        ]  # this assumes only only data_source per dataset
+
+        for mapping_ref in references:
+            mapping = self.dimension_mapping_manager.get_by_id(mapping_ref.mapping_id)
+            dataset_dimension_ids = mapping.get_unique_to_ids()
+
+            dim = self.get_base_dimension(mapping_ref.to_dimension_type)
+            project_dimension_ids = self._dimension_associations.get_unique_ids(
+                mapping_ref.to_dimension_type, data_source
+            )
+            if project_dimension_ids is None:
+                project_dimension_ids = {x.id for x in dim.model.records}
+
+            missing = project_dimension_ids.difference(dataset_dimension_ids)
+            if missing:
+                raise DSGMissingDimensionMapping(
+                    f"Dimension mapping_id={mapping_ref.mapping_id} is missing mapping record(s) to project dimension={dim_key}: {missing}"
+                )
 
     @property
     def config_id(self):

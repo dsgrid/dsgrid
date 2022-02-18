@@ -103,8 +103,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         columns = set(self.get_pivot_dimension_columns())
         dim_type = self.get_pivot_dimension_type()
+        mapped_pivot_columns = columns
         for ref in self._mapping_references:
-            if ref.from_dimension_type.value == dim_type:
+            if ref.from_dimension_type == dim_type:
                 mapping_config = self._dimension_mapping_mgr.get_by_id(
                     ref.mapping_id, version=ref.version
                 )
@@ -115,11 +116,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 diff = set(mapping.keys()).difference(columns)
                 if diff:
                     raise DSGInvalidDataset(
-                        f"Dataset pivoted dimension columns do not match mapping: {diff}"
+                        f"Dimension_mapping={mapping_config.config_id} has more from_id records than the dataset pivoted {dim_type.value} dimension: {diff}"
                     )
-                return mapping
+                else:
+                    mapped_pivot_columns = set(mapping.values())
 
-        return {x: x for x in columns}
+        return mapped_pivot_columns
 
     def get_columns_for_unique_arrays(self, time_dim, load_data_df):
         """Returns the list of dimension columns aginst which the number of timestamps is checked.
@@ -220,38 +222,40 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _map_and_reduce_dimension(self, df, column, records):
         """ Map and partial reduce a dimension """
-        if column == self.get_pivot_dimension_type().value:
-            # map and consolidate pivoted dimension columns
-            nonvalue_cols = list(
-                set(df.columns).difference(set(self.get_pivot_dimension_columns()))
-            )
-            to_ids = sorted(list({x.to_id for x in records}))
-            value_operations = []
-            for tid in to_ids:
-                from_ids = [x.from_id for x in records if x.to_id == tid]
-                fractions = [x.from_fraction for x in records if x.to_id == tid]
-                operation = "+".join(
-                    [f"{qty}*{frac}" for qty, frac in zip(from_ids, fractions)]
-                )  # assumes reduce by summation
-                operation += f" AS {tid}"
-                value_operations.append(operation)
+        if column in df.columns:
+            if column == self.get_pivot_dimension_type().value:
+                # map and consolidate pivoted dimension columns
+                nonvalue_cols = list(
+                    set(df.columns).difference(set(self.get_pivot_dimension_columns()))
+                )
+                to_ids = sorted(list({x.to_id for x in records if x.to_id is not None}))
+                value_operations = []
+                for tid in to_ids:
+                    from_ids = [x.from_id for x in records if x.to_id == tid]
+                    fractions = [x.from_fraction for x in records if x.to_id == tid]
+                    operation = "+".join(
+                        [f"{qty}*{frac}" for qty, frac in zip(from_ids, fractions)]
+                    )  # assumes reduce by summation
+                    operation += f" AS {tid}"
+                    value_operations.append(operation)
+                df = df.selectExpr(*nonvalue_cols, *value_operations)
 
-            df = df.selectExpr(*nonvalue_cols, *value_operations)
-
-        elif column in df.columns:
-            # map and consolidate from_fraction only
-            records = models_to_dataframe(records).filter("to_id is not NULL")
-            df = df.withColumn("fraction", F.lit(1))
-            df = (
-                df.join(records, df[column] == records.from_id, "cross")
-                .drop("from_id")
-                .drop(column)
-                .withColumnRenamed("to_id", column)
-            ).filter(f"{column} is not NULL")
-            non_fraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
-            df = df.fillna(1, ["from_fraction"]).selectExpr(
-                *non_fraction_cols, "fraction*from_fraction as fraction"
-            )
+            else:
+                # map and consolidate from_fraction only
+                records = models_to_dataframe(records).filter("to_id is not NULL")
+                df = df.withColumn("fraction", F.lit(1))
+                df = (
+                    df.join(records, df[column] == records.from_id, "cross")
+                    .drop("from_id")
+                    .drop(column)
+                    .withColumnRenamed("to_id", column)
+                ).filter(f"{column} is not NULL")
+                non_fraction_cols = [
+                    x for x in df.columns if x not in {"fraction", "from_fraction"}
+                ]
+                df = df.fillna(1, ["from_fraction"]).selectExpr(
+                    *non_fraction_cols, "fraction*from_fraction as fraction"
+                )
 
             # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for one_table_handler may not be unique;
             # imagine 5 subsectors being mapped to 2 subsectors.

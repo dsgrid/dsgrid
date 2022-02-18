@@ -175,7 +175,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 mapping.filename,
                 mapping.mapping_type.value,
             )
-            actual_to_records = [x.to_id for x in mapping.records]
+            actual_to_records = [x.to_id for x in mapping.records if x.to_id is not None]
+
             self._check_for_duplicates_in_list(
                 actual_to_records,
                 allow_dup_to_records,

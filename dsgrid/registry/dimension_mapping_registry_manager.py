@@ -144,12 +144,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                     f"they are missing from dimension_id={dim_id}"
                 )
 
-    def validate_records(self, config: DimensionMappingsConfig, warn_only=False):
+    def validate_records(self, config: DimensionMappingsConfig):
         """Validate dimension mapping records.
 
         Check:
         - duplicate records in from_id and to_id columns per mapping archetype
         - sum of from_fraction by from_id per mapping archetype
+        - special check for mapping_type=duplication
 
         """
         for mapping in config.model.mappings:
@@ -187,6 +188,15 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 self._check_fraction_sum(
                     mapping.records, mapping.filename, mapping.mapping_type.value
                 )
+
+            if mapping.mapping_type.value == "duplication":
+                fractions = {x.from_fraction for x in mapping.records}
+                if not (len(fractions) == 1 and 1 in fractions):
+                    raise DSGInvalidDimensionMapping(
+                        f"dimension_mapping={mapping.filename} has mapping_type={mapping.mapping_type.value}, "
+                        f"which does not allow non-one from_fractions. "
+                        "\nConsider removing from_fraction column or using mapping_type: 'one_to_many_explicit_multipliers'. "
+                    )
 
     @staticmethod
     def _check_for_duplicates_in_list(
@@ -281,7 +291,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         config.assign_ids()
         self._check_unique_records(config, warn_only=force)
         self._check_records_against_dimension_records(config)
-        self.validate_records(config, warn_only=force)
+        self.validate_records(config)
 
         registration = make_initial_config_registration(submitter, log_message)
         src_dir = Path(os.path.dirname(config_file))

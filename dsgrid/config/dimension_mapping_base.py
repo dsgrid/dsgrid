@@ -29,16 +29,16 @@ class DimensionMappingType(DSGEnum):
     MANY_TO_MANY_DISAGGREGATION = "many_to_many_disaggregation"
 
     # input from_fraction col, FRACTION_SUM_NOT_EQ1
-    ONE_TO_ONE_MULTIPLICATION = "one_to_one_multiplication"
-    ONE_TO_MANY_MULTIPLICATION = "one_to_many_multiplication"
-    MANY_TO_ONE_MULTIPLICATION = "many_to_one_multiplication"
-    MANY_TO_MANY_MULTIPLICATION = "many_to_many_multiplication"
+    ONE_TO_ONE_EXPLICIT_MULTIPLIERS = "one_to_one_explicit_multipliers"
+    ONE_TO_MANY_EXPLICIT_MULTIPLIERS = "one_to_many_explicit_multipliers"
+    MANY_TO_ONE_EXPLICIT_MULTIPLIERS = "many_to_one_explicit_multipliers"
+    MANY_TO_MANY_EXPLICIT_MULTIPLIERS = "many_to_many_explicit_multipliers"
 
 
 class DimensionMappingArchetype(DSGEnum):
     """Dimension mapping archetype, used to check:
     - whether duplicates are allowed in from and to dimension;
-    - whether sum of from_fraction should be =, <, or > 1 when group by from_id
+    - whether sum of from_fraction should be = or != 1 when group by from_id
     """
 
     ONE_TO_ONE_MAP_FRACTION_SUM_EQ1 = "one_to_one_map_fraction_sum_eq1"  # unique from and to
@@ -64,6 +64,7 @@ class DimensionMappingBaseModel(DSGBaseModel):
     archetype: Optional[DimensionMappingArchetype] = Field(
         title="archetype",
         description="Dimension mapping archetype, determined based on mapping_type",
+        dsg_internal=True,
         options=DimensionMappingArchetype.format_for_docs(),
     )
     from_dimension: DimensionReferenceModel = Field(
@@ -107,13 +108,13 @@ class DimensionMappingBaseModel(DSGBaseModel):
             assigned_archetype = DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1
 
         # input from_fraction col, FRACTION_SUM_NOT_EQ1
-        elif values["mapping_type"] == DimensionMappingType.ONE_TO_ONE_MULTIPLICATION:
+        elif values["mapping_type"] == DimensionMappingType.ONE_TO_ONE_EXPLICIT_MULTIPLIERS:
             assigned_archetype = DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1
-        elif values["mapping_type"] == DimensionMappingType.ONE_TO_MANY_MULTIPLICATION:
+        elif values["mapping_type"] == DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS:
             assigned_archetype = DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1
-        elif values["mapping_type"] == DimensionMappingType.MANY_TO_ONE_MULTIPLICATION:
+        elif values["mapping_type"] == DimensionMappingType.MANY_TO_ONE_EXPLICIT_MULTIPLIERS:
             assigned_archetype = DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1
-        elif values["mapping_type"] == DimensionMappingType.MANY_TO_MANY_MULTIPLICATION:
+        elif values["mapping_type"] == DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS:
             assigned_archetype = DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1
 
         if archetype == None:
@@ -131,7 +132,8 @@ class DimensionMappingBaseModel(DSGBaseModel):
 class DimensionMappingReferenceModel(DSGBaseModel):
     """Reference to a dimension mapping stored in the registry.
 
-    The DimensionMappingReferenceModel is utilized by the project configuration (project.toml) as well as by the dimension mapping reference configuration (dimension_mapping_references.toml) that may be required when submitting a dataset to a project.
+    The DimensionMappingReferenceModel is utilized by the project configuration (project.toml) as well as by the
+    dimension mapping reference configuration (dimension_mapping_references.toml) that may be required when submitting a dataset to a project.
     """
 
     from_dimension_type: DimensionType = Field(

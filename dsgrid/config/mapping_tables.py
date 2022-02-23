@@ -74,7 +74,7 @@ class MappingTableModel(DimensionMappingBaseModel):
     @validator("file_hash")
     def compute_file_hash(cls, file_hash, values):
         """Compute file hash."""
-        return file_hash or values.get("filename")
+        return file_hash or compute_file_hash(values.get("filename"))
 
     @validator("records", always=True)
     def add_records(cls, records, values):

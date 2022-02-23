@@ -9,7 +9,7 @@ import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.spark import models_to_dataframe
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
@@ -221,7 +221,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df
 
     def _map_and_reduce_dimension(self, df, column, records):
-        """ Map and partial reduce a dimension """
+        """ Map and partially reduce a dimension """
         if column in df.columns:
             if column == self.get_pivot_dimension_type().value:
                 # map and consolidate pivoted dimension columns
@@ -242,22 +242,38 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
             else:
                 # map and consolidate from_fraction only
-                records = models_to_dataframe(records).filter("to_id is not NULL")
+                records = models_to_dataframe(records).filter("to_id IS NOT NULL")
                 df = df.withColumn("fraction", F.lit(1))
                 df = (
-                    df.join(records, df[column] == records.from_id, "cross")
+                    df.join(records, on=df[column] == records.from_id, how="cross")
                     .drop("from_id")
                     .drop(column)
                     .withColumnRenamed("to_id", column)
-                ).filter(f"{column} is not NULL")
-                non_fraction_cols = [
+                ).filter(f"{column} IS NOT NULL")
+                nonfraction_cols = [
                     x for x in df.columns if x not in {"fraction", "from_fraction"}
                 ]
-                df = df.fillna(1, ["from_fraction"]).selectExpr(
-                    *non_fraction_cols, "fraction*from_fraction as fraction"
+                df = df.fillna(1, subset=["from_fraction"]).selectExpr(
+                    *nonfraction_cols, "fraction*from_fraction AS fraction"
                 )
 
             # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for one_table_handler may not be unique;
-            # imagine 5 subsectors being mapped to 2 subsectors.
+            # imagine 5 subsectors being remapped/consolidated to 2 subsectors.
 
         return df
+
+    @staticmethod
+    def _check_null_value_in_unique_dimension_rows(dim_table):
+        dim_with_null = {}
+        cols_to_check = {x for x in dim_table.columns if x != "id"}
+
+        for col in cols_to_check:
+            null_count = dim_table.filter(F.col(col).isNull()).count()
+            if null_count > 0:
+                dim_with_null[col] = null_count
+
+        if len(dim_with_null) > 0:
+            raise DSGInvalidDimensionMapping(
+                "Invalid dimension mapping application. "
+                f"Combination of remapped dataset dimensions contain NULL value(s) for dimension(s): \n{dim_with_null}"
+            )

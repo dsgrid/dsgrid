@@ -87,10 +87,16 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 )
 
     def get_unique_dimension_rows(self):
+        """Get distinct combinations of remapped dimensions.
+        Check each col in combination for null value."""
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_cols = set(time_dim.get_timestamp_load_data_columns())
         pivoted_cols = set(self.get_pivot_dimension_columns())
         exclude = time_cols.union(pivoted_cols)
         dim_cols = [x for x in self._load_data.columns if x not in exclude]
         df = self._load_data.select(*dim_cols).distinct()
-        return self._remap_dimension_columns(df).distinct()
+
+        dim_table = self._remap_dimension_columns(df).distinct()
+        self._check_null_value_in_unique_dimension_rows(dim_table)
+
+        return dim_table

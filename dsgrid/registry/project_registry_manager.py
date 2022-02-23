@@ -301,10 +301,9 @@ class ProjectRegistryManager(RegistryManagerBase):
             x.id for x in self._dimension_mgr.get_by_id(data_source_dim_id).model.records
         ][
             0
-        ]  # this assumes only only data_source per dataset
+        ]  # this assumes only data_source per dataset
         dim_table = handler.get_unique_dimension_rows().drop("id")
-        for col in dim_table.columns:
-            assert dim_table.filter(F.col(col).isNull()).count() == 0
+
         associations = project_config.dimension_associations
         # TODO: check a unified project table against dim_table
         # project_table = self._make_single_table(project_config, data_source, pivot_dimension)

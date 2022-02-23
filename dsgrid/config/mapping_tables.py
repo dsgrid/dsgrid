@@ -20,7 +20,7 @@ from dsgrid.utils.files import compute_file_hash, dump_data
 logger = logging.getLogger(__name__)
 
 
-class MappingTableRecordModel(DSGBaseModel):  # AssociationTableRecordModel
+class MappingTableRecordModel(DSGBaseModel):
     """Represents one record in dimension mapping record files. Maps one dimension to another."""
 
     from_id: str = Field(
@@ -31,10 +31,10 @@ class MappingTableRecordModel(DSGBaseModel):  # AssociationTableRecordModel
         title="to_id",
         description="Destination mapping",
     )
-    from_fraction: Union[float, None] = Field(
+    from_fraction: float = Field(
         title="from_fraction",
         description="Fraction of from_id to map to to_id",
-        default=1,
+        default=1.0,
     )
 
     @validator("from_id", "to_id")
@@ -44,7 +44,7 @@ class MappingTableRecordModel(DSGBaseModel):  # AssociationTableRecordModel
         return val
 
 
-class MappingTableModel(DimensionMappingBaseModel):  # AssociationTableModel
+class MappingTableModel(DimensionMappingBaseModel):
     """Attributes for a dimension mapping table"""
 
     filename: str = Field(
@@ -103,7 +103,7 @@ class MappingTableModel(DimensionMappingBaseModel):  # AssociationTableModel
         return serialize_model_data(data)
 
 
-class MappingTableConfig(ConfigWithDataFilesBase):  # AssociationTableConfig
+class MappingTableConfig(ConfigWithDataFilesBase):
     """Provides an interface to an MappingTableModel"""
 
     def __init__(self, *args, **kwargs):

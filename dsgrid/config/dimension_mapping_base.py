@@ -20,7 +20,7 @@ class DimensionMappingType(DSGEnum):
     ONE_TO_ONE = "one_to_one"  # includes rename, down-selection
     MANY_TO_ONE_AGGREGATION = "many_to_one_aggregation"
 
-    # default from_fraction col, FRACTION_SUM_NOT_EQ1
+    # default from_fraction col
     DUPLICATION = "duplication"
 
     # input from_fraction col, FRACTION_SUM_EQ1
@@ -28,7 +28,7 @@ class DimensionMappingType(DSGEnum):
     ONE_TO_MANY_DISAGGREGATION = "one_to_many_disaggregation"
     MANY_TO_MANY_DISAGGREGATION = "many_to_many_disaggregation"
 
-    # input from_fraction col, FRACTION_SUM_NOT_EQ1
+    # input from_fraction col
     ONE_TO_ONE_EXPLICIT_MULTIPLIERS = "one_to_one_explicit_multipliers"
     ONE_TO_MANY_EXPLICIT_MULTIPLIERS = "one_to_many_explicit_multipliers"
     MANY_TO_ONE_EXPLICIT_MULTIPLIERS = "many_to_one_explicit_multipliers"
@@ -38,7 +38,7 @@ class DimensionMappingType(DSGEnum):
 class DimensionMappingArchetype(DSGEnum):
     """Dimension mapping archetype, used to check:
     - whether duplicates are allowed in from and to dimension;
-    - whether sum of from_fraction should be = or != 1 when group by from_id
+    - whether sum of from_fraction should be = or not when group by from_id
     """
 
     ONE_TO_ONE_MAP_FRACTION_SUM_EQ1 = "one_to_one_map_fraction_sum_eq1"  # unique from and to
@@ -46,10 +46,10 @@ class DimensionMappingArchetype(DSGEnum):
     MANY_TO_ONE_MAP_FRACTION_SUM_EQ1 = "many_to_one_map_fraction_sum_eq1"  # unique from, dup to
     MANY_TO_MANY_MAP_FRACTION_SUM_EQ1 = "many_to_many_map_fraction_sum_eq1"  # dup from and to
 
-    ONE_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1 = "one_to_one_map_fraction_sum_not_eq1"
-    ONE_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1 = "one_to_many_map_fraction_sum_not_eq1"
-    MANY_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1 = "many_to_one_map_fraction_sum_not_eq1"
-    MANY_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1 = "many_to_many_map_fraction_sum_not_eq1"
+    ONE_TO_ONE_MAP_FRACTION_SUM = "one_to_one_map_fraction_sum"
+    ONE_TO_MANY_MAP_FRACTION_SUM = "one_to_many_map_fraction_sum"
+    MANY_TO_ONE_MAP_FRACTION_SUM = "many_to_one_map_fraction_sum"
+    MANY_TO_MANY_MAP_FRACTION_SUM = "many_to_many_map_fraction_sum"
 
 
 class DimensionMappingBaseModel(DSGBaseModel):
@@ -89,35 +89,26 @@ class DimensionMappingBaseModel(DSGBaseModel):
 
     @validator("archetype")
     def check_archetype(cls, archetype, values):
-        # default from_fraction col, FRACTION_SUM_EQ1
-        if values["mapping_type"] == DimensionMappingType.ONE_TO_ONE:
-            assigned_archetype = DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_EQ1
-        elif values["mapping_type"] == DimensionMappingType.MANY_TO_ONE_AGGREGATION:
-            assigned_archetype = DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1
 
-        # default from_fraction col, FRACTION_SUM_NOT_EQ1
-        elif values["mapping_type"] == DimensionMappingType.DUPLICATION:
-            assigned_archetype = DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1
+        archetype_assignment = {
+            # default from_fraction col, FRACTION_SUM_EQ1
+            DimensionMappingType.ONE_TO_ONE: DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_EQ1,
+            DimensionMappingType.MANY_TO_ONE_AGGREGATION: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1,
+            # default from_fraction col
+            DimensionMappingType.DUPLICATION: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM,
+            # from_fraction col, FRACTION_SUM_EQ1
+            DimensionMappingType.MANY_TO_MANY_AGGREGATION: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1,
+            DimensionMappingType.ONE_TO_MANY_DISAGGREGATION: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_EQ1,
+            DimensionMappingType.MANY_TO_MANY_DISAGGREGATION: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1,
+            # input from_fraction col, FRACTION_SUM
+            DimensionMappingType.ONE_TO_ONE_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM,
+            DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM,
+            DimensionMappingType.MANY_TO_ONE_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM,
+            DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM,
+        }
 
-        # from_fraction col, FRACTION_SUM_EQ1
-        elif values["mapping_type"] == DimensionMappingType.MANY_TO_MANY_AGGREGATION:
-            assigned_archetype = DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1
-        elif values["mapping_type"] == DimensionMappingType.ONE_TO_MANY_DISAGGREGATION:
-            assigned_archetype = DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_EQ1
-        elif values["mapping_type"] == DimensionMappingType.MANY_TO_MANY_DISAGGREGATION:
-            assigned_archetype = DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1
-
-        # input from_fraction col, FRACTION_SUM_NOT_EQ1
-        elif values["mapping_type"] == DimensionMappingType.ONE_TO_ONE_EXPLICIT_MULTIPLIERS:
-            assigned_archetype = DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1
-        elif values["mapping_type"] == DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS:
-            assigned_archetype = DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1
-        elif values["mapping_type"] == DimensionMappingType.MANY_TO_ONE_EXPLICIT_MULTIPLIERS:
-            assigned_archetype = DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_NOT_EQ1
-        elif values["mapping_type"] == DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS:
-            assigned_archetype = DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_NOT_EQ1
-
-        if archetype == None:
+        assigned_archetype = archetype_assignment[values["mapping_type"]]
+        if archetype is None:
             archetype = assigned_archetype
         else:
             if archetype != assigned_archetype:

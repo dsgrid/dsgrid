@@ -222,40 +222,50 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _map_and_reduce_dimension(self, df, column, records):
         """ Map and partially reduce a dimension """
-        if column in df.columns:
-            if column == self.get_pivot_dimension_type().value:
-                # map and consolidate pivoted dimension columns
-                nonvalue_cols = list(
-                    set(df.columns).difference(set(self.get_pivot_dimension_columns()))
-                )
-                to_ids = sorted(list({x.to_id for x in records if x.to_id is not None}))
-                value_operations = []
-                for tid in to_ids:
-                    from_ids = [x.from_id for x in records if x.to_id == tid]
-                    fractions = [x.from_fraction for x in records if x.to_id == tid]
-                    operation = "+".join(
-                        [f"{qty}*{frac}" for qty, frac in zip(from_ids, fractions)]
-                    )  # assumes reduce by summation
-                    operation += f" AS {tid}"
-                    value_operations.append(operation)
-                df = df.selectExpr(*nonvalue_cols, *value_operations)
+        if column not in df.columns:
+            return df
 
-            else:
-                # map and consolidate from_fraction only
-                records = models_to_dataframe(records).filter("to_id IS NOT NULL")
-                df = df.withColumn("fraction", F.lit(1))
-                df = (
-                    df.join(records, on=df[column] == records.from_id, how="cross")
-                    .drop("from_id")
-                    .drop(column)
-                    .withColumnRenamed("to_id", column)
-                ).filter(f"{column} IS NOT NULL")
-                nonfraction_cols = [
-                    x for x in df.columns if x not in {"fraction", "from_fraction"}
-                ]
-                df = df.fillna(1, subset=["from_fraction"]).selectExpr(
-                    *nonfraction_cols, "fraction*from_fraction AS fraction"
-                )
+        if column == self.get_pivot_dimension_type().value:
+            # map and consolidate pivoted dimension columns (need pytest)
+            # this is only for dataset_schema_handler_one_table, b/c handlder_standard._remap_dimension_columns() only takes in load_data_lookup
+            nonvalue_cols = list(
+                set(df.columns).difference(set(self.get_pivot_dimension_columns()))
+            )
+
+            records_dict = {}
+            for row in records:
+                if row.to_id is None:
+                    pass
+                elif row.to_id not in records_dict:
+                    records_dict[row.to_id] = {row.from_id: row.from_fraction}
+                else:
+                    records_dict[row.to_id].update({row.from_id: row.from_fraction})
+
+            to_ids = sorted(records_dict)
+            value_operations = []
+            for tid in to_ids:
+                operation = "+".join(
+                    [f"{from_id}*{fraction}" for from_id, fraction in records_dict[tid].items()]
+                )  # assumes reduce by summation
+                operation += f" AS {tid}"
+                value_operations.append(operation)
+
+            df = df.selectExpr(*nonvalue_cols, *value_operations)
+
+        else:
+            # map and consolidate from_fraction only
+            records = models_to_dataframe(records).filter("to_id IS NOT NULL")
+            df = df.withColumn("fraction", F.lit(1))
+            df = (
+                df.join(records, on=df[column] == records.from_id, how="cross")
+                .drop("from_id")
+                .drop(column)
+                .withColumnRenamed("to_id", column)
+            ).filter(f"{column} IS NOT NULL")
+            nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
+            df = df.fillna(1, subset=["from_fraction"]).selectExpr(
+                *nonfraction_cols, "fraction*from_fraction AS fraction"
+            )
 
             # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for one_table_handler may not be unique;
             # imagine 5 subsectors being remapped/consolidated to 2 subsectors.

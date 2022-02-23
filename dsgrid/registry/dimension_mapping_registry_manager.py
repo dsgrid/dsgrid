@@ -154,23 +154,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         """
         for mapping in config.model.mappings:
-            if "one_to_one" in mapping.archetype.value:
-                allow_dup_from_records = False
-                allow_dup_to_records = False
-            elif "one_to_many" in mapping.archetype.value:
-                allow_dup_from_records = True
-                allow_dup_to_records = False
-            elif "many_to_one" in mapping.archetype.value:
-                allow_dup_from_records = False
-                allow_dup_to_records = True
-            elif "many_to_many" in mapping.archetype.value:
-                allow_dup_from_records = True
-                allow_dup_to_records = True
-
             actual_from_records = [x.from_id for x in mapping.records]
             self._check_for_duplicates_in_list(
                 actual_from_records,
-                allow_dup_from_records,
+                mapping.archetype.allow_dup_from_records,
                 "from_id",
                 mapping.filename,
                 mapping.mapping_type.value,
@@ -179,13 +166,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
             self._check_for_duplicates_in_list(
                 actual_to_records,
-                allow_dup_to_records,
+                mapping.archetype.allow_dup_to_records,
                 "to_id",
                 mapping.filename,
                 mapping.mapping_type.value,
             )
 
-            if "fraction_sum_eq1" in mapping.archetype.value:
+            if mapping.archetype.check_fraction_sum_eq1:
                 self._check_fraction_sum(
                     mapping.records, mapping.filename, mapping.mapping_type.value
                 )

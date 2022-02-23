@@ -6,11 +6,10 @@ from pydantic import Field, validator
 from semver import VersionInfo
 
 from .dimensions import DimensionReferenceModel
-from dsgrid.data_models import DSGBaseModel, DSGEnum
+from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.versioning import handle_version_or_str
 from dsgrid.exceptions import DSGInvalidDimensionMapping
-
 
 logger = logging.getLogger(__name__)
 
@@ -41,15 +40,63 @@ class DimensionMappingArchetype(DSGEnum):
     - whether sum of from_fraction should be = or not when group by from_id
     """
 
-    ONE_TO_ONE_MAP_FRACTION_SUM_EQ1 = "one_to_one_map_fraction_sum_eq1"  # unique from and to
-    ONE_TO_MANY_MAP_FRACTION_SUM_EQ1 = "one_to_many_map_fraction_sum_eq1"  # dup from, unique to
-    MANY_TO_ONE_MAP_FRACTION_SUM_EQ1 = "many_to_one_map_fraction_sum_eq1"  # unique from, dup to
-    MANY_TO_MANY_MAP_FRACTION_SUM_EQ1 = "many_to_many_map_fraction_sum_eq1"  # dup from and to
+    ONE_TO_ONE_MAP_FRACTION_SUM_EQ1 = EnumValue(
+        value="one_to_one_map_fraction_sum_eq1",
+        description="One-to-one dimension mapping with sum of from_fraction = 1 when grouped by from_id",
+        allow_dup_from_records=False,
+        allow_dup_to_records=False,
+        check_fraction_sum_eq1=True,
+    )
+    ONE_TO_MANY_MAP_FRACTION_SUM_EQ1 = EnumValue(
+        value="one_to_many_map_fraction_sum_eq1",
+        description="One-to-many dimension mapping with sum of from_fraction = 1 when grouped by from_id",
+        allow_dup_from_records=True,
+        allow_dup_to_records=False,
+        check_fraction_sum_eq1=True,
+    )
+    MANY_TO_ONE_MAP_FRACTION_SUM_EQ1 = EnumValue(
+        value="many_to_one_map_fraction_sum_eq1",
+        description="Many-to-one dimension mapping with sum of from_fraction = 1 when grouped by from_id",
+        allow_dup_from_records=False,
+        allow_dup_to_records=True,
+        check_fraction_sum_eq1=True,
+    )
+    MANY_TO_MANY_MAP_FRACTION_SUM_EQ1 = EnumValue(
+        value="many_to_many_map_fraction_sum_eq1",
+        description="Many-to-many dimension mapping with sum of from_fraction = 1 when grouped by from_id",
+        allow_dup_from_records=True,
+        allow_dup_to_records=True,
+        check_fraction_sum_eq1=True,
+    )
 
-    ONE_TO_ONE_MAP_FRACTION_SUM = "one_to_one_map_fraction_sum"
-    ONE_TO_MANY_MAP_FRACTION_SUM = "one_to_many_map_fraction_sum"
-    MANY_TO_ONE_MAP_FRACTION_SUM = "many_to_one_map_fraction_sum"
-    MANY_TO_MANY_MAP_FRACTION_SUM = "many_to_many_map_fraction_sum"
+    ONE_TO_ONE_MAP = EnumValue(
+        value="one_to_one_map",
+        description="One-to-one dimension mapping with no from_fraction sum check",
+        allow_dup_from_records=False,
+        allow_dup_to_records=False,
+        check_fraction_sum_eq1=False,
+    )
+    ONE_TO_MANY_MAP = EnumValue(
+        value="one_to_many_map",
+        description="One-to-many dimension mapping with no from_fraction sum check",
+        allow_dup_from_records=True,
+        allow_dup_to_records=False,
+        check_fraction_sum_eq1=False,
+    )
+    MANY_TO_ONE_MAP = EnumValue(
+        value="many_to_one_map",
+        description="Many-to-one dimension mapping with no from_fraction sum check",
+        allow_dup_from_records=False,
+        allow_dup_to_records=True,
+        check_fraction_sum_eq1=False,
+    )
+    MANY_TO_MANY_MAP = EnumValue(
+        value="many_to_many_map",
+        description="Many-to-many dimension mapping with no from_fraction sum check",
+        allow_dup_from_records=True,
+        allow_dup_to_records=True,
+        check_fraction_sum_eq1=False,
+    )
 
 
 class DimensionMappingBaseModel(DSGBaseModel):
@@ -95,16 +142,16 @@ class DimensionMappingBaseModel(DSGBaseModel):
             DimensionMappingType.ONE_TO_ONE: DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_EQ1,
             DimensionMappingType.MANY_TO_ONE_AGGREGATION: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1,
             # default from_fraction col
-            DimensionMappingType.DUPLICATION: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM,
+            DimensionMappingType.DUPLICATION: DimensionMappingArchetype.ONE_TO_MANY_MAP,
             # from_fraction col, FRACTION_SUM_EQ1
             DimensionMappingType.MANY_TO_MANY_AGGREGATION: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1,
             DimensionMappingType.ONE_TO_MANY_DISAGGREGATION: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_EQ1,
             DimensionMappingType.MANY_TO_MANY_DISAGGREGATION: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1,
             # input from_fraction col, FRACTION_SUM
-            DimensionMappingType.ONE_TO_ONE_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM,
-            DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM,
-            DimensionMappingType.MANY_TO_ONE_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM,
-            DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM,
+            DimensionMappingType.ONE_TO_ONE_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.ONE_TO_ONE_MAP,
+            DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.ONE_TO_MANY_MAP,
+            DimensionMappingType.MANY_TO_ONE_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.MANY_TO_ONE_MAP,
+            DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.MANY_TO_MANY_MAP,
         }
 
         assigned_archetype = archetype_assignment[values["mapping_type"]]

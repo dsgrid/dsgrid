@@ -3,6 +3,7 @@ import collections
 import logging
 import re
 import os
+from collections import defaultdict
 from typing import List
 
 import pyspark.sql.functions as F
@@ -103,7 +104,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         columns = set(self.get_pivot_dimension_columns())
         dim_type = self.get_pivot_dimension_type()
-        mapped_pivot_columns = columns
         for ref in self._mapping_references:
             if ref.from_dimension_type == dim_type:
                 mapping_config = self._dimension_mapping_mgr.get_by_id(
@@ -118,10 +118,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     raise DSGInvalidDataset(
                         f"Dimension_mapping={mapping_config.config_id} has more from_id records than the dataset pivoted {dim_type.value} dimension: {diff}"
                     )
-                else:
-                    mapped_pivot_columns = set(mapping.values())
+                return set(mapping.values())
 
-        return mapped_pivot_columns
+        return columns
 
     def get_columns_for_unique_arrays(self, time_dim, load_data_df):
         """Returns the list of dimension columns aginst which the number of timestamps is checked.
@@ -232,14 +231,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 set(df.columns).difference(set(self.get_pivot_dimension_columns()))
             )
 
-            records_dict = {}
+            records_dict = defaultdict(dict)
             for row in records:
-                if row.to_id is None:
-                    pass
-                elif row.to_id not in records_dict:
-                    records_dict[row.to_id] = {row.from_id: row.from_fraction}
-                else:
-                    records_dict[row.to_id].update({row.from_id: row.from_fraction})
+                if row.to_id is not None:
+                    records_dict[row.to_id][row.from_id] = row.from_fraction
 
             to_ids = sorted(records_dict)
             value_operations = []

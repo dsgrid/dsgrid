@@ -6,7 +6,6 @@ from tempfile import TemporaryDirectory, gettempdir
 import pyspark
 import pytest
 from semver import VersionInfo
-from pydantic import ValidationError
 
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
@@ -203,13 +202,13 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         orig_text = record_file.read_text()
 
         # Invalid 'from' record
-        record_file.write_text(orig_text + "\ninvalid county,1,CO\n")
+        record_file.write_text(orig_text + "invalid county,1,CO\n")
         with pytest.raises(DSGInvalidDimensionMapping):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Invalid 'from' record - nulls aren't allowd
         record_file.write_text(orig_text + ",1.2,CO\n")
-        with pytest.raises(ValidationError):
+        with pytest.raises(DSGInvalidDimensionMapping):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Invalid 'to' record

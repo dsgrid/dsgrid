@@ -23,7 +23,7 @@ from dsgrid.tests.common import (
 logger = logging.getLogger(__name__)
 
 
-def make_standar_scenarios_registry(
+def make_standard_scenarios_registry(
     registry_path,
     src_dir,
     dataset_path=None,
@@ -169,18 +169,24 @@ def run(registry_path, force, project_dir, dataset_path, verbose):
         else:
             print(f"{registry_path} already exists. Use --force to overwrite.")
     os.makedirs(registry_path)
-    tmp_project_dir = Path(tempfile.gettempdir()) / "tmp_project_dir"
-    if tmp_project_dir.exists():
+
+    # Use a path that will be accessible to all workers across compute nodes.
+    tmp_project_dir = Path(".") / "tmp_project_dir"
+    try:
+        assert not tmp_project_dir.exists()
+        if tmp_project_dir.exists():
+            shutil.rmtree(tmp_project_dir)
+        shutil.copytree(project_dir, tmp_project_dir)
+        include_datasets = dataset_path is not None
+        make_standard_scenarios_registry(
+            registry_path,
+            tmp_project_dir / "dsgrid_project",
+            dataset_path=dataset_path,
+            include_datasets=include_datasets,
+        )
+        timer_stats_collector.log_stats()
+    finally:
         shutil.rmtree(tmp_project_dir)
-    shutil.copytree(project_dir, tmp_project_dir)
-    include_datasets = dataset_path is not None
-    make_standar_scenarios_registry(
-        registry_path,
-        tmp_project_dir / "dsgrid_project",
-        dataset_path=dataset_path,
-        include_datasets=include_datasets,
-    )
-    timer_stats_collector.log_stats()
 
 
 if __name__ == "__main__":

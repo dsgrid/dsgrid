@@ -43,8 +43,13 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             self._check_dataset_internal_consistency()
 
     def get_unique_dimension_rows(self):
+        """Get distinct combinations of remapped dimensions, including id.
+        Check each col in combination for null value."""
         path = Path(self._config.model.path)
-        return self._remap_dimension_columns(self._load_data_lookup).distinct()
+        dim_table = self._remap_dimension_columns(self._load_data_lookup).distinct()
+        self._check_null_value_in_unique_dimension_rows(dim_table)
+
+        return dim_table
 
     def _check_lookup_data_consistency(self):
         """Dimension check in load_data_lookup, excludes time:
@@ -101,7 +106,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         lookup_data_ids = (
             self._load_data_lookup.select("id")
             .distinct()
-            .filter("id is not null")
+            .filter("id IS NOT NULL")
             .sort("id")
             .agg(F.collect_list("id"))
             .collect()[0][0]

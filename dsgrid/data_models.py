@@ -79,7 +79,7 @@ class EnumValue:
 
 
 class DSGEnum(Enum):
-    "dsgrid Enum class"
+    """dsgrid Enum class"""
 
     def __new__(cls, *args):
         obj = object.__new__(cls)

@@ -127,7 +127,7 @@ def _setup_invalid_load_data_lookup_missing_records(data_dir):
     data = load_line_delimited_json(lookup_file)
     bad_data = [x for x in data if x["id"] is not None]
     dump_line_delimited_json(bad_data, lookup_file)
-    return DSGInvalidDataset, r"is missing records"
+    return DSGInvalidDataset, r"is missing dimension association records"
 
 
 def _setup_invalid_load_data_missing_timestamp(data_dir):

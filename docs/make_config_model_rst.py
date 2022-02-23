@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 from semver import VersionInfo
 
-from dsgrid.config.association_tables import AssociationTableModel
+from dsgrid.config.mapping_tables import MappingTableModel
 from dsgrid.config.dataset_config import InputSectorDataset, DatasetConfigModel
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingBaseModel,
@@ -260,7 +260,7 @@ def make_config_rst(output):
         DimensionMappingBaseModel,  # dimension mapping toml
         DimensionMappingReferenceListModel,  # dimension mapping references toml
         # TODO: @DT please confirm whether these models below are being used directly by the user or not. If not, I do not think we need to create .rst docs explaining the fields. Do you agree?
-        # AssociationTableModel,
+        # MappingTableModel,
         # DimensionMappingBaseModel,
         # DimensionMappingReferenceModel,
     ):

@@ -4,11 +4,13 @@ import getpass
 import logging
 import os
 from pathlib import Path
+import collections
 
 from prettytable import PrettyTable
+import pyspark.sql.functions as F
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.association_tables import AssociationTableConfig
+from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
 from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
@@ -17,13 +19,15 @@ from dsgrid.exceptions import (
 )
 from dsgrid.data_models import serialize_model
 from dsgrid.registry.common import ConfigKey, make_initial_config_registration, ConfigKey
-from dsgrid.utils.files import dump_data
 from .dimension_mapping_registry import DimensionMappingRegistry, DimensionMappingRegistryModel
 from .dimension_mapping_update_checker import DimensionMappingUpdateChecker
 from .dimension_registry_manager import DimensionRegistryManager
 from .registry_base import RegistryBaseModel
 from .registry_manager_base import RegistryManagerBase
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
+from dsgrid.utils.files import dump_data
+from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.config.dimension_mapping_base import DimensionMappingArchetype
 
 
 logger = logging.getLogger(__name__)
@@ -109,33 +113,25 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 )
 
     def _check_records_against_dimension_records(self, config):
+        """
+        Check that records in mappings are subsets of from and to dimension records.
+        """
         for mapping in config.model.mappings:
-            actual_from_records = set()
-            for record in mapping.records:
-                if record.from_id in actual_from_records:
-                    raise DSGInvalidDimensionMapping(
-                        f"{record.from_id} is listed twice in {mapping.filename}"
-                    )
-                actual_from_records.add(record.from_id)
-
-            if None in actual_from_records:
-                raise DSGInvalidDimensionMapping(
-                    f"'from' records cannot be null: {mapping.filename}"
-                )
-
-            actual_to_records = {x.to_id for x in mapping.records}
+            actual_from_records = {x.from_id for x in mapping.records}
             from_dimension = self._dimension_mgr.get_by_id(mapping.from_dimension.dimension_id)
             allowed_from_records = from_dimension.get_unique_ids()
             diff = actual_from_records.difference(allowed_from_records)
             if diff:
                 dim_id = from_dimension.model.dimension_id
                 raise DSGInvalidDimensionMapping(
-                    f"Dimension mapping has invalid 'from' records: dimension_id={dim_id} {diff}"
+                    f"Dimension mapping={mapping.filename} has invalid 'from_id' records: {diff}, "
+                    f"they are missing from dimension_id={dim_id}"
                 )
 
             # Note: this code cannot complete verify 'to' records. A dataset may be registering a
             # mapping to a project's dimension for a specific data source, but that information
             # is not available here.
+            actual_to_records = {x.to_id for x in mapping.records}
             to_dimension = self._dimension_mgr.get_by_id(mapping.to_dimension.dimension_id)
             allowed_to_records = to_dimension.get_unique_ids()
             if None in actual_to_records:
@@ -144,17 +140,90 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             if diff:
                 dim_id = from_dimension.model.dimension_id
                 raise DSGInvalidDimensionMapping(
-                    f"Dimension mapping has invalid 'to' records: dimension_id={dim_id} {diff}"
+                    f"Dimension mapping={mapping.filename} has invalid 'to_id' records: {diff}, "
+                    f"they are missing from dimension_id={dim_id}"
                 )
 
-    def validate_records(self, config: DimensionMappingsConfig, warn_only=False):
+    def validate_records(self, config: DimensionMappingsConfig):
         """Validate dimension mapping records.
 
         Check:
-        - from_id and to_id column names
-        - check for duplicate IDs and log a warning if they exist (sometimes we want them to exist if it is an aggregation)
+        - duplicate records in from_id and to_id columns per mapping archetype
+        - sum of from_fraction by from_id per mapping archetype
+        - special check for mapping_type=duplication
+
         """
-        pass
+        for mapping in config.model.mappings:
+            actual_from_records = [x.from_id for x in mapping.records]
+            self._check_for_duplicates_in_list(
+                actual_from_records,
+                mapping.archetype.allow_dup_from_records,
+                "from_id",
+                mapping.filename,
+                mapping.mapping_type.value,
+            )
+            actual_to_records = [x.to_id for x in mapping.records if x.to_id is not None]
+
+            self._check_for_duplicates_in_list(
+                actual_to_records,
+                mapping.archetype.allow_dup_to_records,
+                "to_id",
+                mapping.filename,
+                mapping.mapping_type.value,
+            )
+
+            if mapping.archetype.check_fraction_sum_eq1:
+                self._check_fraction_sum(
+                    mapping.records, mapping.filename, mapping.mapping_type.value
+                )
+
+            if mapping.mapping_type.value == "duplication":
+                fractions = {x.from_fraction for x in mapping.records}
+                if not (len(fractions) == 1 and 1 in fractions):
+                    raise DSGInvalidDimensionMapping(
+                        f"dimension_mapping={mapping.filename} has mapping_type={mapping.mapping_type.value}, "
+                        f"which does not allow non-one from_fractions. "
+                        "\nConsider removing from_fraction column or using mapping_type: 'one_to_many_explicit_multipliers'. "
+                    )
+
+    @staticmethod
+    def _check_for_duplicates_in_list(
+        lst: list, allow_dup: bool, id_type: str, mapping_name: str, mapping_type: str
+    ):
+        """Check list for duplicates"""
+        dups = [x for x, n in collections.Counter(lst).items() if n > 1]
+        if len(dups) > 0 and not allow_dup:
+            raise DSGInvalidDimensionMapping(
+                f"dimension_mapping={mapping_name} has mapping_type={mapping_type}, "
+                f"which does not allow duplicated {id_type} records. \nDuplicated {id_type}={dups}. "
+            )
+
+    @staticmethod
+    def _check_fraction_sum(mapping_records, mapping_name, mapping_type):
+        mapping_df = models_to_dataframe(mapping_records)
+        mapping_sum_df = (
+            mapping_df.groupBy("from_id")
+            .agg(F.sum("from_fraction").alias("sum_fraction"))
+            .sort(F.desc("sum_fraction"), "from_id")
+        )
+        fracs_greater_than_one = mapping_sum_df.filter(F.col("sum_fraction") > 1)
+        fracs_less_than_one = mapping_sum_df.filter(F.col("sum_fraction") < 1)
+        if fracs_greater_than_one.count() > 0:
+            id_greater_than_one = {
+                x.from_id for x in fracs_greater_than_one[["from_id"]].distinct().collect()
+            }
+            raise DSGInvalidDimensionMapping(
+                f"dimension_mapping={mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
+                f"Mapping contains from_fraction sum greater than 1 for from_id={id_greater_than_one}. "
+            )
+        elif fracs_less_than_one.count() > 0:
+            id_less_than_one = {
+                x.from_id for x in fracs_less_than_one[["from_id"]].distinct().collect()
+            }
+            raise DSGInvalidDimensionMapping(
+                f"{mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
+                f"Mapping contains from_fraction sum less than 1 for from_id={id_less_than_one}. "
+            )
 
     def get_by_id(self, config_id, version=None):
         self._check_if_not_registered(config_id)
@@ -172,7 +241,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             return mapping
 
         filename = self.get_config_file(key.id, key.version)
-        config = AssociationTableConfig.load(filename)
+        config = MappingTableConfig.load(filename)
         self._mappings[key] = config
         return config
 
@@ -210,7 +279,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         config.assign_ids()
         self._check_unique_records(config, warn_only=force)
         self._check_records_against_dimension_records(config)
-        self.validate_records(config, warn_only=force)
+        self.validate_records(config)
 
         registration = make_initial_config_registration(submitter, log_message)
         src_dir = Path(os.path.dirname(config_file))
@@ -246,7 +315,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             registry_file = Path(os.path.dirname(dst_dir)) / REGISTRY_FILENAME
             registry_config.serialize(registry_file, force=True)
 
-            at_config = AssociationTableConfig(mapping)
+            at_config = MappingTableConfig(mapping)
             at_config.src_dir = src_dir
             at_config.serialize(dst_dir)
             self._id_to_type[mapping.mapping_id] = [
@@ -292,7 +361,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
     ):
-        config = AssociationTableConfig.load(config_file)
+        config = MappingTableConfig.load(config_file)
         self._check_update(config, config_id, version)
         self.update(config, update_type, log_message, submitter=submitter)
 

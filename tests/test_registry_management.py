@@ -202,12 +202,12 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         orig_text = record_file.read_text()
 
         # Invalid 'from' record
-        record_file.write_text(orig_text + "invalid county,CO\n")
+        record_file.write_text(orig_text + "invalid county,1,CO\n")
         with pytest.raises(DSGInvalidDimensionMapping):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Invalid 'from' record - nulls aren't allowd
-        record_file.write_text(orig_text + ",CO\n")
+        record_file.write_text(orig_text + ",1.2,CO\n")
         with pytest.raises(DSGInvalidDimensionMapping):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
@@ -216,12 +216,15 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         with pytest.raises(DSGInvalidDimensionMapping):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
-        # Duplicate 'from' record
-        record_file.write_text(orig_text + "\n08031,CO")
-        with pytest.raises(DSGInvalidDimensionMapping):
+        # Duplicate "from" record, invalid as mapping_type = one_to_one_multiplication
+        orig_text2 = orig_text.split(",")
+        orig_text2 = ",".join(orig_text2[::2])
+        record_file.write_text(orig_text2 + "\n08031,CO\n")
+        msg = r"dimension_mapping.*has mapping_type.*, which does not allow duplicated.*records"
+        with pytest.raises(DSGInvalidDimensionMapping, match=msg):
             dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
-        # Valid
+        # Valid - null value in "to" record (Only one valid test allowed in this test func)
         record_file.write_text(orig_text.replace("CO", ""))
         dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 

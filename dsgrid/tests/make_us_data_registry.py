@@ -59,6 +59,7 @@ def make_test_data_registry(
     dimension_mapping_config = src_dir / dataset_dir / "dimension_mappings.toml"
     dimension_mapping_refs = src_dir / dataset_dir / "dimension_mapping_references.toml"
 
+    print("\n 1. register dimensions: \n")
     user = getpass.getuser()
     log_message = "Initial registration"
     if offline_mode:
@@ -74,7 +75,7 @@ def make_test_data_registry(
     ):
         dim_mgr = manager.dimension_manager
         dim_mgr.register(dim_config_file, user, log_message)
-
+    print("\n 2. register dimension mappings: \n")
     # dsgrid-project-EFS shares project subsectors.
     # dsgrid-test-data has custom subsectors that need to be mapped.
     # This also applies to dimension_mapping_refs below.
@@ -102,10 +103,12 @@ def make_test_data_registry(
     replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
 
     if include_projects:
+        print("\n 3. register project: \n")
         manager.project_manager.register(project_config_file, user, log_message)
-
     if include_datasets:
+        print("\n 4. register dataset: \n")
         manager.dataset_manager.register(dataset_config_file, user, log_message)
+        print("\n 5. submit dataset to project\n")
         manager.project_manager.submit_dataset(
             project_id,
             dataset_id,

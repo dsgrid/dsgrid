@@ -3,13 +3,14 @@ import collections
 import logging
 import re
 import os
+from collections import defaultdict
 from typing import List
 
 import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.spark import models_to_dataframe
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
@@ -104,7 +105,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         columns = set(self.get_pivot_dimension_columns())
         dim_type = self.get_pivot_dimension_type()
         for ref in self._mapping_references:
-            if ref.from_dimension_type.value == dim_type:
+            if ref.from_dimension_type == dim_type:
                 mapping_config = self._dimension_mapping_mgr.get_by_id(
                     ref.mapping_id, version=ref.version
                 )
@@ -115,11 +116,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 diff = set(mapping.keys()).difference(columns)
                 if diff:
                     raise DSGInvalidDataset(
-                        f"Dataset pivoted dimension columns do not match mapping: {diff}"
+                        f"Dimension_mapping={mapping_config.config_id} has more from_id records than the dataset pivoted {dim_type.value} dimension: {diff}"
                     )
-                return mapping
+                return set(mapping.values())
 
-        return {x: x for x in columns}
+        return columns
 
     def get_columns_for_unique_arrays(self, time_dim, load_data_df):
         """Returns the list of dimension columns aginst which the number of timestamps is checked.
@@ -210,17 +211,74 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # This method could be moved elsewhere.
         for ref in self._mapping_references:
             column = ref.from_dimension_type.value
-            if column in df.columns:
-                mapping_config = self._dimension_mapping_mgr.get_by_id(
-                    ref.mapping_id, version=ref.version
-                )
-                records = models_to_dataframe(mapping_config.model.records).filter(
-                    "to_id is not NULL"
-                )
-                df = (
-                    df.join(records, df[column] == records.from_id)
-                    .drop("from_id")
-                    .drop(column)
-                    .withColumnRenamed("to_id", column)
-                )
+            mapping_config = self._dimension_mapping_mgr.get_by_id(
+                ref.mapping_id, version=ref.version
+            )
+            records = mapping_config.model.records
+            df = self._map_and_reduce_dimension(df, column, records)
+
         return df
+
+    def _map_and_reduce_dimension(self, df, column, records):
+        """ Map and partially reduce a dimension """
+        if column not in df.columns:
+            return df
+
+        if column == self.get_pivot_dimension_type().value:
+            # map and consolidate pivoted dimension columns (need pytest)
+            # this is only for dataset_schema_handler_one_table, b/c handlder_standard._remap_dimension_columns() only takes in load_data_lookup
+            nonvalue_cols = list(
+                set(df.columns).difference(set(self.get_pivot_dimension_columns()))
+            )
+
+            records_dict = defaultdict(dict)
+            for row in records:
+                if row.to_id is not None:
+                    records_dict[row.to_id][row.from_id] = row.from_fraction
+
+            to_ids = sorted(records_dict)
+            value_operations = []
+            for tid in to_ids:
+                operation = "+".join(
+                    [f"{from_id}*{fraction}" for from_id, fraction in records_dict[tid].items()]
+                )  # assumes reduce by summation
+                operation += f" AS {tid}"
+                value_operations.append(operation)
+
+            df = df.selectExpr(*nonvalue_cols, *value_operations)
+
+        else:
+            # map and consolidate from_fraction only
+            records = models_to_dataframe(records).filter("to_id IS NOT NULL")
+            df = df.withColumn("fraction", F.lit(1))
+            df = (
+                df.join(records, on=df[column] == records.from_id, how="cross")
+                .drop("from_id")
+                .drop(column)
+                .withColumnRenamed("to_id", column)
+            ).filter(f"{column} IS NOT NULL")
+            nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
+            df = df.fillna(1, subset=["from_fraction"]).selectExpr(
+                *nonfraction_cols, "fraction*from_fraction AS fraction"
+            )
+
+            # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for one_table_handler may not be unique;
+            # imagine 5 subsectors being remapped/consolidated to 2 subsectors.
+
+        return df
+
+    @staticmethod
+    def _check_null_value_in_unique_dimension_rows(dim_table):
+        dim_with_null = {}
+        cols_to_check = {x for x in dim_table.columns if x != "id"}
+
+        for col in cols_to_check:
+            null_count = dim_table.filter(F.col(col).isNull()).count()
+            if null_count > 0:
+                dim_with_null[col] = null_count
+
+        if len(dim_with_null) > 0:
+            raise DSGInvalidDimensionMapping(
+                "Invalid dimension mapping application. "
+                f"Combination of remapped dataset dimensions contain NULL value(s) for dimension(s): \n{dim_with_null}"
+            )

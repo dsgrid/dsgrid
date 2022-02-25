@@ -1,10 +1,7 @@
 import abc
-import collections
 import logging
-import re
 import os
 from collections import defaultdict
-from typing import List
 
 import pyspark.sql.functions as F
 
@@ -13,7 +10,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.spark import models_to_dataframe
-from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +88,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         dim_type = self._config.model.data_schema.load_data_column_dimension
         return sorted(list(self._config.get_dimension(dim_type).get_unique_ids()))
 
+    @track_timing(timer_stats_collector)
     def get_pivot_dimension_columns_mapped_to_project(self):
         """Get columns for the dimension that is pivoted in load_data and remap them to the
         project's record names. The returned dict will not include columns that the project does
@@ -122,6 +120,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return columns
 
+    @track_timing(timer_stats_collector)
     def get_columns_for_unique_arrays(self, time_dim, load_data_df):
         """Returns the list of dimension columns aginst which the number of timestamps is checked.
 
@@ -136,6 +135,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return groupby_cols
 
+    @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency(self, load_data_df):
         """Check dataset time consistency such that:
         1. time range(s) match time config record;
@@ -143,23 +143,22 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         """
         if os.environ.get("__DSGRID_SKIP_DATASET_TIME_CONSISTENCY_CHECKS__"):
+            logger.info("Skip dataset time consistency checks.")
             return
 
+        logger.info("Check dataset time consistency.")
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_dim.check_dataset_time_consistency(load_data_df)
         if time_dim.model.time_type != TimeDimensionType.NOOP:
             self._check_dataset_time_consistency_by_dimensions(time_dim, load_data_df)
 
+    @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency_by_dimensions(self, time_dim, load_data_df):
         """
         Check dataset time consistency such that all dimension combinations return the same set of time ranges.
         """
-        time_ranges = time_dim.get_time_ranges()
-        assert len(time_ranges) == 1, len(time_ranges)
-        time_range = time_ranges[0]
-        # TODO: need to support validation of multiple time ranges: DSGRID-173
-        expected_timestamps = time_range.list_time_range()
-        expected_count = len(expected_timestamps)
+        logger.info("Check dataset time consistency by dimensions.")
+        expected_count = len(time_dim.list_expected_dataset_timestamps())
 
         groupby_cols = self.get_columns_for_unique_arrays(time_dim, load_data_df)
         time_col = time_dim.get_timestamp_load_data_columns()
@@ -169,27 +168,25 @@ class DatasetSchemaHandlerBase(abc.ABC):
             .agg(F.countDistinct(*time_col).alias("distinct_timestamps"))
         )
 
-        distinct_counts = timestamps_by_dims.select("distinct_timestamps").distinct()
-        if distinct_counts.count() > 1:
+        distinct_counts = timestamps_by_dims.select("distinct_timestamps").distinct().collect()
+        if len(distinct_counts) > 1:
             for row in timestamps_by_dims.collect():
-                if row.distinct_timestamps != len(expected_timestamps):
+                if row.distinct_timestamps != expected_count:
                     logger.error(
                         "load_data row with dimensions=%s does not have %s %s: actual=%s",
                         self._show_selected_keys_from_dict(row, groupby_cols),
-                        len(expected_timestamps),
+                        expected_count,
                         time_col[0],
                         row.distinct_timestamps,
                     )
 
-                    raise DSGInvalidDataset(
-                        f"One or more arrays do not have {len(expected_timestamps)} timestamps"
-                    )
-        else:
-            val = distinct_counts.collect()[0].distinct_timestamps
-            if val != expected_count:
-                raise DSGInvalidDataset(
-                    f"load_data arrays do not have {len(expected_timestamps)} {time_col[0]}: actual={val}"
-                )
+            raise DSGInvalidDataset(f"One or more arrays do not have {expected_count} timestamps")
+
+        val = distinct_counts[0].distinct_timestamps
+        if val != expected_count:
+            raise DSGInvalidDataset(
+                f"load_data arrays do not have {expected_count} {time_col[0]}: actual={val}"
+            )
 
     @staticmethod
     def _show_selected_keys_from_dict(dct, keys: list):
@@ -205,6 +202,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             dct_selected.append(dct[key])
         return dict(zip(keys, dct_selected))
 
+    @track_timing(timer_stats_collector)
     def _remap_dimension_columns(self, df):
         # This will likely become a common activity when running queries.
         # May need to cache the result. But that will likely be in Project, not here.
@@ -219,6 +217,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return df
 
+    @track_timing(timer_stats_collector)
     def _map_and_reduce_dimension(self, df, column, records):
         """ Map and partially reduce a dimension """
         if column not in df.columns:
@@ -268,6 +267,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df
 
     @staticmethod
+    @track_timing(timer_stats_collector)
     def _check_null_value_in_unique_dimension_rows(dim_table):
         dim_with_null = {}
         cols_to_check = {x for x in dim_table.columns if x != "id"}

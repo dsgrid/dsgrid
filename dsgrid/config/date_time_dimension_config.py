@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 
 import pandas as pd
@@ -5,8 +6,13 @@ import pandas as pd
 from dsgrid.dimension.time import TimeZone
 from dsgrid.dimension.time import TimeZone, make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.time.types import DatetimeTimestampType
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class DateTimeDimensionConfig(TimeDimensionBaseConfig):
@@ -16,7 +22,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def model_class():
         return DateTimeDimensionModel
 
+    @track_timing(timer_stats_collector)
     def check_dataset_time_consistency(self, load_data_df):
+        logger.info("Check DateTimeDimensionConfig dataset time consistency.")
         tz = self.get_tzinfo()
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
@@ -67,3 +75,10 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_tzinfo(self):
         assert self.model.timezone is not TimeZone.LOCAL, self.model.timezone
         return self.model.timezone.tz
+
+    def list_expected_dataset_timestamps(self):
+        # TODO: need to support validation of multiple time ranges: DSGRID-173
+        time_ranges = self.get_time_ranges()
+        assert len(time_ranges) == 1, len(time_ranges)
+        time_range = time_ranges[0]
+        return [DatetimeTimestampType(x) for x in time_range.iter_timestamps()]

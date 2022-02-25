@@ -40,6 +40,7 @@ from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingR
 
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.spark import read_dataframe
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -437,6 +438,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
         self._base_to_supplemental_mappings.update(base_to_supp)
         # TODO: Once we start using these we may need to store by (from, to) as key instead.
 
+    @track_timing(timer_stats_collector)
     def add_dataset_dimension_mappings(self, dataset_config, references):
         """Add a dataset's dimension mappings to the project.
 

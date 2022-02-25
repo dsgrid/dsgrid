@@ -123,6 +123,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     def get_registry_lock_file(self, config_id):
         return f"configs/.locks/{config_id}.lock"
 
+    @track_timing(timer_stats_collector)
     def register(self, config_file, submitter, log_message, force=False):
         config = ProjectConfig.load(config_file, self._dimension_mgr, self._dimension_mapping_mgr)
         lock_file_path = self.get_registry_lock_file(config.config_id)
@@ -175,6 +176,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _run_checks(self, config: ProjectConfig):
         self._check_dimension_associations(config)
 
+    @track_timing(timer_stats_collector)
     def _check_dimension_associations(self, config: ProjectConfig):
         for dimension_type in config.dimension_associations.dimension_types:
             assoc_ids = config.dimension_associations.get_unique_ids(dimension_type)
@@ -186,6 +188,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     f"Dimension association for {dimension_type} has invalid records: {diff}"
                 )
 
+    @track_timing(timer_stats_collector)
     def submit_dataset(
         self, project_id, dataset_id, dimension_mapping_files, submitter, log_message
     ):
@@ -227,6 +230,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         submitter,
         log_message,
     ):
+        logger.info("Submit dataset=%s to project=%s.")
         self._check_if_not_registered(project_config.config_id)
         dataset_config = self._dataset_mgr.get_by_id(dataset_id)
         dataset_model = project_config.get_dataset(dataset_id)
@@ -286,6 +290,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         mapping_references: List[DimensionMappingReferenceModel],
     ):
         """Check that a dataset has all project-required dimension records."""
+        logger.info("Check dataset-base-to-project-base dimension mappings.")
         handler = make_dataset_schema_handler(
             dataset_config, self._dimension_mgr, self._dimension_mapping_mgr, mapping_references
         )
@@ -309,13 +314,14 @@ class ProjectRegistryManager(RegistryManagerBase):
         # project_table = self._make_single_table(project_config, data_source, pivot_dimension)
 
         for type1, type2 in dimension_pairs:
-            records = associations.get_associations(type1, type2, data_source=data_source)
-            if records is None:
-                records = self._get_project_dimensions_table(
-                    project_config, type1, type2, associations, data_source
-                )
-            columns = (type1.value, type2.value)
+            logger.info("Check dimensions %s and %s", type1.value, type2.value)
             with Timer(timer_stats_collector, "evaluate dimension record counts"):
+                records = associations.get_associations(type1, type2, data_source=data_source)
+                if records is None:
+                    records = self._get_project_dimensions_table(
+                        project_config, type1, type2, associations, data_source
+                    )
+                columns = (type1.value, type2.value)
                 record_count = records.count()
                 count = (
                     records.select(*columns)
@@ -331,7 +337,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                 )
                 dataset_id = dataset_config.model.dataset_id
                 with io.StringIO() as buf, redirect_stdout(buf):
-                    table.show(n=table.count())
+                    show_count = min(table.count(), 100)
+                    table.show(n=show_count)
                     logger.error(
                         "Dataset %s is missing dimension association records for %s:\n%s",
                         dataset_id,
@@ -345,6 +352,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 logger.info(f" dimension association for {type1}, {type2} validated! ")
         self._check_pivot_dimension_columns(project_config, handler, associations, data_source)
 
+    @track_timing(timer_stats_collector)
     def _make_single_table(self, config: ProjectConfig, data_source, pivot_dimension):
         # TODO: prototype code from Meghan - needs testing
         ds = DimensionType.DATA_SOURCE.value
@@ -368,6 +376,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         return table
 
     @staticmethod
+    @track_timing(timer_stats_collector)
     def _get_project_dimensions_table(project_config, type1, type2, associations, data_source):
         """ for each dimension type x, record is the same as project's unless a relevant association is provided. """
         pdim1_ids = associations.get_unique_ids(type1, data_source)
@@ -382,8 +391,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         return create_dataframe_from_dimension_ids(records, type1, type2)
 
     @staticmethod
+    @track_timing(timer_stats_collector)
     def _check_pivot_dimension_columns(project_config, handler, associations, data_source):
         """ pivoted dimension record is the same as project's unless a relevant association is provided. """
+        logger.info("Check pivoted dimension columns.")
         d_dim_ids = handler.get_pivot_dimension_columns_mapped_to_project()
         pivot_dim = handler.get_pivot_dimension_type()
         p_dim_ids = associations.get_unique_ids(pivot_dim, data_source)
@@ -407,6 +418,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._check_update(config, config_id, version)
         self.update(config, update_type, log_message, submitter=submitter)
 
+    @track_timing(timer_stats_collector)
     def update(self, config, update_type, log_message, submitter=None):
         if submitter is None:
             submitter = getpass.getuser()

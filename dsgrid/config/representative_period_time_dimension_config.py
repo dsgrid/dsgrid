@@ -1,13 +1,27 @@
 import abc
+import calendar
+import logging
+import sys
 from collections import namedtuple
-from datetime import timedelta
+from datetime import datetime, timedelta
 
+import pandas as pd
 import pyspark.sql.functions as F
 
-from dsgrid.dimension.time import RepresentativePeriodFormat, TimeZone
+from dsgrid.dimension.time import (
+    RepresentativePeriodFormat,
+    TimeZone,
+    DatetimeRange,
+    LeapDayAdjustmentType,
+)
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.time.types import OneWeekPerMonthByHourType
+from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
+
+
+logger = logging.getLogger(__name__)
 
 
 class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
@@ -28,9 +42,10 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def model_class():
         return RepresentativePeriodTimeDimensionModel
 
+    @track_timing(timer_stats_collector)
     def check_dataset_time_consistency(self, load_data_df):
         self._format_handler.check_dataset_time_consistency(
-            self._format_handler.get_expected_timestamps(self.model.ranges), load_data_df
+            self._format_handler.list_expected_dataset_timestamps(self.model.ranges), load_data_df
         )
 
     def convert_dataframe(self, df):
@@ -41,13 +56,16 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         return self._format_handler.get_frequency()
 
     def get_time_ranges(self):
-        return self._format_handler.get_time_ranges(self.model.ranges)
+        return self._format_handler.get_time_ranges(self.model.ranges, self.get_tzinfo())
 
     def get_timestamp_load_data_columns(self):
         return self._format_handler.get_timestamp_load_data_columns()
 
     def get_tzinfo(self):
         return None
+
+    def list_expected_dataset_timestamps(self):
+        return self._format_handler.list_expected_dataset_timestamps(self.model.ranges)
 
 
 class RepresentativeTimeFormatHandlerBase(abc.ABC):
@@ -65,21 +83,6 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
         Raises
         ------
         DSGInvalidDataset
-
-        """
-
-    @abc.abstractmethod
-    def get_expected_timestamps(self, ranges):
-        """Return a list of times required to be in the data.
-
-        Parameters
-        ----------
-        ranges : list
-
-        Returns
-        -------
-        list
-            list of datetime
 
         """
 
@@ -104,78 +107,106 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
 
         """
 
-    def get_tzinfo(self):
-        """Return a tzinfo instance for this dimension.
+    @abc.abstractmethod
+    def get_time_ranges():
+        """Return a list of DatetimeRange instances for the dataset.
 
         Returns
         -------
-        tzinfo
+        list
+            list of DatetimeRange
 
         """
-        assert self.model.timezone is not TimeZone.LOCAL
-        return self.model.timezone.tz
 
+    @abc.abstractmethod
+    def list_expected_dataset_timestamps(self):
+        """Return a list of the timestamps expected in the load_data table.
 
-OneWeekPerMonthByHourType = namedtuple(
-    "OneWeekPerMonthByHourType", ["month", "day_of_week", "hour"]
-)
+        Returns
+        -------
+        list
+            List of tuples of columns representing time in the load_data table.
+
+        """
 
 
 class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     """Handler for format with hourly data that includes one week per month."""
 
     def check_dataset_time_consistency(self, expected_timestamps, load_data_df):
-        assert False, "not supported yet"
-        # actual_timestamps = [
-        #    OneWeekPerMonthByHourType(month=x.month, day_of_week=x.day_of_week, hour=x.hour)
-        #    for x in load_data_df.select("month", "day_of_week", "hour")
-        #    .distinct()
-        #    .sort("month", "day_of_week", "hour")
-        #    .collect()
-        # ]
-        # if expected_timestamps != actual_timestamps:
-        #    mismatch = sorted(
-        #        set(expected_timestamps).symmetric_difference(set(actual_timestamps))
-        #    )
-        #    raise DSGInvalidDataset(
-        #        f"load_data timestamps do not match expected times. mismatch={mismatch}"
-        #    )
+        logger.info("Check OneWeekPerMonthByHourHandler dataset time consistency.")
+        actual_timestamps = [
+            OneWeekPerMonthByHourType(month=x.month, day_of_week=x.day_of_week, hour=x.hour)
+            for x in load_data_df.select("month", "day_of_week", "hour")
+            .distinct()
+            .sort("month", "day_of_week", "hour")
+            .collect()
+        ]
+        if expected_timestamps != actual_timestamps:
+            mismatch = sorted(
+                set(expected_timestamps).symmetric_difference(set(actual_timestamps))
+            )
+            raise DSGInvalidDataset(
+                f"load_data timestamps do not match expected times. mismatch={mismatch}"
+            )
+        logger.info("Verified that expected_timestamps equal actual_timestamps")
 
-        # timestamps_by_id = (
-        #    load_data_df.select("month", "day_of_week", "hour", "id")
-        #    .groupby("id")
-        #    .agg(F.countDistinct("month", "day_of_week", "hour").alias("distinct_timestamps"))
-        # )
-        # lengths = timestamps_by_id.select("distinct_timestamps").distinct()
-        # count = lengths.count()
-        # if count != 1:
-        #    raise DSGInvalidDataset(
-        #        f"All time arrays must have the same times: unique times={count}"
-        #    )
+        lengths = (
+            load_data_df.select("month", "day_of_week", "hour", "id")
+            .groupby("id")
+            .agg(F.countDistinct("month", "day_of_week", "hour").alias("distinct_timestamps"))
+            .select("distinct_timestamps")
+            .distinct()
+            .collect()
+        )
+        count = len(lengths)
+        if count != 1:
+            raise DSGInvalidDataset(
+                f"All time arrays must have the same times: unique times={count}"
+            )
 
-        # expected_len = len(expected_timestamps)
-        # actual = lengths.collect()[0].distinct_timestamps
-        # if actual != expected_len:
-        #    raise DSGInvalidDataset(
-        #        f"Length of time arrays is incorrect: actual={actual} expected={expected_len}"
-        #    )
+        expected_len = len(expected_timestamps)
+        actual = lengths[0].distinct_timestamps
+        if actual != expected_len:
+            raise DSGInvalidDataset(
+                f"Length of time arrays is incorrect: actual={actual} expected={expected_len}"
+            )
+        logger.info("Verified that all time arrays have the same, correct length.")
 
     def get_frequency(self):
         return timedelta(hours=1)
 
-    def get_expected_timestamps(self, ranges):
-        assert False, "not supported yet"
-        timestamps = []
-        # for model in ranges:
-        #    for month in range(model.start, model.end + 1):
-        #        for day_of_week in range(7):
-        #            for hour in range(24):
-        #                ts = OneWeekPerMonthByHourType(
-        #                    month=month, day_of_week=day_of_week, hour=hour
-        #                )
-        #                timestamps.append(ts)
-        return timestamps
+    def get_time_ranges(self, ranges, tzinfo):
+        # TODO: This method may have some problems but is currently unused.
+        # How to handle year? Leap year?
+        time_ranges = []
+        for model in ranges:
+            if model.end == 2:
+                logger.warning("Last day of February may not be accurate.")
+            last_day = calendar.monthrange(2021, model.end)[1]
+            time_ranges.append(
+                DatetimeRange(
+                    start=pd.Timestamp(datetime(year=1970, month=model.start, day=1)),
+                    end=pd.Timestamp(datetime(year=1970, month=model.end, day=last_day, hour=23)),
+                    frequency=timedelta(hours=1),
+                    leap_day_adjustment=LeapDayAdjustmentType.NONE,
+                )
+            )
+
+        return time_ranges
 
     @staticmethod
     def get_timestamp_load_data_columns():
         return ["month", "day_of_week", "hour"]
+
+    def list_expected_dataset_timestamps(self, ranges):
+        timestamps = []
+        for model in ranges:
+            for month in range(model.start, model.end + 1):
+                for day_of_week in range(7):
+                    for hour in range(24):
+                        ts = OneWeekPerMonthByHourType(
+                            month=month, day_of_week=day_of_week, hour=hour
+                        )
+                        timestamps.append(ts)
+        return timestamps

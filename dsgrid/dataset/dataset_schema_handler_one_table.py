@@ -7,7 +7,7 @@ from dsgrid.config.dataset_config import (
     check_load_data_filename,
 )
 from dsgrid.utils.spark import read_dataframe, get_unique_values
-from dsgrid.utils.timing import timer_stats_collector, Timer
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
@@ -29,17 +29,18 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         load_data_df = config.add_trivial_dimensions(load_data_df)
         return cls(load_data_df, config, *args, **kwargs)
 
+    @track_timing(timer_stats_collector)
     def check_consistency(self):
-        with Timer(timer_stats_collector, "check_one_table_data_consistency"):
-            self._check_one_table_data_consistency()
-        with Timer(timer_stats_collector, "check_dataset_time_consistency"):
-            self._check_dataset_time_consistency(self._load_data)
+        self._check_one_table_data_consistency()
+        self._check_dataset_time_consistency(self._load_data)
 
+    @track_timing(timer_stats_collector)
     def _check_one_table_data_consistency(self):
         """Dimension check in load_data, excludes time:
         * check that data matches record for each dimension.
         * check that all data dimension combinations exist. Time is handled separately.
         """
+        logger.info("Check one table dataset consistency.")
         dimension_types = set()
         pivot_cols = set()
 

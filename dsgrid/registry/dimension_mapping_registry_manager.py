@@ -27,6 +27,7 @@ from .registry_manager_base import RegistryManagerBase
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.config.dimension_mapping_base import DimensionMappingArchetype
 
 
@@ -269,6 +270,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         return mappings
 
+    @track_timing(timer_stats_collector)
     def register(self, config_file, submitter, log_message, force=False):
         lock_file_path = self.get_registry_lock_file(None)
         with self.cloud_interface.make_lock_file(lock_file_path):
@@ -365,6 +367,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._check_update(config, config_id, version)
         self.update(config, update_type, log_message, submitter=submitter)
 
+    @track_timing(timer_stats_collector)
     def update(self, config, update_type, log_message, submitter=None):
         if submitter is None:
             submitter = getpass.getuser()

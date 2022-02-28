@@ -269,15 +269,14 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @staticmethod
     @track_timing(timer_stats_collector)
     def _check_null_value_in_unique_dimension_rows(dim_table):
-        dim_with_null = {}
+        dim_with_null = set()
         cols_to_check = {x for x in dim_table.columns if x != "id"}
 
         for col in cols_to_check:
-            null_count = dim_table.filter(F.col(col).isNull()).count()
-            if null_count > 0:
-                dim_with_null[col] = null_count
+            if not dim_table.select(col).filter(f"{col} is NULL").rdd.isEmpty():
+                dim_with_null.add(col)
 
-        if len(dim_with_null) > 0:
+        if dim_with_null:
             raise DSGInvalidDimensionMapping(
                 "Invalid dimension mapping application. "
                 f"Combination of remapped dataset dimensions contain NULL value(s) for dimension(s): \n{dim_with_null}"

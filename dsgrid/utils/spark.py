@@ -1,9 +1,7 @@
 """Spark helper functions"""
 
 import csv
-import itertools
 import logging
-import multiprocessing
 import os
 from pathlib import Path
 from typing import AnyStr, List, Union
@@ -26,7 +24,6 @@ def init_spark(name="dsgrid"):
     if cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf = SparkConf().setAppName(name).setMaster(cluster)
-        sc = SparkContext(conf=conf)
         spark = SparkSession.builder.config(conf=conf).getOrCreate()
     else:
         logger.info("Create SparkSession %s in local-mode cluster", name)

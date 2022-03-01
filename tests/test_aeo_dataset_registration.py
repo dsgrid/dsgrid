@@ -127,7 +127,8 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
         if "End_Uses" in dataset:
             _modify_data_file(data_dir, drop_first_row=True)
             with pytest.raises(
-                DSGInvalidDataset, match=r"One or more arrays do not have.*timestamps"
+                DSGInvalidDataset,
+                match=r"All time arrays must have the same times: unique timestamp lengths",
             ):
                 _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 

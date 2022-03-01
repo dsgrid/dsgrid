@@ -149,7 +149,7 @@ def _setup_invalid_load_data_id_missing_timestamp(data_dir):
     # Remove one row/timestamp for one load data array.
     text = "\n".join(data_file.read_text().splitlines()[:-1])
     data_file.write_text(text)
-    return DSGInvalidDataset, r"One or more arrays do not have.*timestamps"
+    return DSGInvalidDataset, r"All time arrays must have the same times: unique timestamp lengths"
 
 
 def _setup_invalid_load_data_id_extra_timestamp(data_dir):

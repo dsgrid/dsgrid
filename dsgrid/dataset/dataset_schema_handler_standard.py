@@ -5,7 +5,7 @@ import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.utils.spark import read_dataframe, get_unique_values
-from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
@@ -92,29 +92,36 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         """ Check load_data dimensions and id series. """
         logger.info("Check dataset internal consistency.")
         self._check_load_data_columns()
-        data_ids = []
-        for row in self._load_data.select("id").distinct().sort("id").collect():
-            if row.id is None:
+        ld_ids = self._load_data.select("id").distinct()
+        ldl_ids = self._load_data_lookup.select("id").distinct()
+
+        with Timer(timer_stats_collector, "check load_data for nulls"):
+            if not self._load_data.select("id").filter("id is NULL").rdd.isEmpty():
                 raise DSGInvalidDataset(
                     f"load_data for dataset {self._config.config_id} has a null ID"
                 )
-            data_ids.append(row.id)
-        lookup_data_ids = (
-            self._load_data_lookup.select("id")
-            .distinct()
-            .filter("id IS NOT NULL")
-            .agg(F.collect_list("id"))
-            .collect()[0][0]
-        )
-        lookup_data_ids.sort()
 
-        if data_ids != lookup_data_ids:
-            logger.error(
-                f"Data IDs for %s data/lookup are inconsistent: data=%s lookup=%s",
-                self._config.config_id,
-                data_ids,
-                lookup_data_ids,
-            )
+        with Timer(timer_stats_collector, "check load_data ID count"):
+            data_id_count = ld_ids.count()
+
+        with Timer(timer_stats_collector, "compare load_data and load_data_lookup IDs"):
+            joined = ld_ids.join(ldl_ids, on="id")
+            count = joined.count()
+
+        if data_id_count != count:
+            with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
+                diff = ld_ids.unionAll(ldl_ids).exceptAll(ld_ids.intersect(ldl_ids))
+                diff_count = diff.count()
+                limit = 100
+                if diff_count < limit:
+                    diff_list = diff.collect()
+                else:
+                    diff_list = diff.limit(limit).collect()
+                logger.error(
+                    "load_data and load_data_lookup have %s different IDs: %s",
+                    diff_count,
+                    diff_list,
+                )
             raise DSGInvalidDataset(
                 f"Data IDs for {self._config.config_id} data/lookup are inconsistent"
             )

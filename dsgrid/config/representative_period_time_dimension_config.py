@@ -151,25 +151,11 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
             )
         logger.info("Verified that expected_timestamps equal actual_timestamps")
 
-        lengths = (
-            load_data_df.select("month", "day_of_week", "hour", "id")
-            .groupby("id")
-            .agg(F.countDistinct("month", "day_of_week", "hour").alias("distinct_timestamps"))
-            .select("distinct_timestamps")
-            .distinct()
-            .collect()
-        )
-        count = len(lengths)
-        if count != 1:
-            raise DSGInvalidDataset(
-                f"All time arrays must have the same times: unique times={count}"
-            )
-
+        actual_len = len(actual_timestamps)
         expected_len = len(expected_timestamps)
-        actual = lengths[0].distinct_timestamps
-        if actual != expected_len:
+        if actual_len != expected_len:
             raise DSGInvalidDataset(
-                f"Length of time arrays is incorrect: actual={actual} expected={expected_len}"
+                f"Length of time arrays is incorrect: actual={actual_len} expected={expected_len}"
             )
         logger.info("Verified that all time arrays have the same, correct length.")
 

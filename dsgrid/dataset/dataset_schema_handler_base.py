@@ -143,64 +143,30 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         """
         if os.environ.get("__DSGRID_SKIP_DATASET_TIME_CONSISTENCY_CHECKS__"):
-            logger.info("Skip dataset time consistency checks.")
+            logger.warning("Skip dataset time consistency checks.")
             return
 
         logger.info("Check dataset time consistency.")
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_dim.check_dataset_time_consistency(load_data_df)
         if time_dim.model.time_type != TimeDimensionType.NOOP:
-            self._check_dataset_time_consistency_by_dimensions(time_dim, load_data_df)
+            self._check_dataset_time_consistency_by_time_array(time_dim, load_data_df)
 
     @track_timing(timer_stats_collector)
-    def _check_dataset_time_consistency_by_dimensions(self, time_dim, load_data_df):
-        """
-        Check dataset time consistency such that all dimension combinations return the same set of time ranges.
-        """
-        logger.info("Check dataset time consistency by dimensions.")
-        expected_count = len(time_dim.list_expected_dataset_timestamps())
-
-        groupby_cols = self.get_columns_for_unique_arrays(time_dim, load_data_df)
-        time_col = time_dim.get_timestamp_load_data_columns()
-        timestamps_by_dims = (
-            load_data_df[time_col + groupby_cols]
-            .groupby(groupby_cols)
-            .agg(F.countDistinct(*time_col).alias("distinct_timestamps"))
-        )
-
-        distinct_counts = timestamps_by_dims.select("distinct_timestamps").distinct().collect()
-        if len(distinct_counts) > 1:
-            for row in timestamps_by_dims.collect():
-                if row.distinct_timestamps != expected_count:
-                    logger.error(
-                        "load_data row with dimensions=%s does not have %s %s: actual=%s",
-                        self._show_selected_keys_from_dict(row, groupby_cols),
-                        expected_count,
-                        time_col[0],
-                        row.distinct_timestamps,
-                    )
-
-            raise DSGInvalidDataset(f"One or more arrays do not have {expected_count} timestamps")
-
-        val = distinct_counts[0].distinct_timestamps
-        if val != expected_count:
+    def _check_dataset_time_consistency_by_time_array(self, time_dim, load_data_df):
+        """Check that each unique time array has the same timestamps."""
+        logger.info("Check dataset time consistency by time array.")
+        unique_array_cols = self.get_columns_for_unique_arrays(time_dim, load_data_df)
+        time_cols = time_dim.get_timestamp_load_data_columns()
+        counts = load_data_df.groupBy(*time_cols).count().select("count")
+        distinct_counts = counts.select("count").distinct().collect()
+        if len(distinct_counts) != 1:
             raise DSGInvalidDataset(
-                f"load_data arrays do not have {expected_count} {time_col[0]}: actual={val}"
+                f"All time arrays must have the same times: unique timestamp counts = {len(distinct_counts)}"
             )
-
-    @staticmethod
-    def _show_selected_keys_from_dict(dct, keys: list):
-        """Return a subset of a dictionary based on a list of keys.
-
-        Returns
-        -------
-        Dict
-
-        """
-        dct_selected = []
-        for key in keys:
-            dct_selected.append(dct[key])
-        return dict(zip(keys, dct_selected))
+        unique_ta_counts = load_data_df.select(*unique_array_cols).distinct().count()
+        if unique_ta_counts != distinct_counts[0]["count"]:
+            raise DSGInvalidDataset("dataset has invalid counts")
 
     @track_timing(timer_stats_collector)
     def _remap_dimension_columns(self, df):
@@ -269,6 +235,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @staticmethod
     @track_timing(timer_stats_collector)
     def _check_null_value_in_unique_dimension_rows(dim_table):
+        if os.environ.get("__DSGRID_SKIP_NULL_UNIQUE_DIMENSION_CHECK__"):
+            # This has intermittently caused GC-related timeouts for TEMPO.
+            # Leave a backdoor to skip these checks, which may eventually be removed.
+            logger.warning("Skip _check_null_value_in_unique_dimension_rows")
+            return
+
         dim_with_null = set()
         cols_to_check = {x for x in dim_table.columns if x != "id"}
 

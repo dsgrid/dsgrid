@@ -315,76 +315,22 @@ class ProjectRegistryManager(RegistryManagerBase):
             .select(*cols)
             .distinct()
         )
-        result = project_table.intersect(dim_table.select(*cols).distinct())
-        project_table_count = project_table.count()
-        intersect_count = result.count()
-        diff = project_table_count - intersect_count
-        if diff != 0:
-            msg = (
-                f"Dataset {dataset_config.config_id} is missing required dimension records "
-                f"from project {project_config.config_id}: {diff}"
+        diff = project_table.exceptAll(dim_table.select(*cols).distinct())
+        if not diff.rdd.isEmpty():
+            out_file = f"{dataset_config.config_id}__missing_dimension_record_combinations.csv"
+            diff.write.options(header=True).mode("overwrite").csv(out_file)
+            logger.error(
+                "Dataset {dataset_config.config_id} is missing required dimension "
+                "records from project %s. Recorded missing records in %s.",
+                project_config.config_id,
+                out_file,
             )
-            logger.error(msg)
-            self._find_missing_dimension_records(
-                project_config, dataset_config, dim_table, data_source, exclude_dims
+            raise DSGInvalidDataset(
+                f"Dataset {dataset_config.config_id} is missing required dimension records"
             )
-            raise DSGInvalidDataset(msg)
         self._check_pivot_dimension_columns(
             project_config, handler, project_config.dimension_associations, data_source
         )
-
-    def _find_missing_dimension_records(
-        self,
-        project_config: ProjectConfig,
-        dataset_config: DatasetConfig,
-        dim_table,
-        data_source,
-        exclude_dims,
-    ):
-        """Iterates over pairs of dimensions in order to log the missing records."""
-        # TODO: This code should be rewritten to use the difference of project_table and dim_table
-        # in the calling function.
-        types = [x for x in DimensionType if x not in exclude_dims]
-        associations = project_config.dimension_associations
-        dimension_pairs = [tuple(sorted((x, y))) for x, y in itertools.combinations(types, 2)]
-        found_missing = False
-        for type1, type2 in dimension_pairs:
-            logger.info("Check dimensions %s and %s", type1.value, type2.value)
-            with Timer(timer_stats_collector, "evaluate dimension record counts"):
-                records = associations.get_associations(type1, type2, data_source=data_source)
-                if records is None:
-                    records = self._get_project_dimensions_table(
-                        project_config, type1, type2, associations, data_source
-                    )
-                columns = (type1.value, type2.value)
-                record_count = records.count()
-                count = (
-                    records.select(*columns)
-                    .distinct()
-                    .intersect(dim_table.select(*columns).distinct())
-                    .count()
-                )
-            if count != record_count:
-                found_missing = True
-                table = (
-                    records.select(*columns)
-                    .distinct()
-                    .exceptAll(dim_table.select(*columns).distinct())
-                )
-                dataset_id = dataset_config.model.dataset_id
-                with io.StringIO() as buf, redirect_stdout(buf):
-                    show_count = min(table.count(), 100)
-                    table.show(n=show_count)
-                    logger.error(
-                        "Dataset %s is missing dimension association records for %s:\n%s",
-                        dataset_id,
-                        (type1, type2),
-                        buf.getvalue(),
-                    )
-            else:
-                logger.info(f" dimension association for {type1}, {type2} validated! ")
-
-        assert found_missing, "Did not find missing dimension records"
 
     @staticmethod
     @track_timing(timer_stats_collector)

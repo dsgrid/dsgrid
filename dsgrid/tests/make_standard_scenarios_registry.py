@@ -188,9 +188,9 @@ def run(registry_path, force, project_dir, dataset_path, verbose):
             dataset_path=dataset_path,
             include_datasets=include_datasets,
         )
-        timer_stats_collector.log_stats()
     finally:
         shutil.rmtree(tmp_project_dir)
+        timer_stats_collector.log_stats()
 
 
 if __name__ == "__main__":

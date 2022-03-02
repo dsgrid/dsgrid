@@ -170,8 +170,10 @@ def run(registry_path, force, project_dir, dataset_dir, verbose):
     if tmp_project_dir.exists():
         shutil.rmtree(tmp_project_dir)
     shutil.copytree(project_dir, tmp_project_dir)
-    make_test_data_registry(registry_path, tmp_project_dir / "dsgrid_project", dataset_dir)
-    timer_stats_collector.log_stats()
+    try:
+        make_test_data_registry(registry_path, tmp_project_dir / "dsgrid_project", dataset_dir)
+    finally:
+        timer_stats_collector.log_stats()
 
 
 if __name__ == "__main__":

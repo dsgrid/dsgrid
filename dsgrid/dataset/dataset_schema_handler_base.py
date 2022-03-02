@@ -166,7 +166,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
             )
         unique_ta_counts = load_data_df.select(*unique_array_cols).distinct().count()
         if unique_ta_counts != distinct_counts[0]["count"]:
-            raise DSGInvalidDataset("dataset has invalid counts")
+            raise DSGInvalidDataset(
+                f"dataset has invalid timestamp counts, expected {unique_ta_counts} count for "
+                f"each timestamp in {time_cols} but found {distinct_counts[0]['count']} instead"
+            )
 
     @track_timing(timer_stats_collector)
     def _remap_dimension_columns(self, df):

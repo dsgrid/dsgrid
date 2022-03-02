@@ -317,12 +317,15 @@ class ProjectRegistryManager(RegistryManagerBase):
         )
         diff = project_table.exceptAll(dim_table.select(*cols).distinct())
         if not diff.rdd.isEmpty():
-            out_file = f"{dataset_config.config_id}__missing_dimension_record_combinations.csv"
+            dataset_id = dataset_config.config_id
+            project_id = project_config.config_id
+            out_file = f"{dataset_id}__{project_id}___missing_dimension_record_combinations.csv"
             diff.write.options(header=True).mode("overwrite").csv(out_file)
             logger.error(
-                "Dataset {dataset_config.config_id} is missing required dimension "
-                "records from project %s. Recorded missing records in %s.",
-                project_config.config_id,
+                "Dataset %s is missing required dimension records from project %s. "
+                "Recorded missing records in %s.",
+                dataset_id,
+                project_id,
                 out_file,
             )
             raise DSGInvalidDataset(

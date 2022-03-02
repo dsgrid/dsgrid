@@ -230,7 +230,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         submitter,
         log_message,
     ):
-        logger.info("Submit dataset=%s to project=%s.", project_config.config_id, dataset_id)
+        logger.info("Submit dataset=%s to project=%s.", dataset_id, project_config.config_id)
         self._check_if_not_registered(project_config.config_id)
         dataset_config = self._dataset_mgr.get_by_id(dataset_id)
         dataset_model = project_config.get_dataset(dataset_id)

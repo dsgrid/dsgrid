@@ -215,6 +215,7 @@ def sql(query):
     pyspark.sql.DataFrame
 
     """
+    logger.debug("Run SQL query [%s]", query)
     return SparkSession.getActiveSession().sql(query)
 
 

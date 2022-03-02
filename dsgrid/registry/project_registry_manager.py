@@ -296,8 +296,6 @@ class ProjectRegistryManager(RegistryManagerBase):
         )
         pivot_dimension = handler.get_pivot_dimension_type()
         exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension])
-        types = [x for x in DimensionType if x not in exclude_dims]
-        dimension_pairs = [tuple(sorted((x, y))) for x, y in itertools.combinations(types, 2)]
 
         data_source_dim_id = [
             x.id for x in dataset_config.dimensions if x.type == DimensionType.DATA_SOURCE
@@ -307,12 +305,49 @@ class ProjectRegistryManager(RegistryManagerBase):
         ][
             0
         ]  # this assumes only data_source per dataset
-        dim_table = handler.get_unique_dimension_rows().drop("id")
+        dim_table = (
+            handler.get_unique_dimension_rows().drop("id").drop(DimensionType.DATA_SOURCE.value)
+        )
 
+        cols = [x.value for x in DimensionType if x not in exclude_dims]
+        project_table = (
+            self._make_single_table(project_config, data_source, pivot_dimension)
+            .select(*cols)
+            .distinct()
+        )
+        result = project_table.intersect(dim_table.select(*cols).distinct())
+        project_table_count = project_table.count()
+        intersect_count = result.count()
+        diff = project_table_count - intersect_count
+        if diff != 0:
+            msg = (
+                f"Dataset {dataset_config.config_id} is missing required dimension records "
+                f"from project {project_config.config_id}: {diff}"
+            )
+            logger.error(msg)
+            self._find_missing_dimension_records(
+                project_config, dataset_config, dim_table, data_source, exclude_dims
+            )
+            raise DSGInvalidDataset(msg)
+        self._check_pivot_dimension_columns(
+            project_config, handler, project_config.dimension_associations, data_source
+        )
+
+    def _find_missing_dimension_records(
+        self,
+        project_config: ProjectConfig,
+        dataset_config: DatasetConfig,
+        dim_table,
+        data_source,
+        exclude_dims,
+    ):
+        """Iterates over pairs of dimensions in order to log the missing records."""
+        # TODO: This code should be rewritten to use the difference of project_table and dim_table
+        # in the calling function.
+        types = [x for x in DimensionType if x not in exclude_dims]
         associations = project_config.dimension_associations
-        # TODO: check a unified project table against dim_table
-        # project_table = self._make_single_table(project_config, data_source, pivot_dimension)
-
+        dimension_pairs = [tuple(sorted((x, y))) for x, y in itertools.combinations(types, 2)]
+        found_missing = False
         for type1, type2 in dimension_pairs:
             logger.info("Check dimensions %s and %s", type1.value, type2.value)
             with Timer(timer_stats_collector, "evaluate dimension record counts"):
@@ -330,6 +365,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     .count()
                 )
             if count != record_count:
+                found_missing = True
                 table = (
                     records.select(*columns)
                     .distinct()
@@ -345,19 +381,19 @@ class ProjectRegistryManager(RegistryManagerBase):
                         (type1, type2),
                         buf.getvalue(),
                     )
-                raise DSGInvalidDataset(
-                    f"Dataset {dataset_id} is missing dimension association records for {(type1, type2)}"
-                )
             else:
                 logger.info(f" dimension association for {type1}, {type2} validated! ")
-        self._check_pivot_dimension_columns(project_config, handler, associations, data_source)
 
+        assert found_missing, "Did not find missing dimension records"
+
+    @staticmethod
     @track_timing(timer_stats_collector)
-    def _make_single_table(self, config: ProjectConfig, data_source, pivot_dimension):
-        # TODO: prototype code from Meghan - needs testing
+    def _make_single_table(config: ProjectConfig, data_source, pivot_dimension):
         ds = DimensionType.DATA_SOURCE.value
-        table = config.dimension_associations.table.filter(f"{ds} = '{data_source}'").drop(
-            pivot_dimension.value
+        table = (
+            config.dimension_associations.table.filter(f"{ds} = '{data_source}'")
+            .drop(pivot_dimension.value)
+            .drop(ds)
         )
         exclude = set((DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension))
         all_dimensions = set(d.value for d in DimensionType if d not in exclude)

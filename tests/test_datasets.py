@@ -51,7 +51,9 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
             _setup_invalid_load_data_id_missing_timestamp,
             _setup_invalid_load_data_id_extra_timestamp,
             _setup_invalid_load_data_lookup_mismatched_ids,
+            _setup_invalid_load_data_lookup_null_id,
             _setup_invalid_load_data_extra_column,
+            _setup_invalid_load_data_null_id,
         )
         # This is arranged in this way to avoid having to re-create the registry every time,
         # which is quite slow. There is one downside: if one test is able to register the
@@ -149,7 +151,7 @@ def _setup_invalid_load_data_id_missing_timestamp(data_dir):
     # Remove one row/timestamp for one load data array.
     text = "\n".join(data_file.read_text().splitlines()[:-1])
     data_file.write_text(text)
-    return DSGInvalidDataset, r"All time arrays must have the same times: unique timestamp lengths"
+    return DSGInvalidDataset, r"All time arrays must have the same times.*unique timestamp counts"
 
 
 def _setup_invalid_load_data_id_extra_timestamp(data_dir):
@@ -194,6 +196,16 @@ def _setup_invalid_load_data_lookup_mismatched_ids(data_dir):
     data[0]["id"] += 999999999
     dump_line_delimited_json(data, lookup_file)
     return DSGInvalidDataset, r"Data IDs for .*data.lookup are inconsistent"
+
+
+def _setup_invalid_load_data_lookup_null_id(data_dir):
+    lookup_file = data_dir / "test_efs_comstock" / "load_data_lookup.json"
+    data = load_line_delimited_json(lookup_file)
+    item = copy.deepcopy(data[0])
+    item["geography"] = None
+    data.append(item)
+    dump_line_delimited_json(data, lookup_file)
+    return DSGInvalidDataset, r"has a NULL value"
 
 
 def _setup_invalid_load_data_extra_column(data_dir):

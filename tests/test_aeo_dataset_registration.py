@@ -128,7 +128,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
             _modify_data_file(data_dir, drop_first_row=True)
             with pytest.raises(
                 DSGInvalidDataset,
-                match=r"All time arrays must have the same times: unique timestamp lengths",
+                match=r"All time arrays must have the same times.*unique timestamp counts",
             ):
                 _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 

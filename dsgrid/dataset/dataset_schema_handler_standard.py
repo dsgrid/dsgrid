@@ -77,6 +77,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             dimension = self._config.get_dimension(dimension_type)
             dim_records = dimension.get_unique_ids()
             lookup_records = get_unique_values(self._load_data_lookup, name)
+            if None in lookup_records:
+                raise DSGInvalidDataset(
+                    f"{self._config.config_id} has a NULL value for {dimension_type}"
+                )
             if dim_records != lookup_records:
                 logger.error(
                     "Mismatch in load_data_lookup records. dimension=%s mismatched=%s",

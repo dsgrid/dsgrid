@@ -96,6 +96,9 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
             finally:
                 if test_dir.exists():
                     shutil.rmtree(test_dir)
+                missing_record_file = Path(f"{DATASET_ID}__missing_dimension_record_combinations.csv")
+                if missing_record_file.exists():
+                    shutil.rmtree(missing_record_file)
 
 
 def _setup_invalid_load_data_lookup_column_name(data_dir):

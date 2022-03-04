@@ -6,8 +6,6 @@ import os
 from datetime import datetime
 from pathlib import Path
 
-from prettytable import PrettyTable
-
 from dsgrid import timer_stats_collector
 from .common import RegistryManagerParams, ConfigRegistrationModel, VersionUpdateType
 from .registry_base import RegistryBaseModel
@@ -497,41 +495,6 @@ class RegistryManagerBase(abc.ABC):
         self.fs_interface.rm_tree(self.get_registry_directory(config_id))
         self._registry_configs.pop(config_id, None)
         logger.info("Removed %s from the registry.", config_id)
-
-    def show(self, filters=None, **kwargs):
-        """Show a summary of the registered items in a table."""
-        if filters:
-            logger.info("List registry for: %s", filters)
-
-        table = PrettyTable(title=self.name())
-        table.field_names = ("ID", "Version", "Registration Date", "Submitter", "Description")
-        table._max_width = {
-            "ID": 50,
-            "Description": 50,
-        }
-        # table.max_width = 70
-
-        if filters:
-            transformed_filters = transform_and_validate_filters(filters)
-        field_to_index = {x: i for i, x in enumerate(table.field_names)}
-        rows = []
-        for config_id, registry_config in self._registry_configs.items():
-            last_reg = registry_config.model.registration_history[0]
-
-            row = (
-                config_id,
-                last_reg.version,
-                last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
-                last_reg.submitter,
-                registry_config.model.description,
-            )
-            if not filters or matches_filters(row, field_to_index, transformed_filters):
-                rows.append(row)
-
-        rows.sort(key=lambda x: x[0])
-        table.add_rows(rows)
-        table.align = "l"
-        print(table)
 
     def sync_pull(self, path):
         """Synchronizes files from the remote registry to local.

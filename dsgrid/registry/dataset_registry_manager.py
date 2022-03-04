@@ -4,7 +4,9 @@ import getpass
 import logging
 import os
 from pathlib import Path
+from typing import Union
 
+from prettytable import PrettyTable
 
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_config import DatasetConfig
@@ -205,3 +207,77 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._remove(config_id)
         for key in [x for x in self._datasets if x.id == config_id]:
             self._datasets.pop(key)
+
+    def show(
+        self,
+        filters: list = None,
+        max_width: Union[int, dict] = None,
+        drop_fields: list = None,
+        **kwargs,
+    ):
+        """Show registry in PrettyTable
+        Parameters
+        ----------
+        filters : list of str
+            List of filter expressions for reigstry content (e.g., filters=["Submitter==USER", "Description contains comstock"])
+        max_width : int or dict of int
+            Max column width in PrettyTable, specify as a single value or as a dict of values by field name
+        drop_fields : list of str
+            List of field names not to show.
+        """
+
+        if filters:
+            logger.info("List registry for: %s", filters)
+
+        table = PrettyTable(title=self.name())
+        all_field_names = (
+            "ID",
+            "Version",
+            "Regist Date",
+            "Submitter",
+            "Description",
+        )
+        if drop_fields is None:
+            table.field_names = all_field_names
+        else:
+            table.field_names = tuple(x for x in all_field_names if x not in drop_fields)
+
+        if max_width is None:
+            table._max_width = {
+                "ID": 50,
+                "Regist Date": 10,
+                "Description": 50,
+            }
+        if isinstance(max_width, int):
+            table.max_width = max_width
+        if isinstance(max_width, dict):
+            table._max_width = max_width
+
+        if filters:
+            transformed_filters = transform_and_validate_filters(filters)
+        field_to_index = {x: i for i, x in enumerate(table.field_names)}
+        rows = []
+        for config_id, registry_config in self._registry_configs.items():
+            last_reg = registry_config.model.registration_history[0]
+
+            all_fields = (
+                config_id,
+                last_reg.version,
+                last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
+                last_reg.submitter,
+                registry_config.model.description,
+            )
+            if drop_fields is None:
+                row = all_fields
+            else:
+                row = tuple(
+                    y for (x, y) in zip(all_field_names, all_fields) if x not in drop_fields
+                )
+
+            if not filters or matches_filters(row, field_to_index, transformed_filters):
+                rows.append(row)
+
+        rows.sort(key=lambda x: x[0])
+        table.add_rows(rows)
+        table.align = "l"
+        print(table)

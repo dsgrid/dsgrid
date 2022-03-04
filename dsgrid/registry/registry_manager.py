@@ -315,12 +315,14 @@ class RegistryManager:
     def path(self):
         return self._params.base_path
 
-    def show(self):
+    def show(self, filters=None, max_width=None, drop_fields=None):
         """Show tables of all registry configs."""
-        self.project_manager.show()
-        self.dataset_manager.show()
-        self.dimension_manager.show()
-        self.dimension_mapping_manager.show()
+        self.project_manager.show(filters=filters, max_width=max_width, drop_fields=drop_fields)
+        self.dataset_manager.show(filters=filters, max_width=max_width, drop_fields=drop_fields)
+        self.dimension_manager.show(filters=filters, max_width=max_width, drop_fields=drop_fields)
+        self.dimension_mapping_manager.show(
+            filters=filters, max_width=max_width, drop_fields=drop_fields
+        )
 
     def update_dependent_configs(self, config, update_type, log_message):
         """Update all configs that consume this config. Recursive.

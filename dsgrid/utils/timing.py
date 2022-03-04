@@ -135,7 +135,7 @@ def track_timing(collector):
 
 
 def _timed_func(timer_stats, func, *args, **kwargs):
-    with Timer(timer_stats, func.__name__):
+    with Timer(timer_stats, func.__qualname__):
         return func(*args, **kwargs)
 
 

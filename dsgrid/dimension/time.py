@@ -208,7 +208,6 @@ class DatetimeRange:
         datetime
 
         """
-
         cur = self.start.to_pydatetime()
         end = self.end.to_pydatetime() + self.frequency  # to make end time inclusive
 

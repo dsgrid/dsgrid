@@ -1,5 +1,6 @@
-"""TBD"""
+"""Provides access to a dataset."""
 
+from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 import logging
 from pathlib import Path
 
@@ -18,33 +19,39 @@ class Dataset:
 
     VIEW_NAMES = ("load_data_lookup", "load_data")
 
-    def __init__(self, config, load_data_lookup, data):
-        self._spark = SparkSession.getActiveSession()
-        self._load_data_lookup = load_data_lookup  # DataFrame of dimension elements
-        self._load_data = data  # DataFrame containing load data
-        self._id = config.model.dataset_id
+    def __init__(self, schema_handler):
+        self._handler = schema_handler
+        self._id = schema_handler.config.model.dataset_id
         # Can't use dashes in view names. This will need to be handled when we implement
         # queries based on dataset ID.
         # TODO: do we need a DimensionStore here?
 
+    @property
+    def dataset_id(self):
+        return self._id
+
     @classmethod
-    def load(cls, config):
+    def load(cls, config, dimension_mgr, dimension_mapping_mgr, mapping_references=None):
         """Load a dataset from a store.
 
         Parameters
         ----------
         config : DatasetConfig
+        dimension_mgr : DimensionRegistryManager
+        dimension_mapping_mgr : DimensionMappingRegistryManager
+        mapping_references: None | List[DimensionMappingReferenceListModel]
+            This is required when loading a dataset for use in a project.
 
         Returns
         -------
         Dataset
 
         """
-        load_data = read_dataframe(config.load_data_path)
-        load_data_lookup = read_dataframe(config.load_data_lookup_path, cache=True)
-        load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
-        dataset = cls(config, load_data_lookup, load_data)
-        return dataset
+        return cls(
+            make_dataset_schema_handler(
+                config, dimension_mgr, dimension_mapping_mgr, mapping_references=mapping_references
+            )
+        )
 
     def _make_view_name(self, name):
         return f"{self._id}__{name}"
@@ -55,21 +62,25 @@ class Dataset:
     def create_views(self):
         """Create views for each of the tables in this dataset."""
         # TODO: should we create these in a separate database?
-        self._load_data_lookup.createOrReplaceTempView(self._make_view_name("load_data_lookup"))
-        self._load_data.createOrReplaceTempView(self._make_view_name("load_data"))
+        self.load_data_lookup.createOrReplaceTempView(self._make_view_name("load_data_lookup"))
+        self.load_data.createOrReplaceTempView(self._make_view_name("load_data"))
 
     def delete_views(self):
         """Delete views of the tables in this dataset."""
+        spark = SparkSession.getActiveSession()
         for view in self._make_view_names():
-            self._spark.catalog.dropTempView(view)
+            spark.catalog.dropTempView(view)
+
+    # TODO: the following two methods need to abstract load_data_lookup
+    # They can only be used with Standard dataset schema.
 
     @property
     def load_data(self):
-        return self._load_data
+        return self._handler._load_data
 
     @property
     def load_data_lookup(self):
-        return self._load_data_lookup
+        return self._handler._load_data_lookup
 
     # TODO: this is likely throwaway code
 

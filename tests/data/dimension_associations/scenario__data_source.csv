@@ -1,0 +1,10 @@
+scenario,data_source
+efs_high_ldv,comstock
+efs_high_ldv,resstock
+efs_high_ldv,tempo
+ldv_sales_evs_2035,comstock
+ldv_sales_evs_2035,resstock
+ldv_sales_evs_2035,tempo
+reference,comstock
+reference,resstock
+reference,tempo

@@ -14,7 +14,7 @@ from dsgrid.common import (
     SYNC_EXCLUDE_LIST,
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
-from dsgrid.config.association_tables import AssociationTableConfig
+from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
@@ -62,7 +62,10 @@ class RegistryManager:
             self._dimension_mgr,
         )
         self._dataset_mgr = DatasetRegistryManager.load(
-            params.base_path / DatasetRegistry.registry_path(), params, self._dimension_mgr
+            params.base_path / DatasetRegistry.registry_path(),
+            params,
+            self._dimension_mgr,
+            self._dimension_mapping_dimension_mgr,
         )
         self._project_mgr = ProjectRegistryManager.load(
             params.base_path / ProjectRegistry.registry_path(),
@@ -339,7 +342,7 @@ class RegistryManager:
         if isinstance(config, DimensionConfig):
             version = self.dimension_manager.get_current_version(config.config_id)
             self._update_dimension_users(config, version, update_type, log_message)
-        elif isinstance(config, AssociationTableConfig):
+        elif isinstance(config, MappingTableConfig):
             version = self.dimension_mapping_manager.get_current_version(config.config_id)
             self._update_dimension_mapping_users(config, version, update_type, log_message)
         elif isinstance(config, DatasetConfig):
@@ -458,10 +461,6 @@ class RegistryManager:
             return
         for project in self.project_manager.iter_configs():
             updated = False
-            for mapping_ref in project.model.dimension_mappings.base_to_base:
-                if mapping_ref.mapping_id in updated_mappings:
-                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
-                    updated = True
             for mapping_ref in project.model.dimension_mappings.base_to_supplemental:
                 if mapping_ref.mapping_id in updated_mappings:
                     mapping_ref.version = updated_mappings[mapping_ref.mapping_id]

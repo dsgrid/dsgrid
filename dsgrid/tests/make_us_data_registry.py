@@ -27,6 +27,7 @@ def make_test_data_registry(
     registry_path,
     src_dir,
     dataset_path=None,
+    include_projects=True,
     include_datasets=True,
     offline_mode=True,
 ) -> RegistryManager:
@@ -40,19 +41,25 @@ def make_test_data_registry(
         Path containing source config files
     dataset_path : Path | None
         If None, use "DSGRID_LOCAL_DATA_DIRECTORY" env variable.
+    include_projects : bool
+        If False, do not register any projects.
     include_datasets : bool
         If False, do not register any datasets.
     offline_mode : bool
         If False, use the test remote registry.
     """
+    if not include_projects and include_datasets:
+        raise Exception("If include_datasets is True then include_projects must also be True.")
+
     if dataset_path is None:
-        dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
+        dataset_path = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY)
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
     project_dimension_mapping_config = src_dir / "dimension_mappings.toml"
     dimension_mapping_config = src_dir / dataset_dir / "dimension_mappings.toml"
     dimension_mapping_refs = src_dir / dataset_dir / "dimension_mapping_references.toml"
 
+    print("\n 1. register dimensions: \n")
     user = getpass.getuser()
     log_message = "Initial registration"
     if offline_mode:
@@ -68,7 +75,7 @@ def make_test_data_registry(
     ):
         dim_mgr = manager.dimension_manager
         dim_mgr.register(dim_config_file, user, log_message)
-
+    print("\n 2. register dimension mappings: \n")
     # dsgrid-project-EFS shares project subsectors.
     # dsgrid-test-data has custom subsectors that need to be mapped.
     # This also applies to dimension_mapping_refs below.
@@ -95,9 +102,13 @@ def make_test_data_registry(
     replace_dimension_mapping_uuids_from_registry(path, needs_replacements)
     replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
 
-    manager.project_manager.register(project_config_file, user, log_message)
+    if include_projects:
+        print("\n 3. register project: \n")
+        manager.project_manager.register(project_config_file, user, log_message)
     if include_datasets:
+        print("\n 4. register dataset: \n")
         manager.dataset_manager.register(dataset_config_file, user, log_message)
+        print("\n 5. submit dataset to project\n")
         manager.project_manager.submit_dataset(
             project_id,
             dataset_id,
@@ -159,8 +170,10 @@ def run(registry_path, force, project_dir, dataset_dir, verbose):
     if tmp_project_dir.exists():
         shutil.rmtree(tmp_project_dir)
     shutil.copytree(project_dir, tmp_project_dir)
-    make_test_data_registry(registry_path, tmp_project_dir / "dsgrid_project", dataset_dir)
-    timer_stats_collector.log_stats()
+    try:
+        make_test_data_registry(registry_path, tmp_project_dir / "dsgrid_project", dataset_dir)
+    finally:
+        timer_stats_collector.log_stats()
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ from dsgrid.config.dimensions import (
     DateTimeDimensionModel,
     TimeDimensionBaseModel,
 )
+from .dimension_update_checker import DimensionUpdateChecker
 from dsgrid.data_models import serialize_model
 from dsgrid.exceptions import (
     DSGValueNotRegistered,
@@ -31,6 +32,7 @@ from dsgrid.registry.common import (
 from .registry_manager_base import RegistryManagerBase
 from .dimension_registry import DimensionRegistry, DimensionRegistryModel
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 
 logger = logging.getLogger(__name__)
@@ -202,6 +204,12 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_references : list
             iterable of DimensionReferenceModel instances
 
+
+        Returns
+        -------
+        dict
+            DimensionKey to DimensionConfig
+
         """
         dimensions = {}
         for dim in dimension_references:
@@ -210,6 +218,7 @@ class DimensionRegistryManager(RegistryManagerBase):
 
         return dimensions
 
+    @track_timing(timer_stats_collector)
     def register(self, config_file, submitter, log_message, force=False):
         lock_file_path = self.get_registry_lock_file(None)
         with self.cloud_interface.make_lock_file(lock_file_path):
@@ -350,6 +359,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._check_update(config, config_id, version)
         self.update(config, update_type, log_message, submitter=submitter)
 
+    @track_timing(timer_stats_collector)
     def update(self, config, update_type, log_message, submitter=None):
         if submitter is None:
             submitter = getpass.getuser()
@@ -358,12 +368,19 @@ class DimensionRegistryManager(RegistryManagerBase):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
+        old_config = self.get_by_id(config.config_id)
+        checker = DimensionUpdateChecker(old_config.model, config.model)
+        checker.run()
         registry = self.get_registry_config(config.config_id)
         old_key = DimensionKey(config.model.dimension_type, config.config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)
         new_key = DimensionKey(config.model.dimension_type, config.config_id, version)
         self._dimensions.pop(old_key, None)
         self._dimensions[new_key] = config
+
+        if not self.offline_mode:
+            self.sync_push(self._path)
+
         return version
 
     def remove(self, config_id):

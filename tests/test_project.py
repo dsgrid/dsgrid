@@ -5,6 +5,8 @@ from pyspark.sql import SparkSession
 
 from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
+from dsgrid.config.mapping_tables import MappingTableConfig
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.tests.common import TEST_REGISTRY
 
@@ -20,6 +22,17 @@ def test_project_load():
         PROJECT_ID, version="1.0.0", offline_mode=True, registry_path=TEST_REGISTRY
     )
     assert isinstance(project, Project)
+
+    config = project.config
+    dim = config.get_base_dimension(DimensionType.GEOGRAPHY)
+    assert dim.model.dimension_type == DimensionType.GEOGRAPHY
+    supp_dims = config.get_supplemental_dimensions(DimensionType.GEOGRAPHY)
+    assert len(supp_dims) == 3
+    assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.GEOGRAPHY)
+    mappings = config.get_base_to_supplemental_dimension_mappings_by_types(DimensionType.GEOGRAPHY)
+    assert len(mappings) == 3
+    assert not config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SECTOR)
+
     with pytest.raises(DSGValueNotRegistered):
         project = Project.load(
             PROJECT_ID, version="0.0.0", offline_mode=True, registry_path=TEST_REGISTRY

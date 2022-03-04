@@ -2,6 +2,7 @@
 
 import itertools
 import logging
+from tests.test_project_config import dimension_manager
 
 from pyspark.sql import SparkSession
 
@@ -19,11 +20,13 @@ logger = logging.getLogger(__name__)
 class Project:
     """Interface to a dsgrid project."""
 
-    def __init__(self, config, dataset_configs):
+    def __init__(self, config, dataset_configs, dimension_mgr, dimension_mapping_mgr):
         self._spark = SparkSession.getActiveSession()
         self._config = config
         self._dataset_configs = dataset_configs
         self._datasets = {}
+        self._dimension_mgr = dimension_mgr
+        self._dimension_mapping_mgr = dimension_mapping_mgr
 
     @classmethod
     def load(cls, project_id, registry_path=None, version=None, offline_mode=False):
@@ -48,7 +51,9 @@ class Project:
             dataset_config = dataset_manager.get_by_id(dataset_id)
             dataset_configs[dataset_id] = dataset_config
 
-        return cls(config, dataset_configs)
+        return cls(
+            config, dataset_configs, manager.dimension_manager, manager.dimension_mapping_manager
+        )
 
     @property
     def config(self):
@@ -84,7 +89,13 @@ class Project:
                 f"dataset_id={dataset_id} is not registered in the project"
             )
         config = self._dataset_configs[dataset_id]
-        dataset = Dataset.load(config)
+        input_dataset = self._config.get_dataset(dataset_id)
+        dataset = Dataset.load(
+            config,
+            self._dimension_mgr,
+            self._dimension_mapping_mgr,
+            mapping_references=input_dataset.mapping_references,
+        )
         dataset.create_views()
         self._datasets[dataset_id] = dataset
 

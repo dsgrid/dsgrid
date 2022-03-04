@@ -20,6 +20,9 @@ class DimensionType(DSGEnum):
     SCENARIO = "scenario"
     DATA_SOURCE = "data_source"
 
+    def __lt__(self, other):
+        return self.value < other.value
+
     @classmethod
     def from_column(cls, column):
         try:

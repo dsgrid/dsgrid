@@ -75,3 +75,14 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         tzinfo | None
 
         """
+
+    @abc.abstractmethod
+    def list_expected_dataset_timestamps(self):
+        """Return a list of the timestamps expected in the load_data table.
+
+        Returns
+        -------
+        list
+            List of tuples of columns representing time in the load_data table.
+
+        """

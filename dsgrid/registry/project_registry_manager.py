@@ -467,11 +467,11 @@ class ProjectRegistryManager(RegistryManagerBase):
         table = PrettyTable(title=self.name())
         all_field_names = (
             "ID",
-            "Regist Status",
             "Version",
+            "Regist Status",
+            "Datasets",
             "Regist Date",
             "Submitter",
-            "Datasets",
             "Description",
         )
         if drop_fields is None:
@@ -483,8 +483,8 @@ class ProjectRegistryManager(RegistryManagerBase):
             table._max_width = {
                 "ID": 20,
                 "Regist Status": 10,
-                "Regist Date": 10,
                 "Datasets": 30,
+                "Regist Date": 10,
                 "Description": 30,
             }
         if isinstance(max_width, int):
@@ -502,11 +502,11 @@ class ProjectRegistryManager(RegistryManagerBase):
 
             all_fields = (
                 config_id,
-                config.model.status.value,
                 last_reg.version,
+                config.model.status.value,
+                ",\n".join([f"{x.dataset_id}: {x.status.value}" for x in config.model.datasets]),
                 last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
                 last_reg.submitter,
-                ",\n".join([f"{x.dataset_id}: {x.status.value}" for x in config.model.datasets]),
                 registry_config.model.description,
             )
             if drop_fields is None:

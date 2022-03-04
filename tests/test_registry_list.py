@@ -56,10 +56,7 @@ def test_registry_list_filters():
     # test set 1: good filters for all managers
     good_filters = [filters1, filters2]
     for filters in good_filters:
-        registry_manager.project_manager.show(filters=filters)
-        registry_manager.dataset_manager.show(filters=filters)
-        registry_manager.dimension_manager.show(filters=filters)
-        registry_manager.dimension_mapping_manager.show(filters=filters)
+        registry_manager.show(filters=filters)
 
     # test set 2: good filters for selected managers
     registry_manager.dimension_manager.show(filters=filters3)
@@ -73,3 +70,7 @@ def test_registry_list_filters():
             registry_manager.dataset_manager.show(filters=filters)
             registry_manager.dimension_manager.show(filters=filters)
             registry_manager.dimension_mapping_manager.show(filters=filters)
+
+    # test max_width and drop_fields
+    registry_manager.show(max_width=40, drop_fields=["Submitter", "Regist Date"])
+    registry_manager.show(max_width={"Description": 30, "Regist Date": 20})

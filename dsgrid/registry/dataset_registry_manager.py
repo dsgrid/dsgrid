@@ -16,6 +16,7 @@ from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.registry.common import make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import timer_stats_collector, Timer, track_timing
+from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from .dataset_registry import DatasetRegistry, DatasetRegistryModel
 from .registry_manager_base import RegistryManagerBase
 
@@ -218,7 +219,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         """Show registry in PrettyTable
         Parameters
         ----------
-        filters : list of str
+        filters : list or tuple of str
             List of filter expressions for reigstry content (e.g., filters=["Submitter==USER", "Description contains comstock"])
         max_width : int or dict of int
             Max column width in PrettyTable, specify as a single value or as a dict of values by field name

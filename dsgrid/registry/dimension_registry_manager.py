@@ -302,7 +302,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         """Show registry in PrettyTable
         Parameters
         ----------
-        filters : list of str
+        filters : list or tuple of str
             List of filter expressions for reigstry content (e.g., filters=["Submitter==USER", "Description contains comstock"])
         max_width: int or dict of int
             Max column width in PrettyTable, specify as a single value or as a dict of values by field name

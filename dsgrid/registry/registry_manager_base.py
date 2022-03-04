@@ -17,7 +17,6 @@ from dsgrid.exceptions import (
     DSGInvalidParameter,
 )
 from dsgrid.utils.files import load_data
-from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.timing import Timer, track_timing
 
 

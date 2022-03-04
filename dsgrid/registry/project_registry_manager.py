@@ -35,6 +35,7 @@ from dsgrid.registry.common import (
 )
 from dsgrid.utils.spark import create_dataframe_from_dimension_ids
 from dsgrid.utils.timing import track_timing, timer_stats_collector, Timer
+from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from .common import VersionUpdateType
 from .project_update_checker import ProjectUpdateChecker
 from .dataset_registry_manager import DatasetRegistryManager
@@ -453,7 +454,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         """Show registry in PrettyTable
         Parameters
         ----------
-        filters : list of str
+        filters : list or tuple of str
             List of filter expressions for reigstry content (e.g., filters=["Submitter==USER", "Description contains comstock"])
         max_width : int or dict of int
             Max column width in PrettyTable, specify as a single value or as a dict of values by field name

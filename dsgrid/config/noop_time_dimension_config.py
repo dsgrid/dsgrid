@@ -39,3 +39,6 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_tzinfo(self):
         return None
+
+    def list_expected_dataset_timestamps(self):
+        return []

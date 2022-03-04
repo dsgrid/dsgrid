@@ -1,10 +1,7 @@
 import abc
-import collections
 import logging
-import re
 import os
 from collections import defaultdict
-from typing import List
 
 import pyspark.sql.functions as F
 
@@ -12,8 +9,8 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import TimeDimensionType
-from dsgrid.utils.spark import models_to_dataframe
-from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
+from dsgrid.utils.spark import models_to_dataframe, sql
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +88,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         dim_type = self._config.model.data_schema.load_data_column_dimension
         return sorted(list(self._config.get_dimension(dim_type).get_unique_ids()))
 
+    @track_timing(timer_stats_collector)
     def get_pivot_dimension_columns_mapped_to_project(self):
         """Get columns for the dimension that is pivoted in load_data and remap them to the
         project's record names. The returned dict will not include columns that the project does
@@ -122,6 +120,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return columns
 
+    @track_timing(timer_stats_collector)
     def get_columns_for_unique_arrays(self, time_dim, load_data_df):
         """Returns the list of dimension columns aginst which the number of timestamps is checked.
 
@@ -136,6 +135,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return groupby_cols
 
+    @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency(self, load_data_df):
         """Check dataset time consistency such that:
         1. time range(s) match time config record;
@@ -143,68 +143,35 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         """
         if os.environ.get("__DSGRID_SKIP_DATASET_TIME_CONSISTENCY_CHECKS__"):
+            logger.warning("Skip dataset time consistency checks.")
             return
 
+        logger.info("Check dataset time consistency.")
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_dim.check_dataset_time_consistency(load_data_df)
         if time_dim.model.time_type != TimeDimensionType.NOOP:
-            self._check_dataset_time_consistency_by_dimensions(time_dim, load_data_df)
+            self._check_dataset_time_consistency_by_time_array(time_dim, load_data_df)
 
-    def _check_dataset_time_consistency_by_dimensions(self, time_dim, load_data_df):
-        """
-        Check dataset time consistency such that all dimension combinations return the same set of time ranges.
-        """
-        time_ranges = time_dim.get_time_ranges()
-        assert len(time_ranges) == 1, len(time_ranges)
-        time_range = time_ranges[0]
-        # TODO: need to support validation of multiple time ranges: DSGRID-173
-        expected_timestamps = time_range.list_time_range()
-        expected_count = len(expected_timestamps)
+    @track_timing(timer_stats_collector)
+    def _check_dataset_time_consistency_by_time_array(self, time_dim, load_data_df):
+        """Check that each unique time array has the same timestamps."""
+        logger.info("Check dataset time consistency by time array.")
+        unique_array_cols = self.get_columns_for_unique_arrays(time_dim, load_data_df)
+        time_cols = time_dim.get_timestamp_load_data_columns()
+        counts = load_data_df.groupBy(*time_cols).count().select("count")
+        distinct_counts = counts.select("count").distinct().collect()
+        if len(distinct_counts) != 1:
+            raise DSGInvalidDataset(
+                f"All time arrays must have the same times: unique timestamp counts = {len(distinct_counts)}"
+            )
+        unique_ta_counts = load_data_df.select(*unique_array_cols).distinct().count()
+        if unique_ta_counts != distinct_counts[0]["count"]:
+            raise DSGInvalidDataset(
+                f"dataset has invalid timestamp counts, expected {unique_ta_counts} count for "
+                f"each timestamp in {time_cols} but found {distinct_counts[0]['count']} instead"
+            )
 
-        groupby_cols = self.get_columns_for_unique_arrays(time_dim, load_data_df)
-        time_col = time_dim.get_timestamp_load_data_columns()
-        timestamps_by_dims = (
-            load_data_df[time_col + groupby_cols]
-            .groupby(groupby_cols)
-            .agg(F.countDistinct(*time_col).alias("distinct_timestamps"))
-        )
-
-        distinct_counts = timestamps_by_dims.select("distinct_timestamps").distinct()
-        if distinct_counts.count() > 1:
-            for row in timestamps_by_dims.collect():
-                if row.distinct_timestamps != len(expected_timestamps):
-                    logger.error(
-                        "load_data row with dimensions=%s does not have %s %s: actual=%s",
-                        self._show_selected_keys_from_dict(row, groupby_cols),
-                        len(expected_timestamps),
-                        time_col[0],
-                        row.distinct_timestamps,
-                    )
-
-                    raise DSGInvalidDataset(
-                        f"One or more arrays do not have {len(expected_timestamps)} timestamps"
-                    )
-        else:
-            val = distinct_counts.collect()[0].distinct_timestamps
-            if val != expected_count:
-                raise DSGInvalidDataset(
-                    f"load_data arrays do not have {len(expected_timestamps)} {time_col[0]}: actual={val}"
-                )
-
-    @staticmethod
-    def _show_selected_keys_from_dict(dct, keys: list):
-        """Return a subset of a dictionary based on a list of keys.
-
-        Returns
-        -------
-        Dict
-
-        """
-        dct_selected = []
-        for key in keys:
-            dct_selected.append(dct[key])
-        return dict(zip(keys, dct_selected))
-
+    @track_timing(timer_stats_collector)
     def _remap_dimension_columns(self, df):
         # This will likely become a common activity when running queries.
         # May need to cache the result. But that will likely be in Project, not here.
@@ -219,6 +186,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return df
 
+    @track_timing(timer_stats_collector)
     def _map_and_reduce_dimension(self, df, column, records):
         """ Map and partially reduce a dimension """
         if column not in df.columns:
@@ -268,17 +236,33 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df
 
     @staticmethod
+    @track_timing(timer_stats_collector)
     def _check_null_value_in_unique_dimension_rows(dim_table):
-        dim_with_null = {}
+        if os.environ.get("__DSGRID_SKIP_NULL_UNIQUE_DIMENSION_CHECK__"):
+            # This has intermittently caused GC-related timeouts for TEMPO.
+            # Leave a backdoor to skip these checks, which may eventually be removed.
+            logger.warning("Skip _check_null_value_in_unique_dimension_rows")
+            return
+
         cols_to_check = {x for x in dim_table.columns if x != "id"}
+        cols_str = ", ".join(cols_to_check)
+        filter_str = " OR ".join((f"{x} is NULL" for x in cols_to_check))
+        dim_table.createOrReplaceTempView("dim_table")
 
-        for col in cols_to_check:
-            null_count = dim_table.filter(F.col(col).isNull()).count()
-            if null_count > 0:
-                dim_with_null[col] = null_count
+        try:
+            # Avoid iterating with many checks unless we know there is at least one failure.
+            nulls = sql(f"SELECT {cols_str} FROM dim_table WHERE {filter_str}")
+            if not nulls.rdd.isEmpty():
+                dims_with_null = set()
+                for col in cols_to_check:
+                    if not nulls.select(col).filter(f"{col} is NULL").rdd.isEmpty():
+                        dims_with_null.add(col)
+                assert dims_with_null, "Did not find any dimensions with NULL values"
 
-        if len(dim_with_null) > 0:
-            raise DSGInvalidDimensionMapping(
-                "Invalid dimension mapping application. "
-                f"Combination of remapped dataset dimensions contain NULL value(s) for dimension(s): \n{dim_with_null}"
-            )
+                raise DSGInvalidDimensionMapping(
+                    "Invalid dimension mapping application. "
+                    "Combination of remapped dataset dimensions contain NULL value(s) for "
+                    f"dimension(s): \n{dims_with_null}"
+                )
+        finally:
+            sql("DROP VIEW dim_table")

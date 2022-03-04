@@ -13,7 +13,7 @@ from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.registry.common import make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import load_data
-from dsgrid.utils.timing import timer_stats_collector, Timer
+from dsgrid.utils.timing import timer_stats_collector, Timer, track_timing
 from .dataset_registry import DatasetRegistry, DatasetRegistryModel
 from .registry_manager_base import RegistryManagerBase
 
@@ -45,13 +45,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         return DatasetRegistry
 
     def _run_checks(self, config: DatasetConfig):
+        logger.info("Run dataset registration checks.")
         self._check_if_already_registered(config.model.dataset_id)
         check_required_dimensions(config.model.dimensions, "dataset dimensions")
         if not os.environ.get("__DSGRID_SKIP_DATASET_CONSISTENCY_CHECKS__"):
             self._check_dataset_consistency(config)
 
     def _check_dataset_consistency(self, config: DatasetConfig):
-        path = Path(config.model.path)
         schema_handler = make_dataset_schema_handler(
             config, self._dimension_mgr, self._dimension_mapping_mgr
         )
@@ -97,6 +97,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     def get_registry_lock_file(self, config_id):
         return f"configs/.locks/{config_id}.lock"
 
+    @track_timing(timer_stats_collector)
     def register(self, config_file, submitter, log_message, force=False):
         lock_file_path = self.get_registry_lock_file(load_data(config_file)["dataset_id"])
         with self.cloud_interface.make_lock_file(lock_file_path):
@@ -176,6 +177,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._check_update(config, config_id, version)
         self.update(config, update_type, log_message, submitter)
 
+    @track_timing(timer_stats_collector)
     def update(self, config, update_type, log_message, submitter=None):
         if submitter is None:
             submitter = getpass.getuser()

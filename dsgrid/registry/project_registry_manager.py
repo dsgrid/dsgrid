@@ -339,24 +339,33 @@ class ProjectRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def _make_single_table(config: ProjectConfig, data_source, pivot_dimension):
         ds = DimensionType.DATA_SOURCE.value
-        table = (
-            config.dimension_associations.table.filter(f"{ds} = '{data_source}'")
-            .drop(pivot_dimension.value)
-            .drop(ds)
-        )
+        table = config.dimension_associations.table
+        table_columns = set()
+        # table is None when the project doesn't define any dimension associations.
+        if table is not None:
+            table = (
+                config.dimension_associations.table.filter(f"{ds} = '{data_source}'")
+                .drop(pivot_dimension.value)
+                .drop(ds)
+            )
+            table_columns.update(table.columns)
+
         exclude = set((DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension))
         all_dimensions = set(d.value for d in DimensionType if d not in exclude)
-        missing_dimensions = all_dimensions.difference(table.columns)
+        missing_dimensions = all_dimensions.difference(table_columns)
         for dim in missing_dimensions:
-            table_count = table.count()
+            table_count = 0 if table is None else table.count()
             other = (
                 config.get_base_dimension(DimensionType(dim))
                 .get_records_dataframe()
                 .select("id")
                 .withColumnRenamed("id", dim)
             )
-            table = table.crossJoin(other)
-            assert table.count() == other.count() * table_count
+            if table is None:
+                table = other
+            else:
+                table = table.crossJoin(other)
+                assert table.count() == other.count() * table_count
 
         return table
 

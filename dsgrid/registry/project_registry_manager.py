@@ -6,8 +6,9 @@ import io
 import itertools
 import logging
 from contextlib import redirect_stdout
-from typing import List
+from typing import Union, List, Dict
 
+from prettytable import PrettyTable
 import pyspark.sql.functions as F
 
 from dsgrid.dimension.base_models import DimensionType
@@ -34,6 +35,7 @@ from dsgrid.registry.common import (
 )
 from dsgrid.utils.spark import create_dataframe_from_dimension_ids
 from dsgrid.utils.timing import track_timing, timer_stats_collector, Timer
+from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from .common import VersionUpdateType
 from .project_update_checker import ProjectUpdateChecker
 from .dataset_registry_manager import DatasetRegistryManager
@@ -441,3 +443,88 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._remove(config_id)
         for key in [x for x in self._projects if x.id == config_id]:
             self._projects.pop(key)
+
+    def show(
+        self,
+        filters: List[str] = None,
+        max_width: Union[int, Dict] = None,
+        drop_fields: List[str] = None,
+        **kwargs,
+    ):
+        """Show registry in PrettyTable
+
+        Parameters
+        ----------
+        filters : list or tuple
+            List of filter expressions for reigstry content (e.g., filters=["Submitter==USER", "Description contains comstock"])
+        max_width
+            Max column width in PrettyTable, specify as a single value or as a dict of values by field name
+        drop_fields
+            List of field names not to show
+
+        """
+
+        if filters:
+            logger.info("List registry for: %s", filters)
+
+        table = PrettyTable(title=self.name())
+        all_field_names = (
+            "ID",
+            "Version",
+            "Status",
+            "Datasets",
+            "Date",
+            "Submitter",
+            "Description",
+        )
+        # TODO: may want dataset and dataset status to be separate columns
+        # TODO: this block can be refactored into base, registry should be in HTML table for notebook.
+        if drop_fields is None:
+            table.field_names = all_field_names
+        else:
+            table.field_names = tuple(x for x in all_field_names if x not in drop_fields)
+
+        if max_width is None:
+            table._max_width = {
+                "ID": 20,
+                "Status": 12,
+                "Datasets": 30,
+                "Date": 10,
+                "Description": 30,
+            }
+        if isinstance(max_width, int):
+            table.max_width = max_width
+        elif isinstance(max_width, dict):
+            table._max_width = max_width
+
+        if filters:
+            transformed_filters = transform_and_validate_filters(filters)
+        field_to_index = {x: i for i, x in enumerate(table.field_names)}
+        rows = []
+        for config_id, registry_config in self._registry_configs.items():
+            last_reg = registry_config.model.registration_history[0]
+            config = self.get_by_id(config_id)
+
+            all_fields = (
+                config_id,
+                last_reg.version,
+                config.model.status.value,
+                ",\n".join([f"{x.dataset_id}: {x.status.value}" for x in config.model.datasets]),
+                last_reg.date.strftime("%Y-%m-%d %H:%M:%S"),
+                last_reg.submitter,
+                registry_config.model.description,
+            )
+            if drop_fields is None:
+                row = all_fields
+            else:
+                row = tuple(
+                    y for (x, y) in zip(all_field_names, all_fields) if x not in drop_fields
+                )
+
+            if not filters or matches_filters(row, field_to_index, transformed_filters):
+                rows.append(row)
+
+        rows.sort(key=lambda x: x[0])
+        table.add_rows(rows)
+        table.align = "l"
+        print(table)

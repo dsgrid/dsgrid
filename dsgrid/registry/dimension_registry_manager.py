@@ -4,6 +4,7 @@ import getpass
 import logging
 import os
 from pathlib import Path
+from typing import Union, List, Dict
 
 from prettytable import PrettyTable
 
@@ -291,24 +292,53 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_type = self._id_to_type[config_id]
         return self._path / dimension_type.value / config_id
 
-    def show(self, filters=None):
+    def show(
+        self,
+        filters: List[str] = None,
+        max_width: Union[int, Dict] = None,
+        drop_fields: List[str] = None,
+        **kwargs,
+    ):
+        """Show registry in PrettyTable
+
+        Parameters
+        ----------
+        filters : list or tuple
+            List of filter expressions for reigstry content (e.g., filters=["Submitter==USER", "Description contains comstock"])
+        max_width
+            Max column width in PrettyTable, specify as a single value or as a dict of values by field name
+        drop_fields
+            List of field names not to show
+
+        """
+
         if filters:
             logger.info("List registered dimensions for: %s", filters)
 
         table = PrettyTable(title="Dimensions")
-        table.field_names = (
+        all_field_names = (
             "Type",
             "ID",
             "Version",
-            "Registration Date",
+            "Date",
             "Submitter",
             "Description",
         )
-        table._max_width = {
-            "ID": 50,
-            "Description": 50,
-        }
-        # table.max_width = 70
+        if drop_fields is None:
+            table.field_names = all_field_names
+        else:
+            table.field_names = tuple(x for x in all_field_names if x not in drop_fields)
+
+        if max_width is None:
+            table._max_width = {
+                "ID": 40,
+                "Date": 10,
+                "Description": 40,
+            }
+        if isinstance(max_width, int):
+            table.max_width = max_width
+        elif isinstance(max_width, dict):
+            table._max_width = max_width
 
         if filters:
             transformed_filters = transform_and_validate_filters(filters)
@@ -316,10 +346,9 @@ class DimensionRegistryManager(RegistryManagerBase):
         rows = []
         for dimension_id, registry_config in self._registry_configs.items():
             reg_dim_type = self._id_to_type[dimension_id].value
-
             last_reg = registry_config.model.registration_history[0]
 
-            row = (
+            all_fields = (
                 reg_dim_type,
                 dimension_id,
                 last_reg.version,
@@ -327,6 +356,12 @@ class DimensionRegistryManager(RegistryManagerBase):
                 last_reg.submitter,
                 registry_config.model.description,
             )
+            if drop_fields is None:
+                row = all_fields
+            else:
+                row = tuple(
+                    y for (x, y) in zip(all_field_names, all_fields) if x not in drop_fields
+                )
 
             if not filters or matches_filters(row, field_to_index, transformed_filters):
                 rows.append(row)

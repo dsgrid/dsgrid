@@ -72,5 +72,5 @@ def test_registry_list_filters():
             registry_manager.dimension_mapping_manager.show(filters=filters)
 
     # test max_width and drop_fields
-    registry_manager.show(max_width=40, drop_fields=["Submitter", "Regist Date"])
-    registry_manager.show(max_width={"Description": 30, "Regist Date": 20})
+    registry_manager.show(max_width=40, drop_fields=["Submitter", "Date", "Datasets"])
+    registry_manager.show(max_width={"Description": 30, "Date": 20})

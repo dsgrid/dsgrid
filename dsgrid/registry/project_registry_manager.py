@@ -6,7 +6,7 @@ import io
 import itertools
 import logging
 from contextlib import redirect_stdout
-from typing import List, Union
+from typing import Union, List, Dict
 
 from prettytable import PrettyTable
 import pyspark.sql.functions as F
@@ -446,20 +446,22 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        filters: list = None,
-        max_width: Union[int, dict] = None,
-        drop_fields: list = None,
+        filters: List[str] = None,
+        max_width: Union[int, Dict] = None,
+        drop_fields: List[str] = None,
         **kwargs,
     ):
         """Show registry in PrettyTable
+
         Parameters
         ----------
-        filters : list or tuple of str
+        filters : list or tuple
             List of filter expressions for reigstry content (e.g., filters=["Submitter==USER", "Description contains comstock"])
-        max_width : int or dict of int
+        max_width
             Max column width in PrettyTable, specify as a single value or as a dict of values by field name
-        drop_fields : list of str
-            List of field names not to show.
+        drop_fields
+            List of field names not to show
+
         """
 
         if filters:
@@ -469,9 +471,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         all_field_names = (
             "ID",
             "Version",
-            "Regist Status",
+            "Status",
             "Datasets",
-            "Regist Date",
+            "Date",
             "Submitter",
             "Description",
         )
@@ -483,14 +485,14 @@ class ProjectRegistryManager(RegistryManagerBase):
         if max_width is None:
             table._max_width = {
                 "ID": 20,
-                "Regist Status": 10,
+                "Status": 12,
                 "Datasets": 30,
-                "Regist Date": 10,
+                "Date": 10,
                 "Description": 30,
             }
         if isinstance(max_width, int):
             table.max_width = max_width
-        if isinstance(max_width, dict):
+        elif isinstance(max_width, dict):
             table._max_width = max_width
 
         if filters:

@@ -477,6 +477,8 @@ class ProjectRegistryManager(RegistryManagerBase):
             "Submitter",
             "Description",
         )
+        # TODO: may want dataset and dataset status to be separate columns
+        # TODO: this block can be refactored into base, registry should be in HTML table for notebook.
         if drop_fields is None:
             table.field_names = all_field_names
         else:

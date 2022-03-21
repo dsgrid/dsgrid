@@ -9,6 +9,7 @@ from pydantic import validator, root_validator
 from semver import VersionInfo
 
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.common import check_config_id_strict
 from .config_base import ConfigBase
 from .dimensions import (
@@ -369,29 +370,15 @@ class DatasetConfigModel(DSGBaseModel):
         return dataset_id
 
     @validator("path")
-    def check_path(cls, path, values):
-        """Check dataset parquet path"""
+    def check_path(cls, path):
+        """Check dataset path"""
         # TODO S3: This requires downloading data to the local system.
         # Can we perform all validation on S3 with an EC2 instance?
         if path.startswith("s3://"):
-            raise Exception(f"Loading a dataset from S3 is not currently supported: {path}")
-        else:
-            local_path = Path(path)
-            if not local_path.exists():
-                raise ValueError(f"{local_path} does not exist for InputDataset")
+            raise ValueError(f"Loading a dataset from S3 is not currently supported: {path}")
+        return path
 
-        if values["data_schema_type"] == DataSchemaType.STANDARD:
-            check_load_data_filename(local_path)
-            check_load_data_lookup_filename(local_path)
-        elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
-            check_load_data_filename(local_path)
-        else:
-            raise ValueError(f'data_schema_type={values["data_schema_type"]} not supported.')
-
-        # TODO: check dataset_dimension_mapping (optional) if exists
-        # TODO: check project_dimension_mapping (optional) if exists
-
-        return str(local_path)
+        return path
 
     @validator("trivial_dimensions")
     def check_time_not_trivial(cls, trivial_dimensions):
@@ -424,8 +411,24 @@ class DatasetConfig(ConfigBase):
         return DatasetConfigModel
 
     @classmethod
-    def load(cls, config_file, dimension_manager):
+    def load(cls, config_file, dimension_manager, check_path):
         config = cls._load(config_file)
+
+        # The path doesn't need validation when the dataset is already in the registry and isn't
+        # being updated.
+        if check_path:
+            schema_type = config.model.data_schema_type
+            path = Path(config.model.path)
+            if not path.exists():
+                raise DSGInvalidDataset(f"Dataset {path} does not exist")
+            if schema_type == DataSchemaType.STANDARD:
+                check_load_data_filename(path)
+                check_load_data_lookup_filename(path)
+            elif schema_type == DataSchemaType.ONE_TABLE:
+                check_load_data_filename(path)
+            else:
+                raise DSGInvalidDataset(f"data_schema_type={schema_type} not supported.")
+
         config.src_dir = config_file.parent
         config.load_dimensions(dimension_manager)
         return config

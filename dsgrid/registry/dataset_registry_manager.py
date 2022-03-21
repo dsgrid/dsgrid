@@ -10,7 +10,7 @@ from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.dimension.base_models import check_required_dimensions
-from dsgrid.exceptions import DSGValueNotRegistered
+from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDataset
 from dsgrid.registry.common import make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import timer_stats_collector, Timer, track_timing
@@ -89,7 +89,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             return dataset
 
         dataset = DatasetConfig.load(
-            self.get_config_file(key.id, key.version), self._dimension_mgr
+            self.get_config_file(key.id, key.version), self._dimension_mgr, False
         )
         self._datasets[key] = dataset
         return dataset
@@ -104,7 +104,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._register(config_file, submitter, log_message, force=force)
 
     def _register(self, config_file, submitter, log_message, force=False):
-        config = DatasetConfig.load(Path(config_file), self._dimension_mgr)
+        config = DatasetConfig.load(Path(config_file), self._dimension_mgr, True)
         with Timer(timer_stats_collector, "run_dataset_checks"):
             self._run_checks(config)
         registration = make_initial_config_registration(submitter, log_message)
@@ -137,14 +137,11 @@ class DatasetRegistryManager(RegistryManagerBase):
         self.fs_interface.mkdir(registry_config_path)
         self.fs_interface.copy_tree(config.model.path, dataset_path)
 
-        # The following logic is unfortunately a bit ugly.
-        # We have to record the path to the data tables as relative to the location of the
-        # dataset config file so that Pydantic validation will work.
-        data_parts = list(dataset_path.parts)
-        config_parts = registry_config_path.parts
-        if data_parts[0] != config_parts[0]:
-            raise Exception(f"paths have different roots: {dataset_path} {registry_config_path}")
-        rel_path = Path(*[".."] * (len(config_parts) - 1) + data_parts[1:])
+        # The dataset path needs to be relative to the config file.
+        # The registry paths are fixed like this example.
+        # registry/configs/datasets/<dataset_id>/<version>/dataset.toml
+        # registry/data/<dataset_id>/<version>/
+        rel_path = Path(f"../../../../data/{config.model.dataset_id}/{registry_config.version}")
         cwd = os.getcwd()
         os.chdir(registry_config_path)
         try:
@@ -173,7 +170,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
     ):
-        config = DatasetConfig.load(config_file, self.dimension_manager)
+        config = DatasetConfig.load(config_file, self.dimension_manager, False)
         self._check_update(config, config_id, version)
         self.update(config, update_type, log_message, submitter)
 
@@ -188,16 +185,20 @@ class DatasetRegistryManager(RegistryManagerBase):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
-        registry = self.get_registry_config(config.config_id)
-        old_key = ConfigKey(config.config_id, registry.version)
+        config_id = config.config_id
+        old_config = self.get_by_id(config_id)
+        if old_config.model.path != config.model.path:
+            raise DSGInvalidDataset(f"Dataset path cannot be changed during update: {config_id}")
+        registry = self.get_registry_config(config_id)
+        old_key = ConfigKey(config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)
-        new_key = ConfigKey(config.config_id, version)
+        new_key = ConfigKey(config_id, version)
         self._datasets.pop(old_key, None)
         self._datasets[new_key] = config
 
         if not self.offline_mode:
-            self.sync_push(self.get_registry_directory(config.config_id))
-            self.sync_push(self.get_registry_data_directory(config.config_id))
+            self.sync_push(self.get_registry_directory(config_id))
+            self.sync_push(self.get_registry_data_directory(config_id))
 
         return version
 

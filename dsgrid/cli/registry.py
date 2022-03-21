@@ -33,6 +33,12 @@ def _version_update_callback(ctx, param, val):
     return VersionUpdateType(val)
 
 
+def _path_callback(ctx, param, val):
+    if val is None:
+        return val
+    return Path(val)
+
+
 """
 Click Group Definitions
 """
@@ -187,7 +193,7 @@ def dump_dimension(registry_manager, dimension_id, version, directory, force):
 
 
 @click.command(name="update")
-@click.argument("dimension-config-file")
+@click.argument("dimension-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-d",
     "--dimension-id",
@@ -309,7 +315,9 @@ def dump_dimension_mapping(registry_manager, dimension_mapping_id, version, dire
 
 
 @click.command(name="update")
-@click.argument("dimension-mapping-config-file")
+@click.argument(
+    "dimension-mapping-config-file", type=click.Path(exists=True), callback=_path_callback
+)
 @click.option(
     "-d",
     "--dimension-mapping-id",
@@ -472,7 +480,7 @@ def dump_project(registry_manager, project_id, version, directory, force):
 
 
 @click.command(name="update")
-@click.argument("project-config-file")
+@click.argument("project-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-p",
     "--project-id",
@@ -584,7 +592,14 @@ def dump_dataset(registry_manager, dataset_id, version, directory, force):
 
 
 @click.command(name="update")
-@click.argument("dataset-config-file")
+@click.argument("dataset-config-file", type=click.Path(exists=True), callback=_path_callback)
+@click.option(
+    "-d",
+    "--dataset-id",
+    required=True,
+    type=str,
+    help="dataset ID",
+)
 @click.option(
     "-l",
     "--log-message",
@@ -599,12 +614,23 @@ def dump_dataset(registry_manager, dataset_id, version, directory, force):
     type=click.Choice([x.value for x in VersionUpdateType]),
     callback=_version_update_callback,
 )
+@click.option(
+    "-v",
+    "--version",
+    required=True,
+    callback=_version_info_required_callback,
+    help="Version to update; must be the current version.",
+)
 @click.pass_obj
-def update_dataset(registry_manager, dataset_config_file, log_message, update_type):
+def update_dataset(
+    registry_manager, dataset_config_file, dataset_id, log_message, update_type, version
+):
     """Update an existing dataset registry."""
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
-    manager.update_from_file(dataset_config_file, submitter, update_type, log_message)
+    manager.update_from_file(
+        dataset_config_file, dataset_id, submitter, update_type, log_message, version
+    )
 
 
 @click.command()

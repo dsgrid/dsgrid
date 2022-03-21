@@ -53,6 +53,7 @@ def make_test_data_registry(
 
     if dataset_path is None:
         dataset_path = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY)
+    dataset_path = Path(dataset_path)
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
     project_dimension_mapping_config = src_dir / "dimension_mappings.toml"
@@ -92,7 +93,6 @@ def make_test_data_registry(
     project_id = load_data(project_config_file)["project_id"]
     dataset_config_file = src_dir / dataset_dir / "dataset.toml"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
-    replace_dataset_path(dataset_config_file, dataset_path=dataset_path)
     needs_replacements = [project_config_file]
     if dimension_mapping_refs.exists():
         mapping_refs = [dimension_mapping_refs]
@@ -107,7 +107,9 @@ def make_test_data_registry(
         manager.project_manager.register(project_config_file, user, log_message)
     if include_datasets:
         print("\n 4. register dataset: \n")
-        manager.dataset_manager.register(dataset_config_file, user, log_message)
+        manager.dataset_manager.register(
+            dataset_config_file, dataset_path / dataset_id, user, log_message
+        )
         print("\n 5. submit dataset to project\n")
         manager.project_manager.submit_dataset(
             project_id,
@@ -117,14 +119,6 @@ def make_test_data_registry(
             log_message,
         )
     return manager
-
-
-def replace_dataset_path(dataset_config_file, dataset_path):
-    config = load_data(dataset_config_file)
-    src_data = Path(dataset_path) / config["dataset_id"]
-    config["path"] = str(src_data)
-    dump_data(config, dataset_config_file)
-    logger.info("Replaced dataset path in %s with %s", dataset_config_file, src_data)
 
 
 @click.command()

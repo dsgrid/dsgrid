@@ -64,7 +64,6 @@ def make_registry_for_tempo(registry_path, src_dir, dataset_path=None) -> Regist
     project_id = load_data(project_config_file)["project_id"]
     dataset_config_file = src_dir / dataset_dir / "dataset.toml"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
-    replace_dataset_path(dataset_config_file, dataset_path=dataset_path)
     replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
     replace_dimension_uuids_from_registry(path, (dataset_config_file,))
 
@@ -78,11 +77,3 @@ def make_registry_for_tempo(registry_path, src_dir, dataset_path=None) -> Regist
         log_message,
     )
     return manager
-
-
-def replace_dataset_path(dataset_config_file, dataset_path):
-    config = load_data(dataset_config_file)
-    src_data = Path(dataset_path) / config["dataset_id"]
-    config["path"] = str(src_data)
-    dump_data(config, dataset_config_file)
-    logger.info("Replaced dataset path in %s with %s", dataset_config_file, src_data)

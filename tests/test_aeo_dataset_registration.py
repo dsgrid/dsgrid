@@ -69,21 +69,11 @@ def make_registry_for_aeo(
     dim_mgr.register(src_dir / dataset_dir / "dimensions.toml", user, log_message)
 
     dataset_config_file = src_dir / dataset_dir / "dataset.toml"
-    dataset_id = load_data(dataset_config_file)["dataset_id"]
-    replace_dataset_path(dataset_config_file, dataset_path=dataset_path)
     replace_dimension_uuids_from_registry(path, (dataset_config_file,))
 
-    manager.dataset_manager.register(dataset_config_file, user, log_message)
+    manager.dataset_manager.register(dataset_config_file, dataset_path, user, log_message)
     logger.info(f"dataset={dataset_name} registered successfully!\n")
     return manager
-
-
-def replace_dataset_path(dataset_config_file, dataset_path):
-    config = load_data(dataset_config_file)
-    src_data = Path(dataset_path)
-    config["path"] = str(src_data)
-    dump_data(config, dataset_config_file)
-    logger.info("Replaced dataset path in %s with %s", dataset_config_file, src_data)
 
 
 ### set up tests for AEO data ###

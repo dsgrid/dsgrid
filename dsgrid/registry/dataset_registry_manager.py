@@ -12,7 +12,7 @@ from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.dimension.base_models import check_required_dimensions
-from dsgrid.exceptions import DSGValueNotRegistered
+from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDataset
 from dsgrid.registry.common import make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import timer_stats_collector, Timer, track_timing
@@ -47,9 +47,9 @@ class DatasetRegistryManager(RegistryManagerBase):
     def registry_class():
         return DatasetRegistry
 
+    @track_timing(timer_stats_collector)
     def _run_checks(self, config: DatasetConfig):
         logger.info("Run dataset registration checks.")
-        self._check_if_already_registered(config.model.dataset_id)
         check_required_dimensions(config.model.dimensions, "dataset dimensions")
         if not os.environ.get("__DSGRID_SKIP_DATASET_CONSISTENCY_CHECKS__"):
             self._check_dataset_consistency(config)
@@ -91,8 +91,10 @@ class DatasetRegistryManager(RegistryManagerBase):
         if dataset is not None:
             return dataset
 
-        dataset = DatasetConfig.load(
-            self.get_config_file(key.id, key.version), self._dimension_mgr
+        dataset = DatasetConfig.load_from_registry(
+            self.get_config_file(key.id, key.version),
+            self._dimension_mgr,
+            self._params.base_path / "data",
         )
         self._datasets[key] = dataset
         return dataset
@@ -101,15 +103,22 @@ class DatasetRegistryManager(RegistryManagerBase):
         return f"configs/.locks/{config_id}.lock"
 
     @track_timing(timer_stats_collector)
-    def register(self, config_file, submitter, log_message, force=False):
+    def register(self, config_file, dataset_path, submitter, log_message, force=False):
         lock_file_path = self.get_registry_lock_file(load_data(config_file)["dataset_id"])
         with self.cloud_interface.make_lock_file(lock_file_path):
-            self._register(config_file, submitter, log_message, force=force)
+            self._register(config_file, dataset_path, submitter, log_message, force=force)
 
-    def _register(self, config_file, submitter, log_message, force=False):
-        config = DatasetConfig.load(Path(config_file), self._dimension_mgr)
-        with Timer(timer_stats_collector, "run_dataset_checks"):
-            self._run_checks(config)
+    def _register(self, config_file, dataset_path, submitter, log_message, force=False):
+        # TODO S3: This requires downloading data to the local system.
+        # Can we perform all validation on S3 with an EC2 instance?
+        if str(dataset_path).startswith("s3://"):
+            raise DSGInvalidDataset(
+                f"Loading a dataset from S3 is not currently supported: {dataset_path}"
+            )
+
+        config = DatasetConfig.load_from_user_path(config_file, self._dimension_mgr, dataset_path)
+        self._check_if_already_registered(config.model.dataset_id)
+        self._run_checks(config)
         registration = make_initial_config_registration(submitter, log_message)
 
         if self.dry_run_mode:
@@ -138,22 +147,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self.fs_interface.mkdir(dataset_registry_dir)
         registry_config.serialize(dataset_registry_filename)
         self.fs_interface.mkdir(registry_config_path)
-        self.fs_interface.copy_tree(config.model.path, dataset_path)
-
-        # The following logic is unfortunately a bit ugly.
-        # We have to record the path to the data tables as relative to the location of the
-        # dataset config file so that Pydantic validation will work.
-        data_parts = list(dataset_path.parts)
-        config_parts = registry_config_path.parts
-        if data_parts[0] != config_parts[0]:
-            raise Exception(f"paths have different roots: {dataset_path} {registry_config_path}")
-        rel_path = Path(*[".."] * (len(config_parts) - 1) + data_parts[1:])
-        cwd = os.getcwd()
-        os.chdir(registry_config_path)
-        try:
-            config.model.path = str(rel_path)
-        finally:
-            os.chdir(cwd)
+        self.fs_interface.copy_tree(config.dataset_path, dataset_path)
 
         # Serialize the registry file as well as the updated DatasetConfig to the registry.
         registry_filename = registry_dir / REGISTRY_FILENAME
@@ -176,7 +170,9 @@ class DatasetRegistryManager(RegistryManagerBase):
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
     ):
-        config = DatasetConfig.load(config_file, self.dimension_manager)
+        config = DatasetConfig.load_from_registry(
+            config_file, self.dimension_manager, self._params.base_path / "data"
+        )
         self._check_update(config, config_id, version)
         self.update(config, update_type, log_message, submitter)
 
@@ -191,16 +187,18 @@ class DatasetRegistryManager(RegistryManagerBase):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
-        registry = self.get_registry_config(config.config_id)
-        old_key = ConfigKey(config.config_id, registry.version)
+        self._run_checks(config)
+        config_id = config.config_id
+        registry = self.get_registry_config(config_id)
+        old_key = ConfigKey(config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)
-        new_key = ConfigKey(config.config_id, version)
+        new_key = ConfigKey(config_id, version)
         self._datasets.pop(old_key, None)
         self._datasets[new_key] = config
 
         if not self.offline_mode:
-            self.sync_push(self.get_registry_directory(config.config_id))
-            self.sync_push(self.get_registry_data_directory(config.config_id))
+            self.sync_push(self.get_registry_directory(config_id))
+            self.sync_push(self.get_registry_data_directory(config_id))
 
         return version
 

@@ -13,8 +13,8 @@ import pytest
 
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.tests.common import make_test_project_dir, make_test_data_dir, TEST_DATASET_DIRECTORY
-from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json
-from dsgrid.tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
+from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json, load_data
+from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 logger = logging.getLogger()
 
@@ -40,6 +40,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
         dimension_mapping_refs = dataset_dir / "dimension_mapping_references.toml"
         assert dimension_mapping_refs.exists()
         dataset_config_file = dataset_dir / "dataset.toml"
+        dataset_id = load_data(dataset_config_file)["dataset_id"]
 
         user = getpass.getuser()
         log_message = "test log message"
@@ -65,11 +66,13 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
                 # Spark load_data_lookup dataframes.
                 logger.info(f"> test {i}...")
                 test_dir = base_dir / f"test_data_dir_{i}"
-                replace_dataset_path(dataset_config_file, dataset_path=test_dir)
                 shutil.copytree(make_test_data_dir, test_dir)
+                dataset_path = test_dir / dataset_id
                 exc, match_msg = setup_test(test_dir)
                 with pytest.raises(exc, match=match_msg):
-                    manager.dataset_manager.register(dataset_config_file, user, log_message)
+                    manager.dataset_manager.register(
+                        dataset_config_file, dataset_path, user, log_message
+                    )
             finally:
                 if test_dir.exists():
                     shutil.rmtree(test_dir)
@@ -81,10 +84,12 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
             try:
                 # Create a new directory because there are collisions with cached
                 # Spark load_data_lookup dataframes.
-                replace_dataset_path(dataset_config_file, dataset_path=test_dir)
                 shutil.copytree(make_test_data_dir, test_dir)
+                dataset_path = test_dir / dataset_id
                 exc, match_msg = setup_test(test_dir)
-                manager.dataset_manager.register(dataset_config_file, user, log_message)
+                manager.dataset_manager.register(
+                    dataset_config_file, dataset_path, user, log_message
+                )
                 with pytest.raises(exc, match=match_msg):
                     manager.project_manager.submit_dataset(
                         PROJECT_ID,

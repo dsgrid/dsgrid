@@ -7,7 +7,7 @@ from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
 from dsgrid.utils.files import load_data, dump_data
 from dsgrid.tests.common import make_test_project_dir, make_test_data_dir, TEST_DATASET_DIRECTORY
-from dsgrid.tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
+from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -30,8 +30,12 @@ def test_trivial_dimension_bad(make_test_project_dir, make_test_data_dir):
         config = load_data(dataset_config_file)
         config["trivial_dimensions"] = config["trivial_dimensions"] + ["geography"]
         dump_data(config, dataset_config_file)
+        dataset_path = make_test_data_dir / config["dataset_id"]
 
         with pytest.raises(DSGInvalidDimension):
             manager.dataset_manager.register(
-                config_file=dataset_config_file, submitter="test", log_message="test"
+                config_file=dataset_config_file,
+                dataset_path=dataset_path,
+                submitter="test",
+                log_message="test",
             )

@@ -9,6 +9,7 @@ from pydantic import validator, root_validator
 from semver import VersionInfo
 
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from .config_base import ConfigBase
 from .dimensions import (
@@ -255,10 +256,6 @@ class DatasetConfigModel(DSGBaseModel):
         title="data_schema",
         description="Schema (table layouts) used for writing out the dataset",
     )
-    path: str = Field(
-        title="path",
-        description="Local path containing data to be registered on the remote registry.",
-    )
     dataset_version: Optional[Union[VersionInfo, str]] = Field(
         title="dataset_version",
         description="The version of the dataset.",
@@ -336,6 +333,11 @@ class DatasetConfigModel(DSGBaseModel):
         ),
     )
 
+    @root_validator(pre=True)
+    def handle_legacy_fields(cls, values):
+        values.pop("path", None)
+        return values
+
     @validator("dataset_qualifier_metadata", pre=True)
     def check_dataset_qualifier_metadata(cls, metadata, values):
         if values["dataset_qualifier"] == DatasetQualifierType.QUANTITY:
@@ -368,31 +370,6 @@ class DatasetConfigModel(DSGBaseModel):
         check_config_id_strict(dataset_id, "Dataset")
         return dataset_id
 
-    @validator("path")
-    def check_path(cls, path, values):
-        """Check dataset parquet path"""
-        # TODO S3: This requires downloading data to the local system.
-        # Can we perform all validation on S3 with an EC2 instance?
-        if path.startswith("s3://"):
-            raise Exception(f"Loading a dataset from S3 is not currently supported: {path}")
-        else:
-            local_path = Path(path)
-            if not local_path.exists():
-                raise ValueError(f"{local_path} does not exist for InputDataset")
-
-        if values["data_schema_type"] == DataSchemaType.STANDARD:
-            check_load_data_filename(local_path)
-            check_load_data_lookup_filename(local_path)
-        elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
-            check_load_data_filename(local_path)
-        else:
-            raise ValueError(f'data_schema_type={values["data_schema_type"]} not supported.')
-
-        # TODO: check dataset_dimension_mapping (optional) if exists
-        # TODO: check project_dimension_mapping (optional) if exists
-
-        return str(local_path)
-
     @validator("trivial_dimensions")
     def check_time_not_trivial(cls, trivial_dimensions):
         for dim in trivial_dimensions:
@@ -409,7 +386,7 @@ class DatasetConfig(ConfigBase):
     def __init__(self, model):
         super().__init__(model)
         self._dimensions = {}
-        self._src_dir = None
+        self._dataset_path = None
 
     @staticmethod
     def config_filename():
@@ -424,32 +401,50 @@ class DatasetConfig(ConfigBase):
         return DatasetConfigModel
 
     @classmethod
-    def load(cls, config_file, dimension_manager):
+    def load_from_registry(cls, config_file, dimension_manager, registry_path):
         config = cls._load(config_file)
-        config.src_dir = config_file.parent
+        dataset_path = registry_path / config.config_id / config.model.dataset_version
+        return cls.load(config, dimension_manager, dataset_path)
+
+    @classmethod
+    def load_from_user_path(cls, config_file, dimension_manager, dataset_path):
+        config = cls._load(config_file)
+        schema_type = config.model.data_schema_type
+        if not dataset_path.exists():
+            raise DSGInvalidParameter(f"Dataset {dataset_path} does not exist")
+        if schema_type == DataSchemaType.STANDARD:
+            check_load_data_filename(dataset_path)
+            check_load_data_lookup_filename(dataset_path)
+        elif schema_type == DataSchemaType.ONE_TABLE:
+            check_load_data_filename(dataset_path)
+        else:
+            raise DSGInvalidParameter(f"data_schema_type={schema_type} not supported.")
+
+        return cls.load(config, dimension_manager, dataset_path)
+
+    @classmethod
+    def load(cls, config, dimension_manager, dataset_path):
+        config.dataset_path = dataset_path
         config.load_dimensions(dimension_manager)
         return config
 
     @property
-    def src_dir(self):
-        """Return the directory containing the config file. Data files inside the config file
-        are relative to this.
+    def dataset_path(self):
+        """Return the directory containing the dataset file(s)."""
+        return self._dataset_path
 
-        """
-        return self._src_dir
-
-    @src_dir.setter
-    def src_dir(self, src_dir):
-        """Set the source directory. Must be the directory containing the config file."""
-        self._src_dir = Path(src_dir)
+    @dataset_path.setter
+    def dataset_path(self, dataset_path):
+        """Set the dataset path."""
+        self._dataset_path = Path(dataset_path)
 
     @property
     def load_data_path(self):
-        return check_load_data_filename(self._src_dir / self.model.path)
+        return check_load_data_filename(self._dataset_path)
 
     @property
     def load_data_lookup_path(self):
-        return check_load_data_lookup_filename(self._src_dir / self.model.path)
+        return check_load_data_lookup_filename(self._dataset_path)
 
     def load_dimensions(self, dimension_manager):
         """Load all dataset dimensions.

@@ -15,7 +15,6 @@ from dsgrid.tests.common import (
     replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )
-from dsgrid.tests.make_us_data_registry import replace_dataset_path
 
 
 def test_register_project_and_dataset(make_test_project_dir):
@@ -53,14 +52,14 @@ def test_register_project_and_dataset(make_test_project_dir):
         project_id = load_data(project_config)["project_id"]
         dataset_config = make_test_project_dir / dataset_dir / "dataset.toml"
         dataset_id = load_data(dataset_config)["dataset_id"]
-        replace_dataset_path(dataset_config, TEST_DATASET_DIRECTORY)
         replace_dimension_mapping_uuids_from_registry(
             path, (project_config, dimension_mapping_refs)
         )
         replace_dimension_uuids_from_registry(path, (project_config, dataset_config))
 
+        dataset_path = TEST_DATASET_DIRECTORY / dataset_id
         check_run_command(
-            f"dsgrid registry --path={path} --offline datasets register {dataset_config} -l log"
+            f"dsgrid registry --path={path} --offline datasets register {dataset_config} {dataset_path} -l log"
         )
         check_run_command(
             f"dsgrid registry --path={path} --offline projects register {project_config} -l log"

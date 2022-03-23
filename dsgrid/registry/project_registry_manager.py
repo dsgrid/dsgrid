@@ -36,6 +36,7 @@ from dsgrid.registry.common import (
 from dsgrid.utils.spark import create_dataframe_from_dimension_ids
 from dsgrid.utils.timing import track_timing, timer_stats_collector, Timer
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
+from dsgrid.utils.utilities import display_table
 from .common import VersionUpdateType
 from .project_update_checker import ProjectUpdateChecker
 from .dataset_registry_manager import DatasetRegistryManager
@@ -527,4 +528,4 @@ class ProjectRegistryManager(RegistryManagerBase):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
         table.align = "l"
-        print(table)
+        display_table(table)

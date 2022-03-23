@@ -17,6 +17,7 @@ from dsgrid.registry.common import make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import timer_stats_collector, Timer, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
+from dsgrid.utils.utilities import display_table
 from .dataset_registry import DatasetRegistry, DatasetRegistryModel
 from .registry_manager_base import RegistryManagerBase
 
@@ -282,4 +283,4 @@ class DatasetRegistryManager(RegistryManagerBase):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
         table.align = "l"
-        print(table)
+        display_table(table)

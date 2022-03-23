@@ -5,8 +5,9 @@ import logging
 import inspect
 import json
 import os
-
 from enum import Enum
+
+from prettytable import PrettyTable
 
 from dsgrid.exceptions import DSGJSONError
 
@@ -91,3 +92,41 @@ def check_uniqueness(iterable, tag):
 def list_enum_values(enum: Enum):
     """Returns list enum values."""
     return [e.value for e in enum]
+
+
+try:
+    from IPython.display import display, HTML
+    from IPython import get_ipython
+    from ipykernel.zmqshell import ZMQInteractiveShell
+
+    _IPYTHON_INSTALLED = True
+except ImportError:
+    _IPYTHON_INSTALLED = False
+
+
+def in_jupyter_notebook():
+    """Returns True if the current interpreter is running in a Jupyter notebook.
+
+    Returns
+    -------
+    bool
+
+    """
+    if not _IPYTHON_INSTALLED:
+        return False
+
+    return isinstance(get_ipython(), ZMQInteractiveShell)
+
+
+def display_table(table: PrettyTable):
+    """Displays a table in an ASCII or HTML format as determined by the current interpreter.
+
+    Parameters
+    ----------
+    table : PrettyTable
+
+    """
+    if in_jupyter_notebook():
+        display(HTML(table.get_html_string()))
+    else:
+        print(table)

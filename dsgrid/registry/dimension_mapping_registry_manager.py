@@ -29,6 +29,7 @@ from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.spark import models_to_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.utilities import display_table
 from dsgrid.config.dimension_mapping_base import DimensionMappingArchetype
 
 
@@ -475,4 +476,4 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
         table.align = "l"
-        print(table)
+        display_table(table)

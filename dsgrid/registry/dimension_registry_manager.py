@@ -34,6 +34,7 @@ from .registry_manager_base import RegistryManagerBase
 from .dimension_registry import DimensionRegistry, DimensionRegistryModel
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.utilities import display_table
 
 
 logger = logging.getLogger(__name__)
@@ -369,7 +370,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
         table.align = "l"
-        print(table)
+        display_table(table)
 
     def dump(self, config_id, directory, version=None, force=False):
         path = Path(directory)

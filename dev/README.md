@@ -194,6 +194,9 @@ Now you can run any `dsgrid registry` command.
 
 In addition to the CLI tools you can use `scripts/registry.py` to explore a registry interactively.
 
+One signficant advantage of this method is that you don't have to create a new Spark application on
+every command. That saves several seconds for each iteration.
+
 Be sure to use the `debug` function from the `devtools` package when exploring Pydantic models.
 ```
 ipython -i scripts/registry.py -- --path=$DSGRID_REGISTRY_PATH --offline
@@ -202,6 +205,23 @@ In [1]: manager.show()
 In [2]: dataset = dataset_manager.get_by_id("efs_comstock")
 
 In [3]: debug(dataset.model)
+```
+
+## Interactive Exploration in a Jupyter notebook
+
+It is advantageous to use a Jupyter notebook when you need to find dimension and dimension mapping IDs.
+The registry show commands will detect if the code is running in a notebook and display HTML tables.
+Wrapped text can be copied with the mouse. This is cumbersome in ASCII tables.
+
+Here is an example notebook (assuming you have already downloaded a registry to ./local-registry):
+```
+from IPython.core.display import display, HTML
+display(HTML("<style>.container { width:100% !important; }</style>"))
+
+from dsgrid.registry.registry_manager import RegistryManager
+
+mgr = RegistryManager.load("./local-registry", offline_mode=True)
+mgr.dimension_manager.show()
 ```
 
 ## Spark Standalone Cluster

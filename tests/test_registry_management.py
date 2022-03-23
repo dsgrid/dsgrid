@@ -31,7 +31,7 @@ from dsgrid.tests.common import (
     replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )
-from dsgrid.tests.make_us_data_registry import make_test_data_registry, replace_dataset_path
+from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
 def test_register_project_and_dataset(make_test_project_dir):
@@ -56,6 +56,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         dimension_mapping_id = dimension_mapping_ids[0]
         user = getpass.getuser()
         log_message = "initial registration"
+        dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
         project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.1.0"))
         assert project_config.model.status == ProjectRegistryStatus.COMPLETE
@@ -75,7 +76,7 @@ def test_register_project_and_dataset(make_test_project_dir):
             dataset_config_file = (
                 make_test_project_dir / "datasets/sector_models/comstock/dataset.toml"
             )
-            dataset_mgr.register(dataset_config_file, user, log_message)
+            dataset_mgr.register(dataset_config_file, dataset_path, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
             dim_config_file = make_test_project_dir / "dimensions.toml"

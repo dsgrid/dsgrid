@@ -45,7 +45,7 @@ Step 3: Register dataset
 ------------------------
 .. code-block:: bash
     
-    dsgrid registry datasets register {path-to-dataset.toml} -l "{log message}”
+    dsgrid registry datasets register {path-to-dataset.toml} {directory-containing-load-data} -l "{log message}”
 
 
 Step 4: Generate dimension mappings (to map dataset to project)

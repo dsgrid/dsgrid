@@ -115,9 +115,9 @@ def make_standard_scenarios_registry(
         dataset_path = Path(dataset_path)
         for dataset_id, ddir in zip(dataset_ids, dataset_dirs):
             dataset_config_file = src_dir / dataset_dir / ddir / "dataset.toml"
-            replace_dataset_path(dataset_config_file, dataset_path=dataset_path)
-
-            manager.dataset_manager.register(dataset_config_file, user, log_message)
+            manager.dataset_manager.register(
+                dataset_config_file, dataset_path / dataset_id, user, log_message
+            )
             manager.project_manager.submit_dataset(
                 project_id,
                 dataset_id,
@@ -126,14 +126,6 @@ def make_standard_scenarios_registry(
                 log_message,
             )
     return manager
-
-
-def replace_dataset_path(dataset_config_file, dataset_path):
-    config = load_data(dataset_config_file)
-    src_data = Path(dataset_path) / config["dataset_id"]
-    config["path"] = str(src_data)
-    dump_data(config, dataset_config_file)
-    logger.info("Replaced dataset path in %s with %s", dataset_config_file, src_data)
 
 
 @click.command()

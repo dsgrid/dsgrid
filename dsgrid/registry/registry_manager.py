@@ -200,7 +200,7 @@ class RegistryManager:
                 )
 
         params = RegistryManagerParams(
-            path, remote_path, fs_interface, cloud_interface, offline_mode, dry_run_mode
+            Path(path), remote_path, fs_interface, cloud_interface, offline_mode, dry_run_mode
         )
         path = Path(path)
         for dir_name in (

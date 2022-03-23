@@ -24,9 +24,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @classmethod
     def load(cls, config: DatasetConfig, *args, **kwargs):
-        path = Path(config.model.path)
-        load_data_df = read_dataframe(check_load_data_filename(path))
-        load_data_df = config.add_trivial_dimensions(load_data_df)
+        load_data_df = config.add_trivial_dimensions(read_dataframe(config.load_data_path))
         return cls(load_data_df, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)

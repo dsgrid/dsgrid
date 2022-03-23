@@ -401,9 +401,9 @@ class DatasetConfig(ConfigBase):
         return DatasetConfigModel
 
     @classmethod
-    def load_from_registry(cls, config_file, dimension_manager, registry_path):
+    def load_from_registry(cls, config_file, dimension_manager, registry_data_path):
         config = cls._load(config_file)
-        dataset_path = registry_path / config.config_id / config.model.dataset_version
+        dataset_path = registry_data_path / config.config_id / config.model.dataset_version
         return cls.load(config, dimension_manager, dataset_path)
 
     @classmethod

@@ -117,7 +117,8 @@ class DatasetRegistryManager(RegistryManagerBase):
             )
 
         config = DatasetConfig.load_from_user_path(config_file, self._dimension_mgr, dataset_path)
-        self._check_if_already_registered(config.model.dataset_id)
+        dataset_id = config.model.dataset_id
+        self._check_if_already_registered(dataset_id)
         self._run_checks(config)
         registration = make_initial_config_registration(submitter, log_message)
 
@@ -125,12 +126,12 @@ class DatasetRegistryManager(RegistryManagerBase):
             logger.info(
                 "%s Dataset registration validated for dataset_id=%s",
                 self._log_dry_run_mode_prefix(),
-                config.model.dataset_id,
+                dataset_id,
             )
             return
 
         registry_model = DatasetRegistryModel(
-            dataset_id=config.model.dataset_id,
+            dataset_id=dataset_id,
             version=registration.version,
             description=config.model.description,
             registration_history=[registration],
@@ -138,7 +139,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         registry_config = DatasetRegistry(registry_model)
         # The dataset_version starts the same as the config but can change later.
         config.model.dataset_version = registration.version
-        registry_dir = self.get_registry_directory(config.model.dataset_id)
+        registry_dir = self.get_registry_directory(dataset_id)
         registry_config_path = registry_dir / str(registration.version)
 
         dataset_registry_dir = self.get_registry_data_directory(config.config_id)
@@ -154,7 +155,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         registry_config.serialize(registry_filename, force=True)
         config.serialize(self.get_config_directory(config.config_id, registry_config.version))
 
-        self._update_registry_cache(config.model.dataset_id, registry_config)
+        self._update_registry_cache(dataset_id, registry_config)
 
         if not self.offline_mode:
             self.sync_push(registry_dir)
@@ -163,7 +164,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         logger.info(
             "%s Registered dataset %s with version=%s",
             self._log_offline_mode_prefix(),
-            config.model.dataset_id,
+            dataset_id,
             registration.version,
         )
 
@@ -180,7 +181,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     def update(self, config, update_type, log_message, submitter=None):
         if submitter is None:
             submitter = getpass.getuser()
-        lock_file_path = self.get_registry_lock_file(config.config_id)
+        lock_file_path = self.get_registry_lock_file(config.model.dataset_id)
         with self.cloud_interface.make_lock_file(lock_file_path):
             # Note that projects will not pick up these changes until submit-dataset
             # is called again.
@@ -188,17 +189,17 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _update(self, config, submitter, update_type, log_message):
         self._run_checks(config)
-        config_id = config.config_id
-        registry = self.get_registry_config(config_id)
-        old_key = ConfigKey(config_id, registry.version)
+        dataset_id = config.model.dataset_id
+        registry = self.get_registry_config(dataset_id)
+        old_key = ConfigKey(dataset_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)
-        new_key = ConfigKey(config_id, version)
+        new_key = ConfigKey(dataset_id, version)
         self._datasets.pop(old_key, None)
         self._datasets[new_key] = config
 
         if not self.offline_mode:
-            self.sync_push(self.get_registry_directory(config_id))
-            self.sync_push(self.get_registry_data_directory(config_id))
+            self.sync_push(self.get_registry_directory(dataset_id))
+            self.sync_push(self.get_registry_data_directory(dataset_id))
 
         return version
 

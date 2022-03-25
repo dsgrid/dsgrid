@@ -73,6 +73,11 @@ Data Tables
   a row with a null ``id`` for every combination of dimensions that does not exist in the
   load_data.
 
+  - The ``id`` column must be an integer.
+  - Dimension columns must be strings.
+  - Each dimension column name must match dsgrid dimension types (geography, sector, subsector, etc.).
+  - The values in each dimension column must match the dataset's dimension records.
+
 ::
 
     +---------+------+---------------+-------+
@@ -84,6 +89,8 @@ Data Tables
     |    53025|   com|FullServiceR...|      4|
     |    53045|   com|FullServiceR...|      5|
     +---------+---+------------------+-------+
+
+.. warning:: Registration will fail if dimension columns are not strings.
 
 - ``Trivial dimensions``: 1-element dimensions that are not present in the data files. Dsgrid
   dynamically adds them to ``load_data_lookup`` as an alias column. These dimensions must be

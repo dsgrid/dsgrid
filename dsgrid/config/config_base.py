@@ -33,11 +33,11 @@ class ConfigBase(abc.ABC):
 
         """
         # Subclasses can reimplement this method if they need more arguments.
-        return cls._load(config_file)
+        return cls._load(config_file, *args, **kwargs)
 
     @classmethod
-    def _load(cls, config_file):
-        model = cls.model_class().load(config_file)
+    def _load(cls, config_file, data=None):
+        model = cls.model_class().load(config_file, data=data)
         return cls(model)
 
     @staticmethod
@@ -133,8 +133,8 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
         return self._records_dataframe
 
     @classmethod
-    def load(cls, config_file):
-        config = super().load(config_file)
+    def load(cls, config_file, data=None):
+        config = super().load(config_file, data=data)
         config.src_dir = os.path.dirname(config_file)
         return config
 

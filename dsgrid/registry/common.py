@@ -1,17 +1,21 @@
 """Common definitions for registry components"""
 
 import itertools
+import logging
 import re
 import uuid
 from collections import namedtuple
 from datetime import datetime
-from enum import Enum
-from typing import Optional, Union
+from pathlib import Path
+from typing import Dict, List, Optional, Union
 
 from pydantic import Field
 from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel, DSGEnum
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidDimension, DSGInvalidParameter
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.versioning import make_version
 
 
@@ -22,6 +26,10 @@ REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
 REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE = re.compile(r"^[\w-]+$")
 # Allows letters, numbers, underscores
 REGEX_VALID_REGISTRY_CONFIG_ID_STRICT = re.compile(r"^[\w]+$")
+
+REGISTRY_ID_DELIMITER = "__"
+
+logger = logging.getLogger(__name__)
 
 
 def check_config_id_loose(config_id, tag):
@@ -136,7 +144,22 @@ def make_filename_from_version(handle, version):
     return f"{handle}-v{version}.toml"
 
 
-def make_registry_id(fields, delimiter="__"):
+def make_dimension_id(name: str):
+    """Return a dimension ID created from a dimension name.
+
+    Parameters
+    ----------
+    name : str
+
+    Returns
+    -------
+    str
+
+    """
+    return make_registry_id([name.lower().replace(" ", "_")])
+
+
+def make_registry_id(fields, delimiter=REGISTRY_ID_DELIMITER):
     """Make a unique ID by concatenating a list of fields with a UUID.
 
     Parameters
@@ -151,6 +174,79 @@ def make_registry_id(fields, delimiter="__"):
 
     """
     return delimiter.join(itertools.chain((str(x) for x in fields), [str(uuid.uuid4())]))
+
+
+@track_timing(timer_stats_collector)
+def auto_register_dimensions(
+    config_data_lists: List[Dict],
+    dimension_manager,
+    dimension_file: Path,
+    submitter: str,
+    log_message: str,
+    force: bool,
+    config_handler,
+):
+    """Registers dimensions in dimension_file and then updates config_data_lists with the
+    registered dimension IDs and versions.
+
+    Registration of dimensions is all or none. config_data may be partially updated
+    if an exception occurs.
+
+    Raises
+    ------
+    DSGInvalidDimension
+        Raised if a dimension is specified incorrectly.
+
+    """
+
+    def build_name_mapping(dimension_ids):
+        name_mapping = {}
+        for dim_id in dimension_ids:
+            dim = dimension_manager.get_by_id(dim_id)
+            label = (dim.model.name, dim.model.dimension_type.value)
+            if label in name_mapping:
+                raise DSGInvalidDimension(f"Duplicate {label} in dimensions file")
+            version = dimension_manager.get_current_version(dim_id)
+            name_mapping[label] = DimensionKey(dim.model.dimension_type, dim_id, version)
+        return name_mapping
+
+    def fix_dimension(dim, name_mapping):
+        if "dimension_id" in dim:
+            raise DSGInvalidDimension("dimension_id cannot be present with name")
+        name = dim.pop("name")
+        label = (name, dim["type"])
+        if label in name_mapping:
+            dim["dimension_id"] = name_mapping[label].id
+            dim["version"] = str(name_mapping[label].version)
+        else:
+            dim_type = DimensionType(dim["type"])
+            dim_configs = dimension_manager.list_by_name(name, dim_type)
+            length = len(dim_configs)
+            if length == 0:
+                raise DSGInvalidDimension(
+                    f"Did not find a dimension with type={dim_type} name={name}"
+                )
+            elif length > 1:
+                raise DSGInvalidDimension(
+                    f"Specifying dimensions by name is not supported when there are duplicates: type={dim_type} name={name}"
+                )
+            dim_config = dim_configs[0]
+            dim["dimension_id"] = dim_config.model.dimension_id
+            dim["version"] = dim.get(
+                "version",
+                str(dimension_manager.get_current_version(dim_config.model.dimension_id)),
+            )
+
+    dimension_manager.register(
+        dimension_file, submitter, log_message, force=force, config_handler=config_handler
+    )
+    dimension_ids = config_handler.get_ids(RegistryType.DIMENSION)
+    name_mapping = build_name_mapping(dimension_ids)
+    for dim in itertools.chain(*config_data_lists):
+        if "name" in dim:
+            fix_dimension(dim, name_mapping)
+
+    return name_mapping
 
 
 # def update_version(id_handle, update, registry_path):

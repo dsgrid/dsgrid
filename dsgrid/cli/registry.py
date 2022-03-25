@@ -400,16 +400,40 @@ def list_projects(registry_manager, filter):
 @click.command(name="register")
 @click.argument("project-config-file")
 @click.option(
+    "-d",
+    "--dimension-file",
+    help="File containing dimensions to register with the project",
+    callback=_path_callback,
+)
+@click.option(
+    "-m",
+    "--base-to-supplemental-dimension-mapping-file",
+    help="File containing base-to-supplemental dimension mappings to register with the project",
+    callback=_path_callback,
+)
+@click.option(
     "-l",
     "--log-message",
     required=True,
     help="reason for submission",
 )
 @click.pass_obj
-def register_project(registry_manager, project_config_file, log_message):
+def register_project(
+    registry_manager,
+    project_config_file,
+    dimension_file,
+    base_to_supplemental_dimension_mapping_file,
+    log_message,
+):
     """Register a new project with the dsgrid repository."""
     submitter = getpass.getuser()
-    registry_manager.project_manager.register(project_config_file, submitter, log_message)
+    registry_manager.project_manager.register(
+        project_config_file,
+        submitter,
+        log_message,
+        dimension_file=dimension_file,
+        base_to_supplemental_dimension_mapping_file=base_to_supplemental_dimension_mapping_file,
+    )
 
 
 @click.command()
@@ -428,12 +452,19 @@ def register_project(registry_manager, project_config_file, log_message):
     help="project identifier",
 )
 @click.option(
-    "-m",
-    "--dimension-mapping-files",
+    "-M",
+    "--dimension-mapping-file",
     type=click.Path(exists=True),
-    multiple=True,
     show_default=True,
-    help="dimension mapping file(s)",
+    help="dimension mapping file",
+    callback=_path_callback,
+)
+@click.option(
+    "-m",
+    "--dimension-mapping-reference-file",
+    type=click.Path(exists=True),
+    help="File containing dimension mappings to register with the dataset",
+    callback=_path_callback,
 )
 @click.option(
     "-l",
@@ -443,11 +474,93 @@ def register_project(registry_manager, project_config_file, log_message):
     help="reason for submission",
 )
 @click.pass_obj
-def submit_dataset(registry_manager, dataset_id, project_id, dimension_mapping_files, log_message):
+def submit_dataset(
+    registry_manager,
+    dataset_id,
+    project_id,
+    dimension_mapping_file,
+    dimension_mapping_reference_file,
+    log_message,
+):
     """Submit a dataset to a dsgrid project."""
     submitter = getpass.getuser()
     manager = registry_manager.project_manager
-    manager.submit_dataset(project_id, dataset_id, dimension_mapping_files, submitter, log_message)
+    manager.submit_dataset(
+        project_id,
+        dataset_id,
+        submitter,
+        log_message,
+        dimension_mapping_file,
+        dimension_mapping_reference_file,
+    )
+
+
+@click.command()
+@click.option(
+    "-c",
+    "--dataset-config-file",
+    required=True,
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="Dataset config file",
+)
+@click.option(
+    "-D",
+    "--dataset-path",
+    required=True,
+    type=click.Path(exists=True),
+    callback=_path_callback,
+)
+@click.option(
+    "-d",
+    "--dimension-file",
+    type=click.Path(exists=True),
+    help="File containing dimensions to register with the dataset",
+    callback=_path_callback,
+)
+@click.option(
+    "-M",
+    "--dimension-mapping-file",
+    type=click.Path(exists=True),
+    help="File containing dimension mappings to register with the dataset",
+    callback=_path_callback,
+)
+@click.option(
+    "-p",
+    "--project-id",
+    required=True,
+    type=str,
+    help="project identifier",
+)
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    type=str,
+    help="reason for submission",
+)
+@click.pass_obj
+def register_and_submit_dataset(
+    registry_manager,
+    dataset_config_file,
+    dataset_path,
+    dimension_file,
+    dimension_mapping_file,
+    project_id,
+    log_message,
+):
+    """Register a dataset and then submit it to a dsgrid project."""
+    submitter = getpass.getuser()
+    manager = registry_manager.project_manager
+    manager.register_and_submit_dataset(
+        dataset_config_file,
+        dataset_path,
+        project_id,
+        submitter,
+        log_message,
+        dimension_file=dimension_file,
+        dimension_mapping_file=dimension_mapping_file,
+    )
 
 
 @click.command(name="dump")
@@ -547,8 +660,14 @@ def list_datasets(registry_manager, filter):
 
 
 @click.command(name="register")
-@click.argument("dataset-config-file")
+@click.argument("dataset-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.argument("dataset-path", type=click.Path(exists=True), callback=_path_callback)
+@click.option(
+    "-d",
+    "--dimension-file",
+    help="File containing dimensions to register with the dataset",
+    callback=_path_callback,
+)
 @click.option(
     "-l",
     "--log-message",
@@ -556,11 +675,15 @@ def list_datasets(registry_manager, filter):
     help="reason for submission",
 )
 @click.pass_obj
-def register_dataset(registry_manager, dataset_config_file, dataset_path, log_message):
+def register_dataset(
+    registry_manager, dataset_config_file, dataset_path, dimension_file, log_message
+):
     """Register a new dataset with the dsgrid repository."""
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
-    manager.register(dataset_config_file, dataset_path, submitter, log_message)
+    manager.register(
+        dataset_config_file, dataset_path, submitter, log_message, dimension_file=dimension_file
+    )
 
 
 @click.command(name="dump")
@@ -668,6 +791,7 @@ dimension_mappings.add_command(update_dimension_mapping)
 projects.add_command(list_projects)
 projects.add_command(register_project)
 projects.add_command(submit_dataset)
+projects.add_command(register_and_submit_dataset)
 projects.add_command(dump_project)
 projects.add_command(update_project)
 

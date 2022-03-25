@@ -169,7 +169,6 @@ def run(registry_path, force, project_dir, dataset_path, verbose):
     # Use a path that will be accessible to all workers across compute nodes.
     tmp_project_dir = Path(".") / "tmp_project_dir"
     try:
-        assert not tmp_project_dir.exists()
         if tmp_project_dir.exists():
             shutil.rmtree(tmp_project_dir)
         shutil.copytree(project_dir, tmp_project_dir)

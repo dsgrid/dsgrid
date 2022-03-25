@@ -37,8 +37,6 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
         )
         dataset_dir = make_test_project_dir / "datasets" / "sector_models" / "comstock"
         assert dataset_dir.exists()
-        dimension_mapping_refs = dataset_dir / "dimension_mapping_references.toml"
-        assert dimension_mapping_refs.exists()
         dataset_config_file = dataset_dir / "dataset.toml"
         dataset_id = load_data(dataset_config_file)["dataset_id"]
 
@@ -71,7 +69,11 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
                 exc, match_msg = setup_test(test_dir)
                 with pytest.raises(exc, match=match_msg):
                     manager.dataset_manager.register(
-                        dataset_config_file, dataset_path, user, log_message
+                        dataset_config_file,
+                        dataset_path,
+                        user,
+                        log_message,
+                        dimension_file=dataset_dir / "dimensions.toml",
                     )
             finally:
                 if test_dir.exists():
@@ -88,15 +90,19 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
                 dataset_path = test_dir / dataset_id
                 exc, match_msg = setup_test(test_dir)
                 manager.dataset_manager.register(
-                    dataset_config_file, dataset_path, user, log_message
+                    dataset_config_file,
+                    dataset_path,
+                    user,
+                    log_message,
+                    dimension_file=dataset_dir / "dimensions.toml",
                 )
                 with pytest.raises(exc, match=match_msg):
                     manager.project_manager.submit_dataset(
                         PROJECT_ID,
                         DATASET_ID,
-                        dimension_mapping_files,
                         user,
                         log_message,
+                        dimension_mapping_file=dataset_dir / "dimension_mappings.toml",
                     )
             finally:
                 if test_dir.exists():

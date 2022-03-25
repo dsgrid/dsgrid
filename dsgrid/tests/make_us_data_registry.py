@@ -56,9 +56,8 @@ def make_test_data_registry(
     dataset_path = Path(dataset_path)
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
-    project_dimension_mapping_config = src_dir / "dimension_mappings.toml"
-    dimension_mapping_config = src_dir / dataset_dir / "dimension_mappings.toml"
-    dimension_mapping_refs = src_dir / dataset_dir / "dimension_mapping_references.toml"
+    project_dimension_config = src_dir / "dimensions.toml"
+    project_dimension_mapping_config = src_dir / "base_to_supplemental_dimension_mappings.toml"
 
     print("\n 1. register dimensions: \n")
     user = getpass.getuser()
@@ -70,53 +69,38 @@ def make_test_data_registry(
             path, remote_path=TEST_REMOTE_REGISTRY, offline_mode=offline_mode
         )
 
-    for dim_config_file in (
-        src_dir / "dimensions.toml",
-        src_dir / dataset_dir / "dimensions.toml",
-    ):
-        dim_mgr = manager.dimension_manager
-        dim_mgr.register(dim_config_file, user, log_message)
-    print("\n 2. register dimension mappings: \n")
-    # dsgrid-project-EFS shares project subsectors.
-    # dsgrid-test-data has custom subsectors that need to be mapped.
-    # This also applies to dimension_mapping_refs below.
-    needs_replacements = [project_dimension_mapping_config]
-    if dimension_mapping_config.exists():
-        needs_replacements.append(dimension_mapping_config)
-    replace_dimension_uuids_from_registry(path, needs_replacements)
-    dim_mapping_mgr = manager.dimension_mapping_manager
-    dim_mapping_mgr.register(project_dimension_mapping_config, user, log_message)
-    if dimension_mapping_config.exists():
-        dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
-
     project_config_file = src_dir / "project.toml"
     project_id = load_data(project_config_file)["project_id"]
     dataset_config_file = src_dir / dataset_dir / "dataset.toml"
+    dataset_dimension_file = src_dir / dataset_dir / "dimensions.toml"
+    dataset_mapping_file = src_dir / dataset_dir / "dimension_mappings.toml"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
-    needs_replacements = [project_config_file]
-    if dimension_mapping_refs.exists():
-        mapping_refs = [dimension_mapping_refs]
-        needs_replacements += mapping_refs
-    else:
-        mapping_refs = []
-    replace_dimension_mapping_uuids_from_registry(path, needs_replacements)
-    replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
 
     if include_projects:
-        print("\n 3. register project: \n")
-        manager.project_manager.register(project_config_file, user, log_message)
-    if include_datasets:
-        print("\n 4. register dataset: \n")
-        manager.dataset_manager.register(
-            dataset_config_file, dataset_path / dataset_id, user, log_message
+        print("\n 2. register project: \n")
+        manager.project_manager.register(
+            project_config_file,
+            user,
+            log_message,
+            dimension_file=project_dimension_config,
+            base_to_supplemental_dimension_mapping_file=project_dimension_mapping_config,
         )
-        print("\n 5. submit dataset to project\n")
+    if include_datasets:
+        print("\n 3. register dataset: \n")
+        manager.dataset_manager.register(
+            dataset_config_file,
+            dataset_path / dataset_id,
+            user,
+            log_message,
+            dimension_file=dataset_dimension_file,
+        )
+        print("\n 4. submit dataset to project\n")
         manager.project_manager.submit_dataset(
             project_id,
             dataset_id,
-            mapping_refs,
             user,
             log_message,
+            dimension_mapping_file=dataset_mapping_file,
         )
     return manager
 

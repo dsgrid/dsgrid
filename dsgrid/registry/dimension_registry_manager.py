@@ -2,6 +2,7 @@
 
 import getpass
 import logging
+from operator import ne
 import os
 from pathlib import Path
 from typing import Union, List, Dict
@@ -9,32 +10,29 @@ from typing import Union, List, Dict
 from prettytable import PrettyTable
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_config_factory import get_dimension_config, load_dimension_config
 from dsgrid.config.dimensions_config import DimensionsConfig
 from dsgrid.config.dimensions import (
     DimensionType,
-    DimensionBaseModel,
-    DimensionModel,
-    DateTimeDimensionModel,
     TimeDimensionBaseModel,
 )
-from .dimension_update_checker import DimensionUpdateChecker
 from dsgrid.data_models import serialize_model
 from dsgrid.exceptions import (
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
-    DSGInvalidParameter,
 )
 from dsgrid.registry.common import (
     DimensionKey,
     make_initial_config_registration,
 )
-from .registry_manager_base import RegistryManagerBase
-from .dimension_registry import DimensionRegistry, DimensionRegistryModel
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
+from .common import RegistryType
+from .config_registration_handler import ConfigRegistrationHandler
+from .dimension_update_checker import DimensionUpdateChecker
+from .dimension_registry import DimensionRegistry, DimensionRegistryModel
+from .registry_manager_base import RegistryManagerBase
 
 
 logger = logging.getLogger(__name__)
@@ -145,6 +143,19 @@ class DimensionRegistryManager(RegistryManagerBase):
                     f"There are {len(duplicates)} dimensions with duplicate content (data files)."
                 )
 
+    def finalize_registration(self, config_ids: List[str], error_occurred: bool):
+        if error_occurred:
+            logger.info("Remove all intermediate dimensions after error")
+            self.remove_dimensions(config_ids)
+
+        # TODO DT: add mechanism to verify that nothing has changed.
+        lock_file_path = self.get_registry_lock_file(None)
+        with self.cloud_interface.make_lock_file(lock_file_path):
+            if not self.offline_mode and not self.dry_run_mode:
+                # Sync the entire dimension registry path because it's probably cheaper
+                # than syncing each changed path individually.
+                self.sync_push(self._path)
+
     def get_by_id(self, config_id, version=None, force=False):
         self._check_if_not_registered(config_id)
         dimension_type = self._id_to_type[config_id]
@@ -176,6 +187,25 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_type = self._id_to_type[config_id]
         path = self._path / str(dimension_type) / config_id / str(version)
         return self.fs_interface.exists(path)
+
+    def list_by_name(self, name: str, dimension_type: DimensionType):
+        """Return a list of dimensions matching name and dimension_type.
+
+        Parameters
+        ----------
+        name : str
+        dimension_type DimensionType
+
+        Returns
+        -------
+        List[DimensionConfig]
+
+        """
+        return [
+            x
+            for x in self._dimensions.values()
+            if x.model.dimension_type == dimension_type and x.model.name == name
+        ]
 
     def list_types(self):
         """Return the dimension types present in the registry."""
@@ -221,12 +251,22 @@ class DimensionRegistryManager(RegistryManagerBase):
         return dimensions
 
     @track_timing(timer_stats_collector)
-    def register(self, config_file, submitter, log_message, force=False):
-        lock_file_path = self.get_registry_lock_file(None)
-        with self.cloud_interface.make_lock_file(lock_file_path):
-            self._register(config_file, submitter, log_message, force=force)
+    def register(self, config_file, submitter, log_message, force=False, config_handler=None):
+        error_occurred = False
+        need_to_finalize = config_handler is None
+        if config_handler is None:
+            config_handler = ConfigRegistrationHandler()
 
-    def _register(self, config_file, submitter, log_message, force=False):
+        try:
+            self._register(config_file, submitter, log_message, config_handler, force=force)
+        except Exception:
+            error_occurred = True
+            raise
+        finally:
+            if need_to_finalize:
+                config_handler.finalize_registration(error_occurred)
+
+    def _register(self, config_file, submitter, log_message, config_handler, force=False):
         config = DimensionsConfig.load(config_file)
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)
@@ -244,50 +284,59 @@ class DimensionRegistryManager(RegistryManagerBase):
                     dimension.dimension_type.value,
                     dimension.name,
                 )
-            return
+            return []
 
-        for dimension in config.model.dimensions:
-            registry_model = DimensionRegistryModel(
-                dimension_id=dimension.dimension_id,
-                version=registration.version,
-                description=dimension.description.strip(),
-                registration_history=[registration],
-            )
-            registry_config = DimensionRegistry(registry_model)
-            dst_dir = (
-                self._path
-                / dimension.dimension_type.value
-                / dimension.dimension_id
-                / str(registration.version)
-            )
-            self.fs_interface.mkdir(dst_dir)
+        dimension_ids = []
+        try:
+            # Guarantee that registration of dimensions is all or none.
+            for dimension in config.model.dimensions:
+                registry_model = DimensionRegistryModel(
+                    dimension_id=dimension.dimension_id,
+                    version=registration.version,
+                    description=dimension.description.strip(),
+                    registration_history=[registration],
+                )
+                registry_config = DimensionRegistry(registry_model)
+                dst_dir = (
+                    self._path
+                    / dimension.dimension_type.value
+                    / dimension.dimension_id
+                    / str(registration.version)
+                )
+                self.fs_interface.mkdir(dst_dir)
 
-            registry_file = Path(os.path.dirname(dst_dir)) / REGISTRY_FILENAME
-            registry_config.serialize(registry_file, force=True)
+                registry_file = Path(os.path.dirname(dst_dir)) / REGISTRY_FILENAME
+                registry_config.serialize(registry_file, force=force)
 
-            dimension_config = get_dimension_config(dimension, src_dir)
-            dimension_config.serialize(dst_dir)
-            self._id_to_type[dimension.dimension_id] = dimension.dimension_type
-            self._update_registry_cache(dimension.dimension_id, registry_config)
-            logger.info(
-                "%s Registered dimension id=%s type=%s version=%s name=%s",
-                self._log_offline_mode_prefix(),
-                dimension.dimension_id,
-                dimension.dimension_type.value,
-                registration.version,
-                dimension.name,
-            )
-
-        if not self.offline_mode:
-            # Sync the entire dimension registry path because it's probably cheaper
-            # than syncing each changed path individually.
-            self.sync_push(self._path)
+                dimension_config = get_dimension_config(dimension, src_dir)
+                dimension_config.serialize(dst_dir)
+                self._id_to_type[dimension.dimension_id] = dimension.dimension_type
+                self._update_registry_cache(dimension.dimension_id, registry_config)
+                logger.info(
+                    "%s Registered dimension id=%s type=%s version=%s name=%s",
+                    self._log_offline_mode_prefix(),
+                    dimension.dimension_id,
+                    dimension.dimension_type.value,
+                    registration.version,
+                    dimension.name,
+                )
+                dimension_ids.append(dimension.dimension_id)
+        except Exception:
+            if dimension_ids:
+                logger.warning(
+                    "Exception occured after partial completion of dimension registration."
+                )
+                for dimension_id in dimension_ids:
+                    self.remove(dimension_id)
+            raise
 
         logger.info(
             "Registered %s dimensions with version=%s",
             len(config.model.dimensions),
             registration.version,
         )
+
+        config_handler.add_ids(RegistryType.DIMENSION, dimension_ids, self)
 
     def get_registry_directory(self, config_id):
         dimension_type = self._id_to_type[config_id]
@@ -418,6 +467,23 @@ class DimensionRegistryManager(RegistryManagerBase):
             self.sync_push(self._path)
 
         return version
+
+    def remove_dimensions(self, dimension_ids: List[str]):
+        """Remove multiple dimensions. Use this instead of calling remove if changes need to
+        be synced to the remote registry.
+
+        Parameters
+        ----------
+        dimension_ids : List[str]
+
+        """
+        lock_file_path = self.get_registry_lock_file(None)
+        with self.cloud_interface.make_lock_file(lock_file_path):
+            for dimension_id in dimension_ids:
+                self.remove(dimension_id)
+
+            if not self.offline_mode:
+                self.sync_push(self._path)
 
     def remove(self, config_id):
         self._remove(config_id)

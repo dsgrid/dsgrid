@@ -1,5 +1,6 @@
 import getpass
 import os
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory, gettempdir
 
@@ -93,8 +94,10 @@ def test_register_project_and_dataset(make_test_project_dir):
             dimension_mgr.register(new_file, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
-            dset_dir = Path("datasets/sector_models/comstock")
-            dimension_mapping_config = make_test_project_dir / dset_dir / "dimension_mappings.toml"
+            dimension_mapping_mgr.dump(dimension_mapping_id, base_dir)
+            dimension_mapping_config = base_dir / "dimension_mapping.toml"
+            data = load_data(dimension_mapping_config)
+            dump_data({"mappings": [data]}, dimension_mapping_config)
             dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
 
         check_configs_update(base_dir, manager)
@@ -106,6 +109,114 @@ def test_register_project_and_dataset(make_test_project_dir):
         check_config_remove(dataset_mgr, dataset_id)
         check_config_remove(dimension_mgr, dimension_id)
         check_config_remove(dimension_mapping_mgr, dimension_mapping_id)
+
+
+def test_register_and_submit_rollback_on_failure(make_test_project_dir):
+    src_dir = make_test_project_dir
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        path = create_local_test_registry(base_dir)
+        manager = RegistryManager.load(path, offline_mode=True)
+        project_file = src_dir / "project.toml"
+        project_id = load_data(project_file)["project_id"]
+        project_dimension_file = src_dir / "dimensions.toml"
+        project_mappings_file = src_dir / "base_to_supplemental_dimension_mappings.toml"
+        dataset_dir = src_dir / "datasets" / "sector_models" / "comstock"
+        dataset_config_file = dataset_dir / "dataset.toml"
+        dataset_dimension_file = dataset_dir / "dimensions.toml"
+        dataset_mapping_file = dataset_dir / "dimension_mappings.toml"
+        dataset_path = (
+            Path(os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY))
+            / "test_efs_comstock"
+        )
+        subsectors_file = (
+            dataset_dir
+            / "dimension_mappings"
+            / "lookup_comstock_subsectors_to_project_subsectors.csv"
+        )
+        # Remove some records.
+        data = subsectors_file.read_text().splitlines()[:-2]
+        subsectors_file.write_text("\n".join(data))
+
+        manager.project_manager.register(
+            project_file,
+            getpass.getuser(),
+            "dry run register project",
+            dimension_file=project_dimension_file,
+            base_to_supplemental_dimension_mapping_file=project_mappings_file,
+        )
+
+        orig_dimension_ids = manager.dimension_manager.list_ids()
+        orig_mapping_ids = manager.dimension_mapping_manager.list_ids()
+
+        with pytest.raises(DSGInvalidDataset):
+            manager.project_manager.register_and_submit_dataset(
+                dataset_config_file,
+                dataset_path,
+                project_id,
+                getpass.getuser(),
+                "register dataset and submit",
+                dimension_file=dataset_dimension_file,
+                dimension_mapping_file=dataset_mapping_file,
+            )
+
+        assert manager.dimension_manager.list_ids() == orig_dimension_ids
+        assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids
+
+
+# def test_register_project_dry_run_rollback_dimensions(make_test_project_dir):
+#     src_dir = make_test_project_dir
+#     with TemporaryDirectory() as tmpdir:
+#         base_dir = Path(tmpdir)
+#         path = create_local_test_registry(base_dir)
+#         manager = RegistryManager.load(path, offline_mode=True, dry_run_mode=True)
+#         project_file = src_dir / "project.toml"
+#         dimension_file = src_dir / "dimensions.toml"
+#         mappings_file = src_dir / "base_to_supplemental_dimension_mappings.toml"
+
+#         manager.project_manager.register(
+#             project_file,
+#             getpass.getuser(),
+#             "dry run register project",
+#             dimension_file=dimension_file,
+#             base_to_supplemental_dimension_mapping_file=mappings_file,
+#         )
+
+#         # Dimensions and mappings should have been registered and then cleared.
+#         assert not manager.dimension_manager.list_ids()
+#         assert not manager.dimension_mapping_manager.list_ids()
+#         assert not manager.project_manager.list_ids()
+
+
+def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):
+    src_dir = make_test_project_dir
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        manager = make_test_data_registry(
+            base_dir, src_dir, include_projects=False, include_datasets=False
+        )
+        project_file = src_dir / "project.toml"
+        dimension_file = src_dir / "dimensions.toml"
+        mappings_file = src_dir / "base_to_supplemental_dimension_mappings.toml"
+        orig_dimension_ids = manager.dimension_manager.list_ids()
+
+        data = load_data(project_file)
+        # Inject an invalid project ID so that we can test rollback of dimensions.
+        data["project_id"] = "project-with-dashes"
+        dump_data(data, project_file)
+
+        with pytest.raises(ValueError):
+            manager.project_manager.register(
+                project_file,
+                getpass.getuser(),
+                "register duplicate project",
+                dimension_file=dimension_file,
+                base_to_supplemental_dimension_mapping_file=mappings_file,
+            )
+
+        # Dimensions and mappings should have been registered and then cleared.
+        assert manager.dimension_manager.list_ids() == orig_dimension_ids
+        assert not manager.dimension_mapping_manager.list_ids()
 
 
 def test_auto_updates(make_test_project_dir):
@@ -191,7 +302,7 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         dim_mgr = manager.dimension_manager
         dim_mgr.register(make_test_project_dir / "dimensions.toml", user, log_message)
         dim_mapping_mgr = manager.dimension_mapping_manager
-        dimension_mapping_file = make_test_project_dir / "dimension_mappings.toml"
+        dimension_mapping_file = make_test_project_dir / "dimension_mappings_with_ids.toml"
         replace_dimension_uuids_from_registry(path, [dimension_mapping_file])
 
         record_file = (

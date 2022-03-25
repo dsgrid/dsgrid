@@ -283,8 +283,8 @@ class ProjectConfig(ConfigWithDataFilesBase):
         return ["dimension_associations"]
 
     @classmethod
-    def load(cls, config_file, dimension_manager, dimension_mapping_manager):
-        config = super().load(config_file)
+    def load(cls, config_file, dimension_manager, dimension_mapping_manager, data=None):
+        config = super().load(config_file, data=data)
         config.src_dir = os.path.dirname(config_file)
         config.dimension_mapping_manager = dimension_mapping_manager
         config.dimension_manager = dimension_manager

@@ -13,7 +13,7 @@ from .dimensions import (
     handle_dimension_union,
 )
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.registry.common import make_registry_id, check_config_id_loose
+from dsgrid.registry.common import make_dimension_id, check_config_id_loose
 from dsgrid.utils.utilities import check_uniqueness
 
 logger = logging.getLogger(__name__)
@@ -85,6 +85,6 @@ class DimensionsConfig(ConfigBase):
         logger.info("Dimension record ID assignment:")
         for dim in self.model.dimensions:
             # assign id, made from dimension.name and a UUID
-            dimension_id = make_registry_id([dim.name.lower().replace(" ", "_")])
+            dimension_id = make_dimension_id(dim.name)
             check_config_id_loose(dimension_id, "Dimension")
             dim.dimension_id = dimension_id

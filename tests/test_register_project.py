@@ -34,7 +34,10 @@ def test_invalid_projects(make_test_project_dir):
                 project_config_file = test_dir / "project.toml"
                 exc, match_msg = setup_test(test_dir)
                 with pytest.raises(exc, match=match_msg):
-                    manager.project_manager.register(project_config_file, user, log_message)
+                    dimension_file = make_test_project_dir / "dimensions.toml"
+                    manager.project_manager.register(
+                        project_config_file, user, log_message, dimension_file=dimension_file
+                    )
             finally:
                 if test_dir.exists():
                     shutil.rmtree(test_dir)

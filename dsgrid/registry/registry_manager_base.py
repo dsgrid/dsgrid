@@ -5,6 +5,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
+from typing import List
 
 from dsgrid import timer_stats_collector
 from .common import RegistryManagerParams, ConfigRegistrationModel, VersionUpdateType
@@ -113,7 +114,7 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def register(self, config_file, submitter, log_message, force=False):
+    def register(self, config_file, submitter, log_message, force=False, config_handler=None):
         """Registers a config file in the registry.
 
         Parameters
@@ -125,6 +126,8 @@ class RegistryManagerBase(abc.ABC):
         log_message : str
         force : bool
             If true, register even if an ID is duplicate.
+        config_handler : None or ConfigRegistrationHandler
+            If not None, assign the config IDs that get registered.
 
         Raises
         ------
@@ -135,11 +138,11 @@ class RegistryManagerBase(abc.ABC):
 
         """
         if self.offline_mode or self.dry_run_mode:
-            self._register(config_file, submitter, log_message, force=force)
-        else:
-            lock_file_path = self.get_registry_lock_file(load_data(config_file)["project_id"])
-            with self.cloud_interface.make_lock_file(lock_file_path):
-                self._register(config_file, submitter, log_message, force=force)
+            return self._register(config_file, submitter, log_message, force=force)
+
+        lock_file_path = self.get_registry_lock_file(load_data(config_file)["project_id"])
+        with self.cloud_interface.make_lock_file(lock_file_path):
+            return self._register(config_file, submitter, log_message, force=force)
 
     @staticmethod
     @abc.abstractmethod
@@ -295,6 +298,19 @@ class RegistryManagerBase(abc.ABC):
             version,
             filename,
         )
+
+    @abc.abstractmethod
+    def finalize_registration(self, config_ids: List[str], error_occurred: bool):
+        """Peform final actions after a registration process.
+
+        Parameters
+        ----------
+        config_ids : List[str]
+            Config IDs that were registered
+        error_occurred : bool
+            Set to True if an error occurred and all registered IDs should be removed.
+
+        """
 
     @property
     def fs_interface(self):
@@ -518,6 +534,12 @@ class RegistryManagerBase(abc.ABC):
         remote_path = self.relative_remote_path(path)
         lock_file_path = self.get_registry_lock_file(path.name)
         self.cloud_interface.check_lock_file(lock_file_path)
-        self.cloud_interface.sync_push(
-            remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
-        )
+        try:
+            self.cloud_interface.sync_push(
+                remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
+            )
+        except Exception:
+            logger.exception(
+                "Please report this error to the dsgrid team. The registry may need recovery."
+            )
+            raise

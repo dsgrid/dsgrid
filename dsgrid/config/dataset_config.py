@@ -407,8 +407,8 @@ class DatasetConfig(ConfigBase):
         return cls.load(config, dimension_manager, dataset_path)
 
     @classmethod
-    def load_from_user_path(cls, config_file, dimension_manager, dataset_path):
-        config = cls._load(config_file)
+    def load_from_user_path(cls, config_file, dimension_manager, dataset_path, data=None):
+        config = cls._load(config_file, data=data)
         schema_type = config.model.data_schema_type
         if not dataset_path.exists():
             raise DSGInvalidParameter(f"Dataset {dataset_path} does not exist")

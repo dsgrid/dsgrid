@@ -38,4 +38,5 @@ def test_trivial_dimension_bad(make_test_project_dir, make_test_data_dir):
                 dataset_path=dataset_path,
                 submitter="test",
                 log_message="test",
+                dimension_file=dataset_dir / "dimensions.toml",
             )

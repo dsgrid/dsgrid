@@ -159,9 +159,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         force: bool,
     ):
         """Registers dimension mappings in mapping_file and then updates
-        project_config_data with the registered dimension mapping IDs and versions.
+        mappings with the registered dimension mapping IDs and versions.
 
-        Registration of dimension mappingss is all or none. project_config_data may be partially
+        Registration of dimension mappingss is all or none. mappings may be partially
         updated if an exception occurs.
 
         Raises

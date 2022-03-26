@@ -164,30 +164,6 @@ def test_register_and_submit_rollback_on_failure(make_test_project_dir):
         assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids
 
 
-# def test_register_project_dry_run_rollback_dimensions(make_test_project_dir):
-#     src_dir = make_test_project_dir
-#     with TemporaryDirectory() as tmpdir:
-#         base_dir = Path(tmpdir)
-#         path = create_local_test_registry(base_dir)
-#         manager = RegistryManager.load(path, offline_mode=True, dry_run_mode=True)
-#         project_file = src_dir / "project.toml"
-#         dimension_file = src_dir / "dimensions.toml"
-#         mappings_file = src_dir / "base_to_supplemental_dimension_mappings.toml"
-
-#         manager.project_manager.register(
-#             project_file,
-#             getpass.getuser(),
-#             "dry run register project",
-#             dimension_file=dimension_file,
-#             base_to_supplemental_dimension_mapping_file=mappings_file,
-#         )
-
-#         # Dimensions and mappings should have been registered and then cleared.
-#         assert not manager.dimension_manager.list_ids()
-#         assert not manager.dimension_mapping_manager.list_ids()
-#         assert not manager.project_manager.list_ids()
-
-
 def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):
     src_dir = make_test_project_dir
     with TemporaryDirectory() as tmpdir:

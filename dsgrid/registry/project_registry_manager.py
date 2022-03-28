@@ -114,6 +114,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         if error_occurred:
             logger.info("Remove intermediate project after error")
             self.remove(project_id)
+            return
 
         # TODO DT: add mechanism to verify that nothing has changed.
         lock_file_path = self.get_registry_lock_file(project_id)

@@ -230,6 +230,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         if error_occurred:
             logger.info("Remove all intermediate dimension mappings after error")
             self.remove_dimension_mappings(config_ids)
+            return
 
         # TODO DT: add mechanism to verify that nothing has changed.
         lock_file_path = self.get_registry_lock_file(None)

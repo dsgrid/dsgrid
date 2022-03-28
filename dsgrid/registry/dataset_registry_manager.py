@@ -89,6 +89,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         if error_occurred:
             logger.info("Remove intermediate dataset after error")
             self.remove(dataset_id)
+            return
 
         # TODO DT: add mechanism to verify that nothing has changed.
         lock_file_path = self.get_registry_lock_file(dataset_id)

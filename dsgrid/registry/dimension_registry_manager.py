@@ -147,6 +147,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         if error_occurred:
             logger.info("Remove all intermediate dimensions after error")
             self.remove_dimensions(config_ids)
+            return
 
         # TODO DT: add mechanism to verify that nothing has changed.
         lock_file_path = self.get_registry_lock_file(None)

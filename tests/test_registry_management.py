@@ -11,10 +11,7 @@ from semver import VersionInfo
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
-    DSGInvalidDimension,
     DSGInvalidDimensionMapping,
-    DSGInvalidParameter,
-    DSGInvalidOperation,
     DSGValueNotRegistered,
 )
 from dsgrid.registry.common import DatasetRegistryStatus, ProjectRegistryStatus, VersionUpdateType
@@ -162,6 +159,8 @@ def test_register_and_submit_rollback_on_failure(make_test_project_dir):
 
         assert manager.dimension_manager.list_ids() == orig_dimension_ids
         assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids
+        assert not manager.dataset_manager.list_ids()
+        assert manager.project_manager.list_ids() == [project_id]
 
 
 def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):

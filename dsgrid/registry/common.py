@@ -184,7 +184,7 @@ def auto_register_dimensions(
     submitter: str,
     log_message: str,
     force: bool,
-    config_handler,
+    context,
 ):
     """Registers dimensions in dimension_file and then updates config_data_lists with the
     registered dimension IDs and versions.
@@ -238,9 +238,9 @@ def auto_register_dimensions(
             )
 
     dimension_manager.register(
-        dimension_file, submitter, log_message, force=force, config_handler=config_handler
+        dimension_file, submitter, log_message, force=force, context=context
     )
-    dimension_ids = config_handler.get_ids(RegistryType.DIMENSION)
+    dimension_ids = context.get_ids(RegistryType.DIMENSION)
     name_mapping = build_name_mapping(dimension_ids)
     for dim in itertools.chain(*config_data_lists):
         if "name" in dim:

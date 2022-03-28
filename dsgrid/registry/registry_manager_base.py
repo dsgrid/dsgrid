@@ -114,7 +114,7 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def register(self, config_file, submitter, log_message, force=False, config_handler=None):
+    def register(self, config_file, submitter, log_message, force=False, context=None):
         """Registers a config file in the registry.
 
         Parameters
@@ -126,7 +126,7 @@ class RegistryManagerBase(abc.ABC):
         log_message : str
         force : bool
             If true, register even if an ID is duplicate.
-        config_handler : None or ConfigRegistrationHandler
+        context : None or RegistrationContext
             If not None, assign the config IDs that get registered.
 
         Raises
@@ -302,7 +302,8 @@ class RegistryManagerBase(abc.ABC):
         config_ids : List[str]
             Config IDs that were registered
         error_occurred : bool
-            Set to True if an error occurred and all registered IDs should be removed.
+            Set to True if an error occurred and all intermediately-registered IDs should be
+            removed.
 
         """
 

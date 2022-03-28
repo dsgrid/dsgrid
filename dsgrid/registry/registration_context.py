@@ -8,10 +8,8 @@ from .common import RegistryType
 logger = logging.getLogger(__name__)
 
 
-class ConfigRegistrationHandler:
-    """Handles required actions for config IDs that get registered inside a multi-config
-    registration process.
-    """
+class RegistrationContext:
+    """Maintains state information across a multi-config registration process."""
 
     def __init__(self):
         self._ids = {
@@ -28,7 +26,7 @@ class ConfigRegistrationHandler:
         }
 
     def add_id(self, config_type: RegistryType, config_id: str, manager):
-        """Add a config ID to the handler.
+        """Add a config ID that has been registered.
 
         Parameters
         ----------
@@ -44,7 +42,7 @@ class ConfigRegistrationHandler:
         self.add_ids(config_type, [config_id], manager)
 
     def add_ids(self, config_type: RegistryType, config_ids: List[str], manager):
-        """Add multiple config IDs to the tracker.
+        """Add multiple config IDs that have been registered.
 
         Parameters
         ----------
@@ -71,7 +69,7 @@ class ConfigRegistrationHandler:
         config_list += config_ids
 
     def get_ids(self, config_type: RegistryType):
-        """Return the config IDs for config_type
+        """Return the config IDs for config_type that have been registered with this context.
 
         Parameters
         ----------
@@ -84,8 +82,17 @@ class ConfigRegistrationHandler:
         """
         return self._ids[config_type]
 
-    def finalize_registration(self, error_occurred):
-        """Remove all configs that have been registered."""
+    def finalize(self, error_occurred):
+        """Perform final registration actions. If successful, sync all newly-registered configs
+        and data with the remote registry. If there was an error, remove all intermediate
+        registrations.
+
+        Parameters
+        ----------
+        error_occurred : bool
+            Set to True if there was a registration error. Remove all intermediate registrations.
+
+        """
         try:
             mapping_ids = self._ids[RegistryType.DIMENSION_MAPPING]
             if mapping_ids:

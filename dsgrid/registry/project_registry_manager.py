@@ -44,7 +44,7 @@ from .common import (
     auto_register_dimensions,
     RegistryType,
 )
-from .config_registration_handler import ConfigRegistrationHandler
+from .registration_context import RegistrationContext
 from .project_update_checker import ProjectUpdateChecker
 from .dataset_registry_manager import DatasetRegistryManager
 from .dimension_registry_manager import DimensionRegistryManager
@@ -153,7 +153,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         mappings: List,
         mapping_file: Path,
         dimension_name_mapping: Dict,
-        config_handler: ConfigRegistrationHandler,
+        context: RegistrationContext,
         submitter: str,
         log_message: str,
         force: bool,
@@ -197,7 +197,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 submitter,
                 log_message,
                 force=force,
-                config_handler=config_handler,
+                context=context,
             )
         finally:
             tmp_mapping_file.unlink()
@@ -205,7 +205,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         # Note: Ensure that we don't raise exceptions in the rest of this method.
         # Otherwise, we would need to remove the registered dimension mappings.
 
-        for mapping_id in config_handler.get_ids(RegistryType.DIMENSION_MAPPING):
+        for mapping_id in context.get_ids(RegistryType.DIMENSION_MAPPING):
             mapping = self._dimension_mapping_mgr.get_by_id(mapping_id)
             mappings.append(
                 DimensionMappingReferenceModel(
@@ -225,12 +225,12 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimension_file=None,
         base_to_supplemental_dimension_mapping_file=None,
         force=False,
-        config_handler=None,
+        context=None,
     ):
         error_occurred = False
-        need_to_finalize = config_handler is None
-        if config_handler is None:
-            config_handler = ConfigRegistrationHandler()
+        need_to_finalize = context is None
+        if context is None:
+            context = RegistrationContext()
 
         config_data = load_data(config_file)
         try:
@@ -239,7 +239,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 config_data,
                 submitter,
                 log_message,
-                config_handler,
+                context,
                 dimension_file=dimension_file,
                 base_to_supplemental_dimension_mapping_file=base_to_supplemental_dimension_mapping_file,
                 force=force,
@@ -249,7 +249,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             raise
         finally:
             if need_to_finalize:
-                config_handler.finalize_registration(error_occurred)
+                context.finalize(error_occurred)
 
     @track_timing(timer_stats_collector)
     def _register_project_and_dimensions(
@@ -258,7 +258,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         config_data: Dict,
         submitter: str,
         log_message: str,
-        config_handler: ConfigRegistrationHandler,
+        context: RegistrationContext,
         dimension_file=None,
         base_to_supplemental_dimension_mapping_file=None,
         force=False,
@@ -280,7 +280,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 submitter,
                 log_message,
                 force,
-                config_handler,
+                context,
             )
         if base_to_supplemental_dimension_mapping_file is not None:
             if "dimension_mappings" not in config_data:
@@ -291,7 +291,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 config_data["dimension_mappings"]["base_to_supplemental"],
                 base_to_supplemental_dimension_mapping_file,
                 dimension_name_mapping,
-                config_handler,
+                context,
                 submitter,
                 log_message,
                 force,
@@ -301,7 +301,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             config_file, self._dimension_mgr, self._dimension_mapping_mgr, data=config_data
         )
         self._register(config, submitter, log_message, force)
-        config_handler.add_id(RegistryType.PROJECT, config.model.project_id, self)
+        context.add_id(RegistryType.PROJECT, config.model.project_id, self)
 
     @track_timing(timer_stats_collector)
     def _register(self, config, submitter, log_message, force):
@@ -369,7 +369,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimension_file=None,
         dimension_mapping_file=None,
     ):
-        config_handler = ConfigRegistrationHandler()
+        context = RegistrationContext()
         error_occurred = False
         try:
             self._dataset_mgr.register(
@@ -378,21 +378,21 @@ class ProjectRegistryManager(RegistryManagerBase):
                 submitter,
                 log_message,
                 dimension_file=dimension_file,
-                config_handler=config_handler,
+                context=context,
             )
             self.submit_dataset(
                 project_id,
-                config_handler.get_ids(RegistryType.DATASET)[0],
+                context.get_ids(RegistryType.DATASET)[0],
                 submitter,
                 log_message,
                 dimension_mapping_file=dimension_mapping_file,
-                config_handler=config_handler,
+                context=context,
             )
         except Exception:
             error_occurred = True
             raise
         finally:
-            config_handler.finalize_registration(error_occurred)
+            context.finalize(error_occurred)
 
     @track_timing(timer_stats_collector)
     def submit_dataset(
@@ -403,7 +403,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         log_message,
         dimension_mapping_file=None,
         dimension_mapping_reference_file=None,
-        config_handler=None,
+        context=None,
     ):
         """Registers a dataset with a project. This can only be performed on the
         latest version of the project.
@@ -419,7 +419,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         submitter : str
             Submitter name
         log_message : str
-        config_handler : None or ConfigRegistrationHandler
+        context : None or RegistrationContext
 
         Raises
         ------
@@ -431,10 +431,10 @@ class ProjectRegistryManager(RegistryManagerBase):
             Raised if the project does not contain this dataset.
 
         """
-        need_to_finalize = config_handler is None
+        need_to_finalize = context is None
         error_occurred = False
-        if config_handler is None:
-            config_handler = ConfigRegistrationHandler()
+        if context is None:
+            context = RegistrationContext()
 
         config = self.get_by_id(project_id)
         try:
@@ -445,14 +445,14 @@ class ProjectRegistryManager(RegistryManagerBase):
                 log_message,
                 dimension_mapping_file,
                 dimension_mapping_reference_file,
-                config_handler,
+                context,
             )
         except Exception:
             error_occurred = True
             raise
         finally:
             if need_to_finalize:
-                config_handler.finalize_registration(error_occurred)
+                context.finalize(error_occurred)
 
     def _submit_dataset_and_register_mappings(
         self,
@@ -462,7 +462,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         log_message,
         dimension_mapping_file,
         dimension_mapping_reference_file,  # TODO DT: probably don't need this
-        config_handler,
+        context,
     ):
         logger.info("Submit dataset=%s to project=%s.", dataset_id, project_config.config_id)
         self._check_if_not_registered(project_config.config_id)
@@ -486,7 +486,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 mapping_references,
                 dimension_mapping_file,
                 dimension_name_mapping,
-                config_handler,
+                context,
                 submitter,
                 log_message,
                 False,

@@ -24,7 +24,7 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
 from dsgrid.config.dimension_mapping_base import DimensionMappingArchetype
 from .common import ConfigKey, make_initial_config_registration, ConfigKey, RegistryType
-from .config_registration_handler import ConfigRegistrationHandler
+from .registration_context import RegistrationContext
 from .dimension_mapping_registry import DimensionMappingRegistry, DimensionMappingRegistryModel
 from .dimension_mapping_update_checker import DimensionMappingUpdateChecker
 from .dimension_registry_manager import DimensionRegistryManager
@@ -284,22 +284,22 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         return mappings
 
     @track_timing(timer_stats_collector)
-    def register(self, config_file, submitter, log_message, force=False, config_handler=None):
+    def register(self, config_file, submitter, log_message, force=False, context=None):
         error_occurred = False
-        need_to_finalize = config_handler is None
-        if config_handler is None:
-            config_handler = ConfigRegistrationHandler()
+        need_to_finalize = context is None
+        if context is None:
+            context = RegistrationContext()
 
         try:
-            self._register(config_file, submitter, log_message, config_handler, force=force)
+            self._register(config_file, submitter, log_message, context, force=force)
         except Exception:
             error_occurred = True
             raise
         finally:
             if need_to_finalize:
-                config_handler.finalize_registration(error_occurred)
+                context.finalize(error_occurred)
 
-    def _register(self, config_file, submitter, log_message, config_handler, force=False):
+    def _register(self, config_file, submitter, log_message, context, force=False):
         config = DimensionMappingsConfig.load(config_file)
         config.assign_ids()
         self._check_unique_records(config, warn_only=force)
@@ -373,7 +373,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             registration.version,
         )
 
-        config_handler.add_ids(RegistryType.DIMENSION_MAPPING, dimension_mapping_ids, self)
+        context.add_ids(RegistryType.DIMENSION_MAPPING, dimension_mapping_ids, self)
 
     def dump(self, config_id, directory, version=None, force=False):
         path = Path(directory)

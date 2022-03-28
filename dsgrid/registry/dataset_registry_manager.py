@@ -23,7 +23,7 @@ from .common import (
     auto_register_dimensions,
     RegistryType,
 )
-from .config_registration_handler import ConfigRegistrationHandler
+from .registration_context import RegistrationContext
 from .dataset_registry import DatasetRegistry, DatasetRegistryModel
 from .registry_manager_base import RegistryManagerBase
 
@@ -132,12 +132,12 @@ class DatasetRegistryManager(RegistryManagerBase):
         log_message,
         dimension_file=None,
         force=False,
-        config_handler=None,
+        context=None,
     ):
         error_occurred = False
-        need_to_finalize = config_handler is None
-        if config_handler is None:
-            config_handler = ConfigRegistrationHandler()
+        need_to_finalize = context is None
+        if context is None:
+            context = RegistrationContext()
 
         config_data = load_data(config_file)
         try:
@@ -147,7 +147,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 dataset_path,
                 submitter,
                 log_message,
-                config_handler,
+                context,
                 dimension_file=dimension_file,
                 force=force,
             )
@@ -156,7 +156,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             raise
         finally:
             if need_to_finalize:
-                config_handler.finalize_registration(error_occurred)
+                context.finalize(error_occurred)
 
     def _register_dataset_and_dimensions(
         self,
@@ -165,7 +165,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         dataset_path: Path,
         submitter: str,
         log_message: str,
-        config_handler: ConfigRegistrationHandler,
+        context: RegistrationContext,
         dimension_file=None,
         force=False,
     ):
@@ -186,14 +186,14 @@ class DatasetRegistryManager(RegistryManagerBase):
                 submitter,
                 log_message,
                 force,
-                config_handler,
+                context,
             )
 
         config = DatasetConfig.load_from_user_path(
             config_file, self._dimension_mgr, dataset_path, data=config_data
         )
         self._register(config, dataset_path, submitter, log_message, force=force)
-        config_handler.add_id(RegistryType.DATASET, config.model.dataset_id, self)
+        context.add_id(RegistryType.DATASET, config.model.dataset_id, self)
 
     def _register(
         self,

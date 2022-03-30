@@ -363,6 +363,33 @@ class ProjectConfig(ConfigWithDataFilesBase):
             if x.model.from_dimension.dimension_type == dimension_type
         ]
 
+    def get_base_to_supplemental_dimension_mapping_by_dimension_id(self, dimension_id: str):
+        """Return the base-to-supplemental dimension mappings for the dimension (if any).
+
+        Parameters
+        ----------
+        dimension_id : str
+
+        Returns
+        -------
+        list
+            List of DimensionMappingConfig
+
+        """
+        config = [
+            x
+            for x in self._base_to_supplemental_mappings.values()
+            if x.model.to_dimension.dimension_id == dimension_id
+        ]
+        if not config:
+            print(
+                f"base-to-supplemental dimension_mapping for supplemental_dimension={dimension_id} does not exist"
+            )
+            return
+
+        assert len(config) == 1, config
+        return config[0]
+
     def has_base_to_supplemental_dimension_mapping_types(self, dimension_type):
         """Return True if the config has these base-to-supplemental mappings."""
         return self._has_mapping(

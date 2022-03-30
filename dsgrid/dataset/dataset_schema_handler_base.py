@@ -171,6 +171,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 f"each timestamp in {time_cols} but found {distinct_counts[0]['count']} instead"
             )
 
+    def _get_mapping_reference_by_dimension_type(self, dimension_type: DimensionType):
+        ref = [x for x in self._mapping_references if x.from_dimension_type == dimension_type]
+        if not ref:
+            print(f"mapping_reference for dimension_type={dimension_type.value} does not exist")
+            return
+
+        assert len(ref) == 1, ref
+        ref = ref[0]
+        return self._dimension_mapping_mgr.get_by_id(ref.mapping_id, version=ref.version)
+
     @track_timing(timer_stats_collector)
     def _remap_dimension_columns(self, df):
         # This will likely become a common activity when running queries.

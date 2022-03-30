@@ -44,7 +44,10 @@ def _make_project_dir(project):
 
 ### set up registry for AEO data ###
 def make_registry_for_aeo(
-    registry_path, src_dir, dataset_name: str, dataset_path=None, include_datasets=False
+    registry_path,
+    src_dir,
+    dataset_name: str,
+    dataset_path=None,
 ) -> RegistryManager:
     """Creates a local registry to test registration of AEO dimensions and dataset.
 
@@ -54,8 +57,10 @@ def make_registry_for_aeo(
         Path in which the registry will be created.
     src_dir : Path
         Path containing source config files
+        (e.g., "~/dsgrid-project-StandardScenarios/dsgrid_project/datasets/benchmark/aeo2021/reference/commercial/")
     dataset_path : Path | None
         If None, use "DSGRID_LOCAL_DATA_DIRECTORY" env variable.
+        ()
 
     """
     if dataset_path is None:

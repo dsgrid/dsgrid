@@ -82,6 +82,14 @@ class Dataset:
     def load_data_lookup(self):
         return self._handler._load_data_lookup
 
+    @property
+    def mapped_load_data(self):
+        return self._handler._remap_dimension_columns(self._handler._load_data)
+
+    @property
+    def mapped_load_data_lookup(self):
+        return self._handler._remap_dimension_columns(self._handler._load_data_lookup)
+
     # TODO: this is likely throwaway code
 
     # def compute_sum_by_sector_id(self):

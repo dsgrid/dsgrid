@@ -2,6 +2,7 @@ import logging
 from typing import List
 
 from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 from .common import RegistryType
 from .registry_manager_base import RegistryManagerBase
 
@@ -103,6 +104,7 @@ class RegistrationContext:
         assert manager_context is not None, registry_type
         return manager_context.ids
 
+    @track_timing(timer_stats_collector)
     def finalize(self, error_occurred):
         """Perform final registration actions. If successful, sync all newly-registered configs
         and data with the remote registry. If there was an error, remove all intermediate

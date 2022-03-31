@@ -310,7 +310,9 @@ class DatasetConfigModel(DSGBaseModel):
     )
     dimensions: List = Field(
         title="dimensions",
-        description="List of registered dimension references that make up the dimensions of dataset.",
+        description="List of dimensions that make up the dimensions of dataset. They will be "
+        "automatically registered during dataset registration and then converted "
+        "to dimension_references.",
         requirements=(
             "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined",
             "* Only one dimension reference per type is allowed",

@@ -43,8 +43,9 @@ class DimensionsModel(DSGBaseModel):
 
     base_dimensions: List = Field(
         title="base_dimensions",
-        description="List of registry references (``DimensionReferenceModel``) for a project's "
-        "base dimensions.",
+        description="List of dimensions for a project's base dimensions. They will be "
+        "automatically registered during project registration and then converted to "
+        "base_dimension_references.",
         requirements=(
             "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
             " one dimension reference per type is allowed.",
@@ -63,12 +64,8 @@ class DimensionsModel(DSGBaseModel):
     )
     supplemental_dimensions: List = Field(
         title="supplemental_dimensions",
-        description="List of registry references for a project's supplemental dimensions.",
-        requirements=(
-            "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType`"
-            " are allowed for supplemental dimension references (i.e., multiple `Geography` types"
-            " are allowed).",
-        ),
+        description="List of supplemental dimensions. They will be automatically registered "
+        "during project registration and then converted to supplemental_dimension_references.",
         notes=(
             "Supplemental dimensions are used to support additional querying and transformations",
             "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
@@ -231,7 +228,9 @@ class DimensionMappingsModel(DSGBaseModel):
     base_to_supplemental: List[MappingTableByNameModel] = Field(
         title="base_to_supplemental",
         description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
-        " used to support various queries and dimension transformations.",
+        " used to support various queries and dimension transformations. They will be "
+        "automatically registered during project registration and then converted to "
+        "base_to_supplemental_references.",
         default=[],
     )
     base_to_supplemental_references: List[DimensionMappingReferenceModel] = Field(

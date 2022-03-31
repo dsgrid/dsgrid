@@ -91,19 +91,22 @@ class S3StorageInterface(CloudStorageInterface):
         return next(contents, None) is not None
 
     @contextmanager
-    def make_lock_file(self, path):
+    def make_lock_file_managed(self, path):
         try:
-            self.check_lock_file(path)
-            filepath = self._s3_filesystem.path(path)
-            lock_content = {
-                "username": self._user,
-                "uuid": self._uuid,
-                "timestamp": str(datetime.now()),
-            }
-            self._s3_filesystem.path(filepath).write_text(json.dumps(lock_content))
+            self.make_lock_file(path)
             yield
         finally:
             self.remove_lock_file(path)
+
+    def make_lock_file(self, path):
+        self.check_lock_file(path)
+        filepath = self._s3_filesystem.path(path)
+        lock_content = {
+            "username": self._user,
+            "uuid": self._uuid,
+            "timestamp": str(datetime.now()),
+        }
+        self._s3_filesystem.path(filepath).write_text(json.dumps(lock_content))
 
     def read_lock_file(self, path):
         lockfile_contents = json.loads(self._s3_filesystem.path(path).read_text())

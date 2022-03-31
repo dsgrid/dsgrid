@@ -18,8 +18,11 @@ class FakeStorageInterface(CloudStorageInterface):
         pass
 
     @contextmanager
-    def make_lock_file(self, path):
+    def make_lock_file_managed(self, path):
         yield
+
+    def make_lock_file(self, path):
+        pass
 
     def read_lock_file(self, path):
         pass

@@ -36,8 +36,23 @@ class ConfigBase(abc.ABC):
         return cls._load(config_file, *args, **kwargs)
 
     @classmethod
-    def _load(cls, config_file, data=None):
-        model = cls.model_class().load(config_file, data=data)
+    def load_from_model(cls, model):
+        """Load the config from a model.
+
+        Parameters
+        ---------
+        model : DSGBaseModel
+
+        Returns
+        -------
+        ConfigBase
+
+        """
+        return cls(model)
+
+    @classmethod
+    def _load(cls, config_file):
+        model = cls.model_class().load(config_file)
         return cls(model)
 
     @staticmethod
@@ -133,8 +148,8 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
         return self._records_dataframe
 
     @classmethod
-    def load(cls, config_file, data=None):
-        config = super().load(config_file, data=data)
+    def load(cls, config_file):
+        config = super().load(config_file)
         config.src_dir = os.path.dirname(config_file)
         return config
 

@@ -31,7 +31,7 @@ class DSGBaseModel(BaseModel):
         allow_population_by_field_name = True
 
     @classmethod
-    def load(cls, filename, data=None):
+    def load(cls, filename):
         """Load a data model from a file.
         Temporarily changes to the file's parent directory so that Pydantic
         validators can load relative file paths within the file.
@@ -39,10 +39,6 @@ class DSGBaseModel(BaseModel):
         Parameters
         ----------
         filename : str
-        data : None, dict
-            If not None, use this dictionary instead of loading from the file.
-            This is for situations where the contents of the file were modified but Pydantic
-            validation still requires handling of relative file paths.
 
         """
         filename = Path(filename)
@@ -50,11 +46,7 @@ class DSGBaseModel(BaseModel):
         orig = os.getcwd()
         os.chdir(base_dir)
         try:
-            if data is None:
-                cfg = cls(**load_data(filename.name))
-            else:
-                cfg = cls(**data)
-            return cfg
+            return cls(**load_data(filename.name))
         except ValidationError:
             logger.exception("Failed to validate %s", filename)
             raise

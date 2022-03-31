@@ -12,7 +12,12 @@ import pandas as pd
 import pytest
 
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
-from dsgrid.tests.common import make_test_project_dir, make_test_data_dir, TEST_DATASET_DIRECTORY
+from dsgrid.tests.common import (
+    make_test_project_dir,
+    make_test_data_dir,
+    TEST_DATASET_DIRECTORY,
+    replace_dimension_uuids_from_registry,
+)
 from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json, load_data
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
@@ -39,6 +44,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
         assert dataset_dir.exists()
         dataset_config_file = dataset_dir / "dataset.toml"
         dataset_id = load_data(dataset_config_file)["dataset_id"]
+        replace_dimension_uuids_from_registry(base_dir, (dataset_config_file,))
 
         user = getpass.getuser()
         log_message = "test log message"
@@ -68,12 +74,11 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
                 dataset_path = test_dir / dataset_id
                 exc, match_msg = setup_test(test_dir)
                 with pytest.raises(exc, match=match_msg):
-                    manager.dataset_manager.register(
+                    manager.dataset_manager.register_from_file(
                         dataset_config_file,
                         dataset_path,
                         user,
                         log_message,
-                        dimension_file=dataset_dir / "dimensions.toml",
                     )
             finally:
                 if test_dir.exists():
@@ -89,12 +94,11 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
                 shutil.copytree(make_test_data_dir, test_dir)
                 dataset_path = test_dir / dataset_id
                 exc, match_msg = setup_test(test_dir)
-                manager.dataset_manager.register(
+                manager.dataset_manager.register_from_file(
                     dataset_config_file,
                     dataset_path,
                     user,
                     log_message,
-                    dimension_file=dataset_dir / "dimensions.toml",
                 )
                 with pytest.raises(exc, match=match_msg):
                     manager.project_manager.submit_dataset(

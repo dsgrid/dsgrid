@@ -5,7 +5,7 @@ from typing import Dict, List, Optional, Union
 from pydantic import Field, validator
 from semver import VersionInfo
 
-from .dimensions import DimensionReferenceModel
+from .dimensions import DimensionReferenceModel, DimensionReferenceByNameModel
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.versioning import handle_version_or_str
@@ -165,6 +165,52 @@ class DimensionMappingBaseModel(DSGBaseModel):
                     f'Otherwise, mapping_type={values["mapping_type"]} should have archetype={assigned_archetype} '
                 )
         return archetype
+
+
+class DimensionMappingPreRegisteredBaseModel(DSGBaseModel):
+    """Base class for mapping soon-to-be registered dimensions. As soon as the dimensions
+    are registered this will be converted to a DimensionMappingBaseModel and then registered.
+    """
+
+    mapping_type: DimensionMappingType = Field(
+        title="mapping_type",
+        description="Type/purpose of the dimension mapping",
+        default="many_to_one_aggregation",
+        options=DimensionMappingType.format_for_docs(),
+    )
+    archetype: Optional[DimensionMappingArchetype] = Field(
+        title="archetype",
+        description="Dimension mapping archetype, determined based on mapping_type",
+        dsg_internal=True,
+        options=DimensionMappingArchetype.format_for_docs(),
+    )
+    description: str = Field(
+        title="description",
+        description="Description of dimension mapping",
+    )
+
+
+class DimensionMappingByNameBaseModel(DimensionMappingPreRegisteredBaseModel):
+    """Base class for mapping soon-to-be registered dimensions by name. Used when automatically
+    registering a project's dimensions and mappings along with the project.
+    """
+
+    from_dimension: DimensionReferenceByNameModel = Field(
+        title="from_dimension", description="Reference to soon-to-be-registered from dimension"
+    )
+    to_dimension: DimensionReferenceByNameModel = Field(
+        title="to_dimension", description="Reference to soon-to-be-registered to dimension"
+    )
+
+
+class DimensionMappingDatasetToProjectBaseModel(DimensionMappingPreRegisteredBaseModel):
+    """Base class for mapping soon-to-be registered dimensions for a dataset. Used when
+    automatically registering mappings while submitting a dataset to a project.
+    """
+
+    dimension_type: DimensionType = Field(
+        title="dimension_type", description="Dimension types that will be mapped"
+    )
 
 
 class DimensionMappingReferenceModel(DSGBaseModel):

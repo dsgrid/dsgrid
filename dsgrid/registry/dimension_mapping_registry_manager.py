@@ -13,6 +13,7 @@ import pyspark.sql.functions as F
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
@@ -229,16 +230,17 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def finalize_registration(self, config_ids, error_occurred):
         if error_occurred:
             logger.info("Remove all intermediate dimension mappings after error")
-            self.remove_dimension_mappings(config_ids)
+            for mapping_id in config_ids:
+                self.remove(mapping_id)
             return
 
-        # TODO DT: add mechanism to verify that nothing has changed.
-        lock_file_path = self.get_registry_lock_file(None)
-        with self.cloud_interface.make_lock_file(lock_file_path):
-            if not self.offline_mode and not self.dry_run_mode:
-                # Sync the entire dimension mapping registry path because it's probably cheaper
-                # than syncing each changed path individually.
-                self.sync_push(self._path)
+        if not self.offline_mode and not self.dry_run_mode:
+            lock_file = self.get_registry_lock_file(None)
+            self.cloud_interface.check_lock_file(lock_file)
+            # Sync the entire dimension mapping registry path because it's probably cheaper
+            # than syncing each changed path individually.
+            self.sync_push(self._path)
+            self.cloud_interface.remove_lock_file(lock_file)
 
     def get_by_id(self, config_id, version=None):
         self._check_if_not_registered(config_id)
@@ -259,6 +261,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         config = MappingTableConfig.load(filename)
         self._mappings[key] = config
         return config
+
+    def acquire_registry_locks(self, config_ids: List[str]):
+        self.cloud_interface.make_lock_file(self.get_registry_lock_file(None))
 
     def get_registry_lock_file(self, config_id):
         return "configs/.locks/dimension_mappings.lock"
@@ -284,15 +289,47 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         return mappings
 
+    def make_dimension_mapping_references(self, mapping_ids: List[str]):
+        """Return a list of dimension mapping references from a list of registered mapping IDs.
+
+        Parameters
+        ----------
+        mapping_ids : List[str]
+
+        Returns
+        -------
+        List[DimensionMappingReferenceModel]
+
+        """
+        refs = []
+        for mapping_id in mapping_ids:
+            mapping = self.get_by_id(mapping_id)
+            refs.append(
+                DimensionMappingReferenceModel(
+                    from_dimension_type=mapping.model.from_dimension.dimension_type,
+                    to_dimension_type=mapping.model.to_dimension.dimension_type,
+                    mapping_id=mapping_id,
+                    version=self.get_current_version(mapping_id),
+                )
+            )
+        return refs
+
+    def register_from_file(self, config_file, submitter, log_message, force=False):
+        context = RegistrationContext()
+        config = DimensionMappingsConfig.load(config_file)
+        return self.register(config, submitter, log_message, force=force, context=context)
+
     @track_timing(timer_stats_collector)
-    def register(self, config_file, submitter, log_message, force=False, context=None):
+    def register(
+        self, config: DimensionMappingsConfig, submitter, log_message, force=False, context=None
+    ):
         error_occurred = False
         need_to_finalize = context is None
         if context is None:
             context = RegistrationContext()
 
         try:
-            self._register(config_file, submitter, log_message, context, force=force)
+            return self._register(config, submitter, log_message, context, force=force)
         except Exception:
             error_occurred = True
             raise
@@ -300,16 +337,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             if need_to_finalize:
                 context.finalize(error_occurred)
 
-    def _register(self, config_file, submitter, log_message, context, force=False):
-        config = DimensionMappingsConfig.load(config_file)
+    def _register(self, config, submitter, log_message, context, force=False):
         config.assign_ids()
         self._check_unique_records(config, warn_only=force)
         self._check_records_against_dimension_records(config)
         self.validate_records(config)
 
         registration = make_initial_config_registration(submitter, log_message)
-        src_dir = Path(os.path.dirname(config_file))
-
         if self.dry_run_mode:
             for mapping in config.model.mappings:
                 logger.info(
@@ -345,7 +379,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 registry_config.serialize(registry_file, force=force)
 
                 at_config = MappingTableConfig(mapping)
-                at_config.src_dir = src_dir
+                at_config.src_dir = config.src_dir
                 at_config.serialize(dst_dir)
                 self._id_to_type[mapping.mapping_id] = [
                     mapping.from_dimension.dimension_type,
@@ -364,7 +398,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 logger.warning(
                     "Exception occured after partial completion of dimension mapping registration."
                 )
-                self.remove_dimension_mappings(dimension_mapping_ids)
+                for mapping_id in dimension_mapping_ids:
+                    self.remove(mapping_id)
             raise
 
         logger.info(
@@ -375,6 +410,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         )
 
         context.add_ids(RegistryType.DIMENSION_MAPPING, dimension_mapping_ids, self)
+        return dimension_mapping_ids
 
     def dump(self, config_id, directory, version=None, force=False):
         path = Path(directory)
@@ -404,7 +440,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         if submitter is None:
             submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(None)
-        with self.cloud_interface.make_lock_file(lock_file_path):
+        with self.cloud_interface.make_lock_file_managed(lock_file_path):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
@@ -422,23 +458,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             self.sync_push(self._path)
 
         return version
-
-    def remove_dimension_mappings(self, mapping_ids: List[str]):
-        """Remove multiple dimension mappings. Use this instead of calling remove if changes need
-        to be synced to the remote registry.
-
-        Parameters
-        ----------
-        mapping_ids : List[str]
-
-        """
-        lock_file_path = self.get_registry_lock_file(None)
-        with self.cloud_interface.make_lock_file(lock_file_path):
-            for mapping_id in mapping_ids:
-                self.remove(mapping_id)
-
-            if not self.offline_mode:
-                self.sync_push(self._path)
 
     def remove(self, config_id):
         self._remove(config_id)

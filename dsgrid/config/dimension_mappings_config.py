@@ -1,5 +1,6 @@
 import logging
 import os
+from pathlib import Path
 from typing import Dict, List, Optional, Union
 
 from pydantic import Field, validator
@@ -27,6 +28,10 @@ class DimensionMappingsConfigModel(DSGBaseModel):
 class DimensionMappingsConfig(ConfigBase):
     """Provides an interface to a DimensionMappingsConfigModel."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._src_dir = None
+
     @staticmethod
     def config_filename():
         return "dimension_mappings.toml"
@@ -47,3 +52,23 @@ class DimensionMappingsConfig(ConfigBase):
             mapping_id = make_registry_id((from_type, to_type))
             check_config_id_loose(mapping_id, "Dimension Mapping")
             mapping.mapping_id = mapping_id
+
+    @property
+    def src_dir(self):
+        return self._src_dir
+
+    @src_dir.setter
+    def src_dir(self, src_dir):
+        self._src_dir = src_dir
+
+    @classmethod
+    def load(cls, config_filename: Path, *args, **kwargs):
+        obj = super().load(config_filename, *args, **kwargs)
+        obj.src_dir = config_filename.parent
+        return obj
+
+    @classmethod
+    def load_from_model(cls, model, src_dir):
+        obj = cls(model)
+        obj.src_dir = src_dir
+        return obj

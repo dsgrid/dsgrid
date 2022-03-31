@@ -114,13 +114,38 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def register(self, config_file, submitter, log_message, force=False, context=None):
+    def register_from_file(self, config_file, submitter, log_message, force=False, context=None):
         """Registers a config file in the registry.
 
         Parameters
         ----------
         config_file : str
             Path to  config file
+        submitter : str
+            Submitter name
+        log_message : str
+        force : bool
+            If true, register even if an ID is duplicate.
+        context : None or RegistrationContext
+            If not None, assign the config IDs that get registered.
+
+        Raises
+        ------
+        ValueError
+            Raised if the config_file is invalid.
+        DSGDuplicateValueRegistered
+            Raised if the config ID is already registered.
+
+        """
+
+    @abc.abstractmethod
+    def register(self, config, submitter, log_message, force=False, context=None):
+        """Registers a config file in the registry.
+
+        Parameters
+        ----------
+        config : ConfigBase
+            Configuration instance
         submitter : str
             Submitter name
         log_message : str
@@ -380,6 +405,21 @@ class RegistryManagerBase(abc.ABC):
         """
         self._check_if_not_registered(config_id)
         return self._registry_configs[config_id]
+
+    @abc.abstractmethod
+    def acquire_registry_locks(self, config_ids: List[str]):
+        """Acquire lock(s) on the registry for all config_ids.
+
+        Parameters
+        ----------
+        config_ids : List[str]
+
+        Raises
+        ------
+        DSGRegistryLockError
+            Raised if a lock cannot be acquired.
+
+        """
 
     @abc.abstractmethod
     def get_registry_lock_file(self, config_id):

@@ -12,7 +12,6 @@ from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
 )
 from dsgrid.tests.common import (
-    replace_dimension_mapping_uuids_from_registry,
     replace_dimension_uuids_from_registry,
 )
 
@@ -51,24 +50,19 @@ def test_register_project_and_dataset(make_test_project_dir):
         project_config = src_dir / "project.toml"
         project_id = load_data(project_config)["project_id"]
         dataset_config = src_dir / dataset_dir / "dataset.toml"
-        dataset_dim_file = src_dir / dataset_dir / "dimensions.toml"
         dataset_map_file = src_dir / dataset_dir / "dimension_mappings.toml"
         dataset_id = load_data(dataset_config)["dataset_id"]
 
-        p_dim_file = src_dir / "dimensions.toml"
-        p_map_file = src_dir / "base_to_supplemental_dimension_mappings.toml"
         dataset_path = TEST_DATASET_DIRECTORY / dataset_id
         check_run_command(
             f"dsgrid registry --path={path} --offline projects register {project_config} "
-            f"--dimension-file {p_dim_file} "
-            f"--base-to-supplemental-dimension-mapping-file {p_map_file} "
             "--log-message log"
         )
+        replace_dimension_uuids_from_registry(path, (dataset_config,))
         check_run_command(
             f"dsgrid registry --path={path} --offline projects register-and-submit-dataset "
             f"--dataset-config-file {dataset_config} "
             f"--dataset-path {dataset_path} "
-            f"--dimension-file {dataset_dim_file} "
             f"--dimension-mapping-file {dataset_map_file} "
             f"--project-id {project_id} "
             f"--log-message log"

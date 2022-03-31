@@ -56,8 +56,6 @@ def make_test_data_registry(
     dataset_path = Path(dataset_path)
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
-    project_dimension_config = src_dir / "dimensions.toml"
-    project_dimension_mapping_config = src_dir / "base_to_supplemental_dimension_mappings.toml"
 
     print("\n 1. register dimensions: \n")
     user = getpass.getuser()
@@ -72,27 +70,24 @@ def make_test_data_registry(
     project_config_file = src_dir / "project.toml"
     project_id = load_data(project_config_file)["project_id"]
     dataset_config_file = src_dir / dataset_dir / "dataset.toml"
-    dataset_dimension_file = src_dir / dataset_dir / "dimensions.toml"
     dataset_mapping_file = src_dir / dataset_dir / "dimension_mappings.toml"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
 
     if include_projects:
         print("\n 2. register project: \n")
-        manager.project_manager.register(
+        manager.project_manager.register_from_file(
             project_config_file,
             user,
             log_message,
-            dimension_file=project_dimension_config,
-            base_to_supplemental_dimension_mapping_file=project_dimension_mapping_config,
         )
     if include_datasets:
         print("\n 3. register dataset: \n")
-        manager.dataset_manager.register(
+        replace_dimension_uuids_from_registry(path, (dataset_config_file,))
+        manager.dataset_manager.register_from_file(
             dataset_config_file,
             dataset_path / dataset_id,
             user,
             log_message,
-            dimension_file=dataset_dimension_file,
         )
         print("\n 4. submit dataset to project\n")
         manager.project_manager.submit_dataset(

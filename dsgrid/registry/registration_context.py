@@ -3,6 +3,7 @@ from typing import List
 
 from dsgrid.exceptions import DSGInvalidParameter
 from .common import RegistryType
+from .registry_manager_base import RegistryManagerBase
 
 
 logger = logging.getLogger(__name__)
@@ -12,26 +13,38 @@ class RegistrationContext:
     """Maintains state information across a multi-config registration process."""
 
     def __init__(self):
-        self._ids = {
-            RegistryType.DATASET: [],
-            RegistryType.DIMENSION: [],
-            RegistryType.DIMENSION_MAPPING: [],
-            RegistryType.PROJECT: [],
-        }
         self._managers = {
-            RegistryType.DATASET: None,
-            RegistryType.DIMENSION: None,
+            # This order is required for cleanup in self.finalize().
             RegistryType.DIMENSION_MAPPING: None,
+            RegistryType.DIMENSION: None,
+            RegistryType.DATASET: None,
             RegistryType.PROJECT: None,
         }
 
-    def add_id(self, config_type: RegistryType, config_id: str, manager):
+    def __del__(self):
+        for registry_type in list(RegistryType):
+            manager = self._managers.get(registry_type)
+            if manager is not None:
+                logger.warning(
+                    "RegistrationContext destructed with a reference to %s manager",
+                    registry_type.value,
+                )
+                if manager.has_lock():
+                    logger.error(
+                        "RegistrationContext with a lock on the remote registry. "
+                        "Please contact the dsgrid team. Type=%s IDs=%s",
+                        registry_type.value,
+                        manager.ids,
+                    )
+
+    def add_id(self, registry_type: RegistryType, config_id: str, manager: RegistryManagerBase):
         """Add a config ID that has been registered.
 
         Parameters
         ----------
-        config_type : RegistryType
+        registry_type : RegistryType
         config_id : str
+        manager : RegistryManagerBase
 
         Raises
         ------
@@ -39,15 +52,18 @@ class RegistrationContext:
             Raised if the config ID is already stored.
 
         """
-        self.add_ids(config_type, [config_id], manager)
+        self.add_ids(registry_type, [config_id], manager)
 
-    def add_ids(self, config_type: RegistryType, config_ids: List[str], manager):
+    def add_ids(
+        self, registry_type: RegistryType, config_ids: List[str], manager: RegistryManagerBase
+    ):
         """Add multiple config IDs that have been registered.
 
         Parameters
         ----------
-        config_type : RegistryType
+        registry_type : RegistryType
         config_ids : List[str]
+        manager : RegistryManagerBase
 
         Raises
         ------
@@ -55,32 +71,37 @@ class RegistrationContext:
             Raised if a config ID is already stored.
 
         """
-        # TODO DT: we should record some version from the registry so that we know we can sync safely.
-        config_list = self._ids[config_type]
-        if self._managers[config_type] is None:
-            self._managers[config_type] = manager
-        diff = set(config_ids).intersection(config_list)
+        manager_context = self._managers[registry_type]
+        if manager_context is None:
+            manager_context = RegistryManagerContext(manager)
+            self._managers[registry_type] = manager_context
+            manager.acquire_registry_locks(config_ids)
+            manager_context.set_locked()
+
+        diff = set(config_ids).intersection(manager_context.ids)
         if diff:
             raise DSGInvalidParameter(
-                f"One or more config IDs are already tracked: {config_type} {diff}"
+                f"One or more config IDs are already tracked: {registry_type} {diff}"
             )
 
-        logger.debug("Added registered IDs: %s %s", config_type, config_ids)
-        config_list += config_ids
+        logger.debug("Added registered IDs: %s %s", registry_type, config_ids)
+        manager_context.ids += config_ids
 
-    def get_ids(self, config_type: RegistryType):
-        """Return the config IDs for config_type that have been registered with this context.
+    def get_ids(self, registry_type: RegistryType):
+        """Return the config IDs for registry_type that have been registered with this context.
 
         Parameters
         ----------
-        config_type : RegistryType
+        registry_type : RegistryType
 
         Returns
         -------
         List[str]
 
         """
-        return self._ids[config_type]
+        manager_context = self._managers[registry_type]
+        assert manager_context is not None, registry_type
+        return manager_context.ids
 
     def finalize(self, error_occurred):
         """Perform final registration actions. If successful, sync all newly-registered configs
@@ -94,36 +115,60 @@ class RegistrationContext:
 
         """
         try:
-            mapping_ids = self._ids[RegistryType.DIMENSION_MAPPING]
-            if mapping_ids:
-                manager = self._managers[RegistryType.DIMENSION_MAPPING]
-                manager.finalize_registration(mapping_ids, error_occurred)
-                self._ids[RegistryType.DIMENSION_MAPPING].clear()
-                self._managers[RegistryType.DIMENSION_MAPPING] = None
-
-            dimension_ids = self._ids[RegistryType.DIMENSION]
-            if dimension_ids:
-                manager = self._managers[RegistryType.DIMENSION]
-                manager.finalize_registration(dimension_ids, error_occurred)
-                self._ids[RegistryType.DIMENSION].clear()
-                self._managers[RegistryType.DIMENSION] = None
-
-            dataset_ids = self._ids[RegistryType.DATASET]
-            if dataset_ids:
-                manager = self._managers[RegistryType.DATASET]
-                manager.finalize_registration(dataset_ids, error_occurred)
-                self._ids[RegistryType.DATASET].clear()
-                self._managers[RegistryType.DATASET] = None
-
-            project_ids = self._ids[RegistryType.PROJECT]
-            if project_ids:
-                manager = self._managers[RegistryType.PROJECT]
-                manager.finalize_registration(project_ids, error_occurred)
-                self._ids[RegistryType.PROJECT].clear()
-                self._managers[RegistryType.PROJECT] = None
+            for registry_type, manager_context in self._managers.items():
+                if manager_context is not None and manager_context.ids:
+                    manager_context.manager.finalize_registration(
+                        manager_context.ids, error_occurred
+                    )
+                    manager_context.ids.clear()
+                    manager_context.set_unlocked()
+                    self._managers[registry_type] = None
         except Exception:
             logger.exception(
                 "An unexpected error occurred in finalize_registration. "
                 "Please notify the dsgrid team because registry recovery may be required."
             )
             raise
+
+
+class RegistryManagerContext:
+    """Maintains state for one registry type."""
+
+    def __init__(self, manager: RegistryManagerBase):
+        self._manager = manager
+        self._has_lock = False
+        self._ids = []
+
+    def has_lock(self) -> bool:
+        """Return True if the manager has acquired a lock on the remote registry."""
+        return self._has_lock
+
+    def set_locked(self):
+        """Call when a lock has been acquired on the remote registry."""
+        logger.debug("Locks acquired on remote registry for %s", self._manager.__class__.__name__)
+        self._has_lock = True
+
+    def set_unlocked(self):
+        """Call when all locks have been released on the remote registry."""
+        logger.debug("Locks released on remote registry for %s", self._manager.__class__.__name__)
+        self._has_lock = False
+
+    @property
+    def ids(self):
+        """Return a list of config IDs being managed."""
+        return self._ids
+
+    @ids.setter
+    def ids(self, val):
+        """Return a list of config IDs being managed."""
+        self._ids = val
+
+    @property
+    def manager(self):
+        """Return a RegistryManagerBase"""
+        return self._manager
+
+    @manager.setter
+    def manager(self, val):
+        """Set the RegistryManagerBase"""
+        self._manager = val

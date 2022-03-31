@@ -15,6 +15,7 @@ from dsgrid.config.dimensions_config import DimensionsConfig
 from dsgrid.config.dimensions import (
     DimensionType,
     TimeDimensionBaseModel,
+    DimensionReferenceModel,
 )
 from dsgrid.data_models import serialize_model
 from dsgrid.exceptions import (
@@ -146,16 +147,17 @@ class DimensionRegistryManager(RegistryManagerBase):
     def finalize_registration(self, config_ids: List[str], error_occurred: bool):
         if error_occurred:
             logger.info("Remove all intermediate dimensions after error")
-            self.remove_dimensions(config_ids)
+            for dimension_id in config_ids:
+                self.remove(dimension_id)
             return
 
-        # TODO DT: add mechanism to verify that nothing has changed.
-        lock_file_path = self.get_registry_lock_file(None)
-        with self.cloud_interface.make_lock_file(lock_file_path):
-            if not self.offline_mode and not self.dry_run_mode:
-                # Sync the entire dimension registry path because it's probably cheaper
-                # than syncing each changed path individually.
-                self.sync_push(self._path)
+        if not self.offline_mode and not self.dry_run_mode:
+            lock_file = self.get_registry_lock_file(None)
+            self.cloud_interface.check_lock_file(lock_file)
+            # Sync the entire dimension registry path because it's probably cheaper
+            # than syncing each changed path individually.
+            self.sync_push(self._path)
+            self.cloud_interface.remove_lock_file(lock_file)
 
     def get_by_id(self, config_id, version=None, force=False):
         self._check_if_not_registered(config_id)
@@ -179,6 +181,9 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._dimensions[key] = config
         return config
 
+    def acquire_registry_locks(self, config_ids: List[str]):
+        self.cloud_interface.make_lock_file(self.get_registry_lock_file(None))
+
     def get_registry_lock_file(self, config_id):
         return "configs/.locks/dimensions.lock"
 
@@ -188,25 +193,6 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_type = self._id_to_type[config_id]
         path = self._path / str(dimension_type) / config_id / str(version)
         return self.fs_interface.exists(path)
-
-    def list_by_name(self, name: str, dimension_type: DimensionType):
-        """Return a list of dimensions matching name and dimension_type.
-
-        Parameters
-        ----------
-        name : str
-        dimension_type DimensionType
-
-        Returns
-        -------
-        List[DimensionConfig]
-
-        """
-        return [
-            x
-            for x in self._dimensions.values()
-            if x.model.dimension_type == dimension_type and x.model.name == name
-        ]
 
     def list_types(self):
         """Return the dimension types present in the registry."""
@@ -252,14 +238,16 @@ class DimensionRegistryManager(RegistryManagerBase):
         return dimensions
 
     @track_timing(timer_stats_collector)
-    def register(self, config_file, submitter, log_message, force=False, context=None):
+    def register(
+        self, config: DimensionsConfig, submitter, log_message, force=False, context=None
+    ):
         error_occurred = False
         need_to_finalize = context is None
         if context is None:
             context = RegistrationContext()
 
         try:
-            self._register(config_file, submitter, log_message, context, force=force)
+            return self._register(config, submitter, log_message, context, force=force)
         except Exception:
             error_occurred = True
             raise
@@ -267,15 +255,19 @@ class DimensionRegistryManager(RegistryManagerBase):
             if need_to_finalize:
                 context.finalize(error_occurred)
 
-    def _register(self, config_file, submitter, log_message, context, force=False):
+    @track_timing(timer_stats_collector)
+    def register_from_file(self, config_file, submitter, log_message, force=False):
+        context = RegistrationContext()
         config = DimensionsConfig.load(config_file)
+        return self.register(config, submitter, log_message, force=force, context=context)
+
+    def _register(self, config, submitter, log_message, context, force=False):
         config.assign_ids()
         self.check_unique_records(config, warn_only=force)
         self.check_unique_model_fields(config, warn_only=force)
         # TODO: check that id does not already exist in .dsgrid-registry
 
         registration = make_initial_config_registration(submitter, log_message)
-        src_dir = Path(os.path.dirname(config_file))
 
         if self.dry_run_mode:
             for dimension in config.model.dimensions:
@@ -309,7 +301,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 registry_file = Path(os.path.dirname(dst_dir)) / REGISTRY_FILENAME
                 registry_config.serialize(registry_file, force=force)
 
-                dimension_config = get_dimension_config(dimension, src_dir)
+                dimension_config = get_dimension_config(dimension, config.src_dir)
                 dimension_config.serialize(dst_dir)
                 self._id_to_type[dimension.dimension_id] = dimension.dimension_type
                 self._update_registry_cache(dimension.dimension_id, registry_config)
@@ -338,10 +330,31 @@ class DimensionRegistryManager(RegistryManagerBase):
         )
 
         context.add_ids(RegistryType.DIMENSION, dimension_ids, self)
+        return dimension_ids
 
     def get_registry_directory(self, config_id):
         dimension_type = self._id_to_type[config_id]
         return self._path / dimension_type.value / config_id
+
+    def make_dimension_references(self, dimension_ids: List[str]):
+        """Return a list of dimension references from a list of registered dimension IDs.
+
+        Parameters
+        ----------
+        dimension_ids : List[str]
+
+        """
+        refs = []
+        for dim_id in dimension_ids:
+            dim = self.get_by_id(dim_id)
+            refs.append(
+                DimensionReferenceModel(
+                    dimension_id=dim_id,
+                    dimension_type=dim.model.dimension_type,
+                    version=self.get_current_version(dim_id),
+                )
+            )
+        return refs
 
     def show(
         self,
@@ -450,7 +463,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         if submitter is None:
             submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(None)
-        with self.cloud_interface.make_lock_file(lock_file_path):
+        with self.cloud_interface.make_lock_file_managed(lock_file_path):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
@@ -468,23 +481,6 @@ class DimensionRegistryManager(RegistryManagerBase):
             self.sync_push(self._path)
 
         return version
-
-    def remove_dimensions(self, dimension_ids: List[str]):
-        """Remove multiple dimensions. Use this instead of calling remove if changes need to
-        be synced to the remote registry.
-
-        Parameters
-        ----------
-        dimension_ids : List[str]
-
-        """
-        lock_file_path = self.get_registry_lock_file(None)
-        with self.cloud_interface.make_lock_file(lock_file_path):
-            for dimension_id in dimension_ids:
-                self.remove(dimension_id)
-
-            if not self.offline_mode:
-                self.sync_push(self._path)
 
     def remove(self, config_id):
         self._remove(config_id)

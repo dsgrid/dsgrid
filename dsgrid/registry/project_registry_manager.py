@@ -3,6 +3,7 @@
 import getpass
 import itertools
 import logging
+import os
 from pathlib import Path
 from typing import Union, List, Dict
 
@@ -23,10 +24,19 @@ from dsgrid import timer_stats_collector
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
 )
-from dsgrid.config.project_config import ProjectConfig
+from dsgrid.config.dimension_mappings_config import (
+    DimensionMappingsConfig,
+    DimensionMappingsConfigModel,
+)
+from dsgrid.config.mapping_tables import (
+    MappingTableModel,
+    DatasetBaseToProjectMappingTableListModel,
+)
+from dsgrid.config.project_config import ProjectConfig, ProjectConfigModel
 from dsgrid.registry.common import (
     make_initial_config_registration,
     ConfigKey,
@@ -35,13 +45,11 @@ from dsgrid.registry.common import (
 )
 from dsgrid.utils.spark import create_dataframe_from_dimension_ids
 from dsgrid.utils.timing import track_timing, timer_stats_collector, Timer
-from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.files import dump_data, load_data, run_in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import display_table
 from .common import (
-    DimensionKey,
     VersionUpdateType,
-    auto_register_dimensions,
     RegistryType,
 )
 from .registration_context import RegistrationContext
@@ -116,11 +124,11 @@ class ProjectRegistryManager(RegistryManagerBase):
             self.remove(project_id)
             return
 
-        # TODO DT: add mechanism to verify that nothing has changed.
-        lock_file_path = self.get_registry_lock_file(project_id)
-        with self.cloud_interface.make_lock_file(lock_file_path):
-            if not self.offline_mode:
-                self.sync_push(self.get_registry_directory(project_id))
+        if not self.offline_mode:
+            lock_file = self.get_registry_lock_file(project_id)
+            self.cloud_interface.check_lock_file(lock_file)
+            self.sync_push(self.get_registry_directory(project_id))
+            self.cloud_interface.remove_lock_file(lock_file)
 
     def get_by_id(self, config_id, version=None):
         self._check_if_not_registered(config_id)
@@ -145,86 +153,32 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._projects[key] = project
         return project
 
+    def acquire_registry_locks(self, config_ids: List[str]):
+        for project_id in config_ids:
+            lock_file = self.get_registry_lock_file(project_id)
+            self.cloud_interface.make_lock_file(lock_file)
+
     def get_registry_lock_file(self, config_id):
         return f"configs/.locks/{config_id}.lock"
 
     @track_timing(timer_stats_collector)
-    def _auto_register_dimension_mappings(
-        self,
-        mappings: List,
-        mapping_file: Path,
-        dimension_name_mapping: Dict,
-        context: RegistrationContext,
-        submitter: str,
-        log_message: str,
-        force: bool,
-    ):
-        """Registers dimension mappings in mapping_file and then updates
-        mappings with the registered dimension mapping IDs and versions.
-
-        Registration of dimension mappingss is all or none. mappings may be partially
-        updated if an exception occurs.
-
-        Raises
-        ------
-        DSGInvalidDimension
-            Raised if a dimension is specified incorrectly.
-        DSGInvalidDimensionMapping
-            Raised if a dimension mapping is specified incorrectly.
-
-        """
-        mapping_config_data = load_data(mapping_file)
-        for mapping in mapping_config_data["mappings"]:
-            for dim in ("from_dimension", "to_dimension"):
-                if "name" in mapping[dim]:
-                    if "dimension_id" in mapping[dim]:
-                        raise DSGInvalidDimension(f"dimension_id cannot be present with name")
-                    name = mapping[dim].pop("name")
-                    label = (name, mapping[dim]["type"])
-                    if label not in dimension_name_mapping:
-                        raise DSGInvalidDimension(
-                            f"{label} was not provided as a registered dimension"
-                        )
-                    mapping[dim]["dimension_id"] = dimension_name_mapping[label].id
-                    mapping[dim]["version"] = str(dimension_name_mapping[label].version)
-
-        directory = mapping_file.parent
-        tmp_mapping_file = directory / ("tmp_" + mapping_file.name)
-        dump_data(mapping_config_data, tmp_mapping_file)
-
-        try:
-            self._dimension_mapping_mgr.register(
-                tmp_mapping_file,
-                submitter,
-                log_message,
-                force=force,
-                context=context,
-            )
-        finally:
-            tmp_mapping_file.unlink()
-
-        # Note: Ensure that we don't raise exceptions in the rest of this method.
-        # Otherwise, we would need to remove the registered dimension mappings.
-
-        for mapping_id in context.get_ids(RegistryType.DIMENSION_MAPPING):
-            mapping = self._dimension_mapping_mgr.get_by_id(mapping_id)
-            mappings.append(
-                DimensionMappingReferenceModel(
-                    from_dimension_type=mapping.model.from_dimension.dimension_type,
-                    to_dimension_type=mapping.model.to_dimension.dimension_type,
-                    mapping_id=mapping_id,
-                    version=self._dimension_mapping_mgr.get_current_version(mapping_id),
-                ).dict()
-            )
-
-    @track_timing(timer_stats_collector)
-    def register(
+    def register_from_file(
         self,
         config_file,
         submitter,
         log_message,
-        dimension_file=None,
-        base_to_supplemental_dimension_mapping_file=None,
+        force=False,
+    ):
+        context = RegistrationContext()
+        config = ProjectConfig.load(config_file, self._dimension_mgr, self._dimension_mapping_mgr)
+        return self.register(config, submitter, log_message, force=force, context=context)
+
+    @track_timing(timer_stats_collector)
+    def register(
+        self,
+        config,
+        submitter,
+        log_message,
         force=False,
         context=None,
     ):
@@ -233,16 +187,12 @@ class ProjectRegistryManager(RegistryManagerBase):
         if context is None:
             context = RegistrationContext()
 
-        config_data = load_data(config_file)
         try:
             self._register_project_and_dimensions(
-                config_file,
-                config_data,
+                config,
                 submitter,
                 log_message,
                 context,
-                dimension_file=dimension_file,
-                base_to_supplemental_dimension_mapping_file=base_to_supplemental_dimension_mapping_file,
                 force=force,
             )
         except Exception:
@@ -255,52 +205,73 @@ class ProjectRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def _register_project_and_dimensions(
         self,
-        config_file: Path,
-        config_data: Dict,
+        config: ProjectConfig,
         submitter: str,
         log_message: str,
         context: RegistrationContext,
-        dimension_file=None,
-        base_to_supplemental_dimension_mapping_file=None,
         force=False,
     ):
-        self._check_if_already_registered(config_data["project_id"])
-        if dimension_file is None and base_to_supplemental_dimension_mapping_file is not None:
-            raise DSGInvalidParameter(
-                "dimension_file cannot be None if base_to_supplemental_dimension_mapping_file is set"
+        src_dir = config.src_dir
+        model = config.model
+        self._check_if_already_registered(model.project_id)
+        if model.dimensions.base_dimensions:
+            dim_model = DimensionsConfigModel(dimensions=model.dimensions.base_dimensions)
+            dims_config = DimensionsConfig.load_from_model(dim_model, src_dir)
+            dimension_ids = self._dimension_mgr.register(
+                dims_config, submitter, log_message, force=force, context=context
             )
-        if dimension_file is not None:
-            config_data_lists = [
-                config_data["dimensions"]["base_dimensions"],
-                config_data["dimensions"]["supplemental_dimensions"],
-            ]
-            dimension_name_mapping = auto_register_dimensions(
-                config_data_lists,
-                self._dimension_mgr,
-                dimension_file,
-                submitter,
-                log_message,
-                force,
-                context,
+            # Order of the next two is required for Pydantic validation.
+            model.dimensions.base_dimensions.clear()
+            model.dimensions.base_dimension_references = (
+                self._dimension_mgr.make_dimension_references(dimension_ids)
             )
-        if base_to_supplemental_dimension_mapping_file is not None:
-            if "dimension_mappings" not in config_data:
-                config_data["dimension_mappings"] = {}
-            if "base_to_supplemental" not in config_data["dimension_mappings"]:
-                config_data["dimension_mappings"]["base_to_supplemental"] = []
-            self._auto_register_dimension_mappings(
-                config_data["dimension_mappings"]["base_to_supplemental"],
-                base_to_supplemental_dimension_mapping_file,
-                dimension_name_mapping,
-                context,
-                submitter,
-                log_message,
-                force,
+        if model.dimensions.supplemental_dimensions:
+            dim_model = DimensionsConfigModel(dimensions=model.dimensions.supplemental_dimensions)
+            dims_config = DimensionsConfig.load_from_model(dim_model, src_dir)
+            dimension_ids = self._dimension_mgr.register(
+                dims_config, submitter, log_message, force=force, context=context
             )
+            model.dimensions.supplemental_dimension_references = (
+                self._dimension_mgr.make_dimension_references(dimension_ids)
+            )
+            model.dimensions.supplemental_dimensions.clear()
 
-        config = ProjectConfig.load(
-            config_file, self._dimension_mgr, self._dimension_mapping_mgr, data=config_data
-        )
+        if model.dimension_mappings.base_to_supplemental:
+            mappings = []
+            name_mapping = {}
+            for ref in itertools.chain(
+                model.dimensions.base_dimension_references,
+                model.dimensions.supplemental_dimension_references,
+            ):
+                dim = self._dimension_mgr.get_by_id(ref.dimension_id)
+                name_mapping[(dim.model.name, ref.dimension_type)] = ref
+
+            for mapping in model.dimension_mappings.base_to_supplemental:
+                from_dim = name_mapping[
+                    (mapping.from_dimension.name, mapping.from_dimension.dimension_type)
+                ]
+                to_dim = name_mapping[
+                    (mapping.to_dimension.name, mapping.to_dimension.dimension_type)
+                ]
+
+                mapping_model = run_in_other_dir(
+                    src_dir, MappingTableModel.from_pre_registered_model, mapping, from_dim, to_dim
+                )
+                mappings.append(mapping_model)
+
+            mapping_config = DimensionMappingsConfig.load_from_model(
+                DimensionMappingsConfigModel(mappings=mappings),
+                src_dir,
+            )
+            mapping_ids = self._dimension_mapping_mgr.register(
+                mapping_config, submitter, log_message, context=context, force=force
+            )
+            model.dimension_mappings.base_to_supplemental_references = (
+                self._dimension_mapping_mgr.make_dimension_mapping_references(mapping_ids)
+            )
+            model.dimension_mappings.base_to_supplemental.clear()
+
+        config.load_dimensions_and_mappings(self._dimension_mgr, self._dimension_mapping_mgr)
         self._register(config, submitter, log_message, force)
         context.add_id(RegistryType.PROJECT, config.model.project_id, self)
 
@@ -367,18 +338,16 @@ class ProjectRegistryManager(RegistryManagerBase):
         project_id,
         submitter,
         log_message,
-        dimension_file=None,
         dimension_mapping_file=None,
     ):
         context = RegistrationContext()
         error_occurred = False
         try:
-            self._dataset_mgr.register(
+            self._dataset_mgr.register_from_file(
                 dataset_config_file,
                 dataset_path,
                 submitter,
                 log_message,
-                dimension_file=dimension_file,
                 context=context,
             )
             self.submit_dataset(
@@ -403,7 +372,6 @@ class ProjectRegistryManager(RegistryManagerBase):
         submitter,
         log_message,
         dimension_mapping_file=None,
-        dimension_mapping_reference_file=None,
         context=None,
     ):
         """Registers a dataset with a project. This can only be performed on the
@@ -415,8 +383,6 @@ class ProjectRegistryManager(RegistryManagerBase):
         dataset_id : str
         dimension_mapping_file : Path or None
             Base-to-base dimension mapping file
-        dimension_mapping_reference_file : Path or None
-            Optionally contains references to already-registered dimension mappings.
         submitter : str
             Submitter name
         log_message : str
@@ -445,7 +411,6 @@ class ProjectRegistryManager(RegistryManagerBase):
                 submitter,
                 log_message,
                 dimension_mapping_file,
-                dimension_mapping_reference_file,
                 context,
             )
         except Exception:
@@ -462,7 +427,6 @@ class ProjectRegistryManager(RegistryManagerBase):
         submitter,
         log_message,
         dimension_mapping_file,
-        dimension_mapping_reference_file,  # TODO DT: probably don't need this
         context,
     ):
         logger.info("Submit dataset=%s to project=%s.", dataset_id, project_config.config_id)
@@ -474,25 +438,46 @@ class ProjectRegistryManager(RegistryManagerBase):
                 f"dataset={dataset_id} has already been submitted to project={project_config.config_id}"
             )
 
+        references = []
         if dimension_mapping_file is not None:
-            dataset_config = self._dataset_mgr.get_by_id(dataset_id)
-            dimension_name_mapping = {
-                (y.model.name, x.type.value): x for x, y in project_config.base_dimensions.items()
+            src_dir = dimension_mapping_file.parent
+            mappings = DatasetBaseToProjectMappingTableListModel(
+                **load_data(dimension_mapping_file)
+            ).mappings
+            dataset_mapping = {
+                x.dimension_type: x for x in dataset_config.model.dimension_references
             }
-            for key, val in dataset_config.dimensions.items():
-                dimension_name_mapping[(val.model.name, key.type.value)] = key
+            project_mapping = {
+                x.dimension_type: x
+                for x in project_config.model.dimensions.base_dimension_references
+            }
+            mapping_tables = []
+            for mapping in mappings:
+                mapping_table = run_in_other_dir(
+                    src_dir,
+                    MappingTableModel.from_pre_registered_model,
+                    mapping,
+                    dataset_mapping[mapping.dimension_type],
+                    project_mapping[mapping.dimension_type],
+                )
+                mapping_tables.append(mapping_table)
 
-            mapping_references = []
-            self._auto_register_dimension_mappings(
-                mapping_references,
-                dimension_mapping_file,
-                dimension_name_mapping,
-                context,
-                submitter,
-                log_message,
-                False,
+            mappings_config = DimensionMappingsConfig.load_from_model(
+                DimensionMappingsConfigModel(mappings=mapping_tables), src_dir
             )
-        references = [DimensionMappingReferenceModel(**x) for x in mapping_references]
+            mapping_ids = self._dimension_mapping_mgr.register(
+                mappings_config, submitter, log_message, context=context
+            )
+            for mapping_id in mapping_ids:
+                mapping_config = self._dimension_mapping_mgr.get_by_id(mapping_id)
+                references.append(
+                    DimensionMappingReferenceModel(
+                        from_dimension_type=mapping_config.model.from_dimension.dimension_type,
+                        to_dimension_type=mapping_config.model.to_dimension.dimension_type,
+                        mapping_id=mapping_id,
+                        version=self._dimension_mapping_mgr.get_current_version(mapping_id),
+                    )
+                )
         self._submit_dataset(project_config, dataset_config, submitter, log_message, references)
 
     def _submit_dataset(
@@ -671,7 +656,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         if submitter is None:
             submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(config.config_id)
-        with self.cloud_interface.make_lock_file(lock_file_path):
+        with self.cloud_interface.make_lock_file_managed(lock_file_path):
             return self._update(config, submitter, update_type, log_message)
 
     def _update(self, config, submitter, update_type, log_message):
@@ -679,6 +664,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         checker = ProjectUpdateChecker(old_config.model, config.model)
         result = checker.run()
         self._run_checks(config)
+
         registry = self.get_registry_config(config.config_id)
         old_key = ConfigKey(config.config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)

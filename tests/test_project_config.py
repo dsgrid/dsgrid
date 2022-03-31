@@ -25,39 +25,38 @@ def test_good_project_config(config_as_dict):
 
 
 def test_project_invalid_id(config_as_dict, dimension_manager):
-    dimensions = config_as_dict["dimensions"]["base_dimensions"]
+    dimensions = config_as_dict["dimensions"]["base_dimension_references"]
     first = dimensions[0]
     first["dimension_id"] = "invalid"
     model = ProjectConfigModel(**config_as_dict)
     with pytest.raises(DSGValueNotRegistered):
-        dimension_manager.load_dimensions(model.dimensions.base_dimensions)
+        dimension_manager.load_dimensions(model.dimensions.base_dimension_references)
 
 
 def test_project_config_missing_dimension(config_as_dict):
-    for i, dimension in enumerate(config_as_dict["dimensions"]["base_dimensions"]):
+    for i, dimension in enumerate(config_as_dict["dimensions"]["base_dimension_references"]):
         if dimension["dimension_id"].startswith("county"):
             break
-    config_as_dict["dimensions"]["base_dimensions"].pop(i)
+    config_as_dict["dimensions"]["base_dimension_references"].pop(i)
     with pytest.raises(ValueError):
         ProjectConfigModel(**config_as_dict)
 
 
 def test_project_duplicate_dimension(config_as_dict, dimension_manager):
-    first = config_as_dict["dimensions"]["base_dimensions"][0]
-    config_as_dict["dimensions"]["base_dimensions"].append(first)
+    first = config_as_dict["dimensions"]["base_dimension_references"][0]
+    config_as_dict["dimensions"]["base_dimension_references"].append(first)
     with pytest.raises(ValueError):
         ProjectConfigModel(**config_as_dict)
 
 
 def test_project_duplicate_type(config_as_dict, dimension_manager):
     index = None
-    duplicate = None
-    for i, dim in enumerate(config_as_dict["dimensions"]["supplemental_dimensions"]):
+    for i, dim in enumerate(config_as_dict["dimensions"]["supplemental_dimension_references"]):
         if dim["dimension_id"].startswith("us_states"):
             index = i
-            config_as_dict["dimensions"]["base_dimensions"].append(dim)
+            config_as_dict["dimensions"]["base_dimension_references"].append(dim)
     assert index is not None
-    config_as_dict["dimensions"]["supplemental_dimensions"].pop(index)
+    config_as_dict["dimensions"]["supplemental_dimension_references"].pop(index)
 
     with pytest.raises(ValueError):
         ProjectConfigModel(**config_as_dict)

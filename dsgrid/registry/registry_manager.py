@@ -435,7 +435,7 @@ class RegistryManager:
             return
         for dataset in self.dataset_manager.iter_configs():
             updated = False
-            for dimension_ref in dataset.model.dimensions:
+            for dimension_ref in dataset.model.dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
                     dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
                     updated = True
@@ -447,11 +447,11 @@ class RegistryManager:
             return
         for project in self.project_manager.iter_configs():
             updated = False
-            for dimension_ref in project.model.dimensions.base_dimensions:
+            for dimension_ref in project.model.dimensions.base_dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
                     dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
                     updated = True
-            for dimension_ref in project.model.dimensions.supplemental_dimensions:
+            for dimension_ref in project.model.dimensions.supplemental_dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
                     dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
                     updated = True
@@ -463,7 +463,7 @@ class RegistryManager:
             return
         for project in self.project_manager.iter_configs():
             updated = False
-            for mapping_ref in project.model.dimension_mappings.base_to_supplemental:
+            for mapping_ref in project.model.dimension_mappings.base_to_supplemental_references:
                 if mapping_ref.mapping_id in updated_mappings:
                     mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
                     updated = True

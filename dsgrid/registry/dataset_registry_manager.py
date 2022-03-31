@@ -91,6 +91,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             self.remove(dataset_id)
 
         if not self.offline_mode:
+            lock_file = self.get_registry_lock_file(dataset_id)
             self.cloud_interface.check_lock_file(lock_file)
             if not error_occurred:
                 self.sync_push(self.get_registry_directory(dataset_id))

@@ -122,12 +122,12 @@ class ProjectRegistryManager(RegistryManagerBase):
         if error_occurred:
             logger.info("Remove intermediate project after error")
             self.remove(project_id)
-            return
 
         if not self.offline_mode:
             lock_file = self.get_registry_lock_file(project_id)
             self.cloud_interface.check_lock_file(lock_file)
-            self.sync_push(self.get_registry_directory(project_id))
+            if not error_occurred:
+                self.sync_push(self.get_registry_directory(project_id))
             self.cloud_interface.remove_lock_file(lock_file)
 
     def get_by_id(self, config_id, version=None):

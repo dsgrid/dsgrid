@@ -149,14 +149,14 @@ class DimensionRegistryManager(RegistryManagerBase):
             logger.info("Remove all intermediate dimensions after error")
             for dimension_id in config_ids:
                 self.remove(dimension_id)
-            return
 
         if not self.offline_mode:
             lock_file = self.get_registry_lock_file(None)
             self.cloud_interface.check_lock_file(lock_file)
             # Sync the entire dimension registry path because it's probably cheaper
             # than syncing each changed path individually.
-            self.sync_push(self._path)
+            if not error_occurred:
+                self.sync_push(self._path)
             self.cloud_interface.remove_lock_file(lock_file)
 
     def get_by_id(self, config_id, version=None, force=False):

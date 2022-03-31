@@ -523,6 +523,7 @@ class RegistryManagerBase(abc.ABC):
             Raised if the project_id is not registered.
 
         """
+        # TODO: Do we want to handle specific versions? This removes all configs.
 
     def _remove(self, config_id):
         if not self.offline_mode:

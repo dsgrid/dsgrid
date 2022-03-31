@@ -66,21 +66,15 @@ Click Group Definitions
     "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
     "commands will not be officially synced with the remote registry",
 )
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def registry(ctx, path, remote_path, offline, dry_run):
+def registry(ctx, path, remote_path, offline):
     """Manage a registry."""
     no_prompts = ctx.parent.params["no_prompts"]
     if "--help" in sys.argv:
         ctx.obj = None
     else:
         ctx.obj = RegistryManager.load(
-            path, remote_path, offline_mode=offline, dry_run_mode=dry_run, no_prompts=no_prompts
+            path, remote_path, offline_mode=offline, no_prompts=no_prompts
         )
 
 

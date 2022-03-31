@@ -234,7 +234,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 self.remove(mapping_id)
             return
 
-        if not self.offline_mode and not self.dry_run_mode:
+        if not self.offline_mode:
             lock_file = self.get_registry_lock_file(None)
             self.cloud_interface.check_lock_file(lock_file)
             # Sync the entire dimension mapping registry path because it's probably cheaper
@@ -344,16 +344,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self.validate_records(config)
 
         registration = make_initial_config_registration(submitter, log_message)
-        if self.dry_run_mode:
-            for mapping in config.model.mappings:
-                logger.info(
-                    "%s Dimension mapping validated for registration: from=%s to=%s",
-                    self._log_dry_run_mode_prefix(),
-                    mapping.from_dimension.dimension_id,
-                    mapping.to_dimension.dimension_id,
-                )
-            return []
-
         dimension_mapping_ids = []
         try:
             # Guarantee that registration of dimension mappings is all or none.

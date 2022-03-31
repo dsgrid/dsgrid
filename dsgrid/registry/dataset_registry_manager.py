@@ -91,7 +91,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             self.remove(dataset_id)
             return
 
-        if not self.offline_mode and not self.dry_run_mode:
+        if not self.offline_mode:
             lock_file = self.get_registry_lock_file(dataset_id)
             self.cloud_interface.check_lock_file(lock_file)
             self.sync_push(self.get_registry_directory(dataset_id))
@@ -220,14 +220,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         dataset_id = config.model.dataset_id
         self._run_checks(config)
         registration = make_initial_config_registration(submitter, log_message)
-
-        if self.dry_run_mode:
-            logger.info(
-                "%s Dataset registration validated for dataset_id=%s",
-                self._log_dry_run_mode_prefix(),
-                dataset_id,
-            )
-            return
 
         registry_model = DatasetRegistryModel(
             dataset_id=dataset_id,

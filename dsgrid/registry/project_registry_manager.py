@@ -281,14 +281,6 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         registration = make_initial_config_registration(submitter, log_message)
 
-        if self.dry_run_mode:
-            logger.info(
-                "%s Project validated for registration project_id=%s",
-                self._log_dry_run_mode_prefix(),
-                config.model.project_id,
-            )
-            return
-
         registry_model = ProjectRegistryModel(
             project_id=config.model.project_id,
             version=registration.version,
@@ -494,14 +486,6 @@ class ProjectRegistryManager(RegistryManagerBase):
             dataset_config,
             mapping_references,
         )
-
-        if self.dry_run_mode:
-            logger.info(
-                "%s Dataset submission to project validated dataset_id=%s project_id=%s",
-                self._log_dry_run_mode_prefix(),
-                dataset_config.model.dataset_id,
-                project_config.model.project_id,
-            )
 
         dataset_model = project_config.get_dataset(dataset_config.model.dataset_id)
         dataset_model.mapping_references = mapping_references

@@ -268,18 +268,11 @@ class RegistryManagerBase(abc.ABC):
         if config_id not in self._registry_configs:
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
 
-    def _log_dry_run_mode_prefix(self):
-        return "* DRY RUN MODE * |" if self.dry_run_mode else ""
-
     def _log_offline_mode_prefix(self):
         return "* OFFLINE MODE * |" if self.offline_mode else ""
 
     def _update_registry_cache(self, config_id, registry_config):
         self._registry_configs[config_id] = registry_config
-
-    def _raise_if_dry_run(self, operation):
-        if self.dry_run_mode:
-            raise DSGInvalidOperation(f"operation={operation} is not allowed in dry-run mode")
 
     @property
     def cloud_interface(self):
@@ -341,11 +334,6 @@ class RegistryManagerBase(abc.ABC):
     def offline_mode(self):
         """Return True if there is to be no syncing with the remote registry."""
         return self._params.offline
-
-    @property
-    def dry_run_mode(self):
-        """Return True if no registry changes are to be made. Checking only."""
-        return self._params.dry_run
 
     def get_config_directory(self, config_id, version):
         """Return the path to the config file.
@@ -540,7 +528,6 @@ class RegistryManagerBase(abc.ABC):
         if not self.offline_mode:
             # TODO: DSGRID-145
             raise Exception("sync-push of config removal is currently not supported")
-        self._raise_if_dry_run("remove")
         self._check_if_not_registered(config_id)
         self.fs_interface.rm_tree(self.get_registry_directory(config_id))
         self._registry_configs.pop(config_id, None)

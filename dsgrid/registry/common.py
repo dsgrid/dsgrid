@@ -96,7 +96,7 @@ DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 # Obviates the need to pass parameters to many constructors.
 RegistryManagerParams = namedtuple(
     "RegistryManagerParams",
-    ["base_path", "remote_path", "fs_interface", "cloud_interface", "offline", "dry_run"],
+    ["base_path", "remote_path", "fs_interface", "cloud_interface", "offline"],
 )
 
 

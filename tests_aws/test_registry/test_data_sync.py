@@ -85,7 +85,6 @@ def test_data_sync_project_id(local_registry):
                 local_registry_data_sync,
                 TEST_REMOTE_REGISTRY,
                 offline_mode=False,
-                dry_run_mode=False,
                 no_prompts=True,
             )
 
@@ -125,7 +124,6 @@ def test_data_sync_dataset_id(local_registry):
                 local_registry_data_sync,
                 TEST_REMOTE_REGISTRY,
                 offline_mode=False,
-                dry_run_mode=False,
                 no_prompts=True,
             )
 
@@ -166,7 +164,6 @@ def test_data_sync_project_id_and_dataset_id(local_registry):
                 local_registry_data_sync,
                 TEST_REMOTE_REGISTRY,
                 offline_mode=False,
-                dry_run_mode=False,
                 no_prompts=True,
             )
 
@@ -207,7 +204,6 @@ def test_data_sync_bad_project_id(local_registry):
                 local_registry_data_sync,
                 TEST_REMOTE_REGISTRY,
                 offline_mode=False,
-                dry_run_mode=False,
                 no_prompts=True,
             )
 
@@ -240,7 +236,6 @@ def test_data_sync_bad_dataset_id(local_registry):
                 local_registry_data_sync,
                 TEST_REMOTE_REGISTRY,
                 offline_mode=False,
-                dry_run_mode=False,
                 no_prompts=True,
             )
 
@@ -273,7 +268,6 @@ def test_data_sync_project_id_and_bad_dataset_id(local_registry):
                 local_registry_data_sync,
                 TEST_REMOTE_REGISTRY,
                 offline_mode=False,
-                dry_run_mode=False,
                 no_prompts=True,
             )
 
@@ -306,7 +300,6 @@ def test_data_sync_project_id(local_registry):
                 local_registry_data_sync,
                 TEST_REMOTE_REGISTRY,
                 offline_mode=False,
-                dry_run_mode=False,
                 no_prompts=True,
             )
 
@@ -348,7 +341,6 @@ def test_data_sync_bad_project_id_with_dataset_lock(local_registry):
                 local_registry_data_sync,
                 TEST_REMOTE_REGISTRY,
                 offline_mode=False,
-                dry_run_mode=False,
                 no_prompts=True,
             )
 

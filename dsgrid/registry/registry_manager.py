@@ -106,7 +106,7 @@ class RegistryManager:
         logger.info("Created registry at %s", path)
         cloud_interface = make_cloud_storage_interface(path, "", offline=True, uuid=uid, user=user)
         params = RegistryManagerParams(
-            Path(path), remote_path, fs_interface, cloud_interface, offline=True, dry_run=False
+            Path(path), remote_path, fs_interface, cloud_interface, offline=True
         )
         return cls(params)
 
@@ -132,7 +132,6 @@ class RegistryManager:
         path,
         remote_path=REMOTE_REGISTRY,
         offline_mode=False,
-        dry_run_mode=False,
         user=None,
         no_prompts=False,
     ):
@@ -146,8 +145,6 @@ class RegistryManager:
             path of the remote registry; default is REMOTE_REGISTRY
         offline_mode : bool
             Load registry in offline mode; default is False
-        dry_run_mode : bool
-            Test registry operations in dry-run "test" mode (i.e., do not commit changes to remote)
         user : str
             username
         no_prompts : bool
@@ -200,7 +197,7 @@ class RegistryManager:
                 )
 
         params = RegistryManagerParams(
-            Path(path), remote_path, fs_interface, cloud_interface, offline_mode, dry_run_mode
+            Path(path), remote_path, fs_interface, cloud_interface, offline_mode
         )
         path = Path(path)
         for dir_name in (
@@ -219,10 +216,9 @@ class RegistryManager:
                 fs_interface.mkdir(dir_name)
 
         logger.info(
-            f"Loaded local registry at %s offline_mode=%s dry_run_mode=%s",
+            f"Loaded local registry at %s offline_mode=%s",
             path,
             offline_mode,
-            dry_run_mode,
         )
         return cls(params)
 
@@ -266,21 +262,17 @@ class RegistryManager:
     def _data_sync(self, dataset_id, version, no_prompts=True):
         cloud_interface = self._params.cloud_interface
         offline_mode = self._params.offline
-        dry_run_mode = self._params.dry_run
 
         if offline_mode:
             raise ValueError("dsgrid data-sync only works in online mode.")
-        if dry_run_mode == True:
-            sync = False
-        else:
-            sync = True
+        sync = True
 
         lock_files = list(
             cloud_interface.get_lock_files(
                 relative_path=f"{cloud_interface._s3_filesystem._bucket}/configs/datasets/{dataset_id}"
             )
         )
-        if lock_files and not dry_run_mode:
+        if lock_files:
             assert len(lock_files) == 1
             msg = f"There are {len(lock_files)} lock files in the registry:"
             for lock_file in lock_files:

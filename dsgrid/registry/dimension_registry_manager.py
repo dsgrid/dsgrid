@@ -151,7 +151,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 self.remove(dimension_id)
             return
 
-        if not self.offline_mode and not self.dry_run_mode:
+        if not self.offline_mode:
             lock_file = self.get_registry_lock_file(None)
             self.cloud_interface.check_lock_file(lock_file)
             # Sync the entire dimension registry path because it's probably cheaper
@@ -268,16 +268,6 @@ class DimensionRegistryManager(RegistryManagerBase):
         # TODO: check that id does not already exist in .dsgrid-registry
 
         registration = make_initial_config_registration(submitter, log_message)
-
-        if self.dry_run_mode:
-            for dimension in config.model.dimensions:
-                logger.info(
-                    "%s Dimension validated for registration: type=%s name=%s",
-                    self._log_dry_run_mode_prefix(),
-                    dimension.dimension_type.value,
-                    dimension.name,
-                )
-            return []
 
         dimension_ids = []
         try:

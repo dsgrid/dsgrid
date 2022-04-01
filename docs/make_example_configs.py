@@ -13,7 +13,7 @@ dataset_dir = base_dir / "datasets" / "sector_models" / "comstock"
 
 project_config = base_dir / "project.toml"
 dimensions_config = base_dir / "dimensions.toml"
-dimension_mappings_config = base_dir / "dimension_mappings.toml"
+dimension_mappings_config = base_dir / "dimension_mappings_with_ids.toml"
 dataset_config = dataset_dir / "dataset.toml"
 dimension_mapping_ref_config = dataset_dir / "dimension_mapping_references.toml"
 

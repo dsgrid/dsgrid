@@ -1,4 +1,4 @@
-.. _dsgrid Data Structure 
+.. _dsgrid Data Structure:
 
 *********************
 dsgrid Data Structure

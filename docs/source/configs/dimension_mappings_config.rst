@@ -8,5 +8,5 @@ Dimension Mappings Config
 
 Example dimension_mapping.toml
 ==============================
-.. literalinclude:: ../../_build/example_configs/dimension_mappings.toml
+.. literalinclude:: ../../_build/example_configs/dimension_mappings_with_ids.toml
    :language: toml

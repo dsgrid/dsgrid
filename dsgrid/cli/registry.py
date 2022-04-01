@@ -440,6 +440,15 @@ def register_project(
     callback=_path_callback,
 )
 @click.option(
+    "-r",
+    "--dimension-mapping-references-file",
+    type=click.Path(exists=True),
+    show_default=True,
+    help="dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
+    "Use it when the mappings are already registered.",
+    callback=_path_callback,
+)
+@click.option(
     "-l",
     "--log-message",
     required=True,
@@ -452,6 +461,7 @@ def submit_dataset(
     dataset_id,
     project_id,
     dimension_mapping_file,
+    dimension_mapping_references_file,
     log_message,
 ):
     """Submit a dataset to a dsgrid project."""
@@ -462,7 +472,8 @@ def submit_dataset(
         dataset_id,
         submitter,
         log_message,
-        dimension_mapping_file,
+        dimension_mapping_file=dimension_mapping_file,
+        dimension_mapping_references_file=dimension_mapping_references_file,
     )
 
 

@@ -27,6 +27,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
+    DimensionMappingReferenceListModel,
 )
 from dsgrid.config.dimension_mappings_config import (
     DimensionMappingsConfig,
@@ -364,6 +365,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         submitter,
         log_message,
         dimension_mapping_file=None,
+        dimension_mapping_references_file=None,
         context=None,
     ):
         """Registers a dataset with a project. This can only be performed on the
@@ -375,6 +377,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         dataset_id : str
         dimension_mapping_file : Path or None
             Base-to-base dimension mapping file
+        dimension_mapping_references_file : Path or None
+            Mutually exclusive with dimension_mapping_file. Use it when mappings are already
+            registered.
         submitter : str
             Submitter name
         log_message : str
@@ -390,6 +395,11 @@ class ProjectRegistryManager(RegistryManagerBase):
             Raised if the project does not contain this dataset.
 
         """
+        if dimension_mapping_file is not None and dimension_mapping_references_file is not None:
+            raise DSGInvalidParameter(
+                "dimension_mapping_file and dimension_mapping_references_file cannot both be passed"
+            )
+
         need_to_finalize = context is None
         error_occurred = False
         if context is None:
@@ -403,6 +413,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 submitter,
                 log_message,
                 dimension_mapping_file,
+                dimension_mapping_references_file,
                 context,
             )
         except Exception:
@@ -419,6 +430,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         submitter,
         log_message,
         dimension_mapping_file,
+        dimension_mapping_references_file,
         context,
     ):
         logger.info("Submit dataset=%s to project=%s.", dataset_id, project_config.config_id)
@@ -470,6 +482,14 @@ class ProjectRegistryManager(RegistryManagerBase):
                         version=self._dimension_mapping_mgr.get_current_version(mapping_id),
                     )
                 )
+        elif dimension_mapping_references_file is not None:
+            for ref in DimensionMappingReferenceListModel.load(
+                dimension_mapping_references_file
+            ).references:
+                if not self.dimension_mapping_manager.has_id(ref.mapping_id, version=ref.version):
+                    raise DSGValueNotRegistered(f"mapping_id={ref.mapping_id}")
+                references.append(ref)
+
         self._submit_dataset(project_config, dataset_config, submitter, log_message, references)
 
     def _submit_dataset(

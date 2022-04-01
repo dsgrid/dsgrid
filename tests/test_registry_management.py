@@ -22,6 +22,8 @@ from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
     make_test_project_dir,
+    replace_dimension_uuids_from_registry,
+    replace_dimension_mapping_uuids_from_registry,
     TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import dump_data, load_data
@@ -116,8 +118,6 @@ def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):
             base_dir, src_dir, include_projects=False, include_datasets=False
         )
         project_file = src_dir / "project.toml"
-        dimension_file = src_dir / "dimensions.toml"
-        mappings_file = src_dir / "base_to_supplemental_dimension_mappings.toml"
         orig_dimension_ids = manager.dimension_manager.list_ids()
 
         data = load_data(project_file)
@@ -307,6 +307,59 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         # Valid - null value in "to" record (Only one valid test allowed in this test func)
         record_file.write_text(orig_text.replace("CO", ""))
         dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
+
+
+def test_register_submit_dataset_long_workflow(make_test_project_dir):
+    src_dir = make_test_project_dir
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        manager = make_test_data_registry(
+            base_dir, src_dir, include_projects=False, include_datasets=False
+        )
+        dim_mapping_mgr = manager.dimension_mapping_manager
+        project_config_file = src_dir / "project_with_dimension_ids.toml"
+        project_id = load_data(project_config_file)["project_id"]
+        project_dimension_mapping_config = src_dir / "dimension_mappings_with_ids.toml"
+        project_dimension_file = src_dir / "dimensions.toml"
+        dataset_dir = src_dir / "datasets" / "sector_models" / "comstock"
+        dataset_config_file = dataset_dir / "dataset_with_dimension_ids.toml"
+        dataset_id = load_data(dataset_config_file)["dataset_id"]
+        dataset_dimension_file = dataset_dir / "dimensions.toml"
+        dimension_mapping_config = dataset_dir / "dimension_mapping_config_with_ids.toml"
+        dimension_mapping_refs = dataset_dir / "dimension_mapping_references.toml"
+        user = getpass.getuser()
+        log_message = "register"
+
+        manager.dimension_manager.register_from_file(project_dimension_file, user, log_message)
+        manager.dimension_manager.register_from_file(dataset_dimension_file, user, log_message)
+
+        needs_replacements = [project_dimension_mapping_config, dimension_mapping_config]
+        replace_dimension_uuids_from_registry(base_dir, needs_replacements)
+
+        dim_mapping_mgr.register_from_file(project_dimension_mapping_config, user, log_message)
+        dim_mapping_mgr.register_from_file(dimension_mapping_config, user, log_message)
+
+        needs_replacements = [project_config_file, dimension_mapping_refs]
+        replace_dimension_mapping_uuids_from_registry(base_dir, needs_replacements)
+        replace_dimension_uuids_from_registry(base_dir, (project_config_file, dataset_config_file))
+
+        manager.project_manager.register_from_file(project_config_file, user, "register project")
+        dataset_path = TEST_DATASET_DIRECTORY / dataset_id
+        manager.dataset_manager.register_from_file(
+            dataset_config_file, dataset_path, user, "register dataset"
+        )
+        manager.project_manager.submit_dataset(
+            project_id,
+            dataset_id,
+            user,
+            log_message,
+            dimension_mapping_references_file=dimension_mapping_refs,
+        )
+
+        assert manager.dimension_manager.list_ids()
+        assert manager.dimension_mapping_manager.list_ids()
+        assert manager.project_manager.list_ids() == [project_id]
+        assert manager.dataset_manager.list_ids() == [dataset_id]
 
 
 def register_project(project_mgr, config_file, project_id, user, log_message):

@@ -123,6 +123,25 @@ def load_line_delimited_json(filename):
     return objects
 
 
+def run_in_other_dir(path: Path, func, *args, **kwargs):
+    """Run a function while in another directory.
+
+    Parameters
+    ----------
+    path : Path
+        Change to this directory while running func.
+    func
+        Function to call.
+
+    """
+    orig = os.getcwd()
+    os.chdir(path)
+    try:
+        return func(*args, **kwargs)
+    finally:
+        os.chdir(orig)
+
+
 def _get_module_from_extension(filename, **kwargs):
     ext = os.path.splitext(filename)[1].lower()
     if ext == ".json":

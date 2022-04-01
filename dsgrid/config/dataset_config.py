@@ -14,9 +14,12 @@ from dsgrid.registry.common import check_config_id_strict
 from .config_base import ConfigBase
 from .dimensions import (
     DimensionReferenceModel,
+    DimensionModel,
+    handle_dimension_union,
 )
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
+from dsgrid.utils.utilities import check_uniqueness
 
 
 ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv")
@@ -305,14 +308,27 @@ class DatasetConfigModel(DSGBaseModel):
         description="List of data tags",
         required=False,
     )
-    dimensions: List[DimensionReferenceModel] = Field(
+    dimensions: List = Field(
+        title="dimensions",
+        description="List of dimensions that make up the dimensions of dataset. They will be "
+        "automatically registered during dataset registration and then converted "
+        "to dimension_references.",
+        requirements=(
+            "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined",
+            "* Only one dimension reference per type is allowed",
+            "* Each reference is to an existing registered dimension.",
+        ),
+        default=[],
+    )
+    dimension_references: List[DimensionReferenceModel] = Field(
         title="dimensions",
         description="List of registered dimension references that make up the dimensions of dataset.",
         requirements=(
             "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined",
             "* Only one dimension reference per type is allowed",
             "* Each reference is to an existing registered dimension.",
-        )
+        ),
+        default=[],
         # TODO: Add to notes - link to registering dimensions page
         # TODO: Add to notes - link to example of how to list dimensions to find existing registered dimensions
     )
@@ -379,6 +395,28 @@ class DatasetConfigModel(DSGBaseModel):
                 )
         return trivial_dimensions
 
+    @validator("dimensions")
+    def check_files(cls, values: dict) -> dict:
+        """Validate dimension files are unique across all dimensions"""
+        check_uniqueness(
+            (x.filename for x in values if isinstance(x, DimensionModel)),
+            "dimension record filename",
+        )
+        return values
+
+    @validator("dimensions")
+    def check_names(cls, values: dict) -> dict:
+        """Validate dimension names are unique across all dimensions."""
+        check_uniqueness(
+            [dim.name for dim in values],
+            "dimension record name",
+        )
+        return values
+
+    @validator("dimensions", pre=True, each_item=True, always=True)
+    def handle_dimension_union(cls, values):
+        return handle_dimension_union(values)
+
 
 class DatasetConfig(ConfigBase):
     """Provides an interface to a DatasetConfigModel."""
@@ -387,6 +425,7 @@ class DatasetConfig(ConfigBase):
         super().__init__(model)
         self._dimensions = {}
         self._dataset_path = None
+        self._src_dir = None
 
     @staticmethod
     def config_filename():
@@ -403,12 +442,14 @@ class DatasetConfig(ConfigBase):
     @classmethod
     def load_from_registry(cls, config_file, dimension_manager, registry_data_path):
         config = cls._load(config_file)
+        config.src_dir = config_file.parent
         dataset_path = registry_data_path / config.config_id / config.model.dataset_version
         return cls.load(config, dimension_manager, dataset_path)
 
     @classmethod
     def load_from_user_path(cls, config_file, dimension_manager, dataset_path):
         config = cls._load(config_file)
+        config.src_dir = config_file.parent
         schema_type = config.model.data_schema_type
         if not dataset_path.exists():
             raise DSGInvalidParameter(f"Dataset {dataset_path} does not exist")
@@ -454,7 +495,7 @@ class DatasetConfig(ConfigBase):
         dimension_manager : DimensionRegistryManager
 
         """
-        self._dimensions.update(dimension_manager.load_dimensions(self.model.dimensions))
+        self._dimensions.update(dimension_manager.load_dimensions(self.model.dimension_references))
 
     @property
     def dimensions(self):
@@ -498,3 +539,11 @@ class DatasetConfig(ConfigBase):
             raise DSGInvalidDimension(
                 f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
             )
+
+    @property
+    def src_dir(self):
+        return self._src_dir
+
+    @src_dir.setter
+    def src_dir(self, src_dir):
+        self._src_dir = src_dir

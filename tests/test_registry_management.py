@@ -1,5 +1,6 @@
 import getpass
 import os
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory, gettempdir
 
@@ -10,10 +11,7 @@ from semver import VersionInfo
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
-    DSGInvalidDimension,
     DSGInvalidDimensionMapping,
-    DSGInvalidParameter,
-    DSGInvalidOperation,
     DSGValueNotRegistered,
 )
 from dsgrid.registry.common import DatasetRegistryStatus, ProjectRegistryStatus, VersionUpdateType
@@ -24,6 +22,8 @@ from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
     make_test_project_dir,
+    replace_dimension_uuids_from_registry,
+    replace_dimension_mapping_uuids_from_registry,
     TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import dump_data, load_data
@@ -70,17 +70,17 @@ def test_register_project_and_dataset(make_test_project_dir):
 
         with pytest.raises(DSGDuplicateValueRegistered):
             project_config_file = make_test_project_dir / "project.toml"
-            project_mgr.register(project_config_file, user, log_message)
+            project_mgr.register_from_file(project_config_file, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
             dataset_config_file = (
                 make_test_project_dir / "datasets/sector_models/comstock/dataset.toml"
             )
-            dataset_mgr.register(dataset_config_file, dataset_path, user, log_message)
+            dataset_mgr.register_from_file(dataset_config_file, dataset_path, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
             dim_config_file = make_test_project_dir / "dimensions.toml"
-            dimension_mgr.register(dim_config_file, user, log_message)
+            dimension_mgr.register_from_file(dim_config_file, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
             # Time dimension doesn't have records and duplicates are only based on fields.
@@ -90,12 +90,14 @@ def test_register_project_and_dataset(make_test_project_dir):
             new_models = {"dimensions": time_models}
             new_file = make_test_project_dir / "time_dimension.toml"
             dump_data(new_models, new_file)
-            dimension_mgr.register(new_file, user, log_message)
+            dimension_mgr.register_from_file(new_file, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
-            dset_dir = Path("datasets/sector_models/comstock")
-            dimension_mapping_config = make_test_project_dir / dset_dir / "dimension_mappings.toml"
-            dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
+            dimension_mapping_mgr.dump(dimension_mapping_id, base_dir)
+            dimension_mapping_config = base_dir / "dimension_mapping.toml"
+            data = load_data(dimension_mapping_config)
+            dump_data({"mappings": [data]}, dimension_mapping_config)
+            dimension_mapping_mgr.register_from_file(dimension_mapping_config, user, log_message)
 
         check_configs_update(base_dir, manager)
         check_update_project_dimension(base_dir, manager)
@@ -106,6 +108,83 @@ def test_register_project_and_dataset(make_test_project_dir):
         check_config_remove(dataset_mgr, dataset_id)
         check_config_remove(dimension_mgr, dimension_id)
         check_config_remove(dimension_mapping_mgr, dimension_mapping_id)
+
+
+def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):
+    src_dir = make_test_project_dir
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        manager = make_test_data_registry(
+            base_dir, src_dir, include_projects=False, include_datasets=False
+        )
+        project_file = src_dir / "project.toml"
+        orig_dimension_ids = manager.dimension_manager.list_ids()
+
+        data = load_data(project_file)
+        # Inject an invalid project ID so that we can test rollback of dimensions.
+        data["project_id"] = "project-with-dashes"
+        dump_data(data, project_file)
+
+        with pytest.raises(ValueError):
+            manager.project_manager.register_from_file(
+                project_file,
+                getpass.getuser(),
+                "register duplicate project",
+            )
+
+        # Dimensions and mappings should have been registered and then cleared.
+        assert manager.dimension_manager.list_ids() == orig_dimension_ids
+        assert not manager.dimension_mapping_manager.list_ids()
+
+
+def test_register_and_submit_rollback_on_failure(make_test_project_dir):
+    src_dir = make_test_project_dir
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        path = create_local_test_registry(base_dir)
+        manager = RegistryManager.load(path, offline_mode=True)
+        project_file = src_dir / "project.toml"
+        project_id = load_data(project_file)["project_id"]
+        dataset_dir = src_dir / "datasets" / "sector_models" / "comstock"
+        dataset_config_file = dataset_dir / "dataset.toml"
+        dataset_mapping_file = dataset_dir / "dimension_mappings.toml"
+        dataset_path = (
+            Path(os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY))
+            / "test_efs_comstock"
+        )
+        subsectors_file = (
+            dataset_dir
+            / "dimension_mappings"
+            / "lookup_comstock_subsectors_to_project_subsectors.csv"
+        )
+        # Remove some records.
+        data = subsectors_file.read_text().splitlines()[:-2]
+        subsectors_file.write_text("\n".join(data))
+
+        manager.project_manager.register_from_file(
+            project_file,
+            getpass.getuser(),
+            "register project",
+        )
+
+        replace_dimension_uuids_from_registry(path, (dataset_config_file,))
+        orig_dimension_ids = manager.dimension_manager.list_ids()
+        orig_mapping_ids = manager.dimension_mapping_manager.list_ids()
+
+        with pytest.raises(DSGInvalidDataset):
+            manager.project_manager.register_and_submit_dataset(
+                dataset_config_file,
+                dataset_path,
+                project_id,
+                getpass.getuser(),
+                "register dataset and submit",
+                dimension_mapping_file=dataset_mapping_file,
+            )
+
+        assert manager.dimension_manager.list_ids() == orig_dimension_ids
+        assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids
+        assert not manager.dataset_manager.list_ids()
+        assert manager.project_manager.list_ids() == [project_id]
 
 
 def test_auto_updates(make_test_project_dir):
@@ -147,7 +226,7 @@ def test_auto_updates(make_test_project_dir):
 
         project = project_mgr.get_by_id(project_id)
         found = False
-        for mapping_ref in project.model.dimension_mappings.base_to_supplemental:
+        for mapping_ref in project.model.dimension_mappings.base_to_supplemental_references:
             if mapping_ref.mapping_id == mapping.config_id:
                 assert mapping_ref.version == new_version
                 found = True
@@ -155,7 +234,7 @@ def test_auto_updates(make_test_project_dir):
 
         dataset = dataset_mgr.get_by_id(dataset_id)
         found = False
-        for dimension_ref in dataset.model.dimensions:
+        for dimension_ref in dataset.model.dimension_references:
             if dimension_ref.dimension_id == dimension.config_id:
                 assert dimension_ref.version == VersionInfo.parse("1.1.0")
                 found = True
@@ -189,9 +268,9 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         manager = RegistryManager.load(path, offline_mode=True)
 
         dim_mgr = manager.dimension_manager
-        dim_mgr.register(make_test_project_dir / "dimensions.toml", user, log_message)
+        dim_mgr.register_from_file(make_test_project_dir / "dimensions.toml", user, log_message)
         dim_mapping_mgr = manager.dimension_mapping_manager
-        dimension_mapping_file = make_test_project_dir / "dimension_mappings.toml"
+        dimension_mapping_file = make_test_project_dir / "dimension_mappings_with_ids.toml"
         replace_dimension_uuids_from_registry(path, [dimension_mapping_file])
 
         record_file = (
@@ -205,17 +284,17 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         # Invalid 'from' record
         record_file.write_text(orig_text + "invalid county,1,CO\n")
         with pytest.raises(DSGInvalidDimensionMapping):
-            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+            dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
 
         # Invalid 'from' record - nulls aren't allowd
         record_file.write_text(orig_text + ",1.2,CO\n")
         with pytest.raises(DSGInvalidDimensionMapping):
-            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+            dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
 
         # Invalid 'to' record
         record_file.write_text(orig_text.replace("CO", "Colorado"))
         with pytest.raises(DSGInvalidDimensionMapping):
-            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+            dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
 
         # Duplicate "from" record, invalid as mapping_type = one_to_one_multiplication
         orig_text2 = orig_text.split(",")
@@ -223,20 +302,73 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         record_file.write_text(orig_text2 + "\n08031,CO\n")
         msg = r"dimension_mapping.*has mapping_type.*, which does not allow duplicated.*records"
         with pytest.raises(DSGInvalidDimensionMapping, match=msg):
-            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+            dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
 
         # Valid - null value in "to" record (Only one valid test allowed in this test func)
         record_file.write_text(orig_text.replace("CO", ""))
-        dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+        dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
+
+
+def test_register_submit_dataset_long_workflow(make_test_project_dir):
+    src_dir = make_test_project_dir
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        manager = make_test_data_registry(
+            base_dir, src_dir, include_projects=False, include_datasets=False
+        )
+        dim_mapping_mgr = manager.dimension_mapping_manager
+        project_config_file = src_dir / "project_with_dimension_ids.toml"
+        project_id = load_data(project_config_file)["project_id"]
+        project_dimension_mapping_config = src_dir / "dimension_mappings_with_ids.toml"
+        project_dimension_file = src_dir / "dimensions.toml"
+        dataset_dir = src_dir / "datasets" / "sector_models" / "comstock"
+        dataset_config_file = dataset_dir / "dataset_with_dimension_ids.toml"
+        dataset_id = load_data(dataset_config_file)["dataset_id"]
+        dataset_dimension_file = dataset_dir / "dimensions.toml"
+        dimension_mapping_config = dataset_dir / "dimension_mapping_config_with_ids.toml"
+        dimension_mapping_refs = dataset_dir / "dimension_mapping_references.toml"
+        user = getpass.getuser()
+        log_message = "register"
+
+        manager.dimension_manager.register_from_file(project_dimension_file, user, log_message)
+        manager.dimension_manager.register_from_file(dataset_dimension_file, user, log_message)
+
+        needs_replacements = [project_dimension_mapping_config, dimension_mapping_config]
+        replace_dimension_uuids_from_registry(base_dir, needs_replacements)
+
+        dim_mapping_mgr.register_from_file(project_dimension_mapping_config, user, log_message)
+        dim_mapping_mgr.register_from_file(dimension_mapping_config, user, log_message)
+
+        needs_replacements = [project_config_file, dimension_mapping_refs]
+        replace_dimension_mapping_uuids_from_registry(base_dir, needs_replacements)
+        replace_dimension_uuids_from_registry(base_dir, (project_config_file, dataset_config_file))
+
+        manager.project_manager.register_from_file(project_config_file, user, "register project")
+        dataset_path = TEST_DATASET_DIRECTORY / dataset_id
+        manager.dataset_manager.register_from_file(
+            dataset_config_file, dataset_path, user, "register dataset"
+        )
+        manager.project_manager.submit_dataset(
+            project_id,
+            dataset_id,
+            user,
+            log_message,
+            dimension_mapping_references_file=dimension_mapping_refs,
+        )
+
+        assert manager.dimension_manager.list_ids()
+        assert manager.dimension_mapping_manager.list_ids()
+        assert manager.project_manager.list_ids() == [project_id]
+        assert manager.dataset_manager.list_ids() == [dataset_id]
 
 
 def register_project(project_mgr, config_file, project_id, user, log_message):
-    project_mgr.register(config_file, user, log_message)
+    project_mgr.register_from_file(config_file, user, log_message)
     assert project_mgr.list_ids() == [project_id]
 
 
 def register_dataset(dataset_mgr, config_file, dataset_id, user, log_message):
-    dataset_mgr.register(config_file, user, log_message)
+    dataset_mgr.register_from_file(config_file, user, log_message)
     assert dataset_mgr.list_ids() == [dataset_id]
 
 
@@ -268,9 +400,10 @@ def check_update_project_dimension(tmpdir, manager):
     project_mgr.dump(project_id, project_dir, force=True)
     project_data = load_data(project_config_file)
     new_version = dimension_mgr.get_current_version(dimension_id)
-    for dim in project_data["dimensions"]["base_dimensions"]:
+    for dim in project_data["dimensions"]["base_dimension_references"]:
         if dim["dimension_id"] == dimension_id:
             dim["version"] = str(new_version)
+            break
     dump_data(project_data, project_config_file)
     project_mgr.update_from_file(
         project_config_file,
@@ -281,6 +414,7 @@ def check_update_project_dimension(tmpdir, manager):
         project_mgr.get_current_version(project_id),
     )
     _check_dataset_statuses(project_mgr, project_id, DatasetRegistryStatus.UNREGISTERED)
+    assert project_mgr.get_by_id(project_id).model.status == ProjectRegistryStatus.IN_PROGRESS
 
 
 def _check_dataset_statuses(project_mgr, project_id, expected_status):

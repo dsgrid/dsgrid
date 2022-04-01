@@ -39,11 +39,12 @@ def pytest_sessionstart(session):
             f"python dsgrid/tests/make_us_data_registry.py {TEST_REGISTRY} -p {TEST_PROJECT_REPO} "
             f"-d {TEST_DATASET_DIRECTORY}"
         )
-        if ret != 0:
+        if ret == 0:
+            commit_file.write_text(latest_commit + "\n")
+        elif TEST_REGISTRY.exists():
             # Delete it because it is invalid.
             shutil.rmtree(TEST_REGISTRY)
             sys.exit(1)
-        commit_file.write_text(latest_commit + "\n")
 
 
 def _get_latest_commit():

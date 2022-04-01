@@ -1,19 +1,20 @@
 import csv
 import logging
 import os
-import shutil
-from collections import namedtuple
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import Field, validator
-from pyspark.sql import DataFrame, Row, SparkSession
 
 from .config_base import ConfigWithDataFilesBase
-from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
+from dsgrid.config.dimension_mapping_base import (
+    DimensionMappingBaseModel,
+    DimensionMappingByNameBaseModel,
+    DimensionMappingDatasetToProjectBaseModel,
+    DimensionMappingPreRegisteredBaseModel,
+)
 from dsgrid.data_models import serialize_model_data, DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import compute_file_hash, dump_data
 
 
@@ -44,6 +45,37 @@ class MappingTableRecordModel(DSGBaseModel):
         return val
 
 
+class MappingTableByNameModel(DimensionMappingByNameBaseModel):
+    """Attributes for a dimension mapping table for soon-to-be registered dimensions by name.
+    This will be converted to a MappingTableModel as soon as the dimensions are registered.
+    """
+
+    filename: str = Field(
+        title="filename",
+        alias="file",
+        description="Filename containing association table records.",
+    )
+
+
+class DatasetBaseToProjectMappingTableModel(DimensionMappingDatasetToProjectBaseModel):
+    """Attributes for a dimension mapping table to map soon-to-be-registered dataset base
+    dimensions to a project's dimensions. This will be converted to a MappingTableModel as soon as
+    the dimensions are registered.
+    """
+
+    filename: str = Field(
+        title="filename",
+        alias="file",
+        description="Filename containing association table records.",
+    )
+
+
+class DatasetBaseToProjectMappingTableListModel(DSGBaseModel):
+    """Represents the config file passed to register-and-submit-dataset command."""
+
+    mappings: List[DatasetBaseToProjectMappingTableModel]
+
+
 class MappingTableModel(DimensionMappingBaseModel):
     """Attributes for a dimension mapping table"""
 
@@ -57,7 +89,7 @@ class MappingTableModel(DimensionMappingBaseModel):
         description="Hash of the contents of the file, computed by dsgrid.",
         dsg_internal=True,
     )
-    records: Optional[List] = Field(
+    records: List = Field(
         title="records",
         description="dimension mapping records in filename that get loaded at runtime",
         dsg_internal=True,
@@ -74,7 +106,7 @@ class MappingTableModel(DimensionMappingBaseModel):
     @validator("file_hash")
     def compute_file_hash(cls, file_hash, values):
         """Compute file hash."""
-        return file_hash or compute_file_hash(values.get("filename"))
+        return file_hash or compute_file_hash(values["filename"])
 
     @validator("records", always=True)
     def add_records(cls, records, values):
@@ -101,6 +133,19 @@ class MappingTableModel(DimensionMappingBaseModel):
         exclude.add("records")
         data = super().dict(by_alias=by_alias, exclude=exclude)
         return serialize_model_data(data)
+
+    @classmethod
+    def from_pre_registered_model(
+        cls, model: DimensionMappingPreRegisteredBaseModel, from_dimension, to_dimension
+    ):
+        return MappingTableModel(
+            mapping_type=model.mapping_type,
+            archetype=model.archetype,
+            from_dimension=from_dimension,
+            to_dimension=to_dimension,
+            description=model.description,
+            filename=model.filename,
+        )
 
 
 class MappingTableConfig(ConfigWithDataFilesBase):

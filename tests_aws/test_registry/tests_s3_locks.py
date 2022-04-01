@@ -17,7 +17,7 @@ def test_make_and_release_lock():
         user="test",
         profile=AWS_PROFILE_NAME,
     )
-    with s3.make_lock_file(f"{TEST_REMOTE_REGISTRY}/configs/.locks/test.lock"):
+    with s3.make_lock_file_managed(f"{TEST_REMOTE_REGISTRY}/configs/.locks/test.lock"):
         assert s3._s3_filesystem.path(f"{TEST_REMOTE_REGISTRY}/configs/.locks/test.lock").exists()
     assert s3._s3_filesystem.listdir("configs/.locks") == []
 
@@ -34,7 +34,7 @@ def test_sync_push_fail_if_lock_exists():
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
         lock_file = f"{TEST_REMOTE_REGISTRY}/configs/.locks/dimensions.lock"
-        with s3.make_lock_file(lock_file):
+        with s3.make_lock_file_managed(lock_file):
             assert s3._s3_filesystem.path(lock_file).exists()
             s3 = s3.check_lock_file(lock_file)
             manager = RegistryManager.create(
@@ -68,5 +68,5 @@ def test_bad_lockfile():
             f"{TEST_REMOTE_REGISTRY}/configs/.locks/test.locks",
             f"{TEST_REMOTE_REGISTRY}/configs/.lock/test.lock",
         ):
-            with s3.make_lock_file(bad_lockfile):
+            with s3.make_lock_file_managed(bad_lockfile):
                 pass

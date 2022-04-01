@@ -118,7 +118,8 @@ def check_configs_projects_and_datasets(s3):
             for file in files:
                 if "projects" in path:
                     assert file in ("1.0.0", "1.1.0", "registry.toml")
-                    expected_file_count = 2  # project.toml and lookup_sector_to_subsector.csv
+                    # project.toml, data_source__sector.csv, data_source__subsector.csv, sector__subsector.csv
+                    expected_file_count = 4
                 else:
                     assert file in ("1.0.0", "registry.toml")
                     expected_file_count = 1  # dataset.toml

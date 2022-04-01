@@ -1,7 +1,7 @@
 import csv
 import enum
 import importlib
-import json
+import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -29,6 +29,9 @@ from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, compute_hash, load_data
 from dsgrid.utils.spark import create_dataframe, read_dataframe
 from dsgrid.utils.versioning import handle_version_or_str
+
+
+logger = logging.getLogger(__name__)
 
 
 class DimensionBaseModel(DSGBaseModel):
@@ -526,6 +529,21 @@ class DimensionReferenceModel(DSGBaseModel):
         return handle_version_or_str(version)
 
 
+class DimensionReferenceByNameModel(DSGBaseModel):
+    """Reference to a dimension that has yet to be registered."""
+
+    dimension_type: DimensionType = Field(
+        title="dimension_type",
+        alias="type",
+        description="Type of the dimension",
+        options=DimensionType.format_for_docs(),
+    )
+    name: str = Field(
+        title="name",
+        description="Dimension name",
+    )
+
+
 def handle_dimension_union(value):
     if isinstance(value, DimensionBaseModel):
         return value
@@ -543,8 +561,6 @@ def handle_dimension_union(value):
         else:
             options = [x.value for x in TimeDimensionType]
             raise ValueError(f"{value['time_type']} not supported, valid options: {options}")
-    elif sorted(value.keys()) == ["dimension_id", "type", "version"]:
-        val = DimensionReferenceModel(**value)
     else:
         val = DimensionModel(**value)
     return val

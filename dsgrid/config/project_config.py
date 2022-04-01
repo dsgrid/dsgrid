@@ -10,10 +10,14 @@ from semver import VersionInfo
 from .config_base import ConfigWithDataFilesBase
 from .dataset_config import InputDatasetType
 from .dimension_associations import DimensionAssociations
-from .dimension_mapping_base import DimensionMappingReferenceModel
+from .dimension_mapping_base import DimensionMappingReferenceModel, DimensionMappingBaseModel
+from .mapping_tables import MappingTableByNameModel
+from .dimensions_config import DimensionsConfigModel
 from .dimensions import (
     DimensionReferenceModel,
     DimensionType,
+    handle_dimension_union,
+    DimensionModel,
 )
 from dsgrid.exceptions import DSGInvalidField
 from dsgrid.data_models import DSGBaseModel
@@ -37,7 +41,18 @@ logger = logging.getLogger(__name__)
 class DimensionsModel(DSGBaseModel):
     """Contains dimensions defined by a project"""
 
-    base_dimensions: List[DimensionReferenceModel] = Field(
+    base_dimensions: List = Field(
+        title="base_dimensions",
+        description="List of dimensions for a project's base dimensions. They will be "
+        "automatically registered during project registration and then converted to "
+        "base_dimension_references.",
+        requirements=(
+            "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
+            " one dimension reference per type is allowed.",
+        ),
+        default=[],
+    )
+    base_dimension_references: List[DimensionReferenceModel] = Field(
         title="base_dimensions",
         description="List of registry references (``DimensionReferenceModel``) for a project's "
         "base dimensions.",
@@ -45,8 +60,20 @@ class DimensionsModel(DSGBaseModel):
             "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
             " one dimension reference per type is allowed.",
         ),
+        default=[],
     )
-    supplemental_dimensions: List[DimensionReferenceModel] = Field(
+    supplemental_dimensions: List = Field(
+        title="supplemental_dimensions",
+        description="List of supplemental dimensions. They will be automatically registered "
+        "during project registration and then converted to supplemental_dimension_references.",
+        notes=(
+            "Supplemental dimensions are used to support additional querying and transformations",
+            "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
+            "base data.",
+        ),
+        default=[],
+    )
+    supplemental_dimension_references: List[DimensionReferenceModel] = Field(
         title="supplemental_dimensions",
         description="List of registry references for a project's supplemental dimensions.",
         requirements=(
@@ -62,14 +89,19 @@ class DimensionsModel(DSGBaseModel):
         default=[],
     )
 
-    @validator("base_dimensions")
-    def check_project_dimension(cls, val):
+    @root_validator(pre=False)
+    def check_dimensions(cls, values):
         """Validate base_dimensions types"""
-        check_required_dimensions(val, "project base dimensions")
-        return val
+        dimensions = list(
+            itertools.chain(
+                values.get("base_dimensions", []), values.get("base_dimension_references", [])
+            )
+        )
+        check_required_dimensions(dimensions, "project base dimensions")
+        return values
 
-    @root_validator
-    def check_dimension_mappings(cls, values: dict) -> dict:
+    @root_validator(pre=True)
+    def pre_check_values(cls, values: dict) -> dict:
         """validates that a
         check that keys exist in both jsons
         check that all from_keys have a match in the to_keys json
@@ -93,7 +125,34 @@ class DimensionsModel(DSGBaseModel):
         #            )
         #        mapping.to_dimension = to_dim
 
+        if not values.get("base_dimensions", []) and not values.get(
+            "base_dimension_references", []
+        ):
+            raise ValueError("Either base_dimensions or base_dimension_references must be defined")
+
         return values
+
+    @validator("base_dimensions")
+    def check_files(cls, values: dict) -> dict:
+        """Validate dimension files are unique across all dimensions"""
+        check_uniqueness(
+            (x.filename for x in values if isinstance(x, DimensionModel)),
+            "dimension record filename",
+        )
+        return values
+
+    @validator("base_dimensions")
+    def check_names(cls, values: dict) -> dict:
+        """Validate dimension names are unique across all dimensions."""
+        check_uniqueness(
+            [dim.name for dim in values],
+            "dimension record name",
+        )
+        return values
+
+    @validator("base_dimensions", "supplemental_dimensions", pre=True, each_item=True, always=True)
+    def handle_dimension_union(cls, values):
+        return handle_dimension_union(values)
 
 
 class InputDatasetModel(DSGBaseModel):
@@ -165,8 +224,17 @@ class DimensionMappingsModel(DSGBaseModel):
     """Defines all dimension mappings associated with a dsgrid project,
     including dimension associations, base-to-supplemental mappings, and dataset-to-project mappings."""
 
-    base_to_supplemental: List[DimensionMappingReferenceModel] = Field(
+    # This may eventually need to be a Union of types.
+    base_to_supplemental: List[MappingTableByNameModel] = Field(
         title="base_to_supplemental",
+        description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
+        " used to support various queries and dimension transformations. They will be "
+        "automatically registered during project registration and then converted to "
+        "base_to_supplemental_references.",
+        default=[],
+    )
+    base_to_supplemental_references: List[DimensionMappingReferenceModel] = Field(
+        title="base_to_supplemental_references",
         description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
         " used to support various queries and dimension transformations.",
         default=[],
@@ -245,6 +313,31 @@ class ProjectConfigModel(DSGBaseModel):
         default=[],
     )
 
+    @root_validator
+    def check_mappings_with_dimensions(cls, values):
+        """Check that dimension mappings refer to dimensions listed in the model."""
+        if "dimensions" not in values:
+            # This means that the dimensions validator already failed.
+            return values
+
+        dimension_names = {
+            (x.name, x.dimension_type)
+            for x in itertools.chain(
+                values["dimensions"].base_dimensions,
+                values["dimensions"].supplemental_dimensions,
+            )
+        }
+        mapping_names = set()
+        for mapping in values["dimension_mappings"].base_to_supplemental:
+            mapping_names.add((mapping.from_dimension.name, mapping.from_dimension.dimension_type))
+            mapping_names.add((mapping.to_dimension.name, mapping.to_dimension.dimension_type))
+
+        diff = mapping_names.difference(dimension_names)
+        if diff:
+            raise ValueError(f"base_to_supplemental mappings contain unknown dimensions: {diff}")
+
+        return values
+
     @validator("project_id")
     def check_project_id_handle(cls, project_id):
         """Check for valid characters in project id"""
@@ -262,7 +355,6 @@ class ProjectConfig(ConfigWithDataFilesBase):
         super().__init__(model)
         self._base_dimensions = {}
         self._supplemental_dimensions = {}
-        self._dimension_mapping_mgr = None
         self._base_to_supplemental_mappings = {}
         self._dimension_associations = None
 
@@ -286,32 +378,17 @@ class ProjectConfig(ConfigWithDataFilesBase):
     def load(cls, config_file, dimension_manager, dimension_mapping_manager):
         config = super().load(config_file)
         config.src_dir = os.path.dirname(config_file)
-        config.dimension_mapping_manager = dimension_mapping_manager
-        config.dimension_manager = dimension_manager
-        config.load_dimension_associations()
-        config.load_dimensions(dimension_manager)
-        config.load_dimension_mappings(dimension_mapping_manager)
+        config.load_dimensions_and_mappings(dimension_manager, dimension_mapping_manager)
         return config
+
+    def load_dimensions_and_mappings(self, dimension_manager, dimension_mapping_manager):
+        self.load_dimension_associations()
+        self.load_dimensions(dimension_manager)
+        self.load_dimension_mappings(dimension_mapping_manager)
 
     @property
     def dimension_associations(self):
         return self._dimension_associations
-
-    @property
-    def dimension_mapping_manager(self):
-        return self._dimension_mapping_mgr
-
-    @dimension_mapping_manager.setter
-    def dimension_mapping_manager(self, val: DimensionMappingRegistryManager):
-        self._dimension_mapping_mgr = val
-
-    @property
-    def dimension_manager(self):
-        return self._dimension_mgr
-
-    @dimension_manager.setter
-    def dimension_manager(self, val: DimensionRegistryManager):
-        self._dimension_mgr = val
 
     def get_base_dimension(self, dimension_type: DimensionType):
         """Return the base dimension matching dimension_type.
@@ -398,9 +475,11 @@ class ProjectConfig(ConfigWithDataFilesBase):
         dimension_manager : DimensionRegistryManager
 
         """
-        base_dimensions = dimension_manager.load_dimensions(self.model.dimensions.base_dimensions)
+        base_dimensions = dimension_manager.load_dimensions(
+            self.model.dimensions.base_dimension_references
+        )
         supplemental_dimensions = dimension_manager.load_dimensions(
-            self.model.dimensions.supplemental_dimensions
+            self.model.dimensions.supplemental_dimension_references
         )
         dims = list(itertools.chain(base_dimensions.values(), supplemental_dimensions.values()))
         check_uniqueness((x.model.name for x in dims), "dimension name")
@@ -418,7 +497,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
 
         """
         base_to_supp = dimension_mapping_manager.load_dimension_mappings(
-            self.model.dimension_mappings.base_to_supplemental
+            self.model.dimension_mappings.base_to_supplemental_references
         )
 
         self._base_to_supplemental_mappings.update(base_to_supp)

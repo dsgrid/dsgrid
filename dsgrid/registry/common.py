@@ -1,17 +1,21 @@
 """Common definitions for registry components"""
 
 import itertools
+import logging
 import re
 import uuid
 from collections import namedtuple
 from datetime import datetime
-from enum import Enum
-from typing import Optional, Union
+from pathlib import Path
+from typing import Dict, List, Optional, Union
 
 from pydantic import Field
 from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel, DSGEnum
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidDimension, DSGInvalidParameter
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.versioning import make_version
 
 
@@ -22,6 +26,10 @@ REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
 REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE = re.compile(r"^[\w-]+$")
 # Allows letters, numbers, underscores
 REGEX_VALID_REGISTRY_CONFIG_ID_STRICT = re.compile(r"^[\w]+$")
+
+REGISTRY_ID_DELIMITER = "__"
+
+logger = logging.getLogger(__name__)
 
 
 def check_config_id_loose(config_id, tag):
@@ -88,7 +96,7 @@ DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 # Obviates the need to pass parameters to many constructors.
 RegistryManagerParams = namedtuple(
     "RegistryManagerParams",
-    ["base_path", "remote_path", "fs_interface", "cloud_interface", "offline", "dry_run"],
+    ["base_path", "remote_path", "fs_interface", "cloud_interface", "offline"],
 )
 
 
@@ -136,7 +144,22 @@ def make_filename_from_version(handle, version):
     return f"{handle}-v{version}.toml"
 
 
-def make_registry_id(fields, delimiter="__"):
+def make_dimension_id(name: str):
+    """Return a dimension ID created from a dimension name.
+
+    Parameters
+    ----------
+    name : str
+
+    Returns
+    -------
+    str
+
+    """
+    return make_registry_id([name.lower().replace(" ", "_")])
+
+
+def make_registry_id(fields, delimiter=REGISTRY_ID_DELIMITER):
     """Make a unique ID by concatenating a list of fields with a UUID.
 
     Parameters

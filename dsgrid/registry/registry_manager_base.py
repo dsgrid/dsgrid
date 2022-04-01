@@ -5,6 +5,7 @@ import logging
 import os
 from datetime import datetime
 from pathlib import Path
+from typing import List
 
 from dsgrid import timer_stats_collector
 from .common import RegistryManagerParams, ConfigRegistrationModel, VersionUpdateType
@@ -113,7 +114,7 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def register(self, config_file, submitter, log_message, force=False):
+    def register_from_file(self, config_file, submitter, log_message, force=False, context=None):
         """Registers a config file in the registry.
 
         Parameters
@@ -125,6 +126,8 @@ class RegistryManagerBase(abc.ABC):
         log_message : str
         force : bool
             If true, register even if an ID is duplicate.
+        context : None or RegistrationContext
+            If not None, assign the config IDs that get registered.
 
         Raises
         ------
@@ -134,12 +137,31 @@ class RegistryManagerBase(abc.ABC):
             Raised if the config ID is already registered.
 
         """
-        if self.offline_mode or self.dry_run_mode:
-            self._register(config_file, submitter, log_message, force=force)
-        else:
-            lock_file_path = self.get_registry_lock_file(load_data(config_file)["project_id"])
-            with self.cloud_interface.make_lock_file(lock_file_path):
-                self._register(config_file, submitter, log_message, force=force)
+
+    @abc.abstractmethod
+    def register(self, config, submitter, log_message, force=False, context=None):
+        """Registers a config file in the registry.
+
+        Parameters
+        ----------
+        config : ConfigBase
+            Configuration instance
+        submitter : str
+            Submitter name
+        log_message : str
+        force : bool
+            If true, register even if an ID is duplicate.
+        context : None or RegistrationContext
+            If not None, assign the config IDs that get registered.
+
+        Raises
+        ------
+        ValueError
+            Raised if the config_file is invalid.
+        DSGDuplicateValueRegistered
+            Raised if the config ID is already registered.
+
+        """
 
     @staticmethod
     @abc.abstractmethod
@@ -246,18 +268,11 @@ class RegistryManagerBase(abc.ABC):
         if config_id not in self._registry_configs:
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
 
-    def _log_dry_run_mode_prefix(self):
-        return "* DRY RUN MODE * |" if self.dry_run_mode else ""
-
     def _log_offline_mode_prefix(self):
         return "* OFFLINE MODE * |" if self.offline_mode else ""
 
     def _update_registry_cache(self, config_id, registry_config):
         self._registry_configs[config_id] = registry_config
-
-    def _raise_if_dry_run(self, operation):
-        if self.dry_run_mode:
-            raise DSGInvalidOperation(f"operation={operation} is not allowed in dry-run mode")
 
     @property
     def cloud_interface(self):
@@ -296,6 +311,20 @@ class RegistryManagerBase(abc.ABC):
             filename,
         )
 
+    @abc.abstractmethod
+    def finalize_registration(self, config_ids: List[str], error_occurred: bool):
+        """Peform final actions after a registration process.
+
+        Parameters
+        ----------
+        config_ids : List[str]
+            Config IDs that were registered
+        error_occurred : bool
+            Set to True if an error occurred and all intermediately-registered IDs should be
+            removed.
+
+        """
+
     @property
     def fs_interface(self):
         """Return the FilesystemInterface to list directories and read/write files."""
@@ -305,11 +334,6 @@ class RegistryManagerBase(abc.ABC):
     def offline_mode(self):
         """Return True if there is to be no syncing with the remote registry."""
         return self._params.offline
-
-    @property
-    def dry_run_mode(self):
-        """Return True if no registry changes are to be made. Checking only."""
-        return self._params.dry_run
 
     def get_config_directory(self, config_id, version):
         """Return the path to the config file.
@@ -369,6 +393,21 @@ class RegistryManagerBase(abc.ABC):
         """
         self._check_if_not_registered(config_id)
         return self._registry_configs[config_id]
+
+    @abc.abstractmethod
+    def acquire_registry_locks(self, config_ids: List[str]):
+        """Acquire lock(s) on the registry for all config_ids.
+
+        Parameters
+        ----------
+        config_ids : List[str]
+
+        Raises
+        ------
+        DSGRegistryLockError
+            Raised if a lock cannot be acquired.
+
+        """
 
     @abc.abstractmethod
     def get_registry_lock_file(self, config_id):
@@ -484,12 +523,12 @@ class RegistryManagerBase(abc.ABC):
             Raised if the project_id is not registered.
 
         """
+        # TODO: Do we want to handle specific versions? This removes all configs.
 
     def _remove(self, config_id):
         if not self.offline_mode:
             # TODO: DSGRID-145
             raise Exception("sync-push of config removal is currently not supported")
-        self._raise_if_dry_run("remove")
         self._check_if_not_registered(config_id)
         self.fs_interface.rm_tree(self.get_registry_directory(config_id))
         self._registry_configs.pop(config_id, None)
@@ -518,6 +557,12 @@ class RegistryManagerBase(abc.ABC):
         remote_path = self.relative_remote_path(path)
         lock_file_path = self.get_registry_lock_file(path.name)
         self.cloud_interface.check_lock_file(lock_file_path)
-        self.cloud_interface.sync_push(
-            remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
-        )
+        try:
+            self.cloud_interface.sync_push(
+                remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
+            )
+        except Exception:
+            logger.exception(
+                "Please report this error to the dsgrid team. The registry may need recovery."
+            )
+            raise

@@ -46,8 +46,7 @@ class DSGBaseModel(BaseModel):
         orig = os.getcwd()
         os.chdir(base_dir)
         try:
-            cfg = cls(**load_data(filename.name))
-            return cfg
+            return cls(**load_data(filename.name))
         except ValidationError:
             logger.exception("Failed to validate %s", filename)
             raise

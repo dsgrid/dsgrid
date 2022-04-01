@@ -9,15 +9,21 @@ from typing import Union, List, Dict
 from prettytable import PrettyTable
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dataset_config import DatasetConfig, DatasetConfigModel
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
+from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDataset
-from dsgrid.registry.common import make_initial_config_registration, ConfigKey
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import timer_stats_collector, Timer, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import display_table
+from .common import (
+    make_initial_config_registration,
+    ConfigKey,
+    RegistryType,
+)
+from .registration_context import RegistrationContext
 from .dataset_registry import DatasetRegistry, DatasetRegistryModel
 from .registry_manager_base import RegistryManagerBase
 
@@ -51,7 +57,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def _run_checks(self, config: DatasetConfig):
         logger.info("Run dataset registration checks.")
-        check_required_dimensions(config.model.dimensions, "dataset dimensions")
+        check_required_dimensions(config.model.dimension_references, "dataset dimensions")
         if not os.environ.get("__DSGRID_SKIP_DATASET_CONSISTENCY_CHECKS__"):
             self._check_dataset_consistency(config)
 
@@ -77,6 +83,21 @@ class DatasetRegistryManager(RegistryManagerBase):
     def dimension_mapping_manager(self, val):
         self._dimension_mapping_mgr = val
 
+    def finalize_registration(self, config_ids, error_occurred):
+        assert len(config_ids) == 1, config_ids
+        dataset_id = config_ids[0]
+        if error_occurred:
+            logger.info("Remove intermediate dataset after error")
+            self.remove(dataset_id)
+
+        if not self.offline_mode:
+            lock_file = self.get_registry_lock_file(dataset_id)
+            self.cloud_interface.check_lock_file(lock_file)
+            if not error_occurred:
+                self.sync_push(self.get_registry_directory(dataset_id))
+                self.sync_push(self.get_registry_data_directory(dataset_id))
+            self.cloud_interface.remove_lock_file(lock_file)
+
     def get_by_id(self, config_id, version=None):
         self._check_if_not_registered(config_id)
         if version is None:
@@ -100,16 +121,69 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._datasets[key] = dataset
         return dataset
 
+    def acquire_registry_locks(self, config_ids: List[str]):
+        for dataset_id in config_ids:
+            lock_file = self.get_registry_lock_file(dataset_id)
+            self.cloud_interface.make_lock_file(lock_file)
+
     def get_registry_lock_file(self, config_id):
         return f"configs/.locks/{config_id}.lock"
 
     @track_timing(timer_stats_collector)
-    def register(self, config_file, dataset_path, submitter, log_message, force=False):
-        lock_file_path = self.get_registry_lock_file(load_data(config_file)["dataset_id"])
-        with self.cloud_interface.make_lock_file(lock_file_path):
-            self._register(config_file, dataset_path, submitter, log_message, force=force)
+    def register_from_file(
+        self,
+        config_file,
+        dataset_path,
+        submitter,
+        log_message,
+        force=False,
+        context=None,
+    ):
+        config = DatasetConfig.load_from_user_path(config_file, self._dimension_mgr, dataset_path)
+        return self.register(
+            config, dataset_path, submitter, log_message, force=force, context=context
+        )
 
-    def _register(self, config_file, dataset_path, submitter, log_message, force=False):
+    @track_timing(timer_stats_collector)
+    def register(
+        self,
+        config,
+        dataset_path,
+        submitter,
+        log_message,
+        force=False,
+        context=None,
+    ):
+        error_occurred = False
+        need_to_finalize = context is None
+        if context is None:
+            context = RegistrationContext()
+
+        try:
+            self._register_dataset_and_dimensions(
+                config,
+                dataset_path,
+                submitter,
+                log_message,
+                context,
+                force=force,
+            )
+        except Exception:
+            error_occurred = True
+            raise
+        finally:
+            if need_to_finalize:
+                context.finalize(error_occurred)
+
+    def _register_dataset_and_dimensions(
+        self,
+        config: Path,
+        dataset_path: Path,
+        submitter: str,
+        log_message: str,
+        context: RegistrationContext,
+        force=False,
+    ):
         # TODO S3: This requires downloading data to the local system.
         # Can we perform all validation on S3 with an EC2 instance?
         if str(dataset_path).startswith("s3://"):
@@ -117,19 +191,35 @@ class DatasetRegistryManager(RegistryManagerBase):
                 f"Loading a dataset from S3 is not currently supported: {dataset_path}"
             )
 
-        config = DatasetConfig.load_from_user_path(config_file, self._dimension_mgr, dataset_path)
+        model = config.model
+        self._check_if_already_registered(model.dataset_id)
+
+        if model.dimensions:
+            dim_model = DimensionsConfigModel(dimensions=model.dimensions)
+            dims_config = DimensionsConfig.load_from_model(dim_model, config.src_dir)
+            dimension_ids = self._dimension_mgr.register(
+                dims_config, submitter, log_message, force=force, context=context
+            )
+            model.dimension_references += self._dimension_mgr.make_dimension_references(
+                dimension_ids
+            )
+            model.dimensions.clear()
+
+        config.load_dimensions(self._dimension_mgr)
+        self._register(config, dataset_path, submitter, log_message, force=force)
+        context.add_id(RegistryType.DATASET, config.model.dataset_id, self)
+
+    def _register(
+        self,
+        config: DatasetConfig,
+        dataset_path: Path,
+        submitter: str,
+        log_message: str,
+        force=False,
+    ):
         dataset_id = config.model.dataset_id
-        self._check_if_already_registered(dataset_id)
         self._run_checks(config)
         registration = make_initial_config_registration(submitter, log_message)
-
-        if self.dry_run_mode:
-            logger.info(
-                "%s Dataset registration validated for dataset_id=%s",
-                self._log_dry_run_mode_prefix(),
-                dataset_id,
-            )
-            return
 
         registry_model = DatasetRegistryModel(
             dataset_id=dataset_id,
@@ -143,7 +233,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         registry_dir = self.get_registry_directory(dataset_id)
         registry_config_path = registry_dir / str(registration.version)
 
-        dataset_registry_dir = self.get_registry_data_directory(config.config_id)
+        dataset_registry_dir = self.get_registry_data_directory(dataset_id)
         dataset_registry_filename = dataset_registry_dir / REGISTRY_FILENAME
         dataset_path = dataset_registry_dir / str(registry_config.version)
         self.fs_interface.mkdir(dataset_registry_dir)
@@ -153,14 +243,10 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         # Serialize the registry file as well as the updated DatasetConfig to the registry.
         registry_filename = registry_dir / REGISTRY_FILENAME
-        registry_config.serialize(registry_filename, force=True)
-        config.serialize(self.get_config_directory(config.config_id, registry_config.version))
+        registry_config.serialize(registry_filename, force=force)
+        config.serialize(self.get_config_directory(dataset_id, registry_config.version))
 
         self._update_registry_cache(dataset_id, registry_config)
-
-        if not self.offline_mode:
-            self.sync_push(registry_dir)
-            self.sync_push(dataset_registry_dir)
 
         logger.info(
             "%s Registered dataset %s with version=%s",
@@ -183,7 +269,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         if submitter is None:
             submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(config.model.dataset_id)
-        with self.cloud_interface.make_lock_file(lock_file_path):
+        with self.cloud_interface.make_lock_file_managed(lock_file_path):
             # Note that projects will not pick up these changes until submit-dataset
             # is called again.
             return self._update(config, submitter, update_type, log_message)
@@ -205,6 +291,8 @@ class DatasetRegistryManager(RegistryManagerBase):
         return version
 
     def remove(self, config_id):
+        config = self.get_by_id(config_id)
+        self.fs_interface.rm_tree(config.dataset_path.parent)
         self._remove(config_id)
         for key in [x for x in self._datasets if x.id == config_id]:
             self._datasets.pop(key)

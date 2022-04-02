@@ -147,6 +147,7 @@ def test_register_and_submit_rollback_on_failure(make_test_project_dir):
         project_id = load_data(project_file)["project_id"]
         dataset_dir = src_dir / "datasets" / "sector_models" / "comstock"
         dataset_config_file = dataset_dir / "dataset.toml"
+        dataset_id = load_data(dataset_config_file)["dataset_id"]
         dataset_mapping_file = dataset_dir / "dimension_mappings.toml"
         dataset_path = (
             Path(os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY))
@@ -171,15 +172,22 @@ def test_register_and_submit_rollback_on_failure(make_test_project_dir):
         orig_dimension_ids = manager.dimension_manager.list_ids()
         orig_mapping_ids = manager.dimension_mapping_manager.list_ids()
 
-        with pytest.raises(DSGInvalidDataset):
-            manager.project_manager.register_and_submit_dataset(
-                dataset_config_file,
-                dataset_path,
-                project_id,
-                getpass.getuser(),
-                "register dataset and submit",
-                dimension_mapping_file=dataset_mapping_file,
+        try:
+            with pytest.raises(DSGInvalidDataset):
+                manager.project_manager.register_and_submit_dataset(
+                    dataset_config_file,
+                    dataset_path,
+                    project_id,
+                    getpass.getuser(),
+                    "register dataset and submit",
+                    dimension_mapping_file=dataset_mapping_file,
+                )
+        finally:
+            missing_record_file = Path(
+                f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
             )
+            if missing_record_file.exists():
+                shutil.rmtree(missing_record_file)
 
         assert manager.dimension_manager.list_ids() == orig_dimension_ids
         assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids

@@ -57,7 +57,6 @@ def make_test_data_registry(
     path = create_local_test_registry(registry_path)
     dataset_dir = Path("datasets/sector_models/comstock")
 
-    print("\n 1. register dimensions: \n")
     user = getpass.getuser()
     log_message = "Initial registration"
     if offline_mode:
@@ -74,14 +73,14 @@ def make_test_data_registry(
     dataset_id = load_data(dataset_config_file)["dataset_id"]
 
     if include_projects:
-        print("\n 2. register project: \n")
+        print("\n 1. register project: \n")
         manager.project_manager.register_from_file(
             project_config_file,
             user,
             log_message,
         )
     if include_datasets:
-        print("\n 3. register dataset: \n")
+        print("\n 2. register dataset: \n")
         replace_dimension_uuids_from_registry(path, (dataset_config_file,))
         manager.dataset_manager.register_from_file(
             dataset_config_file,
@@ -89,7 +88,7 @@ def make_test_data_registry(
             user,
             log_message,
         )
-        print("\n 4. submit dataset to project\n")
+        print("\n 3. submit dataset to project\n")
         manager.project_manager.submit_dataset(
             project_id,
             dataset_id,

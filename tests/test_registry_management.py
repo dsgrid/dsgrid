@@ -110,6 +110,7 @@ def test_duplicate_dimensions(make_test_project_dir):
 
         # Registering duplicate dimensions and mappings are allowed.
         # If names are the same, they are replaced. Otherwise, new ones get registered.
+        # Time dimension has more fields checked.
         dimension_ids = dimension_mgr.list_ids()
         dim_config_file = make_test_project_dir / "dimensions.toml"
 
@@ -122,6 +123,16 @@ def test_duplicate_dimensions(make_test_project_dir):
 
         dimension_mgr.register(dim_config_file, user, log_message)
         assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 1
+
+        data = load_data(dim_config_file)
+        for dim in data["dimensions"]:
+            if dim["type"] == "time":
+                assert dim["time_interval_type"] == "period_beginning"
+                dim["time_interval_type"] = "period_ending"
+        dump_data(data, dim_config_file)
+
+        dimension_mgr.register(dim_config_file, user, log_message)
+        assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 2
 
 
 def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):

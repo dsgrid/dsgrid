@@ -30,9 +30,9 @@ class RegistrationContext:
                     "RegistrationContext destructed with a reference to %s manager",
                     registry_type.value,
                 )
-                if manager.has_lock():
+                if not manager.offline_mode and manager.has_lock():
                     logger.error(
-                        "RegistrationContext with a lock on the remote registry. "
+                        "RegistrationContext destructed with a lock on the remote registry. "
                         "Please contact the dsgrid team. Type=%s IDs=%s",
                         registry_type.value,
                         manager.ids,
@@ -118,12 +118,13 @@ class RegistrationContext:
         """
         try:
             for registry_type, manager_context in self._managers.items():
-                if manager_context is not None and manager_context.ids:
-                    manager_context.manager.finalize_registration(
-                        manager_context.ids, error_occurred
-                    )
-                    manager_context.ids.clear()
-                    manager_context.set_unlocked()
+                if manager_context is not None:
+                    if manager_context.ids:
+                        manager_context.manager.finalize_registration(
+                            manager_context.ids, error_occurred
+                        )
+                        manager_context.ids.clear()
+                        manager_context.set_unlocked()
                     self._managers[registry_type] = None
         except Exception:
             logger.exception(
@@ -174,3 +175,8 @@ class RegistryManagerContext:
     def manager(self, val):
         """Set the RegistryManagerBase"""
         self._manager = val
+
+    @property
+    def offline_mode(self):
+        """Return True if the manager is in offline mode."""
+        return self._manager.offline_mode

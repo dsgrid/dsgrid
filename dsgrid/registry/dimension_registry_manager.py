@@ -5,7 +5,7 @@ import logging
 from operator import ne
 import os
 from pathlib import Path
-from typing import Union, List, Dict
+from typing import Union, List, Dict, Set
 
 from prettytable import PrettyTable
 
@@ -68,81 +68,47 @@ class DimensionRegistryManager(RegistryManagerBase):
     def registry_class():
         return DimensionRegistry
 
-    def check_unique_model_fields(self, config: DimensionsConfig, warn_only=False):
-        """Check if any new dimension record files have identical contents as any existing files.
-
-        Parameters
-        ----------
-        config : DimensionConfig
-        warn_only: bool
-            If True, log a warning instead of raising an exception.
-
-        Raises
-        ------
-        DSGDuplicateValueRegistered
-            Raised if there are duplicates and warn_only is False.
-
-        """
+    def _replace_duplicates(self, config: DimensionsConfig):
         hashes = {}
-        for dimension_id, registry_config in self._registry_configs.items():
-            dimension = self.get_by_id(dimension_id, registry_config.model.version)
-            hashes[dimension.model.model_hash] = dimension_id
-
-        duplicates = []
-        for dimension in config.model.dimensions:
-            if dimension.model_hash in hashes:
-                duplicates.append((dimension.dimension_id, hashes[dimension.model_hash]))
-
-        if duplicates:
-            for dup in duplicates:
-                logger.error(
-                    "%s has duplicate content with existing dimension ID %s", dup[0], dup[1]
-                )
-            if not warn_only:
-                raise DSGDuplicateValueRegistered(
-                    f"There are {len(duplicates)} dimensions with duplicate definitions."
-                )
-
-    def check_unique_records(self, config: DimensionsConfig, warn_only=False):
-        """Check if any new dimension record files have identical contents as any existing files.
-
-        Parameters
-        ----------
-        config : DimensionConfig
-        warn_only: bool
-            If True, log a warning instead of raising an exception.
-
-        Raises
-        ------
-        DSGDuplicateValueRegistered
-            Raised if there are duplicates and warn_only is False.
-
-        """
-        hashes = {}
+        time_dim = None
         for dimension_id, registry_config in self._registry_configs.items():
             dimension = self.get_by_id(dimension_id, registry_config.model.version)
             if isinstance(dimension.model, TimeDimensionBaseModel):
-                continue
-            hashes[dimension.model.file_hash] = {
-                "dimension_id": dimension_id,
-                "dimension_type": dimension.model.dimension_type,
-            }
+                time_dim = dimension.model
+            else:
+                hashes[dimension.model.file_hash] = dimension.model
 
-        duplicates = []
-        for dimension in config.model.dimensions:
-            if not isinstance(dimension, TimeDimensionBaseModel) and dimension.file_hash in hashes:
-                if dimension.dimension_type == hashes[dimension.file_hash]["dimension_type"]:
-                    duplicates.append((dimension.dimension_id, hashes[dimension.file_hash]))
-
-        if duplicates:
-            for dup in duplicates:
-                logger.error(
-                    "%s has duplicate content with existing dimension ID %s", dup[0], dup[1]
+        existing_ids = set()
+        for i, dim in enumerate(config.model.dimensions):
+            replace_dim = False
+            existing = None
+            if isinstance(dim, TimeDimensionBaseModel):
+                if time_dim is not None:
+                    existing = time_dim
+                    replace_dim = True
+                    for field in type(dim).__fields__:
+                        exclude = set(("description", "dimension_id"))
+                        if field not in exclude and getattr(dim, field) != getattr(
+                            time_dim, field
+                        ):
+                            replace_dim = False
+            elif dim.file_hash in hashes:
+                existing = hashes[dim.file_hash]
+                if dim.dimension_type == existing.dimension_type:
+                    if dim.name == existing.name:
+                        replace_dim = True
+                    else:
+                        logger.info(
+                            "Register new dimension even though records are duplicate: %s",
+                            dim.name,
+                        )
+            if replace_dim:
+                logger.info(
+                    "Replace %s with existing dimension %s", dim.name, existing.dimension_id
                 )
-            if not warn_only:
-                raise DSGDuplicateValueRegistered(
-                    f"There are {len(duplicates)} dimensions with duplicate content (data files)."
-                )
+                config.model.dimensions[i] = existing
+                existing_ids.add(existing.dimension_id)
+        return existing_ids
 
     def finalize_registration(self, config_ids: List[str], error_occurred: bool):
         if error_occurred:
@@ -238,7 +204,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         return dimensions
 
     @track_timing(timer_stats_collector)
-    def register(
+    def register_from_config(
         self, config: DimensionsConfig, submitter, log_message, force=False, context=None
     ):
         error_occurred = False
@@ -256,15 +222,16 @@ class DimensionRegistryManager(RegistryManagerBase):
                 context.finalize(error_occurred)
 
     @track_timing(timer_stats_collector)
-    def register_from_file(self, config_file, submitter, log_message, force=False):
+    def register(self, config_file, submitter, log_message, force=False):
         context = RegistrationContext()
         config = DimensionsConfig.load(config_file)
-        return self.register(config, submitter, log_message, force=force, context=context)
+        return self.register_from_config(
+            config, submitter, log_message, force=force, context=context
+        )
 
     def _register(self, config, submitter, log_message, context, force=False):
         config.assign_ids()
-        self.check_unique_records(config, warn_only=force)
-        self.check_unique_model_fields(config, warn_only=force)
+        existing_ids = self._replace_duplicates(config)
         # TODO: check that id does not already exist in .dsgrid-registry
 
         registration = make_initial_config_registration(submitter, log_message)
@@ -273,6 +240,8 @@ class DimensionRegistryManager(RegistryManagerBase):
         try:
             # Guarantee that registration of dimensions is all or none.
             for dimension in config.model.dimensions:
+                if dimension.dimension_id in existing_ids:
+                    continue
                 registry_model = DimensionRegistryModel(
                     dimension_id=dimension.dimension_id,
                     version=registration.version,
@@ -320,6 +289,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         )
 
         context.add_ids(RegistryType.DIMENSION, dimension_ids, self)
+        dimension_ids.extend(existing_ids)
         return dimension_ids
 
     def get_registry_directory(self, config_id):
@@ -351,6 +321,8 @@ class DimensionRegistryManager(RegistryManagerBase):
         filters: List[str] = None,
         max_width: Union[int, Dict] = None,
         drop_fields: List[str] = None,
+        dimension_ids: Set[str] = None,
+        return_table: bool = False,
         **kwargs,
     ):
         """Show registry in PrettyTable
@@ -399,6 +371,8 @@ class DimensionRegistryManager(RegistryManagerBase):
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for dimension_id, registry_config in self._registry_configs.items():
+            if dimension_ids and dimension_id not in dimension_ids:
+                continue
             reg_dim_type = self._id_to_type[dimension_id].value
             last_reg = registry_config.model.registration_history[0]
 
@@ -423,6 +397,8 @@ class DimensionRegistryManager(RegistryManagerBase):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
         table.align = "l"
+        if return_table:
+            return table
         display_table(table)
 
     def dump(self, config_id, directory, version=None, force=False):

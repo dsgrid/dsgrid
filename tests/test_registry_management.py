@@ -70,34 +70,22 @@ def test_register_project_and_dataset(make_test_project_dir):
 
         with pytest.raises(DSGDuplicateValueRegistered):
             project_config_file = make_test_project_dir / "project.toml"
-            project_mgr.register_from_file(project_config_file, user, log_message)
+            project_mgr.register(project_config_file, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
             dataset_config_file = (
                 make_test_project_dir / "datasets/sector_models/comstock/dataset.toml"
             )
-            dataset_mgr.register_from_file(dataset_config_file, dataset_path, user, log_message)
+            dataset_mgr.register(dataset_config_file, dataset_path, user, log_message)
 
-        with pytest.raises(DSGDuplicateValueRegistered):
-            dim_config_file = make_test_project_dir / "dimensions.toml"
-            dimension_mgr.register_from_file(dim_config_file, user, log_message)
-
-        with pytest.raises(DSGDuplicateValueRegistered):
-            # Time dimension doesn't have records and duplicates are only based on fields.
-            dimension_models = load_data(make_test_project_dir / "dimensions.toml")["dimensions"]
-            time_models = [x for x in dimension_models if x["type"] == "time"]
-            assert len(time_models) == 1
-            new_models = {"dimensions": time_models}
-            new_file = make_test_project_dir / "time_dimension.toml"
-            dump_data(new_models, new_file)
-            dimension_mgr.register_from_file(new_file, user, log_message)
-
-        with pytest.raises(DSGDuplicateValueRegistered):
-            dimension_mapping_mgr.dump(dimension_mapping_id, base_dir)
-            dimension_mapping_config = base_dir / "dimension_mapping.toml"
-            data = load_data(dimension_mapping_config)
-            dump_data({"mappings": [data]}, dimension_mapping_config)
-            dimension_mapping_mgr.register_from_file(dimension_mapping_config, user, log_message)
+        # Duplicate mappings get re-used.
+        mapping_ids = dimension_mapping_mgr.list_ids()
+        dimension_mapping_mgr.dump(dimension_mapping_id, base_dir)
+        dimension_mapping_config = base_dir / "dimension_mapping.toml"
+        data = load_data(dimension_mapping_config)
+        dump_data({"mappings": [data]}, dimension_mapping_config)
+        dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
+        assert len(dimension_mapping_mgr.list_ids()) == len(mapping_ids)
 
         check_configs_update(base_dir, manager)
         check_update_project_dimension(base_dir, manager)
@@ -108,6 +96,32 @@ def test_register_project_and_dataset(make_test_project_dir):
         check_config_remove(dataset_mgr, dataset_id)
         check_config_remove(dimension_mgr, dimension_id)
         check_config_remove(dimension_mapping_mgr, dimension_mapping_id)
+
+
+def test_duplicate_dimensions(make_test_project_dir):
+    with TemporaryDirectory() as tmpdir:
+        path = create_local_test_registry(Path(tmpdir))
+        user = getpass.getuser()
+        log_message = "Initial registration"
+        manager = RegistryManager.load(path, offline_mode=True)
+
+        dimension_mgr = manager.dimension_manager
+        dimension_mgr.register(make_test_project_dir / "dimensions.toml", user, log_message)
+
+        # Registering duplicate dimensions and mappings are allowed.
+        # If names are the same, they are replaced. Otherwise, new ones get registered.
+        dimension_ids = dimension_mgr.list_ids()
+        dim_config_file = make_test_project_dir / "dimensions.toml"
+
+        dimension_mgr.register(dim_config_file, user, log_message)
+        assert len(dimension_mgr.list_ids()) == len(dimension_ids)
+
+        data = load_data(dim_config_file)
+        data["dimensions"][0]["name"] += " new"
+        dump_data(data, dim_config_file)
+
+        dimension_mgr.register(dim_config_file, user, log_message)
+        assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 1
 
 
 def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):
@@ -126,7 +140,7 @@ def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):
         dump_data(data, project_file)
 
         with pytest.raises(ValueError):
-            manager.project_manager.register_from_file(
+            manager.project_manager.register(
                 project_file,
                 getpass.getuser(),
                 "register duplicate project",
@@ -162,7 +176,7 @@ def test_register_and_submit_rollback_on_failure(make_test_project_dir):
         data = subsectors_file.read_text().splitlines()[:-2]
         subsectors_file.write_text("\n".join(data))
 
-        manager.project_manager.register_from_file(
+        manager.project_manager.register(
             project_file,
             getpass.getuser(),
             "register project",
@@ -276,7 +290,7 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         manager = RegistryManager.load(path, offline_mode=True)
 
         dim_mgr = manager.dimension_manager
-        dim_mgr.register_from_file(make_test_project_dir / "dimensions.toml", user, log_message)
+        dim_mgr.register(make_test_project_dir / "dimensions.toml", user, log_message)
         dim_mapping_mgr = manager.dimension_mapping_manager
         dimension_mapping_file = make_test_project_dir / "dimension_mappings_with_ids.toml"
         replace_dimension_uuids_from_registry(path, [dimension_mapping_file])
@@ -292,17 +306,17 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         # Invalid 'from' record
         record_file.write_text(orig_text + "invalid county,1,CO\n")
         with pytest.raises(DSGInvalidDimensionMapping):
-            dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Invalid 'from' record - nulls aren't allowd
         record_file.write_text(orig_text + ",1.2,CO\n")
         with pytest.raises(DSGInvalidDimensionMapping):
-            dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Invalid 'to' record
         record_file.write_text(orig_text.replace("CO", "Colorado"))
         with pytest.raises(DSGInvalidDimensionMapping):
-            dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Duplicate "from" record, invalid as mapping_type = one_to_one_multiplication
         orig_text2 = orig_text.split(",")
@@ -310,11 +324,11 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         record_file.write_text(orig_text2 + "\n08031,CO\n")
         msg = r"dimension_mapping.*has mapping_type.*, which does not allow duplicated.*records"
         with pytest.raises(DSGInvalidDimensionMapping, match=msg):
-            dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
         # Valid - null value in "to" record (Only one valid test allowed in this test func)
         record_file.write_text(orig_text.replace("CO", ""))
-        dim_mapping_mgr.register_from_file(dimension_mapping_file, user, log_message)
+        dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
 
 def test_register_submit_dataset_long_workflow(make_test_project_dir):
@@ -338,22 +352,22 @@ def test_register_submit_dataset_long_workflow(make_test_project_dir):
         user = getpass.getuser()
         log_message = "register"
 
-        manager.dimension_manager.register_from_file(project_dimension_file, user, log_message)
-        manager.dimension_manager.register_from_file(dataset_dimension_file, user, log_message)
+        manager.dimension_manager.register(project_dimension_file, user, log_message)
+        manager.dimension_manager.register(dataset_dimension_file, user, log_message)
 
         needs_replacements = [project_dimension_mapping_config, dimension_mapping_config]
         replace_dimension_uuids_from_registry(base_dir, needs_replacements)
 
-        dim_mapping_mgr.register_from_file(project_dimension_mapping_config, user, log_message)
-        dim_mapping_mgr.register_from_file(dimension_mapping_config, user, log_message)
+        dim_mapping_mgr.register(project_dimension_mapping_config, user, log_message)
+        dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
 
         needs_replacements = [project_config_file, dimension_mapping_refs]
         replace_dimension_mapping_uuids_from_registry(base_dir, needs_replacements)
         replace_dimension_uuids_from_registry(base_dir, (project_config_file, dataset_config_file))
 
-        manager.project_manager.register_from_file(project_config_file, user, "register project")
+        manager.project_manager.register(project_config_file, user, "register project")
         dataset_path = TEST_DATASET_DIRECTORY / dataset_id
-        manager.dataset_manager.register_from_file(
+        manager.dataset_manager.register(
             dataset_config_file, dataset_path, user, "register dataset"
         )
         manager.project_manager.submit_dataset(
@@ -371,12 +385,12 @@ def test_register_submit_dataset_long_workflow(make_test_project_dir):
 
 
 def register_project(project_mgr, config_file, project_id, user, log_message):
-    project_mgr.register_from_file(config_file, user, log_message)
+    project_mgr.register(config_file, user, log_message)
     assert project_mgr.list_ids() == [project_id]
 
 
 def register_dataset(dataset_mgr, config_file, dataset_id, user, log_message):
-    dataset_mgr.register_from_file(config_file, user, log_message)
+    dataset_mgr.register(config_file, user, log_message)
     assert dataset_mgr.list_ids() == [dataset_id]
 
 

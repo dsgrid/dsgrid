@@ -57,8 +57,8 @@ def make_registry_for_tempo(registry_path, src_dir, dataset_path=None) -> Regist
     log_message = "Initial registration"
     manager = RegistryManager.load(path, offline_mode=True)
     dim_mgr = manager.dimension_manager
-    dim_mgr.register(src_dir / src_dir / "dimensions.toml", user, log_message)
-    dim_mgr.register(src_dir / dataset_dir / "dimensions.toml", user, log_message)
+    dim_mgr.register_from_config(src_dir / src_dir / "dimensions.toml", user, log_message)
+    dim_mgr.register_from_config(src_dir / dataset_dir / "dimensions.toml", user, log_message)
 
     project_config_file = src_dir / "project.toml"
     project_id = load_data(project_config_file)["project_id"]

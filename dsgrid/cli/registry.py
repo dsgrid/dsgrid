@@ -154,7 +154,7 @@ def register_dimensions(registry_manager, dimension_config_file, log_message):
     """Register new dimensions with the dsgrid repository."""
     manager = registry_manager.dimension_manager
     submitter = getpass.getuser()
-    manager.register_from_file(dimension_config_file, submitter, log_message)
+    manager.register(dimension_config_file, submitter, log_message)
 
 
 @click.command(name="dump")
@@ -278,7 +278,7 @@ def register_dimension_mappings(
     """Register new dimension mappings with the dsgrid repository."""
     submitter = getpass.getuser()
     manager = registry_manager.dimension_mapping_manager
-    manager.register_from_file(dimension_mapping_config_file, submitter, log_message, force=force)
+    manager.register(dimension_mapping_config_file, submitter, log_message, force=force)
 
 
 @click.command(name="dump")
@@ -409,7 +409,7 @@ def register_project(
 ):
     """Register a new project with the dsgrid repository."""
     submitter = getpass.getuser()
-    registry_manager.project_manager.register_from_file(
+    registry_manager.project_manager.register(
         project_config_file,
         submitter,
         log_message,
@@ -648,7 +648,7 @@ def register_dataset(
     """Register a new dataset with the dsgrid repository."""
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
-    manager.register_from_file(dataset_config_file, dataset_path, submitter, log_message)
+    manager.register(dataset_config_file, dataset_path, submitter, log_message)
 
 
 @click.command(name="dump")

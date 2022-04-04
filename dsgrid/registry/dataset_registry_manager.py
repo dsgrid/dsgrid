@@ -130,7 +130,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         return f"configs/.locks/{config_id}.lock"
 
     @track_timing(timer_stats_collector)
-    def register_from_file(
+    def register(
         self,
         config_file,
         dataset_path,
@@ -140,12 +140,12 @@ class DatasetRegistryManager(RegistryManagerBase):
         context=None,
     ):
         config = DatasetConfig.load_from_user_path(config_file, self._dimension_mgr, dataset_path)
-        return self.register(
+        return self.register_from_config(
             config, dataset_path, submitter, log_message, force=force, context=context
         )
 
     @track_timing(timer_stats_collector)
-    def register(
+    def register_from_config(
         self,
         config,
         dataset_path,
@@ -177,13 +177,14 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _register_dataset_and_dimensions(
         self,
-        config: Path,
+        config: DatasetConfig,
         dataset_path: Path,
         submitter: str,
         log_message: str,
         context: RegistrationContext,
         force=False,
     ):
+        logger.info("Start registration of dataset %s", config.model.dataset_id)
         # TODO S3: This requires downloading data to the local system.
         # Can we perform all validation on S3 with an EC2 instance?
         if str(dataset_path).startswith("s3://"):
@@ -197,7 +198,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         if model.dimensions:
             dim_model = DimensionsConfigModel(dimensions=model.dimensions)
             dims_config = DimensionsConfig.load_from_model(dim_model, config.src_dir)
-            dimension_ids = self._dimension_mgr.register(
+            dimension_ids = self._dimension_mgr.register_from_config(
                 dims_config, submitter, log_message, force=force, context=context
             )
             model.dimension_references += self._dimension_mgr.make_dimension_references(
@@ -302,6 +303,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         filters: List[str] = None,
         max_width: Union[int, Dict] = None,
         drop_fields: List[str] = None,
+        return_table: bool = False,
         **kwargs,
     ):
         """Show registry in PrettyTable
@@ -371,4 +373,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
         table.align = "l"
+        if return_table:
+            return table
         display_table(table)

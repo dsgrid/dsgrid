@@ -29,7 +29,7 @@ def test_trivial_dimension_bad(make_test_project_dir, make_test_data_dir):
             include_datasets=False,
         )
         project_config_file = make_test_project_dir / "project.toml"
-        manager.project_manager.register_from_file(project_config_file, "user", "log")
+        manager.project_manager.register(project_config_file, "user", "log")
 
         dataset_dir = make_test_project_dir / "datasets" / "sector_models" / "comstock"
         assert dataset_dir.exists()
@@ -42,7 +42,7 @@ def test_trivial_dimension_bad(make_test_project_dir, make_test_data_dir):
         dataset_path = make_test_data_dir / config["dataset_id"]
 
         with pytest.raises(DSGInvalidDimension):
-            manager.dataset_manager.register_from_file(
+            manager.dataset_manager.register(
                 config_file=dataset_config_file,
                 dataset_path=dataset_path,
                 submitter="test",

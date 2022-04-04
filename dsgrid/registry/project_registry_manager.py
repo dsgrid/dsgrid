@@ -163,19 +163,18 @@ class ProjectRegistryManager(RegistryManagerBase):
         return f"configs/.locks/{config_id}.lock"
 
     @track_timing(timer_stats_collector)
-    def register_from_file(
+    def register(
         self,
         config_file,
         submitter,
         log_message,
         force=False,
     ):
-        context = RegistrationContext()
         config = ProjectConfig.load(config_file, self._dimension_mgr, self._dimension_mapping_mgr)
-        return self.register(config, submitter, log_message, force=force, context=context)
+        return self.register_from_config(config, submitter, log_message, force=force)
 
     @track_timing(timer_stats_collector)
-    def register(
+    def register_from_config(
         self,
         config,
         submitter,
@@ -184,9 +183,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         context=None,
     ):
         error_occurred = False
-        need_to_finalize = context is None
-        if context is None:
-            context = RegistrationContext()
+        context = RegistrationContext()
 
         try:
             self._register_project_and_dimensions(
@@ -200,8 +197,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             error_occurred = True
             raise
         finally:
-            if need_to_finalize:
-                context.finalize(error_occurred)
+            context.finalize(error_occurred)
 
     @track_timing(timer_stats_collector)
     def _register_project_and_dimensions(
@@ -214,11 +210,12 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         src_dir = config.src_dir
         model = config.model
+        logger.info("Start registration of project %s", model.project_id)
         self._check_if_already_registered(model.project_id)
         if model.dimensions.base_dimensions:
             dim_model = DimensionsConfigModel(dimensions=model.dimensions.base_dimensions)
             dims_config = DimensionsConfig.load_from_model(dim_model, src_dir)
-            dimension_ids = self._dimension_mgr.register(
+            dimension_ids = self._dimension_mgr.register_from_config(
                 dims_config, submitter, log_message, force=force, context=context
             )
             # Order of the next two is required for Pydantic validation.
@@ -229,7 +226,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         if model.dimensions.supplemental_dimensions:
             dim_model = DimensionsConfigModel(dimensions=model.dimensions.supplemental_dimensions)
             dims_config = DimensionsConfig.load_from_model(dim_model, src_dir)
-            dimension_ids = self._dimension_mgr.register(
+            dimension_ids = self._dimension_mgr.register_from_config(
                 dims_config, submitter, log_message, force=force, context=context
             )
             model.dimensions.supplemental_dimension_references = (
@@ -264,7 +261,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 DimensionMappingsConfigModel(mappings=mappings),
                 src_dir,
             )
-            mapping_ids = self._dimension_mapping_mgr.register(
+            mapping_ids = self._dimension_mapping_mgr.register_from_config(
                 mapping_config, submitter, log_message, context=context, force=force
             )
             model.dimension_mappings.base_to_supplemental_references = (
@@ -336,7 +333,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         context = RegistrationContext()
         error_occurred = False
         try:
-            self._dataset_mgr.register_from_file(
+            self._dataset_mgr.register(
                 dataset_config_file,
                 dataset_path,
                 submitter,
@@ -469,7 +466,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             mappings_config = DimensionMappingsConfig.load_from_model(
                 DimensionMappingsConfigModel(mappings=mapping_tables), src_dir
             )
-            mapping_ids = self._dimension_mapping_mgr.register(
+            mapping_ids = self._dimension_mapping_mgr.register_from_config(
                 mappings_config, submitter, log_message, context=context
             )
             for mapping_id in mapping_ids:
@@ -691,6 +688,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         filters: List[str] = None,
         max_width: Union[int, Dict] = None,
         drop_fields: List[str] = None,
+        return_table: bool = False,
         **kwargs,
     ):
         """Show registry in PrettyTable
@@ -769,4 +767,6 @@ class ProjectRegistryManager(RegistryManagerBase):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
         table.align = "l"
+        if return_table:
+            return table
         display_table(table)

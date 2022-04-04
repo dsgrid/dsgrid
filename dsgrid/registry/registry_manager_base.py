@@ -114,7 +114,7 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def register_from_file(self, config_file, submitter, log_message, force=False, context=None):
+    def register(self, config_file, submitter, log_message, force=False, context=None):
         """Registers a config file in the registry.
 
         Parameters
@@ -139,7 +139,7 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def register(self, config, submitter, log_message, force=False, context=None):
+    def register_from_config(self, config, submitter, log_message, force=False, context=None):
         """Registers a config file in the registry.
 
         Parameters

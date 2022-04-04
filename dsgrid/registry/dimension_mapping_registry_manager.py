@@ -79,40 +79,30 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def registry_class():
         return DimensionMappingRegistry
 
-    def _check_unique_records(self, config: DimensionMappingsConfig, warn_only=False):
-        """Check if any new mapping files have identical contents as any existing files.
-
-        Parameters
-        ----------
-        config : DimensionMappingsConfig
-        warn_only: bool
-            If True, log a warning instead of raising an exception.
-
-        Raises
-        ------
-        DSGDuplicateValueRegistered
-            Raised if there are duplicates and warn_only is False.
-
-        """
+    def _replace_duplicates(self, config: DimensionMappingsConfig):
         hashes = {}
         for mapping_id, registry_config in self._registry_configs.items():
             mapping = self.get_by_id(mapping_id, registry_config.model.version).model
-            hashes[mapping.file_hash] = mapping_id
+            hashes[mapping.file_hash] = mapping
 
-        duplicates = []
-        for mapping in config.model.mappings:
-            if mapping.file_hash in hashes:
-                duplicates.append((mapping.mapping_id, hashes[mapping.file_hash]))
+        existing_ids = set()
+        for i, mapping in enumerate(config.model.mappings):
+            existing = hashes.get(mapping.file_hash)
+            if (
+                existing is not None
+                and mapping.from_dimension.dimension_type == mapping.from_dimension.dimension_type
+                and mapping.to_dimension.dimension_type == mapping.to_dimension.dimension_type
+            ):
+                logger.info(
+                    "Replace mapping of %s to %s with existing mapping ID %s",
+                    mapping.from_dimension.dimension_id,
+                    mapping.to_dimension.dimension_id,
+                    existing.mapping_id,
+                )
+                config.model.mappings[i] = existing
+                existing_ids.add(existing.mapping_id)
 
-        if duplicates:
-            for dup in duplicates:
-                logger.error(
-                    "%s has duplicate content with existing mapping ID %s", dup[0], dup[1]
-                )
-            if not warn_only:
-                raise DSGDuplicateValueRegistered(
-                    f"There are {len(duplicates)} dimension mappings with duplicate content (data files)."
-                )
+        return existing_ids
 
     def _check_records_against_dimension_records(self, config):
         """
@@ -314,13 +304,15 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             )
         return refs
 
-    def register_from_file(self, config_file, submitter, log_message, force=False):
+    def register(self, config_file, submitter, log_message, force=False):
         context = RegistrationContext()
         config = DimensionMappingsConfig.load(config_file)
-        return self.register(config, submitter, log_message, force=force, context=context)
+        return self.register_from_config(
+            config, submitter, log_message, force=force, context=context
+        )
 
     @track_timing(timer_stats_collector)
-    def register(
+    def register_from_config(
         self, config: DimensionMappingsConfig, submitter, log_message, force=False, context=None
     ):
         error_occurred = False
@@ -339,7 +331,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
     def _register(self, config, submitter, log_message, context, force=False):
         config.assign_ids()
-        self._check_unique_records(config, warn_only=force)
+        existing_ids = self._replace_duplicates(config)
         self._check_records_against_dimension_records(config)
         self.validate_records(config)
 
@@ -348,6 +340,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         try:
             # Guarantee that registration of dimension mappings is all or none.
             for mapping in config.model.mappings:
+                if mapping.mapping_id in existing_ids:
+                    continue
                 from_id = mapping.from_dimension.dimension_id
                 to_id = mapping.to_dimension.dimension_id
                 if not self.dimension_manager.has_id(from_id):
@@ -400,6 +394,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         )
 
         context.add_ids(RegistryType.DIMENSION_MAPPING, dimension_mapping_ids, self)
+        dimension_mapping_ids.extend(existing_ids)
         return dimension_mapping_ids
 
     def dump(self, config_id, directory, version=None, force=False):
@@ -460,6 +455,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         filters: List[str] = None,
         max_width: Union[int, Dict] = None,
         drop_fields: List[str] = None,
+        return_table: bool = False,
         **kwargs,
     ):
         """Show registry in PrettyTable
@@ -532,4 +528,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         rows.sort(key=lambda x: x[0])
         table.add_rows(rows)
         table.align = "l"
+        if return_table:
+            return table
         display_table(table)

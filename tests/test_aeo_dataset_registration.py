@@ -67,9 +67,7 @@ def make_registry_for_aeo(
     manager = RegistryManager.load(path, offline_mode=True)
 
     dataset_config_file = src_dir / dataset_dir / "dataset.toml"
-    manager.dataset_manager.register_from_file(
-        dataset_config_file, dataset_path, user, log_message
-    )
+    manager.dataset_manager.register(dataset_config_file, dataset_path, user, log_message)
     logger.info(f"dataset={dataset_name} registered successfully!\n")
     return manager
 

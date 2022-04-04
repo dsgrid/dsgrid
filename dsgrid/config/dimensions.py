@@ -99,12 +99,10 @@ class DimensionBaseModel(DSGBaseModel):
         ),
     )
 
-    # Keep this last for validation purposes.
-    model_hash: Optional[str] = Field(
-        title="model_hash",
-        description="Hash of the contents of the model",
-        dsg_internal=True,
-    )
+    @root_validator(pre=True)
+    def handle_legacy_fields(cls, values):
+        values.pop("model_hash", None)
+        return values
 
     @validator("name")
     def check_name(cls, name):
@@ -182,18 +180,6 @@ class DimensionBaseModel(DSGBaseModel):
             importlib.import_module(values["module"]),
             values["class_name"],
         )
-
-    @validator("model_hash")
-    def compute_model_hash(cls, model_hash, values):
-        # Always re-compute because the user may have changed something.
-        text = ""
-        for key, val in sorted(values.items()):
-            # dimension_id is auto-generated; don't check for that
-            # Don't let users create a dimension where the only difference
-            # is the records. They need to change something else.
-            if key not in ("dimension_id", "file_hash"):
-                text += str(val)
-        return compute_hash(text.encode())
 
 
 class DimensionModel(DimensionBaseModel):

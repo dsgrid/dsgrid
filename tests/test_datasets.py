@@ -74,7 +74,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
                 dataset_path = test_dir / dataset_id
                 exc, match_msg = setup_test(test_dir)
                 with pytest.raises(exc, match=match_msg):
-                    manager.dataset_manager.register_from_file(
+                    manager.dataset_manager.register(
                         dataset_config_file,
                         dataset_path,
                         user,
@@ -94,7 +94,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
                 shutil.copytree(make_test_data_dir, test_dir)
                 dataset_path = test_dir / dataset_id
                 exc, match_msg = setup_test(test_dir)
-                manager.dataset_manager.register_from_file(
+                manager.dataset_manager.register(
                     dataset_config_file,
                     dataset_path,
                     user,

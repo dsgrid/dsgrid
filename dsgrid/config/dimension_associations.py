@@ -56,7 +56,6 @@ class DimensionAssociations:
                     .drop(column)
                     .withColumnRenamed(tmp, column)
                 )
-                table.cache()
             dims = set((DimensionType.from_column(x) for x in table.columns))
             all_dims.update(dims)
             key = _make_key(dims)

@@ -90,8 +90,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             existing = hashes.get(mapping.file_hash)
             if (
                 existing is not None
-                and mapping.from_dimension.dimension_type == mapping.from_dimension.dimension_type
-                and mapping.to_dimension.dimension_type == mapping.to_dimension.dimension_type
+                and mapping.from_dimension.dimension_type == existing.from_dimension.dimension_type
+                and mapping.to_dimension.dimension_type == existing.to_dimension.dimension_type
             ):
                 logger.info(
                     "Replace mapping of %s to %s with existing mapping ID %s",

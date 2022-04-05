@@ -11,6 +11,9 @@ from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.spark import init_spark
 
+SS_PROJECT = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/project.toml"
+RS_DATASET = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/datasets/sector_models/resstock/dataset.toml"
+
 
 class RegistrationGui:
     """Provides a UI for registering dsgrid projects and datasets."""
@@ -62,7 +65,7 @@ class RegistrationGui:
         )
         self._online_mode_cbox = widgets.Checkbox(
             value=False,
-            description="online mode",
+            description="Online mode",
         )
         self._online_mode_cbox.observe(self._on_online_click, names="value")
         self._sync_cbox = widgets.Checkbox(
@@ -73,13 +76,22 @@ class RegistrationGui:
         self._load_btn.on_click(self._on_load_click)
         self._register_project_btn = widgets.Button(description="Register project", disabled=True)
         self._register_project_btn.on_click(self._on_register_project_click)
-        self._project_file_text = widgets.Text("", description="Project File")
+        self._project_file_text = widgets.Text(
+            "", description="Project File", placeholder="project.toml"
+        )
+        self._project_file_ex = widgets.HTML(
+            f"<a href={SS_PROJECT} target='_blank'>Example: Standard Scenarios</a>"
+        )
         self._register_dataset_btn = widgets.Button(description="Register dataset", disabled=True)
         self._register_dataset_btn.on_click(self._on_register_dataset_click)
-        self._dataset_file_text = widgets.Text("", description="Dataset File")
-        self._log_message_text = widgets.Text(
-            "", description="Registration log message", layout=widgets.Layout(width="500px")
+        self._dataset_file_ex = widgets.HTML(
+            f"<a href={RS_DATASET} target='_blank'>Example: ResStock</a>"
         )
+        self._dataset_file_text = widgets.Text(
+            "", description="Dataset File", placeholder="dataset.toml"
+        )
+        self._log_message_label = widgets.HTML("Registration log message")
+        self._log_message_text = widgets.Text("", layout=widgets.Layout(width="400px"))
         self._show_projects_btn = widgets.Button(
             disabled=True,
             description="Show projects",
@@ -98,15 +110,12 @@ class RegistrationGui:
             tooltip="Display a table showing all registered dimensions",
         )
         self._show_dimensions_btn.on_click(self._on_show_dimensions_click)
-        self._dimensions_filter_text = widgets.Text(
-            tooltip="Example: Type == geography",
-            description="Filter dimensions",
-            value="",
-        )
+        self._dim_filter_message_text = widgets.HTML("Filter dimensions")
+        self._dimensions_filter_text = widgets.Text(value="", placeholder="Type == geography")
+        self._project_dimensions_filter_text = widgets.HTML("Filter dimensions by project")
         self._project_dimensions_filter_dd = widgets.Dropdown(
             options=self._project_ids,
             value=self._project_ids[0],
-            description="Filter dimensions by project:",
             disabled=False,
         )
         self._show_dimension_mappings_btn = widgets.Button(
@@ -132,16 +141,21 @@ class RegistrationGui:
         )
         options_box = widgets.VBox((self._online_mode_cbox, self._sync_cbox))
 
-        register_project_box = widgets.HBox((self._register_project_btn, self._project_file_text))
-        register_dataset_box = widgets.HBox((self._register_dataset_btn, self._dataset_file_text))
-        register_box = widgets.VBox(
-            (register_project_box, register_dataset_box, self._log_message_text)
+        register_project_box = widgets.HBox(
+            (self._register_project_btn, self._project_file_text, self._project_file_ex)
         )
+        register_dataset_box = widgets.HBox(
+            (self._register_dataset_btn, self._dataset_file_text, self._dataset_file_ex)
+        )
+        log_box = widgets.HBox((self._log_message_label, self._log_message_text))
+        register_box = widgets.VBox((register_project_box, register_dataset_box, log_box))
 
         show_dims_box = widgets.HBox(
             (
                 self._show_dimensions_btn,
+                self._dim_filter_message_text,
                 self._dimensions_filter_text,
+                self._project_dimensions_filter_text,
                 self._project_dimensions_filter_dd,
             )
         )

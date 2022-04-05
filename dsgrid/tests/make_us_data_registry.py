@@ -70,11 +70,13 @@ def make_test_data_registry(
     project_id = load_data(project_config_file)["project_id"]
     dataset_config_file = src_dir / dataset_dir / "dataset.toml"
     dataset_mapping_file = src_dir / dataset_dir / "dimension_mappings.toml"
+    if not dataset_mapping_file.exists():
+        dataset_mapping_file = None
     dataset_id = load_data(dataset_config_file)["dataset_id"]
 
     if include_projects:
         print("\n 1. register project: \n")
-        manager.project_manager.register_from_file(
+        manager.project_manager.register(
             project_config_file,
             user,
             log_message,
@@ -82,7 +84,7 @@ def make_test_data_registry(
     if include_datasets:
         print("\n 2. register dataset: \n")
         replace_dimension_uuids_from_registry(path, (dataset_config_file,))
-        manager.dataset_manager.register_from_file(
+        manager.dataset_manager.register(
             dataset_config_file,
             dataset_path / dataset_id,
             user,

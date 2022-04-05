@@ -29,15 +29,14 @@ def test_register_dimensions_and_mappings(make_test_project_dir):
             f"dsgrid registry --path={path} --offline dimensions register {dim_config_file} -l log"
         )
         check_run_command(cmd)
-        # Can't register duplicates.
-        assert run_command(cmd) != 0
-
         replace_dimension_uuids_from_registry(path, (project_dimension_mapping_config,))
+
+        # Registering duplicates is allowed.
+        check_run_command(cmd)
 
         cmd = f"dsgrid registry --path={path} --offline dimension-mappings register {project_dimension_mapping_config} -l log"
         check_run_command(cmd)
-        # Can't register duplicates.
-        assert run_command(cmd) != 0
+        check_run_command(cmd)
 
 
 def test_register_project_and_dataset(make_test_project_dir):

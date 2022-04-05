@@ -47,83 +47,51 @@ def make_standard_scenarios_registry(
     """
     if not include_projects and include_datasets:
         raise Exception("If include_datasets is True then include_projects must also be True.")
-    efs_repo = os.environ.get("DSGRID_EFS_REPO")
-    if efs_repo is None:
-        # Required because StandardScenarios uses dimensions from this project.
-        print(
-            "You must define the path to a local copy of dsgrid-project-EFS in the env "
-            "variable DSGRID_EFS_REPO",
-            file=sys.stderr,
-        )
-        sys.exit(1)
 
     path = create_local_test_registry(registry_path)
     project_config_file = src_dir / "project.toml"
-    dataset_dir = Path("datasets/sector_models")
+    dataset_base = Path("datasets/sector_models")
     dataset_ids = (
         "conus_2022_reference_comstock",
         "conus_2022_reference_resstock",
         "tempo_conus_2022",
     )
     dataset_dirs = ("comstock", "resstock", "tempo")
-    project_dimension_mapping_config = src_dir / "dimension_mappings.toml"
 
     user = getpass.getuser()
     log_message = "Initial registration"
     manager = RegistryManager.load(path, offline_mode=True)
-    dim_mgr = manager.dimension_manager
-    dim_mapping_mgr = manager.dimension_mapping_manager
-
-    dimension_files = [src_dir / "dimensions.toml", f"{efs_repo}/dsgrid_project/dimensions.toml"]
-    dimension_mapping_files = [project_dimension_mapping_config]
-    dim_uuid_replacements = [project_config_file, project_dimension_mapping_config]
-    dim_mapping_uuid_replacements = [project_config_file]
-    mapping_refs = defaultdict(list)
-    for dataset_id in dataset_dirs:  # Yes, this is odd.
-        dim_config_file = src_dir / dataset_dir / dataset_id / "dimensions.toml"
-        dimension_files.append(dim_config_file)
-        dim_mapping_config_file = src_dir / dataset_dir / dataset_id / "dimension_mappings.toml"
-        if dim_mapping_config_file.exists():
-            dimension_mapping_files.append(dim_mapping_config_file)
-
-        dataset_config_file = src_dir / dataset_dir / dataset_id / "dataset.toml"
-        dim_uuid_replacements.append(dataset_config_file),
-        dim_mapping_uuid_replacements.append(dataset_config_file)
-        if dim_mapping_config_file.exists():
-            dim_uuid_replacements.append(dim_mapping_config_file)
-        dimension_mapping_refs = (
-            src_dir / dataset_dir / dataset_id / "dimension_mapping_references.toml"
-        )
-        if dimension_mapping_refs.exists():
-            dim_mapping_uuid_replacements.append(dimension_mapping_refs)
-            mapping_refs[dataset_id].append(dimension_mapping_refs)
-
-    for filename in dimension_files:
-        dim_mgr.register(filename, user, log_message)
-
-    replace_dimension_uuids_from_registry(path, dim_uuid_replacements)
-
-    for filename in dimension_mapping_files:
-        dim_mapping_mgr.register(filename, user, log_message)
-    replace_dimension_mapping_uuids_from_registry(path, dim_mapping_uuid_replacements)
 
     project_id = load_data(project_config_file)["project_id"]
     if include_projects:
         manager.project_manager.register(project_config_file, user, log_message)
 
+    dim_uuid_replacements = []
+    dim_mapping_uuid_replacements = []
+    for dataset_dir in dataset_dirs:
+        dataset_config_file = src_dir / dataset_base / dataset_dir / "dataset.toml"
+        dim_uuid_replacements.append(dataset_config_file)
+        dim_mapping_uuid_replacements.append(dataset_config_file)
+
+    replace_dimension_uuids_from_registry(path, dim_uuid_replacements)
+
     if include_datasets:
         dataset_path = Path(dataset_path)
-        for dataset_id, ddir in zip(dataset_ids, dataset_dirs):
-            dataset_config_file = src_dir / dataset_dir / ddir / "dataset.toml"
+        for dataset_id, dataset_dir in zip(dataset_ids, dataset_dirs):
+            config_path = src_dir / dataset_base / dataset_dir
+            dataset_config_file = config_path / "dataset.toml"
             manager.dataset_manager.register(
                 dataset_config_file, dataset_path / dataset_id, user, log_message
             )
+            dimension_mapping_file = config_path / "dimension_mappings.toml"
+            if not dimension_mapping_file.exists():
+                dimension_mapping_file = None
             manager.project_manager.submit_dataset(
                 project_id,
                 dataset_id,
-                mapping_refs[ddir],
                 user,
                 log_message,
+                dimension_mapping_file=dimension_mapping_file,
             )
     return manager
 

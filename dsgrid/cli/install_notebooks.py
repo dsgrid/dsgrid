@@ -35,9 +35,9 @@ def install_notebooks(path, force):
         sys.exit(1)
 
     path.mkdir(exist_ok=True, parents=True)
+    to_copy = []
+    existing = []
     for src_file in src_path.iterdir():
-        to_copy = []
-        existing = []
         if src_file.suffix == ".ipynb":
             dst = path / src_file.name
             if dst.exists() and not force:
@@ -53,7 +53,7 @@ def install_notebooks(path, force):
         sys.exit(1)
 
     if not to_copy:
-        print("No notebook files found", file=sys.stder)
+        print("No notebook files found", file=sys.stderr)
         sys.exit(1)
 
     for src, dst in to_copy:

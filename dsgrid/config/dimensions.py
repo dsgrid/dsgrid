@@ -450,10 +450,10 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
 
-    @validator("ranges", pre=True)
+    @validator("ranges")
     def check_times(cls, ranges, values):
         # Return if an error has already occurred
-        for req in ("str_format", "frequency"):
+        for req in "str_format":
             if values.get(req) is None:
                 return ranges
 

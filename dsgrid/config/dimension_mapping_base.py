@@ -154,16 +154,17 @@ class DimensionMappingBaseModel(DSGBaseModel):
             DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.MANY_TO_MANY_MAP,
         }
 
-        assigned_archetype = archetype_assignment[values["mapping_type"]]
-        if archetype is None:
-            archetype = assigned_archetype
-        else:
-            if archetype != assigned_archetype:
-                raise DSGInvalidDimensionMapping(
-                    '"mapping_type" and "archetype" are both defined. '
-                    'To assign archetype based on mapping_type, remove "archetype" from config. '
-                    f'Otherwise, mapping_type={values["mapping_type"]} should have archetype={assigned_archetype} '
-                )
+        if "mapping_type" in values:
+            assigned_archetype = archetype_assignment[values["mapping_type"]]
+            if archetype is None:
+                archetype = assigned_archetype
+            else:
+                if archetype != assigned_archetype:
+                    raise DSGInvalidDimensionMapping(
+                        '"mapping_type" and "archetype" are both defined. '
+                        'To assign archetype based on mapping_type, remove "archetype" from config. '
+                        f'Otherwise, mapping_type={values["mapping_type"]} should have archetype={assigned_archetype} '
+                    )
         return archetype
 
 

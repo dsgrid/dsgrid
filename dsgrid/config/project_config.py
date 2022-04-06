@@ -107,6 +107,7 @@ class DimensionsModel(DSGBaseModel):
         check that all from_keys have a match in the to_keys json
 
         """
+        # TODO: Can we delete this?
         # supplemental_mapping = {
         #   x.name: x.cls for x in values["supplemental_dimensions"]}
         # Should already have been checked.
@@ -215,8 +216,9 @@ class InputDatasetModel(DSGBaseModel):
 
     @validator("model_sector")
     def check_model_sector(cls, model_sector, values):
-        if not values["dataset_type"] == InputDatasetType.SECTOR_MODEL:
-            raise ValueError("model_sector is only required if dataset_type is 'sector_model'")
+        if "dataset_type" in values:
+            if not values["dataset_type"] == InputDatasetType.SECTOR_MODEL:
+                raise ValueError("model_sector is only required if dataset_type is 'sector_model'")
         return model_sector
 
 
@@ -313,13 +315,9 @@ class ProjectConfigModel(DSGBaseModel):
         default=[],
     )
 
-    @root_validator
+    @root_validator(pre=False, skip_on_failure=True)
     def check_mappings_with_dimensions(cls, values):
         """Check that dimension mappings refer to dimensions listed in the model."""
-        if "dimensions" not in values:
-            # This means that the dimensions validator already failed.
-            return values
-
         dimension_names = {
             (x.name, x.dimension_type)
             for x in itertools.chain(

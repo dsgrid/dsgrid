@@ -356,28 +356,30 @@ class DatasetConfigModel(DSGBaseModel):
 
     @validator("dataset_qualifier_metadata", pre=True)
     def check_dataset_qualifier_metadata(cls, metadata, values):
-        if values["dataset_qualifier"] == DatasetQualifierType.QUANTITY:
-            metadata = None
-        elif values["dataset_qualifier"] == DatasetQualifierType.GROWTH_RATE:
-            metadata = GrowthRateModel(**metadata)
-        else:
-            raise ValueError(
-                f'Cannot load dataset_qualifier_metadata model for dataset_qualifier={values["dataset_qualifier"]}'
-            )
+        if "dataset_qualifier" in values:
+            if values["dataset_qualifier"] == DatasetQualifierType.QUANTITY:
+                metadata = None
+            elif values["dataset_qualifier"] == DatasetQualifierType.GROWTH_RATE:
+                metadata = GrowthRateModel(**metadata)
+            else:
+                raise ValueError(
+                    f'Cannot load dataset_qualifier_metadata model for dataset_qualifier={values["dataset_qualifier"]}'
+                )
         return metadata
 
     @validator("data_schema", pre=True)
     def check_data_schema(cls, schema, values):
         """Check and deserialize model for data_schema"""
-        # placeholder for when there's more data_schema_type
-        if values["data_schema_type"] == DataSchemaType.STANDARD:
-            schema = StandardDataSchemaModel(**schema)
-        elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
-            schema = OneTableDataSchemaModel(**schema)
-        else:
-            raise ValueError(
-                f'Cannot load data_schema model for data_schema_type={values["data_schema_type"]}'
-            )
+        if "data_schema_type" in values:
+            # placeholder for when there's more data_schema_type
+            if values["data_schema_type"] == DataSchemaType.STANDARD:
+                schema = StandardDataSchemaModel(**schema)
+            elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
+                schema = OneTableDataSchemaModel(**schema)
+            else:
+                raise ValueError(
+                    f'Cannot load data_schema model for data_schema_type={values["data_schema_type"]}'
+                )
         return schema
 
     @validator("dataset_id")

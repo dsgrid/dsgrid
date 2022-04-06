@@ -102,6 +102,8 @@ class SubmitDataset(DSGBaseModel):
         Check dataset fields to project fields.
         Fields to check: id, model_name, model, sectors
         """
+        # TODO: How are the project_version and teh dataset_version enough to
+        #   pull configs? Where are the project and dataset ids?
         # TODO: Need help here. I tried to make this a validator function but
         #   I was hitting issues with field names and the enumeration classes
         #   not storing the values. This is the best I could do ATM.

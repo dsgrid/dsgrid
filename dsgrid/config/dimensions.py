@@ -152,6 +152,10 @@ class DimensionBaseModel(DSGBaseModel):
             # An error occurred with name. Ignore everything else.
             return class_name
 
+        if "module" not in values:
+            # An error occurred with module. Ignore everything else.
+            return class_name
+
         mod = importlib.import_module(values["module"])
         cls_name = class_name or values["name"]
         if not hasattr(mod, cls_name):
@@ -169,9 +173,10 @@ class DimensionBaseModel(DSGBaseModel):
 
     @validator("cls", always=True)
     def get_dimension_class(cls, dim_class, values):
-        if "name" not in values or values.get("class_name") is None:
-            # An error occurred with name. Ignore everything else.
-            return None
+        # Return if an error has already occurred
+        for req in ("name", "module", "class_name"):
+            if values.get(req) is None:
+                return dim_class
 
         if dim_class is not None:
             raise ValueError(f"cls={dim_class} should not be set")
@@ -386,11 +391,11 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         options=TimeZone.format_descriptions_for_docs(),
     )
 
-    @root_validator(pre=False)
+    @root_validator(pre=False, skip_on_failure=True)
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
 
-    @root_validator(pre=False)
+    @root_validator(pre=False, skip_on_failure=True)
     def check_frequency(cls, values):
         if values["frequency"] in [timedelta(days=365), timedelta(days=366)]:
             raise ValueError(
@@ -401,6 +406,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
+        # TODO: Should this be a root_validator with pre=False, skip_on_failure=True?
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
 
@@ -442,6 +448,7 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
+        # TODO: Should this be a root_validator with pre=False, skip_on_failure=True?
         return _check_time_ranges(ranges, values["str_format"], timedelta(days=365))
 
 

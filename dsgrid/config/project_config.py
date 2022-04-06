@@ -107,25 +107,6 @@ class DimensionsModel(DSGBaseModel):
         check that all from_keys have a match in the to_keys json
 
         """
-        # TODO: Can we delete this?
-        # supplemental_mapping = {
-        #   x.name: x.cls for x in values["supplemental_dimensions"]}
-        # Should already have been checked.
-        # assert len(supplemental_mapping) == \
-        #   len(values["supplemental_dimensions"])
-        # for dim in values["base_dimensions"]:
-        #    mappings = getattr(dim, "mappings", [])
-        #    # TODO: other mapping types
-        #    for mapping in (
-        #       x for x in mappings if isinstance(x, DimensionDirectMapping)):
-        #        to_dim = supplemental_mapping.get(mapping.to_dimension)
-        #        if to_dim is None:
-        #            raise ValueError(
-        #               f"dimension {mapping.to_dimension} is not stored in"
-        #               f"supplemental_dimensions"
-        #            )
-        #        mapping.to_dimension = to_dim
-
         if not values.get("base_dimensions", []) and not values.get(
             "base_dimension_references", []
         ):

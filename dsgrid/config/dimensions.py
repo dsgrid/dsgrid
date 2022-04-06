@@ -404,9 +404,13 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             )
         return values
 
-    @validator("ranges", pre=True)
+    @validator("ranges")
     def check_times(cls, ranges, values):
-        # TODO: Should this be a root_validator with pre=False, skip_on_failure=True?
+        # Return if an error has already occurred
+        for req in ("str_format", "frequency"):
+            if values.get(req) is None:
+                return ranges
+
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
 
@@ -448,7 +452,11 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
 
     @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
-        # TODO: Should this be a root_validator with pre=False, skip_on_failure=True?
+        # Return if an error has already occurred
+        for req in ("str_format", "frequency"):
+            if values.get(req) is None:
+                return ranges
+
         return _check_time_ranges(ranges, values["str_format"], timedelta(days=365))
 
 

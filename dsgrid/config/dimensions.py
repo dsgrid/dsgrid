@@ -404,13 +404,10 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             )
         return values
 
-    @validator("ranges")
+    @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
-        # Return if an error has already occurred
-        for req in ("str_format", "frequency"):
-            if values.get(req) is None:
-                return ranges
-
+        # This check has to run first, in which case "str_format" and "frequency"
+        # will be in values as long as the user provided them
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
 
@@ -450,13 +447,10 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
 
-    @validator("ranges")
+    @validator("ranges", pre=True)
     def check_times(cls, ranges, values):
-        # Return if an error has already occurred
-        for req in "str_format":
-            if values.get(req) is None:
-                return ranges
-
+        # This check has to run first, in which case "str_format" will be in
+        # values as long as the user provided them
         return _check_time_ranges(ranges, values["str_format"], timedelta(days=365))
 
 

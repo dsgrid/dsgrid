@@ -7,6 +7,7 @@ import click
 
 from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.cli.download import download
+from dsgrid.cli.install_notebooks import install_notebooks
 from dsgrid.cli.query import query
 from dsgrid.cli.registry import registry
 from dsgrid.loggers import setup_logging, check_log_file_size
@@ -47,5 +48,6 @@ def callback(*args, **kwargs):
 
 
 cli.add_command(download)
+cli.add_command(install_notebooks)
 cli.add_command(query)
 cli.add_command(registry)

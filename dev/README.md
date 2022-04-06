@@ -224,6 +224,24 @@ mgr = RegistryManager.load("./local-registry", offline_mode=True)
 mgr.dimension_manager.show()
 ```
 
+## Interactive Exploration in a Jupyter notebook UI
+
+The dsgrid team has developed a simple UI to interact with the registry. Here's how to use it.
+
+```
+$ dsgrid install-notebooks
+```
+
+That copies the dsgrid notebooks to `~/dsgrid-notebooks`.
+
+If you are running a Spark cluster then set the environment variable `SPARK_CLUSTER`.
+
+```
+$ export SPARK_CLUSTER=spark://<hostname>:7077
+```
+
+Start Jupyter and open `registration.ipynb`.
+
 ## Spark Standalone Cluster
 
 It can be advantageous to create a standalone cluster instead of starting Spark from within a

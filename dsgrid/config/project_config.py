@@ -481,7 +481,9 @@ class ProjectConfig(ConfigWithDataFilesBase):
         )
         dims = list(itertools.chain(base_dimensions.values(), supplemental_dimensions.values()))
         check_uniqueness((x.model.name for x in dims), "dimension name")
-        check_uniqueness((getattr(x.model, "cls") for x in dims), "dimension cls")
+        check_uniqueness(
+            (getattr(x.model, "cls") for x in base_dimensions.values()), "dimension cls"
+        )
 
         self._base_dimensions.update(base_dimensions)
         self._supplemental_dimensions.update(supplemental_dimensions)

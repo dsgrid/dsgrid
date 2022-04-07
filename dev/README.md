@@ -242,6 +242,41 @@ $ export SPARK_CLUSTER=spark://<hostname>:7077
 
 Start Jupyter and open `registration.ipynb`.
 
+Handling of stdout and stderr needs improvement. If the notebook gets cluttered, the best solution is to
+re-execute the cell that creates the UI. You can pass default values for all text box fields in order to
+avoid having to re-enter them every time.
+
+```
+app = RegistrationGui(
+    defaults={
+       "local_registry": "/my-local-registry",
+        "project_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/project.toml",
+        "dataset_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/sector_models/comstock/dataset.toml",
+        "dimension_mapping_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/sector_models/comstock/dimension_mappings.toml",
+        "dataset_path": "/dsgrid-data/data-StandardScenarios/conus_2022_reference_comstock",
+        "log_message": "log message",
+    }
+)
+```
+
+Note that you can access the dsgrid registry manager instances from the `app` instance.
+
+```
+from dsgrid.dimension.base_models import DimensionType
+project_config = app.project_manager.get_by_id("dsgrid_conus_2022")
+geography_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
+spark_df = geography_dim.get_records_dataframe()
+pandas_df = spark_df.toPandas()
+```
+
+You can debug Pydantic data models with the devtools package.
+
+```
+from devtools import debug
+debug(project_config.model)
+debug(geography_dim.model)
+```
+
 ## Spark Standalone Cluster
 
 It can be advantageous to create a standalone cluster instead of starting Spark from within a

@@ -388,6 +388,20 @@ jade submit-jobs config.json -R periodic -r1
 - After all jobs finish `<output-dir>/stats` will interactive resource utilization plots.
 - In the future we will have Spark metrics recorded in JSON files.
 
+## Connecting a Jupyter notebook to a Spark cluster on Eagle
+
+Make sure you have already installed the dsgrid notebooks in your scratch directory. That installs
+notebooks as well as a script that will start a Jupyter notebook on Eagle. It is called `start_notebook.sh`.
+
+1. Create a JADE configuration per the above steps. However, the command passed to JADE must be
+`bash dsgrid-notebooks/start_notebook.sh`.
+2. Consider whether you want to run the notebook server from the container or from your local conda environment.
+Set the JADE config parameter appropriately in `config.json`.
+3. Submit the JADE job. Once the job starts run `tail -f <output-dir>/*.e`. It will eventually show
+the Jupyter notebook URL as well as the the command you need to run to open an SSH tunnel.
+4. Open the SSH tunnel.
+5. Connect to the notebook.
+
 ### Executing scripts
 There are two basic ways to submit scripts to a Spark cluster.
 

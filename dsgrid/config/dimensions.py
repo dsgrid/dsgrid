@@ -404,10 +404,10 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             )
         return values
 
-    @validator("ranges", pre=True)
+    @validator("ranges")
     def check_times(cls, ranges, values):
-        # This check has to run first, in which case "str_format" and "frequency"
-        # will be in values as long as the user provided them
+        if "str_format" not in values or "frequency" not in values:
+            return ranges
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
 
@@ -447,10 +447,10 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
 
-    @validator("ranges", pre=True)
+    @validator("ranges")
     def check_times(cls, ranges, values):
-        # This check has to run first, in which case "str_format" will be in
-        # values as long as the user provided them
+        if "str_format" not in values:
+            return ranges
         return _check_time_ranges(ranges, values["str_format"], timedelta(days=365))
 
 
@@ -571,8 +571,8 @@ def _check_time_ranges(ranges: list, str_format: str, frequency: timedelta):
     assert isinstance(frequency, timedelta)
     for time_range in ranges:
         # Make sure start and end time parse.
-        start = datetime.strptime(time_range["start"], str_format)
-        end = datetime.strptime(time_range["end"], str_format)
+        start = datetime.strptime(time_range.start, str_format)
+        end = datetime.strptime(time_range.end, str_format)
         if str_format == "%Y":
             if frequency != timedelta(days=365):
                 raise ValueError(f"str_format={str_format} is inconsistent with {frequency}")

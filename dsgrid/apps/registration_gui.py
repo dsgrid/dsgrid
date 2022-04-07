@@ -109,7 +109,9 @@ class RegistrationGui:
         )
         self._register_project_btn.on_click(self._on_register_project_click)
         self._project_file_text = widgets.Text(
-            self._defaults["project_file"], description="Project File", placeholder="project.toml"
+            str(self._defaults["project_file"]),
+            description="Project File",
+            placeholder="project.toml",
         )
         self._project_file_ex = widgets.HTML(
             f"<a href={SS_PROJECT} target='_blank'>Example: Standard Scenarios</a>"
@@ -122,7 +124,9 @@ class RegistrationGui:
             f"<a href={RS_DATASET} target='_blank'>Example: ResStock</a>"
         )
         self._dataset_file_text = widgets.Text(
-            self._defaults["dataset_file"], description="Dataset File", placeholder="dataset.toml"
+            str(self._defaults["dataset_file"]),
+            description="Dataset File",
+            placeholder="dataset.toml",
         )
         self._dataset_path_text = widgets.Text(
             self._defaults["dataset_path"],
@@ -131,7 +135,7 @@ class RegistrationGui:
         )
         self._dimension_mapping_label = widgets.HTML("Dimension mapping file")
         self._dimension_mapping_text = widgets.Text(
-            self._defaults["dimension_mapping_file"], placeholder="dimension_mappings.toml"
+            str(self._defaults["dimension_mapping_file"]), placeholder="dimension_mappings.toml"
         )
         self._dataset_project_id_dd = widgets.Dropdown(
             description="Project ID",
@@ -347,6 +351,9 @@ class RegistrationGui:
         if str(dimension_mapping_file) == "":
             dimension_mapping_file = None
         project_id = self._dataset_project_id_dd.value
+        if project_id == "":
+            print("project_id cannot be empty", file=sys.stderr)
+            return
         self._registration_pre_check()
         try:
             self._manager.project_manager.register_and_submit_dataset(

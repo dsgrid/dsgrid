@@ -106,6 +106,8 @@ class MappingTableModel(DimensionMappingBaseModel):
     @validator("file_hash")
     def compute_file_hash(cls, file_hash, values):
         """Compute file hash."""
+        if "filename" not in values:
+            return file_hash  # this means filename validator fail
         return file_hash or compute_file_hash(values["filename"])
 
     @validator("records", always=True)
@@ -115,6 +117,8 @@ class MappingTableModel(DimensionMappingBaseModel):
             raise ValueError("records should not be defined in the dimension mapping config")
 
         records = []
+        if "filename" not in values:
+            return records  # this means filename validator fail
         filename = Path(values["filename"])
         if filename.name.endswith(".csv"):
             with open(filename) as f_in:

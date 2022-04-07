@@ -107,24 +107,6 @@ class DimensionsModel(DSGBaseModel):
         check that all from_keys have a match in the to_keys json
 
         """
-        # supplemental_mapping = {
-        #   x.name: x.cls for x in values["supplemental_dimensions"]}
-        # Should already have been checked.
-        # assert len(supplemental_mapping) == \
-        #   len(values["supplemental_dimensions"])
-        # for dim in values["base_dimensions"]:
-        #    mappings = getattr(dim, "mappings", [])
-        #    # TODO: other mapping types
-        #    for mapping in (
-        #       x for x in mappings if isinstance(x, DimensionDirectMapping)):
-        #        to_dim = supplemental_mapping.get(mapping.to_dimension)
-        #        if to_dim is None:
-        #            raise ValueError(
-        #               f"dimension {mapping.to_dimension} is not stored in"
-        #               f"supplemental_dimensions"
-        #            )
-        #        mapping.to_dimension = to_dim
-
         if not values.get("base_dimensions", []) and not values.get(
             "base_dimension_references", []
         ):
@@ -215,8 +197,9 @@ class InputDatasetModel(DSGBaseModel):
 
     @validator("model_sector")
     def check_model_sector(cls, model_sector, values):
-        if not values["dataset_type"] == InputDatasetType.SECTOR_MODEL:
-            raise ValueError("model_sector is only required if dataset_type is 'sector_model'")
+        if "dataset_type" in values:
+            if not values["dataset_type"] == InputDatasetType.SECTOR_MODEL:
+                raise ValueError("model_sector is only required if dataset_type is 'sector_model'")
         return model_sector
 
 
@@ -313,13 +296,9 @@ class ProjectConfigModel(DSGBaseModel):
         default=[],
     )
 
-    @root_validator
+    @root_validator(pre=False, skip_on_failure=True)
     def check_mappings_with_dimensions(cls, values):
         """Check that dimension mappings refer to dimensions listed in the model."""
-        if "dimensions" not in values:
-            # This means that the dimensions validator already failed.
-            return values
-
         dimension_names = {
             (x.name, x.dimension_type)
             for x in itertools.chain(
@@ -483,7 +462,9 @@ class ProjectConfig(ConfigWithDataFilesBase):
         )
         dims = list(itertools.chain(base_dimensions.values(), supplemental_dimensions.values()))
         check_uniqueness((x.model.name for x in dims), "dimension name")
-        check_uniqueness((getattr(x.model, "cls") for x in dims), "dimension cls")
+        check_uniqueness(
+            (getattr(x.model, "cls") for x in base_dimensions.values()), "dimension cls"
+        )
 
         self._base_dimensions.update(base_dimensions)
         self._supplemental_dimensions.update(supplemental_dimensions)

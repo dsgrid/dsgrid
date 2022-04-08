@@ -99,7 +99,7 @@ class RegistrationGui:
         )
         self._online_mode_cbox.observe(self._on_online_click, names="value")
         self._sync_cbox = widgets.Checkbox(
-            value=False,  # TODO: set to true when registry is fixed
+            value=True,
             description="Sync pull",
         )
         self._load_btn = widgets.Button(description="Load registry", layout=button_layout)
@@ -276,6 +276,8 @@ class RegistrationGui:
 
     def _on_online_click(self, _):
         # Syncing is always enabled when in online mode.
+        if self._online_mode_cbox.value:
+            self._sync_cbox.value = True
         self._sync_cbox.disabled = self._online_mode_cbox.value
 
     def _on_load_click(self, _):

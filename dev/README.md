@@ -396,11 +396,23 @@ notebooks as well as a script that will start a Jupyter notebook on Eagle. It is
 1. Create a JADE configuration per the above steps. However, the command passed to JADE must be
 `bash dsgrid-notebooks/start_notebook.sh`.
 2. Consider whether you want to run the notebook server from the container or from your local conda environment.
-Set the JADE config parameter appropriately in `config.json`.
+Set the JADE config parameter `run_user_script_outside_container` appropriately in `config.json`.
 3. Submit the JADE job. Once the job starts run `tail -f <output-dir>/*.e`. It will eventually show
 the Jupyter notebook URL as well as the the command you need to run to open an SSH tunnel.
 4. Open the SSH tunnel.
 5. Connect to the notebook.
+
+When you are done with your work, save and close the notebook. You can release the Eagle compute node
+allocation in one of these ways:
+
+1. Stop the Jupyter server and allow JADE to shutdown cleanly. Do this if you care about collecting
+Spark logs or compute node resource utilization stats. ssh to the Spark master node (this is the compute
+node in the ssh tunnel commmand) and run `jupyter notebook stop 8889`. If you used a different port to
+start the notebook server, adjust accordingly.
+2. Use JADE to cancel the job. Do this if you have other other jobs running and don't want to accidentally
+cancel them. Run `jade cancel-jobs <output-dir>`.
+3. Use SLURM to cancel the job. Find the job ID with `squeue` and then run `scancel <job-id>`.
+4. Are you confident that you have no other jobs running? `scancel -u $USER`
 
 ### Executing scripts
 There are two basic ways to submit scripts to a Spark cluster.

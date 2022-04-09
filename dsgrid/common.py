@@ -5,7 +5,7 @@ AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 REMOTE_REGISTRY = "s3://nrel-dsgrid-registry"
 
 if os.environ.get("NREL_CLUSTER") is not None:
-    LOCAL_REGISTRY = Path("/scratch") / os.environ["USER"]
+    LOCAL_REGISTRY = Path("/scratch") / os.environ["USER"] / ".dsgrid-registry"
 else:
     LOCAL_REGISTRY = Path.home() / ".dsgrid-registry"
 

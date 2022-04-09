@@ -242,6 +242,41 @@ $ export SPARK_CLUSTER=spark://<hostname>:7077
 
 Start Jupyter and open `registration.ipynb`.
 
+Handling of stdout and stderr needs improvement. If the notebook gets cluttered, the best solution is to
+re-execute the cell that creates the UI. You can pass default values for all text box fields in order to
+avoid having to re-enter them every time.
+
+```
+app = RegistrationGui(
+    defaults={
+       "local_registry": "/my-local-registry",
+        "project_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/project.toml",
+        "dataset_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/sector_models/comstock/dataset.toml",
+        "dimension_mapping_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/sector_models/comstock/dimension_mappings.toml",
+        "dataset_path": "/dsgrid-data/data-StandardScenarios/conus_2022_reference_comstock",
+        "log_message": "log message",
+    }
+)
+```
+
+Note that you can access the dsgrid registry manager instances from the `app` instance.
+
+```
+from dsgrid.dimension.base_models import DimensionType
+project_config = app.project_manager.get_by_id("dsgrid_conus_2022")
+geography_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
+spark_df = geography_dim.get_records_dataframe()
+pandas_df = spark_df.toPandas()
+```
+
+You can debug Pydantic data models with the devtools package.
+
+```
+from devtools import debug
+debug(project_config.model)
+debug(geography_dim.model)
+```
+
 ## Spark Standalone Cluster
 
 It can be advantageous to create a standalone cluster instead of starting Spark from within a
@@ -352,6 +387,32 @@ jade submit-jobs config.json -R periodic -r1
 - After all jobs finish `<output-dir>/spark_logs` will contain Spark log files.
 - After all jobs finish `<output-dir>/stats` will interactive resource utilization plots.
 - In the future we will have Spark metrics recorded in JSON files.
+
+## Connecting a Jupyter notebook to a Spark cluster on Eagle
+
+Make sure you have already installed the dsgrid notebooks in your scratch directory. That installs
+notebooks as well as a script that will start a Jupyter notebook on Eagle. It is called `start_notebook.sh`.
+
+1. Create a JADE configuration per the above steps. However, the command passed to JADE must be
+`bash dsgrid-notebooks/start_notebook.sh`.
+2. Consider whether you want to run the notebook server from the container or from your local conda environment.
+Set the JADE config parameter `run_user_script_outside_container` appropriately in `config.json`.
+3. Submit the JADE job. Once the job starts run `tail -f <output-dir>/*.e`. It will eventually show
+the Jupyter notebook URL as well as the the command you need to run to open an SSH tunnel.
+4. Open the SSH tunnel.
+5. Connect to the notebook.
+
+When you are done with your work, save and close the notebook. You can release the Eagle compute node
+allocation in one of these ways:
+
+1. Stop the Jupyter server and allow JADE to shutdown cleanly. Do this if you care about collecting
+Spark logs or compute node resource utilization stats. ssh to the Spark master node (this is the compute
+node in the ssh tunnel commmand) and run `jupyter notebook stop 8889`. If you used a different port to
+start the notebook server, adjust accordingly.
+2. Use JADE to cancel the job. Do this if you have other other jobs running and don't want to accidentally
+cancel them. Run `jade cancel-jobs <output-dir>`.
+3. Use SLURM to cancel the job. Find the job ID with `squeue` and then run `scancel <job-id>`.
+4. Are you confident that you have no other jobs running? `scancel -u $USER`
 
 ### Executing scripts
 There are two basic ways to submit scripts to a Spark cluster.

@@ -38,7 +38,7 @@ def install_notebooks(path, force):
     to_copy = []
     existing = []
     for src_file in src_path.iterdir():
-        if src_file.suffix == ".ipynb":
+        if src_file.suffix in (".ipynb", ".sh"):
             dst = path / src_file.name
             if dst.exists() and not force:
                 existing.append(dst)

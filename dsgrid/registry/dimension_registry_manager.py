@@ -70,11 +70,11 @@ class DimensionRegistryManager(RegistryManagerBase):
 
     def _replace_duplicates(self, config: DimensionsConfig):
         hashes = {}
-        time_dim = None
+        time_dims = {}
         for dimension_id, registry_config in self._registry_configs.items():
             dimension = self.get_by_id(dimension_id, registry_config.model.version)
             if isinstance(dimension.model, TimeDimensionBaseModel):
-                time_dim = dimension.model
+                time_dims[dimension.model.dimension_id] = dimension.model
             else:
                 hashes[dimension.model.file_hash] = dimension.model
 
@@ -83,15 +83,9 @@ class DimensionRegistryManager(RegistryManagerBase):
             replace_dim = False
             existing = None
             if isinstance(dim, TimeDimensionBaseModel):
-                if time_dim is not None:
-                    existing = time_dim
+                existing = self._get_matching_time_dimension(time_dims.values(), dim)
+                if existing is not None:
                     replace_dim = True
-                    for field in type(dim).__fields__:
-                        exclude = set(("description", "dimension_id"))
-                        if field not in exclude and getattr(dim, field) != getattr(
-                            time_dim, field
-                        ):
-                            replace_dim = False
             elif dim.file_hash in hashes:
                 existing = hashes[dim.file_hash]
                 if dim.dimension_type == existing.dimension_type:
@@ -109,6 +103,23 @@ class DimensionRegistryManager(RegistryManagerBase):
                 config.model.dimensions[i] = existing
                 existing_ids.add(existing.dimension_id)
         return existing_ids
+
+    @staticmethod
+    def _get_matching_time_dimension(existing_dims, new_dim):
+        for time_dim in existing_dims:
+            if type(time_dim) != type(new_dim):
+                continue
+            existing = time_dim
+            match = True
+            for field in type(new_dim).__fields__:
+                exclude = set(("description", "dimension_id"))
+                if field not in exclude and getattr(new_dim, field) != getattr(time_dim, field):
+                    match = False
+                    break
+            if match:
+                return time_dim
+
+        return None
 
     def finalize_registration(self, config_ids: List[str], error_occurred: bool):
         if error_occurred:

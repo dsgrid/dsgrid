@@ -1,9 +1,15 @@
 from pathlib import Path
+import os
 
 AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 REMOTE_REGISTRY = "s3://nrel-dsgrid-registry"
-LOCAL_REGISTRY = Path.home() / ".dsgrid-registry"
-LOCAL_REGISTRY_DATA = Path.home() / ".dsgrid-registry" / "data"
+
+if os.environ.get("NREL_CLUSTER") is not None:
+    LOCAL_REGISTRY = Path("/scratch") / os.environ["USER"]
+else:
+    LOCAL_REGISTRY = Path.home() / ".dsgrid-registry"
+
+LOCAL_REGISTRY_DATA = LOCAL_REGISTRY / "data"
 PROJECT_FILENAME = "project.toml"
 REGISTRY_FILENAME = "registry.toml"
 DATASET_FILENAME = "dataset.toml"

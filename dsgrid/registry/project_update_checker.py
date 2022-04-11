@@ -40,3 +40,10 @@ class ProjectUpdateChecker(ConfigUpdateCheckerBase):
                 self._new_model.project_id,
                 changes,
             )
+            if self._new_model.status == ProjectRegistryStatus.COMPLETE:
+                self._new_model.status = ProjectRegistryStatus.IN_PROGRESS
+                logger.warning(
+                    "Set project status to %s because of changes=%s.",
+                    self._new_model.status,
+                    changes,
+                )

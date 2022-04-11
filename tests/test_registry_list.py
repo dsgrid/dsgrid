@@ -9,7 +9,6 @@ registry_manager = RegistryManager.load(
     path=TEST_REGISTRY,
     remote_path=REMOTE_REGISTRY,
     offline_mode=True,
-    dry_run_mode=False,
     no_prompts=True,
 )
 

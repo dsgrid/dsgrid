@@ -9,6 +9,16 @@ from enum import Enum
 
 from prettytable import PrettyTable
 
+try:
+    from IPython.display import display, HTML
+    from IPython import get_ipython
+    from ipykernel.zmqshell import ZMQInteractiveShell
+
+    _IPYTHON_INSTALLED = True
+except ImportError:
+    _IPYTHON_INSTALLED = False
+
+
 from dsgrid.exceptions import DSGJSONError
 
 logger = logging.getLogger(__name__)
@@ -92,16 +102,6 @@ def check_uniqueness(iterable, tag):
 def list_enum_values(enum: Enum):
     """Returns list enum values."""
     return [e.value for e in enum]
-
-
-try:
-    from IPython.display import display, HTML
-    from IPython import get_ipython
-    from ipykernel.zmqshell import ZMQInteractiveShell
-
-    _IPYTHON_INSTALLED = True
-except ImportError:
-    _IPYTHON_INSTALLED = False
 
 
 def in_jupyter_notebook():

@@ -23,3 +23,7 @@ help:
 	python make_config_model_rst.py -o $(BUILDDIR)/config_rsts
 	python make_example_configs.py
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+
+clean:
+	@echo "Deleting everything in _build"
+	rm -rf _build

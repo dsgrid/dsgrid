@@ -1,7 +1,7 @@
 import csv
 import enum
 import importlib
-import json
+import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -29,6 +29,9 @@ from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash, compute_hash, load_data
 from dsgrid.utils.spark import create_dataframe, read_dataframe
 from dsgrid.utils.versioning import handle_version_or_str
+
+
+logger = logging.getLogger(__name__)
 
 
 class DimensionBaseModel(DSGBaseModel):
@@ -96,12 +99,10 @@ class DimensionBaseModel(DSGBaseModel):
         ),
     )
 
-    # Keep this last for validation purposes.
-    model_hash: Optional[str] = Field(
-        title="model_hash",
-        description="Hash of the contents of the model",
-        dsg_internal=True,
-    )
+    @root_validator(pre=True)
+    def handle_legacy_fields(cls, values):
+        values.pop("model_hash", None)
+        return values
 
     @validator("name")
     def check_name(cls, name):
@@ -151,6 +152,10 @@ class DimensionBaseModel(DSGBaseModel):
             # An error occurred with name. Ignore everything else.
             return class_name
 
+        if "module" not in values:
+            # An error occurred with module. Ignore everything else.
+            return class_name
+
         mod = importlib.import_module(values["module"])
         cls_name = class_name or values["name"]
         if not hasattr(mod, cls_name):
@@ -168,9 +173,10 @@ class DimensionBaseModel(DSGBaseModel):
 
     @validator("cls", always=True)
     def get_dimension_class(cls, dim_class, values):
-        if "name" not in values or values.get("class_name") is None:
-            # An error occurred with name. Ignore everything else.
-            return None
+        # Return if an error has already occurred
+        for req in ("name", "module", "class_name"):
+            if values.get(req) is None:
+                return dim_class
 
         if dim_class is not None:
             raise ValueError(f"cls={dim_class} should not be set")
@@ -179,18 +185,6 @@ class DimensionBaseModel(DSGBaseModel):
             importlib.import_module(values["module"]),
             values["class_name"],
         )
-
-    @validator("model_hash")
-    def compute_model_hash(cls, model_hash, values):
-        # Always re-compute because the user may have changed something.
-        text = ""
-        for key, val in sorted(values.items()):
-            # dimension_id is auto-generated; don't check for that
-            # Don't let users create a dimension where the only difference
-            # is the records. They need to change something else.
-            if key not in ("dimension_id", "file_hash"):
-                text += str(val)
-        return compute_hash(text.encode())
 
 
 class DimensionModel(DimensionBaseModel):
@@ -397,11 +391,11 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         options=TimeZone.format_descriptions_for_docs(),
     )
 
-    @root_validator(pre=False)
+    @root_validator(pre=False, skip_on_failure=True)
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
 
-    @root_validator(pre=False)
+    @root_validator(pre=False, skip_on_failure=True)
     def check_frequency(cls, values):
         if values["frequency"] in [timedelta(days=365), timedelta(days=366)]:
             raise ValueError(
@@ -410,8 +404,10 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             )
         return values
 
-    @validator("ranges", pre=True)
+    @validator("ranges")
     def check_times(cls, ranges, values):
+        if "str_format" not in values or "frequency" not in values:
+            return ranges
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
 
@@ -451,8 +447,10 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
 
-    @validator("ranges", pre=True)
+    @validator("ranges")
     def check_times(cls, ranges, values):
+        if "str_format" not in values:
+            return ranges
         return _check_time_ranges(ranges, values["str_format"], timedelta(days=365))
 
 
@@ -526,6 +524,21 @@ class DimensionReferenceModel(DSGBaseModel):
         return handle_version_or_str(version)
 
 
+class DimensionReferenceByNameModel(DSGBaseModel):
+    """Reference to a dimension that has yet to be registered."""
+
+    dimension_type: DimensionType = Field(
+        title="dimension_type",
+        alias="type",
+        description="Type of the dimension",
+        options=DimensionType.format_for_docs(),
+    )
+    name: str = Field(
+        title="name",
+        description="Dimension name",
+    )
+
+
 def handle_dimension_union(value):
     if isinstance(value, DimensionBaseModel):
         return value
@@ -543,8 +556,6 @@ def handle_dimension_union(value):
         else:
             options = [x.value for x in TimeDimensionType]
             raise ValueError(f"{value['time_type']} not supported, valid options: {options}")
-    elif sorted(value.keys()) == ["dimension_id", "type", "version"]:
-        val = DimensionReferenceModel(**value)
     else:
         val = DimensionModel(**value)
     return val
@@ -560,8 +571,8 @@ def _check_time_ranges(ranges: list, str_format: str, frequency: timedelta):
     assert isinstance(frequency, timedelta)
     for time_range in ranges:
         # Make sure start and end time parse.
-        start = datetime.strptime(time_range["start"], str_format)
-        end = datetime.strptime(time_range["end"], str_format)
+        start = datetime.strptime(time_range.start, str_format)
+        end = datetime.strptime(time_range.end, str_format)
         if str_format == "%Y":
             if frequency != timedelta(days=365):
                 raise ValueError(f"str_format={str_format} is inconsistent with {frequency}")

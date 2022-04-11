@@ -18,7 +18,6 @@ class ConfigUpdateCheckerBase(abc.ABC):
         self._changed_fields = set()
 
     def _check_common(self):
-        changed_fields = []
         for field, attrs in self._type.__fields__.items():
             old = getattr(self._old_model, field)
             new = getattr(self._new_model, field)

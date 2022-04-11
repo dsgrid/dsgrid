@@ -33,7 +33,22 @@ class ConfigBase(abc.ABC):
 
         """
         # Subclasses can reimplement this method if they need more arguments.
-        return cls._load(config_file)
+        return cls._load(config_file, *args, **kwargs)
+
+    @classmethod
+    def load_from_model(cls, model):
+        """Load the config from a model.
+
+        Parameters
+        ---------
+        model : DSGBaseModel
+
+        Returns
+        -------
+        ConfigBase
+
+        """
+        return cls(model)
 
     @classmethod
     def _load(cls, config_file):

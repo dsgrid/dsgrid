@@ -48,8 +48,23 @@ class CloudStorageInterface(abc.ABC):
 
     @abc.abstractmethod
     @contextmanager
-    def make_lock_file(self, path):
+    def make_lock_file_managed(self, path):
         """Context manager to make a lock file given the file path. On close, it removes the lock file.
+
+        Parameters
+        ----------
+        path : str
+            Lock file path
+
+        Raises
+        ------
+        DSGRegistryLockError
+            Raises a registry lock error if a registry.lock already exists
+        """
+
+    @abc.abstractmethod
+    def make_lock_file(self, path):
+        """Make a lock file given the file path.
 
         Parameters
         ----------

@@ -11,6 +11,7 @@ from pydantic import BaseModel, ValidationError
 from pydantic.json import isoformat, timedelta_isoformat
 from semver import VersionInfo
 
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.utils.files import load_data
 
 
@@ -42,12 +43,14 @@ class DSGBaseModel(BaseModel):
 
         """
         filename = Path(filename)
+        if not filename.is_file():
+            raise DSGInvalidParameter(f"{filename} is not a file")
+
         base_dir = filename.parent.absolute()
         orig = os.getcwd()
         os.chdir(base_dir)
         try:
-            cfg = cls(**load_data(filename.name))
-            return cfg
+            return cls(**load_data(filename.name))
         except ValidationError:
             logger.exception("Failed to validate %s", filename)
             raise

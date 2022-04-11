@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import List, Union
 
 from pydantic import Field
@@ -13,7 +14,7 @@ from .dimensions import (
     handle_dimension_union,
 )
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.registry.common import make_registry_id, check_config_id_loose
+from dsgrid.registry.common import make_dimension_id, check_config_id_loose
 from dsgrid.utils.utilities import check_uniqueness
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,10 @@ class DimensionsConfigModel(DSGBaseModel):
 class DimensionsConfig(ConfigBase):
     """Provides an interface to a DimensionsConfigModel."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._src_dir = None
+
     @staticmethod
     def config_filename():
         return "dimensions.toml"
@@ -85,6 +90,26 @@ class DimensionsConfig(ConfigBase):
         logger.info("Dimension record ID assignment:")
         for dim in self.model.dimensions:
             # assign id, made from dimension.name and a UUID
-            dimension_id = make_registry_id([dim.name.lower().replace(" ", "_")])
+            dimension_id = make_dimension_id(dim.name)
             check_config_id_loose(dimension_id, "Dimension")
             dim.dimension_id = dimension_id
+
+    @property
+    def src_dir(self):
+        return self._src_dir
+
+    @src_dir.setter
+    def src_dir(self, src_dir):
+        self._src_dir = src_dir
+
+    @classmethod
+    def load(cls, config_filename: Path, *args, **kwargs):
+        obj = super().load(config_filename, *args, **kwargs)
+        obj.src_dir = config_filename.parent
+        return obj
+
+    @classmethod
+    def load_from_model(cls, model, src_dir):
+        obj = cls(model)
+        obj.src_dir = src_dir
+        return obj

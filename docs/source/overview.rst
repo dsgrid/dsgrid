@@ -109,6 +109,7 @@ Dimensions are used in dsgrid to define expectations of the project, allowable d
 transformations, and dimenison properties of underlying data sets. As such, dimensions are 
 defined both at the project and dataset levels. More specifically, there are three categories of 
 dimensions used in dsgrid. 
+
 - ``Base Dimension`` (defined by project): Base Dimensions are the core dimensions of a project. 
   They define the project's dimension expectations. All datasets must adhere to the projet's 
   base dimension definition or provide an appropriate :ref:`Dimension Mapping Overview` to the 

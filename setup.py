@@ -43,6 +43,11 @@ setup(
     url=metadata["__url__"],
     packages=find_packages(),
     package_dir={"dsgrid": "dsgrid"},
+    package_data={
+        "dsgrid": [
+            "notebooks/*.ipynb",
+        ]
+    },
     entry_points={
         "console_scripts": [
             "dsgrid=dsgrid.cli.dsgrid:cli",

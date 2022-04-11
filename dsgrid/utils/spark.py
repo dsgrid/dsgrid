@@ -118,8 +118,9 @@ def _read_natively(filename):
 
 
 def _post_process_dataframe(df, cache=False, require_unique=None):
-    if cache:
-        df = df.cache()
+    # TODO This is causing Spark warning messages. Disable until we know why.
+    # if cache:
+    #     df = df.cache()
 
     if require_unique is not None:
         with Timer(timer_stats_collector, "check_unique"):

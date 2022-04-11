@@ -2,7 +2,6 @@
 
 import itertools
 import logging
-from tests.test_project_config import dimension_manager
 
 from pyspark.sql import SparkSession
 

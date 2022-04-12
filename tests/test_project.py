@@ -50,6 +50,11 @@ def test_dataset_load():
     assert "subsector" in lookup.columns
     assert "id" in lookup.columns
 
+    query_names = sorted(project.config.list_dimension_query_names(DimensionType.GEOGRAPHY))
+    assert query_names == ["census_division", "census_region", "county", "state"]
+    records = project.config.get_dimension_records(DimensionType.GEOGRAPHY, "state")
+    assert records.filter("id = 'CO'").count() > 0
+
     project.unload_dataset(DATASET_ID)
     assert spark.sql("show tables").rdd.isEmpty()
 

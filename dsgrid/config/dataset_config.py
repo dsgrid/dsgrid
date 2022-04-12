@@ -348,11 +348,6 @@ class DatasetConfigModel(DSGBaseModel):
         ),
     )
 
-    @root_validator(pre=True)
-    def handle_legacy_fields(cls, values):
-        values.pop("path", None)
-        return values
-
     @validator("dataset_qualifier_metadata", pre=True)
     def check_dataset_qualifier_metadata(cls, metadata, values):
         if "dataset_qualifier" in values:
@@ -424,7 +419,7 @@ class DatasetConfig(ConfigBase):
 
     def __init__(self, model):
         super().__init__(model)
-        self._dimensions = {}
+        self._dimensions = {}  # DimensionKey to DimensionConfig
         self._dataset_path = None
         self._src_dir = None
 
@@ -497,6 +492,10 @@ class DatasetConfig(ConfigBase):
 
         """
         self._dimensions.update(dimension_manager.load_dimensions(self.model.dimension_references))
+        check_uniqueness((x.model.name for x in self._dimensions.values()), "dimension name")
+        check_uniqueness(
+            (x.model.query_name for x in self._dimensions.values()), "dimension query name"
+        )
 
     @property
     def dimensions(self):

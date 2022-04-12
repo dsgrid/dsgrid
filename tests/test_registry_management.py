@@ -67,7 +67,7 @@ def test_register_project_and_dataset(make_test_project_dir):
 
         with pytest.raises(DSGDuplicateValueRegistered):
             dataset_config_file = (
-                make_test_project_dir / "datasets/sector_models/comstock/dataset.toml"
+                make_test_project_dir / "datasets" / "sector_models" / "comstock" / "dataset.toml"
             )
             dataset_mgr.register(dataset_config_file, dataset_path, user, log_message)
 
@@ -126,6 +126,46 @@ def test_duplicate_dimensions(make_test_project_dir):
 
         dimension_mgr.register(dim_config_file, user, log_message)
         assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 2
+
+
+def test_duplicate_project_dimension_display_names(make_test_project_dir):
+    with TemporaryDirectory() as tmpdir:
+        path = create_local_test_registry(Path(tmpdir))
+        user = getpass.getuser()
+        log_message = "Initial registration"
+        manager = RegistryManager.load(path, offline_mode=True)
+
+        project_file = make_test_project_dir / "project.toml"
+        data = load_data(project_file)
+        for dim in data["dimensions"]["supplemental_dimensions"]:
+            if dim["display_name"] == "State":
+                dim["display_name"] = "County"
+        dump_data(data, project_file)
+        with pytest.raises(ValueError):
+            manager.project_manager.register(project_file, user, log_message)
+
+
+def test_duplicate_dataset_dimension_display_names(make_test_project_dir):
+    with TemporaryDirectory() as tmpdir:
+        path = create_local_test_registry(Path(tmpdir))
+        user = getpass.getuser()
+        log_message = "Initial registration"
+        manager = RegistryManager.load(path, offline_mode=True)
+
+        dataset_file = (
+            make_test_project_dir / "datasets" / "sector_models" / "comstock" / "dataset.toml"
+        )
+        manager.project_manager.register(make_test_project_dir / "project.toml", user, log_message)
+        replace_dimension_uuids_from_registry(path, (dataset_file,))
+
+        data = load_data(dataset_file)
+        for dim in data["dimensions"]:
+            if dim["display_name"] == "Detailed Subsector":
+                dim["display_name"] = "Sector"
+        dump_data(data, dataset_file)
+        dataset_path = TEST_DATASET_DIRECTORY / data["dataset_id"]
+        with pytest.raises(ValueError):
+            manager.dataset_manager.register(dataset_file, dataset_path, user, log_message)
 
 
 def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):

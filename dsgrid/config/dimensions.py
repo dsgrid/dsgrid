@@ -21,7 +21,7 @@ from dsgrid.dimension.time import (
     TimeDimensionType,
     RepresentativePeriodFormat,
 )
-from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
+from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME, REGEX_VALID_REGISTRY_DISPLAY_NAME
 from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -43,6 +43,21 @@ class DimensionBaseModel(DSGBaseModel):
             " dimension names.",
         ),
         updateable=False,
+    )
+    display_name: str = Field(
+        title="display_name",
+        description="Display name. Source for auto-generated query_name.",
+        note="Dimension display names should be singular, concise names that are common across "
+        "projects and datasets. Must be unique within a project or dataset.",
+        notes=(
+            "Only alphanumeric characters and spaces are supported (no dashes or special characters).",
+            "The :meth:`~dsgrid.config.dimensions.check_display_name` validator is used to enforce valid"
+            " dimension display names.",
+        ),
+    )
+    query_name: Optional[str] = Field(
+        title="query_name",
+        description="Auto-generated query name for SQL queries.",
     )
     dimension_type: DimensionType = Field(
         title="dimension_type",
@@ -94,11 +109,6 @@ class DimensionBaseModel(DSGBaseModel):
         ),
     )
 
-    @root_validator(pre=True)
-    def handle_legacy_fields(cls, values):
-        values.pop("model_hash", None)
-        return values
-
     @validator("name")
     def check_name(cls, name):
         if name == "":
@@ -133,6 +143,22 @@ class DimensionBaseModel(DSGBaseModel):
                  """
             )
         return name
+
+    @validator("display_name")
+    def check_display_name(cls, display_name):
+        if display_name == "":
+            raise ValueError(f'Empty name field for dimension: "{cls}"')
+        if REGEX_VALID_REGISTRY_DISPLAY_NAME.search(display_name) is None:
+            raise ValueError(f"display_name={display_name} does not meet the requirements")
+        return display_name
+
+    @validator("query_name")
+    def check_query_name(cls, query_name, values):
+        if "display_name" not in values:
+            return query_name
+        if query_name is not None:
+            return query_name
+        return values["display_name"].lower().replace(" ", "_")
 
     @validator("module", always=True)
     def check_module(cls, module):

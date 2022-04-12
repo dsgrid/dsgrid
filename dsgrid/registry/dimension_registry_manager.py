@@ -89,7 +89,7 @@ class DimensionRegistryManager(RegistryManagerBase):
             elif dim.file_hash in hashes:
                 existing = hashes[dim.file_hash]
                 if dim.dimension_type == existing.dimension_type:
-                    if dim.name == existing.name:
+                    if dim.name == existing.name and dim.display_name == existing.display_name:
                         replace_dim = True
                     else:
                         logger.info(

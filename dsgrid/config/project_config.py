@@ -19,7 +19,7 @@ from .dimensions import (
     handle_dimension_union,
     DimensionModel,
 )
-from dsgrid.exceptions import DSGInvalidField
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.registry.common import (
@@ -91,7 +91,7 @@ class DimensionsModel(DSGBaseModel):
 
     @root_validator(pre=False)
     def check_dimensions(cls, values):
-        """Validate base_dimensions types"""
+        """Validate that the dimensions are complete and consistent."""
         dimensions = list(
             itertools.chain(
                 values.get("base_dimensions", []), values.get("base_dimension_references", [])
@@ -102,11 +102,7 @@ class DimensionsModel(DSGBaseModel):
 
     @root_validator(pre=True)
     def pre_check_values(cls, values: dict) -> dict:
-        """validates that a
-        check that keys exist in both jsons
-        check that all from_keys have a match in the to_keys json
-
-        """
+        """Checks that base dimensions are defined."""
         if not values.get("base_dimensions", []) and not values.get(
             "base_dimension_references", []
         ):
@@ -238,12 +234,6 @@ class DimensionMappingsModel(DSGBaseModel):
         # TODO: need to document missing dimension records, fill values, etc. DSGRID-191.
     )
 
-    @root_validator(pre=True)
-    def pre_process(cls, values):
-        # Some projects were registered with this field. Keep backwards compatibility.
-        values.pop("base_to_base", None)
-        return values
-
 
 class ProjectConfigModel(DSGBaseModel):
     """Represents project configurations"""
@@ -332,8 +322,8 @@ class ProjectConfig(ConfigWithDataFilesBase):
 
     def __init__(self, model):
         super().__init__(model)
-        self._base_dimensions = {}
-        self._supplemental_dimensions = {}
+        self._base_dimensions = {}  # DimensionKey to DimensionConfig
+        self._supplemental_dimensions = {}  # DimensionKey to DimensionConfig
         self._base_to_supplemental_mappings = {}
         self._dimension_associations = None
 
@@ -386,6 +376,26 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return dim_config
         assert False, dimension_type
 
+    def get_dimension_records(self, dimension_type: DimensionType, query_name: str):
+        """Return a DataFrame containing the records for a dimension.
+
+        Parameters
+        ----------
+        dimension_type : DimensionType
+        query_name : str
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+        for dim_config in self.iter_dimensions():
+            model = dim_config.model
+            if model.dimension_type == dimension_type and model.query_name == query_name:
+                return dim_config.get_records_dataframe()
+
+        raise DSGInvalidDimension(f"{dimension_type} is not stored")
+
     def get_supplemental_dimensions(self, dimension_type: DimensionType):
         """Return the supplemental dimensions matching dimension (if any).
 
@@ -395,7 +405,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
 
         Returns
         -------
-        DimensionConfig
+        List[DimensionConfig]
 
         """
         return [v for k, v in self.supplemental_dimensions.items() if k.type == dimension_type]
@@ -460,14 +470,15 @@ class ProjectConfig(ConfigWithDataFilesBase):
         supplemental_dimensions = dimension_manager.load_dimensions(
             self.model.dimensions.supplemental_dimension_references
         )
-        dims = list(itertools.chain(base_dimensions.values(), supplemental_dimensions.values()))
+        self._base_dimensions.update(base_dimensions)
+        self._supplemental_dimensions.update(supplemental_dimensions)
+
+        dims = list(self.iter_dimensions())
         check_uniqueness((x.model.name for x in dims), "dimension name")
+        check_uniqueness((x.model.query_name for x in dims), "dimension query name")
         check_uniqueness(
             (getattr(x.model, "cls") for x in base_dimensions.values()), "dimension cls"
         )
-
-        self._base_dimensions.update(base_dimensions)
-        self._supplemental_dimensions.update(supplemental_dimensions)
 
     def load_dimension_mappings(self, dimension_mapping_manager: DimensionMappingRegistryManager):
         """Load all dimension mappings.
@@ -555,6 +566,26 @@ class ProjectConfig(ConfigWithDataFilesBase):
         for dataset in self.model.datasets:
             yield dataset.dataset_id
 
+    def iter_dimensions(self):
+        """Return an iterator over all dimensions of the project.
+
+        Yields
+        ------
+        DimensionConfig
+
+        """
+        return itertools.chain(
+            self.base_dimensions.values(), self.supplemental_dimensions.values()
+        )
+
+    def list_dimension_query_names(self, dimension_type: DimensionType):
+        """List the query names available for a dimension type."""
+        query_names = []
+        for dim_config in self.iter_dimensions():
+            if dim_config.model.dimension_type == dimension_type:
+                query_names.append(dim_config.model.query_name)
+        return query_names
+
     def list_registered_dataset_ids(self):
         """List registered datasets associated with the project.
 
@@ -635,7 +666,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
         Returns
         -------
         dict
-            dict of DimensionBaseModel keyed by DimensionKey
+            dict of DimensionConfig keyed by DimensionKey
 
         """
         return self._base_dimensions
@@ -647,7 +678,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
         Returns
         -------
         dict
-            dict of DimensionBaseModel keyed by DimensionKey
+            dict of DimensionConfig keyed by DimensionKey
 
         """
         return self._supplemental_dimensions

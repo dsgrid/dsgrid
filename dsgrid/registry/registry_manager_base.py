@@ -526,9 +526,6 @@ class RegistryManagerBase(abc.ABC):
         # TODO: Do we want to handle specific versions? This removes all configs.
 
     def _remove(self, config_id):
-        if not self.offline_mode:
-            # TODO: DSGRID-145
-            raise Exception("sync-push of config removal is currently not supported")
         self._check_if_not_registered(config_id)
         self.fs_interface.rm_tree(self.get_registry_directory(config_id))
         self._registry_configs.pop(config_id, None)

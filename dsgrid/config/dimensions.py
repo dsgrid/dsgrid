@@ -50,9 +50,10 @@ class DimensionBaseModel(DSGBaseModel):
         note="Dimension display names should be singular, concise names that are common across "
         "projects and datasets. Must be unique within a project or dataset.",
         notes=(
-            "Only alphanumeric characters and spaces are supported (no dashes or special characters).",
-            "The :meth:`~dsgrid.config.dimensions.check_display_name` validator is used to enforce valid"
-            " dimension display names.",
+            "Only alphanumeric characters, underscores, and spaces are supported (no dashes or "
+            "special characters).",
+            "The :meth:`~dsgrid.config.dimensions.check_display_name` validator is used to "
+            "enforce valid dimension display names.",
         ),
     )
     query_name: Optional[str] = Field(

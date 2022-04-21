@@ -1,7 +1,10 @@
 [flake8]
 max-line-length = 99
 ignore =
+    E203 # whitespace before ':' (black does that and is better)
+    E265 # block comment should start with '# ' (it dislikes #comment)
+    E266 # too many leading '#' for block comment
     E402 # Module level import not top of file
+    E501 # line too long (suppressed for long comments)
     W503 # line break occurred before binary operator
     W504 # line break occurred before binary operator
-    E266 # too many leading '#' for block comment

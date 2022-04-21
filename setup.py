@@ -79,6 +79,7 @@ setup(
         "semver",
         "sqlalchemy",
         "toml",
+        "flake8",
     ],
     extras_require={
         "test": test_requires,

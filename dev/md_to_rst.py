@@ -29,17 +29,17 @@ def convert_files(file_registry):
                 try:
                     cmd_and_args = ["pandoc", p_md, "-o", p_rst]
                     call(cmd_and_args)
-                except Exception as e:
+                except Exception:
                     try:
                         call(["pandoc"])
-                    except:
+                    except Exception:
                         logger.error("Call to pandoc fails")
-                        raise e
+                        raise
                     if not os.path.exists(p_md):
                         logger.error("Input file {} does not exist".format(p_md))
-                        raise e
+                        raise
                     logger.error("Call '{}' failed".format(list2cmdline(cmd_and_args)))
-                    raise e
+                    raise
                 # append .postfix
                 p_postfix = p + ".postfix"
                 if os.path.exists(p_postfix):
@@ -51,14 +51,14 @@ def convert_files(file_registry):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="""Utility to convert Markdown 
+        description="""Utility to convert Markdown
         (.md) files to reStructuredText (.rst)"""
     )
     parser.add_argument(
         "file_registry",
-        help="""Text file that lists the 
-        markdown files to convert. Each line is the file path and name for an 
-        .md file, where the path is relative to the location of file_registry, 
+        help="""Text file that lists the
+        markdown files to convert. Each line is the file path and name for an
+        .md file, where the path is relative to the location of file_registry,
         and the .md extension is omitted.""",
     )
     parser.add_argument(

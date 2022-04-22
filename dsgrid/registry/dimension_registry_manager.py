@@ -2,7 +2,6 @@
 
 import getpass
 import logging
-from operator import ne
 import os
 from pathlib import Path
 from typing import Union, List, Dict, Set
@@ -17,15 +16,8 @@ from dsgrid.config.dimensions import (
     TimeDimensionBaseModel,
     DimensionReferenceModel,
 )
-from dsgrid.data_models import serialize_model
-from dsgrid.exceptions import (
-    DSGValueNotRegistered,
-    DSGDuplicateValueRegistered,
-)
-from dsgrid.registry.common import (
-    DimensionKey,
-    make_initial_config_registration,
-)
+from dsgrid.exceptions import DSGValueNotRegistered
+from dsgrid.registry.common import DimensionKey, make_initial_config_registration
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
@@ -109,7 +101,6 @@ class DimensionRegistryManager(RegistryManagerBase):
         for time_dim in existing_dims:
             if type(time_dim) != type(new_dim):
                 continue
-            existing = time_dim
             match = True
             for field in type(new_dim).__fields__:
                 exclude = set(("description", "dimension_id"))
@@ -136,7 +127,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 self.sync_push(self._path)
             self.cloud_interface.remove_lock_file(lock_file)
 
-    def get_by_id(self, config_id, version=None, force=False):
+    def get_by_id(self, config_id, version=None):
         self._check_if_not_registered(config_id)
         dimension_type = self._id_to_type[config_id]
         if version is None:

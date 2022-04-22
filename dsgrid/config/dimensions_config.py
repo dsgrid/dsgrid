@@ -1,21 +1,15 @@
 import logging
 from pathlib import Path
-from typing import List, Union
+from typing import List
 
 from pydantic import Field
 from pydantic import validator
 
-from .config_base import ConfigBase
-from .dimensions import (
-    DateTimeDimensionModel,
-    AnnualTimeDimensionModel,
-    RepresentativePeriodTimeDimensionModel,
-    DimensionModel,
-    handle_dimension_union,
-)
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import make_dimension_id, check_config_id_loose
 from dsgrid.utils.utilities import check_uniqueness
+from .config_base import ConfigBase
+from .dimensions import DimensionModel, handle_dimension_union
 
 logger = logging.getLogger(__name__)
 

@@ -8,17 +8,14 @@ from pathlib import Path
 from typing import List
 
 from dsgrid import timer_stats_collector
-from .common import RegistryManagerParams, ConfigRegistrationModel, VersionUpdateType
-from .registry_base import RegistryBaseModel
 from dsgrid.common import REGISTRY_FILENAME, SYNC_EXCLUDE_LIST
 from dsgrid.exceptions import (
+    DSGInvalidParameter,
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
-    DSGInvalidOperation,
-    DSGInvalidParameter,
 )
-from dsgrid.utils.files import load_data
-from dsgrid.utils.timing import Timer, track_timing
+from dsgrid.utils.timing import track_timing
+from .common import RegistryManagerParams, ConfigRegistrationModel, VersionUpdateType
 
 
 logger = logging.getLogger(__name__)

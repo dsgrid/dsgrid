@@ -15,7 +15,7 @@ The following commands are part of dsgrid:
 .. toctree::
    :glob:
    :maxdepth: 1
- 
+
    registry
    query
    download

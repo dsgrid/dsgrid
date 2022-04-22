@@ -2,9 +2,6 @@ import getpass
 import logging
 import os
 import shutil
-import sys
-import tempfile
-from collections import defaultdict
 from pathlib import Path
 
 import click
@@ -13,11 +10,8 @@ from dsgrid.loggers import setup_logging, check_log_file_size
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import create_local_test_registry
 from dsgrid.utils.timing import timer_stats_collector
-from dsgrid.utils.files import load_data, dump_data
-from dsgrid.tests.common import (
-    replace_dimension_uuids_from_registry,
-    replace_dimension_mapping_uuids_from_registry,
-)
+from dsgrid.utils.files import load_data
+from dsgrid.tests.common import replace_dimension_uuids_from_registry
 
 
 logger = logging.getLogger(__name__)

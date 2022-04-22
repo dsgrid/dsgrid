@@ -6,9 +6,9 @@ import os
 from pathlib import Path
 from typing import AnyStr, List, Union
 
-from pyspark.sql import DataFrame, Row, SparkSession
+from pyspark.sql import Row, SparkSession
 from pyspark.sql.types import StructType, StringType
-from pyspark import SparkConf, SparkContext
+from pyspark import SparkConf
 
 from dsgrid.exceptions import DSGInvalidField
 from dsgrid.utils.files import load_data

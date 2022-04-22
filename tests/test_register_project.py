@@ -6,7 +6,6 @@ from tempfile import TemporaryDirectory
 import pytest
 
 from dsgrid.exceptions import DSGInvalidDimensionAssociation
-from dsgrid.tests.common import make_test_project_dir
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
@@ -42,6 +41,6 @@ def test_invalid_projects(make_test_project_dir):
 
 def _setup_invalid_dimension_associations(project_dir):
     association_file = project_dir / "dimension_associations" / "sector__subsector.csv"
-    with open(association_file, "a") as f_out:
+    with open(association_file, "a", encoding="utf8") as f_out:
         f_out.write("invalid,invalid\n")
     return DSGInvalidDimensionAssociation, r"Dropped records when joining by data_source"

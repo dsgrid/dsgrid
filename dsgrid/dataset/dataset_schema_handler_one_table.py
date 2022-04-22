@@ -1,10 +1,7 @@
-from pathlib import Path
 import logging
-import itertools
 
 from dsgrid.config.dataset_config import (
     DatasetConfig,
-    check_load_data_filename,
 )
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -16,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
-    """ define interface/required behaviors for ONE_TABLE dataset schema """
+    """define interface/required behaviors for ONE_TABLE dataset schema"""
 
     def __init__(self, load_data_df, *args, **kwargs):
         super().__init__(*args, **kwargs)

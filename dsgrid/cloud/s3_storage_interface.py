@@ -1,18 +1,17 @@
 from contextlib import contextmanager
 from datetime import datetime
-from dsgrid.utils.files import dump_data
 import json
 import logging
 import os
 from pathlib import Path
 import time
 
-from .cloud_storage_interface import CloudStorageInterface
 from dsgrid.exceptions import DSGMakeLockError, DSGRegistryLockError
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
 from dsgrid.filesystem.s3_filesystem import S3Filesystem
 from dsgrid.utils.run_command import check_run_command
-from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
+from dsgrid.utils.timing import track_timing, timer_stats_collector
+from .cloud_storage_interface import CloudStorageInterface
 
 logger = logging.getLogger(__name__)
 

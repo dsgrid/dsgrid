@@ -1,11 +1,8 @@
-import os
-
 import pytest
 from pyspark.sql import SparkSession
 
 from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
-from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.tests.common import TEST_REGISTRY

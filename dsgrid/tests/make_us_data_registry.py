@@ -15,9 +15,8 @@ from dsgrid.tests.common import (
     TEST_REMOTE_REGISTRY,
 )
 from dsgrid.utils.timing import timer_stats_collector
-from dsgrid.utils.files import load_data, dump_data
+from dsgrid.utils.files import load_data
 from dsgrid.tests.common import replace_dimension_uuids_from_registry, TEST_PROJECT_REPO
-from dsgrid.tests.common import replace_dimension_mapping_uuids_from_registry
 
 
 logger = logging.getLogger(__name__)

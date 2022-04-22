@@ -1,21 +1,20 @@
 import pytest
 import uuid
-from pathlib import Path
-from tempfile import TemporaryDirectory, gettempdir
 import shutil
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
 import toml
 
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY, SYNC_EXCLUDE_LIST
+from dsgrid.common import SYNC_EXCLUDE_LIST
 from dsgrid.tests.common import (
-    TEST_PROJECT_PATH,
     TEST_REMOTE_REGISTRY,
     AWS_PROFILE_NAME,
     TEST_DATASET_DIRECTORY,
-    make_test_project_dir,
 )
 from tests_aws.test_registry.common import clean_remote_registry
 
@@ -281,7 +280,7 @@ def test_data_sync_project_id_and_bad_dataset_id(local_registry):
             clean_remote_registry(s3_cloudinterface._s3_filesystem)
 
 
-def test_data_sync_project_id(local_registry):
+def test_data_sync_project_id2(local_registry):
     with TemporaryDirectory() as local_registry_data_sync:
         s3_cloudinterface = S3StorageInterface(
             remote_path=TEST_REMOTE_REGISTRY,

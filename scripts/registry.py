@@ -2,16 +2,12 @@
 
 import getpass
 import logging
-import os
 import sys
 
 import click
-from devtools import debug
-from semver import VersionInfo
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.loggers import setup_logging
-from dsgrid.registry.common import VersionUpdateType
 from dsgrid.registry.registry_manager import RegistryManager
 
 

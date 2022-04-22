@@ -8,12 +8,12 @@ Submit a dataset
 
 Step 1: Create dimensions
 -------------------------
-Before creating dimension csv files, the dataset contributor should review the 
-project dimensions to determine which match their dataset directly and which ones 
+Before creating dimension csv files, the dataset contributor should review the
+project dimensions to determine which match their dataset directly and which ones
 are different and need to be registered.
 
-If new dimensions need to be registered that are different from the project, go 
-ahead and create the dimension csv files (in a project repository) and fill out 
+If new dimensions need to be registered that are different from the project, go
+ahead and create the dimension csv files (in a project repository) and fill out
 the dimensions in the dataset.toml file.
 
 For any dimension that uses the same defintion as project dimension, you can find the dimension ID in the project.toml.

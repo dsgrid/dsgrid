@@ -128,10 +128,10 @@ Dimension Commands
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value', 
+    filter table with a case-insensitive expression in the format 'field operation value',
     accept multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n 
+    example:\n
        -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
@@ -240,10 +240,10 @@ Dimension Mapping Commands
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value', 
+    filter table with a case-insensitive expression in the format 'field operation value',
     accept multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n 
+    example:\n
        -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
@@ -376,10 +376,10 @@ Project Commands
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value', 
+    filter table with a case-insensitive expression in the format 'field operation value',
     accept multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n 
+    example:\n
        -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
@@ -619,10 +619,10 @@ Dataset Commands
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value', 
+    filter table with a case-insensitive expression in the format 'field operation value',
     accept multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n 
+    example:\n
        -f 'Submitter == username' -f 'Description contains sector'
     """,
 )

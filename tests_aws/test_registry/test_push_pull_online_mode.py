@@ -1,22 +1,12 @@
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
-import os
-import shutil
-import getpass
-import sys
-from pathlib import Path
-from tempfile import TemporaryDirectory, gettempdir
 import getpass
 import uuid
-
-import pytest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from dsgrid.tests.common import create_local_test_registry, AWS_PROFILE_NAME, TEST_REMOTE_REGISTRY
-
-from .common import clean_remote_registry, create_empty_remote_registry
-
-from dsgrid.dimension.base_models import DimensionType
-from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
+from .common import clean_remote_registry, create_empty_remote_registry
 
 
 def test_pull_delete_local():
@@ -24,9 +14,7 @@ def test_pull_delete_local():
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
         submitter = getpass.getuser()
-        log_message = "test"
         path = create_local_test_registry(base_dir)
-        len_fs = len(LocalFilesystem().listdir(path))
         LocalFilesystem().touch(Path(path) / "junk")
         LocalFilesystem().touch(Path(path) / "configss")
         s3_cloudinterface = S3StorageInterface(
@@ -48,7 +36,6 @@ def test_pull_exclude():
         with TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir)
             submitter = getpass.getuser()
-            log_message = "test"
             path = create_local_test_registry(base_dir)
             s3_cloudinterface = S3StorageInterface(
                 remote_path=TEST_REMOTE_REGISTRY,
@@ -78,7 +65,6 @@ def test_push_exclude():
         with TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir)
             submitter = getpass.getuser()
-            log_message = "test"
             path = create_local_test_registry(base_dir)
             LocalFilesystem().listdir(Path(path))
             LocalFilesystem().touch(Path(path) / "exclude")

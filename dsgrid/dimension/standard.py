@@ -4,15 +4,6 @@ from typing import Optional, Union
 
 from pydantic import Field
 from pydantic import validator
-from sqlalchemy import (
-    Column,
-    Boolean,
-    String,
-    ForeignKey,
-    Table,
-    select,
-    text,  # Integer, Text, DateTime,
-)
 
 from dsgrid.config.dimensions import (
     DateTimeDimensionModel,

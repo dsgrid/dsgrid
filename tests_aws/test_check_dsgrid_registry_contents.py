@@ -26,7 +26,7 @@ def check_config_dimensions(s3, F, msg):
             split_f = str(f).split("__")
             try:
                 uuid.UUID(split_f[-1])
-            except:
+            except Exception:
                 raise DSGInvalidRegistryState(msg.format(file=get_joined_file(parts, 3)))
         if level == 4:
             # L4: /configs/dimensions/{dimension_type}/{dimension_id}__{uuid}/registry.toml | ...{version}
@@ -47,7 +47,7 @@ def check_config_dimensions(s3, F, msg):
 
                 try:
                     handle_version_or_str(x)
-                except:
+                except Exception:
                     raise DSGInvalidRegistryState(msg.format(get_joined_file(parts, 3) / x))
         if level == 5:
             # L5: /configs/dimensions/{dimension_type}/{dimension_id}__{uuid}/{version}/dimension.toml | ...{dimension}.csv (or json)

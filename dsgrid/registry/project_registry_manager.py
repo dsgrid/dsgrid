@@ -3,24 +3,18 @@
 import getpass
 import itertools
 import logging
-import os
-from pathlib import Path
 from typing import Union, List, Dict
 
 from prettytable import PrettyTable
-import pyspark.sql.functions as F
-from semver import VersionInfo
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
-    DSGInvalidDimension,
     DSGInvalidDimensionAssociation,
     DSGInvalidParameter,
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
 )
-from dsgrid import timer_stats_collector
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dataset_config import DatasetConfig
@@ -37,7 +31,7 @@ from dsgrid.config.mapping_tables import (
     MappingTableModel,
     DatasetBaseToProjectMappingTableListModel,
 )
-from dsgrid.config.project_config import ProjectConfig, ProjectConfigModel
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.registry.common import (
     make_initial_config_registration,
     ConfigKey,
@@ -45,8 +39,8 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
 )
 from dsgrid.utils.spark import create_dataframe_from_dimension_ids
-from dsgrid.utils.timing import track_timing, timer_stats_collector, Timer
-from dsgrid.utils.files import dump_data, load_data, run_in_other_dir
+from dsgrid.utils.timing import track_timing, timer_stats_collector
+from dsgrid.utils.files import load_data, run_in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import display_table
 from .common import (
@@ -663,7 +657,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _update(self, config, submitter, update_type, log_message):
         old_config = self.get_by_id(config.config_id)
         checker = ProjectUpdateChecker(old_config.model, config.model)
-        result = checker.run()
+        checker.run()
         self._run_checks(config)
 
         registry = self.get_registry_config(config.config_id)

@@ -1,10 +1,10 @@
+import errno
 import sys
 import os
-import shutil, errno
+import shutil
 import logging
 
 import pyspark.sql.functions as F
-import pandas as pd
 
 from dsgrid.loggers import setup_logging
 from dsgrid.utils.timing import timed_info
@@ -111,11 +111,11 @@ class EnumerateTable:
 
         current_n_parts = df.rdd.getNumPartitions()
 
-        if n_files != None and repartition_by != None:
+        if n_files is not None and repartition_by is not None:
             df_out = df.repartition(n_files, repartition_by)
-        elif n_files == None and repartition_by != None:
+        elif n_files is None and repartition_by is not None:
             df_out = df.repartition(repartition_by)
-        elif n_files != None and repartition_by == None:
+        elif n_files is not None and repartition_by is None:
             df_out = df.repartition(n_files)
         else:
             df_out = df

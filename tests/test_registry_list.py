@@ -1,6 +1,7 @@
 import pytest
+
 from dsgrid.common import REMOTE_REGISTRY
-from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.tests.common import TEST_REGISTRY
 

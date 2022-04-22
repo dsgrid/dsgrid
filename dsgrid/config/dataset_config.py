@@ -1,25 +1,24 @@
+import logging
 from pathlib import Path
 from typing import List, Optional, Dict, Union, Any
-import os
-import logging
-import pyspark.sql.functions as F
 
 from pydantic import Field
 from pydantic import validator, root_validator
+import pyspark.sql.functions as F
 from semver import VersionInfo
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
+from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
+from dsgrid.exceptions import DSGInvalidDimension
+from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
     DimensionReferenceModel,
     DimensionModel,
     handle_dimension_union,
 )
-from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
-from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.utils.utilities import check_uniqueness
 
 
 ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv")
@@ -96,14 +95,14 @@ class DataSchemaType(DSGEnum):
     STANDARD = EnumValue(
         value="standard",
         description="""
-        Standard data schema with load_data and load_data_lookup tables. 
+        Standard data schema with load_data and load_data_lookup tables.
         Applies to datasets for which the data are provided in full.
         """,
     )
     ONE_TABLE = EnumValue(
         value="one_table",
         description="""
-        One_table data schema with load_data table. 
+        One_table data schema with load_data table.
         Typically appropriate for small, low-temporal resolution datasets.
         """,
     )
@@ -115,7 +114,7 @@ class DSGDatasetParquetType(DSGEnum):
     LOAD_DATA = EnumValue(
         value="load_data",
         description="""
-        In STANDARD data_schema_type, load_data is a file with ID, timestamp, and metric value columns. 
+        In STANDARD data_schema_type, load_data is a file with ID, timestamp, and metric value columns.
         In ONE_TABLE data_schema_type, load_data is a file with multiple data dimension and metric value columns.
         """,
     )

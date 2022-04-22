@@ -17,14 +17,12 @@ from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
-    DSGDuplicateValueRegistered,
 )
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.spark import models_to_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
-from dsgrid.config.dimension_mapping_base import DimensionMappingArchetype
-from .common import ConfigKey, make_initial_config_registration, ConfigKey, RegistryType
+from .common import ConfigKey, make_initial_config_registration, RegistryType
 from .registration_context import RegistrationContext
 from .dimension_mapping_registry import DimensionMappingRegistry, DimensionMappingRegistryModel
 from .dimension_mapping_update_checker import DimensionMappingUpdateChecker

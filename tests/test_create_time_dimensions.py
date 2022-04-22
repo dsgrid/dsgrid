@@ -3,7 +3,6 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 import logging
-import os
 
 from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data

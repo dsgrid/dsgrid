@@ -2,19 +2,18 @@
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import Field
 from pydantic import validator
 from semver import VersionInfo
 
-from .registry_base import RegistryBaseModel, RegistryBase
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import (
     DatasetRegistryStatus,
-    ProjectRegistryStatus,
 )
 from dsgrid.utils.versioning import make_version
+from .registry_base import RegistryBaseModel, RegistryBase
 
 logger = logging.getLogger(__name__)
 

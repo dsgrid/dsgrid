@@ -1,15 +1,14 @@
 import logging
-import os
-from typing import Dict, List, Optional, Union
+from typing import List, Optional, Union
 
 from pydantic import Field, validator
 from semver import VersionInfo
 
-from .dimensions import DimensionReferenceModel, DimensionReferenceByNameModel
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.versioning import handle_version_or_str
 from dsgrid.exceptions import DSGInvalidDimensionMapping
+from .dimensions import DimensionReferenceModel, DimensionReferenceByNameModel
 
 logger = logging.getLogger(__name__)
 

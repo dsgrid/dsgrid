@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class DatasetSchemaHandlerBase(abc.ABC):
-    """ define interface/required behaviors per dataset schema """
+    """define interface/required behaviors per dataset schema"""
 
     def __init__(self, config, dimension_mgr, dimension_mapping_mgr, mapping_references=None):
         self._config = config
@@ -188,7 +188,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     @track_timing(timer_stats_collector)
     def _map_and_reduce_dimension(self, df, column, records):
-        """ Map and partially reduce a dimension """
+        """Map and partially reduce a dimension"""
         if column not in df.columns:
             return df
 

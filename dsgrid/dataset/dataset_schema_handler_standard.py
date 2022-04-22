@@ -1,7 +1,4 @@
-from pathlib import Path
 import logging
-
-import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.utils.spark import read_dataframe, get_unique_values
@@ -14,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
-    """ define interface/required behaviors for STANDARD dataset schema """
+    """define interface/required behaviors for STANDARD dataset schema"""
 
     def __init__(self, load_data_df, load_data_lookup, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -93,7 +90,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @track_timing(timer_stats_collector)
     def _check_dataset_internal_consistency(self):
-        """ Check load_data dimensions and id series. """
+        """Check load_data dimensions and id series."""
         logger.info("Check dataset internal consistency.")
         self._check_load_data_columns()
         ld_ids = self._load_data.select("id").distinct()

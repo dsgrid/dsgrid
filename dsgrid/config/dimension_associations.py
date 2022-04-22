@@ -1,7 +1,5 @@
-import itertools
 import logging
 from pathlib import Path
-from typing import Dict
 
 from pyspark.sql.types import StringType
 

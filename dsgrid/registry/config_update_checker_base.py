@@ -1,7 +1,7 @@
 import abc
 import logging
 
-from dsgrid.exceptions import DSGInvalidRegistryState, DSGInvalidOperation
+from dsgrid.exceptions import DSGInvalidOperation
 
 
 logger = logging.getLogger(__name__)
@@ -13,7 +13,7 @@ class ConfigUpdateCheckerBase(abc.ABC):
     def __init__(self, old_model, new_model):
         self._old_model = old_model
         self._new_model = new_model
-        assert type(self._old_model) == type(self._new_model)
+        assert type(self._old_model) is type(self._new_model)  # noqa: E721
         self._type = type(self._old_model)
         self._changed_fields = set()
 

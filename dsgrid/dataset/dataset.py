@@ -1,15 +1,10 @@
 """Provides access to a dataset."""
 
-from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 import logging
-from pathlib import Path
 
 from pyspark.sql import SparkSession
-import pyspark.sql.functions as F
 
-from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.utils.spark import read_dataframe
-
+from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 
 logger = logging.getLogger(__name__)
 

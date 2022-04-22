@@ -3,7 +3,7 @@ import pytest
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
 from dsgrid.config.project_config import ProjectConfigModel
-from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import TEST_REGISTRY
 from tests.data.dimension_models.minimal.models import PROJECT_CONFIG_FILE
 

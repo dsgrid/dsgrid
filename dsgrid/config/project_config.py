@@ -7,18 +7,6 @@ from pydantic import Field
 from pydantic import root_validator, validator
 from semver import VersionInfo
 
-from .config_base import ConfigWithDataFilesBase
-from .dataset_config import InputDatasetType
-from .dimension_associations import DimensionAssociations
-from .dimension_mapping_base import DimensionMappingReferenceModel, DimensionMappingBaseModel
-from .mapping_tables import MappingTableByNameModel
-from .dimensions_config import DimensionsConfigModel
-from .dimensions import (
-    DimensionReferenceModel,
-    DimensionType,
-    handle_dimension_union,
-    DimensionModel,
-)
 from dsgrid.exceptions import DSGInvalidField
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import check_required_dimensions
@@ -29,10 +17,20 @@ from dsgrid.registry.common import (
 )
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
-
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
+from .config_base import ConfigWithDataFilesBase
+from .dataset_config import InputDatasetType
+from .dimension_associations import DimensionAssociations
+from .dimension_mapping_base import DimensionMappingReferenceModel
+from .mapping_tables import MappingTableByNameModel
+from .dimensions import (
+    DimensionReferenceModel,
+    DimensionType,
+    handle_dimension_union,
+    DimensionModel,
+)
 
 
 logger = logging.getLogger(__name__)

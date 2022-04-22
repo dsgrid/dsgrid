@@ -1,6 +1,6 @@
 from pathlib import Path
 import pytest
-from tempfile import TemporaryDirectory, gettempdir
+from tempfile import TemporaryDirectory
 
 from dsgrid.tests.common import AWS_PROFILE_NAME, TEST_REMOTE_REGISTRY
 from dsgrid.cloud.factory import make_cloud_storage_interface

@@ -65,7 +65,7 @@ class SparkPartition:
 
     @timed_info
     def file_size_if_partition_by(self, df, key):
-        """ calculate sharded file size based on paritionBy key """
+        """calculate sharded file size based on paritionBy key"""
         n_rows, n_cols, data_MB = self.get_data_size(df)
         n_partitions = df.select(key).distinct().count()
         avg_MB = round(data_MB / n_partitions, 2)

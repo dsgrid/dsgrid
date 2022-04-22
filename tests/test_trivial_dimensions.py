@@ -1,15 +1,8 @@
-import os
-from pyspark.sql.functions import log
 import pytest
 
-from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
 from dsgrid.utils.files import load_data, dump_data
 from dsgrid.tests.common import (
-    make_test_project_dir,
-    make_test_data_dir,
-    TEST_DATASET_DIRECTORY,
     replace_dimension_uuids_from_registry,
 )
 from dsgrid.tests.make_us_data_registry import make_test_data_registry

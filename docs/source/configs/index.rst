@@ -18,4 +18,3 @@ Dimension, Dataset, Project and Related Configs
    dimensions_config
    dimension_mappings_config
    dimension_mapping_references_config
-

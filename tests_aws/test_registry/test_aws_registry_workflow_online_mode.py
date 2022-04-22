@@ -1,30 +1,18 @@
-from dsgrid.filesystem.local_filesystem import LocalFilesystem
-import os
-import shutil
-import getpass
-import sys
-from pathlib import Path
-from tempfile import TemporaryDirectory, gettempdir
 import getpass
 import uuid
-
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from dsgrid.tests.common import (
     check_configs_update,
-    create_local_test_registry,
-    make_test_project_dir,
-    make_test_data_dir,
     AWS_PROFILE_NAME,
     TEST_REMOTE_REGISTRY,
 )
 
-from .common import clean_remote_registry, create_empty_remote_registry
-
-from dsgrid.dimension.base_models import DimensionType
-from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
-
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
+from .common import clean_remote_registry, create_empty_remote_registry
 
 
 def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data_dir):
@@ -33,7 +21,6 @@ def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data
         with TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir)
             submitter = getpass.getuser()
-            log_message = "test"
             s3_cloud_storage = S3StorageInterface(
                 local_path=base_dir,
                 remote_path=TEST_REMOTE_REGISTRY,
@@ -57,7 +44,6 @@ def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data
             assert dataset_dir.exists()
             dimension_mapping_refs = dataset_dir / "dimension_mapping_references.toml"
             assert dimension_mapping_refs.exists()
-            dataset_config_file = dataset_dir / "dataset.toml"
 
             # TODO: finish workflow when ready (submit dataset)
 
@@ -79,7 +65,6 @@ def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data
 
 def check_configs_dimensions(s3):
     for dim_type in DimensionType:
-        dimtype = dim_type.value
         files = s3.listdir(f"configs/dimensions/{dim_type.value}")
         for file in files:
             assert s3.listdir(f"configs/dimensions/{dim_type.value}/{file}") == [

@@ -1,15 +1,13 @@
 import logging
-import os
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import List
 
-from pydantic import Field, validator
-from semver import VersionInfo
+from pydantic import Field
 
-from .mapping_tables import MappingTableModel
-from .config_base import ConfigBase
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import make_registry_id, check_config_id_loose
+from .mapping_tables import MappingTableModel
+from .config_base import ConfigBase
 
 
 logger = logging.getLogger(__name__)

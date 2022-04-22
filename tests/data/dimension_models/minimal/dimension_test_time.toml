@@ -58,5 +58,3 @@ ranges = [{start = "2020", end = "2050"}]
 str_format = "%Y"
 include_leap_day = true
 measurement_type = "mean"
-
-

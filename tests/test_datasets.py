@@ -13,9 +13,6 @@ import pytest
 
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.tests.common import (
-    make_test_project_dir,
-    make_test_data_dir,
-    TEST_DATASET_DIRECTORY,
     replace_dimension_uuids_from_registry,
 )
 from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json, load_data
@@ -85,7 +82,6 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
                     shutil.rmtree(test_dir)
 
         submit_tests = (_setup_invalid_load_data_lookup_missing_records,)
-        dimension_mapping_files = [dataset_dir / "dimension_mapping_references.toml"]
         for i, setup_test in enumerate(submit_tests):
             test_dir = base_dir / f"test_data_dir_{i}"
             try:

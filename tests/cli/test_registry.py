@@ -1,16 +1,11 @@
-import os
 import re
 from pathlib import Path
-from tempfile import TemporaryDirectory, gettempdir
+from tempfile import TemporaryDirectory
 
 
-from dsgrid.utils.run_command import check_run_command, run_command
+from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.files import load_data
-from dsgrid.tests.common import (
-    create_local_test_registry,
-    make_test_project_dir,
-    TEST_DATASET_DIRECTORY,
-)
+from dsgrid.tests.common import TEST_DATASET_DIRECTORY
 from dsgrid.tests.common import (
     replace_dimension_uuids_from_registry,
 )

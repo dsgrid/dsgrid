@@ -18,7 +18,6 @@ from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
-from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.filesystem.factory import make_filesystem_interface
@@ -216,7 +215,7 @@ class RegistryManager:
                 fs_interface.mkdir(dir_name)
 
         logger.info(
-            f"Loaded local registry at %s offline_mode=%s",
+            "Loaded local registry at %s offline_mode=%s",
             path,
             offline_mode,
         )
@@ -288,7 +287,7 @@ class RegistryManager:
                     sync = False
 
         if sync:
-            logger.info(f"Sync data from remote registry for {dataset_id}, version={version}.")
+            logger.info("Sync data from remote registry for %s, version=%s.", dataset_id, version)
             cloud_interface.sync_pull(
                 remote_path=self._params.remote_path + f"/data/{dataset_id}/{version}",
                 local_path=str(self._params.base_path) + f"/data/{dataset_id}/{version}",
@@ -301,7 +300,9 @@ class RegistryManager:
                 is_file=True,
             )
         else:
-            logger.info(f"Skipping remote registry data sync for {dataset_id}, version={version}.")
+            logger.info(
+                "Skipping remote registry data sync for %s, version=%s.", dataset_id, version
+            )
 
     @property
     def path(self):
@@ -463,7 +464,6 @@ class RegistryManager:
                 for mapping_ref in mapping_list:
                     if mapping_ref.mapping_id in updated_mappings:
                         mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
-                        updated_project = True
             if updated and project.config_id not in updated_projects:
                 updated_projects[project.config_id] = project
 

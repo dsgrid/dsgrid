@@ -11,18 +11,15 @@ import pytest
 
 from dsgrid.tests.common import (
     TEST_PROJECT_PATH,
-    make_test_data_dir,
     create_local_test_registry,
-    replace_dimension_uuids_from_registry,
 )
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.utils.files import load_data, dump_data
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 
 
 logger = logging.getLogger()
 
-### set up make_test_project_dir ###
+# set up make_test_project_dir
 TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_aeo"
 
 
@@ -42,7 +39,7 @@ def _make_project_dir(project):
     return tmpdir
 
 
-### set up registry for AEO data ###
+# set up registry for AEO data
 def make_registry_for_aeo(
     registry_path, src_dir, dataset_name: str, dataset_path=None, include_datasets=False
 ) -> RegistryManager:
@@ -72,7 +69,7 @@ def make_registry_for_aeo(
     return manager
 
 
-### set up tests for AEO data ###
+# set up tests for AEO data
 def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
     if "test_aeo_data" not in os.listdir(make_test_data_dir):
         logger.info("test_invalid_datasets requires the dsgrid-test-data repository")
@@ -123,7 +120,7 @@ def _test_dataset_registration(make_test_project_dir, data_dir, dataset):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
         logger.info(f"temp_registry created: {base_dir}")
-        manager = make_registry_for_aeo(
+        make_registry_for_aeo(
             base_dir,
             make_test_project_dir,
             dataset,

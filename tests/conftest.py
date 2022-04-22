@@ -2,16 +2,19 @@ import os
 import re
 import shutil
 import sys
+from pathlib import Path
+from tempfile import gettempdir
 
 import pytest
 
 from dsgrid.utils.run_command import run_command, check_run_command
 from dsgrid.utils.spark import init_spark
 from dsgrid.tests.common import (
+    TEST_DATASET_DIRECTORY,
     TEST_PROJECT_PATH,
     TEST_PROJECT_REPO,
-    TEST_DATASET_DIRECTORY,
     TEST_REGISTRY,
+    TEST_STANDARD_SCENARIOS_PROJECT_REPO,
 )
 
 
@@ -61,3 +64,38 @@ def spark_session():
     spark = init_spark("dsgrid_test")
     yield spark
     spark.stop()
+
+
+@pytest.fixture
+def make_test_project_dir():
+    tmpdir = _make_project_dir(TEST_PROJECT_REPO)
+    yield tmpdir / "dsgrid_project"
+    shutil.rmtree(tmpdir)
+
+
+@pytest.fixture
+def make_standard_scenarios_project_dir():
+    tmpdir = _make_project_dir(TEST_STANDARD_SCENARIOS_PROJECT_REPO)
+    yield tmpdir / "dsgrid_project"
+    shutil.rmtree(tmpdir)
+
+
+@pytest.fixture
+def make_test_data_dir():
+    tmpdir = Path(gettempdir()) / "test_data"
+    if os.path.exists(tmpdir):
+        shutil.rmtree(tmpdir)
+    os.mkdir(tmpdir)
+    dst_path = tmpdir / "datasets"
+    shutil.copytree(Path(TEST_DATASET_DIRECTORY), dst_path)
+    yield dst_path
+    shutil.rmtree(tmpdir)
+
+
+def _make_project_dir(project):
+    tmpdir = Path(gettempdir()) / "test_project"
+    if os.path.exists(tmpdir):
+        shutil.rmtree(tmpdir)
+    os.mkdir(tmpdir)
+    shutil.copytree(project / "dsgrid_project", tmpdir / "dsgrid_project")
+    return tmpdir

@@ -9,13 +9,12 @@ from typing import Union, List, Dict
 from prettytable import PrettyTable
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.dataset_config import DatasetConfig, DatasetConfigModel
+from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDataset
-from dsgrid.utils.files import load_data
-from dsgrid.utils.timing import timer_stats_collector, Timer, track_timing
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import display_table
 from .common import (

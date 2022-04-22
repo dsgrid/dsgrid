@@ -5,18 +5,14 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, List, Optional, Union
 
-import pandas as pd
 from pydantic import validator, root_validator
 from pydantic import Field
-from pyspark.sql import DataFrame, Row, SparkSession
 from semver import VersionInfo
 
-from dsgrid.data_models import DSGBaseModel, serialize_model, ExtendedJSONEncoder
-from dsgrid.dimension.base_models import (
-    DimensionType,
-)
+from dsgrid.data_models import DSGBaseModel
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeInvervalType,
@@ -26,8 +22,7 @@ from dsgrid.dimension.time import (
     RepresentativePeriodFormat,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
-from dsgrid.utils.files import compute_file_hash, compute_hash, load_data
-from dsgrid.utils.spark import create_dataframe, read_dataframe
+from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.versioning import handle_version_or_str
 
 
@@ -130,10 +125,10 @@ class DimensionBaseModel(DSGBaseModel):
         if name.lower().replace(" ", "-") in prohibited_names:
             raise ValueError(
                 f"""
-                 Dimension name '{name}' is not descriptive enough for a dimension record name. 
-                 Please be more descriptive in your naming. 
-                 Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable, 
-                 identifiable, and reusable for other datasets and projects. 
+                 Dimension name '{name}' is not descriptive enough for a dimension record name.
+                 Please be more descriptive in your naming.
+                 Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable,
+                 identifiable, and reusable for other datasets and projects.
                  e.g., 'time-2012-est-houlry-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name.
                  """
             )
@@ -241,7 +236,7 @@ class DimensionModel(DimensionBaseModel):
 
         records = []
         if filename.name.endswith(".csv"):
-            with open(filename) as f_in:
+            with open(filename, encoding="utf") as f_in:
                 ids = set()
                 reader = csv.DictReader(f_in)
                 for row in reader:
@@ -307,7 +302,7 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         title="time_type",
         default=TimeDimensionType.DATETIME,
         description="""
-        Type of time dimension: 
+        Type of time dimension:
             datetime, annual, representative_period, noop
         """,
         options=TimeDimensionType.format_for_docs(),
@@ -333,8 +328,8 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         title="measurement_type",
         default=MeasurementType.TOTAL,
         description="""
-        The type of measurement represented by a value associated with a timestamp: 
-            mean, min, max, measured, total 
+        The type of measurement represented by a value associated with a timestamp:
+            mean, min, max, measured, total
         """,
         options=MeasurementType.format_for_docs(),
     )
@@ -379,14 +374,14 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         title="timezone",
         description="""
         Time zone of data:
-            UTC, 
-            HawaiiAleutianStandard, 
+            UTC,
+            HawaiiAleutianStandard,
             AlaskaStandard, AlaskaPrevailing,
-            PacificStandard, PacificPrevailing, 
-            MountainStandard, MountainPrevailing, 
-            CentralStandard, CentralPrevailing, 
+            PacificStandard, PacificPrevailing,
+            MountainStandard, MountainPrevailing,
+            CentralStandard, CentralPrevailing,
             EasternStandard, EasternPrevailing,
-            LOCAL 
+            LOCAL
         """,
         options=TimeZone.format_descriptions_for_docs(),
     )
@@ -419,8 +414,8 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
         title="measurement_type",
         default=MeasurementType.TOTAL,
         description="""
-        The type of measurement represented by a value associated with a timestamp: 
-            mean, min, max, measured, total 
+        The type of measurement represented by a value associated with a timestamp:
+            mean, min, max, measured, total
         """,
         options=MeasurementType.format_for_docs(),
     )
@@ -461,8 +456,8 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         title="measurement_type",
         default=MeasurementType.TOTAL,
         description="""
-        The type of measurement represented by a value associated with a timestamp: 
-            mean, min, max, measured, total 
+        The type of measurement represented by a value associated with a timestamp:
+            mean, min, max, measured, total
         """,
         options=MeasurementType.format_for_docs(),
     )

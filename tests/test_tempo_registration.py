@@ -9,10 +9,9 @@ import pytest
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     create_local_test_registry,
-    make_standard_scenarios_project_dir,
-    TEST_DATASET_DIRECTORY,
+    # TEST_DATASET_DIRECTORY,
 )
-from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.files import load_data
 from dsgrid.tests.common import (
     replace_dimension_uuids_from_registry,
 )
@@ -24,11 +23,12 @@ logger = logging.getLogger()
 # This is disabled because the test data is not finalized.
 @pytest.mark.skip
 def test_register_project_and_dataset(make_standard_scenarios_project_dir):
-    with TemporaryDirectory() as tmpdir:
-        base_dir = Path(tmpdir)
-        manager = make_registry_for_tempo(
-            base_dir, make_standard_scenarios_project_dir, TEST_DATASET_DIRECTORY
-        )
+    with TemporaryDirectory() as _:
+        pass
+        # base_dir = Path(tmpdir)
+        # manager = make_registry_for_tempo(
+        #     base_dir, make_standard_scenarios_project_dir, TEST_DATASET_DIRECTORY
+        # )
         # TODO: not working yet
         # dataset_mgr = manager.dataset_manager
         # config_ids = dataset_mgr.list_ids()

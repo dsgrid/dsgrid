@@ -6,7 +6,6 @@ from typing import List, Optional, Union
 
 from pydantic import Field, validator
 
-from .config_base import ConfigWithDataFilesBase
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingBaseModel,
     DimensionMappingByNameBaseModel,
@@ -14,8 +13,8 @@ from dsgrid.config.dimension_mapping_base import (
     DimensionMappingPreRegisteredBaseModel,
 )
 from dsgrid.data_models import serialize_model_data, DSGBaseModel
-from dsgrid.dimension.base_models import DimensionType
-from dsgrid.utils.files import compute_file_hash, dump_data
+from dsgrid.utils.files import compute_file_hash
+from .config_base import ConfigWithDataFilesBase
 
 
 logger = logging.getLogger(__name__)
@@ -121,7 +120,7 @@ class MappingTableModel(DimensionMappingBaseModel):
             return records  # this means filename validator fail
         filename = Path(values["filename"])
         if filename.name.endswith(".csv"):
-            with open(filename) as f_in:
+            with open(filename, encoding="utf8") as f_in:
                 reader = csv.DictReader(f_in)
                 for row in reader:
                     record = MappingTableRecordModel(**row)

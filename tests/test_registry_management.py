@@ -2,7 +2,7 @@ import getpass
 import os
 import shutil
 from pathlib import Path
-from tempfile import TemporaryDirectory, gettempdir
+from tempfile import TemporaryDirectory
 
 import pyspark
 import pytest
@@ -15,22 +15,15 @@ from dsgrid.exceptions import (
     DSGValueNotRegistered,
 )
 from dsgrid.registry.common import DatasetRegistryStatus, ProjectRegistryStatus, VersionUpdateType
-from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
-from dsgrid.registry.project_registry_manager import ProjectRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
-    make_test_project_dir,
     replace_dimension_uuids_from_registry,
     replace_dimension_mapping_uuids_from_registry,
     TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import dump_data, load_data
-from dsgrid.tests.common import (
-    replace_dimension_mapping_uuids_from_registry,
-    replace_dimension_uuids_from_registry,
-)
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
@@ -412,7 +405,6 @@ def check_update_project_dimension(tmpdir, manager):
     dimension_mgr = manager.dimension_manager
     dimension_id = dimension_mgr.list_ids()[0]
     user = getpass.getuser()
-    msg = "update registration"
 
     dim_dir = Path(tmpdir) / "new_dimension"
     dim_config_file = dim_dir / dimension_mgr.registry_class().config_filename()

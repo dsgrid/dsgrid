@@ -6,25 +6,21 @@ from pathlib import Path
 import click
 from semver import VersionInfo
 
-from dsgrid.config.mapping_tables import MappingTableModel
-from dsgrid.config.dataset_config import InputSectorDataset, DatasetConfigModel
+from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingBaseModel,
-    DimensionMappingReferenceModel,
     DimensionMappingReferenceListModel,
 )
 from dsgrid.config.dimensions import DimensionModel, DateTimeDimensionModel
 from dsgrid.config.project_config import (
     DimensionsModel,
-    InputDatasetModel,
-    DimensionMappingsModel,
     ProjectConfigModel,
 )
 import pydantic
 import pkgutil
 import importlib
 import dsgrid
-import sys
+
 
 dsgrid_modules = []
 for importer, modname, ispkg in pkgutil.iter_modules(dsgrid.__path__):
@@ -49,7 +45,7 @@ def get_class_path(cls_name):
                 with open(module_file, "r") as f:
                     if f"class {cls_name}" in f.read():
                         return mod.__name__
-        except:
+        except Exception:
             pass
 
 
@@ -176,7 +172,7 @@ def get_subfield_rows(field_items_list, class_name_list, fields, indent_level):
                 _continue = True
             else:
                 _continue = False
-        if _continue == True:
+        if _continue:
             for i, field in enumerate(fields):
                 rows.extend(get_row(i, field, fields, field_items, cls, indent_level))
     return rows

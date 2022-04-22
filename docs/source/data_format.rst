@@ -130,7 +130,7 @@ File Format
                │   ├── part-00000-e7b9b687-e2e8-4f7d-a196-02cd97e7bb87-c000.snappy.parquet
                │   ├── part-00001-2c65bf32-8873-4936-a9ba-946a2c32c2d9-c000.snappy.parquet
                │   ├── part-00001-e7b9b687-e2e8-4f7d-a196-02cd97e7bb87-c000.snappy.parquet
-               │   ├── ...     
+               │   ├── ...
                ├── load_data_lookup.parquet
                │   ├── _SUCCESS
                │   ├── part-00000-7c563524-3af3-46be-8dec-0af3c6a28dbb-c000.snappy.parquet

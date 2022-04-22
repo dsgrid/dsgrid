@@ -3,7 +3,6 @@ from datetime import datetime
 
 import pandas as pd
 
-from dsgrid.dimension.time import TimeZone
 from dsgrid.dimension.time import TimeZone, make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import DatetimeTimestampType

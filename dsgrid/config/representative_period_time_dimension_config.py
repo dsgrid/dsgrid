@@ -1,22 +1,18 @@
 import abc
 import calendar
 import logging
-import sys
-from collections import namedtuple
 from datetime import datetime, timedelta
 
 import pandas as pd
-import pyspark.sql.functions as F
 
 from dsgrid.dimension.time import (
     RepresentativePeriodFormat,
-    TimeZone,
     DatetimeRange,
     LeapDayAdjustmentType,
 )
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import OneWeekPerMonthByHourType
-from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
+from dsgrid.utils.timing import track_timing, timer_stats_collector
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -108,7 +104,7 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_time_ranges():
+    def get_time_ranges(self):
         """Return a list of DatetimeRange instances for the dataset.
 
         Returns
@@ -162,7 +158,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     def get_frequency(self):
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, tzinfo):
+    def get_time_ranges(self, ranges, _):
         # TODO: This method may have some problems but is currently unused.
         # How to handle year? Leap year?
         time_ranges = []

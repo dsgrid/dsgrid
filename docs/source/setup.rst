@@ -5,7 +5,7 @@ Setup
 
 Python Environment
 ==================
-dsgrid requires python=3.8 or later. If you do not already have a python environment with python>=3.8, we recommend using `Conda <https://conda.io/projects/conda/en/latest/index.html>`_ to help manage your python packages and environments. 
+dsgrid requires python=3.8 or later. If you do not already have a python environment with python>=3.8, we recommend using `Conda <https://conda.io/projects/conda/en/latest/index.html>`_ to help manage your python packages and environments.
 
 Steps to make a dsgrid Conda environment:
 
@@ -13,19 +13,19 @@ Steps to make a dsgrid Conda environment:
 2. Create a suitable environment.
 
 .. code-block:: bash
-        
+
     conda create -n dsgrid python=3.8
 
 3. Activate the environment:
 
 .. code-block:: bash
-        
+
     conda activate dsgrid
 
 
 Installation
 ============
-Clone the `dsgrid repository <https://github.com/dsgrid/dsgrid>`_. 
+Clone the `dsgrid repository <https://github.com/dsgrid/dsgrid>`_.
 
 With ssh keys:
 
@@ -54,7 +54,7 @@ Currently, the dsgrid registry is only accessible through the internal NREL dsgr
 
 Setup sandbox account
 ---------------------
-Once the NREL Stratus Cloud Team has set you up with a dsgrid sandbox account (``nrel-aws-dsgrid``), you will recieve an email with your temporay password and instructions on how to setup your account. Follow the instructions in the email to complete the following: 
+Once the NREL Stratus Cloud Team has set you up with a dsgrid sandbox account (``nrel-aws-dsgrid``), you will recieve an email with your temporay password and instructions on how to setup your account. Follow the instructions in the email to complete the following:
 
     1. Log in and set up your password
     2. Set up Multi-Factor Authentication (MFA)
@@ -82,7 +82,7 @@ To save your changes in vi, type ``ESC`` then ``:x``.
 Finally, check that you can view contents in the registry:
 
 .. code-block:: bash
-    
+
     aws s3 ls s3://nrel-dsgrid-registry
 
 
@@ -107,7 +107,7 @@ We recommend that dsgrid project repositories use the following directory organi
             │       │   ├── dimensions
             │       │   ├── dataset.toml
             │       │   ├── dimension_mappings.toml
-            │       └── ...   
+            │       └── ...
             ├── dimension_associations
             ├── dimension_mappings
             ├── dimensions

@@ -47,8 +47,15 @@ class DimensionBaseModel(DSGBaseModel):
     display_name: str = Field(
         title="display_name",
         description="Display name. Source for auto-generated query_name.",
-        note="Dimension display names should be singular, concise names that are common across "
-        "projects and datasets. Must be unique within a project or dataset.",
+        note="Dimension display names should be singular noun phrases that are concise and "
+        "distinguish the dimension across all dimensions within a project, inclusive of dataset "
+        "dimensions, project base dimensions, and project supplemental dimensions. This uniqueness "
+        "requirement applies unless the dimension is trivial, that is, contains only a single "
+        "record. For trivial dimensions, if the dimension represents an aggregation of everything, "
+        "e.g., all of the sectors, then the convention is to list the display name as 'None'; "
+        "if the dimension represents a single slice of the data, e.g., all electricity use or "
+        "model year 2018, then the convention is to list that 'record' name as the display name, "
+        "e.g.,'Electricity Use' or '2018'.",
         notes=(
             "Only alphanumeric characters, underscores, and spaces are supported (no dashes or "
             "special characters).",

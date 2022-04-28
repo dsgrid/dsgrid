@@ -57,7 +57,7 @@ class DimensionBaseModel(DSGBaseModel):
         "model year 2018, then the convention is to list that 'record' name as the display name, "
         "e.g.,'Electricity Use' or '2018'.",
         notes=(
-            "Only alphanumeric characters, underscores, and spaces are supported (no dashes or "
+            "Only alphanumeric characters, underscores, and spaces are supported (no "
             "special characters).",
             "The :meth:`~dsgrid.config.dimensions.check_display_name` validator is used to "
             "enforce valid dimension display names.",

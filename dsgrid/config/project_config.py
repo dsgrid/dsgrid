@@ -89,7 +89,8 @@ class DimensionsModel(DSGBaseModel):
     )
     all_in_one_supplemental_dimensions: List[DimensionType] = Field(
         title="all_in_one_supplemental_dimensions",
-        description="dsgrid will auto-generate dimensions containing all records for these dimensions.",
+        description="dsgrid will auto-generate dimensions that aggregate across all records for "
+        "the base dimensions of these types.",
         default=[],
     )
 
@@ -398,7 +399,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
             if model.dimension_type == dimension_type and model.query_name == query_name:
                 return dim_config.get_records_dataframe()
 
-        raise DSGInvalidDimension(f"{dimension_type} is not stored")
+        raise DSGInvalidDimension(f"{dimension_type} with query_name={query_name} is not stored")
 
     def get_supplemental_dimensions(self, dimension_type: DimensionType):
         """Return the supplemental dimensions matching dimension (if any).

@@ -51,11 +51,9 @@ class DimensionBaseModel(DSGBaseModel):
         "distinguish the dimension across all dimensions within a project, inclusive of dataset "
         "dimensions, project base dimensions, and project supplemental dimensions. This uniqueness "
         "requirement applies unless the dimension is trivial, that is, contains only a single "
-        "record. For trivial dimensions, if the dimension represents an aggregation of everything, "
-        "e.g., all of the sectors, then the convention is to list the display name as 'None'; "
-        "if the dimension represents a single slice of the data, e.g., all electricity use or "
-        "model year 2018, then the convention is to list that 'record' name as the display name, "
-        "e.g.,'Electricity Use' or '2018'.",
+        "record. For trivial dimensions, if the dimension represents a single slice of the data, "
+        "e.g., all electricity use or model year 2018, then the convention is to list that "
+        "'record' name as the display name, e.g.,'Electricity Use' or '2018'.",
         notes=(
             "Only alphanumeric characters, underscores, and spaces are supported (no "
             "special characters).",

@@ -166,7 +166,7 @@ class DimensionBaseModel(DSGBaseModel):
             return query_name
         if query_name is not None:
             return query_name
-        return values["display_name"].lower().replace(" ", "_")
+        return values["display_name"].lower().replace(" ", "_").replace("-", "_")
 
     @validator("module", always=True)
     def check_module(cls, module):

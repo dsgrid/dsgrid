@@ -1,6 +1,7 @@
 import itertools
 import logging
 import os
+from collections import defaultdict
 from typing import Dict, List, Union
 
 from pydantic import Field
@@ -9,7 +10,7 @@ from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import check_required_dimensions
-from dsgrid.exceptions import DSGInvalidField
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension
 from dsgrid.registry.common import (
     ProjectRegistryStatus,
     DatasetRegistryStatus,
@@ -84,6 +85,11 @@ class DimensionsModel(DSGBaseModel):
             "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
             "base data.",
         ),
+        default=[],
+    )
+    all_in_one_supplemental_dimensions: List[DimensionType] = Field(
+        title="all_in_one_supplemental_dimensions",
+        description="dsgrid will auto-generate dimensions containing all records for these dimensions.",
         default=[],
     )
 
@@ -471,9 +477,14 @@ class ProjectConfig(ConfigWithDataFilesBase):
         self._base_dimensions.update(base_dimensions)
         self._supplemental_dimensions.update(supplemental_dimensions)
 
-        dims = list(self.iter_dimensions())
+        dims = []
+        dims_by_type = defaultdict(list)
+        for dim in self.iter_dimensions():
+            dims.append(dim)
+            dims_by_type[dim.model.dimension_type].append(dim)
         check_uniqueness((x.model.name for x in dims), "dimension name")
-        check_uniqueness((x.model.query_name for x in dims), "dimension query name")
+        for dims in dims_by_type.values():
+            check_uniqueness((x.model.display_name for x in dims), "dimension display name")
         check_uniqueness(
             (getattr(x.model, "cls") for x in base_dimensions.values()), "dimension cls"
         )

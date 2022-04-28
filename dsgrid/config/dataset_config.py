@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Union, Any
 
 from pydantic import Field
-from pydantic import validator, root_validator
+from pydantic import validator
 import pyspark.sql.functions as F
 from semver import VersionInfo
 
@@ -493,9 +493,6 @@ class DatasetConfig(ConfigBase):
         """
         self._dimensions.update(dimension_manager.load_dimensions(self.model.dimension_references))
         check_uniqueness((x.model.name for x in self._dimensions.values()), "dimension name")
-        check_uniqueness(
-            (x.model.query_name for x in self._dimensions.values()), "dimension query name"
-        )
 
     @property
     def dimensions(self):

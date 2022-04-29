@@ -16,7 +16,7 @@ from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDataset
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.utils.utilities import display_table
+from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
     make_initial_config_registration,
     ConfigKey,
@@ -57,6 +57,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     def _run_checks(self, config: DatasetConfig):
         logger.info("Run dataset registration checks.")
         check_required_dimensions(config.model.dimension_references, "dataset dimensions")
+        check_uniqueness((x.model.name for x in config.model.dimensions), "dimension name")
         if not os.environ.get("__DSGRID_SKIP_DATASET_CONSISTENCY_CHECKS__"):
             self._check_dataset_consistency(config)
 

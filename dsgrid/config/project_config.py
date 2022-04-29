@@ -1,7 +1,6 @@
 import itertools
 import logging
 import os
-from collections import defaultdict
 from typing import Dict, List, Union
 
 from pydantic import Field
@@ -477,18 +476,6 @@ class ProjectConfig(ConfigWithDataFilesBase):
         )
         self._base_dimensions.update(base_dimensions)
         self._supplemental_dimensions.update(supplemental_dimensions)
-
-        dims = []
-        dims_by_type = defaultdict(list)
-        for dim in self.iter_dimensions():
-            dims.append(dim)
-            dims_by_type[dim.model.dimension_type].append(dim)
-        check_uniqueness((x.model.name for x in dims), "dimension name")
-        for dims in dims_by_type.values():
-            check_uniqueness((x.model.display_name for x in dims), "dimension display name")
-        check_uniqueness(
-            (getattr(x.model, "cls") for x in base_dimensions.values()), "dimension cls"
-        )
 
     def load_dimension_mappings(self, dimension_mapping_manager: DimensionMappingRegistryManager):
         """Load all dimension mappings.

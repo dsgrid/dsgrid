@@ -4,6 +4,7 @@ import getpass
 import itertools
 import logging
 import shutil
+from collections import defaultdict
 from pathlib import Path
 from typing import Union, List, Dict
 
@@ -47,7 +48,7 @@ from dsgrid.utils.spark import create_dataframe_from_dimension_ids
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, run_in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.utils.utilities import display_table
+from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
     VersionUpdateType,
     RegistryType,
@@ -440,6 +441,19 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     @track_timing(timer_stats_collector)
     def _run_checks(self, config: ProjectConfig):
+        dims = []
+        dims_by_type = defaultdict(list)
+        for dim in config.iter_dimensions():
+            dims.append(dim)
+            dims_by_type[dim.model.dimension_type].append(dim)
+
+        check_uniqueness((x.model.name for x in dims), "dimension name")
+        for dims in dims_by_type.values():
+            check_uniqueness((x.model.display_name for x in dims), "dimension display name")
+        check_uniqueness(
+            (getattr(x.model, "cls") for x in config.model.dimensions.base_dimensions),
+            "dimension cls",
+        )
         self._check_dimension_associations(config)
 
     @track_timing(timer_stats_collector)

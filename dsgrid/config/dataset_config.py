@@ -492,7 +492,6 @@ class DatasetConfig(ConfigBase):
 
         """
         self._dimensions.update(dimension_manager.load_dimensions(self.model.dimension_references))
-        check_uniqueness((x.model.name for x in self._dimensions.values()), "dimension name")
 
     @property
     def dimensions(self):

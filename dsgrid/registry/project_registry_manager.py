@@ -3,6 +3,7 @@
 import getpass
 import itertools
 import logging
+import shutil
 from pathlib import Path
 from typing import Union, List, Dict
 
@@ -58,6 +59,8 @@ from .dimension_registry_manager import DimensionRegistryManager
 from .project_registry import ProjectRegistry, ProjectRegistryModel
 from .registry_manager_base import RegistryManagerBase
 
+
+_SUPPLEMENTAL_TMP_DIR = "__tmp_supplemental__"
 
 logger = logging.getLogger(__name__)
 
@@ -210,75 +213,101 @@ class ProjectRegistryManager(RegistryManagerBase):
         model = config.model
         logger.info("Start registration of project %s", model.project_id)
         self._check_if_already_registered(model.project_id)
-        if model.dimensions.base_dimensions:
-            self._register_dimensions_from_models(
-                src_dir,
-                model.dimensions.base_dimensions,
-                model.dimensions.base_dimension_references,
-                context,
-                submitter,
-                log_message,
-                force,
-            )
-        if model.dimensions.supplemental_dimensions:
-            self._register_dimensions_from_models(
-                src_dir,
-                model.dimensions.supplemental_dimensions,
-                model.dimensions.supplemental_dimension_references,
-                context,
-                submitter,
-                log_message,
-                force,
-            )
-
-        if model.dimensions.all_in_one_supplemental_dimensions:
-            model.dimension_mappings.base_to_supplemental += self._register_all_in_one_dimensions(
-                src_dir,
-                model,
-                context,
-                submitter,
-                log_message,
-                force,
-            )
-
-        if model.dimension_mappings.base_to_supplemental:
-            mappings = []
-            name_mapping = {}
-            for ref in itertools.chain(
-                model.dimensions.base_dimension_references,
-                model.dimensions.supplemental_dimension_references,
-            ):
-                dim = self._dimension_mgr.get_by_id(ref.dimension_id)
-                name_mapping[(dim.model.name, ref.dimension_type)] = ref
-
-            for mapping in model.dimension_mappings.base_to_supplemental:
-                from_dim = name_mapping[
-                    (mapping.from_dimension.name, mapping.from_dimension.dimension_type)
-                ]
-                to_dim = name_mapping[
-                    (mapping.to_dimension.name, mapping.to_dimension.dimension_type)
-                ]
-
-                mapping_model = run_in_other_dir(
-                    src_dir, MappingTableModel.from_pre_registered_model, mapping, from_dim, to_dim
+        tmp_dirs = []
+        try:
+            if model.dimensions.base_dimensions:
+                self._register_dimensions_from_models(
+                    src_dir,
+                    model.dimensions.base_dimensions,
+                    model.dimensions.base_dimension_references,
+                    context,
+                    submitter,
+                    log_message,
+                    force,
                 )
-                mappings.append(mapping_model)
+            if model.dimensions.supplemental_dimensions:
+                self._register_dimensions_from_models(
+                    src_dir,
+                    model.dimensions.supplemental_dimensions,
+                    model.dimensions.supplemental_dimension_references,
+                    context,
+                    submitter,
+                    log_message,
+                    force,
+                )
+            if model.dimensions.all_in_one_supplemental_dimensions:
+                supp_dir = src_dir / _SUPPLEMENTAL_TMP_DIR
+                assert not supp_dir.exists()
+                supp_dir.mkdir()
+                tmp_dirs.append(supp_dir)
+                model.dimension_mappings.base_to_supplemental += (
+                    self._register_all_in_one_dimensions(
+                        src_dir,
+                        supp_dir,
+                        model,
+                        context,
+                        submitter,
+                        log_message,
+                        force,
+                    )
+                )
+            if model.dimension_mappings.base_to_supplemental:
+                self._register_base_to_supplemental_mappings(
+                    src_dir,
+                    model,
+                    context,
+                    submitter,
+                    log_message,
+                    force,
+                )
 
-            mapping_config = DimensionMappingsConfig.load_from_model(
-                DimensionMappingsConfigModel(mappings=mappings),
-                src_dir,
-            )
-            mapping_ids = self._dimension_mapping_mgr.register_from_config(
-                mapping_config, submitter, log_message, context=context, force=force
-            )
-            model.dimension_mappings.base_to_supplemental_references += (
-                self._dimension_mapping_mgr.make_dimension_mapping_references(mapping_ids)
-            )
-            model.dimension_mappings.base_to_supplemental.clear()
+            config.load_dimensions_and_mappings(self._dimension_mgr, self._dimension_mapping_mgr)
+            self._register(config, submitter, log_message, force)
+            context.add_id(RegistryType.PROJECT, config.model.project_id, self)
+        finally:
+            for directory in tmp_dirs:
+                shutil.rmtree(directory)
 
-        config.load_dimensions_and_mappings(self._dimension_mgr, self._dimension_mapping_mgr)
-        self._register(config, submitter, log_message, force)
-        context.add_id(RegistryType.PROJECT, config.model.project_id, self)
+    def _register_base_to_supplemental_mappings(
+        self,
+        src_dir,
+        model,
+        context,
+        submitter,
+        log_message,
+        force,
+    ):
+        mappings = []
+        name_mapping = {}
+        for ref in itertools.chain(
+            model.dimensions.base_dimension_references,
+            model.dimensions.supplemental_dimension_references,
+        ):
+            dim = self._dimension_mgr.get_by_id(ref.dimension_id)
+            name_mapping[(dim.model.name, ref.dimension_type)] = ref
+
+        for mapping in model.dimension_mappings.base_to_supplemental:
+            from_dim = name_mapping[
+                (mapping.from_dimension.name, mapping.from_dimension.dimension_type)
+            ]
+            to_dim = name_mapping[(mapping.to_dimension.name, mapping.to_dimension.dimension_type)]
+
+            mapping_model = run_in_other_dir(
+                src_dir, MappingTableModel.from_pre_registered_model, mapping, from_dim, to_dim
+            )
+            mappings.append(mapping_model)
+
+        mapping_config = DimensionMappingsConfig.load_from_model(
+            DimensionMappingsConfigModel(mappings=mappings),
+            src_dir,
+        )
+        mapping_ids = self._dimension_mapping_mgr.register_from_config(
+            mapping_config, submitter, log_message, context=context, force=force
+        )
+        model.dimension_mappings.base_to_supplemental_references += (
+            self._dimension_mapping_mgr.make_dimension_mapping_references(mapping_ids)
+        )
+        model.dimension_mappings.base_to_supplemental.clear()
 
     def _register_dimensions_from_models(
         self,
@@ -302,6 +331,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _register_all_in_one_dimensions(
         self,
         src_dir,
+        supp_dir,
         model,
         context,
         submitter,
@@ -321,24 +351,14 @@ class ProjectRegistryManager(RegistryManagerBase):
 
             dim_ref = dim_type_to_ref[dimension_type]
             dim_config = self._dimension_mgr.get_by_id(dim_ref.dimension_id)
-            supp_dim_dir = src_dir / "dimensions" / "supplemental"
-            if not supp_dim_dir.exists():
-                raise DSGInvalidParameter(
-                    f"supplemental dimensions directory {supp_dim_dir} does not exist"
-                )
-            supp_map_dir = src_dir / "dimension_mappings" / "base_to_supplemental"
-            if not supp_map_dir.exists():
-                raise DSGInvalidParameter(
-                    f"supplemental dimension mappings directory {supp_map_dir} does not exist"
-                )
             dt_str = dimension_type.value
             dt_plural = f"all_{dt_str}s"
             dt_plural_dash = f"all-{dt_str}s"
             dt_plural_formal = f"All {dt_str[0].upper()}{dt_str[1:]}"
-            dim_record_file = supp_dim_dir / f"{dt_plural}.csv"
+            dim_record_file = supp_dir / f"{dt_plural}.csv"
             dim_text = f"id,name\nall_{dt_str}s,{dt_plural_formal}\n"
             dim_record_file.write_text(dim_text)
-            map_record_file = supp_map_dir / f"lookup_{dt_str}_to_{dt_plural}.csv"
+            map_record_file = supp_dir / f"lookup_{dt_str}_to_{dt_plural}.csv"
             with open(map_record_file, "w") as f_out:
                 f_out.write("from_id,to_id\n")
                 for record in dim_config.get_unique_ids():
@@ -350,7 +370,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             new_dim = run_in_other_dir(
                 src_dir,
                 DimensionModel,
-                filename=str(Path("dimensions") / "supplemental" / dim_record_file.name),
+                filename=str(Path(_SUPPLEMENTAL_TMP_DIR) / dim_record_file.name),
                 name=dt_plural_dash,
                 display_name="None",
                 dimension_type=dimension_type,
@@ -359,11 +379,10 @@ class ProjectRegistryManager(RegistryManagerBase):
                 description=dt_plural_formal,
             )
             new_dimensions.append(new_dim)
-
-            new_mappings[dimension_type] = MappingTableByNameModel(
-                filename=str(
-                    Path("dimension_mappings") / "base_to_supplemental" / map_record_file.name
-                ),
+            new_mappings[dimension_type] = run_in_other_dir(
+                src_dir,
+                MappingTableByNameModel,
+                filename=str(Path(_SUPPLEMENTAL_TMP_DIR) / map_record_file.name),
                 mapping_type=DimensionMappingType.MANY_TO_ONE_AGGREGATION,
                 from_dimension=DimensionReferenceByNameModel(
                     dimension_type=dimension_type,

@@ -67,7 +67,7 @@ def test_register_project_and_dataset(make_test_project_dir):
 
         with pytest.raises(DSGDuplicateValueRegistered):
             dataset_config_file = (
-                make_test_project_dir / "datasets/sector_models/comstock/dataset.toml"
+                make_test_project_dir / "datasets" / "sector_models" / "comstock" / "dataset.toml"
             )
             dataset_mgr.register(dataset_config_file, dataset_path, user, log_message)
 
@@ -126,6 +126,23 @@ def test_duplicate_dimensions(make_test_project_dir):
 
         dimension_mgr.register(dim_config_file, user, log_message)
         assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 2
+
+
+def test_duplicate_project_dimension_display_names(make_test_project_dir):
+    with TemporaryDirectory() as tmpdir:
+        path = create_local_test_registry(Path(tmpdir))
+        user = getpass.getuser()
+        log_message = "Initial registration"
+        manager = RegistryManager.load(path, offline_mode=True)
+
+        project_file = make_test_project_dir / "project.toml"
+        data = load_data(project_file)
+        for dim in data["dimensions"]["supplemental_dimensions"]:
+            if dim["display_name"] == "State":
+                dim["display_name"] = "County"
+        dump_data(data, project_file)
+        with pytest.raises(ValueError):
+            manager.project_manager.register(project_file, user, log_message)
 
 
 def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):
@@ -302,7 +319,7 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         record_file = (
             make_test_project_dir
             / "dimension_mappings"
-            / "base-to-supplemental"
+            / "base_to_supplemental"
             / "lookup_county_to_state.csv"
         )
         orig_text = record_file.read_text()

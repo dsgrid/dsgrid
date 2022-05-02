@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Union, Any
 
 from pydantic import Field
-from pydantic import validator, root_validator
+from pydantic import validator
 import pyspark.sql.functions as F
 from semver import VersionInfo
 
@@ -348,11 +348,6 @@ class DatasetConfigModel(DSGBaseModel):
         ),
     )
 
-    @root_validator(pre=True)
-    def handle_legacy_fields(cls, values):
-        values.pop("path", None)
-        return values
-
     @validator("dataset_qualifier_metadata", pre=True)
     def check_dataset_qualifier_metadata(cls, metadata, values):
         if "dataset_qualifier" in values:
@@ -424,7 +419,7 @@ class DatasetConfig(ConfigBase):
 
     def __init__(self, model):
         super().__init__(model)
-        self._dimensions = {}
+        self._dimensions = {}  # DimensionKey to DimensionConfig
         self._dataset_path = None
         self._src_dir = None
 

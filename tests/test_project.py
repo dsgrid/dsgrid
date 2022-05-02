@@ -28,7 +28,12 @@ def test_project_load():
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.GEOGRAPHY)
     mappings = config.get_base_to_supplemental_dimension_mappings_by_types(DimensionType.GEOGRAPHY)
     assert len(mappings) == 3
-    assert not config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SECTOR)
+    assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SECTOR)
+    assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SUBSECTOR)
+
+    records = project.config.get_dimension_records(DimensionType.SUBSECTOR, "none").collect()
+    assert len(records) == 1
+    assert records[0].id == "all_subsectors"
 
     with pytest.raises(DSGValueNotRegistered):
         project = Project.load(
@@ -49,6 +54,11 @@ def test_dataset_load():
     lookup = spark.sql(f"select * from {DATASET_ID}__load_data_lookup")
     assert "subsector" in lookup.columns
     assert "id" in lookup.columns
+
+    query_names = sorted(project.config.list_dimension_query_names(DimensionType.GEOGRAPHY))
+    assert query_names == ["census_division", "census_region", "county", "state"]
+    records = project.config.get_dimension_records(DimensionType.GEOGRAPHY, "state")
+    assert records.filter("id = 'CO'").count() > 0
 
     project.unload_dataset(DATASET_ID)
     assert spark.sql("show tables").rdd.isEmpty()

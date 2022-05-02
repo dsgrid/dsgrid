@@ -21,7 +21,7 @@ from dsgrid.dimension.time import (
     TimeDimensionType,
     RepresentativePeriodFormat,
 )
-from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
+from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME, REGEX_VALID_REGISTRY_DISPLAY_NAME
 from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.versioning import handle_version_or_str
 
@@ -43,6 +43,27 @@ class DimensionBaseModel(DSGBaseModel):
             " dimension names.",
         ),
         updateable=False,
+    )
+    display_name: str = Field(
+        title="display_name",
+        description="Display name. Source for auto-generated query_name.",
+        note="Dimension display names should be singular noun phrases that are concise and "
+        "distinguish the dimension across all dimensions within a project, inclusive of dataset "
+        "dimensions, project base dimensions, and project supplemental dimensions. This uniqueness "
+        "requirement applies unless the dimension is trivial, that is, contains only a single "
+        "record. For trivial dimensions, if the dimension represents a single slice of the data, "
+        "e.g., all electricity use or model year 2018, then the convention is to list that "
+        "'record' name as the display name, e.g.,'Electricity Use' or '2018'.",
+        notes=(
+            "Only alphanumeric characters, underscores, and spaces are supported (no "
+            "special characters).",
+            "The :meth:`~dsgrid.config.dimensions.check_display_name` validator is used to "
+            "enforce valid dimension display names.",
+        ),
+    )
+    query_name: Optional[str] = Field(
+        title="query_name",
+        description="Auto-generated query name for SQL queries.",
     )
     dimension_type: DimensionType = Field(
         title="dimension_type",
@@ -94,11 +115,6 @@ class DimensionBaseModel(DSGBaseModel):
         ),
     )
 
-    @root_validator(pre=True)
-    def handle_legacy_fields(cls, values):
-        values.pop("model_hash", None)
-        return values
-
     @validator("name")
     def check_name(cls, name):
         if name == "":
@@ -133,6 +149,26 @@ class DimensionBaseModel(DSGBaseModel):
                  """
             )
         return name
+
+    @validator("display_name")
+    def check_display_name(cls, display_name):
+        if display_name == "":
+            raise ValueError(f'Empty name field for dimension: "{cls}"')
+        if REGEX_VALID_REGISTRY_DISPLAY_NAME.search(display_name) is None:
+            raise ValueError(f"display_name={display_name} does not meet the requirements")
+        return display_name
+
+    @validator("query_name")
+    def check_query_name(cls, query_name, values):
+        if "display_name" not in values:
+            return query_name
+
+        generated_query_name = values["display_name"].lower().replace(" ", "_").replace("-", "_")
+
+        if query_name is not None and query_name != generated_query_name:
+            raise ValueError(f"query_name cannot be set by the user: {query_name}")
+
+        return generated_query_name
 
     @validator("module", always=True)
     def check_module(cls, module):

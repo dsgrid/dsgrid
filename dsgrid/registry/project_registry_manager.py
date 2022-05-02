@@ -355,9 +355,9 @@ class ProjectRegistryManager(RegistryManagerBase):
             dt_str = dimension_type.value
             dt_plural = f"all_{dt_str}s"
             dt_plural_dash = f"all-{dt_str}s"
-            dt_plural_formal = f"All {dt_str[0].upper()}{dt_str[1:]}"
+            dt_plural_formal = f"All {dt_str.title()}s"
             dim_record_file = supp_dir / f"{dt_plural}.csv"
-            dim_text = f"id,name\nall_{dt_str}s,{dt_plural_formal}\n"
+            dim_text = f"id,name\n{dt_plural},{dt_plural_formal}\n"
             dim_record_file.write_text(dim_text)
             map_record_file = supp_dir / f"lookup_{dt_str}_to_{dt_plural}.csv"
             with open(map_record_file, "w") as f_out:

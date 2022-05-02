@@ -577,11 +577,11 @@ class ProjectConfig(ConfigWithDataFilesBase):
 
     def list_dimension_query_names(self, dimension_type: DimensionType):
         """List the query names available for a dimension type."""
-        query_names = []
-        for dim_config in self.iter_dimensions():
-            if dim_config.model.dimension_type == dimension_type:
-                query_names.append(dim_config.model.query_name)
-        return query_names
+        return [
+            x.model.query_name
+            for x in self.iter_dimensions()
+            if x.model.dimension_type == dimension_type
+        ]
 
     def list_registered_dataset_ids(self):
         """List registered datasets associated with the project.

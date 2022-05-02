@@ -162,9 +162,13 @@ class DimensionBaseModel(DSGBaseModel):
     def check_query_name(cls, query_name, values):
         if "display_name" not in values:
             return query_name
-        if query_name is not None:
-            return query_name
-        return values["display_name"].lower().replace(" ", "_").replace("-", "_")
+
+        generated_query_name = values["display_name"].lower().replace(" ", "_").replace("-", "_")
+
+        if query_name is not None and query_name != generated_query_name:
+            raise ValueError(f"query_name cannot be set by the user: {query_name}")
+
+        return generated_query_name
 
     @validator("module", always=True)
     def check_module(cls, module):

@@ -70,8 +70,29 @@ class DimensionAssociations:
                 "Every supplied dimension must have an association with data_source. "
                 f"has_data_source = {dims_with_data_source} all = {all_dims}"
             )
-
         table = _join_associations_by_data_source(associations, associations_by_data_source)
+
+        # # new #
+        # all_dims = set()
+        # associations = {}
+        # for association_file in association_files:
+        #     filename = path / association_file
+        #     table = read_dataframe(filename, cache=True)
+        #     for column in table.columns:
+        #         tmp = column + "tmp_name"
+        #         table = (
+        #             table.withColumn(tmp, table[column].cast(StringType()))
+        #             .drop(column)
+        #             .withColumnRenamed(tmp, column)
+        #         )
+        #     dims = set((DimensionType.from_column(x) for x in table.columns))
+        #     all_dims.update(dims)
+        #     key = _make_key(dims)
+        #     associations[key] = table
+        #     logger.debug("Loaded dimension associations from %s %s", path, table.columns)
+
+        # table = _join_associations(associations)
+
         return cls(table)
 
     @property
@@ -189,23 +210,41 @@ def _get_column_distinct_counts(df, columns):
 
 def _join_associations_by_data_source(associations, associations_by_data_source):
     tables = []
-    for dims, table in associations.items():
-        table2 = table
-        for i, dim in enumerate(dims):
-            if i == 0:
-                on_columns = [dim.value]
-            else:
-                on_columns = [dim.value, DimensionType.DATA_SOURCE.value]
-            ds_table = associations_by_data_source[_make_key((dim, DimensionType.DATA_SOURCE))]
-            table2 = table2.join(ds_table, on=on_columns)
-            orig = table.distinct().count()
-            final = table2.select(table.columns).distinct().count()
-            if orig != final:
-                raise DSGInvalidDimensionAssociation(
-                    f"Dropped records when joining by data_source: {orig - final}"
-                )
-        tables.append(table2)
+    if len(associations) > 0:
+        for dims, table in associations.items():
+            table2 = table
+            for i, dim in enumerate(dims):
+                if i == 0:
+                    on_columns = [dim.value]
+                else:
+                    on_columns = [dim.value, DimensionType.DATA_SOURCE.value]
 
+                ds_table = associations_by_data_source[_make_key((dim, DimensionType.DATA_SOURCE))]
+                table2 = table2.join(ds_table, on=on_columns)
+                orig = table.distinct().count()
+                final = table2.select(table.columns).distinct().count()
+                if orig != final:
+                    raise DSGInvalidDimensionAssociation(
+                        f"Dropped records when joining by data_source: {orig - final}"
+                    )
+            tables.append(table2)
+    else:
+        tables = list(associations_by_data_source.values())
+
+    table = tables[0]
+    if len(tables) > 1:
+        for other in tables[1:]:
+            on_columns = list(set(other.columns).intersection(table.columns))
+            if on_columns:
+                table = table.join(other, on=on_columns, how="outer")
+            else:
+                table = table.crossJoin(other)
+
+    return table
+
+
+def _join_associations(associations):
+    tables = list(associations.values())
     table = tables[0]
     if len(tables) > 1:
         for other in tables[1:]:

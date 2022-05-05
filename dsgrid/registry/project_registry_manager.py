@@ -731,11 +731,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         table_columns = set()
         # table is None when the project doesn't define any dimension associations.
         if table is not None:
-            table = (
-                config.dimension_associations.table.filter(f"{ds} = '{data_source}'")
-                .drop(pivot_dimension.value)
-                .drop(ds)
-            )
+            if ds in table.columns:
+                table = table.filter(f"{ds} = '{data_source}'").drop(ds)
+            if pivot_dimension.value in table.columns:
+                table = table.drop(pivot_dimension.value)
             table_columns.update(table.columns)
 
         exclude = set((DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension))

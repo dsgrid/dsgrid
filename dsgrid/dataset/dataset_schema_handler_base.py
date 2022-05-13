@@ -176,6 +176,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # This will likely become a common activity when running queries.
         # May need to cache the result. But that will likely be in Project, not here.
         # This method could be moved elsewhere.
+
         for ref in self._mapping_references:
             column = ref.from_dimension_type.value
             mapping_config = self._dimension_mapping_mgr.get_by_id(
@@ -189,10 +190,27 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @track_timing(timer_stats_collector)
     def _map_and_reduce_dimension(self, df, column, records):
         """Map and partially reduce a dimension"""
-        if column not in df.columns:
-            return df
 
-        if column == self.get_pivot_dimension_type().value:
+        if column in df.columns:
+            if "fraction" not in df.columns:
+                df = df.withColumn("fraction", F.lit(1))
+            # map and consolidate from_fraction only
+            records = models_to_dataframe(records).filter("to_id IS NOT NULL")
+            df = (
+                df.join(records, on=df[column] == records.from_id, how="inner")
+                .drop("from_id")
+                .drop(column)
+                .withColumnRenamed("to_id", column)
+            ).filter(f"{column} IS NOT NULL")
+            nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
+            df = df.fillna(1, subset=["from_fraction"]).selectExpr(
+                *nonfraction_cols, "fraction*from_fraction AS fraction"
+            )
+
+            # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for one_table_handler may not be unique;
+            # imagine 5 subsectors being remapped/consolidated to 2 subsectors.
+
+        elif column == self.get_pivot_dimension_type().value:
             # map and consolidate pivoted dimension columns (need pytest)
             # this is only for dataset_schema_handler_one_table, b/c handlder_standard._remap_dimension_columns() only takes in load_data_lookup
             nonvalue_cols = list(
@@ -216,22 +234,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             df = df.selectExpr(*nonvalue_cols, *value_operations)
 
         else:
-            # map and consolidate from_fraction only
-            records = models_to_dataframe(records).filter("to_id IS NOT NULL")
-            df = df.withColumn("fraction", F.lit(1))
-            df = (
-                df.join(records, on=df[column] == records.from_id, how="cross")
-                .drop("from_id")
-                .drop(column)
-                .withColumnRenamed("to_id", column)
-            ).filter(f"{column} IS NOT NULL")
-            nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
-            df = df.fillna(1, subset=["from_fraction"]).selectExpr(
-                *nonfraction_cols, "fraction*from_fraction AS fraction"
-            )
-
-            # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for one_table_handler may not be unique;
-            # imagine 5 subsectors being remapped/consolidated to 2 subsectors.
+            pass
 
         return df
 

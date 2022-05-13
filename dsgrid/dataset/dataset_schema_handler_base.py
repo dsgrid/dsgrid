@@ -210,35 +210,32 @@ class DatasetSchemaHandlerBase(abc.ABC):
             # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for one_table_handler may not be unique;
             # imagine 5 subsectors being remapped/consolidated to 2 subsectors.
 
-        elif column == self.get_pivot_dimension_type().value:
-            if set(self.get_pivot_dimension_columns()).difference(set(df.columns)):
-                # map and consolidate pivoted dimension columns (need pytest)
-                # this is only for dataset_schema_handler_one_table,
-                # b/c handlder_standard._remap_dimension_columns() only takes in load_data_lookup
-                nonvalue_cols = list(
-                    set(df.columns).difference(set(self.get_pivot_dimension_columns()))
-                )
+        # if mapping is for pivoted dimension and df contains pivoted dimension cols
+        elif column == self.get_pivot_dimension_type().value and not set(
+            self.get_pivot_dimension_columns()
+        ).difference(set(df.columns)):
+            # map and consolidate pivoted dimension columns (need pytest)
+            # this is only for dataset_schema_handler_one_table,
+            # b/c handlder_standard._remap_dimension_columns() only takes in load_data_lookup
+            nonvalue_cols = list(
+                set(df.columns).difference(set(self.get_pivot_dimension_columns()))
+            )
 
-                records_dict = defaultdict(dict)
-                for row in records:
-                    if row.to_id is not None:
-                        records_dict[row.to_id][row.from_id] = row.from_fraction
+            records_dict = defaultdict(dict)
+            for row in records:
+                if row.to_id is not None:
+                    records_dict[row.to_id][row.from_id] = row.from_fraction
 
-                to_ids = sorted(records_dict)
-                value_operations = []
-                for tid in to_ids:
-                    operation = "+".join(
-                        [
-                            f"{from_id}*{fraction}"
-                            for from_id, fraction in records_dict[tid].items()
-                        ]
-                    )  # assumes reduce by summation
-                    operation += f" AS {tid}"
-                    value_operations.append(operation)
+            to_ids = sorted(records_dict)
+            value_operations = []
+            for tid in to_ids:
+                operation = "+".join(
+                    [f"{from_id}*{fraction}" for from_id, fraction in records_dict[tid].items()]
+                )  # assumes reduce by summation
+                operation += f" AS {tid}"
+                value_operations.append(operation)
 
-                df = df.selectExpr(*nonvalue_cols, *value_operations)
-            else:
-                assert False
+            df = df.selectExpr(*nonvalue_cols, *value_operations)
 
         else:
             pass

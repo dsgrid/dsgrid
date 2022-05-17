@@ -1,7 +1,6 @@
 import pytest
 from pyspark.sql import SparkSession
 from collections import defaultdict
-import pandas as pd
 
 from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
@@ -159,9 +158,11 @@ def test_dimension_map_and_reduce_in_dataset():
             load_data_sum = load_data_sum.selectExpr(*value_operations).toPandas()
 
             # 2B.3 check that the newly mapped load_data_sum = mapped_load_data_sum within tolerance
-            assert pd.testing.assert_frame_equal(
-                load_data_sum, mapped_load_data_sum, check_less_precision=True
-            )
+            decimal_tolerance = 3
+            load_data_diff = (
+                (load_data_sum - mapped_load_data_sum).round(decimal_tolerance).iloc[0]
+            )  # pd.series
+            assert len(load_data_diff[load_data_diff != 0]) == 0
 
         else:
             pass

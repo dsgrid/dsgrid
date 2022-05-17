@@ -159,10 +159,8 @@ def test_dimension_map_and_reduce_in_dataset():
             load_data_sum = load_data_sum.selectExpr(*value_operations).toPandas()
 
             # 2B.3 check that the newly mapped load_data_sum = mapped_load_data_sum within tolerance
-            decimal_tolerance = 3
             assert pd.testing.assert_frame_equal(
-                load_data_sum.round(decimal_tolerance),
-                mapped_load_data_sum.round(decimal_tolerance),
+                load_data_sum, mapped_load_data_sum, check_less_precision=True
             )
 
         else:

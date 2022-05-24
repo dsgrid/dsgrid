@@ -5,12 +5,10 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from dsgrid.exceptions import DSGInvalidDimensionAssociation
+from dsgrid.exceptions import DSGInvalidField
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
-# TODO: This test needs to be re-designed.
-@pytest.mark.skip
 def test_invalid_projects(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
@@ -45,4 +43,4 @@ def _setup_invalid_dimension_associations(project_dir):
     association_file = project_dir / "dimension_associations" / "sector__subsector.csv"
     with open(association_file, "a", encoding="utf8") as f_out:
         f_out.write("invalid,invalid\n")
-    return DSGInvalidDimensionAssociation, r"Dropped records when joining by data_source"
+    return DSGInvalidField, r"DataFrame contains NULL value"

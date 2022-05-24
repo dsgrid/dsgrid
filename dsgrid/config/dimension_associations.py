@@ -4,7 +4,7 @@ from pathlib import Path
 from pyspark.sql.types import StringType
 
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.utils.spark import read_dataframe
+from dsgrid.utils.spark import read_dataframe, check_for_nulls
 
 
 logger = logging.getLogger(__name__)
@@ -189,4 +189,5 @@ def _join_associations(associations):
             else:
                 table = table.crossJoin(other)
 
+    check_for_nulls(table)
     return table

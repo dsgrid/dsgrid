@@ -13,7 +13,7 @@ DATA_DIR = Path("tests") / "data" / "dimension_associations"
 
 
 def test_dimension_associations(spark_session):
-    da = DimensionAssociations.load(Path("."), DATA_DIR.iterdir())
+    da = DimensionAssociations.load(Path("."), sort_files(DATA_DIR))
     assert isinstance(da.table, DataFrame)
     assert da.has_associations(DimensionType.SECTOR, DimensionType.SUBSECTOR)
     assert da.has_associations(
@@ -73,10 +73,23 @@ def test_dimension_associations_three_dims(spark_session):
             if "model_year" in path.name and "data_source" not in path.name:
                 path.unlink()
         new_file.write_text("\n".join(lines))
-        da = DimensionAssociations.load(dst, [x.name for x in dst.iterdir()])
+        da = DimensionAssociations.load(dst, [x.name for x in sort_files(dst)])
         assert (
             da.get_associations(
                 DimensionType.MODEL_YEAR, DimensionType.SECTOR, DimensionType.SUBSECTOR
             ).count()
             == 27
         )
+
+
+def sort_files(path: Path):
+    sorted_files = []
+    other_files = []
+    for filename in path.iterdir():
+        names = set(filename.name.replace(".csv", "").split("__"))
+        if DimensionType.DATA_SOURCE.value in names:
+            sorted_files.append(filename)
+        else:
+            other_files.append(filename)
+    sorted_files.extend(other_files)
+    return sorted_files

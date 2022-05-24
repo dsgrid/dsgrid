@@ -286,7 +286,8 @@ class ProjectConfigModel(DSGBaseModel):
     )
     dimension_associations: List = Field(
         title="dimension_associations",
-        description="List of tabular files that specify required dimension associations.",
+        description="List of tabular files that specify required dimension associations. The "
+        "files will be joined in the given order to produce a single table.",
         default=[],
     )
 

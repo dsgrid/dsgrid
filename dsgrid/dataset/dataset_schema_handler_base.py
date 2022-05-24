@@ -7,9 +7,9 @@ import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping, DSGInvalidField
 from dsgrid.dimension.time import TimeDimensionType
-from dsgrid.utils.spark import models_to_dataframe, sql
+from dsgrid.utils.spark import models_to_dataframe, check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -176,6 +176,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # This will likely become a common activity when running queries.
         # May need to cache the result. But that will likely be in Project, not here.
         # This method could be moved elsewhere.
+
         for ref in self._mapping_references:
             column = ref.from_dimension_type.value
             mapping_config = self._dimension_mapping_mgr.get_by_id(
@@ -189,12 +190,33 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @track_timing(timer_stats_collector)
     def _map_and_reduce_dimension(self, df, column, records):
         """Map and partially reduce a dimension"""
-        if column not in df.columns:
-            return df
 
-        if column == self.get_pivot_dimension_type().value:
+        if column in df.columns:
+            if "fraction" not in df.columns:
+                df = df.withColumn("fraction", F.lit(1))
+            # map and consolidate from_fraction only
+            records = models_to_dataframe(records).filter("to_id IS NOT NULL")
+            df = (
+                df.join(records, on=df[column] == records.from_id, how="inner")
+                .drop("from_id")
+                .drop(column)
+                .withColumnRenamed("to_id", column)
+            ).filter(f"{column} IS NOT NULL")
+            nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
+            df = df.fillna(1, subset=["from_fraction"]).selectExpr(
+                *nonfraction_cols, "fraction*from_fraction AS fraction"
+            )
+
+            # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for one_table_handler may not be unique;
+            # imagine 5 subsectors being remapped/consolidated to 2 subsectors.
+
+        # if mapping is for pivoted dimension and df contains pivoted dimension cols
+        elif column == self.get_pivot_dimension_type().value and not set(
+            self.get_pivot_dimension_columns()
+        ).difference(set(df.columns)):
             # map and consolidate pivoted dimension columns (need pytest)
-            # this is only for dataset_schema_handler_one_table, b/c handlder_standard._remap_dimension_columns() only takes in load_data_lookup
+            # this is only for dataset_schema_handler_one_table,
+            # b/c handlder_standard._remap_dimension_columns() only takes in load_data_lookup
             nonvalue_cols = list(
                 set(df.columns).difference(set(self.get_pivot_dimension_columns()))
             )
@@ -216,22 +238,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             df = df.selectExpr(*nonvalue_cols, *value_operations)
 
         else:
-            # map and consolidate from_fraction only
-            records = models_to_dataframe(records).filter("to_id IS NOT NULL")
-            df = df.withColumn("fraction", F.lit(1))
-            df = (
-                df.join(records, on=df[column] == records.from_id, how="cross")
-                .drop("from_id")
-                .drop(column)
-                .withColumnRenamed("to_id", column)
-            ).filter(f"{column} IS NOT NULL")
-            nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
-            df = df.fillna(1, subset=["from_fraction"]).selectExpr(
-                *nonfraction_cols, "fraction*from_fraction AS fraction"
-            )
-
-            # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for one_table_handler may not be unique;
-            # imagine 5 subsectors being remapped/consolidated to 2 subsectors.
+            pass
 
         return df
 
@@ -244,25 +251,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
             logger.warning("Skip _check_null_value_in_unique_dimension_rows")
             return
 
-        cols_to_check = {x for x in dim_table.columns if x != "id"}
-        cols_str = ", ".join(cols_to_check)
-        filter_str = " OR ".join((f"{x} is NULL" for x in cols_to_check))
-        dim_table.createOrReplaceTempView("dim_table")
-
         try:
-            # Avoid iterating with many checks unless we know there is at least one failure.
-            nulls = sql(f"SELECT {cols_str} FROM dim_table WHERE {filter_str}")
-            if not nulls.rdd.isEmpty():
-                dims_with_null = set()
-                for col in cols_to_check:
-                    if not nulls.select(col).filter(f"{col} is NULL").rdd.isEmpty():
-                        dims_with_null.add(col)
-                assert dims_with_null, "Did not find any dimensions with NULL values"
-
-                raise DSGInvalidDimensionMapping(
-                    "Invalid dimension mapping application. "
-                    "Combination of remapped dataset dimensions contain NULL value(s) for "
-                    f"dimension(s): \n{dims_with_null}"
-                )
-        finally:
-            sql("DROP VIEW dim_table")
+            check_for_nulls(dim_table, exclude_columns={"id"})
+        except DSGInvalidField as exc:
+            raise DSGInvalidDimensionMapping(
+                "Invalid dimension mapping application. "
+                "Combination of remapped dataset dimensions contain NULL value(s) for "
+                f"dimension(s): \n{str(exc)}"
+            )

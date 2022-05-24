@@ -204,6 +204,45 @@ def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True):
     return df
 
 
+@track_timing(timer_stats_collector)
+def check_for_nulls(df, exclude_columns=None):
+    """Check if a DataFrame has null values.
+
+    Parameters
+    ----------
+    df : spark.sql.DataFrame
+    exclude_columns : None or Set
+
+    Raises
+    ------
+    DSGInvalidField
+        Raised if null exists in any column.
+
+    """
+    if exclude_columns is None:
+        exclude_columns = set()
+    cols_to_check = set(df.columns).difference(exclude_columns)
+    cols_str = ", ".join(cols_to_check)
+    filter_str = " OR ".join((f"{x} is NULL" for x in cols_to_check))
+    df.createOrReplaceTempView("tmp_table")
+
+    try:
+        # Avoid iterating with many checks unless we know there is at least one failure.
+        nulls = sql(f"SELECT {cols_str} FROM tmp_table WHERE {filter_str}")
+        if not nulls.rdd.isEmpty():
+            cols_with_null = set()
+            for col in cols_to_check:
+                if not nulls.select(col).filter(f"{col} is NULL").rdd.isEmpty():
+                    cols_with_null.add(col)
+            assert cols_with_null, "Did not find any columns with NULL values"
+
+            raise DSGInvalidField(
+                f"DataFrame contains NULL value(s) for column(s): {cols_with_null}"
+            )
+    finally:
+        sql("DROP VIEW tmp_table")
+
+
 def sql(query):
     """Run a SQL query with Spark.
 

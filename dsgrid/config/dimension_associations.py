@@ -4,8 +4,7 @@ from pathlib import Path
 from pyspark.sql.types import StringType
 
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDimensionAssociation
-from dsgrid.utils.spark import read_dataframe
+from dsgrid.utils.spark import read_dataframe, check_for_nulls
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +29,6 @@ class DimensionAssociations:
         path: Path
         association_files : list
             List of filenames with paths relative to path.
-            Every dimension given must provide an association with DimensionType.DATA_SOURCE.
 
         Returns
         -------
@@ -41,9 +39,7 @@ class DimensionAssociations:
             return cls(None)
 
         all_dims = set()
-        dims_with_data_source = set()
         associations = {}
-        associations_by_data_source = {}
         for association_file in association_files:
             filename = path / association_file
             table = read_dataframe(filename, cache=True)
@@ -57,21 +53,11 @@ class DimensionAssociations:
             dims = set((DimensionType.from_column(x) for x in table.columns))
             all_dims.update(dims)
             key = _make_key(dims)
-            if DimensionType.DATA_SOURCE in dims:
-                dims.remove(DimensionType.DATA_SOURCE)
-                dims_with_data_source.update(dims)
-                associations_by_data_source[key] = table
-            else:
-                associations[key] = table
+            associations[key] = table
             logger.debug("Loaded dimension associations from %s %s", path, table.columns)
 
-        if len(dims_with_data_source) != len(all_dims) - 1:
-            raise DSGInvalidDimensionAssociation(
-                "Every supplied dimension must have an association with data_source. "
-                f"has_data_source = {dims_with_data_source} all = {all_dims}"
-            )
+        table = _join_associations(associations)
 
-        table = _join_associations_by_data_source(associations, associations_by_data_source)
         return cls(table)
 
     @property
@@ -91,6 +77,8 @@ class DimensionAssociations:
     def get_associations(self, *dimensions, data_source=None):
         """Return the records for the union of dimension associations associated with dimensions.
 
+        Return full assocation table for dimensions if data_source is not a col in table.
+
         Parameters
         ----------
         dimensions : tuple
@@ -108,7 +96,7 @@ class DimensionAssociations:
         ds_column = DimensionType.DATA_SOURCE.value
         columns = [ds_column] + [x.value for x in dimensions]
         table = self._table.select(*columns)
-        if data_source is not None:
+        if data_source is not None and ds_column in table.columns:
             table = table.filter(f"{ds_column} = '{data_source}'")
         return table.distinct()
 
@@ -165,7 +153,10 @@ class DimensionAssociations:
 
         """
         col = DimensionType.DATA_SOURCE.value
-        return sorted((getattr(x, col) for x in self._table.select(col).distinct().collect()))
+        if col in self._table.columns:
+            return sorted((getattr(x, col) for x in self._table.select(col).distinct().collect()))
+        else:
+            return []
 
     @property
     def table(self):
@@ -187,25 +178,8 @@ def _get_column_distinct_counts(df, columns):
     return {x: df.select(x).distinct().count() for x in columns}
 
 
-def _join_associations_by_data_source(associations, associations_by_data_source):
-    tables = []
-    for dims, table in associations.items():
-        table2 = table
-        for i, dim in enumerate(dims):
-            if i == 0:
-                on_columns = [dim.value]
-            else:
-                on_columns = [dim.value, DimensionType.DATA_SOURCE.value]
-            ds_table = associations_by_data_source[_make_key((dim, DimensionType.DATA_SOURCE))]
-            table2 = table2.join(ds_table, on=on_columns)
-            orig = table.distinct().count()
-            final = table2.select(table.columns).distinct().count()
-            if orig != final:
-                raise DSGInvalidDimensionAssociation(
-                    f"Dropped records when joining by data_source: {orig - final}"
-                )
-        tables.append(table2)
-
+def _join_associations(associations):
+    tables = list(associations.values())
     table = tables[0]
     if len(tables) > 1:
         for other in tables[1:]:
@@ -215,4 +189,5 @@ def _join_associations_by_data_source(associations, associations_by_data_source)
             else:
                 table = table.crossJoin(other)
 
+    check_for_nulls(table)
     return table

@@ -7,9 +7,9 @@ import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping, DSGInvalidField
 from dsgrid.dimension.time import TimeDimensionType
-from dsgrid.utils.spark import models_to_dataframe, sql
+from dsgrid.utils.spark import models_to_dataframe, check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -251,25 +251,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
             logger.warning("Skip _check_null_value_in_unique_dimension_rows")
             return
 
-        cols_to_check = {x for x in dim_table.columns if x != "id"}
-        cols_str = ", ".join(cols_to_check)
-        filter_str = " OR ".join((f"{x} is NULL" for x in cols_to_check))
-        dim_table.createOrReplaceTempView("dim_table")
-
         try:
-            # Avoid iterating with many checks unless we know there is at least one failure.
-            nulls = sql(f"SELECT {cols_str} FROM dim_table WHERE {filter_str}")
-            if not nulls.rdd.isEmpty():
-                dims_with_null = set()
-                for col in cols_to_check:
-                    if not nulls.select(col).filter(f"{col} is NULL").rdd.isEmpty():
-                        dims_with_null.add(col)
-                assert dims_with_null, "Did not find any dimensions with NULL values"
-
-                raise DSGInvalidDimensionMapping(
-                    "Invalid dimension mapping application. "
-                    "Combination of remapped dataset dimensions contain NULL value(s) for "
-                    f"dimension(s): \n{dims_with_null}"
-                )
-        finally:
-            sql("DROP VIEW dim_table")
+            check_for_nulls(dim_table, exclude_columns={"id"})
+        except DSGInvalidField as exc:
+            raise DSGInvalidDimensionMapping(
+                "Invalid dimension mapping application. "
+                "Combination of remapped dataset dimensions contain NULL value(s) for "
+                f"dimension(s): \n{str(exc)}"
+            )

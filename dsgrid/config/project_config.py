@@ -613,6 +613,48 @@ class ProjectConfig(ConfigWithDataFilesBase):
             if dataset.status == status:
                 yield dataset
 
+    @track_timing(timer_stats_collector)
+    def make_dimension_association_table(self, data_source=None):
+        """Return a table with associations across all dimensions.
+
+        Parameters
+        ----------
+        data_source : DimensionType, optional
+            Filter table by data_source, by default None.
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+        ds = DimensionType.DATA_SOURCE.value
+        table = self.dimension_associations.table
+        table_columns = set()
+        # table is None when the project doesn't define any dimension associations.
+        if table is not None:
+            if ds in table.columns and data_source is not None:
+                table = table.filter(f"{ds} = '{data_source}'").drop(ds)
+            table_columns.update(table.columns)
+
+        exclude = set((DimensionType.TIME, DimensionType.DATA_SOURCE))
+        all_dimensions = set(d.value for d in DimensionType if d not in exclude)
+        missing_dimensions = all_dimensions.difference(table_columns)
+        for dim in missing_dimensions:
+            table_count = 0 if table is None else table.count()
+            other = (
+                self.get_base_dimension(DimensionType(dim))
+                .get_records_dataframe()
+                .select("id")
+                .withColumnRenamed("id", dim)
+            )
+            if table is None:
+                table = other
+            else:
+                table = table.crossJoin(other)
+                assert table.count() == other.count() * table_count
+
+        return table
+
     def are_all_datasets_submitted(self):
         """Return True if all datasets have been submitted.
 

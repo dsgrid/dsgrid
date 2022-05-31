@@ -140,6 +140,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         Check:
         - duplicate records in from_id and to_id columns per mapping archetype
         - sum of from_fraction by from_id per mapping archetype
+        - sum of from_fraction by to_id per mapping archetype
         - special check for mapping_type=duplication
 
         """
@@ -162,9 +163,16 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 mapping.mapping_type.value,
             )
 
-            if mapping.archetype.check_fraction_sum_eq1:
+            if mapping.archetype.check_fraction_sum_eq1_fromid:
                 self._check_fraction_sum(
-                    mapping.records, mapping.filename, mapping.mapping_type.value
+                    mapping.records,
+                    mapping.filename,
+                    mapping.mapping_type.value,
+                    group_by="from_id",
+                )
+            if mapping.archetype.check_fraction_sum_eq1_toid:
+                self._check_fraction_sum(
+                    mapping.records, mapping.filename, mapping.mapping_type.value, group_by="to_id"
                 )
 
             if mapping.mapping_type.value == "duplication":
@@ -189,30 +197,30 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             )
 
     @staticmethod
-    def _check_fraction_sum(mapping_records, mapping_name, mapping_type):
+    def _check_fraction_sum(mapping_records, mapping_name, mapping_type, group_by="from_id"):
         mapping_df = models_to_dataframe(mapping_records)
         mapping_sum_df = (
-            mapping_df.groupBy("from_id")
+            mapping_df.groupBy(group_by)
             .agg(F.sum("from_fraction").alias("sum_fraction"))
-            .sort(F.desc("sum_fraction"), "from_id")
+            .sort(F.desc("sum_fraction"), group_by)
         )
         fracs_greater_than_one = mapping_sum_df.filter(F.col("sum_fraction") > 1)
         fracs_less_than_one = mapping_sum_df.filter(F.col("sum_fraction") < 1)
         if fracs_greater_than_one.count() > 0:
             id_greater_than_one = {
-                x.from_id for x in fracs_greater_than_one[["from_id"]].distinct().collect()
+                x[group_by] for x in fracs_greater_than_one[[group_by]].distinct().collect()
             }
             raise DSGInvalidDimensionMapping(
                 f"dimension_mapping={mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
-                f"Mapping contains from_fraction sum greater than 1 for from_id={id_greater_than_one}. "
+                f"Mapping contains from_fraction sum greater than 1 for {group_by}={id_greater_than_one}. "
             )
         elif fracs_less_than_one.count() > 0:
             id_less_than_one = {
-                x.from_id for x in fracs_less_than_one[["from_id"]].distinct().collect()
+                x[group_by] for x in fracs_less_than_one[[group_by]].distinct().collect()
             }
             raise DSGInvalidDimensionMapping(
                 f"{mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
-                f"Mapping contains from_fraction sum less than 1 for from_id={id_less_than_one}. "
+                f"Mapping contains from_fraction sum less than 1 for {group_by}={id_less_than_one}. "
             )
 
     def finalize_registration(self, config_ids, error_occurred):

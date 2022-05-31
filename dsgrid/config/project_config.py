@@ -636,7 +636,9 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 table = table.filter(f"{ds} = '{data_source}'").drop(ds)
             table_columns.update(table.columns)
 
-        exclude = set((DimensionType.TIME, DimensionType.DATA_SOURCE))
+        exclude = {DimensionType.TIME}
+        if data_source is not None:
+            exclude.add(ds)
         all_dimensions = set(d.value for d in DimensionType if d not in exclude)
         missing_dimensions = all_dimensions.difference(table_columns)
         for dim in missing_dimensions:
@@ -644,8 +646,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
             other = (
                 self.get_base_dimension(DimensionType(dim))
                 .get_records_dataframe()
-                .select("id")
-                .withColumnRenamed("id", dim)
+                .selectExpr(f"id as {dim}")
             )
             if table is None:
                 table = other

@@ -636,10 +636,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 table = table.filter(f"{ds} = '{data_source}'").drop(ds)
             table_columns.update(table.columns)
 
-        exclude = {DimensionType.TIME}
-        if data_source is not None:
-            exclude.add(ds)
-        all_dimensions = set(d.value for d in DimensionType if d not in exclude)
+        all_dimensions = {d.value for d in DimensionType if d != DimensionType.TIME}
         missing_dimensions = all_dimensions.difference(table_columns)
         for dim in missing_dimensions:
             table_count = 0 if table is None else table.count()

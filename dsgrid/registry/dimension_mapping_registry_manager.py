@@ -163,14 +163,14 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 mapping.mapping_type.value,
             )
 
-            if mapping.archetype.check_fraction_sum_eq1_fromid:
+            if mapping.archetype.check_fraction_sum_eq1_from_id:
                 self._check_fraction_sum(
                     mapping.records,
                     mapping.filename,
                     mapping.mapping_type.value,
                     group_by="from_id",
                 )
-            if mapping.archetype.check_fraction_sum_eq1_toid:
+            if mapping.archetype.check_fraction_sum_eq1_to_id:
                 self._check_fraction_sum(
                     mapping.records, mapping.filename, mapping.mapping_type.value, group_by="to_id"
                 )

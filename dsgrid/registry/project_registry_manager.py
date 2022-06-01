@@ -698,11 +698,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         )
 
         cols = [x.value for x in DimensionType if x not in exclude_dims]
-        project_table = (
-            self._make_single_table(project_config, data_source, pivot_dimension)
-            .select(*cols)
-            .distinct()
-        )
+        assoc_table = project_config.make_dimension_association_table(data_source=data_source)
+        if pivot_dimension.value in assoc_table.columns:
+            assoc_table = assoc_table.drop(pivot_dimension.value)
+        project_table = assoc_table.select(*cols).distinct()
         diff = project_table.exceptAll(dim_table.select(*cols).distinct())
         if not diff.rdd.isEmpty():
             dataset_id = dataset_config.config_id
@@ -722,39 +721,6 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._check_pivot_dimension_columns(
             project_config, handler, project_config.dimension_associations, data_source
         )
-
-    @staticmethod
-    @track_timing(timer_stats_collector)
-    def _make_single_table(config: ProjectConfig, data_source, pivot_dimension):
-        ds = DimensionType.DATA_SOURCE.value
-        table = config.dimension_associations.table
-        table_columns = set()
-        # table is None when the project doesn't define any dimension associations.
-        if table is not None:
-            if ds in table.columns:
-                table = table.filter(f"{ds} = '{data_source}'").drop(ds)
-            if pivot_dimension.value in table.columns:
-                table = table.drop(pivot_dimension.value)
-            table_columns.update(table.columns)
-
-        exclude = set((DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension))
-        all_dimensions = set(d.value for d in DimensionType if d not in exclude)
-        missing_dimensions = all_dimensions.difference(table_columns)
-        for dim in missing_dimensions:
-            table_count = 0 if table is None else table.count()
-            other = (
-                config.get_base_dimension(DimensionType(dim))
-                .get_records_dataframe()
-                .select("id")
-                .withColumnRenamed("id", dim)
-            )
-            if table is None:
-                table = other
-            else:
-                table = table.crossJoin(other)
-                assert table.count() == other.count() * table_count
-
-        return table
 
     @staticmethod
     @track_timing(timer_stats_collector)

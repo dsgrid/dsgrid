@@ -36,6 +36,9 @@ def test_project_load():
     assert len(records) == 1
     assert records[0].id == "all_subsectors"
 
+    table = project.config.make_dimension_association_table()
+    assert table.select("data_source").distinct().collect()[0].data_source == "comstock"
+
     with pytest.raises(DSGValueNotRegistered):
         project = Project.load(
             PROJECT_ID, version="0.0.0", offline_mode=True, registry_path=TEST_REGISTRY

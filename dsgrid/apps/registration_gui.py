@@ -328,7 +328,8 @@ class RegistrationGui:
         if str(project_file) == "":
             print("project_file cannot be empty", file=sys.stderr)
             return
-        self._registration_pre_check()
+        if not self._registration_pre_check():
+            return
         try:
             self._manager.project_manager.register(
                 project_file, submitter=getpass.getuser(), log_message=self._log_message_text.value
@@ -356,7 +357,8 @@ class RegistrationGui:
         if project_id == "":
             print("project_id cannot be empty", file=sys.stderr)
             return
-        self._registration_pre_check()
+        if not self._registration_pre_check():
+            return
         try:
             self._manager.project_manager.register_and_submit_dataset(
                 dataset_file,
@@ -377,7 +379,8 @@ class RegistrationGui:
         log_message = self._log_message_text.value
         if log_message == "":
             print("log_message cannot be empty", file=sys.stderr)
-            return
+            return False
+        return True
 
     def _post_registration_handling(self):
         self._log_message_text.value = ""

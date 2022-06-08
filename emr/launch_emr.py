@@ -56,7 +56,7 @@ def launchemr(name=None):
 
     # Upload parent directory package
     pkg_to_upload = build_package()
-    fs.put(str(pkg_to_upload), f"{s3_scratch}/pkg.tar.gz")
+    fs.put(str(pkg_to_upload), f"{s3_scratch}/pkg.tar.gz", recursive=False)
 
     emr = boto3.client("emr")
 
@@ -80,10 +80,11 @@ def launchemr(name=None):
             os.remove(cluster_id_filename)
 
     if not cluster_id_filename.exists():
+        # resource: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/emr.html
         resp = emr.run_job_flow(
             Name=f"{getpass.getuser()}-dsgrid",
             LogUri=f"{s3_scratch}/emrlogs/",
-            ReleaseLabel="emr-5.35.0",  # <-- update
+            ReleaseLabel="emr-5.35.0",
             Instances={
                 "InstanceGroups": [
                     {
@@ -106,6 +107,8 @@ def launchemr(name=None):
                 "Ec2KeyName": cfg["ssh_keys"]["key_name"],
                 "KeepJobFlowAliveWhenNoSteps": True,
                 "Ec2SubnetId": cfg.get("subnet_id"),
+                "TerminationProtected": False,
+                # "AutoTerminate": True,
             },
             Applications=[
                 {
@@ -139,6 +142,9 @@ def launchemr(name=None):
                 },
             ],
             VisibleToAllUsers=True,
+            # AutoTerminationPolicy={
+            #     'IdleTimeout': 3600, #sec
+            # },
             EbsRootVolumeSize=80,
             JobFlowRole="EMR_EC2_DefaultRole",
             ServiceRole="EMR_DefaultRole",
@@ -189,21 +195,6 @@ def launchemr(name=None):
     ) as sftp:
         sftp.put_r(aws_credentials, "/home/hadoop/.aws")
 
-    # print("Cloning latest dsgrid repo")
-    # dsgrid_repo_path = here / "dsgrid"
-    # if dsgrid_repo_path.exists():
-    #     shutil.rmtree(dsgrid_repo_path)
-
-    # if dsgrid_repo == None:
-    #     Path.mkdir(dsgrid_repo_path, parents=True)
-    #     git.Repo.clone_from(
-    #         "https://github.com/dsgrid/dsgrid.git",
-    #         dsgrid_repo_path,
-    #         branch=str(cfg.get("repo_branch")),
-    #     )
-    # else:
-    #     shutil.copytree(dsgrid_repo, dsgrid_repo_path, ignore=shutil.ignore_patterns("emr/"))
-
     local_notebooks_dir = here.parent / "dsgrid" / "notebooks"
     print(f"Copying notebooks to master node, from: {local_notebooks_dir}...")
     with pysftp.Connection(
@@ -211,16 +202,6 @@ def launchemr(name=None):
     ) as sftp:
         sftp.makedirs("dsgrid_notebooks")
         sftp.put_r(str(local_notebooks_dir), "dsgrid_notebooks")
-
-    # print("Installing dsgrid...")
-    # ssh_client = paramiko.SSHClient()
-    # ssh_client.load_system_host_keys()
-    # ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    # ssh_client.connect(master_address, username="hadoop", key_filename=mypkey)
-    # command = "cd ~/dsgrid && pip install -e ."
-    # stdin, stdout, stderr = ssh_client.exec_command(command)
-    # print(stdout.readlines())
-    # ssh_client.close()
 
     print("Opening tunnel to jupyter notebook server")
     tunnel = sshtunnel.SSHTunnelForwarder(

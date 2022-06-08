@@ -151,3 +151,4 @@ dmypy.json
 
 tests/data/registry/*
 emr/credentials/
+emr/running_cluster_id.txt

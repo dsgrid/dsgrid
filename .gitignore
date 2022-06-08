@@ -149,6 +149,10 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+poetry.lock
+running_cluster_id.txt
+
+emr/code/*
 tests/data/registry/*
 emr/credentials/
 emr/running_cluster_id.txt

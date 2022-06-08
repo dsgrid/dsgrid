@@ -11,5 +11,5 @@ ssh_keys:
 
 s3_scratch: s3://nrel-dsgrid-int-scratch/emr-test3
 billing_id: 210031
-subnet_id: subnet-00de90a8ac1b5afd5 #subnet-03c3675a2bf1477c0 # private, ensures connectivity
+subnet_id: subnet-00de90a8ac1b5afd5 # <-- this is public subset (private subnet: subnet-03c3675a2bf1477c0), ensures connectivity
 repo_branch: main

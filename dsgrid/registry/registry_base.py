@@ -1,6 +1,5 @@
 import abc
 import logging
-from pathlib import Path
 from typing import List, Optional, Union
 
 
@@ -27,14 +26,15 @@ class RegistryBaseModel(DSGBaseModel):
 
     version: Union[str, VersionInfo] = Field(
         title="version",
-        description="dimension version",
+        description="Dimension version",
     )
     description: Optional[str] = Field(
-        title="description", description="description of what is stored"
+        title="description",
+        description="Description of what is stored",
     )
     registration_history: Optional[List[ConfigRegistrationModel]] = Field(
         title="registration_history",
-        description="history of all registration updates",
+        description="History of all registration updates",
         default=[],
     )
 
@@ -72,10 +72,10 @@ class RegistryBase(ConfigBase, abc.ABC):
     def registration_history(self):
         return self._model.registration_history
 
-    def serialize(self, filename, force=False):
-        if filename.exists() and not force:
-            raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
-        dump_data(serialize_model(self._model), filename)
+    def serialize(self, path, force=False):
+        if path.exists() and not force:
+            raise DSGInvalidOperation(f"{path} exists. Set force=True to overwrite.")
+        dump_data(serialize_model(self._model), path)
 
     @property
     def version(self):

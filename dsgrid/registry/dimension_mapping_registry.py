@@ -13,7 +13,7 @@ class DimensionMappingRegistryModel(RegistryBaseModel):
 
     dimension_mapping_id: str = Field(
         title="dimension_mapping_id",
-        description="dimension mapping identifier",
+        description="Dimension mapping identifier",
     )
 
 

@@ -33,8 +33,14 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_lock_files(self):
-        """Returns a generator of lock files within the /.locks directory (non-recursive)."""
+    def get_lock_files(self, relative_path=None):
+        """Returns a generator of lock files within the /.locks directory (non-recursive).
+
+        Parameters
+        ----------
+        relative_path : str
+            Relative path to search for lock files in. By default, None.
+        """
 
     @abc.abstractmethod
     def has_lock_files(self):
@@ -42,8 +48,23 @@ class CloudStorageInterface(abc.ABC):
 
     @abc.abstractmethod
     @contextmanager
-    def make_lock_file(self, path):
+    def make_lock_file_managed(self, path):
         """Context manager to make a lock file given the file path. On close, it removes the lock file.
+
+        Parameters
+        ----------
+        path : str
+            Lock file path
+
+        Raises
+        ------
+        DSGRegistryLockError
+            Raises a registry lock error if a registry.lock already exists
+        """
+
+    @abc.abstractmethod
+    def make_lock_file(self, path):
+        """Make a lock file given the file path.
 
         Parameters
         ----------
@@ -84,7 +105,7 @@ class CloudStorageInterface(abc.ABC):
         """
 
     @abc.abstractmethod
-    def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False):
+    def sync_pull(self, remote_path, local_path, exclude=None, delete_local=False, is_file=False):
         """Synchronize data from remote_path to local_path.
         If delete_local is True, this deletes any files in local_path that do not exist in remote_path.
 
@@ -94,12 +115,13 @@ class CloudStorageInterface(abc.ABC):
             Remote registry path
         local_path : str
             Local registry path
-        delete_local : bool
+        delete_local : bool, optional
             If true, this method deletes files and directories that exist in the local_path but not in the remote_path
         exclude : list, optional
             List of patterns to exclude, by default None.
-            If excluding whole directories, the exclusion must end with /* , e.g. "data/*"
-
+            If excluding whole directories, the exclusion must end with /* , e.g. data/*
+        is_file : bool, optional
+            If the path is a file (not a registry). By default False.
         """
 
     @abc.abstractmethod
@@ -114,5 +136,5 @@ class CloudStorageInterface(abc.ABC):
             Local registry path
         exclude : list, optional
             List of patterns to exclude, by default None.
-            If excluding whole directories, the exclusion must end with /* , e.g. "data/*"
+            If excluding whole directories, the exclusion must end with /* , e.g. data/*
         """

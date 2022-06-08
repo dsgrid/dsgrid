@@ -1,8 +1,5 @@
 """Manages a dsgrid registry."""
 
-# TODO: need to support a dataset registry CLI seperate from submit-dataset
-# TODO: Do we want to support dry-run mode for write only? and offline mode for read-only?
-
 import getpass
 import logging
 import sys
@@ -15,7 +12,6 @@ from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import VersionUpdateType
 
-# from dsgrid.filesystem import aws
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.filters import ACCEPTED_OPS
 
@@ -35,6 +31,12 @@ def _version_info_required_callback(ctx, param, val):
 
 def _version_update_callback(ctx, param, val):
     return VersionUpdateType(val)
+
+
+def _path_callback(ctx, param, val):
+    if val is None:
+        return val
+    return Path(val)
 
 
 """
@@ -64,19 +66,16 @@ Click Group Definitions
     "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
     "commands will not be officially synced with the remote registry",
 )
-@click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
 @click.pass_context
-def registry(ctx, path, remote_path, offline, dry_run):
+def registry(ctx, path, remote_path, offline):
     """Manage a registry."""
     no_prompts = ctx.parent.params["no_prompts"]
-    ctx.obj = RegistryManager.load(
-        path, remote_path, offline_mode=offline, dry_run_mode=dry_run, no_prompts=no_prompts
-    )
+    if "--help" in sys.argv:
+        ctx.obj = None
+    else:
+        ctx.obj = RegistryManager.load(
+            path, remote_path, offline_mode=offline, no_prompts=no_prompts
+        )
 
 
 @click.group()
@@ -129,10 +128,10 @@ Dimension Commands
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value', 
+    filter table with a case-insensitive expression in the format 'field operation value',
     accept multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n 
+    example:\n
        -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
@@ -142,9 +141,8 @@ def list_dimensions(registry_manager, filter):
     registry_manager.dimension_manager.show(filters=filter)
 
 
-# TODO: update_dataset
 @click.command(name="register")
-@click.argument("dimension-config-file")
+@click.argument("dimension-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -189,7 +187,7 @@ def dump_dimension(registry_manager, dimension_id, version, directory, force):
 
 
 @click.command(name="update")
-@click.argument("dimension-config-file")
+@click.argument("dimension-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-d",
     "--dimension-id",
@@ -220,22 +218,14 @@ def dump_dimension(registry_manager, dimension_id, version, directory, force):
 )
 @click.pass_obj
 def update_dimension(
-    registry_manager, project_config_file, project_id, log_message, update_type, version
+    registry_manager, dimension_config_file, dimension_id, log_message, update_type, version
 ):
     """Update an existing dimension registry."""
-    manager = registry_manager.dimension_mapping_registry_manager
+    manager = registry_manager.dimension_manager
     submitter = getpass.getuser()
     manager.update_from_file(
         dimension_config_file, dimension_id, submitter, update_type, log_message, version
     )
-
-
-@click.command(name="remove")
-@click.argument("dimension-id")
-@click.pass_obj
-def remove_dimension(registry_manager, dimension_id):
-    """Remove a dimension from the dsgrid repository."""
-    registry_manager.dimension_manager.remove(dimension_id)
 
 
 """
@@ -250,10 +240,10 @@ Dimension Mapping Commands
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value', 
+    filter table with a case-insensitive expression in the format 'field operation value',
     accept multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n 
+    example:\n
        -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
@@ -264,7 +254,9 @@ def list_dimension_mappings(registry_manager, filter):
 
 
 @click.command(name="register")
-@click.argument("dimension-mapping-config-file")
+@click.argument(
+    "dimension-mapping-config-file", type=click.Path(exists=True), callback=_path_callback
+)
 @click.option(
     # TODO: Why do we want this?
     "--force",
@@ -319,7 +311,9 @@ def dump_dimension_mapping(registry_manager, dimension_mapping_id, version, dire
 
 
 @click.command(name="update")
-@click.argument("dimension-mapping-config-file")
+@click.argument(
+    "dimension-mapping-config-file", type=click.Path(exists=True), callback=_path_callback
+)
 @click.option(
     "-d",
     "--dimension-mapping-id",
@@ -350,10 +344,15 @@ def dump_dimension_mapping(registry_manager, dimension_mapping_id, version, dire
 )
 @click.pass_obj
 def update_dimension_mapping(
-    registry_manager, project_config_file, project_id, log_message, update_type, version
+    registry_manager,
+    dimension_mapping_config_file,
+    dimension_mapping_id,
+    log_message,
+    update_type,
+    version,
 ):
     """Update an existing dimension mapping registry."""
-    manager = registry_manager.dimension_mapping_registry_manager
+    manager = registry_manager.dimension_mapping_manager
     submitter = getpass.getuser()
     manager.update_from_file(
         dimension_mapping_config_file,
@@ -363,14 +362,6 @@ def update_dimension_mapping(
         log_message,
         version,
     )
-
-
-@click.command(name="remove")
-@click.argument("dimension-mapping-id")
-@click.pass_obj
-def remove_dimension_mapping(registry_manager, dimension_mapping_id):
-    """Remove a dimension mapping from the dsgrid repository."""
-    registry_manager.dimension_mapping_manager.remove(dimension_mapping_id)
 
 
 """
@@ -385,10 +376,10 @@ Project Commands
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value', 
+    filter table with a case-insensitive expression in the format 'field operation value',
     accept multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n 
+    example:\n
        -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
@@ -403,7 +394,7 @@ def list_projects(registry_manager, filter):
 
 
 @click.command(name="register")
-@click.argument("project-config-file")
+@click.argument("project-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -411,10 +402,18 @@ def list_projects(registry_manager, filter):
     help="reason for submission",
 )
 @click.pass_obj
-def register_project(registry_manager, project_config_file, log_message):
+def register_project(
+    registry_manager,
+    project_config_file,
+    log_message,
+):
     """Register a new project with the dsgrid repository."""
     submitter = getpass.getuser()
-    registry_manager.project_manager.register(project_config_file, submitter, log_message)
+    registry_manager.project_manager.register(
+        project_config_file,
+        submitter,
+        log_message,
+    )
 
 
 @click.command()
@@ -434,11 +433,20 @@ def register_project(registry_manager, project_config_file, log_message):
 )
 @click.option(
     "-m",
-    "--dimension-mapping-files",
+    "--dimension-mapping-file",
     type=click.Path(exists=True),
-    multiple=True,
     show_default=True,
-    help="dimension mapping file(s)",
+    help="dimension mapping file",
+    callback=_path_callback,
+)
+@click.option(
+    "-r",
+    "--dimension-mapping-references-file",
+    type=click.Path(exists=True),
+    show_default=True,
+    help="dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
+    "Use it when the mappings are already registered.",
+    callback=_path_callback,
 )
 @click.option(
     "-l",
@@ -448,11 +456,84 @@ def register_project(registry_manager, project_config_file, log_message):
     help="reason for submission",
 )
 @click.pass_obj
-def submit_dataset(registry_manager, dataset_id, project_id, dimension_mapping_files, log_message):
+def submit_dataset(
+    registry_manager,
+    dataset_id,
+    project_id,
+    dimension_mapping_file,
+    dimension_mapping_references_file,
+    log_message,
+):
     """Submit a dataset to a dsgrid project."""
     submitter = getpass.getuser()
     manager = registry_manager.project_manager
-    manager.submit_dataset(project_id, dataset_id, dimension_mapping_files, submitter, log_message)
+    manager.submit_dataset(
+        project_id,
+        dataset_id,
+        submitter,
+        log_message,
+        dimension_mapping_file=dimension_mapping_file,
+        dimension_mapping_references_file=dimension_mapping_references_file,
+    )
+
+
+@click.command()
+@click.option(
+    "-c",
+    "--dataset-config-file",
+    required=True,
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="Dataset config file",
+)
+@click.option(
+    "-d",
+    "--dataset-path",
+    required=True,
+    type=click.Path(exists=True),
+    callback=_path_callback,
+)
+@click.option(
+    "-m",
+    "--dimension-mapping-file",
+    type=click.Path(exists=True),
+    help="File containing dimension mappings to register with the dataset",
+    callback=_path_callback,
+)
+@click.option(
+    "-p",
+    "--project-id",
+    required=True,
+    type=str,
+    help="project identifier",
+)
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    type=str,
+    help="reason for submission",
+)
+@click.pass_obj
+def register_and_submit_dataset(
+    registry_manager,
+    dataset_config_file,
+    dataset_path,
+    dimension_mapping_file,
+    project_id,
+    log_message,
+):
+    """Register a dataset and then submit it to a dsgrid project."""
+    submitter = getpass.getuser()
+    manager = registry_manager.project_manager
+    manager.register_and_submit_dataset(
+        dataset_config_file,
+        dataset_path,
+        project_id,
+        submitter,
+        log_message,
+        dimension_mapping_file=dimension_mapping_file,
+    )
 
 
 @click.command(name="dump")
@@ -485,7 +566,7 @@ def dump_project(registry_manager, project_id, version, directory, force):
 
 
 @click.command(name="update")
-@click.argument("project-config-file")
+@click.argument("project-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-p",
     "--project-id",
@@ -526,14 +607,6 @@ def update_project(
     )
 
 
-@click.command(name="remove")
-@click.argument("project-id")
-@click.pass_obj
-def remove_project(registry_manager, project_id):
-    """Remove a project from the dsgrid repository."""
-    registry_manager.project_manager.remove(project_id)
-
-
 """
 Dataset Commands
 """
@@ -546,10 +619,10 @@ Dataset Commands
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value', 
+    filter table with a case-insensitive expression in the format 'field operation value',
     accept multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n 
+    example:\n
        -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
@@ -560,7 +633,8 @@ def list_datasets(registry_manager, filter):
 
 
 @click.command(name="register")
-@click.argument("dataset-config-file")
+@click.argument("dataset-config-file", type=click.Path(exists=True), callback=_path_callback)
+@click.argument("dataset-path", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -568,11 +642,13 @@ def list_datasets(registry_manager, filter):
     help="reason for submission",
 )
 @click.pass_obj
-def register_dataset(registry_manager, dataset_config_file, log_message):
+def register_dataset(
+    registry_manager, dataset_config_file, dataset_path, dimension_file, log_message
+):
     """Register a new dataset with the dsgrid repository."""
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
-    manager.register(dataset_config_file, submitter, log_message)
+    manager.register(dataset_config_file, dataset_path, submitter, log_message)
 
 
 @click.command(name="dump")
@@ -605,7 +681,14 @@ def dump_dataset(registry_manager, dataset_id, version, directory, force):
 
 
 @click.command(name="update")
-@click.argument("dataset-config-file")
+@click.argument("dataset-config-file", type=click.Path(exists=True), callback=_path_callback)
+@click.option(
+    "-d",
+    "--dataset-id",
+    required=True,
+    type=str,
+    help="dataset ID",
+)
 @click.option(
     "-l",
     "--log-message",
@@ -620,59 +703,71 @@ def dump_dataset(registry_manager, dataset_id, version, directory, force):
     type=click.Choice([x.value for x in VersionUpdateType]),
     callback=_version_update_callback,
 )
+@click.option(
+    "-v",
+    "--version",
+    required=True,
+    callback=_version_info_required_callback,
+    help="Version to update; must be the current version.",
+)
 @click.pass_obj
-def update_dataset(registry_manager, dataset_config_file, log_message, update_type):
+def update_dataset(
+    registry_manager, dataset_config_file, dataset_id, log_message, update_type, version
+):
     """Update an existing dataset registry."""
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
-    manager.update_from_file(dataset_config_file, submitter, update_type, log_message)
-
-
-@click.command(name="remove")
-@click.argument("dataset-id")
-@click.pass_obj
-def remove_dataset(registry_manager, dataset_id):
-    """Remove a dataset from the dsgrid repository."""
-    registry_manager.dataset_manager.remove(dataset_id)
+    manager.update_from_file(
+        dataset_config_file, dataset_id, submitter, update_type, log_message, version
+    )
 
 
 @click.command()
 @click.pass_obj
-def sync(registry_manager):
-    """Sync the official dsgrid registry to the local system."""
-    # aws.sync(REMOTE_REGISTRY, registry_manager.path)
+@click.pass_context
+@click.option(
+    "--project-id",
+    "-P",
+    type=str,
+    help="Sync latest dataset(s) version based on Project ID",
+)
+@click.option(
+    "--dataset-id",
+    "-D",
+    type=str,
+    help="Sync latest dataset version based on Dataset ID",
+)
+def data_sync(ctx, registry_manager, project_id, dataset_id):
+    """Sync the official dsgrid registry data to the local system."""
+    no_prompts = ctx.parent.parent.params["no_prompts"]
+    registry_manager.data_sync(project_id, dataset_id, no_prompts)
 
-
-# remove commands are disabled until DSGRID-147 is implemented
 
 dimensions.add_command(list_dimensions)
 dimensions.add_command(register_dimensions)
 dimensions.add_command(dump_dimension)
 dimensions.add_command(update_dimension)
-# dimensions.add_command(remove_dimension)
 
 dimension_mappings.add_command(list_dimension_mappings)
 dimension_mappings.add_command(register_dimension_mappings)
 dimension_mappings.add_command(dump_dimension_mapping)
 dimension_mappings.add_command(update_dimension_mapping)
-# dimension_mappings.add_command(remove_dimension_mapping)
 
 projects.add_command(list_projects)
 projects.add_command(register_project)
 projects.add_command(submit_dataset)
+projects.add_command(register_and_submit_dataset)
 projects.add_command(dump_project)
 projects.add_command(update_project)
-# projects.add_command(remove_project)
 
 datasets.add_command(list_datasets)
 datasets.add_command(register_dataset)
 datasets.add_command(dump_dataset)
 datasets.add_command(update_dataset)
-# datasets.add_command(remove_dataset)
 
 registry.add_command(list_)
 registry.add_command(dimensions)
 registry.add_command(dimension_mappings)
 registry.add_command(projects)
 registry.add_command(datasets)
-registry.add_command(sync)
+registry.add_command(data_sync)

@@ -5,8 +5,8 @@ from dsgrid.utils.run_command import check_run_command
 
 
 def test_check_run_command():
-    good_cmd = "dsgrid registry --offline list"
-    bad_cmd = "dsgrid registry invalid"
+    good_cmd = "dsgrid registry --help"
+    bad_cmd = "dsgrid invalid"
     check_run_command(good_cmd)
 
     with pytest.raises(DSGRuntimeError):

@@ -1,80 +1,153 @@
-from dsgrid.filesystem.local_filesystem import LocalFilesystem
-import os
-import shutil
-import getpass
-import sys
-from pathlib import Path
-from tempfile import TemporaryDirectory, gettempdir
 import getpass
 import uuid
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
+from dsgrid.tests.common import (
+    check_configs_update,
+    AWS_PROFILE_NAME,
+    TEST_REMOTE_REGISTRY,
+)
 
-from dsgrid.tests.common import create_local_test_registry, make_test_project_dir
-
+from dsgrid.cloud.s3_storage_interface import S3StorageInterface
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.tests.make_us_data_registry import make_test_data_registry
 from .common import clean_remote_registry, create_empty_remote_registry
 
-from dsgrid.dimension.base_models import DimensionType
-from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.cloud.s3_storage_interface import S3StorageInterface
 
-PROJECT_REPO = os.environ.get("TEST_PROJECT_REPO")
-S3_PROFILE_NAME = "nrel-aws-dsgrid"
-TEST_REGISTRY = "s3://nrel-dsgrid-registry-test"
-
-
-def test_aws_registry_workflow_online_mode(make_test_project_dir):
+def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data_dir):
     """Test the registry workflow where online_mode=True, using the test remote registry"""
     try:
         with TemporaryDirectory() as tmpdir:
             base_dir = Path(tmpdir)
             submitter = getpass.getuser()
-            log_message = "test"
             s3_cloud_storage = S3StorageInterface(
                 local_path=base_dir,
-                remote_path=TEST_REGISTRY,
+                remote_path=TEST_REMOTE_REGISTRY,
                 user=submitter,
                 uuid=str(uuid.uuid4()),
-                profile=S3_PROFILE_NAME,
+                profile=AWS_PROFILE_NAME,
             )
-
-            # create temp local registry
-            path = create_local_test_registry(base_dir)
-            assert LocalFilesystem().listdir(path)
-            dataset_dir = Path("datasets/sector_models/comstock")
 
             # refresh remote test registry (clean/ create empty)
             clean_remote_registry(s3_cloud_storage._s3_filesystem)
             create_empty_remote_registry(s3_cloud_storage._s3_filesystem)
 
-            manager = RegistryManager.load(
-                path=path, remote_path=TEST_REGISTRY, user=submitter, no_prompts=True
+            manager = make_test_data_registry(
+                base_dir,
+                make_test_project_dir,
+                dataset_path=make_test_data_dir,
+                include_datasets=True,
+                offline_mode=False,
             )
+            dataset_dir = make_test_project_dir / "datasets" / "sector_models" / "comstock"
+            assert dataset_dir.exists()
+            dimension_mapping_refs = dataset_dir / "dimension_mapping_references.toml"
+            assert dimension_mapping_refs.exists()
 
-            # test registry dimensions for project and dataset
-            for dim_config_file in (
-                make_test_project_dir / "dimensions.toml",
-                make_test_project_dir / dataset_dir / "dimensions.toml",
-            ):
-                manager.dimension_manager.register(dim_config_file, submitter, log_message)
+            # TODO: finish workflow when ready (submit dataset)
 
             # check that we didn't push unexpected things...
             s3 = manager.dimension_manager.cloud_interface._s3_filesystem
             assert s3.listdir("") == ["configs", "data"]
-            for dim_type in DimensionType:
-                dimtype = dim_type.value
-                files = s3.listdir(f"configs/dimensions/{dim_type.value}")
-                for file in files:
-                    assert s3.listdir(f"configs/dimensions/{dim_type.value}/{file}") == [
-                        "1.0.0",
-                        "registry.toml",
-                    ], (
-                        s3.listdir(f"configs/dimensions/{dim_type.value}/{file}")
-                        == ["1.0.0", "registry.toml"],
-                        f"configs/dimensions/{dim_type.value}/{file}",
-                        file,
-                    )
-
-            # TODO: finish workflow when ready
-
+            check_configs_dimensions(s3)
+            check_configs_dimension_mappings(s3)
+            check_configs_projects_and_datasets(s3)
+            check_data(s3)
+            updated_ids = check_configs_update(base_dir, manager)
+            check_dimension_version(s3, *updated_ids[0])
+            check_dimension_mapping_version(s3, *updated_ids[1])
+            check_dataset_version(s3, *updated_ids[2])
+            check_project_version(s3, *updated_ids[3])
     finally:
         clean_remote_registry(s3_cloud_storage._s3_filesystem)
+
+
+def check_configs_dimensions(s3):
+    for dim_type in DimensionType:
+        files = s3.listdir(f"configs/dimensions/{dim_type.value}")
+        for file in files:
+            assert s3.listdir(f"configs/dimensions/{dim_type.value}/{file}") == [
+                "1.0.0",
+                "registry.toml",
+            ], (
+                s3.listdir(f"configs/dimensions/{dim_type.value}/{file}")
+                == ["1.0.0", "registry.toml"],
+                f"configs/dimensions/{dim_type.value}/{file}",
+                file,
+            )
+
+
+def check_configs_dimension_mappings(s3):
+    path = "configs/dimension_mappings"
+    folders = s3.listdir(path)
+    for folder in folders:
+        files = s3.listdir(f"{path}/{folder}")
+        for file in files:
+            assert file in ("1.0.0", "registry.toml")
+            if file != "registry.toml":
+                files2 = s3.listdir(f"{path}/{folder}/{file}")
+                for file in files2:
+                    assert len(files2) == 2
+                    extensions = [file.split(".")[-1] for file in files2]
+                    for extension in extensions:
+                        assert extension in ("csv", "toml")
+
+
+def check_configs_projects_and_datasets(s3):
+    paths = ("configs/projects", "configs/datasets")
+    for path in paths:
+        folders = s3.listdir(path)
+        for folder in folders:
+            files = s3.listdir(f"{path}/{folder}")
+            for file in files:
+                if "projects" in path:
+                    assert file in ("1.0.0", "1.1.0", "registry.toml")
+                    # project.toml, data_source__sector.csv, data_source__subsector.csv, sector__subsector.csv
+                    expected_file_count = 4
+                else:
+                    assert file in ("1.0.0", "registry.toml")
+                    expected_file_count = 1  # dataset.toml
+                if file != "registry.toml":
+                    files2 = s3.listdir(f"{path}/{folder}/{file}")
+                    for file in files2:
+                        assert len(files2) == expected_file_count
+                        extensions = [file.split(".")[-1] for file in files2]
+                        for extension in extensions:
+                            assert extension in ("csv", "toml")
+
+
+def check_dimension_version(s3, config_id, dimension_type, version):
+    assert "dimension.toml" in s3.listdir(
+        f"configs/dimensions/{dimension_type.value}/{config_id}/{version}"
+    )
+
+
+def check_dimension_mapping_version(s3, config_id, version):
+    assert "dimension_mapping.toml" in s3.listdir(
+        f"configs/dimension_mappings/{config_id}/{version}"
+    )
+
+
+def check_dataset_version(s3, config_id, version):
+    assert "dataset.toml" in s3.listdir(f"configs/datasets/{config_id}/{version}")
+
+
+def check_project_version(s3, config_id, version):
+    assert "project.toml" in s3.listdir(f"configs/projects/{config_id}/{version}")
+
+
+def check_data(s3):
+    path = "data/"
+    folders = s3.listdir(path)
+    for folder in folders:
+        files = s3.listdir(f"{path}/{folder}")
+        for file in files:
+            assert file in ("1.0.0", "registry.toml")
+            if file != "registry.toml":
+                files2 = s3.listdir(f"{path}/{folder}/{file}")
+                for file in files2:
+                    assert len(files2) == 2
+                    extensions = [file.split(".")[-1] for file in files2]
+                    for extension in extensions:
+                        assert extension in ("csv", "json")

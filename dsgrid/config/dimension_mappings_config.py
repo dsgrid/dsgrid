@@ -1,14 +1,13 @@
 import logging
-import os
-from typing import Dict, List, Optional, Union
+from pathlib import Path
+from typing import List
 
-from pydantic import Field, validator
-from semver import VersionInfo
+from pydantic import Field
 
-from .association_tables import AssociationTableModel
-from .config_base import ConfigBase
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import make_registry_id, check_config_id_loose
+from .mapping_tables import MappingTableModel
+from .config_base import ConfigBase
 
 
 logger = logging.getLogger(__name__)
@@ -18,7 +17,7 @@ class DimensionMappingsConfigModel(DSGBaseModel):
     """Represents dimension mapping model configurations"""
 
     # This may eventually change to a Union if there are more subclasses.
-    mappings: List[AssociationTableModel] = Field(
+    mappings: List[MappingTableModel] = Field(
         title="mappings",
         description="dimension mappings between and within projects and datasets",
     )
@@ -26,6 +25,10 @@ class DimensionMappingsConfigModel(DSGBaseModel):
 
 class DimensionMappingsConfig(ConfigBase):
     """Provides an interface to a DimensionMappingsConfigModel."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._src_dir = None
 
     @staticmethod
     def config_filename():
@@ -47,3 +50,23 @@ class DimensionMappingsConfig(ConfigBase):
             mapping_id = make_registry_id((from_type, to_type))
             check_config_id_loose(mapping_id, "Dimension Mapping")
             mapping.mapping_id = mapping_id
+
+    @property
+    def src_dir(self):
+        return self._src_dir
+
+    @src_dir.setter
+    def src_dir(self, src_dir):
+        self._src_dir = src_dir
+
+    @classmethod
+    def load(cls, config_filename: Path, *args, **kwargs):
+        obj = super().load(config_filename, *args, **kwargs)
+        obj.src_dir = config_filename.parent
+        return obj
+
+    @classmethod
+    def load_from_model(cls, model, src_dir):
+        obj = cls(model)
+        obj.src_dir = src_dir
+        return obj

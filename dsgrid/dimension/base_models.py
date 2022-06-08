@@ -1,17 +1,16 @@
 """Dimension types for dsgrid"""
 
-from enum import Enum
-
 from pydantic import Field
 
 from dsgrid.exceptions import DSGInvalidDimension
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, DSGEnum
+from dsgrid.utils.utilities import check_uniqueness
 
 
-class DimensionType(Enum):
+class DimensionType(DSGEnum):
     """Dimension types"""
 
-    END_USE = "end_use"
+    METRIC = "metric"
     GEOGRAPHY = "geography"
     SECTOR = "sector"
     SUBSECTOR = "subsector"
@@ -21,22 +20,35 @@ class DimensionType(Enum):
     SCENARIO = "scenario"
     DATA_SOURCE = "data_source"
 
+    def __lt__(self, other):
+        return self.value < other.value
+
+    @classmethod
+    def from_column(cls, column):
+        try:
+            return cls(column)
+        except ValueError:
+            raise DSGInvalidDimension(
+                f"column={column} is not expected or of a known dimension type."
+            )
+
 
 class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 
+    # TODO: add support/links for docs
     id: str = Field(
         title="ID",
-        description="unique identifier within a dimension",
+        description="Unique identifier within a dimension",
     )
     name: str = Field(
         title="name",
-        description="user-defined name",
+        description="User-defined name",
     )
 
 
-class EndUseDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all end use dimensions"""
+class MetricDimensionBaseModel(DimensionRecordBaseModel):
+    """Base class for all metric dimensions (e.g. EnergyEndUse)"""
 
 
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
@@ -56,15 +68,11 @@ class ScenarioDimensionBaseModel(DimensionRecordBaseModel):
 
 
 class SectorDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all subsector dimensions"""
+    """Base class for all sector dimensions"""
 
 
 class SubsectorDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all subsector dimensions"""
-
-
-class TimeDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all time dimensions"""
 
 
 class WeatherYearDimensionBaseModel(DimensionRecordBaseModel):
@@ -72,11 +80,10 @@ class WeatherYearDimensionBaseModel(DimensionRecordBaseModel):
 
 
 _DIMENSION_TO_MODEL = {
-    DimensionType.END_USE: EndUseDimensionBaseModel,
+    DimensionType.METRIC: MetricDimensionBaseModel,
     DimensionType.GEOGRAPHY: GeographyDimensionBaseModel,
     DimensionType.SECTOR: SectorDimensionBaseModel,
     DimensionType.SUBSECTOR: SubsectorDimensionBaseModel,
-    DimensionType.TIME: TimeDimensionBaseModel,
     DimensionType.WEATHER_YEAR: WeatherYearDimensionBaseModel,
     DimensionType.MODEL_YEAR: ModelYearDimensionBaseModel,
     DimensionType.SCENARIO: ScenarioDimensionBaseModel,
@@ -90,3 +97,27 @@ def get_record_base_model(type_enum):
     if dim_model is None:
         raise DSGInvalidDimension(f"no mapping for {type_enum}")
     return dim_model
+
+
+def check_required_dimensions(dimensions, tag):
+    """Check that a project or dataset config contains all required dimensions.
+
+    Parameters
+    ----------
+    dimensions : list
+        list of DimensionReferenceModel
+    tag : str
+        User-defined string to include in exception messages
+
+    Raises
+    ------
+    ValueError
+        Raised if a required dimension is not provided.
+
+    """
+    dimension_types = {x.dimension_type for x in dimensions}
+    required_dim_types = set(DimensionType)
+    missing = required_dim_types.difference(dimension_types)
+    if missing:
+        raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
+    check_uniqueness((x.dimension_type for x in dimensions), tag)

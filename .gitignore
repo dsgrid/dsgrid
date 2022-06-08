@@ -68,6 +68,7 @@ coverage.xml
 *.py,cover
 .hypothesis/
 .pytest_cache/
+local-registry/
 
 # Translations
 *.mo
@@ -87,8 +88,9 @@ instance/
 .scrapy
 
 # Sphinx documentation
-doc/_build/
-doc/api/
+docs/_build/
+docs/source/index.rst
+docs/source/api/
 
 # PyBuilder
 target/
@@ -147,9 +149,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
-credentials/
-
 poetry.lock
 running_cluster_id.txt
 
 emr/code/*
+tests/data/registry/*
+emr/credentials/

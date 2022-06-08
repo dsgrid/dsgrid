@@ -2,16 +2,12 @@
 
 import getpass
 import logging
-import os
 import sys
 
 import click
-from devtools import debug
-from semver import VersionInfo
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.loggers import setup_logging
-from dsgrid.registry.common import VersionUpdateType
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -38,18 +34,12 @@ from dsgrid.registry.registry_manager import RegistryManager
     "commands will not be officially synced with the remote registry",
 )
 @click.option(
-    "-d",
-    "--dry-run",
-    is_flag=True,
-    help="run registry commands in dry-run mode without writing to the local or remote registry",
-)
-@click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def load(path, remote_path, offline, dry_run, verbose):
+def load(path, remote_path, offline, verbose):
     level = logging.DEBUG if verbose else logging.INFO
     setup_logging("dsgrid", "dsgrid.log", console_level=level, file_level=level, mode="a")
-    return RegistryManager.load(path, remote_path, offline_mode=offline, dry_run_mode=dry_run)
+    return RegistryManager.load(path, remote_path, offline_mode=offline)
 
 
 if __name__ == "__main__":

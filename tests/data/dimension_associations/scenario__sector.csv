@@ -1,0 +1,10 @@
+scenario,sector
+efs_high_ldv,com
+efs_high_ldv,res
+efs_high_ldv,trans
+ldv_sales_evs_2035,com
+ldv_sales_evs_2035,res
+ldv_sales_evs_2035,trans
+reference,com
+reference,res
+reference,trans

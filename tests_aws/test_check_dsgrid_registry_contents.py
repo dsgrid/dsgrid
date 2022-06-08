@@ -1,11 +1,10 @@
-from dsgrid.cloud.s3_storage_interface import S3StorageInterface
-from dsgrid.dimension.base_models import DimensionType
 from pathlib import Path
-from dsgrid.exceptions import DSGInvalidRegistryState
 import uuid
 
-S3_PROFILE_NAME = "nrel-aws-dsgrid"
-REGISTRY = "s3://nrel-dsgrid-registry"
+from dsgrid.cloud.s3_storage_interface import S3StorageInterface
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidRegistryState
+from dsgrid.tests.common import AWS_PROFILE_NAME, TEST_REMOTE_REGISTRY
 
 
 def get_joined_file(parts, join_level):
@@ -27,7 +26,7 @@ def check_config_dimensions(s3, F, msg):
             split_f = str(f).split("__")
             try:
                 uuid.UUID(split_f[-1])
-            except:
+            except Exception:
                 raise DSGInvalidRegistryState(msg.format(file=get_joined_file(parts, 3)))
         if level == 4:
             # L4: /configs/dimensions/{dimension_type}/{dimension_id}__{uuid}/registry.toml | ...{version}
@@ -48,7 +47,7 @@ def check_config_dimensions(s3, F, msg):
 
                 try:
                     handle_version_or_str(x)
-                except:
+                except Exception:
                     raise DSGInvalidRegistryState(msg.format(get_joined_file(parts, 3) / x))
         if level == 5:
             # L5: /configs/dimensions/{dimension_type}/{dimension_id}__{uuid}/{version}/dimension.toml | ...{dimension}.csv (or json)
@@ -76,9 +75,15 @@ def test_registry_path_expectations():
     """Test/check that registry files are all expected."""
     # TODO: this function is oeprational, however there is lots of logic tweaking to do to reduce path validation redundancy and improve test performance
     s3 = S3StorageInterface(
-        local_path="", remote_path=REGISTRY, uuid="1", user="test", profile=S3_PROFILE_NAME
+        local_path="",
+        remote_path=TEST_REMOTE_REGISTRY,
+        uuid="1",
+        user="test",
+        profile=AWS_PROFILE_NAME,
     )
-    msg = "INVALID REGISTRY STATE: An invalid file was pushed to dsgrid registry: {file}"
+    msg = (
+        "INVALID TEST_REMOTE_REGISTRY STATE: An invalid file was pushed to dsgrid registry: {file}"
+    )
     for level_0 in s3._s3_filesystem.listdir(exclude_hidden=False):
         # L0: Only 3 dirs allowed: /configs, /data, /.locks
         if level_0 not in ("configs", "data", ".locks"):
@@ -86,7 +91,7 @@ def test_registry_path_expectations():
         for level_1 in s3._s3_filesystem.listdir(directory=level_0):
             base_level_1_file = Path(level_0) / Path(level_1)
             for F in s3._s3_filesystem.path(level_0 + "/" + level_1).rglob("*"):
-                F = F.relative_to(REGISTRY[4:])
+                F = F.relative_to(TEST_REMOTE_REGISTRY[4:])
                 if level_0 == ".locks":
                     if base_level_1_file.suffix != ".lock":
                         raise DSGInvalidRegistryState(msg.format(file=F))

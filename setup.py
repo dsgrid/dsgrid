@@ -16,11 +16,19 @@ with open(here / "dsgrid" / "_version.py", encoding="utf-8") as f:
 with open(here / "README.md", encoding="utf-8") as f:
     readme = f.read()
 
-dev_requires = ["black", "pre-commit", "devtools"]
+dev_requires = ["black", "pre-commit", "devtools", "jupyter", "flake8"]
 
 test_requires = ["pytest", "pytest-cov"]
 
-doc_requires = ["ghp-import", "numpydoc", "pandoc", "sphinx", "sphinx_rtd_theme"]
+doc_requires = [
+    "ghp-import",
+    "numpydoc",
+    "pandoc",
+    "sphinx",
+    "sphinx_rtd_theme",
+    "sphinx_argparse",
+    "sphinxcontrib.programoutput",
+]
 
 release_requires = ["twine", "setuptools", "wheel"]
 
@@ -35,10 +43,15 @@ setup(
     url=metadata["__url__"],
     packages=find_packages(),
     package_dir={"dsgrid": "dsgrid"},
+    package_data={
+        "dsgrid": [
+            "notebooks/*.ipynb",
+        ]
+    },
     entry_points={
         "console_scripts": [
             "dsgrid=dsgrid.cli.dsgrid:cli",
-            "dsgrid-internal=dsgrid.cli.dsgrid_internal:cli",
+            "dsgrid-admin=dsgrid.cli.dsgrid_admin:cli",
         ],
     },
     include_package_data=True,
@@ -57,16 +70,16 @@ setup(
         "awscli",
         "boto3",
         "click>=8",
-        "findspark",
         "numpy",
         "pandas",
         "prettytable",
         "pydantic",
-        "pyspark",
+        "pyspark==3.2.0",  # Keep this synced with the spark version in Dockerfile.
         "s3path",
         "semver",
         "sqlalchemy",
         "toml",
+        "flake8",
     ],
     extras_require={
         "test": test_requires,

@@ -6,18 +6,22 @@ import os
 from pathlib import Path
 import uuid
 
+from pyspark.sql import SparkSession
+
 from dsgrid.common import (
     LOCAL_REGISTRY,
     REMOTE_REGISTRY,
     SYNC_EXCLUDE_LIST,
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
-from dsgrid.config.association_tables import AssociationTableConfig
+from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.filesystem.factory import make_filesystem_interface
+from dsgrid.utils.spark import init_spark
 from .common import (
     RegistryType,
     RegistryManagerParams,
@@ -45,6 +49,8 @@ class RegistryManager:
     """
 
     def __init__(self, params: RegistryManagerParams):
+        if SparkSession.getActiveSession() is None:
+            init_spark("registry")
         self._params = params
         self._dimension_mgr = DimensionRegistryManager.load(
             params.base_path / DimensionRegistry.registry_path(), params
@@ -55,7 +61,10 @@ class RegistryManager:
             self._dimension_mgr,
         )
         self._dataset_mgr = DatasetRegistryManager.load(
-            params.base_path / DatasetRegistry.registry_path(), params, self._dimension_mgr
+            params.base_path / DatasetRegistry.registry_path(),
+            params,
+            self._dimension_mgr,
+            self._dimension_mapping_dimension_mgr,
         )
         self._project_mgr = ProjectRegistryManager.load(
             params.base_path / ProjectRegistry.registry_path(),
@@ -87,6 +96,8 @@ class RegistryManager:
 
         fs_interface = make_filesystem_interface(path)
         fs_interface.mkdir(path)
+        fs_interface.mkdir(path / "configs")
+        fs_interface.mkdir(path / "data")
         fs_interface.mkdir(path / DatasetRegistry.registry_path())
         fs_interface.mkdir(path / ProjectRegistry.registry_path())
         fs_interface.mkdir(path / DimensionRegistry.registry_path())
@@ -94,7 +105,7 @@ class RegistryManager:
         logger.info("Created registry at %s", path)
         cloud_interface = make_cloud_storage_interface(path, "", offline=True, uuid=uid, user=user)
         params = RegistryManagerParams(
-            Path(path), remote_path, fs_interface, cloud_interface, offline=True, dry_run=False
+            Path(path), remote_path, fs_interface, cloud_interface, offline=True
         )
         return cls(params)
 
@@ -120,7 +131,6 @@ class RegistryManager:
         path,
         remote_path=REMOTE_REGISTRY,
         offline_mode=False,
-        dry_run_mode=False,
         user=None,
         no_prompts=False,
     ):
@@ -134,8 +144,6 @@ class RegistryManager:
             path of the remote registry; default is REMOTE_REGISTRY
         offline_mode : bool
             Load registry in offline mode; default is False
-        dry_run_mode : bool
-            Test registry operations in dry-run "test" mode (i.e., do not commit changes to remote)
         user : str
             username
         no_prompts : bool
@@ -163,7 +171,7 @@ class RegistryManager:
                 msg = f"There are {len(lock_files)} lock files in the registry:"
                 for lock_file in lock_files:
                     msg = msg + "\n\t" + f"- {lock_file}"
-                logger.log(msg)
+                logger.info(msg)
                 if not no_prompts:
                     msg = (
                         msg
@@ -172,13 +180,14 @@ class RegistryManager:
                     val = input(msg)
                     if val == "" or val.lower() == "y":
                         sync = True
-                    else:
-                        logger.info("Skipping remote registry sync.")
+                else:
+                    logger.info("Skipping remote registry sync.")
             else:
                 sync = True
 
             if sync:
-                logger.info("Sync from remote registry.")
+                logger.info("Sync configs from remote registry.")
+                # NOTE: When creating a registry, only the /configs are pulled. To sync_pull /data, use the dsgrid registry data-sync CLI command.
                 cloud_interface.sync_pull(
                     remote_path + "/configs",
                     str(path) + "/configs",
@@ -187,7 +196,7 @@ class RegistryManager:
                 )
 
         params = RegistryManagerParams(
-            path, remote_path, fs_interface, cloud_interface, offline_mode, dry_run_mode
+            Path(path), remote_path, fs_interface, cloud_interface, offline_mode
         )
         path = Path(path)
         for dir_name in (
@@ -206,23 +215,107 @@ class RegistryManager:
                 fs_interface.mkdir(dir_name)
 
         logger.info(
-            f"Loaded local registry at %s offline_mode=%s dry_run_mode=%s",
+            "Loaded local registry at %s offline_mode=%s",
             path,
             offline_mode,
-            dry_run_mode,
         )
         return cls(params)
+
+    def data_sync(self, project_id, dataset_id, no_prompts=True):
+        """Sync data from the remote dsgrid registry.
+
+        Parameters
+        ----------
+        project_id : str
+            Sync by project_id filter
+        dataset_id : str
+            Sync by dataset_id filter
+        no_prompts :  bool
+            If no_prompts is False, the user will be prompted to continue sync pulling the registry if lock files exist. By default, True.
+        """
+        if not project_id and not dataset_id:
+            raise ValueError("Must provide a dataset_id or project_id for dsgrid data-sync.")
+
+        if project_id:
+            config = self.project_manager.get_by_id(project_id)
+            if dataset_id:
+                if dataset_id not in config.list_registered_dataset_ids():
+                    raise DSGValueNotRegistered(
+                        f"No registered dataset ID = '{dataset_id}' registered to project ID = '{project_id}'"
+                    )
+                datasets = [(dataset_id, str(config.get_dataset(dataset_id).version))]
+            else:
+                datasets = []
+                for dataset in config.list_registered_dataset_ids():
+                    datasets.append((dataset, str(config.get_dataset(dataset).version)))
+
+        if dataset_id and not project_id:
+            if not self.dataset_manager.has_id(dataset_id):
+                raise DSGValueNotRegistered(f"No registered dataset ID = '{dataset_id}'")
+            version = self.dataset_manager.get_current_version(dataset_id)
+            datasets = [(dataset_id, version)]
+
+        for dataset, version in datasets:
+            self._data_sync(dataset, version, no_prompts)
+
+    def _data_sync(self, dataset_id, version, no_prompts=True):
+        cloud_interface = self._params.cloud_interface
+        offline_mode = self._params.offline
+
+        if offline_mode:
+            raise ValueError("dsgrid data-sync only works in online mode.")
+        sync = True
+
+        lock_files = list(
+            cloud_interface.get_lock_files(
+                relative_path=f"{cloud_interface._s3_filesystem._bucket}/configs/datasets/{dataset_id}"
+            )
+        )
+        if lock_files:
+            assert len(lock_files) == 1
+            msg = f"There are {len(lock_files)} lock files in the registry:"
+            for lock_file in lock_files:
+                msg = msg + "\n\t" + f"- {lock_file}"
+            logger.log(msg)
+            if not no_prompts:
+                msg = msg + "\n... Do you want to continue syncing the registry contents? [Y] >>> "
+                val = input(msg)
+                if val == "" or val.lower() == "y":
+                    sync = True
+                else:
+                    logger.info("Skipping remote registry sync.")
+                    sync = False
+
+        if sync:
+            logger.info("Sync data from remote registry for %s, version=%s.", dataset_id, version)
+            cloud_interface.sync_pull(
+                remote_path=self._params.remote_path + f"/data/{dataset_id}/{version}",
+                local_path=str(self._params.base_path) + f"/data/{dataset_id}/{version}",
+                delete_local=True,
+            )
+            cloud_interface.sync_pull(
+                remote_path=self._params.remote_path + f"/data/{dataset_id}/registry.toml",
+                local_path=str(self._params.base_path) + f"/data/{dataset_id}/registry.toml",
+                delete_local=True,
+                is_file=True,
+            )
+        else:
+            logger.info(
+                "Skipping remote registry data sync for %s, version=%s.", dataset_id, version
+            )
 
     @property
     def path(self):
         return self._params.base_path
 
-    def show(self):
+    def show(self, filters=None, max_width=None, drop_fields=None):
         """Show tables of all registry configs."""
-        self.project_manager.show()
-        self.dataset_manager.show()
-        self.dimension_manager.show()
-        self.dimension_mapping_manager.show()
+        self.project_manager.show(filters=filters, max_width=max_width, drop_fields=drop_fields)
+        self.dataset_manager.show(filters=filters, max_width=max_width, drop_fields=drop_fields)
+        self.dimension_manager.show(filters=filters, max_width=max_width, drop_fields=drop_fields)
+        self.dimension_mapping_manager.show(
+            filters=filters, max_width=max_width, drop_fields=drop_fields
+        )
 
     def update_dependent_configs(self, config, update_type, log_message):
         """Update all configs that consume this config. Recursive.
@@ -244,7 +337,7 @@ class RegistryManager:
         if isinstance(config, DimensionConfig):
             version = self.dimension_manager.get_current_version(config.config_id)
             self._update_dimension_users(config, version, update_type, log_message)
-        elif isinstance(config, AssociationTableConfig):
+        elif isinstance(config, MappingTableConfig):
             version = self.dimension_mapping_manager.get_current_version(config.config_id)
             self._update_dimension_mapping_users(config, version, update_type, log_message)
         elif isinstance(config, DatasetConfig):
@@ -335,7 +428,7 @@ class RegistryManager:
             return
         for dataset in self.dataset_manager.iter_configs():
             updated = False
-            for dimension_ref in dataset.model.dimensions:
+            for dimension_ref in dataset.model.dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
                     dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
                     updated = True
@@ -347,11 +440,11 @@ class RegistryManager:
             return
         for project in self.project_manager.iter_configs():
             updated = False
-            for dimension_ref in project.model.dimensions.base_dimensions:
+            for dimension_ref in project.model.dimensions.base_dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
                     dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
                     updated = True
-            for dimension_ref in project.model.dimensions.supplemental_dimensions:
+            for dimension_ref in project.model.dimensions.supplemental_dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
                     dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
                     updated = True
@@ -363,11 +456,7 @@ class RegistryManager:
             return
         for project in self.project_manager.iter_configs():
             updated = False
-            for mapping_ref in project.model.dimension_mappings.base_to_base:
-                if mapping_ref.mapping_id in updated_mappings:
-                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
-                    updated = True
-            for mapping_ref in project.model.dimension_mappings.base_to_supplemental:
+            for mapping_ref in project.model.dimension_mappings.base_to_supplemental_references:
                 if mapping_ref.mapping_id in updated_mappings:
                     mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
                     updated = True
@@ -375,7 +464,6 @@ class RegistryManager:
                 for mapping_ref in mapping_list:
                     if mapping_ref.mapping_id in updated_mappings:
                         mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
-                        updated_project = True
             if updated and project.config_id not in updated_projects:
                 updated_projects[project.config_id] = project
 
@@ -384,7 +472,7 @@ class RegistryManager:
             return
         for project in self.project_manager.iter_configs():
             updated = False
-            for dataset in project.model.input_datasets.datasets:
+            for dataset in project.model.datasets:
                 # TODO: does dataset status matter? update unregistered?
                 if dataset.dataset_id in updated_datasets:
                     dataset.version = updated_datasets[dataset.dataset_id]
@@ -408,15 +496,9 @@ def get_registry_path(registry_path=None):
     if not os.path.exists(registry_path):
         raise ValueError(
             f"Registry path {registry_path} does not exist. To create the registry, "
-            "run the following commands:\n"
+            "run the following command:\n"
             "  dsgrid registry create $DSGRID_REGISTRY_PATH\n"
-            "  dsgrid registry register-project $TEST_PROJECT_REPO/dsgrid_project/project.toml\n"
-            "  dsgrid registry submit-dataset "
-            "$TEST_PROJECT_REPO/dsgrid_project/datasets/input/sector_models/comstock/dataset.toml "
-            "-p test -l initial_submission\n"
-            "where $TEST_PROJECT_REPO points to the location of the dsgrid-data-UnitedStates "
-            "repository on your system. If you would prefer a different location, "
-            "set the DSGRID_REGISTRY_PATH environment variable before running the commands."
+            "Then register dimensions, dimension mappings, projects, and datasets."
         )
     return registry_path
 

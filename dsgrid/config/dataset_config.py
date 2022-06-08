@@ -1,47 +1,159 @@
-"""
-Running List of TODO's:
-
-
-Questions:
-- Do diemsnion names need to be distinct from project's? What if the dataset
-is using the same dimension as the project?
-"""
-from enum import Enum
-from pathlib import Path
-from typing import List, Optional, Dict
-import os
 import logging
+from pathlib import Path
+from typing import List, Optional, Dict, Union, Any
 
 from pydantic import Field
 from pydantic import validator
+import pyspark.sql.functions as F
+from semver import VersionInfo
 
-from dsgrid.common import LOCAL_REGISTRY_DATA
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
+from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
+from dsgrid.exceptions import DSGInvalidDimension
+from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
     DimensionReferenceModel,
+    DimensionModel,
+    handle_dimension_union,
 )
-from dsgrid.data_models import DSGBaseModel
 
 
-# TODO: likely needs refinement (missing mappings)
-LOAD_DATA_FILENAME = "load_data.parquet"
-LOAD_DATA_LOOKUP_FILENAME = "load_data_lookup.parquet"
+ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv")
+ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
+    "load_data_lookup.parquet",
+    "load_data_lookup.csv",
+    "load_data_lookup.json",
+)
 
 logger = logging.getLogger(__name__)
 
 
-class InputDatasetType(Enum):
+def check_load_data_filename(path: Path):
+    """Return the load_data filename in path. Supports Parquet and CSV.
+
+    Parameters
+    ----------
+    path : Path
+
+    Returns
+    -------
+    Path
+
+    Raises
+    ------
+    ValueError
+        Raised if no supported load data filename exists.
+
+    """
+    for allowed_name in ALLOWED_LOAD_DATA_FILENAMES:
+        filename = path / allowed_name
+        if filename.exists():
+            return filename
+
+    # Use ValueError because this gets called in Pydantic model validation.
+    raise ValueError(f"no load_data file exists in {path}")
+
+
+def check_load_data_lookup_filename(path: Path):
+    """Return the load_data_lookup filename in path. Supports Parquet, CSV, and JSON.
+
+    Parameters
+    ----------
+    path : Path
+
+    Returns
+    -------
+    Path
+
+    Raises
+    ------
+    ValueError
+        Raised if no supported load data lookup filename exists.
+
+    """
+    for allowed_name in ALLOWED_LOAD_DATA_LOOKUP_FILENAMES:
+        filename = path / allowed_name
+        if filename.exists():
+            return filename
+
+    # Use ValueError because this gets called in Pydantic model validation.
+    raise ValueError(f"no load_data_lookup file exists in {path}")
+
+
+class InputDatasetType(DSGEnum):
     SECTOR_MODEL = "sector_model"
     HISTORICAL = "historical"
     BENCHMARK = "benchmark"
 
 
-class DSGDatasetParquetType(Enum):
-    LOAD_DATA = "load_data"  # required
-    LOAD_DATA_LOOKUP = "load_data_lookup"  # required
-    DATASET_DIMENSION_MAPPING = "dataset_dimension_mapping"  # optional
-    PROJECT_DIMENSION_MAPPING = "project_dimension_mapping"  # optional
+class DataSchemaType(DSGEnum):
+    """Data schema types."""
+
+    STANDARD = EnumValue(
+        value="standard",
+        description="""
+        Standard data schema with load_data and load_data_lookup tables.
+        Applies to datasets for which the data are provided in full.
+        """,
+    )
+    ONE_TABLE = EnumValue(
+        value="one_table",
+        description="""
+        One_table data schema with load_data table.
+        Typically appropriate for small, low-temporal resolution datasets.
+        """,
+    )
+
+
+class DSGDatasetParquetType(DSGEnum):
+    """Dataset parquet types."""
+
+    LOAD_DATA = EnumValue(
+        value="load_data",
+        description="""
+        In STANDARD data_schema_type, load_data is a file with ID, timestamp, and metric value columns.
+        In ONE_TABLE data_schema_type, load_data is a file with multiple data dimension and metric value columns.
+        """,
+    )
+    LOAD_DATA_LOOKUP = EnumValue(
+        value="load_data_lookup",
+        description="""
+        load_data_lookup is a file with multiple data dimension columns and an ID column that maps to load_data file.
+        """,
+    )
+    # # These are not currently supported by dsgrid but may be needed in the near future
+    # DATASET_DIMENSION_MAPPING = EnumValue(
+    #     value="dataset_dimension_mapping",
+    #     description="",
+    # )  # optional
+    # PROJECT_DIMENSION_MAPPING = EnumValue(
+    #     value="project_dimension_mapping",
+    #     description="",
+    # )  # optional
+
+
+class DataClassificationType(DSGEnum):
+    """Data risk classification type.
+
+    See https://uit.stanford.edu/guide/riskclassifications for more information.
+    """
+
+    # TODO: can we get NREL/DOE definitions for these instead of standford's?
+
+    LOW = EnumValue(
+        value="low",
+        description="Low risk data that does not require special data management",
+    )
+    MODERATE = EnumValue(
+        value="moderate",
+        description=(
+            "The moderate class includes all data under an NDA, data classified as business sensitive, "
+            "data classification as Critical Energy Infrastructure Infromation (CEII), or data with Personal Identifiable Information (PII)."
+        ),
+    )
 
 
 # TODO will need to rename this as it really should be more generic inputs
@@ -57,56 +169,212 @@ class InputSectorDataset(DSGBaseModel):
         title="data_type",
         alias="type",
         description="DSG parquet input dataset type",
+        options=DSGDatasetParquetType.format_for_docs(),
     )
     directory: str = Field(
         title="directory",
-        description="directory with parquet files",
+        description="Directory with parquet files",
     )
 
-    # TODO:
-    #   1. validate data matches dimensions specified in dataset config;
-    #   2. check that all required dimensions exist in the data or partitioning
-    #   3. check expected counts of things
-    #   4. check for required tables accounted for;
-    #   5. any specific scaling factor checks?
+
+class StandardDataSchemaModel(DSGBaseModel):
+    load_data_column_dimension: DimensionType = Field(
+        title="load_data_column_dimension",
+        description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
+    )
+
+
+class OneTableDataSchemaModel(DSGBaseModel):
+    load_data_column_dimension: DimensionType = Field(
+        title="load_data_column_dimension",
+        description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
+    )
+
+
+class DatasetQualifierType(DSGEnum):
+    QUANTITY = "quantity"
+    GROWTH_RATE = "growth_rate"
+
+
+class GrowthRateType(DSGEnum):
+    EXPONENTIAL_ANNUAL = "exponential_annual"
+    EXPONENTIAL_MONTHLY = "exponential_monthly"
+
+
+class GrowthRateModel(DSGBaseModel):
+    growth_rate_type: GrowthRateType = Field(
+        title="growth_rate_type",
+        description="Type of growth rates, e.g., exponential_annual",
+        options=GrowthRateType.format_for_docs(),
+    )
 
 
 class DatasetConfigModel(DSGBaseModel):
-    """Represents model dataset configurations"""
+    """Represents dataset configurations."""
 
     dataset_id: str = Field(
         title="dataset_id",
-        description="dataset identifier",
+        description="Unique dataset identifier.",
+        requirements=(
+            "When registering a dataset to a project, the dataset_id must match the expected ID "
+            "defined in the project config.",
+            "For posterity, dataset_id cannot be the same as the ``data_source``"
+            " (e.g., dataset cannot be 'ComStock')",
+        ),
+        updateable=False,
     )
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
-        description="DSG defined input dataset type",
+        description="Input dataset type.",
+        options=InputDatasetType.format_for_docs(),
     )
     # TODO: This must be validated against the project's dimension records for data_source
+    # TODO: This must also be validated against the project_config
+    dataset_qualifier: DatasetQualifierType = Field(
+        title="dataset_qualifier",
+        description="What type of values the dataset represents (e.g., growth_rate, quantity)",
+        options=DatasetQualifierType.format_for_docs(),
+        default="quantity",
+    )
+    dataset_qualifier_metadata: Optional[GrowthRateModel] = Field(
+        title="dataset_qualifier_metadata",
+        description="Additional metadata to include related to the dataset_qualifier",
+    )
     data_source: str = Field(
         title="data_source",
-        description="data source name, e.g. 'ComStock'",
+        description="Data source name, e.g. 'ComStock'.",
+        requirements=(
+            "When registering a dataset to a project, the `data_source` field must match one of "
+            "the dimension ID records defined by the project's base data source dimension.",
+        ),
+        # TODO: it would be nice to extend the description here with a CLI example of how to list the project's data source IDs.
     )
-    path: str = Field(
-        title="path",
-        description="path containing data",
+    data_schema_type: DataSchemaType = Field(
+        title="data_schema_type",
+        description="Discriminator for data schema",
+        options=DataSchemaType.format_for_docs(),
+    )
+    data_schema: Any = Field(
+        title="data_schema",
+        description="Schema (table layouts) used for writing out the dataset",
+    )
+    dataset_version: Optional[Union[VersionInfo, str]] = Field(
+        title="dataset_version",
+        description="The version of the dataset.",
     )
     description: str = Field(
         title="description",
-        description="describe dataset in details",
+        description="A detailed description of the dataset.",
     )
-    dimensions: List[DimensionReferenceModel] = Field(
+    origin_creator: str = Field(
+        title="origin_creator",
+        description="Origin data creator's name (first and last)",
+    )
+    origin_organization: str = Field(
+        title="origin_organization",
+        description="Origin organization name, e.g., NREL",
+    )
+    origin_contributors: List[str] = Field(
+        title="origin_contributors",
+        description="List of origin data contributor's first and last names"
+        """ e.g., ["Harry Potter", "Ronald Weasley"]""",
+        required=False,
+    )
+    origin_project: str = Field(
+        title="origin_project",
+        description="Origin project name",
+        optional=True,
+    )
+    origin_date: str = Field(
+        title="origin_date",
+        description="Date the source data was generated",
+    )
+    origin_version: str = Field(
+        title="origin_version",
+        description="Version of the origin data",
+    )
+    source: str = Field(
+        title="source",
+        description="Source of the data (text description or link)",
+    )
+    data_classification: DataClassificationType = Field(
+        title="data_classification",
+        description="Data security classification (e.g., low, moderate, high)",
+        options=DataClassificationType.format_for_docs(),
+    )
+    tags: Optional[List[str]] = Field(
+        title="source",
+        description="List of data tags",
+        required=False,
+    )
+    dimensions: List = Field(
         title="dimensions",
-        description="dimensions defined by the dataset",
+        description="List of dimensions that make up the dimensions of dataset. They will be "
+        "automatically registered during dataset registration and then converted "
+        "to dimension_references.",
+        requirements=(
+            "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined",
+            "* Only one dimension reference per type is allowed",
+            "* Each reference is to an existing registered dimension.",
+        ),
+        default=[],
     )
-    # TODO: Metdata is TBD
-    metadata: Optional[Dict] = Field(
-        title="metdata",
-        description="Dataset Metadata",
+    dimension_references: List[DimensionReferenceModel] = Field(
+        title="dimensions",
+        description="List of registered dimension references that make up the dimensions of dataset.",
+        requirements=(
+            "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined",
+            "* Only one dimension reference per type is allowed",
+            "* Each reference is to an existing registered dimension.",
+        ),
+        default=[],
+        # TODO: Add to notes - link to registering dimensions page
+        # TODO: Add to notes - link to example of how to list dimensions to find existing registered dimensions
+    )
+    user_defined_metadata: Optional[Dict] = Field(
+        title="user_defined_metadata",
+        description="Additional user defined metadata fields",
+        default={},
+        required=False,
+    )
+    trivial_dimensions: Optional[List[DimensionType]] = Field(
+        title="trivial_dimensions",
+        default=[],
+        description="List of trivial dimensions (i.e., 1-element dimensions) that"
+        " do not exist in the load_data_lookup. List the dimensions by dimension type.",
+        notes=(
+            "Trivial dimensions are 1-element dimensions that are not present in the parquet data"
+            " columns. Instead they are added by dsgrid as an alias column.",
+        ),
     )
 
-    # TODO: if local path provided, we want to upload to S3 and set the path
-    #   in the toml file back to S3 path --> does this happen in DatasetConfig instead?
+    @validator("dataset_qualifier_metadata", pre=True)
+    def check_dataset_qualifier_metadata(cls, metadata, values):
+        if "dataset_qualifier" in values:
+            if values["dataset_qualifier"] == DatasetQualifierType.QUANTITY:
+                metadata = None
+            elif values["dataset_qualifier"] == DatasetQualifierType.GROWTH_RATE:
+                metadata = GrowthRateModel(**metadata)
+            else:
+                raise ValueError(
+                    f'Cannot load dataset_qualifier_metadata model for dataset_qualifier={values["dataset_qualifier"]}'
+                )
+        return metadata
+
+    @validator("data_schema", pre=True)
+    def check_data_schema(cls, schema, values):
+        """Check and deserialize model for data_schema"""
+        if "data_schema_type" in values:
+            # placeholder for when there's more data_schema_type
+            if values["data_schema_type"] == DataSchemaType.STANDARD:
+                schema = StandardDataSchemaModel(**schema)
+            elif values["data_schema_type"] == DataSchemaType.ONE_TABLE:
+                schema = OneTableDataSchemaModel(**schema)
+            else:
+                raise ValueError(
+                    f'Cannot load data_schema model for data_schema_type={values["data_schema_type"]}'
+                )
+        return schema
 
     @validator("dataset_id")
     def check_dataset_id(cls, dataset_id):
@@ -114,36 +382,36 @@ class DatasetConfigModel(DSGBaseModel):
         check_config_id_strict(dataset_id, "Dataset")
         return dataset_id
 
-    @validator("path")
-    def check_path(cls, path):
-        """Check dataset parquet path"""
-        # TODO S3: This requires downloading data to the local system.
-        # Can we perform all validation on S3 with an EC2 instance?
-        if path.startswith("s3://"):
-            # For unit test purposes this always uses the defaul local registry instead of
-            # whatever the user created with RegistryManager.
-            # TODO: Interpretation of this path is confusing. We need a better way.
-            # The path in the remote location should be verified but it does not need
-            # to be synced as part of this validation.
-            subpaths = path.split("/")
-            local_path = LOCAL_REGISTRY_DATA / subpaths[-2] / subpaths[-1]
-        else:
-            local_path = Path(path)
-            if not local_path.exists():
-                raise ValueError(f"{local_path} does not exist for InputDataset")
+    @validator("trivial_dimensions")
+    def check_time_not_trivial(cls, trivial_dimensions):
+        for dim in trivial_dimensions:
+            if dim == DimensionType.TIME:
+                raise ValueError(
+                    "The time dimension is currently not a dsgrid supported trivial dimension."
+                )
+        return trivial_dimensions
 
-        load_data_path = local_path / LOAD_DATA_FILENAME
-        if not load_data_path.exists():
-            raise ValueError(f"{local_path} does not contain {LOAD_DATA_FILENAME}")
+    @validator("dimensions")
+    def check_files(cls, values: dict) -> dict:
+        """Validate dimension files are unique across all dimensions"""
+        check_uniqueness(
+            (x.filename for x in values if isinstance(x, DimensionModel)),
+            "dimension record filename",
+        )
+        return values
 
-        load_data_lookup_path = local_path / LOAD_DATA_LOOKUP_FILENAME
-        if not os.path.exists(load_data_lookup_path):
-            raise ValueError(f"{local_path} does not contain {LOAD_DATA_LOOKUP_FILENAME}")
+    @validator("dimensions")
+    def check_names(cls, values: dict) -> dict:
+        """Validate dimension names are unique across all dimensions."""
+        check_uniqueness(
+            [dim.name for dim in values],
+            "dimension record name",
+        )
+        return values
 
-        # TODO: check dataset_dimension_mapping (optional) if exists
-        # TODO: check project_dimension_mapping (optional) if exists
-
-        return str(local_path)
+    @validator("dimensions", pre=True, each_item=True, always=True)
+    def handle_dimension_union(cls, values):
+        return handle_dimension_union(values)
 
 
 class DatasetConfig(ConfigBase):
@@ -151,7 +419,9 @@ class DatasetConfig(ConfigBase):
 
     def __init__(self, model):
         super().__init__(model)
-        self._dimensions = {}
+        self._dimensions = {}  # DimensionKey to DimensionConfig
+        self._dataset_path = None
+        self._src_dir = None
 
     @staticmethod
     def config_filename():
@@ -166,10 +436,52 @@ class DatasetConfig(ConfigBase):
         return DatasetConfigModel
 
     @classmethod
-    def load(cls, config_file, dimension_manager):
+    def load_from_registry(cls, config_file, dimension_manager, registry_data_path):
         config = cls._load(config_file)
+        config.src_dir = config_file.parent
+        dataset_path = registry_data_path / config.config_id / config.model.dataset_version
+        return cls.load(config, dimension_manager, dataset_path)
+
+    @classmethod
+    def load_from_user_path(cls, config_file, dimension_manager, dataset_path):
+        config = cls._load(config_file)
+        config.src_dir = config_file.parent
+        schema_type = config.model.data_schema_type
+        if not dataset_path.exists():
+            raise DSGInvalidParameter(f"Dataset {dataset_path} does not exist")
+        if schema_type == DataSchemaType.STANDARD:
+            check_load_data_filename(dataset_path)
+            check_load_data_lookup_filename(dataset_path)
+        elif schema_type == DataSchemaType.ONE_TABLE:
+            check_load_data_filename(dataset_path)
+        else:
+            raise DSGInvalidParameter(f"data_schema_type={schema_type} not supported.")
+
+        return cls.load(config, dimension_manager, dataset_path)
+
+    @classmethod
+    def load(cls, config, dimension_manager, dataset_path):
+        config.dataset_path = dataset_path
         config.load_dimensions(dimension_manager)
         return config
+
+    @property
+    def dataset_path(self):
+        """Return the directory containing the dataset file(s)."""
+        return self._dataset_path
+
+    @dataset_path.setter
+    def dataset_path(self, dataset_path):
+        """Set the dataset path."""
+        self._dataset_path = Path(dataset_path)
+
+    @property
+    def load_data_path(self):
+        return check_load_data_filename(self._dataset_path)
+
+    @property
+    def load_data_lookup_path(self):
+        return check_load_data_lookup_filename(self._dataset_path)
 
     def load_dimensions(self, dimension_manager):
         """Load all dataset dimensions.
@@ -179,20 +491,55 @@ class DatasetConfig(ConfigBase):
         dimension_manager : DimensionRegistryManager
 
         """
-        self._dimensions.update(dimension_manager.load_dimensions(self.model.dimensions))
+        self._dimensions.update(dimension_manager.load_dimensions(self.model.dimension_references))
 
     @property
     def dimensions(self):
         return self._dimensions
 
-    # TODO:
-    #   - check binning/partitioning / file size requirements?
-    #   - check unique names
-    #   - check unique files
-    #   - add similar validators as project_config Dimensions
-    # NOTE: project_config.Dimensions has a lot of the
-    #       validators we want here however, its unclear to me how we can
-    #       apply them in both classes because they are root valitors and
-    #       also because Dimensions includes project_dimension and
-    #       supplemental_dimensions which are not required at the dataset
-    #       level.
+    def get_dimension(self, dimension_type: DimensionType):
+        """Return the dimension matching dimension_type.
+
+        Parameters
+        ----------
+        dimension_type : DimensionType
+
+        Returns
+        -------
+        DimensionConfig
+
+        """
+        for key, dim_config in self.dimensions.items():
+            if key.type == dimension_type:
+                return dim_config
+        assert False, dimension_type
+
+    def add_trivial_dimensions(self, df):
+        """Add trivial 1-element dimensions to load_data_lookup."""
+        for dim in self._dimensions.values():
+            if dim.model.dimension_type in self.model.trivial_dimensions:
+                self._check_trivial_record_length(dim.model.records)
+                val = dim.model.records[0].id
+                col = dim.model.dimension_type.value
+                df = df.withColumn(col, F.lit(val))
+        return df
+
+    def remove_trivial_dimensions(self, df):
+        trivial_cols = {d.value for d in self.model.trivial_dimensions}
+        select_cols = [col for col in df.columns if col not in trivial_cols]
+        return df[select_cols]
+
+    def _check_trivial_record_length(self, records):
+        """Check that trivial dimensions have only 1 record."""
+        if len(records) > 1:
+            raise DSGInvalidDimension(
+                f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
+            )
+
+    @property
+    def src_dir(self):
+        return self._src_dir
+
+    @src_dir.setter
+    def src_dir(self, src_dir):
+        self._src_dir = src_dir

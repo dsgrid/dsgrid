@@ -110,10 +110,10 @@ class Timer:
         self._timer_stat = timer_stats.get_stat(name)
 
     def __enter__(self):
-        self._start = time.time()
+        self._start = time.perf_counter()
 
     def __exit__(self, exc, value, tb):
-        self._timer_stat.update(time.time() - self._start)
+        self._timer_stat.update(time.perf_counter() - self._start)
 
 
 def track_timing(collector):
@@ -135,7 +135,7 @@ def track_timing(collector):
 
 
 def _timed_func(timer_stats, func, *args, **kwargs):
-    with Timer(timer_stats, func.__name__):
+    with Timer(timer_stats, func.__qualname__):
         return func(*args, **kwargs)
 
 

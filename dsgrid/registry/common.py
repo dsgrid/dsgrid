@@ -1,27 +1,33 @@
 """Common definitions for registry components"""
 
 import itertools
+import logging
 import re
 import uuid
 from collections import namedtuple
 from datetime import datetime
-from enum import Enum
 from typing import Optional, Union
 
 from pydantic import Field
 from semver import VersionInfo
 
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, DSGEnum
 from dsgrid.utils.versioning import make_version
 
 
 REGISTRY_LOG_FILE = "dsgrid_registry.log"
 # Allows letters, numbers, underscores, spaces, dashes
 REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
+# Allows letters, numbers, underscores, dashes, spaces
+REGEX_VALID_REGISTRY_DISPLAY_NAME = re.compile(r"^[\w -]+$")
 # Allows letters, numbers, underscores, dashes
 REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE = re.compile(r"^[\w-]+$")
 # Allows letters, numbers, underscores
 REGEX_VALID_REGISTRY_CONFIG_ID_STRICT = re.compile(r"^[\w]+$")
+
+REGISTRY_ID_DELIMITER = "__"
+
+logger = logging.getLogger(__name__)
 
 
 def check_config_id_loose(config_id, tag):
@@ -40,7 +46,7 @@ def check_config_id_strict(config_id, tag):
         )
 
 
-class RegistryType(Enum):
+class RegistryType(DSGEnum):
     """Registry types"""
 
     DATASET = "dataset"
@@ -49,25 +55,24 @@ class RegistryType(Enum):
     PROJECT = "project"
 
 
-class DatasetRegistryStatus(Enum):
+class DatasetRegistryStatus(DSGEnum):
     """Statuses for a dataset within a project"""
 
-    # TODO: is this complete?
     UNREGISTERED = "Unregistered"
     REGISTERED = "Registered"
 
 
-class ProjectRegistryStatus(Enum):
+class ProjectRegistryStatus(DSGEnum):
     """Statuses for a project within the DSGRID registry"""
 
-    # TODO: is this complete?
     INITIAL_REGISTRATION = "Initial Registration"
     IN_PROGRESS = "In Progress"
     COMPLETE = "Complete"
+    PUBLISHED = "Published"
     DEPRECATED = "Deprecated"
 
 
-class VersionUpdateType(Enum):
+class VersionUpdateType(DSGEnum):
     """Types of updates that can be made to projects, datasets, and dimensions"""
 
     # TODO: we need to find general version update types that can be mapped to
@@ -89,7 +94,7 @@ DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 # Obviates the need to pass parameters to many constructors.
 RegistryManagerParams = namedtuple(
     "RegistryManagerParams",
-    ["base_path", "remote_path", "fs_interface", "cloud_interface", "offline", "dry_run"],
+    ["base_path", "remote_path", "fs_interface", "cloud_interface", "offline"],
 )
 
 
@@ -98,11 +103,20 @@ class ConfigRegistrationModel(DSGBaseModel):
 
     version: Union[str, VersionInfo] = Field(
         title="version",
-        description="version resulting from the registration",
+        description="Version resulting from the registration",
     )
-    submitter: str = Field(title="submitter", description="person that submitted the registration")
-    date: datetime = Field(title="date", description="registration date")
-    log_message: Optional[str] = Field(title="log_message", description="reason for the update")
+    submitter: str = Field(
+        title="submitter",
+        description="Username that submitted the registration",
+    )
+    date: datetime = Field(
+        title="date",
+        description="Registration date",
+    )
+    log_message: Optional[str] = Field(
+        title="log_message",
+        description="Reason for the update",
+    )
 
 
 def get_version_from_filename(filename):
@@ -128,7 +142,22 @@ def make_filename_from_version(handle, version):
     return f"{handle}-v{version}.toml"
 
 
-def make_registry_id(fields, delimiter="__"):
+def make_dimension_id(name: str):
+    """Return a dimension ID created from a dimension name.
+
+    Parameters
+    ----------
+    name : str
+
+    Returns
+    -------
+    str
+
+    """
+    return make_registry_id([name.lower().replace(" ", "_")])
+
+
+def make_registry_id(fields, delimiter=REGISTRY_ID_DELIMITER):
     """Make a unique ID by concatenating a list of fields with a UUID.
 
     Parameters

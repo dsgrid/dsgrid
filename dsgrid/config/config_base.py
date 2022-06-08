@@ -1,4 +1,5 @@
 import abc
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -6,6 +7,10 @@ from pathlib import Path
 from dsgrid.data_models import serialize_model
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.files import dump_data
+from dsgrid.utils.spark import models_to_dataframe
+
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigBase(abc.ABC):
@@ -28,7 +33,22 @@ class ConfigBase(abc.ABC):
 
         """
         # Subclasses can reimplement this method if they need more arguments.
-        return cls._load(config_file)
+        return cls._load(config_file, *args, **kwargs)
+
+    @classmethod
+    def load_from_model(cls, model):
+        """Load the config from a model.
+
+        Parameters
+        ---------
+        model : DSGBaseModel
+
+        Returns
+        -------
+        ConfigBase
+
+        """
+        return cls(model)
 
     @classmethod
     def _load(cls, config_file):
@@ -95,6 +115,37 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._src_dir = None
+        self._records_dataframe = None
+
+    @staticmethod
+    @abc.abstractmethod
+    def data_file_fields():
+        """Return the model field names that contain single data files.
+
+        Returns
+        -------
+        list
+
+        """
+
+    @staticmethod
+    @abc.abstractmethod
+    def data_files_fields():
+        """Return the model field names that contain multiple data files.
+
+        Returns
+        -------
+        list
+
+        """
+
+    def get_records_dataframe(self):
+        """Return the records in a spark dataframe. Cached on first call."""
+        if self._records_dataframe is None:
+            self._records_dataframe = models_to_dataframe(self.model.records, cache=True)
+            logger.debug("Loaded %s records dataframe", self.config_id)
+
+        return self._records_dataframe
 
     @classmethod
     def load(cls, config_file):
@@ -106,23 +157,42 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
         # Serialize the data alongside the config file at path and point the
         # config to that file to ensure that the config will be Pydantic-valid when loaded.
         model_data = serialize_model(self.model)
-        orig_file = getattr(self.model, "filename")
+        dst_config_file = path / self.config_filename()
+        if dst_config_file.exists() and not force:
+            raise DSGInvalidOperation(f"{dst_config_file} exists. Set force=True to overwrite.")
 
-        # Leading directories from the original are not relevant in the registry.
-        dst_record_file = Path(path) / Path(orig_file).name
-        filename = path / self.config_filename()
+        for field in self.data_file_fields():
+            orig_file = getattr(self.model, field)
 
-        for path in (dst_record_file, filename):
-            if path.exists() and not force:
-                raise DSGInvalidOperation(f"{path} exists. Set force=True to overwrite.")
+            # Leading directories from the original are not relevant in the registry.
+            dst_data_file = Path(path) / Path(orig_file).name
+            if dst_data_file.exists() and not force:
+                raise DSGInvalidOperation(f"{dst_data_file} exists. Set force=True to overwrite.")
 
-        shutil.copyfile(self._src_dir / self.model.filename, dst_record_file)
-        # We have to make this change in the serialized dict instead of
-        # model because Pydantic will fail the assignment due to not being
-        # able to find the path.
-        model_data["file"] = Path(self.model.filename).name
-        dump_data(model_data, filename)
-        return filename
+            shutil.copyfile(self._src_dir / orig_file, dst_data_file)
+            # - We have to make this change in the serialized dict instead of
+            #   model because Pydantic will fail the assignment due to not being
+            #   able to find the path.
+            # - This filename/file hack is because file is used as an alias.
+            #   Hopefully this won't happen with any other fields.
+            if field == "filename" and field not in model_data:
+                field = "file"
+            model_data[field] = Path(orig_file).name
+
+        new_files = []
+        for field in self.data_files_fields():
+            for orig_file in getattr(self.model, field):
+                dst_data_file = Path(path) / Path(orig_file).name
+                if dst_data_file.exists() and not force:
+                    raise DSGInvalidOperation(
+                        f"{dst_data_file} exists. Set force=True to overwrite."
+                    )
+                shutil.copyfile(self._src_dir / orig_file, dst_data_file)
+                new_files.append(Path(orig_file).name)
+            model_data[field] = new_files
+
+        dump_data(model_data, dst_config_file)
+        return dst_config_file
 
     @property
     def src_dir(self):

@@ -1,14 +1,15 @@
 import pytest
+
 from dsgrid.common import REMOTE_REGISTRY
-from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.tests.common import TEST_REGISTRY
 
 
 registry_manager = RegistryManager.load(
-    path=get_registry_path(),
+    path=TEST_REGISTRY,
     remote_path=REMOTE_REGISTRY,
     offline_mode=True,
-    dry_run_mode=False,
     no_prompts=True,
 )
 
@@ -55,10 +56,7 @@ def test_registry_list_filters():
     # test set 1: good filters for all managers
     good_filters = [filters1, filters2]
     for filters in good_filters:
-        registry_manager.project_manager.show(filters=filters)
-        registry_manager.dataset_manager.show(filters=filters)
-        registry_manager.dimension_manager.show(filters=filters)
-        registry_manager.dimension_mapping_manager.show(filters=filters)
+        registry_manager.show(filters=filters)
 
     # test set 2: good filters for selected managers
     registry_manager.dimension_manager.show(filters=filters3)
@@ -72,3 +70,7 @@ def test_registry_list_filters():
             registry_manager.dataset_manager.show(filters=filters)
             registry_manager.dimension_manager.show(filters=filters)
             registry_manager.dimension_mapping_manager.show(filters=filters)
+
+    # test max_width and drop_fields
+    registry_manager.show(max_width=40, drop_fields=["Submitter", "Date", "Datasets"])
+    registry_manager.show(max_width={"Description": 30, "Date": 20})

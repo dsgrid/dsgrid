@@ -9,6 +9,10 @@ class DSGBaseWarning(Warning):
     """Base class for all dsgrid warnings."""
 
 
+class DSGInvalidDataset(DSGBaseException):
+    """Raised if a dataset is invalid."""
+
+
 class DSGInvalidField(DSGBaseException):
     """Raised if a field is missing or invalid."""
 
@@ -21,8 +25,16 @@ class DSGInvalidDimension(DSGBaseException):
     """Raised if a type is not stored or is invalid."""
 
 
+class DSGInvalidDimensionAssociation(DSGBaseException):
+    """Raised if an association is not stored or is invalid."""
+
+
 class DSGInvalidDimensionMapping(DSGBaseException):
     """Raised if a mapping is not stored or is invalid."""
+
+
+class DSGMissingDimensionMapping(DSGBaseException):
+    """Raised if a mapping is not provided."""
 
 
 class DSGInvalidOperation(DSGBaseException):

@@ -2,19 +2,18 @@
 
 import logging
 from pathlib import Path
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import Field
 from pydantic import validator
 from semver import VersionInfo
 
-from .registry_base import RegistryBaseModel, RegistryBase
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import (
     DatasetRegistryStatus,
-    ProjectRegistryStatus,
 )
 from dsgrid.utils.versioning import make_version
+from .registry_base import RegistryBaseModel, RegistryBase
 
 logger = logging.getLogger(__name__)
 
@@ -24,15 +23,15 @@ class ProjectDatasetRegistryModel(DSGBaseModel):
 
     dataset_id: str = Field(
         title="dataset_id",
-        description="dataset identifier",
+        description="Dataset identifier",
     )
     version: Optional[Union[None, str, VersionInfo]] = Field(
         title="dataset_version",
-        description="full dataset version to be used to find dataset registry",
+        description="Full dataset version to be used to find dataset registry",
     )
     status: DatasetRegistryStatus = Field(
         title="status",
-        description="dataset status within the project",
+        description="Dataset status within the project",
     )
 
     @validator("version")
@@ -47,7 +46,7 @@ class ProjectRegistryModel(RegistryBaseModel):
 
     project_id: str = Field(
         tile="project_id",
-        description="unique project identifier",
+        description="Unique project identifier",
     )
 
 

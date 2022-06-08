@@ -1,8 +1,9 @@
 """Implementation for AWS S3 bucket filesystem"""
 
-import boto3
 import logging
 import re
+
+import boto3
 from s3path import S3Path, register_configuration_parameter
 
 from .cloud_filesystem import CloudFilesystemInterface
@@ -27,6 +28,16 @@ class S3Filesystem(CloudFilesystemInterface):
         self._client = self._session.client("s3")
 
         register_configuration_parameter(S3Path("/"), resource=self._session.resource("s3"))
+
+    @property
+    def profile(self):
+        """Return the AWS profile."""
+        return self._profile
+
+    @property
+    def bucket(self):
+        """Return the AWS bucket."""
+        return self._bucket
 
     def _Key(self, path):
         """Get formatted S3 key from provided path for S3Path module"""
@@ -68,19 +79,14 @@ class S3Filesystem(CloudFilesystemInterface):
             return [x.name for x in contents if x.is_dir()]
         return [x.name for x in contents]
 
-    def list_versions(self, directory, prefix=""):
+    def list_versions(self, path):
         assert False, "not supported yet"
-        self._s3.list_object_versions(Bucket=self._bucket, Prefix=prefix)
+        # self._s3.list_object_versions(Bucket=self._bucket, Prefix=prefix)
 
     def mkdir(self, directory):
         key = self._Key(directory)
         self._client.put_object(Bucket=self._bucket, Body="", Key=f"{key}/")
         return None
-
-    @property
-    def path(self):
-        """Return the full s3 path."""
-        return self._path
 
     def rglob(
         self,
@@ -106,8 +112,7 @@ class S3Filesystem(CloudFilesystemInterface):
 
     def path(self, path):
         """Returns S3Path"""
-        path = self._Key(path)
-        return S3Path(f"/{self._bucket}/{path}")
+        return S3Path(f"/{self._bucket}/{self._Key(path)}")
 
-    def touch(self, filepath):
-        self.path(filepath).touch()
+    def touch(self, path):
+        self.path(path).touch()

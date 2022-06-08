@@ -1,0 +1,15 @@
+master_instance:
+  type: m5.2xlarge
+core_instances:
+  count: 2
+  type: r5.2xlarge
+
+# profile: nrel-aws-dsgrid
+ssh_keys:
+  pkey_location: /Users/lliu2/.ssh/lliu2-dsgrid.pem # The path to your private key file used with AWS.
+  key_name: lliu2-dsgrid # The name of the permission key file on AWS.
+
+s3_scratch: s3://nrel-dsgrid-int-scratch/emr-test3
+billing_id: 210031
+subnet_id: subnet-00de90a8ac1b5afd5 #subnet-03c3675a2bf1477c0 # private, ensures connectivity
+repo_branch: main

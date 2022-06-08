@@ -5,7 +5,7 @@ create a conda environment for launching AWS Elastic Map Reduce Spark cluster.
 ```
 cd path_to/dsgrid/emr/
 conda env create -f environment.yml
-conda activate daskemr
+conda activate dsgrid-emr
 ```
 
 The `launch_emr.py` script can be used launch an EMR cluster under the ds-grid account.
@@ -29,6 +29,7 @@ core_instances:
   count: 2
   type: r5.2xlarge
 ```
+You can find more information about EC2 instance types at [EC2Instances.info] (https://ec2instances.info/).
 
 Private SSH keys to ensure connectivity
 ```

@@ -9,6 +9,7 @@ import sshtunnel
 import time
 import webbrowser
 import yaml
+
 # import git
 # import paramiko
 import tempfile
@@ -78,12 +79,16 @@ def launchemr(name=None):
             print(f"  CANNOT read EMR cluster: {e}, REMOVING...")
             os.remove(cluster_id_filename)
 
+    if cfg.get("ssh_keys") is not None and "key_name" in cfg["ssh_keys"]:
+        key_name = cfg["ssh_keys"]["key_name"]
+    else:
+        key_name = os.environ["USER"] + "-dsgrid"
     if not cluster_id_filename.exists():
         # resource: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/emr.html
         resp = emr.run_job_flow(
             Name=f"{getpass.getuser()}-dsgrid",
             LogUri=f"{s3_scratch}/emrlogs/",
-            ReleaseLabel="emr-5.35.0",
+            ReleaseLabel="emr-6.6.0",
             Instances={
                 "InstanceGroups": [
                     {
@@ -103,7 +108,7 @@ def launchemr(name=None):
                         "InstanceCount": cfg.get("core_instances", {}).get("count", 2),
                     },
                 ],
-                "Ec2KeyName": cfg["ssh_keys"]["key_name"],
+                "Ec2KeyName": key_name,
                 "KeepJobFlowAliveWhenNoSteps": True,
                 "Ec2SubnetId": cfg.get("subnet_id"),
                 "TerminationProtected": False,
@@ -112,23 +117,18 @@ def launchemr(name=None):
             Applications=[
                 {
                     "Name": "Hadoop",
-                    # "Version": "2.10.1"
                 },
                 {
                     "Name": "Spark",
-                    # "Version": "2.4.8"
                 },
                 {
                     "Name": "Livy",
-                    # "Version": "0.7.1"
                 },
                 {
                     "Name": "Hive",
-                    # "Version": "2.3.9"
                 },
                 {
                     "Name": "JupyterEnterpriseGateway",
-                    # "Version": "2.1.0"
                 },
             ],
             BootstrapActions=[
@@ -141,9 +141,9 @@ def launchemr(name=None):
                 },
             ],
             VisibleToAllUsers=True,
-            # AutoTerminationPolicy={
-            #     'IdleTimeout': 3600, #sec
-            # },
+            AutoTerminationPolicy={
+                "IdleTimeout": 7200,  # sec
+            },
             EbsRootVolumeSize=80,
             JobFlowRole="EMR_EC2_DefaultRole",
             ServiceRole="EMR_DefaultRole",
@@ -169,8 +169,6 @@ def launchemr(name=None):
             break
         elif state in ["TERMINATED", "TERMINATED_WITH_ERRORS"]:
             print(f"EMR Cluster is {state}", message)
-            # print("FAIL!!! Sleeping for 2 hrs...")
-            # time.sleep(7200)
             os.remove(cluster_id_filename)
             raise RuntimeError(f"EMR Cluster is {state}: {message}")
         time.sleep(30)
@@ -178,11 +176,14 @@ def launchemr(name=None):
     master_instance = emr.list_instances(
         ClusterId=job_flow_id, InstanceGroupTypes=["MASTER"]
     )
-    ip_address = master_instance.get("Instances")[0].get("PrivateIpAddress")
+    ip_address = master_instance.get("Instances")[0].get("PublicIpAddress")
     master_address = resp["Cluster"]["MasterPublicDnsName"]
     print(f"Connecting to {master_address} at {ip_address}")
 
-    mypkey = os.path.abspath(os.path.expanduser(cfg["ssh_keys"]["pkey_location"]))
+    if cfg.get("ssh_keys") is not None and "pkey_location" in cfg["ssh_keys"]:
+        mypkey = os.path.abspath(os.path.expanduser(cfg["ssh_keys"]["pkey_location"]))
+    else:
+        mypkey = str(Path.home() / ".ssh" / f"{os.environ['USER']}-dsgrid.pem")
 
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
@@ -216,6 +217,7 @@ def launchemr(name=None):
     print(f"\n{jupyter_url}")
     print("  Password is dsgrid")
     print("  Press Ctrl+C to quit\n")
+    print(f"  To ssh into the master node: ssh -i {mypkey} hadoop@{ip_address}\n")
     webbrowser.open_new_tab(jupyter_url)
     try:
         while True:

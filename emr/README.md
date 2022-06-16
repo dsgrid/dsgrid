@@ -44,3 +44,9 @@ repo_branch: main
 ```
 
 Once the cluster is running and ssh-tunnel is set-up you can access the system through Jupyter (available on http://localhost:53644) or sshing into the Master node. The IP for the master node gets printed during the initialization process. For example: `ssh -i "dsgrid-key.pem" hadoop@172.18.27.112`
+
+Create a SparkSession attached to the cluster by entering this code block in a Jupyter cell.
+```
+from pyspark.sql import SparkSession
+spark = SparkSession.builder.appName("app").getOrCreate()
+```

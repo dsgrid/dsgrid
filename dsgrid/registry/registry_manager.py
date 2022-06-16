@@ -3,6 +3,7 @@
 import getpass
 import logging
 import os
+import sys
 from pathlib import Path
 import uuid
 
@@ -81,6 +82,10 @@ class RegistryManager:
         Parameters
         ----------
         path : str
+        remote_path : str
+            Path to remote registry.
+        use_remote_data_path : None, str
+            Path to remote registry.
 
         Returns
         -------
@@ -105,7 +110,7 @@ class RegistryManager:
         logger.info("Created registry at %s", path)
         cloud_interface = make_cloud_storage_interface(path, "", offline=True, uuid=uid, user=user)
         params = RegistryManagerParams(
-            Path(path), remote_path, fs_interface, cloud_interface, offline=True
+            Path(path), remote_path, False, fs_interface, cloud_interface, offline=True
         )
         return cls(params)
 
@@ -130,6 +135,7 @@ class RegistryManager:
         cls,
         path,
         remote_path=REMOTE_REGISTRY,
+        use_remote_data=None,
         offline_mode=False,
         user=None,
         no_prompts=False,
@@ -142,6 +148,9 @@ class RegistryManager:
             base path of the local or base registry
         remote_path: str, optional
             path of the remote registry; default is REMOTE_REGISTRY
+        use_remote_data: bool, None
+            If set, use load data tables from remote_path. If not set, auto-determine what to do
+            based on HPC or AWS EMR environment variables.
         offline_mode : bool
             Load registry in offline mode; default is False
         user : str
@@ -161,6 +170,10 @@ class RegistryManager:
         if str(path).startswith("s3"):
             raise Exception(f"S3 is not yet supported as the base path: {path}")
         fs_interface = make_filesystem_interface(path)
+
+        if use_remote_data is None:
+            use_remote_data = _should_use_remote_data()
+
         cloud_interface = make_cloud_storage_interface(
             path, remote_path, offline=offline_mode, uuid=uid, user=user
         )
@@ -196,7 +209,7 @@ class RegistryManager:
                 )
 
         params = RegistryManagerParams(
-            Path(path), remote_path, fs_interface, cloud_interface, offline_mode
+            Path(path), remote_path, use_remote_data, fs_interface, cloud_interface, offline_mode
         )
         path = Path(path)
         for dir_name in (
@@ -514,3 +527,33 @@ _REGISTRY_TYPE_TO_CLASS = {
 def get_registry_class(registry_type):
     """Return the subtype of RegistryBase correlated with registry_type."""
     return _REGISTRY_TYPE_TO_CLASS[registry_type]
+
+
+def _should_use_remote_data():
+    if sys.platform in ("darwin", "win32"):
+        # Local systems need to sync all load data files.
+        use_remote_data = False
+    elif "NREL_CLUSTER" in os.environ:
+        # All Eagle compute nodes have access to the shared load data files.
+        logger.info("Use remote data on NREL_CLUSTER %s", os.environ["NREL_CLUSTER"])
+        use_remote_data = True
+    elif "GITHUB_ACTION" in os.environ:
+        logger.info("Do not use remote data on GitHub CI")
+        use_remote_data = False
+    elif os.environ["USER"] in ("hadoop", "livy"):
+        # Spark on EC2 nodes must read from S3.
+        logger.info("Use remote data on AWS")
+        use_remote_data = True
+    else:
+        logger.warning("Unknown environment. Do not use remote data.")
+        use_remote_data = False
+    # This link describes how we could authoritatively check for an EC2 instance.
+    # However, it hangs on a local computer.
+    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+    # cmd = "curl http://169.254.169.254/latest/dynamic/instance-identity/document"
+    # output = {}
+    # ret = run_command(cmd, output=output)
+    # if ret == 0 and "instanceId" in json.loads(output["stdout"].strip()):
+    #     logger.info("Use remote data on AWS")
+    #     use_remote_data = True
+    return use_remote_data

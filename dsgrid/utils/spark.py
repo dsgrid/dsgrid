@@ -1,11 +1,11 @@
 """Spark helper functions"""
 
-import csv
 import logging
 import os
 from pathlib import Path
 from typing import AnyStr, List, Union
 
+import pandas as pd
 from pyspark.sql import Row, SparkSession
 from pyspark.sql.types import StructType, StringType
 from pyspark import SparkConf
@@ -63,6 +63,12 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
     Supported formats when read_with_spark=True: .csv, .json, .parquet
     Supported formats when read_with_spark=False: .csv, .json
 
+    When reading CSV files on AWS read_with_spark should be set to False because the
+    files would need to be present on local storage for all workers. The master node
+    will sync the config files from S3, read them with standard filesystem system calls,
+    and then convert the data to Spark dataframes. This could change if we ever decide
+    to read CSV files with Spark directly from S3.
+
     Parameters
     ----------
     filename : str | Path
@@ -85,36 +91,38 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
         Raised if a require_unique column has duplicate values.
 
     """
-    filename = Path(filename)
     func = _read_with_spark if read_with_spark else _read_natively
-    df = func(filename)
+    df = func(str(filename))
     _post_process_dataframe(df, cache=cache, require_unique=require_unique)
     return df
 
 
 def _read_with_spark(filename):
     spark = SparkSession.getActiveSession()
-    path = str(filename)
-    if filename.suffix == ".csv":
-        df = spark.read.csv(path, inferSchema=True, header=True)
+    if filename.endswith(".csv"):
+        df = spark.read.csv(filename, inferSchema=True, header=True)
     elif Path(filename).suffix == ".parquet":
-        df = spark.read.parquet(path)
+        df = spark.read.parquet(filename)
     elif Path(filename).suffix == ".json":
-        df = spark.read.json(path, mode="FAILFAST")
+        df = spark.read.json(filename, mode="FAILFAST")
     else:
         assert False, f"Unsupported file extension: {filename}"
     return df
 
 
 def _read_natively(filename):
-    if filename.suffix == ".csv":
-        with open(filename, encoding="utf-8-sig") as f_in:
-            rows = [Row(**x) for x in csv.DictReader(f_in)]
+    if Path(filename).suffix == ".csv":
+        # Reading the file is faster with pandas. Converting a list of Row to spark df
+        # is a tiny bit faster. Pandas is likely scales better with bigger files.
+        # Keep the code in case we ever want to revert.
+        # with open(filename, encoding="utf-8-sig") as f_in:
+        #     rows = [Row(**x) for x in csv.DictReader(f_in)]
+        obj = pd.read_csv(filename)
     elif Path(filename).suffix == ".json":
-        rows = load_data(filename)
+        obj = load_data(filename)
     else:
         assert False, f"Unsupported file extension: {filename}"
-    return SparkSession.getActiveSession().createDataFrame(rows)
+    return SparkSession.getActiveSession().createDataFrame(obj)
 
 
 def _post_process_dataframe(df, cache=False, require_unique=None):

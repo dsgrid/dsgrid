@@ -31,16 +31,16 @@ ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
 logger = logging.getLogger(__name__)
 
 
-def check_load_data_filename(path: Path):
+def check_load_data_filename(path: str):
     """Return the load_data filename in path. Supports Parquet and CSV.
 
     Parameters
     ----------
-    path : Path
+    path : str
 
     Returns
     -------
-    Path
+    str
 
     Raises
     ------
@@ -48,25 +48,28 @@ def check_load_data_filename(path: Path):
         Raised if no supported load data filename exists.
 
     """
+    if path.startswith("s3://"):
+        return path + "load_data.parquet"
+
     for allowed_name in ALLOWED_LOAD_DATA_FILENAMES:
-        filename = path / allowed_name
+        filename = Path(path) / allowed_name
         if filename.exists():
-            return filename
+            return str(filename)
 
     # Use ValueError because this gets called in Pydantic model validation.
     raise ValueError(f"no load_data file exists in {path}")
 
 
-def check_load_data_lookup_filename(path: Path):
+def check_load_data_lookup_filename(path: str):
     """Return the load_data_lookup filename in path. Supports Parquet, CSV, and JSON.
 
     Parameters
     ----------
-    path : Path
+    path : str
 
     Returns
     -------
-    Path
+    str
 
     Raises
     ------
@@ -74,10 +77,13 @@ def check_load_data_lookup_filename(path: Path):
         Raised if no supported load data lookup filename exists.
 
     """
+    if path.startswith("s3://"):
+        return path + "load_data_lookup.parquet"
+
     for allowed_name in ALLOWED_LOAD_DATA_LOOKUP_FILENAMES:
-        filename = path / allowed_name
+        filename = Path(path) / allowed_name
         if filename.exists():
-            return filename
+            return str(filename)
 
     # Use ValueError because this gets called in Pydantic model validation.
     raise ValueError(f"no load_data_lookup file exists in {path}")
@@ -439,7 +445,9 @@ class DatasetConfig(ConfigBase):
     def load_from_registry(cls, config_file, dimension_manager, registry_data_path):
         config = cls._load(config_file)
         config.src_dir = config_file.parent
-        dataset_path = registry_data_path / config.config_id / config.model.dataset_version
+        # Join with forward slashes instead of Path because this might be an s3 path and
+        # we don't want backslashes on Windows.
+        dataset_path = f"{registry_data_path}/{config.config_id}/{config.model.dataset_version}"
         return cls.load(config, dimension_manager, dataset_path)
 
     @classmethod
@@ -447,8 +455,12 @@ class DatasetConfig(ConfigBase):
         config = cls._load(config_file)
         config.src_dir = config_file.parent
         schema_type = config.model.data_schema_type
+        if str(dataset_path).startswith("s3://"):
+            # TODO: This may need to handle AWS s3 at some point.
+            raise DSGInvalidParameter("Registering a dataset from an S3 path is not supported.")
         if not dataset_path.exists():
             raise DSGInvalidParameter(f"Dataset {dataset_path} does not exist")
+        dataset_path = str(dataset_path)
         if schema_type == DataSchemaType.STANDARD:
             check_load_data_filename(dataset_path)
             check_load_data_lookup_filename(dataset_path)
@@ -473,7 +485,7 @@ class DatasetConfig(ConfigBase):
     @dataset_path.setter
     def dataset_path(self, dataset_path):
         """Set the dataset path."""
-        self._dataset_path = Path(dataset_path)
+        self._dataset_path = dataset_path
 
     @property
     def load_data_path(self):

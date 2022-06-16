@@ -49,7 +49,7 @@ def check_load_data_filename(path: str):
 
     """
     if path.startswith("s3://"):
-        return path + "load_data.parquet"
+        return path + "/load_data.parquet"
 
     for allowed_name in ALLOWED_LOAD_DATA_FILENAMES:
         filename = Path(path) / allowed_name
@@ -78,7 +78,7 @@ def check_load_data_lookup_filename(path: str):
 
     """
     if path.startswith("s3://"):
-        return path + "load_data_lookup.parquet"
+        return path + "/load_data_lookup.parquet"
 
     for allowed_name in ALLOWED_LOAD_DATA_LOOKUP_FILENAMES:
         filename = Path(path) / allowed_name

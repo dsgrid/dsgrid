@@ -203,13 +203,15 @@ EOF
 # This sets the notebook server up to properly run as a background service.
 # -----------------------------------------------------------------------------
 echo "Configuring Jupyter Notebook Upstart Service"
+# Ensure that SPARK_HOME is set for both Jupyter and any user that logs in to the master node via ssh.
+export SPARK_HOME=/usr/lib/spark
 cat <<EOF > /tmp/jupyter-notebook.service
 [Unit]
 Description=Jupyter Notebook
 [Service]
 User=hadoop
 ExecStart=$HOME/miniconda/bin/jupyter-notebook --config=$HOME/.jupyter/jupyter_notebook_config.py
-Environment=JAVA_HOME=$JAVA_HOME
+Environment=JAVA_HOME=$JAVA_HOME SPARK_HOME=$SPARK_HOME
 Type=simple
 PIDFile=/run/jupyter.pid
 WorkingDirectory=$HOME
@@ -221,6 +223,7 @@ EOF
 sudo mv /tmp/jupyter-notebook.service /etc/systemd/system/
 sudo systemctl enable jupyter-notebook
 
+echo "export SPARK_HOME=$SPARK_HOME" >> /home/hadoop/.bashrc
 
 # -----------------------------------------------------------------------------
 # 12. Start the Jupyter Notebook Server

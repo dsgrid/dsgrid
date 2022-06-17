@@ -113,10 +113,14 @@ class DatasetRegistryManager(RegistryManagerBase):
         if dataset is not None:
             return dataset
 
+        if self._params.use_remote_data:
+            dataset_path = self._params.remote_path + "/data"
+        else:
+            dataset_path = str(self._params.base_path / "data")
         dataset = DatasetConfig.load_from_registry(
             self.get_config_file(key.id, key.version),
             self._dimension_mgr,
-            self._params.base_path / "data",
+            dataset_path,
         )
         self._datasets[key] = dataset
         return dataset
@@ -293,7 +297,7 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def remove(self, config_id):
         config = self.get_by_id(config_id)
-        self.fs_interface.rm_tree(config.dataset_path.parent)
+        self.fs_interface.rm_tree(Path(config.dataset_path).parent)
         self._remove(config_id)
         for key in [x for x in self._datasets if x.id == config_id]:
             self._datasets.pop(key)

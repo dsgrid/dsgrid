@@ -75,6 +75,7 @@ setup(
         "prettytable",
         "pydantic",
         "pyspark==3.2.0",  # Keep this synced with the spark version in Dockerfile.
+        "requests",
         "s3path",
         "semver",
         "sqlalchemy",

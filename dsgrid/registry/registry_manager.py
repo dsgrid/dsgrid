@@ -543,7 +543,6 @@ def _should_use_remote_data():
         use_remote_data = True
     elif "GITHUB_ACTION" in os.environ:
         logger.info("Do not use remote data on GitHub CI")
-        use_remote_data = False
     else:
         # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
         try:

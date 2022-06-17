@@ -39,15 +39,15 @@ class Project:
         ----------
         project_id : str
         registry_path : str | None
+        version : str | None
+            Use the latest if not specified.
+        offline_mode : bool
+            If True, don't sync with remote registry
         remote_path: str, optional
             path of the remote registry; default is REMOTE_REGISTRY
         use_remote_data: bool, None
             If set, use load data tables from remote_path. If not set, auto-determine what to do
             based on HPC or AWS EMR environment variables.
-        version : str | None
-            Use the latest if not specified.
-        offline_mode : bool
-            If True, don't sync with remote registry
         """
         registry_path = get_registry_path(registry_path=registry_path)
         manager = RegistryManager.load(

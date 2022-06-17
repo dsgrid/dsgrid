@@ -4,6 +4,7 @@ import logging
 
 from pyspark.sql import SparkSession
 
+from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
@@ -24,7 +25,15 @@ class Project:
         self._dimension_mapping_mgr = dimension_mapping_mgr
 
     @classmethod
-    def load(cls, project_id, registry_path=None, version=None, offline_mode=False):
+    def load(
+        cls,
+        project_id,
+        registry_path=None,
+        version=None,
+        offline_mode=False,
+        remote_path=REMOTE_REGISTRY,
+        use_remote_data=None,
+    ):
         """Load a project from the registry.
         Parameters
         ----------
@@ -34,9 +43,19 @@ class Project:
             Use the latest if not specified.
         offline_mode : bool
             If True, don't sync with remote registry
+        remote_path: str, optional
+            path of the remote registry; default is REMOTE_REGISTRY
+        use_remote_data: bool, None
+            If set, use load data tables from remote_path. If not set, auto-determine what to do
+            based on HPC or AWS EMR environment variables.
         """
         registry_path = get_registry_path(registry_path=registry_path)
-        manager = RegistryManager.load(registry_path, offline_mode=offline_mode)
+        manager = RegistryManager.load(
+            registry_path,
+            remote_path=remote_path,
+            use_remote_data=use_remote_data,
+            offline_mode=offline_mode,
+        )
         dataset_manager = manager.dataset_manager
         project_manager = manager.project_manager
         config = project_manager.get_by_id(project_id, version=version)

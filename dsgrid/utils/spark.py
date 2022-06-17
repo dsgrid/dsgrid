@@ -99,11 +99,12 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
 
 def _read_with_spark(filename):
     spark = SparkSession.getActiveSession()
-    if filename.endswith(".csv"):
+    suffix = Path(filename).suffix
+    if suffix == ".csv":
         df = spark.read.csv(filename, inferSchema=True, header=True)
-    elif Path(filename).suffix == ".parquet":
+    elif suffix == ".parquet":
         df = spark.read.parquet(filename)
-    elif Path(filename).suffix == ".json":
+    elif suffix == ".json":
         df = spark.read.json(filename, mode="FAILFAST")
     else:
         assert False, f"Unsupported file extension: {filename}"
@@ -111,14 +112,15 @@ def _read_with_spark(filename):
 
 
 def _read_natively(filename):
-    if Path(filename).suffix == ".csv":
+    suffix = Path(filename).suffix
+    if suffix == ".csv":
         # Reading the file is faster with pandas. Converting a list of Row to spark df
         # is a tiny bit faster. Pandas is likely scales better with bigger files.
         # Keep the code in case we ever want to revert.
         # with open(filename, encoding="utf-8-sig") as f_in:
         #     rows = [Row(**x) for x in csv.DictReader(f_in)]
         obj = pd.read_csv(filename)
-    elif Path(filename).suffix == ".json":
+    elif suffix == ".json":
         obj = load_data(filename)
     else:
         assert False, f"Unsupported file extension: {filename}"

@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 import uuid
 
+import requests
 from pyspark.sql import SparkSession
 
 from dsgrid.common import (
@@ -530,9 +531,12 @@ def get_registry_class(registry_type):
 
 
 def _should_use_remote_data():
+    use_remote_data = False
     if sys.platform in ("darwin", "win32"):
         # Local systems need to sync all load data files.
-        use_remote_data = False
+        pass
+    elif "DSGRID_USE_LOCAL_DATA" in os.environ:
+        pass
     elif "NREL_CLUSTER" in os.environ:
         # All Eagle compute nodes have access to the shared load data files.
         logger.info("Use remote data on NREL_CLUSTER %s", os.environ["NREL_CLUSTER"])
@@ -540,20 +544,31 @@ def _should_use_remote_data():
     elif "GITHUB_ACTION" in os.environ:
         logger.info("Do not use remote data on GitHub CI")
         use_remote_data = False
-    elif os.environ["USER"] in ("hadoop", "livy"):
-        # Spark on EC2 nodes must read from S3.
-        logger.info("Use remote data on AWS")
-        use_remote_data = True
     else:
-        logger.warning("Unknown environment. Do not use remote data.")
-        use_remote_data = False
-    # This link describes how we could authoritatively check for an EC2 instance.
-    # However, it hangs on a local computer.
-    # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
-    # cmd = "curl http://169.254.169.254/latest/dynamic/instance-identity/document"
-    # output = {}
-    # ret = run_command(cmd, output=output)
-    # if ret == 0 and "instanceId" in json.loads(output["stdout"].strip()):
-    #     logger.info("Use remote data on AWS")
-    #     use_remote_data = True
+        # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/identify_ec2_instances.html
+        try:
+            response = requests.get(
+                "http://169.254.169.254/latest/dynamic/instance-identity/document", timeout=2
+            )
+            ret = 0
+        except requests.ConnectTimeout:
+            logger.warning(
+                "Connection timed out while trying to read AWS identity. "
+                "If you are not running on AWS and would prefer to not experience this delay, set "
+                "the environment varible DSGRID_USE_LOCAL_DATA."
+            )
+            ret = 1
+        except Exception:
+            logger.exception("Failed to read identity document")
+            ret = 1
+
+        if ret == 0 and response.status_code == 200:
+            identity_data = response.json()
+            logger.info("Identity data: %s", identity_data)
+            if "instanceId" in identity_data:
+                logger.info("Use remote data on AWS")
+                use_remote_data = True
+            else:
+                logger.warning("Unknown payload from identity request.")
+
     return use_remote_data

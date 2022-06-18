@@ -45,6 +45,7 @@ def launchemr(name=None):
     # this is moving the bootstrap-dask file to S3
     profile_name = cfg.get("profile", "default")
     region = cfg.get("region", "us-west-2")  # incompatible with existing subnet_id
+    print(f"Using AWS profile:  {profile_name}  with region:  {region}  ")
     session = boto3.Session(profile_name=profile_name, region_name=region)
     credentials = session.get_credentials()
 
@@ -58,7 +59,12 @@ def launchemr(name=None):
     pkg_to_upload = build_package()
     fs.put(str(pkg_to_upload), f"{s3_scratch}/pkg.tar.gz", recursive=False)
 
-    emr = boto3.client("emr")
+    emr = boto3.client(
+        "emr",
+        aws_access_key_id=credentials.access_key,
+        aws_secret_access_key=credentials.secret_key,
+        aws_session_token=credentials.token,
+    )
 
     if cluster_id_filename.exists():
         with open(cluster_id_filename, "rt") as f:
@@ -92,7 +98,9 @@ def launchemr(name=None):
             Instances={
                 "InstanceGroups": [
                     {
-                        "Market": "ON_DEMAND",
+                        "Market": cfg.get("master_instance", {}).get(
+                            "market", "ON_DEMAND"
+                        ),
                         "InstanceRole": "MASTER",
                         "InstanceType": cfg.get("master_instance", {}).get(
                             "type", "m5.2xlarge"
@@ -100,7 +108,9 @@ def launchemr(name=None):
                         "InstanceCount": 1,
                     },
                     {
-                        "Market": "ON_DEMAND",  # <-- can be changed to "SPOT"
+                        "Market": cfg.get("core_instance", {}).get(
+                            "market", "ON_DEMAND"
+                        ),
                         "InstanceRole": "CORE",
                         "InstanceType": cfg.get("core_instances", {}).get(
                             "type", "r5.12xlarge"
@@ -114,6 +124,16 @@ def launchemr(name=None):
                 "TerminationProtected": False,
                 # "AutoTerminate": True,
             },
+            Configurations=[
+                {
+                    "Classification": "yarn-site",
+                    "Properties": {
+                        "yarn.log-aggregation-enable": "true",
+                        "yarn.log-aggregation.retain-seconds": "-1",
+                        "yarn.nodemanager.remote-app-log-dir": "s3://nrel-dsgrid-int-scratch/logs",
+                    },
+                }
+            ],
             Applications=[
                 {
                     "Name": "Hadoop",
@@ -142,7 +162,7 @@ def launchemr(name=None):
             ],
             VisibleToAllUsers=True,
             AutoTerminationPolicy={
-                "IdleTimeout": 7200,  # sec
+                "IdleTimeout": 3600,  # sec
             },
             EbsRootVolumeSize=80,
             JobFlowRole="EMR_EC2_DefaultRole",
@@ -189,7 +209,7 @@ def launchemr(name=None):
     cnopts.hostkeys = None
 
     print("Copying AWS config files")
-    aws_credentials = here / "credentials"
+    aws_credentials = str(Path.home() / ".aws")
     with pysftp.Connection(
         master_address, username="hadoop", private_key=mypkey, cnopts=cnopts
     ) as sftp:

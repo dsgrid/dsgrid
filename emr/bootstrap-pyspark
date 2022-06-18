@@ -71,16 +71,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-
 # -----------------------------------------------------------------------------
-# 1. Check if running on the master node. If not, there's nothing to do.
-# -----------------------------------------------------------------------------
-grep -q '"isMaster": true' /mnt/var/lib/info/instance.json \
-|| { echo "Not running on master node, nothing to do" && exit 0; }
-
-
-# -----------------------------------------------------------------------------
-# 2. Install Miniconda
+# 1. Install Miniconda
 # -----------------------------------------------------------------------------
 echo "Installing Miniconda"
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o /tmp/miniconda.sh
@@ -92,7 +84,7 @@ conda update conda -y
 
 
 # -----------------------------------------------------------------------------
-# 3. Install packages to use in packaged environment
+# 2. Install packages to use in packaged environment
 #
 # We install a few packages by default, and allow users to extend this list
 # with a CLI flag:
@@ -111,6 +103,7 @@ conda install \
 python \
 pyspark \
 pyarrow \
+findspark \
 s3fs \
 boto3 \
 conda-pack \
@@ -130,10 +123,17 @@ rm $HOME/pkg.tar.gz
 
 
 # -----------------------------------------------------------------------------
-# 4. Package the environment to be distributed to worker nodes
+# 3. Package the environment to be distributed to worker nodes
 # -----------------------------------------------------------------------------
 # echo "Packaging environment"
 # conda pack -q -o $HOME/environment.tar.gz # TODO: can probably get this from dsgrid package and not have to install
+
+
+# -----------------------------------------------------------------------------
+# 4. Check if running on the master node. If not, there's nothing to do.
+# -----------------------------------------------------------------------------
+grep -q '"isMaster": true' /mnt/var/lib/info/instance.json \
+|| { echo "Not running on master node, nothing to do" && exit 0; }
 
 
 # -----------------------------------------------------------------------------

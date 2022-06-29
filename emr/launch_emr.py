@@ -14,6 +14,7 @@ import tempfile
 import subprocess
 import sys
 import argparse
+import logging
 
 
 def build_package():
@@ -89,7 +90,7 @@ def launchemr(dir_to_sync=None, name=None):
             else:
                 print(f"  Reconnecting to cluster: {job_flow_id}")
         except Exception as e:
-            print(f"  CANNOT read EMR cluster: {e}, REMOVING...")
+            logging.exception(f"  CANNOT read EMR cluster: {e}, REMOVING...")
             os.remove(cluster_id_filename)
 
     if not cluster_id_filename.exists():
@@ -261,9 +262,11 @@ def launchemr(dir_to_sync=None, name=None):
     print(f"  To ssh into the master node: ssh -i {mypkey} hadoop@{ip_address}\n")
     try:
         webbrowser.open_new_tab(jupyter_url)
-    except Exception as e:
-        print(e)
-        print("Try copying the Jupyter Notebook URL directly into a web browser.")
+    except Exception:
+        logging.exception(
+            "Failed to open a web brower tab. "
+            "Try copying the Jupyter Notebook URL directly into a web browser."
+        )
 
     try:
         while True:

@@ -1,68 +1,56 @@
 # EMR for dsgrid
 
 ## Setup
-
-Create a conda environment for launching AWS Elastic Map Reduce Spark cluster:
-```bash
+create a conda environment for launching AWS Elastic Map Reduce (EMR) Spark cluster.
+```
 cd path_to/dsgrid/emr/
 conda env create -f environment.yml
 conda activate dsgrid-emr
 ```
 
-The `launch_emr.py` script can be used launch an EMR cluster under the dsgrid account. It should take about 10 minutes to initialize the cluster for the first time. The `emr_config.yml` file holds all the configurations required to launch new clusters. For the purpose of getting started, the most notable option is `ssh_keys` which is required to open a ssh-tunnel between EMR and localhost. This key can be obtained [here](https://us-west-2.console.aws.amazon.com/ec2/v2/home?region=us-west-2#KeyPairs:). If you name your key `<USER>-dsgrid`, choose an RSA key pair type, create a .pem private key file, and place the .pem file in the `~/.ssh` folder then you should not have to change the `emr_config.yml` file to spin up a basic Spark cluster.
+### Overview
+The `emr_config.yml` file holds all the required configurations to launch new clusters. An ssh-key is required to open a ssh-tunnel between EMR and localhost. This key can be obtained on the [AWS console](https://us-west-2.console.aws.amazon.com/ec2/v2/home?region=us-west-2#KeyPairs:). If you choose an RSA key pair type, create a .pem private key file with the name `<USER>-dsgrid`, and place the .pem file in the `~/.ssh` folder then you should not have to change the `emr_config.yml` file to spin up a basic Spark cluster.
 
-## AWS Credentials
-You will also need a `credentials` folder containing a `config` and `credentials` file with the proper aws keys under a `nrel-aws-dsgrid` profile.
+The bootstrap actions are defined in the `bootstrap-pyspark` file and include installing dsgrid and other packages on both master and core/worker instances.
 
-## Usage
+The `launch_emr.py` script can be used to launch an EMR cluster under the `nrel-aws-dsgrid` account.
+It should take about 10 minutes to initialize the cluster for the first time. The script copies the `dsgrid/dsgrid/notebooks/` folder onto AWS.
+
 
 ### Config file
-All relevant config info is stored on the `emr_config.yml` file.
+The `emr_config.yml` file manages the EC2 instances request in addition to the location of your AWS credentials and ssh key.
+To create this file, make a copy of the `emr_config_example.yml` file. The default location and name of the pem key is as follows. If your pem key is stored differently, edit the config accordingly.
+```
+ssh_keys:
+  pkey_location: ~/.ssh/<USER>-dsgrid.pem # The path to your private key file used with AWS.
+  key_name: <USER>-dsgrid.pem # The name of the permission key file on AWS.
+```
 
-The only parts that need to be edited by the user are:
+As part of the bootstrapping process, your AWS `config` and `credentials` files will be copied to the S3 filesystem to enable certain dsgrid operations, such as syncing the registry. By default, the launching script will look for those credentials in `~/.aws` of your local system. If different, specify the location in the config:
+```
+aws_credentials_location: path_to_your_credentials
+```
 
-Cluster Size:
-```yml
+Below is the default cluster instance configuration. We recommend using only ON_DEMAND for `master_instance` to maintain continuity of the cluster. For `core_instances`, choose between ON_DEMAND or SPOT at this time. SPOT pricing can be up to 90% less than ON_DEMAND but instances under this pricing scheme can be reclaimed by EC2 intermittently, which may affect your running processes. You can learn more about EC2 instance types at [EC2Instances.info] (https://ec2instances.info/) or [AWS EC2 pricing] (https://aws.amazon.com/ec2/pricing/?trk=36c6da98-7b20-48fa-8225-4784bced9843&sc_channel=ps&sc_campaign=acquisition&sc_medium=ACQ-P%7CPS-GO%7CBrand%7CDesktop%7CSU%7CCompute%7CEC2%7CUS%7CEN%7CText&s_kwcid=AL!4422!3!488982705735!p!!g!!aws%20ec2%20pricing&ef_id=EAIaIQobChMIs-bhp6-_-AIV4w-tBh2MHw9VEAAYASABEgKzyPD_BwE:G:s&s_kwcid=AL!4422!3!488982705735!p!!g!!aws%20ec2%20pricing).
+```
 master_instance:
   type: m5.2xlarge
   market: ON_DEMAND
 core_instances:
   count: 2
-  type: r5.2xlarge #c5d.12xlarge
+  type: c5d.12xlarge
   market: SPOT
-```
-You can find more information about EC2 instance types at [EC2Instances.info] (https://ec2instances.info/).
-
-Private SSH keys to ensure connectivity. The default option is to leave ssh_keys blank:
-```yml
-ssh_keys:
-  # The default behavior uses ~/.ssh/<USER>-dsgrid.pem and <USER>-dsgrid.
-  # Change these values if you use different settings.
-  # pkey_location: ~/.ssh/<USER>-dsgrid.pem # The path to your private key file used with AWS.
-  # key_name: <USER>-dsgrid # The name of the permission key file on AWS.
-```
-
-If you choose to specify a different name and/or file location follow this pattern:
-```yml
-ssh_keys:
-  pkey_location: /Users/roliveir/.ssh/dsgrid-key.pem # The path to your private key file used with AWS.
-  key_name: dsgrid-key # The name of the permission key file on AWS.
-```
-
-dsgrid branch to clone and install
-```yml
-repo_branch: main
 ```
 
 ### Running
 
 To start up the cluster, run the `launch_emr.py` script from the `dsgrid/emr` folder using the `dsgrid-emr` conda environment you created:
-```bash
-(dsgrid-emr) [$USER@COMPUTER ~/dsgrid/emr]$ python launch_emr.py
+```
+python launch_emr.py
 ```
 
-Once the cluster is running and the ssh-tunnel is set-up you can access the system through Jupyter or by ssh-ing into the Master node. The Jupyter address and the IP for the master node get printed during the initialization process. For example the text printed during start up looks like: 
-```bash
+Once the cluster is running and the ssh-tunnel is set-up you can access the system through Jupyter or by ssh-ing into the Master node. The Jupyter address and the IP for the master node get printed during the initialization process. For example the stdout printed during start up looks like:
+```
 copying tests_aws/test_registry/test_data_sync.py -> dsgrid-0.1.0/tests_aws/test_registry
 copying tests_aws/test_registry/test_push_pull_online_mode.py -> dsgrid-0.1.0/tests_aws/test_registry
 copying tests_aws/test_registry/tests_s3_locks.py -> dsgrid-0.1.0/tests_aws/test_registry
@@ -72,19 +60,6 @@ removing 'dsgrid-0.1.0' (and everything under it)
 Started a new cluster: j-2Y17R69QY2BKZ
 Cluster Status: STARTING - (no message)
 Cluster Status: STARTING - (no message)
-Cluster Status: STARTING - (no message)
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
-Cluster Status: BOOTSTRAPPING - Running bootstrap actions
 Cluster Status: BOOTSTRAPPING - Running bootstrap actions
 Cluster Status: BOOTSTRAPPING - Running bootstrap actions
 Cluster Status: BOOTSTRAPPING - Running bootstrap actions
@@ -100,24 +75,21 @@ Jupyter Notebook URL: http://localhost:43431
   Password is dsgrid
   Press Ctrl+C to quit
 
-  To ssh into the master node: ssh -i /home/ehale/.ssh/ehale-dsgrid.pem hadoop@54.184.112.221
+  To ssh into the master node: ssh -i ~/.ssh/<USER>-dsgrid.pem hadoop@54.184.112.221
 ```
-and based on this the user can login to Jupyter by putting `http://localhost:43431` in the address bar of her web browser or can ssh to the Master node via:
-```bash
-ssh -i /home/ehale/.ssh/ehale-dsgrid.pem hadoop@54.184.112.221
-```
+Login to Jupyter by opening the URL in a web browser. You can also ssh to the Master node as instructed above.
 
 In either case, create a SparkSession attached to the cluster by entering this code block in a Jupyter cell or by running these lines in an ipython session or by including them in a script:
 ```
 from pyspark.sql import SparkSession
-spark = SparkSession.builder.appName("app").getOrCreate()
+spark = SparkSession.builder.appName("AWS-Cluster").getOrCreate()
 ```
 
 ### Shutting down
 
-If you are not working in the default Jupyter dsgrid_notebooks folder you might want to save your work back to your local machine before shutting the cluster down. 
+If you are not working in the default Jupyter dsgrid_notebooks folder you might want to save your work back to your local machine before shutting the cluster down.
 
-To shut the cluster down, simply Ctrl-C out of the local python process you used to start the cluster. You will see text like:
+To shut the cluster down, simply Ctrl+C out of the local python process you used to start the cluster. You will see stdout like:
 ```
 Caught Ctrl+C, shutting down tunnel, please wait
 Copying notebooks back to local machine: /home/ehale/dsgrid/dsgrid/notebooks...
@@ -125,4 +97,4 @@ Terminate cluster [y/n]? y
 Terminating cluster j-2Y17R69QY2BKZ
 ```
 
-You can also see what instances you have running (and manually shut them down, if so desired) by going to the [EC2 management](https://us-west-2.console.aws.amazon.com/ec2/v2/home?region=us-west-2#Home) page of the AWS console. The EC2 instances will also shut down automatically after 1 hour of idle time.
+You can also see what instances you have running (and manually shut them down, if so desired, but doing it this way will not preserve any changes made to the notebooks) by going to the [EC2 management](https://us-west-2.console.aws.amazon.com/ec2/v2/home?region=us-west-2#Home) page of the AWS console. The EC2 instances will also shut down automatically after 1 hour of idle time.

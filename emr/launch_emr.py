@@ -9,12 +9,11 @@ import sshtunnel
 import time
 import webbrowser
 import yaml
-
-# import git
-# import paramiko
+from datetime import datetime
 import tempfile
 import subprocess
 import sys
+import argparse
 
 
 def build_package():
@@ -24,14 +23,20 @@ def build_package():
     """
     pkgdir = Path(__file__).resolve().parent.parent
 
-    subprocess.run([sys.executable, "setup.py", "sdist"], cwd=pkgdir, check=True)
+    subprocess.run(
+        [sys.executable, "setup.py", "sdist"],
+        cwd=pkgdir,
+        check=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
 
     return sorted(
         (pkgdir / "dist").glob("*.tar.gz"), key=os.path.getmtime, reverse=True
     )[0]
 
 
-def launchemr(name=None):
+def launchemr(dir_to_sync=None, name=None):
 
     if name is None:
         name = f"dsgrid-SparkEMR ({getpass.getuser()})"
@@ -42,22 +47,23 @@ def launchemr(name=None):
 
     cluster_id_filename = here / "running_cluster_id.txt"
 
-    # this is moving the bootstrap-dask file to S3
+    # Get AWS credentials
     profile_name = cfg.get("profile", "default")
     region = cfg.get("region", "us-west-2")  # incompatible with existing subnet_id
     print(f"Using AWS profile:  {profile_name}  with region:  {region}  ")
     session = boto3.Session(profile_name=profile_name, region_name=region)
     credentials = session.get_credentials()
 
+    # Get AWS ssh key
+    if cfg.get("ssh_keys") is not None and "key_name" in cfg["ssh_keys"]:
+        key_name = cfg["ssh_keys"]["key_name"]
+    else:
+        key_name = getpass.getuser() + "-dsgrid"
+
+    # Set user scratch folder for cluster
     fs = s3fs.S3FileSystem(key=credentials.access_key, secret=credentials.secret_key)
     s3_scratch = cfg["s3_scratch"].strip().rstrip("/")
-    bootstrap_script_loc = f"{s3_scratch}/bootstrap-pyspark"
-    local_bootstrap_pyspark = str(here / "bootstrap-pyspark")
-    fs.put(local_bootstrap_pyspark, bootstrap_script_loc)
-
-    # Upload parent directory package
-    pkg_to_upload = build_package()
-    fs.put(str(pkg_to_upload), f"{s3_scratch}/pkg.tar.gz", recursive=False)
+    timestamp = datetime.utcnow().strftime("%Y-%m-%d_%H:%M")
 
     emr = boto3.client(
         "emr",
@@ -68,7 +74,8 @@ def launchemr(name=None):
 
     if cluster_id_filename.exists():
         with open(cluster_id_filename, "rt") as f:
-            job_flow_id = f.read()
+            text = f.read()
+            [job_flow_id, s3_scratch_user] = [x.strip() for x in text.split("\n")]
         print(f"Found previously running EMR cluster: {job_flow_id}")
         try:
             resp = emr.describe_cluster(ClusterId=job_flow_id)
@@ -85,15 +92,25 @@ def launchemr(name=None):
             print(f"  CANNOT read EMR cluster: {e}, REMOVING...")
             os.remove(cluster_id_filename)
 
-    if cfg.get("ssh_keys") is not None and "key_name" in cfg["ssh_keys"]:
-        key_name = cfg["ssh_keys"]["key_name"]
-    else:
-        key_name = os.environ["USER"] + "-dsgrid"
     if not cluster_id_filename.exists():
+        s3_scratch_user = f"{s3_scratch}/{getpass.getuser()}_{timestamp}"
+        # Upload bootstrap script
+        bootstrap_script_loc = f"{s3_scratch_user}/bootstrap-pyspark"
+        local_bootstrap_pyspark = str(here / "bootstrap-pyspark")
+        fs.put(local_bootstrap_pyspark, bootstrap_script_loc)
+
+        # Upload dsgrid package
+        pkg_to_upload = build_package()
+        fs.put(str(pkg_to_upload), f"{s3_scratch_user}/pkg.tar.gz", recursive=False)
+
+        # Run EMR job flow
         # resource: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/emr.html
+        idle_time_out = min(
+            cfg.get("idle_time_out", 3600), 3600 * 3
+        )  # sec, enforcing max of 3hrs
         resp = emr.run_job_flow(
             Name=f"{getpass.getuser()}-dsgrid",
-            LogUri=f"{s3_scratch}/emrlogs/",
+            LogUri=f"{s3_scratch_user}/emrlogs/",
             ReleaseLabel="emr-6.6.0",
             Instances={
                 "InstanceGroups": [
@@ -108,12 +125,10 @@ def launchemr(name=None):
                         "InstanceCount": 1,
                     },
                     {
-                        "Market": cfg.get("core_instance", {}).get(
-                            "market", "ON_DEMAND"
-                        ),
+                        "Market": cfg.get("core_instance", {}).get("market", "SPOT"),
                         "InstanceRole": "CORE",
                         "InstanceType": cfg.get("core_instances", {}).get(
-                            "type", "r5.12xlarge"
+                            "type", "c5d.12xlarge"
                         ),
                         "InstanceCount": cfg.get("core_instances", {}).get("count", 2),
                     },
@@ -130,7 +145,7 @@ def launchemr(name=None):
                     "Properties": {
                         "yarn.log-aggregation-enable": "true",
                         "yarn.log-aggregation.retain-seconds": "-1",
-                        "yarn.nodemanager.remote-app-log-dir": "s3://nrel-dsgrid-int-scratch/logs",
+                        "yarn.nodemanager.remote-app-log-dir": f"{s3_scratch_user}/yarnlogs",
                     },
                 }
             ],
@@ -156,13 +171,13 @@ def launchemr(name=None):
                     "Name": "launchFromS3",
                     "ScriptBootstrapAction": {
                         "Path": bootstrap_script_loc,
-                        "Args": ["--s3scratch", s3_scratch],
+                        "Args": ["--s3scratch", s3_scratch_user],
                     },
                 },
             ],
             VisibleToAllUsers=True,
             AutoTerminationPolicy={
-                "IdleTimeout": 3600,  # sec
+                "IdleTimeout": idle_time_out,  # sec
             },
             EbsRootVolumeSize=80,
             JobFlowRole="EMR_EC2_DefaultRole",
@@ -174,7 +189,7 @@ def launchemr(name=None):
         )
         job_flow_id = resp["JobFlowId"]
         with open(cluster_id_filename, "wt") as f:
-            f.write(job_flow_id)
+            f.write(job_flow_id + "\n" + s3_scratch_user)
         time.sleep(5)
         print(f"Started a new cluster: {job_flow_id}")
 
@@ -203,25 +218,31 @@ def launchemr(name=None):
     if cfg.get("ssh_keys") is not None and "pkey_location" in cfg["ssh_keys"]:
         mypkey = os.path.abspath(os.path.expanduser(cfg["ssh_keys"]["pkey_location"]))
     else:
-        mypkey = str(Path.home() / ".ssh" / f"{os.environ['USER']}-dsgrid.pem")
+        mypkey = str(Path.home() / ".ssh" / f"{getpass.getuser()}-dsgrid.pem")
 
     cnopts = pysftp.CnOpts()
     cnopts.hostkeys = None
 
     print("Copying AWS config files")
-    aws_credentials = str(Path.home() / ".aws")
+    aws_credentials = cfg.get("aws_credentials_location", str(Path.home() / ".aws"))
     with pysftp.Connection(
         master_address, username="hadoop", private_key=mypkey, cnopts=cnopts
     ) as sftp:
         sftp.put_r(aws_credentials, "/home/hadoop/.aws")
 
-    local_notebooks_dir = here.parent / "dsgrid" / "notebooks"
-    print(f"Copying notebooks to master node, from: {local_notebooks_dir}...")
+    if dir_to_sync is None:
+        dir_to_sync = here.parent / "dsgrid" / "notebooks"
+    else:
+        dir_to_sync = Path(dir_to_sync)
+    print(f"Copying directory to master node: {dir_to_sync}...")
     with pysftp.Connection(
         master_address, username="hadoop", private_key=mypkey, cnopts=cnopts
     ) as sftp:
-        sftp.makedirs("dsgrid_notebooks")
-        sftp.put_r(str(local_notebooks_dir), "dsgrid_notebooks")
+        if sftp.exists(dir_to_sync.name):
+            sftp.rmdir(dir_to_sync.name)
+        else:
+            sftp.makedirs(dir_to_sync.name)
+        sftp.put_r(str(dir_to_sync), dir_to_sync.name)
 
     print("Opening tunnel to jupyter notebook server")
     tunnel = sshtunnel.SSHTunnelForwarder(
@@ -247,25 +268,42 @@ def launchemr(name=None):
 
     tunnel.stop()
 
-    print(f"Copying notebooks back to local machine: {local_notebooks_dir}...")
+    print(f"Copying directory back to local machine: {dir_to_sync}...")
     with tempfile.TemporaryDirectory() as tmpdir:
         with pysftp.Connection(
             master_address, username="hadoop", private_key=mypkey, cnopts=cnopts
         ) as sftp:
-            sftp.get_r("dsgrid_notebooks", tmpdir)
-        shutil.rmtree(local_notebooks_dir)
-        shutil.copytree(
-            os.path.join(tmpdir, "dsgrid_notebooks"), str(local_notebooks_dir)
-        )
+            sftp.get_r(dir_to_sync.name, tmpdir)
+        shutil.rmtree(dir_to_sync)
+        shutil.copytree(os.path.join(tmpdir, dir_to_sync.name), str(dir_to_sync))
 
     resp = input("Terminate cluster [y/n]? ")
     if resp.lower().startswith("y"):
         print(f"Terminating cluster {job_flow_id}")
         emr.terminate_job_flows(JobFlowIds=[job_flow_id])
+
+        resp2 = input(f"Delete S3 scratch directory: {s3_scratch_user} : [y/n]? ")
+        if resp2.lower().endswith("y"):
+            print("Deleting S3 scratch directory...")
+            while fs.exists(s3_scratch_user):
+                fs.rm(
+                    s3_scratch_user, recursive=True
+                )  # folder in use until cluster is shut down completely
+
         os.remove(cluster_id_filename)
-        if not resp.lower().endswith("k"):
-            fs.rm(s3_scratch, recursive=True)
 
 
 if __name__ == "__main__":
-    launchemr()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-d",
+        "--dir_to_sync",
+        help="Path of directory to sync to AWS Hadoop filesystem for Jupyter, defaults to: ~/dsgrid/dsgrid/notebooks/",
+    )
+    parser.add_argument(
+        "-n",
+        "--name",
+        help="Name of AWS EMR session to display, defaults to: dsgrid-SparkEMR <USER>",
+    )
+    args = parser.parse_args()
+    launchemr(dir_to_sync=args.dir_to_sync, name=args.name)

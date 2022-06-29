@@ -259,7 +259,12 @@ def launchemr(dir_to_sync=None, name=None):
     print("  Password is dsgrid")
     print("  Press Ctrl+C to quit\n")
     print(f"  To ssh into the master node: ssh -i {mypkey} hadoop@{ip_address}\n")
-    webbrowser.open_new_tab(jupyter_url)
+    try:
+        webbrowser.open_new_tab(jupyter_url)
+    except Exception as e:
+        print(e)
+        print("Try copying the Jupyter Notebook URL directly into a web browser.")
+
     try:
         while True:
             time.sleep(1)
@@ -298,7 +303,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-d",
         "--dir_to_sync",
-        help="Path of directory to sync to AWS Hadoop filesystem for Jupyter, defaults to: ~/dsgrid/dsgrid/notebooks/",
+        help="Path of directory to sync to AWS Hadoop filesystem for Jupyter, defaults to: ./dsgrid/notebooks",
     )
     parser.add_argument(
         "-n",

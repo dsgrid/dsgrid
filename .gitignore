@@ -152,6 +152,5 @@ dmypy.json
 poetry.lock
 
 tests/data/registry/*
-emr/credentials/ # not needed, can delete this folder
-*/running_cluster_id.txt
+emr/running_cluster_id.txt
 emr/emr_config.yml

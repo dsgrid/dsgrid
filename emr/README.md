@@ -14,19 +14,19 @@ The `emr_config.yml` file holds all the required configurations to launch new cl
 The bootstrap actions are defined in the `bootstrap-pyspark` file and include installing dsgrid and other packages on both master and core/worker instances.
 
 The `launch_emr.py` script can be used to launch an EMR cluster under the `nrel-aws-dsgrid` account.
-It should take about 10 minutes to initialize the cluster for the first time. The script copies the `dsgrid/dsgrid/notebooks/` folder onto AWS.
+It should take about 10 minutes to initialize the cluster for the first time. The script copies the `./dsgrid/notebooks` folder or a user-specified folder onto the AWS Hadoop filesystem (see the Running section on how to specify that).
 
 
 ### Config file
 The `emr_config.yml` file manages the EC2 instances request in addition to the location of your AWS credentials and ssh key.
-To create this file, make a copy of the `emr_config_example.yml` file. The default location and name of the pem key is as follows. If your pem key is stored differently, edit the config accordingly.
+To create this file, make a copy of the `emr_config_example.yml` file. The default location and name of the pem key is as follows. Edit the config if your pem key is stored differently.
 ```
 ssh_keys:
   pkey_location: ~/.ssh/<USER>-dsgrid.pem # The path to your private key file used with AWS.
   key_name: <USER>-dsgrid.pem # The name of the permission key file on AWS.
 ```
 
-As part of the bootstrapping process, your AWS `config` and `credentials` files will be copied to the S3 filesystem to enable certain dsgrid operations, such as syncing the registry. By default, the launching script will look for those credentials in `~/.aws` of your local system. If different, specify the location in the config:
+As part of the bootstrapping process, your AWS `config` and `credentials` files will be copied to the S3 filesystem to enable certain dsgrid operations, such as syncing the remote dsgrid registry. By default, the launching script will look for those credentials in `~/.aws` of your local system. If different, specify the location in the config:
 ```
 aws_credentials_location: path_to_your_credentials
 ```
@@ -47,10 +47,10 @@ core_instances:
 
 To start up the cluster, run the `launch_emr.py` script from the `dsgrid/emr` folder using the `dsgrid-emr` conda environment you created:
 ```
-python launch_emr.py [--dir_to_sync <path_to_dir> --name <name_your_emr_session>]
+python launch_emr.py [--dir_to_sync <path_to_dir>] [--name <name_your_emr_session>]
 ```
 
-By default, the `dsgrid/dsgrid/notebooks` folder is copied to the Hadoop filesystem. If you want to sync a different folder, use the `--dir_to_sync` flag.
+By default, the `./dsgrid/notebooks` folder is copied to the Hadoop filesystem. If you want to sync a different folder, use the `--dir_to_sync` or `-d` flag.
 
 Once the cluster is running and the ssh-tunnel is set-up you can access the system through Jupyter or by ssh-ing into the Master node. The Jupyter address and the IP for the master node get printed during the initialization process. For example the stdout printed during start up looks like:
 ```
@@ -97,8 +97,6 @@ Caught Ctrl+C, shutting down tunnel, please wait
 Copying notebooks back to local machine: /home/ehale/dsgrid/dsgrid/notebooks...
 Terminate cluster [y/n]? y
 Terminating cluster j-2Y17R69QY2BKZ
-Delete S3 scratch directory: <S3_PATH> : [y/n]? y
-Deleting S3 scratch directory...
 ```
 
-You can also see what instances you have running (and manually shut them down, if so desired, but doing it this way will not preserve any changes made to `dir_to_sync`) by going to the [EC2 management](https://us-west-2.console.aws.amazon.com/ec2/v2/home?region=us-west-2#Home) page of the AWS console. The cluster will also shut down after the `idle_time_out` is reached.
+After terminating your cluster, you will be prompted to delete your S3 scratch folder, which contains files for bootstrapping as well as your EMR logs. dsgrid will periodically clear out the scratch folder to maintain storage cost and EMR performance. You can also see what instances you have running (and manually shut them down, if so desired, but doing it this way will not preserve any changes made to `dir_to_sync`) by going to the [EC2 management](https://us-west-2.console.aws.amazon.com/ec2/v2/home?region=us-west-2#Home) page of the AWS console. The cluster will also shut down after the `idle_time_out` is reached.

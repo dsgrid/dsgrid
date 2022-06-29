@@ -5,7 +5,7 @@ core_instances:
   count: 2
   type: c5d.12xlarge
   market: SPOT
-idle_time_out: 3600 # sec, defaults to 1 hr, dsgrid enforces an idle timeout of 3 hrs
+idle_time_out: 3600 # sec, defaults to 1 hr, dsgrid enforces a max idle timeout of 3 hrs
 
 profile: nrel-aws-dsgrid # if you have multiple AWS profiles and dsgrid is not your default, set it here
 ssh_keys:

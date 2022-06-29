@@ -41,13 +41,16 @@ core_instances:
   type: c5d.12xlarge
   market: SPOT
 ```
+`idle_time_out` controlls the length of time for which the EC2 instances could sit idling before they get shut down automatically. If unspecified, `idle_time_out` is default to 1 hour. dsgrid enforces a maximum idle time of 3 hours.
 
 ### Running
 
 To start up the cluster, run the `launch_emr.py` script from the `dsgrid/emr` folder using the `dsgrid-emr` conda environment you created:
 ```
-python launch_emr.py
+python launch_emr.py [--dir_to_sync <path_to_dir> --name <name_your_emr_session>]
 ```
+
+By default, the `dsgrid/dsgrid/notebooks` folder is copied to the Hadoop filesystem. If you want to sync a different folder, use the `--dir_to_sync` flag.
 
 Once the cluster is running and the ssh-tunnel is set-up you can access the system through Jupyter or by ssh-ing into the Master node. The Jupyter address and the IP for the master node get printed during the initialization process. For example the stdout printed during start up looks like:
 ```
@@ -86,15 +89,16 @@ spark = SparkSession.builder.appName("AWS-Cluster").getOrCreate()
 ```
 
 ### Shutting down
+When shutting down the cluster, the `dir_to_sync` folder gets copied back to your local machine.
 
-If you are not working in the default Jupyter dsgrid_notebooks folder you might want to save your work back to your local machine before shutting the cluster down.
-
-To shut the cluster down, simply Ctrl+C out of the local python process you used to start the cluster. You will see stdout like:
+To shut the cluster down, simply Ctrl+C out of the local python process you used to start the cluster and follow the prompts. You will see stdout like:
 ```
 Caught Ctrl+C, shutting down tunnel, please wait
 Copying notebooks back to local machine: /home/ehale/dsgrid/dsgrid/notebooks...
 Terminate cluster [y/n]? y
 Terminating cluster j-2Y17R69QY2BKZ
+Delete S3 scratch directory: <S3_PATH> : [y/n]? y
+Deleting S3 scratch directory...
 ```
 
-You can also see what instances you have running (and manually shut them down, if so desired, but doing it this way will not preserve any changes made to the notebooks) by going to the [EC2 management](https://us-west-2.console.aws.amazon.com/ec2/v2/home?region=us-west-2#Home) page of the AWS console. The EC2 instances will also shut down automatically after 1 hour of idle time.
+You can also see what instances you have running (and manually shut them down, if so desired, but doing it this way will not preserve any changes made to `dir_to_sync`) by going to the [EC2 management](https://us-west-2.console.aws.amazon.com/ec2/v2/home?region=us-west-2#Home) page of the AWS console. The cluster will also shut down after the `idle_time_out` is reached.

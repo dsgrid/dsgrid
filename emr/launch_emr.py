@@ -96,7 +96,10 @@ def launchemr(dir_to_sync=None, name=None):
             else:
                 print(f"  Reconnecting to cluster: {job_flow_id}")
 
-        except Exception as e:
+        except (
+            emr.exceptions.InternalServerException,
+            emr.exceptions.InvalidRequestException,
+        ) as e:
             print(f"  CANNOT read EMR cluster {e}, REMOVING...")
             os.remove(cluster_id_filename)
             resp = input(

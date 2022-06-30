@@ -6,7 +6,11 @@ from dsgrid.utils.run_command import check_run_command, run_command
 
 def test_install_notebooks():
     with TemporaryDirectory() as tmpdir:
-        expected_filenames = ["registration.ipynb", "start_notebook.sh"]
+        expected_filenames = [
+            "connect_to_dsgrid_registry.ipynb",
+            "registration.ipynb",
+            "start_notebook.sh",
+        ]
         check_run_command(f"dsgrid install-notebooks --path={tmpdir}")
         files = list((Path(tmpdir) / "dsgrid-notebooks").iterdir())
         # TODO: Why does this fail only on CI?

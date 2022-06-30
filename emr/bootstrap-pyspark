@@ -12,7 +12,7 @@ Options:
     --jupyter / --no-jupyter    Whether to also install and start a Jupyter
                                 Notebook Server. Default is True.
     --password, -pw             Set the password for the Jupyter Notebook
-                                Server. Default is 'pyspark-user'.
+                                Server. Default is 'dsgrid'.
     --conda-packages            Extra packages to install from conda.
 "
 
@@ -20,7 +20,7 @@ set -e
 
 # Parse Inputs. This is specific to this script, and can be ignored
 # -----------------------------------------------------------------
-JUPYTER_PASSWORD="pyspark-user"
+JUPYTER_PASSWORD="dsgrid"
 EXTRA_CONDA_PACKAGES=""
 JUPYTER="true"
 
@@ -36,6 +36,11 @@ while [[ $# -gt 0 ]]; do
             ;;
         --jupyter)
             JUPYTER="true"
+            shift
+            ;;
+        --s3scratch)
+            S3_SCRATCH="$2"
+            shift
             shift
             ;;
         -pw|--password)
@@ -66,16 +71,8 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-
 # -----------------------------------------------------------------------------
-# 1. Check if running on the master node. If not, there's nothing to do.
-# -----------------------------------------------------------------------------
-grep -q '"isMaster": true' /mnt/var/lib/info/instance.json \
-|| { echo "Not running on master node, nothing to do" && exit 0; }
-
-
-# -----------------------------------------------------------------------------
-# 2. Install Miniconda
+# 1. Install Miniconda
 # -----------------------------------------------------------------------------
 echo "Installing Miniconda"
 curl https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -o /tmp/miniconda.sh
@@ -87,7 +84,7 @@ conda update conda -y
 
 
 # -----------------------------------------------------------------------------
-# 3. Install packages to use in packaged environment
+# 2. Install packages to use in packaged environment
 #
 # We install a few packages by default, and allow users to extend this list
 # with a CLI flag:
@@ -103,12 +100,14 @@ conda install \
 -c conda-forge \
 -y \
 -q \
+python \
 pyspark \
 pyarrow \
+findspark \
 s3fs \
 boto3 \
 conda-pack \
-tornado=6 \
+tornado \
 pandas \
 pytz \
 fastparquet \
@@ -117,11 +116,24 @@ matplotlib \
 $EXTRA_CONDA_PACKAGES
 
 
+echo "Installing dsgrid"
+aws s3 cp $S3_SCRATCH/pkg.tar.gz $HOME
+pip install $HOME/pkg.tar.gz
+rm $HOME/pkg.tar.gz
+
+
 # -----------------------------------------------------------------------------
-# 4. Package the environment to be distributed to worker nodes
+# 3. Package the environment to be distributed to worker nodes
 # -----------------------------------------------------------------------------
-echo "Packaging environment"
-conda pack -q -o $HOME/environment.tar.gz # TODO: can probably get this from dsgrid package and not have to install
+# echo "Packaging environment"
+# conda pack -q -o $HOME/environment.tar.gz # TODO: can probably get this from dsgrid package and not have to install
+
+
+# -----------------------------------------------------------------------------
+# 4. Check if running on the master node. If not, there's nothing to do.
+# -----------------------------------------------------------------------------
+grep -q '"isMaster": true' /mnt/var/lib/info/instance.json \
+|| { echo "Not running on master node, nothing to do" && exit 0; }
 
 
 # -----------------------------------------------------------------------------
@@ -129,6 +141,7 @@ conda pack -q -o $HOME/environment.tar.gz # TODO: can probably get this from dsg
 # -----------------------------------------------------------------------------
 echo "Packages installed in the worker environment:"
 conda list
+
 
 # -----------------------------------------------------------------------------
 # 7. If Jupyter isn't requested, we're done
@@ -190,20 +203,31 @@ EOF
 # This sets the notebook server up to properly run as a background service.
 # -----------------------------------------------------------------------------
 echo "Configuring Jupyter Notebook Upstart Service"
-cat <<EOF > /tmp/jupyter-notebook.conf
-description "Jupyter Notebook Server"
-start on runlevel [2345]
-stop on runlevel [016]
-respawn
-respawn limit unlimited
-exec su - hadoop -c "jupyter notebook" >> /var/log/jupyter-notebook.log 2>&1
+# Ensure that SPARK_HOME is set for both Jupyter and any user that logs in to the master node via ssh.
+export SPARK_HOME=/usr/lib/spark
+cat <<EOF > /tmp/jupyter-notebook.service
+[Unit]
+Description=Jupyter Notebook
+[Service]
+User=hadoop
+ExecStart=$HOME/miniconda/bin/jupyter-notebook --config=$HOME/.jupyter/jupyter_notebook_config.py
+Environment=JAVA_HOME=$JAVA_HOME SPARK_HOME=$SPARK_HOME
+Type=simple
+PIDFile=/run/jupyter.pid
+WorkingDirectory=$HOME
+Restart=always
+RestartSec=10
+[Install]
+WantedBy=multi-user.target
 EOF
-sudo mv /tmp/jupyter-notebook.conf /etc/init/
+sudo mv /tmp/jupyter-notebook.service /etc/systemd/system/
+sudo systemctl enable jupyter-notebook
 
+echo "export SPARK_HOME=$SPARK_HOME" >> /home/hadoop/.bashrc
 
 # -----------------------------------------------------------------------------
 # 12. Start the Jupyter Notebook Server
 # -----------------------------------------------------------------------------
 echo "Starting Jupyter Notebook Server"
-sudo initctl reload-configuration
-sudo initctl start jupyter-notebook
+sudo systemctl daemon-reload
+sudo systemctl start jupyter-notebook

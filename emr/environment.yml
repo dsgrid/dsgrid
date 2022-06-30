@@ -1,0 +1,13 @@
+name: dsgrid-emr
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - boto3
+  - pysftp
+  - python>=3.6.0
+  - sshtunnel
+  - requests
+  - pyyaml
+  - s3fs
+  - flit

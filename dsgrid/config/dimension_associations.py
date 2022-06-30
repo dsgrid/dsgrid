@@ -42,7 +42,7 @@ class DimensionAssociations:
         associations = {}
         for association_file in association_files:
             filename = path / association_file
-            table = read_dataframe(filename, cache=True)
+            table = read_dataframe(filename, cache=True, read_with_spark=False)
             for column in table.columns:
                 tmp = column + "tmp_name"
                 table = (

@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "dsgrid"
 version = "0.1.0"
-description = "EMR boilerplate for ds-grid"
+description = "EMR boilerplate for dsgrid"
 authors = ["roliveir <ricardo.oliveira@nrel.gov>"]
 
 [tool.poetry.dependencies]

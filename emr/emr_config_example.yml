@@ -1,0 +1,19 @@
+master_instance:
+  type: m5.2xlarge
+  market: ON_DEMAND
+core_instances:
+  count: 2
+  type: c5d.12xlarge
+  market: SPOT
+idle_time_out: 3600 # sec, defaults to 1 hr, dsgrid enforces a max idle timeout of 3 hrs
+
+profile: nrel-aws-dsgrid # if you have multiple AWS profiles and dsgrid is not your default, set it here
+ssh_keys:
+  # The default behavior uses ~/.ssh/<USER>-dsgrid.pem and <USER>-dsgrid.
+  # Change these values if you use different settings.
+  # pkey_location: ~/.ssh/<USER>-dsgrid.pem # The path to your private key file used with AWS.
+  # key_name: <USER>-dsgrid # The name of the permission key file on AWS.
+
+s3_scratch: s3://nrel-dsgrid-int-scratch/scratch-emr
+billing_id: 210031
+subnet_id: subnet-00de90a8ac1b5afd5 # <-- this is public subset (private subnet: subnet-03c3675a2bf1477c0), ensures connectivity

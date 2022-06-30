@@ -87,11 +87,24 @@ def launchemr(dir_to_sync=None, name=None):
             if state in ["TERMINATED", "TERMINATED_WITH_ERRORS"]:
                 print(f"  EMR cluster is {state}: {message}, REMOVING...")
                 os.remove(cluster_id_filename)
+                resp = input(
+                    f" >> Delete S3 scratch directory for the TERMINATED cluster: {s3_scratch_user} : [y/n]? "
+                )
+                if resp.lower().endswith("y") and fs.exists(s3_scratch_user):
+                    print("Deleting S3 scratch directory...")
+                    fs.rm(s3_scratch_user, recursive=True)
             else:
                 print(f"  Reconnecting to cluster: {job_flow_id}")
+
         except Exception as e:
-            logging.exception(f"  CANNOT read EMR cluster: {e}, REMOVING...")
+            print(f"  CANNOT read EMR cluster {e}, REMOVING...")
             os.remove(cluster_id_filename)
+            resp = input(
+                f" >> Delete S3 scratch directory for the UNKNOWN cluster: {s3_scratch_user} : [y/n]? "
+            )
+            if resp.lower().endswith("y") and fs.exists(s3_scratch_user):
+                print("Deleting S3 scratch directory...")
+                fs.rm(s3_scratch_user, recursive=True)
 
     if not cluster_id_filename.exists():
         s3_scratch_user = f"{s3_scratch}/{getpass.getuser()}_{timestamp}"
@@ -205,7 +218,6 @@ def launchemr(dir_to_sync=None, name=None):
             break
         elif state in ["TERMINATED", "TERMINATED_WITH_ERRORS"]:
             print(f"EMR Cluster is {state}", message)
-            os.remove(cluster_id_filename)
             raise RuntimeError(f"EMR Cluster is {state}: {message}")
         time.sleep(30)
 
@@ -285,20 +297,54 @@ def launchemr(dir_to_sync=None, name=None):
         shutil.rmtree(dir_to_sync)
         shutil.copytree(os.path.join(tmpdir, dir_to_sync.name), str(dir_to_sync))
 
-    resp = input("Terminate cluster [y/n]? ")
+    resp = input(" >> Terminate cluster [y/n]? ")
     if resp.lower().startswith("y"):
-        print(f"Terminating cluster {job_flow_id}")
+        print(f"Terminating cluster {job_flow_id} ...")
         emr.terminate_job_flows(JobFlowIds=[job_flow_id])
+        wait = True
 
-        resp2 = input(f"Delete S3 scratch directory: {s3_scratch_user} : [y/n]? ")
-        if resp2.lower().endswith("y"):
-            print("Deleting S3 scratch directory...")
-            while fs.exists(s3_scratch_user):
-                fs.rm(
-                    s3_scratch_user, recursive=True
-                )  # folder in use until cluster is shut down completely
+        # Give time for cluster to shut down fully
+        while wait:
+            state = sleep_loop_for_cluster_shutdown(
+                emr, job_flow_id, n_attempts=12, sleep_interval=10
+            )
+            if state != "TERMINATED":
+                resp = input(
+                    f" >> Cluster: {job_flow_id} could not be terminated after 2 min, "
+                    "wait some more? [y/n]? "
+                )
+                if resp.lower().startswith("y"):
+                    continue
+                else:
+                    print("Try manually shut down the cluster on the AWS portal.")
+            wait = False
 
-        os.remove(cluster_id_filename)
+        # Delete s3 scratch
+        if state == "TERMINATED":
+            os.remove(cluster_id_filename)
+            resp2 = input(
+                f" >> Delete S3 scratch directory: {s3_scratch_user} : [y/n]? "
+            )
+            if resp2.lower().endswith("y"):
+                print("Deleting S3 scratch directory...")
+                fs.rm(s3_scratch_user, recursive=True)
+
+
+def sleep_loop_for_cluster_shutdown(emr, job_flow_id, n_attempts=18, sleep_interval=10):
+    attempt = 0
+    state = emr.describe_cluster(ClusterId=job_flow_id)["Cluster"]["Status"]["State"]
+
+    while state != "TERMINATED":
+        attempt += 1
+        time.sleep(sleep_interval)
+        state = emr.describe_cluster(ClusterId=job_flow_id)["Cluster"]["Status"][
+            "State"
+        ]
+        print(f"Cluster Status: {state}")
+        if attempt == n_attempts:
+            break
+
+    return state
 
 
 if __name__ == "__main__":

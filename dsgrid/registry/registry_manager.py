@@ -4,8 +4,8 @@ import getpass
 import logging
 import os
 import sys
-from pathlib import Path
 import uuid
+from pathlib import Path
 
 import requests
 from pyspark.sql import SparkSession

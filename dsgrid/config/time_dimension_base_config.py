@@ -22,12 +22,13 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def convert_dataframe(self, df):
-        """Convert a dataframe to use standard datetime timestamps.
+    def convert_dataframe(self, df, project_time_dim):
+        """Convert a dataframe to use project's time format and time zone.
 
         Parameters
         ----------
         df : pyspark.sql.DataFrame
+        project_time_dim : TimeDimensionBaseConfig
 
         Returns
         -------

@@ -9,7 +9,7 @@ from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import check_required_dimensions
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension, DSGInvalidParameter
 from dsgrid.registry.common import (
     ProjectRegistryStatus,
     DatasetRegistryStatus,
@@ -381,6 +381,26 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return dim_config
         assert False, dimension_type
 
+    def get_dimension(self, dimension_type: DimensionType, query_name: str):
+        """Return an instance of DimensionBaseConfig.
+
+        Parameters
+        ----------
+        dimension_type : DimensionType
+        query_name : str
+
+        Returns
+        -------
+        DimensionBaseConfig
+
+        """
+        for dim_config in self.iter_dimensions():
+            model = dim_config.model
+            if model.dimension_type == dimension_type and model.query_name == query_name:
+                return dim_config
+
+        raise DSGInvalidDimension(f"{dimension_type} with query_name={query_name} is not stored")
+
     def get_dimension_records(self, dimension_type: DimensionType, query_name: str):
         """Return a DataFrame containing the records for a dimension.
 
@@ -394,12 +414,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
         pyspark.sql.DataFrame
 
         """
-        for dim_config in self.iter_dimensions():
-            model = dim_config.model
-            if model.dimension_type == dimension_type and model.query_name == query_name:
-                return dim_config.get_records_dataframe()
-
-        raise DSGInvalidDimension(f"{dimension_type} with query_name={query_name} is not stored")
+        return self.get_dimension(dimension_type, query_name).get_records_dataframe()
 
     def get_supplemental_dimensions(self, dimension_type: DimensionType):
         """Return the supplemental dimensions matching dimension (if any).
@@ -433,6 +448,34 @@ class ProjectConfig(ConfigWithDataFilesBase):
             for x in self._base_to_supplemental_mappings.values()
             if x.model.from_dimension.dimension_type == dimension_type
         ]
+
+    def get_base_to_supplemental_mapping_records(
+        self, dimension_type: DimensionType, query_name: str
+    ):
+        """Return the project's base-to-supplemental dimension mapping records.
+
+        Parameters
+        ----------
+        dimension_type : DimensionType
+        query_name : str
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+        dim = self.get_dimension(dimension_type, query_name)
+        base_dim = self.get_base_dimension(dimension_type)
+        if dim.model.dimension_id == base_dim.model.dimension_id:
+            raise DSGInvalidParameter(f"Cannot pass base dimension: {dimension_type}/{query_name}")
+
+        for mapping in self._base_to_supplemental_mappings.values():
+            if mapping.model.to_dimension.dimension_id == dim.model.dimension_id:
+                # TODO DT: Is it weird that we are carrying around NULLs?
+                # Seems like we could drop them at registration time.
+                return mapping.get_records_dataframe().filter("to_id is not NULL")
+
+        raise DSGInvalidParameter(f"No mapping is stored for {dimension_type}/{query_name}")
 
     def has_base_to_supplemental_dimension_mapping_types(self, dimension_type):
         """Return True if the config has these base-to-supplemental mappings."""

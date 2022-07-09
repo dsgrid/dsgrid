@@ -1,8 +1,10 @@
 import logging
+from typing import List
 
 from dsgrid.config.dataset_config import (
     DatasetConfig,
 )
+from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -96,3 +98,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_null_value_in_unique_dimension_rows(dim_table)
 
         return dim_table
+
+    @track_timing(timer_stats_collector)
+    def filter_data(self, dimensions: List[DatasetSimpleModel]):
+        assert False, "not supported yet"

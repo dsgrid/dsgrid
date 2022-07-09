@@ -8,8 +8,11 @@ from pathlib import Path
 import click
 
 from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY
+from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.loggers import setup_logging, check_log_file_size
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.registry.filter_registry_manager import FilterRegistryManager
+from dsgrid.utils.files import load_data
 
 
 logger = logging.getLogger(__name__)
@@ -169,8 +172,48 @@ def remove_dataset(registry_manager, dataset_id):
     registry_manager.dataset_manager.remove(dataset_id)
 
 
+def _path_cb(_, __, val):
+    return Path(val)
+
+
+@click.command()
+@click.argument("src_registry_path", type=click.Path(exists=True), callback=_path_cb)
+@click.argument("dst_registry_path", type=click.Path(exists=False), callback=_path_cb)
+@click.argument("config_file", type=click.Path(exists=True), callback=_path_cb)
+@click.option(
+    "-r",
+    "--use-rsync",
+    default=False,
+    is_flag=True,
+    show_default=True,
+    help="Use rsync instead of copy. Useful when calling many times. Not available on Windows.",
+)
+@click.option(
+    "-f",
+    "--force",
+    default=False,
+    is_flag=True,
+    show_default=True,
+    help="Overwrite dst_registry_path if it already exists. Only applies if use_rsync is False.",
+)
+def make_filtered_registry(
+    src_registry_path: Path, dst_registry_path: Path, config_file: Path, use_rsync, force
+):
+    """Make a filtered registry for testing purposes."""
+    simple_model = RegistrySimpleModel(**load_data(config_file))
+    RegistryManager.copy(
+        src_registry_path,
+        dst_registry_path,
+        use_rsync=use_rsync,
+        force=force,
+    )
+    mgr = FilterRegistryManager.load(dst_registry_path, offline_mode=True)
+    mgr.filter(simple_model=simple_model)
+
+
 cli.add_command(registry)
 cli.add_command(create_registry)
+cli.add_command(make_filtered_registry)
 
 registry.add_command(dimensions)
 registry.add_command(dimension_mappings)

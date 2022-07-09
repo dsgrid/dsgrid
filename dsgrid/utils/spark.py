@@ -2,6 +2,7 @@
 
 import logging
 import os
+import shutil
 from pathlib import Path
 from typing import AnyStr, List, Union
 
@@ -251,6 +252,22 @@ def check_for_nulls(df, exclude_columns=None):
             )
     finally:
         sql("DROP VIEW tmp_table")
+
+
+def overwrite_dataframe_file(filename, df):
+    suffix = Path(filename).suffix
+    tmp = str(filename) + ".tmp"
+    if suffix == ".parquet":
+        df.write.parquet(tmp)
+    elif suffix == ".csv":
+        df.write.csv(tmp, header=True)
+    elif suffix == ".json":
+        df.write.json(tmp)
+    if os.path.isfile(filename):
+        os.unlink(filename)
+    else:
+        shutil.rmtree(filename)
+    os.rename(tmp, str(filename))
 
 
 def sql(query):

@@ -2,10 +2,12 @@ import abc
 import logging
 import os
 from collections import defaultdict
+from typing import List
 
 import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping, DSGInvalidField
 from dsgrid.dimension.time import TimeDimensionType
@@ -54,6 +56,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
         -------
         pyspark.sql.DataFrame
 
+        """
+
+    @abc.abstractmethod
+    def filter_data(self, dimensions: List[DatasetSimpleModel]):
+        """Filter the load data by dimensions and rewrite the files.
+
+        dimensions : List[DimensionSimpleModel]
         """
 
     @property

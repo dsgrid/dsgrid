@@ -6,7 +6,9 @@ from pyspark.sql import SparkSession
 
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dataset.dataset import Dataset
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered
+from dsgrid.query import AlternateDimensionsModel, QueryContext
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
 
 
@@ -74,6 +76,14 @@ class Project:
         """Returns the ProjectConfig."""
         return self._config
 
+    @property
+    def dimension_manager(self):
+        return self._dimension_mgr
+
+    @property
+    def dimension_mapping_manager(self):
+        return self._dimension_mapping_mgr
+
     def get_dataset(self, dataset_id):
         """Returns a Dataset. Calls load_dataset if it hasn't already been loaded.
 
@@ -86,9 +96,11 @@ class Project:
         Dataset
 
         """
-        if dataset_id not in self._datasets:
-            raise ValueError(f"dataset {dataset_id} has not been loaded")
-        return self._datasets[dataset_id]
+        if dataset_id in self._datasets:
+            dataset = self._datasets[dataset_id]
+        else:
+            dataset = self.load_dataset(dataset_id)
+        return dataset
 
     def load_dataset(self, dataset_id):
         """Loads a dataset. Creates a view for each of its tables.
@@ -96,6 +108,10 @@ class Project:
         Parameters
         ----------
         dataset_id : str
+
+        Returns
+        -------
+        Dataset
 
         """
         if dataset_id not in self._dataset_configs:
@@ -109,9 +125,11 @@ class Project:
             self._dimension_mgr,
             self._dimension_mapping_mgr,
             mapping_references=input_dataset.mapping_references,
+            project_time_dim=self._config.get_base_dimension(DimensionType.TIME),
         )
         dataset.create_views()
         self._datasets[dataset_id] = dataset
+        return dataset
 
     def unload_dataset(self, dataset_id):
         """Loads a dataset. Creates a view for each of its tables.
@@ -130,3 +148,45 @@ class Project:
 
     def list_datasets(self):
         return [x.dataset_id for x in self._iter_datasets()]
+
+    def process_query(self, query_context: QueryContext):
+        df = self._make_query_dataframe(query_context)
+        # TODO: handle final aggregration
+        # if query_context.model.aggregation is not None:
+        name = query_context.model.name
+        output_dir = query_context.model.output_dir
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filename = output_dir / (name + ".parquet")
+        df.write.mode("overwrite").parquet(str(filename))
+        logger.info("Wrote query=%s output table to %s", name, filename)
+
+    def _make_query_dataframe(self, query_context: QueryContext):
+        for field in AlternateDimensionsModel.__fields__:
+            model = getattr(query_context.model.alternate_dimensions, field, None)
+            if model is not None:
+                dim_type = DimensionType(field)
+                query_context.set_alt_dimension_records(
+                    dim_type,
+                    self._config.get_base_to_supplemental_mapping_records(
+                        dim_type, model.query_name
+                    ),
+                )
+
+        dfs = []
+        for dataset_id in query_context.model.dataset_ids:
+            logger.info("Start processing query for dataset_id=%s", dataset_id)
+            dataset = self.get_dataset(dataset_id)
+            dfs.append(dataset.get_dataframe(query_context))
+            logger.info("Finished processing query for dataset_id=%s", dataset_id)
+
+        if not dfs:
+            logger.warning("No data matched %s", query_context.name)
+            return None
+
+        if len(dfs) == 1:
+            return dfs[0]
+
+        main_df = dfs[0]
+        for df in dfs[1:]:
+            main_df = main_df.union(df)
+        return main_df

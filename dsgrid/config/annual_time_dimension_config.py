@@ -41,7 +41,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data timestamps do not match expected times. mismatch={mismatch}"
             )
 
-    def convert_dataframe(self, df):
+    def convert_dataframe(self, df, project_time_dim):
         return df
 
     def get_frequency(self):

@@ -383,6 +383,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return dim_config
         assert False, dimension_type
 
+<<<<<<< HEAD
     def get_dimension(self, query_name: str):
         """Return an instance of DimensionBaseConfig.
 
@@ -409,7 +410,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        DimensionBaseConfig
 
         """
         return self.get_dimension(query_name).get_records_dataframe()
@@ -467,6 +468,8 @@ class ProjectConfig(ConfigWithDataFilesBase):
 
         for mapping in self._base_to_supplemental_mappings.values():
             if mapping.model.to_dimension.dimension_id == dim.model.dimension_id:
+                # TODO DT: Is it weird that we are carrying around NULLs?
+                # Seems like we could drop them at registration time.
                 return mapping.get_records_dataframe().filter("to_id is not NULL")
 
         raise DSGInvalidParameter(f"No mapping is stored for {dimension_type}/{query_name}")

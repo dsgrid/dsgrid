@@ -673,7 +673,11 @@ class ProjectRegistryManager(RegistryManagerBase):
         """Check that a dataset has all project-required dimension records."""
         logger.info("Check dataset-base-to-project-base dimension mappings.")
         handler = make_dataset_schema_handler(
-            dataset_config, self._dimension_mgr, self._dimension_mapping_mgr, mapping_references
+            dataset_config,
+            self._dimension_mgr,
+            self._dimension_mapping_mgr,
+            mapping_references,
+            project_time_dim=project_config.get_base_dimension(DimensionType.TIME),
         )
         pivot_dimension = handler.get_pivot_dimension_type()
         exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension])

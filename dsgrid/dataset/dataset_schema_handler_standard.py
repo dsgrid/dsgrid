@@ -5,11 +5,12 @@ import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DatasetSimpleModel
-from dsgrid.utils.spark import read_dataframe, get_unique_values, overwrite_dataframe_file
-from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.query import QueryContext
+from dsgrid.utils.spark import read_dataframe, get_unique_values, overwrite_dataframe_file
+from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,57 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_null_value_in_unique_dimension_rows(dim_table)
 
         return dim_table
+
+    def make_project_dataframe(
+        self, load_data_df=None, lookup_df=None, query_context: QueryContext = None
+    ):
+        ld_df = self._remap_dimension_columns(load_data_df or self._load_data)
+        lk_df = self._remap_dimension_columns(lookup_df or self._load_data_lookup)
+
+        if query_context is not None:
+            for dimension_type, records in query_context.iter_alt_dimension_records():
+                column = dimension_type.value
+                if column == self.get_pivot_dimension_type().value:
+                    # This class requires that the pivot dimension is metric and so operation
+                    # is supported.
+                    model = getattr(query_context.model.alternate_dimensions, column)
+                    ld_df = self._map_and_reduce_pivot_dimension(
+                        ld_df,
+                        records,
+                        set(self.get_pivot_dimension_columns_mapped_to_project()),
+                        operation=model.operation,
+                        keep_individual_fields=model.keep_individual_fields,
+                    )
+                else:
+                    ld_df = self._map_and_reduce_non_pivot_dimension(
+                        ld_df,
+                        records,
+                        column,
+                    )
+                if column in lk_df.columns:
+                    lk_df = self._map_and_reduce_non_pivot_dimension(lk_df, records, column)
+                logger.info("Replaced dimensions with alternate records %s", column)
+
+        ld_df = ld_df.join(lk_df.drop("fraction"), on="id").drop("id")
+
+        # Map the time here because some columns may have been collapsed above.
+        ld_df = self._convert_time_dimension(ld_df)
+
+        # TODO: consider persisting this table to a Parquet file
+        # We can a registry of cached tables that are identified by query parameters.
+        # Can we use a hash of the stringified version of QueryModel as pertains to this dataset?
+        return ld_df
+
+    @track_timing(timer_stats_collector)
+    def get_dataframe(self, query_context: QueryContext):
+        # TODO: handle pre-filtering of load data.
+        #   - time could be filtered
+        #   - columns could be dropped or aggregated
+        ld_df = self._load_data
+        lk_df = self._filter_project_dimensions(self._load_data_lookup, query_context)
+        return self.make_project_dataframe(
+            load_data_df=ld_df, lookup_df=lk_df, query_context=query_context
+        )
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):

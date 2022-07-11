@@ -263,7 +263,7 @@ def overwrite_dataframe_file(filename, df):
         df.write.csv(tmp, header=True)
     elif suffix == ".json":
         df.write.json(tmp)
-    if os.path.isfile(filename):
+    if os.path.isfile(filename) or os.path.islink(filename):
         os.unlink(filename)
     else:
         shutil.rmtree(filename)

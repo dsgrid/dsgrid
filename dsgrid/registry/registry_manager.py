@@ -4,8 +4,8 @@ import getpass
 import logging
 import os
 import requests
-import sys
 import shutil
+import sys
 import uuid
 from pathlib import Path
 
@@ -23,8 +23,8 @@ from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidParameter
-from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.utils.run_command import check_run_command
+from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.utils.spark import init_spark
 from .common import (
     RegistryType,
@@ -497,7 +497,7 @@ class RegistryManager:
                 updated_projects[project.config_id] = project
 
     @staticmethod
-    def copy(src: Path, dst: Path, use_rsync=False, force=False):
+    def copy(src: Path, dst: Path, make_data_symlinks=False, use_rsync=False, force=False):
         """Copy a registry to a new path.
 
         Parameters
@@ -506,6 +506,8 @@ class RegistryManager:
         dst : Path
         simple_model : RegistrySimpleModel
             Filter all configs and data according to this model.
+        make_data_symlinks : bool
+            If True, make symlinks to data files.
         use_rsync : bool
             If True, use rsync instead of copy. Useful for testing when the method is called many
             times. Not available on Windows.
@@ -533,8 +535,32 @@ class RegistryManager:
                     shutil.rmtree(dst)
                 else:
                     raise DSGInvalidParameter(f"{dst} already exists.")
-            logger.info("Copy data from source registry", src)
-            shutil.copytree(src, dst)
+            logger.info("Copy data from source registry %s", src)
+            if make_data_symlinks:
+                (dst).mkdir()
+                shutil.copytree(src / "configs", dst / "configs")
+                _make_data_symlinks(src, dst)
+            else:
+                shutil.copytree(src, dst, symlinks=True)
+
+
+def _make_data_symlinks(src, dst):
+    # registry/data/dataset_id/registry.toml
+    # registry/data/dataset_id/version/*.parquet
+    for dataset_id in (src / "data").iterdir():
+        if dataset_id.is_dir():
+            (dst / "data" / dataset_id.name).mkdir(parents=True)
+        for path in (src / "data" / dataset_id).iterdir():
+            if path.is_dir():
+                (dst / "data" / dataset_id.name / path.name).mkdir()
+                for data_file in path.iterdir():
+                    os.symlink(
+                        data_file,
+                        dst / "data" / dataset_id.name / path.name / data_file.name,
+                        target_is_directory=data_file.is_dir(),
+                    )
+            elif path.is_file():
+                shutil.copyfile(path, dst / "data" / dataset_id.name / path.name)
 
 
 def get_registry_path(registry_path=None):

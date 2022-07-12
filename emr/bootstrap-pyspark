@@ -92,29 +92,23 @@ conda update conda -y
 # - pyspark
 # - pyarrow for working with hdfs, parquet, ORC, etc...
 # - s3fs for access to s3
-# - conda-pack for packaging the environment for distribution
 # - ensure tornado 5, since tornado 6 doesn't work with jupyter-server-proxy
 # -----------------------------------------------------------------------------
 echo "Installing base packages"
 conda install \
--c conda-forge \
 -y \
 -q \
-python \
+python=3.9 \
 pyspark \
 pyarrow \
-findspark \
 s3fs \
 boto3 \
-conda-pack \
-tornado \
 pandas \
 pytz \
-fastparquet \
-python-snappy \
 matplotlib \
 $EXTRA_CONDA_PACKAGES
 
+conda install -c conda-forge -y -q findspark
 
 echo "Installing dsgrid"
 aws s3 cp $S3_SCRATCH/pkg.tar.gz $HOME

@@ -181,20 +181,13 @@ def _path_cb(_, __, val):
 @click.argument("dst_registry_path", type=click.Path(exists=False), callback=_path_cb)
 @click.argument("config_file", type=click.Path(exists=True), callback=_path_cb)
 @click.option(
-    "--data-symlinks/--no-data-symlinks",
-    default=False,
-    is_flag=True,
+    "-m",
+    "--mode",
+    default="copy",
+    type=click.Choice(["copy", "data-symlinks", "rsync"]),
     show_default=True,
-    help="Make symlinks to data files (no big copy operations).",
-)
-@click.option(
-    "-r",
-    "--use-rsync",
-    default=False,
-    is_flag=True,
-    show_default=True,
-    help="Use rsync instead of copy. Mutually exclusive with --data-symlinks. Not available on "
-    "Windows.",
+    help="Controls whether to copy all data, make symlinks to data files, or sync data with the "
+    "rsync utility (not available on Windows).",
 )
 @click.option(
     "-f",
@@ -208,24 +201,18 @@ def make_filtered_registry(
     src_registry_path: Path,
     dst_registry_path: Path,
     config_file: Path,
-    data_symlinks,
-    use_rsync,
+    mode,
     force,
 ):
     """Make a filtered registry for testing purposes."""
-    if use_rsync and data_symlinks:
-        print("use_rsync is not supported with data_symlinks", file=sys.stderr)
-        sys.exit(1)
-
     simple_model = RegistrySimpleModel(**load_data(config_file))
     RegistryManager.copy(
         src_registry_path,
         dst_registry_path,
-        make_data_symlinks=data_symlinks,
-        use_rsync=use_rsync,
+        mode=mode,
         force=force,
     )
-    mgr = FilterRegistryManager.load(dst_registry_path, offline_mode=True)
+    mgr = FilterRegistryManager.load(dst_registry_path, offline_mode=True, use_remote_data=False)
     mgr.filter(simple_model=simple_model)
 
 

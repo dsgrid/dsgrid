@@ -497,7 +497,7 @@ class RegistryManager:
                 updated_projects[project.config_id] = project
 
     @staticmethod
-    def copy(src: Path, dst: Path, make_data_symlinks=False, use_rsync=False, force=False):
+    def copy(src: Path, dst: Path, mode="copy", force=False):
         """Copy a registry to a new path.
 
         Parameters
@@ -506,8 +506,9 @@ class RegistryManager:
         dst : Path
         simple_model : RegistrySimpleModel
             Filter all configs and data according to this model.
-        make_data_symlinks : bool
-            If True, make symlinks to data files.
+        mode : str
+            Controls whether to copy all data, make symlinks to data files, or sync data with the
+            rsync utility (not available on Windows). Options: 'copy', 'data-symlinks', 'rsync'
         use_rsync : bool
             If True, use rsync instead of copy. Useful for testing when the method is called many
             times. Not available on Windows.
@@ -524,24 +525,26 @@ class RegistryManager:
         if not {x.name for x in src.iterdir()}.issuperset({"configs", "data"}):
             raise DSGInvalidParameter(f"{src} is not a valid registry")
 
-        if use_rsync:
+        if mode == "rsync":
             dst.mkdir(exist_ok=True)
             cmd = f"rsync -a {src}/ {dst}"
             logger.info("rsync data with [%s]", cmd)
             check_run_command(cmd)
-        else:
+        elif mode in ("copy", "data-symlinks"):
             if dst.exists():
                 if force:
                     shutil.rmtree(dst)
                 else:
                     raise DSGInvalidParameter(f"{dst} already exists.")
             logger.info("Copy data from source registry %s", src)
-            if make_data_symlinks:
+            if mode == "data-symlinks":
                 (dst).mkdir()
                 shutil.copytree(src / "configs", dst / "configs")
                 _make_data_symlinks(src, dst)
             else:
                 shutil.copytree(src, dst, symlinks=True)
+        else:
+            raise DSGInvalidParameter(f"mode={mode} is not supported")
 
 
 def _make_data_symlinks(src, dst):

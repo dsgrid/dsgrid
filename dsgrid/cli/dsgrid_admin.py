@@ -195,7 +195,7 @@ def _path_cb(_, __, val):
     default=False,
     is_flag=True,
     show_default=True,
-    help="Overwrite dst_registry_path if it already exists. Only applies if use_rsync is False.",
+    help="Overwrite dst_registry_path if it already exists. Does not apply if using rsync.",
 )
 def make_filtered_registry(
     src_registry_path: Path,

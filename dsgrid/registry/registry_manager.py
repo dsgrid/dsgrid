@@ -509,11 +509,8 @@ class RegistryManager:
         mode : str
             Controls whether to copy all data, make symlinks to data files, or sync data with the
             rsync utility (not available on Windows). Options: 'copy', 'data-symlinks', 'rsync'
-        use_rsync : bool
-            If True, use rsync instead of copy. Useful for testing when the method is called many
-            times. Not available on Windows.
         force : bool
-            Overwrite dst if it already exists. Only applies if use_rsync is False.
+            Overwrite dst if it already exists. Does not apply if using rsync.
 
         Raises
         ------

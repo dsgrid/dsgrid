@@ -3,11 +3,12 @@
 import getpass
 import logging
 import os
-import sys
-from pathlib import Path
-import uuid
-
 import requests
+import shutil
+import sys
+import uuid
+from pathlib import Path
+
 from pyspark.sql import SparkSession
 
 from dsgrid.common import (
@@ -21,7 +22,8 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGValueNotRegistered
+from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidParameter
+from dsgrid.utils.run_command import check_run_command
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.utils.spark import init_spark
 from .common import (
@@ -57,7 +59,7 @@ class RegistryManager:
         self._dimension_mgr = DimensionRegistryManager.load(
             params.base_path / DimensionRegistry.registry_path(), params
         )
-        self._dimension_mapping_dimension_mgr = DimensionMappingRegistryManager.load(
+        self._dimension_mapping_mgr = DimensionMappingRegistryManager.load(
             params.base_path / DimensionMappingRegistry.registry_path(),
             params,
             self._dimension_mgr,
@@ -66,14 +68,14 @@ class RegistryManager:
             params.base_path / DatasetRegistry.registry_path(),
             params,
             self._dimension_mgr,
-            self._dimension_mapping_dimension_mgr,
+            self._dimension_mapping_mgr,
         )
         self._project_mgr = ProjectRegistryManager.load(
             params.base_path / ProjectRegistry.registry_path(),
             params,
             self._dataset_mgr,
             self._dimension_mgr,
-            self._dimension_mapping_dimension_mgr,
+            self._dimension_mapping_mgr,
         )
 
     @classmethod
@@ -121,7 +123,7 @@ class RegistryManager:
 
     @property
     def dimension_mapping_manager(self):
-        return self._dimension_mapping_dimension_mgr
+        return self._dimension_mapping_mgr
 
     @property
     def dimension_manager(self):
@@ -493,6 +495,72 @@ class RegistryManager:
                     updated = True
             if updated and project.config_id not in updated_projects:
                 updated_projects[project.config_id] = project
+
+    @staticmethod
+    def copy(src: Path, dst: Path, mode="copy", force=False):
+        """Copy a registry to a new path.
+
+        Parameters
+        ----------
+        src : Path
+        dst : Path
+        simple_model : RegistrySimpleModel
+            Filter all configs and data according to this model.
+        mode : str
+            Controls whether to copy all data, make symlinks to data files, or sync data with the
+            rsync utility (not available on Windows). Options: 'copy', 'data-symlinks', 'rsync'
+        force : bool
+            Overwrite dst if it already exists. Does not apply if using rsync.
+
+        Raises
+        ------
+        DSGInvalidParameter
+            Raised if src is not a valid registry.
+            Raised if dst exists, use_rsync is False, and force is False.
+
+        """
+        if not {x.name for x in src.iterdir()}.issuperset({"configs", "data"}):
+            raise DSGInvalidParameter(f"{src} is not a valid registry")
+
+        if mode == "rsync":
+            dst.mkdir(exist_ok=True)
+            cmd = f"rsync -a {src}/ {dst}"
+            logger.info("rsync data with [%s]", cmd)
+            check_run_command(cmd)
+        elif mode in ("copy", "data-symlinks"):
+            if dst.exists():
+                if force:
+                    shutil.rmtree(dst)
+                else:
+                    raise DSGInvalidParameter(f"{dst} already exists.")
+            logger.info("Copy data from source registry %s", src)
+            if mode == "data-symlinks":
+                (dst).mkdir()
+                shutil.copytree(src / "configs", dst / "configs")
+                _make_data_symlinks(src, dst)
+            else:
+                shutil.copytree(src, dst, symlinks=True)
+        else:
+            raise DSGInvalidParameter(f"mode={mode} is not supported")
+
+
+def _make_data_symlinks(src, dst):
+    # registry/data/dataset_id/registry.toml
+    # registry/data/dataset_id/version/*.parquet
+    for dataset_id in (src / "data").iterdir():
+        if dataset_id.is_dir():
+            (dst / "data" / dataset_id.name).mkdir(parents=True)
+        for path in (src / "data" / dataset_id).iterdir():
+            if path.is_dir():
+                (dst / "data" / dataset_id.name / path.name).mkdir()
+                for data_file in path.iterdir():
+                    os.symlink(
+                        data_file,
+                        dst / "data" / dataset_id.name / path.name / data_file.name,
+                        target_is_directory=data_file.is_dir(),
+                    )
+            elif path.is_file():
+                shutil.copyfile(path, dst / "data" / dataset_id.name / path.name)
 
 
 def get_registry_path(registry_path=None):

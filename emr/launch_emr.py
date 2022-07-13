@@ -32,9 +32,7 @@ def build_package():
         stderr=subprocess.DEVNULL,
     )
 
-    return sorted(
-        (pkgdir / "dist").glob("*.tar.gz"), key=os.path.getmtime, reverse=True
-    )[0]
+    return sorted((pkgdir / "dist").glob("*.tar.gz"), key=os.path.getmtime, reverse=True)[0]
 
 
 def launchemr(dir_to_sync=None, name=None):
@@ -81,9 +79,7 @@ def launchemr(dir_to_sync=None, name=None):
         try:
             resp = emr.describe_cluster(ClusterId=job_flow_id)
             state = resp["Cluster"]["Status"]["State"]
-            message = resp["Cluster"]["Status"]["StateChangeReason"].get(
-                "Message", "(no message)"
-            )
+            message = resp["Cluster"]["Status"]["StateChangeReason"].get("Message", "(no message)")
             if state in ["TERMINATED", "TERMINATED_WITH_ERRORS"]:
                 print(f"  EMR cluster is {state}: {message}, REMOVING...")
                 os.remove(cluster_id_filename)
@@ -122,9 +118,7 @@ def launchemr(dir_to_sync=None, name=None):
 
         # Run EMR job flow
         # resource: https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/emr.html
-        idle_time_out = min(
-            cfg.get("idle_time_out", 3600), 3600 * 3
-        )  # sec, enforcing max of 3hrs
+        idle_time_out = min(cfg.get("idle_time_out", 3600), 3600 * 3)  # sec, enforcing max of 3hrs
         resp = emr.run_job_flow(
             Name=f"{getpass.getuser()}-dsgrid",
             LogUri=f"{s3_scratch_user}/emrlogs/",
@@ -132,21 +126,15 @@ def launchemr(dir_to_sync=None, name=None):
             Instances={
                 "InstanceGroups": [
                     {
-                        "Market": cfg.get("master_instance", {}).get(
-                            "market", "ON_DEMAND"
-                        ),
+                        "Market": cfg.get("master_instance", {}).get("market", "ON_DEMAND"),
                         "InstanceRole": "MASTER",
-                        "InstanceType": cfg.get("master_instance", {}).get(
-                            "type", "m5.2xlarge"
-                        ),
+                        "InstanceType": cfg.get("master_instance", {}).get("type", "m5.2xlarge"),
                         "InstanceCount": 1,
                     },
                     {
                         "Market": cfg.get("core_instance", {}).get("market", "SPOT"),
                         "InstanceRole": "CORE",
-                        "InstanceType": cfg.get("core_instances", {}).get(
-                            "type", "c5d.12xlarge"
-                        ),
+                        "InstanceType": cfg.get("core_instances", {}).get("type", "c5d.12xlarge"),
                         "InstanceCount": cfg.get("core_instances", {}).get("count", 2),
                     },
                 ],
@@ -213,9 +201,7 @@ def launchemr(dir_to_sync=None, name=None):
     while True:
         resp = emr.describe_cluster(ClusterId=job_flow_id)
         state = resp["Cluster"]["Status"]["State"]
-        message = resp["Cluster"]["Status"]["StateChangeReason"].get(
-            "Message", "(no message)"
-        )
+        message = resp["Cluster"]["Status"]["StateChangeReason"].get("Message", "(no message)")
         print(f"Cluster Status: {state} - {message}")
         if state == "WAITING":
             break
@@ -224,9 +210,7 @@ def launchemr(dir_to_sync=None, name=None):
             raise RuntimeError(f"EMR Cluster is {state}: {message}")
         time.sleep(30)
 
-    master_instance = emr.list_instances(
-        ClusterId=job_flow_id, InstanceGroupTypes=["MASTER"]
-    )
+    master_instance = emr.list_instances(ClusterId=job_flow_id, InstanceGroupTypes=["MASTER"])
     ip_address = master_instance.get("Instances")[0].get("PublicIpAddress")
     master_address = resp["Cluster"]["MasterPublicDnsName"]
     print(f"Connecting to {master_address} at {ip_address}")
@@ -325,9 +309,7 @@ def launchemr(dir_to_sync=None, name=None):
         # Delete s3 scratch
         if state == "TERMINATED":
             os.remove(cluster_id_filename)
-            resp2 = input(
-                f" >> Delete S3 scratch directory: {s3_scratch_user} : [y/n]? "
-            )
+            resp2 = input(f" >> Delete S3 scratch directory: {s3_scratch_user} : [y/n]? ")
             if resp2.lower().endswith("y"):
                 print("Deleting S3 scratch directory...")
                 fs.rm(s3_scratch_user, recursive=True)
@@ -340,9 +322,7 @@ def sleep_loop_for_cluster_shutdown(emr, job_flow_id, n_attempts=18, sleep_inter
     while state != "TERMINATED":
         attempt += 1
         time.sleep(sleep_interval)
-        state = emr.describe_cluster(ClusterId=job_flow_id)["Cluster"]["Status"][
-            "State"
-        ]
+        state = emr.describe_cluster(ClusterId=job_flow_id)["Cluster"]["Status"]["State"]
         print(f"Cluster Status: {state}")
         if attempt == n_attempts:
             break

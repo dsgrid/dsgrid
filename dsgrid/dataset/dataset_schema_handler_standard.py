@@ -1,12 +1,16 @@
 import logging
+from typing import List
+
+import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.query import QueryContext
-from dsgrid.utils.spark import read_dataframe, get_unique_values
+from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.query import QueryContext
+from dsgrid.utils.spark import read_dataframe, get_unique_values, overwrite_dataframe_file
 
 logger = logging.getLogger(__name__)
 
@@ -208,3 +212,31 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             raise DSGInvalidDataset(
                 f"load_data is missing {missing} columns for dimension={dim_type.value} based on records."
             )
+
+    @track_timing(timer_stats_collector)
+    def filter_data(self, dimensions: List[DatasetSimpleModel]):
+        lookup = self._load_data_lookup
+        pivot_dimension_type = self.get_pivot_dimension_type()
+        pivoted_columns = set(self.get_pivot_dimension_columns())
+        pivoted_columns_to_keep = set()
+        lookup_columns = set(lookup.columns)
+        for dim in dimensions:
+            column = dim.dimension_type.value
+            if column in lookup_columns:
+                lookup = lookup.filter(lookup[column].isin(dim.record_ids))
+            elif dim.dimension_type == pivot_dimension_type:
+                pivoted_columns_to_keep.update(set(dim.record_ids))
+            # else trivial dimension
+
+        # Bring it all into memory so that we can delete the original file.
+        lookup2 = lookup.coalesce(1).cache()
+        lookup2.count()
+        overwrite_dataframe_file(self._config.load_data_lookup_path, lookup2)
+        logger.info("Rewrote simplified %s", self._config.load_data_lookup_path)
+        ids = next(iter(lookup2.select("id").distinct().select(F.collect_list("id")).first()))
+
+        load_df = self._load_data.filter(self._load_data.id.isin(ids))
+        pivoted_columns_to_remove = list(pivoted_columns.difference(pivoted_columns_to_keep))
+        load_df = load_df.drop(*pivoted_columns_to_remove)
+        overwrite_dataframe_file(self._config.load_data_path, load_df)
+        logger.info("Rewrote simplified %s", self._config.load_data_path)

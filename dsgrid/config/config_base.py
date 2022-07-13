@@ -1,4 +1,5 @@
 import abc
+import filecmp
 import logging
 import os
 import shutil
@@ -187,7 +188,9 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
                     raise DSGInvalidOperation(
                         f"{dst_data_file} exists. Set force=True to overwrite."
                     )
-                shutil.copyfile(self._src_dir / orig_file, dst_data_file)
+                src_data_file = self._src_dir / orig_file
+                if not dst_data_file.exists() or not filecmp.cmp(src_data_file, dst_data_file):
+                    shutil.copyfile(self._src_dir / orig_file, dst_data_file)
                 new_files.append(Path(orig_file).name)
             model_data[field] = new_files
 

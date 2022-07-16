@@ -175,6 +175,33 @@ class TimeZone(DSGEnum):
     )
 
 
+class TimeZoneConversion:
+    def __init__():
+        pass
+
+    @staticmethod
+    def get_standard_time(tz: TimeZone):
+        """ get equivalent standard time"""
+        if tz == TimeZone.UTC:
+            return TimeZone.UTC
+        if tz == TimeZone.HST:
+            return TimeZone.HST
+        if tz in [TimeZone.AST, TimeZone.APT]:
+            return TimeZone.AST
+        if tz in [TimeZone.PST, TimeZone.PPT]:
+            return TimeZone.PST
+        if tz in [TimeZone.MST, TimeZone.MPT]:
+            return TimeZone.MST
+        if tz in [TimeZone.CST, TimeZone.CPT]:
+            return TimeZone.CST
+        if tz in [TimeZone.EST, TimeZone.EPT]:
+            return TimeZone.EST
+        if tz == TimeZone.NONE:
+            return TimeZone.NONE
+        if tz == TimeZone.LOCAL:
+            raise ValueError(f"tz={tz} cannot be used for this function.")
+
+
 class DatetimeRange:
     def __init__(self, start, end, frequency, leap_day_adjustment: LeapDayAdjustmentType):
         self.start = start

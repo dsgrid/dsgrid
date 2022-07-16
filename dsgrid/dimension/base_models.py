@@ -121,3 +121,12 @@ def check_required_dimensions(dimensions, tag):
     if missing:
         raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
     check_uniqueness((x.dimension_type for x in dimensions), tag)
+
+    breakpoint()
+    for dim in dimensions:
+        if dim.dimension_type == DimensionType.GEOGRAPHY:
+            check_timezone_in_base_geography(dim)
+
+
+def check_timezone_in_base_geography(dimension):
+    pass

@@ -642,9 +642,7 @@ def list_datasets(registry_manager, filter):
     help="reason for submission",
 )
 @click.pass_obj
-def register_dataset(
-    registry_manager, dataset_config_file, dataset_path, dimension_file, log_message
-):
+def register_dataset(registry_manager, dataset_config_file, dataset_path, log_message):
     """Register a new dataset with the dsgrid repository."""
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()

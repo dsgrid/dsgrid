@@ -1,10 +1,12 @@
 """Dimension types for dsgrid"""
 
 from pydantic import Field
+from typing import Optional
 
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.data_models import DSGBaseModel, DSGEnum
 from dsgrid.utils.utilities import check_uniqueness
+from dsgrid.dimension.time import TimeZone
 
 
 class DimensionType(DSGEnum):
@@ -53,6 +55,16 @@ class MetricDimensionBaseModel(DimensionRecordBaseModel):
 
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
+
+    time_zone: Optional[TimeZone] = Field(
+        title="Local Prevailing Time Zone",
+        description="""
+        These time zone information are used in reference to project timezone
+        to convert between project time and local times as necessary.
+        All Prevailing timezones account for daylight savings time.
+        If a location does not observe daylight savings, use Standard timezones.
+        """,
+    )
 
 
 class DataSourceDimensionBaseModel(DimensionRecordBaseModel):
@@ -122,7 +134,6 @@ def check_required_dimensions(dimensions, tag):
         raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 
-    breakpoint()
     for dim in dimensions:
         if dim.dimension_type == DimensionType.GEOGRAPHY:
             check_timezone_in_base_geography(dim)

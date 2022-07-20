@@ -5,7 +5,6 @@ from typing import Optional, Union
 from pydantic import Field
 from pydantic import validator
 
-from dsgrid.dimension.time import TimeZone
 from dsgrid.config.dimensions import (
     DateTimeDimensionModel,
     AnnualTimeDimensionModel,
@@ -29,31 +28,9 @@ from dsgrid.dimension.base_models import (
 class CensusDivision(GeographyDimensionBaseModel):
     """Census Region attributes"""
 
-    time_zone: Optional[TimeZone] = Field(
-        title="Local Prevailing Time Zone",
-        description="""
-        These time zone information are used in reference to project timezone
-        to convert between project time and local times as necessary.
-        All Prevailing timezones account for daylight savings time.
-        If a location does not observe daylight savings, use Standard timezones.
-        """,
-        default=TimeZone.UTC,
-    )
-
 
 class CensusRegion(GeographyDimensionBaseModel):
     """Census Region attributes"""
-
-    time_zone: Optional[TimeZone] = Field(
-        title="Local Prevailing Time Zone",
-        description="""
-        These time zone information are used in reference to project timezone
-        to convert between project time and local times as necessary.
-        All Prevailing timezones account for daylight savings time.
-        If a location does not observe daylight savings, use Standard timezones.
-        """,
-        default=TimeZone.UTC,
-    )
 
 
 class State(GeographyDimensionBaseModel):
@@ -62,32 +39,12 @@ class State(GeographyDimensionBaseModel):
     is_conus: bool
     census_division: str = ""
     census_region: str = ""
-    time_zone: Optional[TimeZone] = Field(
-        title="Local Prevailing Time Zone",
-        description="""
-        These time zone information are used in reference to project timezone
-        to convert between project time and local times as necessary.
-        All Prevailing timezones account for daylight savings time.
-        If a location does not observe daylight savings, use Standard timezones.
-        """,
-        default=TimeZone.UTC,
-    )
 
 
 class County(GeographyDimensionBaseModel):
     """County attributes"""
 
     state: str
-    time_zone: Optional[TimeZone] = Field(
-        title="Local Prevailing Time Zone",
-        description="""
-        These time zone information are used in reference to project timezone
-        to convert between project time and local times as necessary.
-        All Prevailing timezones account for daylight savings time.
-        If a location does not observe daylight savings, use Standard timezones.
-        """,
-        default=TimeZone.UTC,
-    )
 
 
 # ---------------------------
@@ -168,7 +125,7 @@ class Time(DateTimeDimensionModel):
 # order to be used.
 
 # class Timezone(TimeDimensionBaseModel):
-#    """Timezone attributes"""
+#    """Timezone attributes""" # <--- PROBABLY NOT
 #
 #
 # class DayType(TimeDimensionModel):

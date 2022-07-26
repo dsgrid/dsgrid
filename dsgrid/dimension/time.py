@@ -163,7 +163,7 @@ class TimeZone(DSGEnum):
         tz=pytz.timezone("US/Eastern"),
     )
     NONE = EnumValue(
-        value="None",
+        value="none",
         description="No timezone, suitable for temporally aggregated data",
         tz=None,
     )
@@ -174,27 +174,27 @@ class TimeZone(DSGEnum):
         tz=None,  # TODO: needs handling: DSGRID-171
     )
 
-    @classmethod
-    def get_standard_time(cls):
+    def get_standard_time(self):
         """ get equivalent standard time"""
-        if cls == TimeZone.UTC:
+        if self == TimeZone.UTC:
             return TimeZone.UTC
-        if cls == TimeZone.HST:
+        if self == TimeZone.HST:
             return TimeZone.HST
-        if cls in [TimeZone.AST, TimeZone.APT]:
+        if self in [TimeZone.AST, TimeZone.APT]:
             return TimeZone.AST
-        if cls in [TimeZone.PST, TimeZone.PPT]:
+        if self in [TimeZone.PST, TimeZone.PPT]:
             return TimeZone.PST
-        if cls in [TimeZone.MST, TimeZone.MPT]:
+        if self in [TimeZone.MST, TimeZone.MPT]:
             return TimeZone.MST
-        if cls in [TimeZone.CST, TimeZone.CPT]:
+        if self in [TimeZone.CST, TimeZone.CPT]:
             return TimeZone.CST
-        if cls in [TimeZone.EST, TimeZone.EPT]:
+        if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EST
-        if cls == TimeZone.NONE:
+        if self == TimeZone.NONE:
+            print(f"TimeZone={self.value} does not have meaningful standard time.")
             return TimeZone.NONE
-        if cls == TimeZone.LOCAL:
-            print(f"TimeZone={cls.value} does not have meaningful standard time.")
+        if self == TimeZone.LOCAL:
+            print(f"TimeZone={self.value} does not have meaningful standard time.")
             return TimeZone.LOCAL
 
 

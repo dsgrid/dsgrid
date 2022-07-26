@@ -5,6 +5,7 @@ import os
 import shutil
 from pathlib import Path
 from typing import AnyStr, List, Union
+import enum
 
 import pandas as pd
 from pyspark.sql import Row, SparkSession
@@ -181,10 +182,18 @@ def models_to_dataframe(models, cache=False):
     cls = type(models[0])
     rows = []
     for model in models:
-        row = Row(**{f: getattr(model, f) for f in cls.__fields__})
-        rows.append(row)
+        dct = {}
+        for f in cls.__fields__:
+            val = getattr(model, f)
+            if isinstance(val, enum.Enum):
+                val = val.value
+            dct[f] = val
+        rows.append(Row(**dct))
 
-    df = SparkSession.getActiveSession().createDataFrame(rows)
+    try:
+        df = SparkSession.getActiveSession().createDataFrame(rows)
+    except Exception:
+        breakpoint()
     if cache:
         df.cache()
     return df

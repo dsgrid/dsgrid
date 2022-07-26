@@ -1,7 +1,6 @@
 """Dimension types for dsgrid"""
 
 from pydantic import Field
-from typing import Optional
 
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.data_models import DSGBaseModel, DSGEnum
@@ -56,7 +55,7 @@ class MetricDimensionBaseModel(DimensionRecordBaseModel):
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
-    time_zone: Optional[TimeZone] = Field(
+    time_zone: TimeZone = Field(
         title="Local Prevailing Time Zone",
         description="""
         These time zone information are used in reference to project timezone
@@ -64,6 +63,7 @@ class GeographyDimensionBaseModel(DimensionRecordBaseModel):
         All Prevailing timezones account for daylight savings time.
         If a location does not observe daylight savings, use Standard timezones.
         """,
+        default=TimeZone.NONE,
     )
 
 
@@ -132,12 +132,37 @@ def check_required_dimensions(dimensions, tag):
     missing = required_dim_types.difference(dimension_types)
     if missing:
         raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
+
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 
-    for dim in dimensions:
-        if dim.dimension_type == DimensionType.GEOGRAPHY:
-            check_timezone_in_base_geography(dim)
 
+def check_timezone_in_base_geography(dim_config):
+    """Check that a project's base geography dimension contains valid timezones
+    in records.
 
-def check_timezone_in_base_geography(dimension):
-    pass
+    Parameters
+    ----------
+    dimension : DimensionType
+
+    Raises
+    ------
+    DSGInvalidDimension
+        Raised if a required dimension is not provided.
+
+    """
+    dimension = dim_config.model
+    if dimension.dimension_type != DimensionType.GEOGRAPHY:
+        raise ValueError(
+            f"Dimension has type {dimension.dimension_type}, "
+            "Can only check timezone for Geography."
+        )
+
+    tz = set(TimeZone) - TimeZone.NONE
+    record_tz = {rec.time_zone for rec in dimension.records}
+
+    diff = record_tz.difference(tz)
+    if diff:
+        raise DSGInvalidDimension(
+            f"Base Geography dimension {dimension.display} has invalid timezone(s) in "
+            f"records: {dimension.filename}. Use dsgrid TimeZone enum values only."
+        )

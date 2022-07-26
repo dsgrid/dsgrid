@@ -10,7 +10,7 @@ from typing import Union, List, Dict
 
 from prettytable import PrettyTable
 
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, check_timezone_in_base_geography
 from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidDimensionAssociation,
@@ -446,6 +446,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         for dim in config.iter_dimensions():
             dims.append(dim)
             dims_by_type[dim.model.dimension_type].append(dim)
+
+        for dim in config.model.dimensions.base_dimensions:
+            if dim.model.dimension_type == DimensionType.GEOGRAPHY:
+                check_timezone_in_base_geography(dim)
 
         check_uniqueness((x.model.name for x in dims), "dimension name")
         for dims in dims_by_type.values():

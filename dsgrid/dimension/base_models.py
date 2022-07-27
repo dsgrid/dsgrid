@@ -152,7 +152,7 @@ def check_timezone_in_base_geography(dim_config):
     """
     dimension = dim_config.model
     if dimension.dimension_type != DimensionType.GEOGRAPHY:
-        raise ValueError(
+        raise DSGInvalidDimension(
             f"Dimension has type {dimension.dimension_type}, "
             "Can only check timezone for Geography."
         )

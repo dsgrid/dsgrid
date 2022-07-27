@@ -1,8 +1,11 @@
 """Dimensions related to time"""
 import datetime
 import pytz
+import logging
 
 from dsgrid.data_models import DSGEnum, EnumValue
+
+logger = logging.getLogger(__name__)
 
 
 class TimeDimensionType(DSGEnum):
@@ -175,7 +178,7 @@ class TimeZone(DSGEnum):
     )
 
     def get_standard_time(self):
-        """ get equivalent standard time"""
+        """ get equivalent standard time """
         if self == TimeZone.UTC:
             return TimeZone.UTC
         if self == TimeZone.HST:
@@ -191,10 +194,10 @@ class TimeZone(DSGEnum):
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EST
         if self == TimeZone.NONE:
-            print(f"TimeZone={self.value} does not have meaningful standard time.")
+            logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
             return TimeZone.NONE
         if self == TimeZone.LOCAL:
-            print(f"TimeZone={self.value} does not have meaningful standard time.")
+            logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
             return TimeZone.LOCAL
 
 

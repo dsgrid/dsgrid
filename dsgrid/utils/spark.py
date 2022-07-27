@@ -190,10 +190,8 @@ def models_to_dataframe(models, cache=False):
             dct[f] = val
         rows.append(Row(**dct))
 
-    try:
-        df = SparkSession.getActiveSession().createDataFrame(rows)
-    except Exception:
-        breakpoint()
+    df = SparkSession.getActiveSession().createDataFrame(rows)
+
     if cache:
         df.cache()
     return df

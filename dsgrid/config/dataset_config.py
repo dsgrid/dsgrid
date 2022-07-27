@@ -238,8 +238,6 @@ class DatasetConfigModel(DSGBaseModel):
         description="Input dataset type.",
         options=InputDatasetType.format_for_docs(),
     )
-    # TODO: This must be validated against the project's dimension records for data_source
-    # TODO: This must also be validated against the project_config
     dataset_qualifier: DatasetQualifierType = Field(
         title="dataset_qualifier",
         description="What type of values the dataset represents (e.g., growth_rate, quantity)",

@@ -9,6 +9,7 @@ from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import check_required_dimensions
+
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension
 from dsgrid.registry.common import (
     ProjectRegistryStatus,
@@ -102,6 +103,7 @@ class DimensionsModel(DSGBaseModel):
             )
         )
         check_required_dimensions(dimensions, "project base dimensions")
+
         return values
 
     @root_validator(pre=True)

@@ -4,13 +4,12 @@ import getpass
 import itertools
 import logging
 import shutil
-from collections import defaultdict
 from pathlib import Path
 from typing import Union, List, Dict
 
 from prettytable import PrettyTable
 
-from dsgrid.dimension.base_models import DimensionType, check_timezone_in_base_geography
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidDimensionAssociation,
@@ -373,7 +372,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 DimensionModel,
                 filename=str(Path(_SUPPLEMENTAL_TMP_DIR) / dim_record_file.name),
                 name=dt_plural_dash,
-                display_name="None",
+                display_name=dt_plural_formal,
                 dimension_type=dimension_type,
                 module=dim_config.model.module,
                 class_name=dim_config.model.class_name,
@@ -441,19 +440,9 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     @track_timing(timer_stats_collector)
     def _run_checks(self, config: ProjectConfig):
-        dims = []
-        dims_by_type = defaultdict(list)
-        for dim in config.iter_dimensions():
-            dims.append(dim)
-            dims_by_type[dim.model.dimension_type].append(dim)
-
-        for dim in config.model.dimensions.base_dimensions:
-            if dim.model.dimension_type == DimensionType.GEOGRAPHY:
-                check_timezone_in_base_geography(dim)
-
+        dims = [x for x in config.iter_dimensions()]
         check_uniqueness((x.model.name for x in dims), "dimension name")
-        for dims in dims_by_type.values():
-            check_uniqueness((x.model.display_name for x in dims), "dimension display name")
+        check_uniqueness((x.model.display_name for x in dims), "dimension display name")
         check_uniqueness(
             (getattr(x.model, "cls") for x in config.model.dimensions.base_dimensions),
             "dimension cls",

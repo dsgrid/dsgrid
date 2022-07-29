@@ -11,6 +11,7 @@ from semver import VersionInfo
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
+    DSGInvalidDimension,
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
 )
@@ -141,7 +142,7 @@ def test_duplicate_project_dimension_display_names(make_test_project_dir):
             if dim["display_name"] == "State":
                 dim["display_name"] = "County"
         dump_data(data, project_file)
-        with pytest.raises(ValueError):
+        with pytest.raises(DSGInvalidDimension):
             manager.project_manager.register(project_file, user, log_message)
 
 

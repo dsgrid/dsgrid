@@ -62,9 +62,7 @@ def test_filter_registry():
         assert len(records) == 1
         assert records[0].id == COUNTY_ID
 
-        supp_dim = project.config.get_dimension_records(
-            DimensionType.GEOGRAPHY, QUERY_NAME
-        ).collect()
+        supp_dim = project.config.get_dimension_records(QUERY_NAME).collect()
         assert len(supp_dim) == 1
         assert supp_dim[0].id == STATE_ID
 

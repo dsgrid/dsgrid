@@ -7,9 +7,11 @@ from pyspark.sql import SparkSession
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGValueNotRegistered
-from dsgrid.query import AlternateDimensionsModel, QueryContext
+from dsgrid.exceptions import DSGInvalidParameter, DSGValueNotRegistered
+from dsgrid.query.query_context import QueryContext
+from dsgrid.query.models import ChainedAggregationModel
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
+from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 
 logger = logging.getLogger(__name__)
@@ -18,9 +20,10 @@ logger = logging.getLogger(__name__)
 class Project:
     """Interface to a dsgrid project."""
 
-    def __init__(self, config, dataset_configs, dimension_mgr, dimension_mapping_mgr):
+    def __init__(self, config, version, dataset_configs, dimension_mgr, dimension_mapping_mgr):
         self._spark = SparkSession.getActiveSession()
         self._config = config
+        self._version = version
         self._dataset_configs = dataset_configs
         self._datasets = {}
         self._dimension_mgr = dimension_mgr
@@ -61,6 +64,8 @@ class Project:
         dataset_manager = manager.dataset_manager
         project_manager = manager.project_manager
         config = project_manager.get_by_id(project_id, version=version)
+        if version is None:
+            version = project_manager.get_current_version(project_id)
 
         dataset_configs = {}
         for dataset_id in config.list_registered_dataset_ids():
@@ -68,7 +73,11 @@ class Project:
             dataset_configs[dataset_id] = dataset_config
 
         return cls(
-            config, dataset_configs, manager.dimension_manager, manager.dimension_mapping_manager
+            config,
+            version,
+            dataset_configs,
+            manager.dimension_manager,
+            manager.dimension_mapping_manager,
         )
 
     @property
@@ -83,6 +92,17 @@ class Project:
     @property
     def dimension_mapping_manager(self):
         return self._dimension_mapping_mgr
+
+    @property
+    def version(self):
+        """Return the version of the project.
+
+        Returns
+        -------
+        VersionInfo
+
+        """
+        return self._version
 
     def get_dataset(self, dataset_id):
         """Returns a Dataset. Calls load_dataset if it hasn't already been loaded.
@@ -149,44 +169,114 @@ class Project:
     def list_datasets(self):
         return [x.dataset_id for x in self._iter_datasets()]
 
-    def process_query(self, query_context: QueryContext):
-        df = self._make_query_dataframe(query_context)
-        # TODO: handle final aggregration
-        # if query_context.model.aggregation is not None:
-        name = query_context.model.name
-        output_dir = query_context.model.output_dir
-        output_dir.mkdir(parents=True, exist_ok=True)
-        filename = output_dir / (name + ".parquet")
-        df.write.mode("overwrite").parquet(str(filename))
-        logger.info("Wrote query=%s output table to %s", name, filename)
-
-    def _make_query_dataframe(self, query_context: QueryContext):
-        for field in AlternateDimensionsModel.__fields__:
-            model = getattr(query_context.model.alternate_dimensions, field, None)
-            if model is not None:
-                dim_type = DimensionType(field)
-                query_context.set_alt_dimension_records(
-                    dim_type,
-                    self._config.get_base_to_supplemental_mapping_records(
-                        dim_type, model.query_name
-                    ),
-                )
+    @track_timing(timer_stats_collector)
+    def process_query(self, context: QueryContext):
+        self._handle_supplemental_query_names(context)
+        self._build_filtered_record_ids_by_dimension_type(context)
 
         dfs = []
-        for dataset_id in query_context.model.dataset_ids:
+        for dataset_id in context.model.project.dataset_ids:
             logger.info("Start processing query for dataset_id=%s", dataset_id)
             dataset = self.get_dataset(dataset_id)
-            dfs.append(dataset.get_dataframe(query_context))
+            dfs.append(dataset.get_dataframe(context))
             logger.info("Finished processing query for dataset_id=%s", dataset_id)
 
         if not dfs:
-            logger.warning("No data matched %s", query_context.name)
+            logger.warning("No data matched %s", context.name)
             return None
 
-        if len(dfs) == 1:
-            return dfs[0]
-
         main_df = dfs[0]
-        for df in dfs[1:]:
-            main_df = main_df.union(df)
-        return main_df
+        if len(dfs) > 1:
+            for df in dfs[1:]:
+                if df.columns != main_df.columns:
+                    raise Exception(
+                        f"BUG: dataset columns must match. main={main_df.columns} new={df.columns}"
+                    )
+                main_df = main_df.union(df)
+
+        return self._convert_columns_to_query_names(main_df)
+
+    def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
+        record_ids = {}
+        base_dim_query_names = self._config.get_base_dimension_query_names()
+
+        def default_records(dimension_type):
+            return (
+                self._config.get_base_dimension(dimension_type)
+                .get_records_dataframe()
+                .select("id")
+            )
+
+        for dim_filter in context.model.project.dimension_filters:
+            dim_type = dim_filter.dimension_type
+            df = record_ids.get(dim_type, default_records(dim_type))
+            if dim_filter.query_name == base_dim_query_names[dim_type]:
+                df = dim_filter.apply_filter(df, column="id")
+            else:
+                mapping_records = self._config.get_base_to_supplemental_mapping_records(
+                    dim_filter.query_name
+                )
+                required_ids = (
+                    mapping_records.filter("to_id is not NULL").select("from_id").distinct()
+                )
+                df = df.join(required_ids, on=df.id == required_ids.from_id).drop("from_id")
+            record_ids[dim_filter.dimension_type] = df
+
+        for aggregation in context.model.project.metric_reductions:
+            dim = self._config.get_dimension(aggregation.query_name)
+            dim_type = dim.model.dimension_type
+            mapping_records = self._config.get_base_to_supplemental_mapping_records(
+                aggregation.query_name
+            ).filter("to_id is not NULL")
+            required_ids = mapping_records.select("from_id").distinct()
+            df = record_ids.get(dim_type, default_records(dim_type))
+            df = df.join(required_ids, on=df.id == required_ids.from_id).drop("from_id")
+            # TODO: We could truncate the mapping records with any record that just got removed
+            # for the life of this query. Save in the context.
+            record_ids[dim_type] = df
+
+        for dimension_type, record_ids in record_ids.items():
+            context.set_record_ids_by_dimension_type(dimension_type, record_ids)
+
+    def _handle_supplemental_query_names(self, context: QueryContext):
+        def check_query_name(query_name, tag):
+            dim = self._config.get_dimension(query_name)
+            base_dim = self._config.get_base_dimension(dim.model.dimension_type)
+            if dim.model.dimension_id == base_dim.model.dimension_id:
+                raise DSGInvalidParameter(
+                    f"{tag} cannot contain a base dimension: "
+                    f"{dim.model.dimension_type}/{query_name}"
+                )
+            return dim, base_dim
+
+        for query_name in context.model.supplemental_columns:
+            check_query_name(query_name, "supplemental_columns")
+
+        for aggregation in context.model.project.metric_reductions:
+            query_name = aggregation.query_name
+            dim, base_dim = check_query_name(query_name, "MetricReductionModel")
+            context.add_metric_reduction_records(
+                query_name,
+                dim.model.dimension_type,
+                self._config.get_base_to_supplemental_mapping_records(query_name),
+            )
+
+        for aggregation in context.model.aggregations:
+            assert not isinstance(
+                aggregation, ChainedAggregationModel
+            ), "ChainedAggregationModel is not supported yet"
+
+            for query_name in aggregation.group_by_columns:
+                dim = self._config.get_dimension(query_name)
+                base_dim = self._config.get_base_dimension(dim.model.dimension_type)
+                if dim.model.dimension_id != base_dim.model.dimension_id:
+                    context.add_required_dimension_mapping(aggregation.name, query_name)
+
+    def _convert_columns_to_query_names(self, df):
+        # All columns start off as base dimension names but need to be query names.
+        columns = set(df.columns)
+        base_query_names = self._config.get_base_dimension_query_names()
+        for dim_type in DimensionType:
+            if dim_type.value in columns:
+                df = df.withColumnRenamed(dim_type.value, base_query_names[dim_type])
+        return df

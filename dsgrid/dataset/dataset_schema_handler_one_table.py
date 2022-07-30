@@ -5,6 +5,7 @@ from dsgrid.config.dataset_config import (
     DatasetConfig,
 )
 from dsgrid.config.simple_models import DatasetSimpleModel
+from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -95,7 +96,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         df = self._load_data.select(*dim_cols).distinct()
 
         dim_table = self._remap_dimension_columns(df).distinct()
-        self._check_null_value_in_unique_dimension_rows(dim_table)
+        check_null_value_in_unique_dimension_rows(dim_table)
 
         return dim_table
 

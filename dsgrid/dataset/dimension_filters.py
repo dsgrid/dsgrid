@@ -1,42 +1,25 @@
 import abc
 import logging
+from typing import Any, Union
 
-# from typing import Any, List, Union
+import pyspark.sql.functions as F
+from pydantic import Field, validator
 
-# from dsgrid.data_models import DSGBaseModel
-# from dsgrid.dimension.base_models import DimensionType
+from dsgrid.data_models import DSGBaseModel
+from dsgrid.dimension.base_models import DimensionType
 
 
 logger = logging.getLogger(__name__)
 
 
-class DimensionFilterBase(abc.ABC):
-    def __and__(self, other):
-        return DimensionFilterCombo(self, other, "and").where_clause()
+class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
 
-    def __or__(self, other):
-        return DimensionFilterCombo(self, other, "or").where_clause()
+    dimension_type: DimensionType
+    query_name: str
 
     @abc.abstractmethod
     def apply_filter(self, df):
         """Apply the filter to a DataFrame"""
-
-    @abc.abstractmethod
-    def dimension_type(self):
-        """Return the dimension type."""
-
-    @abc.abstractmethod
-    def query_name(self):
-        """Return the query name."""
-
-    @abc.abstractmethod
-    def values(self):
-        """Return the filter values.
-
-        Returns
-        -------
-        list
-        """
 
     @staticmethod
     def _make_value_str(value):
@@ -56,104 +39,150 @@ class DimensionFilterBase(abc.ABC):
         return f"({text})"
 
 
-# class DimensionFilterValueModel(DSGBaseModel):
+class _DimensionFilterWithWhereClauseModel(DimensionFilterBaseModel, abc.ABC):
+    def apply_filter(self, df, column=None):
+        return df.filter(self.where_clause(column=column))
 
-#     dimension_type: DimensionType
-#     query_name: str
-#     value: Any
+    @abc.abstractmethod
+    def where_clause(self, column=None):
+        """Returns the text for a where clause in a filter statement.
+
+        Parameters
+        ----------
+        column : None or str
+            Column to use. If None, use the dimension type.
+
+        Returns
+        -------
+        str
+
+        """
 
 
-class DimensionFilterValue(DimensionFilterBase):
-    def __init__(self, dimension_type, query_name, value):
-        self._dimension_type = dimension_type
-        self._query_name = query_name
-        self._value = value
+class DimensionFilterValueModel(_DimensionFilterWithWhereClauseModel):
+    """Filters a table where a dimension column has a specific value.
 
-    def __str__(self):
-        # TODO DT: or __repr__?
-        return f"DimensionFilterValue: {self.where_clause}"
+    Example:
+        DimensionFilterValueModel(
+            dimension_type=DimensionType.GEOGRAPHY,
+            query_name="county",
+            value="06037",
+        ),
+    is equivalent to
+        df.filter("county == '06037'")
 
-    def apply_filter(self, df):
-        pass
+    """
 
-    @property
-    def query_name(self):
-        return self._query_name
+    value: Any
 
     def where_clause(self, column=None):
         if column is None:
-            column = self._dimension_type.value
-        value = self._make_value_str(self._value)
+            column = self.dimension_type.value
+        value = self._make_value_str(self.value)
         text = f"({column} == {value})"
-        logger.debug(
-            "dimension_type=%s query_name=%s query=%s",
-            self._dimension_type,
-            self._query_name,
-            text,
-        )
-        return text
-        # return f"({self._query_name} == {value})"
-
-    @property
-    def dimension_type(self):
-        return self._dimension_type
-
-    def values(self):
-        return [self._value]
-
-
-# class DimensionFilterListModel(DSGBaseModel):
-
-#     dimension_type: DimensionType
-#     query_name: str
-#     values: List[Any]
-
-
-class DimensionFilterList(DimensionFilterBase):
-    def __init__(self, dimension_type, query_name, values):
-        self._dimension_type = dimension_type
-        self._query_name = query_name
-        self._values = values
-
-    def apply_filter(self, df):
-        pass
-
-    @property
-    def query_name(self):
-        return self._query_name
-
-    def where_clause(self):
-        values = self._make_values_str(self._values)
-        # return f"({self._query_name} in {values})"
-        text = f"({self._dimension_type.value} in {values})"
-        logger.debug(
-            "dimension_type=%s query_name=%s query=%s",
-            self._dimension_type,
-            self._query_name,
-            text,
-        )
         return text
 
-    @property
-    def dimension_type(self):
-        return self._dimension_type
 
-    def values(self):
-        return self._values
+class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
+    """Filters a table where a dimension column matches an expression.
+    Builds the filter string based on inferred types.
+
+    Example:
+        DimensionFilterExpressionModel(
+            dimension_type=DimensionType.GEOGRAPHY,
+            query_name="county",
+            operator="=="
+            value="06037",
+        ),
+    is equivalent to
+        df.filter("county == '06037'")
+
+    """
+
+    operator: str
+    value: Union[str, int, float]
+
+    def where_clause(self, column=None):
+        if column is None:
+            column = self.dimension_type.value
+        value = self._make_value_str(self.value)
+        text = f"({column} {self.operator} {value})"
+        return text
 
 
-# class DimensionFilterComboModel(DSGBaseModel):
+class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
+    """Filters a table where a dimension column matches an expression.
+    Uses the passed string with no modification.
 
-#     first: Union[DimensionFilterValueModel, DimensionFilterListModel]
-#     second: Union[DimensionFilterValueModel, DimensionFilterListModel]
-#     operator: str
+    Example:
+        DimensionFilterExpressionModel(
+            dimension_type=DimensionType.GEOGRAPHY,
+            query_name="county",
+            value="== '06037'",
+        ),
+    is equivalent to
+        df.filter("county == '06037'")
+
+    The difference between this class and DimensionFilterExpressionModel is that the latter
+    will attempt to add quotes as necessary.
+
+    """
+
+    value: Union[str, int, float]
+
+    def where_clause(self, column=None):
+        if column is None:
+            column = self.dimension_type.value
+        text = f"({column} {self.value})"
+        return text
 
 
-class DimensionFilterCombo:  # TODO: base type?
-    def __init__(self, first, second, operator):
-        self._first = first
-        self._second = second
-        self._operator = operator
+DIMENSION_COLUMN_FILTER_OPERATORS = {
+    "between",
+    "contains",
+    "endswith",
+    "isNotNull",
+    "isNull",
+    "isin",
+    "like",
+    "rlike",
+    "startswith",
+}
 
-    def where_clause(self):
-        return f"({self._first.where_clause()} {self._operator} {self._second.where_clause()})"
+
+class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
+    """Filters a table where a dimension column matches a Spark SQL operator.
+
+    Examples:
+    import pyspark.sql.functions as F
+    df.filter(F.col("geography").like("abc%"))
+    df.filter(~F.col("sector").startswith("com"))
+    df.filter(F.col("timestamp").between("2012-07-01 00:00:00", "2012-08-01 00:00:00"))
+    """
+
+    value: Any = Field(title="value", description="Value to filter on")
+    operator: str = Field(
+        title="operator", description="Method on pyspark.sql.functions.col to invoke"
+    )
+    negate: bool = Field(
+        title="negate",
+        description="Change the filter to match the negation of the value.",
+        default=False,
+    )
+
+    @validator("operator")
+    def check_operator(cls, operator):
+        if operator not in DIMENSION_COLUMN_FILTER_OPERATORS:
+            raise ValueError(
+                f"operator={operator} is not supported. Allowed={DIMENSION_COLUMN_FILTER_OPERATORS}"
+            )
+        return operator
+
+    def apply_filter(self, df, column=None):
+        if column is None:
+            column = self._dimension_type.value
+        col = F.col(column)
+        method = getattr(col, self.operator)
+        if self.negate:
+            return df.filter(~method(self._value))
+        return df.filter(method(self._value))

@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import List
 
 import pyspark.sql.functions as F
@@ -8,8 +9,17 @@ from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.query import QueryContext
-from dsgrid.utils.spark import read_dataframe, get_unique_values, overwrite_dataframe_file
+from dsgrid.query.query_context import QueryContext
+from dsgrid.utils.dataset import (
+    check_null_value_in_unique_dimension_rows,
+    map_and_reduce_pivot_dimension,
+)
+from dsgrid.utils.spark import (
+    read_dataframe,
+    get_unique_values,
+    overwrite_dataframe_file,
+    write_dataframe_and_auto_partition,
+)
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -41,59 +51,121 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         """Get distinct combinations of remapped dimensions, including id.
         Check each col in combination for null value."""
         dim_table = self._remap_dimension_columns(self._load_data_lookup).distinct()
-        self._check_null_value_in_unique_dimension_rows(dim_table)
-
+        check_null_value_in_unique_dimension_rows(dim_table)
         return dim_table
 
     def make_project_dataframe(
         self, load_data_df=None, lookup_df=None, query_context: QueryContext = None
     ):
-        ld_df = self._remap_dimension_columns(load_data_df or self._load_data)
-        lk_df = self._remap_dimension_columns(lookup_df or self._load_data_lookup)
+        ld_df = load_data_df or self._load_data
+        lk_df = lookup_df or self._load_data_lookup
 
         if query_context is not None:
-            for dimension_type, records in query_context.iter_alt_dimension_records():
-                column = dimension_type.value
-                if column == self.get_pivot_dimension_type().value:
-                    # This class requires that the pivot dimension is metric and so operation
-                    # is supported.
-                    model = getattr(query_context.model.alternate_dimensions, column)
-                    ld_df = self._map_and_reduce_pivot_dimension(
-                        ld_df,
-                        records,
-                        set(self.get_pivot_dimension_columns_mapped_to_project()),
-                        operation=model.operation,
-                        keep_individual_fields=model.keep_individual_fields,
-                    )
-                else:
-                    ld_df = self._map_and_reduce_non_pivot_dimension(
-                        ld_df,
-                        records,
-                        column,
-                    )
-                if column in lk_df.columns:
-                    lk_df = self._map_and_reduce_non_pivot_dimension(lk_df, records, column)
-                logger.info("Replaced dimensions with alternate records %s", column)
+            lk_df, ld_df = self._prefilter_dataset(query_context, lk_df, ld_df)
+
+        lk_df = self._remap_dimension_columns(lk_df)
+        ld_df = self._remap_dimension_columns(
+            ld_df,
+            # Some pivot columns may have been removed.
+            pivot_columns=set(ld_df.columns).intersection(self.get_pivot_dimension_columns()),
+        )
+
+        if query_context is not None:
+            ld_df = self._process_metric_aggregations(query_context, ld_df)
 
         ld_df = ld_df.join(lk_df.drop("fraction"), on="id").drop("id")
 
         # Map the time here because some columns may have been collapsed above.
         ld_df = self._convert_time_dimension(ld_df)
 
-        # TODO: consider persisting this table to a Parquet file
-        # We can a registry of cached tables that are identified by query parameters.
-        # Can we use a hash of the stringified version of QueryModel as pertains to this dataset?
+        # All dataset columns need to be in the same order.
+        pivot_columns = sorted(
+            set(ld_df.columns).intersection(self.get_pivot_dimension_columns_mapped_to_project())
+        )
+        dim_columns = sorted(set(ld_df.columns).intersection([x.value for x in DimensionType]))
+        covered = set(pivot_columns + dim_columns)
+        remaining = sorted((x for x in ld_df.columns if x not in covered))
+        final_columns = remaining + dim_columns + pivot_columns
+        return ld_df.select(*final_columns)
+
+    def _prefilter_dataset(self, context: QueryContext, lk_df, ld_df):
+        # TODO: prefilter time
+        if context.model.project.drop_dimensions:
+            columns = [x.value for x in context.model.project.drop_dimensions]
+            lk_df = lk_df.drop(*columns)
+
+        for dim_type, project_record_ids in context.iter_record_ids_by_dimension_type():
+            dataset_mapping = self._get_dataset_to_project_mapping_records(dim_type)
+            if dataset_mapping is None:
+                dataset_record_ids = project_record_ids
+            else:
+                dataset_record_ids = (
+                    dataset_mapping.withColumnRenamed("from_id", "dataset_record_id")
+                    .join(
+                        project_record_ids,
+                        on=dataset_mapping.to_id == project_record_ids.id,
+                    )
+                    .select("dataset_record_id")
+                    .distinct()
+                    .withColumnRenamed("dataset_record_id", "id")
+                )
+            if dim_type == self.get_pivot_dimension_type():
+                # Drop columns that don't match requested project record IDs.
+                cols_to_keep = {x.id for x in dataset_record_ids.collect()}
+                cols_to_drop = set(self.get_pivot_dimension_columns()).difference(cols_to_keep)
+                if cols_to_drop:
+                    ld_df = ld_df.drop(*cols_to_drop)
+            else:
+                # Drop rows that don't match requested project record IDs.
+                tmp = dataset_record_ids.withColumnRenamed("id", "dataset_record_id")
+                lk_df = lk_df.join(
+                    tmp,
+                    on=lk_df[dim_type.value] == tmp.dataset_record_id,
+                ).drop("dataset_record_id")
+
+        return lk_df, ld_df
+
+    def _process_metric_aggregations(self, context: QueryContext, ld_df):
+        orig_project_pivot_columns = self.get_pivot_dimension_columns_mapped_to_project()
+        pivot_columns = set(ld_df.columns).intersection(orig_project_pivot_columns)
+        assert (
+            len(context.model.project.metric_reductions) <= 1
+        ), "More than one metric aggregation is not supported yet"
+        # TODO: need to merge dataframes on each loop
+        for aggregation in context.model.project.metric_reductions:
+            query_name = aggregation.query_name
+            dim_type, records = context.get_metric_reduction_records(query_name)
+            column = dim_type.value
+            assert column == self.get_pivot_dimension_type().value, self.get_pivot_dimension_type()
+            ld_df, columns = map_and_reduce_pivot_dimension(
+                ld_df,
+                records,
+                pivot_columns,
+                aggregation.operation,
+                rename=True,
+            )
+            if context.metric_columns is None:
+                context.metric_columns = columns
+            elif context.metric_columns != columns:
+                raise Exception(
+                    "BUG: metric_columns are different across datasets: "
+                    f"first={context.metric_columns} second={columns}"
+                )
+            logger.info("Replaced dimensions with supplemental records %s", column)
+
+        if context.metric_columns is None:
+            # No metric aggregations defined.
+            context.metric_columns = sorted(pivot_columns)
+        logger.info("Set Query Metric columns to %s", context.metric_columns)
+
         return ld_df
 
     @track_timing(timer_stats_collector)
     def get_dataframe(self, query_context: QueryContext):
-        # TODO: handle pre-filtering of load data.
-        #   - time could be filtered
-        #   - columns could be dropped or aggregated
-        ld_df = self._load_data
-        lk_df = self._filter_project_dimensions(self._load_data_lookup, query_context)
         return self.make_project_dataframe(
-            load_data_df=ld_df, lookup_df=lk_df, query_context=query_context
+            # TODO DT: Can we remove NULLs at registration time?
+            lookup_df=self._load_data_lookup.filter("id is not NULL"),
+            query_context=query_context,
         )
 
     @track_timing(timer_stats_collector)
@@ -216,6 +288,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: List[DatasetSimpleModel]):
         lookup = self._load_data_lookup
+        lookup.cache()
         pivot_dimension_type = self.get_pivot_dimension_type()
         pivoted_columns = set(self.get_pivot_dimension_columns())
         pivoted_columns_to_keep = set()
@@ -226,17 +299,28 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 lookup = lookup.filter(lookup[column].isin(dim.record_ids))
             elif dim.dimension_type == pivot_dimension_type:
                 pivoted_columns_to_keep.update(set(dim.record_ids))
-            # else trivial dimension
 
-        # Bring it all into memory so that we can delete the original file.
-        lookup2 = lookup.coalesce(1).cache()
-        lookup2.count()
-        overwrite_dataframe_file(self._config.load_data_lookup_path, lookup2)
+        drop_columns = []
+        for dim in self._config.model.trivial_dimensions:
+            col = dim.value
+            count = lookup.select(col).distinct().count()
+            assert count == 1, f"{dim}: count"
+            drop_columns.append(col)
+        lookup = lookup.drop(*drop_columns)
+
+        lookup2 = lookup.coalesce(1)
+        lookup2 = overwrite_dataframe_file(self._config.load_data_lookup_path, lookup2)
+        lookup.unpersist()
         logger.info("Rewrote simplified %s", self._config.load_data_lookup_path)
         ids = next(iter(lookup2.select("id").distinct().select(F.collect_list("id")).first()))
 
         load_df = self._load_data.filter(self._load_data.id.isin(ids))
         pivoted_columns_to_remove = list(pivoted_columns.difference(pivoted_columns_to_keep))
         load_df = load_df.drop(*pivoted_columns_to_remove)
-        overwrite_dataframe_file(self._config.load_data_path, load_df)
+        path = Path(self._config.load_data_path)
+        if path.suffix == ".csv":
+            # write_dataframe_and_auto_partition doesn't support CSV yet
+            overwrite_dataframe_file(path, load_df)
+        else:
+            write_dataframe_and_auto_partition(load_df, path)
         logger.info("Rewrote simplified %s", self._config.load_data_path)

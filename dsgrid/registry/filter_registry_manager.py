@@ -20,7 +20,6 @@ class FilterRegistryManager(RegistryManager):
         ----------
         simple_model : RegistrySimpleModel
             Filter all configs and data according to this model.
-
         """
         project_ids_to_keep = {x.project_id for x in simple_model.projects}
         to_remove = [x for x in self._project_mgr.list_ids() if x not in project_ids_to_keep]

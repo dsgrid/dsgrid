@@ -6,7 +6,7 @@ import logging
 from pyspark.sql import SparkSession
 
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-from dsgrid.query import QueryContext
+from dsgrid.query.query_context import QueryContext
 
 logger = logging.getLogger(__name__)
 

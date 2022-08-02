@@ -29,6 +29,7 @@ ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.csv",
     "load_data_lookup.json",
 )
+ALLOWED_DATA_FILES = ALLOWED_LOAD_DATA_FILENAMES + ALLOWED_LOAD_DATA_LOOKUP_FILENAMES
 
 logger = logging.getLogger(__name__)
 

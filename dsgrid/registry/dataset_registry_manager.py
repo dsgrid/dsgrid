@@ -9,7 +9,7 @@ from typing import Union, List, Dict
 from prettytable import PrettyTable
 
 from dsgrid.common import REGISTRY_FILENAME
-from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dataset_config import DatasetConfig, ALLOWED_DATA_FILES
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dimension.base_models import check_required_dimensions
@@ -241,10 +241,18 @@ class DatasetRegistryManager(RegistryManagerBase):
         dataset_registry_dir = self.get_registry_data_directory(dataset_id)
         dataset_registry_filename = dataset_registry_dir / REGISTRY_FILENAME
         dataset_path = dataset_registry_dir / str(registry_config.version)
+        dataset_path.mkdir(exist_ok=True, parents=True)
         self.fs_interface.mkdir(dataset_registry_dir)
         registry_config.serialize(dataset_registry_filename)
         self.fs_interface.mkdir(registry_config_path)
-        self.fs_interface.copy_tree(config.dataset_path, dataset_path)
+        for filename in ALLOWED_DATA_FILES:
+            path = Path(config.dataset_path) / filename
+            if path.exists():
+                dst = dataset_path / filename
+                if path.is_file():
+                    self.fs_interface.copy_file(path, dst)
+                else:
+                    self.fs_interface.copy_tree(path, dst)
 
         # Serialize the registry file as well as the updated DatasetConfig to the registry.
         registry_filename = registry_dir / REGISTRY_FILENAME

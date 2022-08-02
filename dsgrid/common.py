@@ -4,7 +4,13 @@ import os
 AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 REMOTE_REGISTRY = "s3://nrel-dsgrid-registry"
 
-if os.environ.get("NREL_CLUSTER") is not None:
+
+def on_hpc():
+    # NREL_CLUSTER is not set when you ssh into a compute node.
+    return "NREL_CLUSTER" in os.environ or "SLURM_JOB_ID" in os.environ
+
+
+if on_hpc():
     LOCAL_REGISTRY = Path("/scratch") / os.environ["USER"] / ".dsgrid-registry"
 else:
     LOCAL_REGISTRY = Path.home() / ".dsgrid-registry"

@@ -206,6 +206,17 @@ class QueryResultBaseModel(QueryBaseModel):
     output_format: str = Field(
         title="output_format", description="Output file format: csv or parquet", default="parquet"
     )
+    # TODO: implement
+    sort_dimensions: List = Field(
+        title="sort_dimensions",
+        description="Sort the results by these dimensions.",
+        default=[],
+    )
+    # TODO: implement
+    time_zone: Optional[str] = Field(
+        title="time_zone",
+        description="Convert the results to this time zone.",
+    )
 
     @validator("aggregations")
     def check_aggregations(cls, aggregations):

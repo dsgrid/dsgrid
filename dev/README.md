@@ -443,8 +443,8 @@ CLI inputs. Refer to its help.
 The dsgrid team maintains a Docker container built with the Dockerfile in the root of this
 repository. It includes the dsgrid software, Spark, as well as secondary tools like Jupyter. This
 can be used to run dsgrid software on any computer (local, Eagle, or the cloud). The team converts
-the container to Singularity so that it can be used on Eagle. The container image is located at
-`/projects/dsgrid/containers/dsgrid`. Here's how to start a shell with important directories
+the container to Singularity so that it can be used on Eagle. The container images are located at
+`/projects/dsgrid/containers/`. Here's how to start a shell with important directories
 mounted:
 
 ```
@@ -452,7 +452,7 @@ $ module load singularity-container
 $ singularity shell \
     -B /scratch:/scratch \
     -B /projects:/projects \
-    /projects/dsgrid/containers/dsgrid
+    /projects/dsgrid/containers/nvidia_spark_v0.0.3.sif
 ```
 
 Here's how to run a script in the container:
@@ -462,7 +462,7 @@ $ module load singularity-container
 $ singularity exec \
     -B /scratch:/scratch \
     -B /projects:/projects \
-    /projects/dsgrid/containers/dsgrid \
+    /projects/dsgrid/containers/nvidia_spark_v0.0.3.sif \
     my-script.sh
 ```
 
@@ -483,6 +483,22 @@ Verify the installation by checking that this environment variable is set:
 $ echo $JAVA_HOME
 ```
 
+## Queries
+
+When developing code to support queries you will need to use a miniature registry. Running against
+full datasets in a project will take forever. Here is an example of how to create a simplified version
+of the StandardScenarios project. Run this on an Eagle compute node after configuring a cluster.
+
+This uses a configuration file from the dsgrid-test-data repository that selects a few dimension records
+from each dataset.
+
+It assumes that you have synced the dsgrid registry to `/scratch/$USER/standard-registry`.
+
+```
+$ dsgrid-admin make-filtered-registry /scratch/$USER/standard-registry small-registry ~/repos/dsgrid-test-data/filtered_registries/simple_standard_scenarios.json
+```
+
+Follow examples in `~/repos/dsgrid/tests/test_queries.py`.
 
 ## Publish Documentation
 

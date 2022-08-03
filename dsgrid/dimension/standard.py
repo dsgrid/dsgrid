@@ -36,9 +36,9 @@ class CensusRegion(GeographyDimensionBaseModel):
 class State(GeographyDimensionBaseModel):
     """State attributes"""
 
-    is_conus: bool
-    census_division: str = ""
-    census_region: str = ""
+    is_conus: Optional[bool]
+    census_division: Optional[str] = ""
+    census_region: Optional[str] = ""
 
 
 class County(GeographyDimensionBaseModel):

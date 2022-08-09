@@ -216,9 +216,7 @@ class Project:
                 mapping_records = self._config.get_base_to_supplemental_mapping_records(
                     dim_filter.query_name
                 )
-                required_ids = (
-                    mapping_records.filter("to_id is not NULL").select("from_id").distinct()
-                )
+                required_ids = mapping_records.select("from_id").distinct()
                 df = df.join(required_ids, on=df.id == required_ids.from_id).drop("from_id")
                 df = dim_filter.apply_filter(df, column="id")
             record_ids[dim_filter.dimension_type] = df

@@ -220,6 +220,7 @@ class Project:
                     mapping_records.filter("to_id is not NULL").select("from_id").distinct()
                 )
                 df = df.join(required_ids, on=df.id == required_ids.from_id).drop("from_id")
+                df = dim_filter.apply_filter(df, column="id")
             record_ids[dim_filter.dimension_type] = df
 
         for aggregation in context.model.project.metric_reductions:

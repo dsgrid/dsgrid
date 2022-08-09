@@ -184,5 +184,5 @@ class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
         col = F.col(column)
         method = getattr(col, self.operator)
         if self.negate:
-            return df.filter(~method(self._value))
-        return df.filter(method(self._value))
+            return df.filter(~method(self.value))
+        return df.filter(method(self.value))

@@ -91,7 +91,7 @@ class ChainedAggregationModel(DSGBaseModel):
     def check_aggregations(cls, aggregations):
         length = len(aggregations)
         if len(aggregations) < 2:
-            raise ValueError(f"length of ChainedAggregationModel must be at least: {length}")
+            raise ValueError(f"length of ChainedAggregationModel must be at least 2: {length}")
         if aggregations[-1].name is None:
             raise ValueError("ChainedAggregationModel requires its last model to define a name.")
         return aggregations

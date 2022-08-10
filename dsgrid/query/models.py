@@ -8,7 +8,6 @@ from pydantic import Field, root_validator, validator
 from dsgrid.data_models import DSGBaseModel
 
 # from dsgrid.dataset.dimension_filters import (
-#     DimensionFilterValueModel,
 #     DimensionFilterExpressionModel,
 #     DimensionFilterExpressionRawModel,
 #     DimensionFilterColumnOperatorModel,
@@ -22,7 +21,6 @@ class FilteredDatasetModel(DSGBaseModel):
     dataset_id: str = Field(title="dataset_id", description="Dataset ID")
     filters: List[Any] = Field(
         # Union[
-        #     DimensionFilterValueModel,
         #     DimensionFilterExpressionModel,
         #     DimensionFilterExpressionRawModel,
         #     DimensionFilterColumnOperatorModel,
@@ -126,7 +124,6 @@ class ProjectQueryModel(DSGBaseModel):
     dimension_filters: List[Any] = Field(
         # List[
         # Union[
-        #     DimensionFilterValueModel,
         #     DimensionFilterExpressionModel,
         #     DimensionFilterExpressionRawModel,
         #     DimensionFilterColumnOperatorModel,

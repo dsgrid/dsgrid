@@ -59,30 +59,6 @@ class _DimensionFilterWithWhereClauseModel(DimensionFilterBaseModel, abc.ABC):
         """
 
 
-class DimensionFilterValueModel(_DimensionFilterWithWhereClauseModel):
-    """Filters a table where a dimension column has a specific value.
-
-    Example:
-        DimensionFilterValueModel(
-            dimension_type=DimensionType.GEOGRAPHY,
-            dimension_query_name="county",
-            value="06037",
-        ),
-    is equivalent to
-        df.filter("county == '06037'")
-
-    """
-
-    value: Any
-
-    def where_clause(self, column=None):
-        if column is None:
-            column = self.dimension_type.value
-        value = self._make_value_str(self.value)
-        text = f"({column} == {value})"
-        return text
-
-
 class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
     """Filters a table where a dimension column matches an expression.
     Builds the filter string based on inferred types.

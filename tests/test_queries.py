@@ -23,7 +23,6 @@ from dsgrid.query.models import (
     QueryResultModel,
 )
 from dsgrid.dataset.dimension_filters import (
-    DimensionFilterValueModel,
     DimensionFilterExpressionModel,
     DimensionFilterColumnOperatorModel,
 )
@@ -297,9 +296,10 @@ class QueryTestElectricityValues(QueryTestBase):
                         operator="like",
                         value="%",
                     ),
-                    DimensionFilterValueModel(
+                    DimensionFilterExpressionModel(
                         dimension_type=DimensionType.GEOGRAPHY,
                         dimension_query_name="county",
+                        operator="==",
                         value="06037",
                     ),
                 ],

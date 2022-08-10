@@ -82,8 +82,10 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         # TODO: need to merge dataframes on each loop
         processed_first = False
         for aggregation in context.model.metric_reductions:
-            query_name = aggregation.query_name
-            records = self._project.config.get_base_to_supplemental_mapping_records(query_name)
+            dimension_query_name = aggregation.dimension_query_name
+            records = self._project.config.get_base_to_supplemental_mapping_records(
+                dimension_query_name
+            )
             df, columns = map_and_reduce_pivot_dimension(
                 df,
                 records,
@@ -107,13 +109,15 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
         orig = df
         all_query_names = set(self._project.config.get_dimension_query_names())
-        for query_name in set(df.columns).intersection(all_query_names):
+        for dimension_query_name in set(df.columns).intersection(all_query_names):
             assert not {"id", "name"}.intersection(df.columns), df.columns
-            records = self._project.config.get_dimension_records(query_name).select("id", "name")
+            records = self._project.config.get_dimension_records(dimension_query_name).select(
+                "id", "name"
+            )
             df = (
-                df.join(records, on=df[query_name] == records.id)
-                .drop("id", query_name)
-                .withColumnRenamed("name", query_name)
+                df.join(records, on=df[dimension_query_name] == records.id)
+                .drop("id", dimension_query_name)
+                .withColumnRenamed("name", dimension_query_name)
             )
         assert df.count() == orig.count(), f"counts changed {df.count()} {orig.count()}"
         return df
@@ -178,16 +182,16 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         logger.info("Wrote query=%s output table to %s", context.model.name, filename)
 
     def _add_columns(self, df, query_names):
-        for query_name in query_names:
-            dim = self._project.config.get_dimension(query_name)
+        for dimension_query_name in query_names:
+            dim = self._project.config.get_dimension(dimension_query_name)
             base_dim = self._project.config.get_base_dimension(dim.model.dimension_type)
-            base_query_name = base_dim.model.query_name
+            base_query_name = base_dim.model.dimension_query_name
             records = self._project.config.get_base_to_supplemental_mapping_records(
-                query_name
+                dimension_query_name
             ).drop("from_fraction")
             df = (
                 df.join(records, on=df[base_query_name] == records.from_id)
-                .withColumnRenamed("to_id", query_name)
+                .withColumnRenamed("to_id", dimension_query_name)
                 .drop("from_id")
             )
 
@@ -325,8 +329,12 @@ class DerivedDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
                                 context, df, repartition, aggregation_name=agg.name
                             )
                 else:
-                    for query_name in set(aggregation.group_by_columns).difference(df.columns):
-                        context.add_required_dimension_mapping(aggregation.name, query_name)
+                    for dimension_query_name in set(aggregation.group_by_columns).difference(
+                        df.columns
+                    ):
+                        context.add_required_dimension_mapping(
+                            aggregation.name, dimension_query_name
+                        )
                     df2 = self._perform_aggregation(context, df, aggregation)
                     df2 = self._replace_ids_with_names(context, df2)
                     self._save_query_results(

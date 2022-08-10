@@ -15,8 +15,10 @@ class QueryContext:
         self._model = model
         self._record_ids_by_dimension_type = {}  # DimensionType to DataFrame
         self._metric_columns = None
-        self._required_dimension_mappings = defaultdict(list)  # aggregation_name to [query_name]
-        self._metric_reductions = {}  # query_name to (dimension_type, records)
+        self._required_dimension_mappings = defaultdict(
+            list
+        )  # aggregation_name to [dimension_query_name]
+        self._metric_reductions = {}  # dimension_query_name to (dimension_type, records)
 
     @property
     def metric_columns(self):
@@ -49,17 +51,17 @@ class QueryContext:
             existing = self._required_dimension_mappings[key]
             self._required_dimension_mappings[key] = list(set(existing + query_names))
 
-    def add_required_dimension_mapping(self, aggregation_name: str, query_name: str):
-        self._required_dimension_mappings[aggregation_name].append(query_name)
+    def add_required_dimension_mapping(self, aggregation_name: str, dimension_query_name: str):
+        self._required_dimension_mappings[aggregation_name].append(dimension_query_name)
 
     def get_required_dimension_mappings(self, aggregation_name: str):
         return self._required_dimension_mappings.get(aggregation_name, [])
 
-    def add_metric_reduction_records(self, query_name: str, dimension_type, records):
-        self._metric_reductions[query_name] = (dimension_type, records)
+    def add_metric_reduction_records(self, dimension_query_name: str, dimension_type, records):
+        self._metric_reductions[dimension_query_name] = (dimension_type, records)
 
-    def get_metric_reduction_records(self, query_name: str):
-        val = self._metric_reductions.get(query_name)
+    def get_metric_reduction_records(self, dimension_query_name: str):
+        val = self._metric_reductions.get(dimension_query_name)
         if val is None:
-            raise DSGInvalidParameter(f"query_name={query_name} is not stored")
+            raise DSGInvalidParameter(f"dimension_query_name={dimension_query_name} is not stored")
         return val[0], val[1]

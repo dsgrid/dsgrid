@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
 
     dimension_type: DimensionType
-    query_name: str
+    dimension_query_name: str
 
     @abc.abstractmethod
     def apply_filter(self, df):
@@ -65,7 +65,7 @@ class DimensionFilterValueModel(_DimensionFilterWithWhereClauseModel):
     Example:
         DimensionFilterValueModel(
             dimension_type=DimensionType.GEOGRAPHY,
-            query_name="county",
+            dimension_query_name="county",
             value="06037",
         ),
     is equivalent to
@@ -90,7 +90,7 @@ class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
     Example:
         DimensionFilterExpressionModel(
             dimension_type=DimensionType.GEOGRAPHY,
-            query_name="county",
+            dimension_query_name="county",
             operator="=="
             value="06037",
         ),
@@ -117,7 +117,7 @@ class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
     Example:
         DimensionFilterExpressionModel(
             dimension_type=DimensionType.GEOGRAPHY,
-            query_name="county",
+            dimension_query_name="county",
             value="== '06037'",
         ),
     is equivalent to

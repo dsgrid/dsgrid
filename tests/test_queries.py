@@ -15,7 +15,7 @@ from dsgrid.loggers import setup_logging
 from dsgrid.project import Project
 from dsgrid.query.models import (
     AggregationModel,
-    ProjectConstraintsModel,
+    ProjectQueryModel,
     ProjectQueryResultModel,
     CreateDerivedDatasetQueryModel,
     DerivedDatasetQueryModel,
@@ -170,7 +170,7 @@ class QueryTestBase(abc.ABC):
 
     def get_filtered_county_id(self):
         filters = self._model.project.dimension_filters
-        counties = [x.value for x in filters if x.query_name == "county"]
+        counties = [x.value for x in filters if x.dimension_query_name == "county"]
         assert len(counties) == 1, f"Unexpected length of filtered counties: {len(counties)}"
         return counties[0]
 
@@ -219,9 +219,9 @@ class QueryTestElectricityAgg(QueryTestBase):
         name = self.NAME
         self._model = ProjectQueryResultModel(
             name=name,
-            project=ProjectConstraintsModel(
+            project=ProjectQueryModel(
                 project_id="dsgrid_conus_2022",
-                include_dsgrid_dataset_components=True,
+                include_dsgrid_dataset_components=False,
                 dataset_ids=[
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
@@ -231,7 +231,7 @@ class QueryTestElectricityAgg(QueryTestBase):
                 dimension_filters=[
                     DimensionFilterExpressionModel(
                         dimension_type=DimensionType.GEOGRAPHY,
-                        query_name="county",
+                        dimension_query_name="county",
                         operator="==",
                         value="06037",
                     ),
@@ -281,9 +281,9 @@ class QueryTestElectricityValues(QueryTestBase):
     def make_query(self):
         self._model = ProjectQueryResultModel(
             name=self.NAME,
-            project=ProjectConstraintsModel(
+            project=ProjectQueryModel(
                 project_id="dsgrid_conus_2022",
-                include_dsgrid_dataset_components=True,
+                include_dsgrid_dataset_components=False,
                 dataset_ids=[
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
@@ -292,17 +292,17 @@ class QueryTestElectricityValues(QueryTestBase):
                 dimension_filters=[
                     DimensionFilterColumnOperatorModel(
                         dimension_type=DimensionType.METRIC,
-                        query_name="electricity",
+                        dimension_query_name="electricity",
                         operator="like",
                         value="%",
                     ),
                     DimensionFilterValueModel(
                         dimension_type=DimensionType.GEOGRAPHY,
-                        query_name="county",
+                        dimension_query_name="county",
                         value="06037",
                     ),
                 ],
-                drop_dimensions=[DimensionType.SUBSECTOR],
+                # drop_dimensions=[DimensionType.SUBSECTOR],
                 # filtered_datasets=[],
             ),
             supplemental_columns=["state"],
@@ -324,7 +324,8 @@ class QueryTestElectricityValues(QueryTestBase):
         non_value_columns.update({"id", "timestamp"})
         non_value_columns.update(self._model.supplemental_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
-        expected = ["electricity_cooling", "electricity_heating"]
+        # TODO: fraction will be removed eventually
+        expected = ["electricity_cooling", "electricity_heating", "fraction"]
         success = value_columns == expected
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
@@ -365,14 +366,16 @@ class QueryTestElectricityUseByCounty(QueryTestBase):
     def make_query(self):
         self._model = ProjectQueryResultModel(
             name=self.NAME,
-            project=ProjectConstraintsModel(
+            project=ProjectQueryModel(
                 project_id="dsgrid_conus_2022",
-                include_dsgrid_dataset_components=True,
+                include_dsgrid_dataset_components=False,
                 dataset_ids=[
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
                     # "tempo_conus_2022",
                 ],
+                # TODO: Should this filter out non-electricity columns? Is that what we want?
+                # We should leave non-electicity columns in the table.
                 metric_reductions=[
                     MetricReductionModel(dimension_query_name="electricity", operation="sum")
                 ],
@@ -408,9 +411,9 @@ class QueryTestElectricityUseByState(QueryTestBase):
     def make_query(self):
         self._model = ProjectQueryResultModel(
             name=self.NAME,
-            project=ProjectConstraintsModel(
+            project=ProjectQueryModel(
                 project_id="dsgrid_conus_2022",
-                include_dsgrid_dataset_components=True,
+                include_dsgrid_dataset_components=False,
                 dataset_ids=[
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
@@ -470,9 +473,9 @@ class QueryTestElectricityValuesDerivedDataset(QueryTestBase):
         self._model = CreateDerivedDatasetQueryModel(
             name=self.NAME,
             dataset_id="com_res",
-            project=ProjectConstraintsModel(
+            project=ProjectQueryModel(
                 project_id="dsgrid_conus_2022",
-                include_dsgrid_dataset_components=True,
+                include_dsgrid_dataset_components=False,
                 dataset_ids=[
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
@@ -481,7 +484,7 @@ class QueryTestElectricityValuesDerivedDataset(QueryTestBase):
                 dimension_filters=[
                     DimensionFilterColumnOperatorModel(
                         dimension_type=DimensionType.METRIC,
-                        query_name="electricity",
+                        dimension_query_name="electricity",
                         operator="like",
                         value="%",
                     ),
@@ -499,7 +502,8 @@ class QueryTestElectricityValuesDerivedDataset(QueryTestBase):
         non_value_columns.update({"id", "timestamp"})
         non_value_columns.update(self._model.supplemental_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
-        expected = ["electricity_cooling", "electricity_heating"]
+        # TODO: fraction will be removed eventually
+        expected = ["electricity_cooling", "electricity_heating", "fraction"]
         success = value_columns == expected
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
@@ -817,7 +821,7 @@ def perform_op_by_electricity(stats, table, name, operation):
 
 
 def run_query(
-    query_name,
+    dimension_query_name,
     registry_path=REGISTRY_PATH,
     operation="sum",
     output_dir=Path("queries"),
@@ -832,16 +836,16 @@ def run_query(
         offline_mode=True,
         registry_path=registry_path,
     )
-    if query_name == QueryTestElectricityValues.NAME:
+    if dimension_query_name == QueryTestElectricityValues.NAME:
         query = QueryTestElectricityValues(registry_path, project, output_dir=output_dir)
-    elif query_name == QueryTestElectricityAgg.NAME:
+    elif dimension_query_name == QueryTestElectricityAgg.NAME:
         query = QueryTestElectricityAgg(operation, registry_path, project, output_dir=output_dir)
-    elif query_name == QueryTestElectricityUseByCounty.NAME:
+    elif dimension_query_name == QueryTestElectricityUseByCounty.NAME:
         query = QueryTestElectricityUseByCounty(registry_path, project, output_dir=output_dir)
-    elif query_name == QueryTestElectricityUseByState.NAME:
+    elif dimension_query_name == QueryTestElectricityUseByState.NAME:
         query = QueryTestElectricityUseByState(registry_path, project, output_dir=output_dir)
     else:
-        raise Exception(f"no query for {query_name}")
+        raise Exception(f"no query for {dimension_query_name}")
 
     ProjectQuerySubmitter(project, output_dir).submit(
         query.make_query(),

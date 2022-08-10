@@ -383,36 +383,36 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return dim_config
         assert False, dimension_type
 
-    def get_dimension(self, query_name: str):
+    def get_dimension(self, dimension_query_name: str):
         """Return an instance of DimensionBaseConfig.
 
         Parameters
         ----------
-        query_name : str
+        dimension_query_name : str
 
         Returns
         -------
         DimensionBaseConfig
 
         """
-        dim = self._dimensions_by_query_name.get(query_name)
+        dim = self._dimensions_by_query_name.get(dimension_query_name)
         if dim is None:
-            raise DSGInvalidDimension(f"query_name={query_name} is not stored")
+            raise DSGInvalidDimension(f"dimension_query_name={dimension_query_name} is not stored")
         return dim
 
-    def get_dimension_records(self, query_name: str):
+    def get_dimension_records(self, dimension_query_name: str):
         """Return a DataFrame containing the records for a dimension.
 
         Parameters
         ----------
-        query_name : str
+        dimension_query_name : str
 
         Returns
         -------
         DimensionBaseConfig
 
         """
-        return self.get_dimension(query_name).get_records_dataframe()
+        return self.get_dimension(dimension_query_name).get_records_dataframe()
 
     def get_supplemental_dimensions(self, dimension_type: DimensionType):
         """Return the supplemental dimensions matching dimension (if any).
@@ -447,29 +447,33 @@ class ProjectConfig(ConfigWithDataFilesBase):
             if x.model.from_dimension.dimension_type == dimension_type
         ]
 
-    def get_base_to_supplemental_mapping_records(self, query_name: str):
+    def get_base_to_supplemental_mapping_records(self, dimension_query_name: str):
         """Return the project's base-to-supplemental dimension mapping records.
 
         Parameters
         ----------
-        query_name : str
+        dimension_query_name : str
 
         Returns
         -------
         pyspark.sql.DataFrame
 
         """
-        dim = self.get_dimension(query_name)
+        dim = self.get_dimension(dimension_query_name)
         dimension_type = dim.model.dimension_type
         base_dim = self.get_base_dimension(dimension_type)
         if dim.model.dimension_id == base_dim.model.dimension_id:
-            raise DSGInvalidParameter(f"Cannot pass base dimension: {dimension_type}/{query_name}")
+            raise DSGInvalidParameter(
+                f"Cannot pass base dimension: {dimension_type}/{dimension_query_name}"
+            )
 
         for mapping in self._base_to_supplemental_mappings.values():
             if mapping.model.to_dimension.dimension_id == dim.model.dimension_id:
                 return mapping.get_records_dataframe().filter("to_id is not NULL")
 
-        raise DSGInvalidParameter(f"No mapping is stored for {dimension_type}/{query_name}")
+        raise DSGInvalidParameter(
+            f"No mapping is stored for {dimension_type}/{dimension_query_name}"
+        )
 
     def has_base_to_supplemental_dimension_mapping_types(self, dimension_type):
         """Return True if the config has these base-to-supplemental mappings."""
@@ -511,7 +515,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
         base_dim_query_names = {}
         for dimension_type in DimensionType:
             dim = self.get_base_dimension(dimension_type)
-            base_dim_query_names[dimension_type] = dim.model.query_name
+            base_dim_query_names[dimension_type] = dim.model.dimension_query_name
         return base_dim_query_names
 
     def load_dimension_associations(self):
@@ -541,12 +545,12 @@ class ProjectConfig(ConfigWithDataFilesBase):
         self._supplemental_dimensions.update(supplemental_dimensions)
         self._dimensions_by_query_name.clear()
         for dim in self.iter_dimensions():
-            if dim.model.query_name in self._dimensions_by_query_name:
+            if dim.model.dimension_query_name in self._dimensions_by_query_name:
                 raise DSGInvalidDimension(
-                    f"query_name={dim.model.query_name} exists multiple times in project "
+                    f"dimension_query_name={dim.model.dimension_query_name} exists multiple times in project "
                     f"{self.config_id}"
                 )
-            self._dimensions_by_query_name[dim.model.query_name] = dim
+            self._dimensions_by_query_name[dim.model.dimension_query_name] = dim
 
     def load_dimension_mappings(self, dimension_mapping_manager: DimensionMappingRegistryManager):
         """Load all dimension mappings.
@@ -649,7 +653,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
     def list_dimension_query_names(self, dimension_type: DimensionType):
         """List the query names available for a dimension type."""
         return [
-            x.model.query_name
+            x.model.dimension_query_name
             for x in self.iter_dimensions()
             if x.model.dimension_type == dimension_type
         ]

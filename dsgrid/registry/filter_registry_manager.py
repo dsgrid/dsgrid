@@ -55,7 +55,7 @@ class FilterRegistryManager(RegistryManager):
 
             for simple_dim in project.dimensions.supplemental_dimensions:
                 for dim in project_config.get_supplemental_dimensions(simple_dim.dimension_type):
-                    if dim.model.query_name == simple_dim.query_name:
+                    if dim.model.dimension_query_name == simple_dim.dimension_query_name:
                         handle_dimension(simple_dim, dim)
 
         logger.info("Filter dataset dimensions")

@@ -73,7 +73,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if query_context is not None:
             ld_df = self._process_metric_aggregations(query_context, ld_df)
 
-        ld_df = ld_df.join(lk_df.drop("fraction"), on="id").drop("id")
+        # TODO: handle fraction application
+        # Currently this requires fraction = 1.0
+        ld_df = ld_df.join(lk_df, on="id").drop("id")
 
         # Map the time here because some columns may have been collapsed above.
         ld_df = self._convert_time_dimension(ld_df)
@@ -90,9 +92,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def _prefilter_dataset(self, context: QueryContext, lk_df, ld_df):
         # TODO: prefilter time
-        if context.model.project.drop_dimensions:
-            columns = [x.value for x in context.model.project.drop_dimensions]
-            lk_df = lk_df.drop(*columns)
+
+        # TODO: The required behavior here is unclear. Drop duplicates?
+        # if context.model.project.drop_dimensions:
+        #     columns = [x.value for x in context.model.project.drop_dimensions]
+        #     lk_df = lk_df.drop(*columns)
 
         for dim_type, project_record_ids in context.iter_record_ids_by_dimension_type():
             dataset_mapping = self._get_dataset_to_project_mapping_records(dim_type)
@@ -105,9 +109,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                         project_record_ids,
                         on=dataset_mapping.to_id == project_record_ids.id,
                     )
-                    .select("dataset_record_id")
+                    .selectExpr("dataset_record_id AS id")
                     .distinct()
-                    .withColumnRenamed("dataset_record_id", "id")
                 )
             if dim_type == self.get_pivot_dimension_type():
                 # Drop columns that don't match requested project record IDs.
@@ -133,8 +136,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ), "More than one metric aggregation is not supported yet"
         # TODO: need to merge dataframes on each loop
         for aggregation in context.model.project.metric_reductions:
-            query_name = aggregation.query_name
-            dim_type, records = context.get_metric_reduction_records(query_name)
+            dimension_query_name = aggregation.dimension_query_name
+            dim_type, records = context.get_metric_reduction_records(dimension_query_name)
             column = dim_type.value
             assert column == self.get_pivot_dimension_type().value, self.get_pivot_dimension_type()
             ld_df, columns = map_and_reduce_pivot_dimension(

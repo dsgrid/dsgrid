@@ -210,22 +210,23 @@ class Project:
         for dim_filter in context.model.project.dimension_filters:
             dim_type = dim_filter.dimension_type
             df = record_ids.get(dim_type, default_records(dim_type))
-            if dim_filter.query_name == base_dim_query_names[dim_type]:
+            if dim_filter.dimension_query_name == base_dim_query_names[dim_type]:
                 df = dim_filter.apply_filter(df, column="id")
             else:
                 mapping_records = self._config.get_base_to_supplemental_mapping_records(
-                    dim_filter.query_name
+                    dim_filter.dimension_query_name
                 )
                 required_ids = mapping_records.select("from_id").distinct()
                 df = df.join(required_ids, on=df.id == required_ids.from_id).drop("from_id")
                 df = dim_filter.apply_filter(df, column="id")
+            # TODO DT: if dimension_type already exists in record_ids, make this an intersection of the two dataframes.
             record_ids[dim_filter.dimension_type] = df
 
         for aggregation in context.model.project.metric_reductions:
-            dim = self._config.get_dimension(aggregation.query_name)
+            dim = self._config.get_dimension(aggregation.dimension_query_name)
             dim_type = dim.model.dimension_type
             mapping_records = self._config.get_base_to_supplemental_mapping_records(
-                aggregation.query_name
+                aggregation.dimension_query_name
             ).filter("to_id is not NULL")
             required_ids = mapping_records.select("from_id").distinct()
             df = record_ids.get(dim_type, default_records(dim_type))
@@ -238,26 +239,26 @@ class Project:
             context.set_record_ids_by_dimension_type(dimension_type, record_ids)
 
     def _handle_supplemental_query_names(self, context: QueryContext):
-        def check_query_name(query_name, tag):
-            dim = self._config.get_dimension(query_name)
+        def check_query_name(dimension_query_name, tag):
+            dim = self._config.get_dimension(dimension_query_name)
             base_dim = self._config.get_base_dimension(dim.model.dimension_type)
             if dim.model.dimension_id == base_dim.model.dimension_id:
                 raise DSGInvalidParameter(
                     f"{tag} cannot contain a base dimension: "
-                    f"{dim.model.dimension_type}/{query_name}"
+                    f"{dim.model.dimension_type}/{dimension_query_name}"
                 )
             return dim, base_dim
 
-        for query_name in context.model.supplemental_columns:
-            check_query_name(query_name, "supplemental_columns")
+        for dimension_query_name in context.model.supplemental_columns:
+            check_query_name(dimension_query_name, "supplemental_columns")
 
         for aggregation in context.model.project.metric_reductions:
-            query_name = aggregation.query_name
-            dim, base_dim = check_query_name(query_name, "MetricReductionModel")
+            dimension_query_name = aggregation.dimension_query_name
+            dim, base_dim = check_query_name(dimension_query_name, "MetricReductionModel")
             context.add_metric_reduction_records(
-                query_name,
+                dimension_query_name,
                 dim.model.dimension_type,
-                self._config.get_base_to_supplemental_mapping_records(query_name),
+                self._config.get_base_to_supplemental_mapping_records(dimension_query_name),
             )
 
         for aggregation in context.model.aggregations:
@@ -265,11 +266,11 @@ class Project:
                 aggregation, ChainedAggregationModel
             ), "ChainedAggregationModel is not supported yet"
 
-            for query_name in aggregation.group_by_columns:
-                dim = self._config.get_dimension(query_name)
+            for dimension_query_name in aggregation.group_by_columns:
+                dim = self._config.get_dimension(dimension_query_name)
                 base_dim = self._config.get_base_dimension(dim.model.dimension_type)
                 if dim.model.dimension_id != base_dim.model.dimension_id:
-                    context.add_required_dimension_mapping(aggregation.name, query_name)
+                    context.add_required_dimension_mapping(aggregation.name, dimension_query_name)
 
     def _convert_columns_to_query_names(self, df):
         # All columns start off as base dimension names but need to be query names.

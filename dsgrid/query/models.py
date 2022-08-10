@@ -35,10 +35,10 @@ class FilteredDatasetModel(DSGBaseModel):
 
 class MetricReductionModel(DSGBaseModel):
     """Reduces the metric values for each set of unique dimension combinations, excluding
-    query_name."""
+    dimension_query_name."""
 
-    query_name: str = Field(
-        title="query_name", alias="dimension_query_name", description="Dimension query name"
+    dimension_query_name: str = Field(
+        title="dimension_query_name", description="Dimension query name"
     )
     operation: str = Field(
         title="operation",
@@ -100,7 +100,7 @@ class ChainedAggregationModel(DSGBaseModel):
 # TODO: Deserializing JSON into QueryModel probably won't work for all cases, notably the unions.
 
 
-class ProjectConstraintsModel(DSGBaseModel):
+class ProjectQueryModel(DSGBaseModel):
     """Defines how to transform a project into a derived dataset"""
 
     project_id: str = Field(title="project_id", description="Project ID for query")
@@ -145,6 +145,16 @@ class ProjectConstraintsModel(DSGBaseModel):
         description="Version of project or dataset on which the query is based. "
         "Should not be set by the user",
     )
+
+    @root_validator(pre=True)
+    def check_unsupported_fields(cls, values):
+        if values.get("include_dsgrid_dataset_components", True):
+            raise ValueError("Setting include_dsgrid_dataset_components=true is not supported yet")
+        if values.get("drop_dimensions", []):
+            raise ValueError("drop_dimensions is not supported yet")
+        if values.get("excluded_dataset_ids", []):
+            raise ValueError("excluded_dataset_ids is not supported yet")
+        return values
 
     @validator("excluded_dataset_ids")
     def check_dataset_ids(cls, excluded_dataset_ids, values):
@@ -233,7 +243,7 @@ class QueryResultBaseModel(QueryBaseModel):
 class ProjectQueryResultModel(QueryResultBaseModel):
     """Represents a user query on a Project."""
 
-    project: ProjectConstraintsModel = Field(
+    project: ProjectQueryModel = Field(
         title="project", description="Defines the datasets to use and how to transform them."
     )
 
@@ -257,7 +267,7 @@ class CreateDerivedDatasetQueryModel(QueryBaseModel):
     """
 
     dataset_id: str = Field(title="dataset_id", description="Derived Dataset ID for query")
-    project: ProjectConstraintsModel = Field(
+    project: ProjectQueryModel = Field(
         title="project", description="Defines the datasets to use and how to transform them."
     )
     supplemental_columns: List[str] = Field(
@@ -271,6 +281,7 @@ class CreateDerivedDatasetQueryModel(QueryBaseModel):
         description="Specifies how metric values should be reduced.",
         default=[],
     )
+    # TODO: maybe this shouldn't be here.
     aggregations: List[Union[AggregationModel, ChainedAggregationModel]] = Field(
         title="aggregations", description="Informs how to groupBy and aggregate data.", default=[]
     )

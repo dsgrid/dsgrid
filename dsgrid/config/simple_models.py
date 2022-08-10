@@ -11,7 +11,7 @@ from dsgrid.dimension.base_models import DimensionType
 class DimensionSimpleModel(DSGBaseModel):
 
     dimension_type: DimensionType
-    query_name: Optional[str]
+    dimension_query_name: Optional[str]
     record_ids: List[str]
 
 
@@ -30,8 +30,10 @@ class DimensionsSimpleModel(DSGBaseModel):
     @root_validator
     def check_supplemental_dimensions(cls, values):
         for dim in values["supplemental_dimensions"]:
-            if dim.query_name is None:
-                raise ValueError(f"supplemental dimensions must define query_name: {dim}")
+            if dim.dimension_query_name is None:
+                raise ValueError(
+                    f"supplemental dimensions must define dimension_query_name: {dim}"
+                )
         return values
 
 

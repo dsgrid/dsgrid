@@ -191,8 +191,15 @@ class QueryBaseModel(DSGBaseModel, abc.ABC):
         return compute_hash(text.encode()), text
 
 
-class QueryResultBaseModel(QueryBaseModel):
-    """Base class for queries that produce result tables"""
+def check_aggregations(aggregations):
+    for agg in aggregations:
+        if isinstance(agg, AggregationModel) and agg.name is None:
+            raise ValueError("AggregationModel must define a name")
+    return aggregations
+
+
+class QueryResultModel(DSGBaseModel):
+    """Defines fie queries that produce result tables"""
 
     supplemental_columns: List[str] = Field(
         title="supplemental_columns",
@@ -226,7 +233,14 @@ class QueryResultBaseModel(QueryBaseModel):
     time_zone: Optional[str] = Field(
         title="time_zone",
         description="Convert the results to this time zone.",
+        default=None,
     )
+
+    @root_validator(pre=True)
+    def check_unsupported_fields(cls, values):
+        if values.get("sort_dimensions", []):
+            raise ValueError("Setting sort_dimensions is not supported yet")
+        return values
 
     @validator("aggregations")
     def check_aggregations(cls, aggregations):
@@ -240,16 +254,23 @@ class QueryResultBaseModel(QueryBaseModel):
         return fmt
 
 
-class ProjectQueryResultModel(QueryResultBaseModel):
+class ProjectQueryResultModel(QueryBaseModel):
     """Represents a user query on a Project."""
 
     project: ProjectQueryModel = Field(
         title="project", description="Defines the datasets to use and how to transform them."
     )
+    result: QueryResultModel = Field(
+        title="result",
+        description="Controls the output results",
+        default=QueryResultModel(),
+    )
 
     @root_validator
     def check_metric_reductions(cls, values):
-        if values["metric_reductions"] and values["project"].metric_reductions:
+        if "result" not in values or "project" not in values:
+            return values
+        if values["result"].metric_reductions and values["project"].metric_reductions:
             raise ValueError(
                 "metric_reductions cannot be set within the project constraints as well as in the result"
             )
@@ -261,7 +282,7 @@ class ProjectQueryResultModel(QueryResultBaseModel):
         return compute_hash(text.encode()), text
 
 
-class CreateDerivedDatasetQueryModel(QueryBaseModel):
+class DerivedDatasetQueryModel(QueryBaseModel):
     """Represents a user query to create a Derived Dataset. This dataset requires a Project
     in order to retrieve dimension records and dimension mapping records.
     """
@@ -270,25 +291,13 @@ class CreateDerivedDatasetQueryModel(QueryBaseModel):
     project: ProjectQueryModel = Field(
         title="project", description="Defines the datasets to use and how to transform them."
     )
-    supplemental_columns: List[str] = Field(
-        title="supplemental_columns",
-        description="Add these supplemental dimension query names as columns in result tables. "
-        "Applies to all aggregations.",
-        default=[],
+    # TODO: not all fields apply here. The differences between a derived dataset and result
+    # are still murky.
+    result: QueryResultModel = Field(
+        title="result",
+        description="Controls the output results",
+        default=QueryResultModel(),
     )
-    metric_reductions: List[MetricReductionModel] = Field(
-        title="metric_reductions",
-        description="Specifies how metric values should be reduced.",
-        default=[],
-    )
-    # TODO: maybe this shouldn't be here.
-    aggregations: List[Union[AggregationModel, ChainedAggregationModel]] = Field(
-        title="aggregations", description="Informs how to groupBy and aggregate data.", default=[]
-    )
-
-    @validator("aggregations")
-    def check_aggregations(cls, aggregations):
-        return check_aggregations(aggregations)
 
     def serialize_cached_content(self):
         # Exclude all result-oriented fields in orer to faciliate re-using queries.
@@ -303,14 +312,10 @@ class CreateDerivedDatasetQueryModel(QueryBaseModel):
 # TODO: create the format (config / .toml) that will define this object
 
 
-class DerivedDatasetQueryModel(QueryResultBaseModel):
+class DerivedDatasetQueryResultModel(QueryBaseModel):
     """Represents a user query on a Derived Dataset."""
 
     dataset_id: str = Field(title="dataset_id", description="Derived Dataset ID for query")
-
-
-def check_aggregations(aggregations):
-    for agg in aggregations:
-        if isinstance(agg, AggregationModel) and agg.name is None:
-            raise ValueError("AggregationModel must define a name")
-    return aggregations
+    result: QueryResultModel = Field(
+        title="result", description="Controls the output results", default=QueryResultModel()
+    )

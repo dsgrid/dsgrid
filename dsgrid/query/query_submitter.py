@@ -11,9 +11,9 @@ from dsgrid.utils.files import dump_data, load_data
 from .models import (
     ChainedAggregationModel,
     ProjectQueryResultModel,
-    CreateDerivedDatasetQueryModel,
     DerivedDatasetQueryModel,
-    QueryResultBaseModel,
+    DerivedDatasetQueryResultModel,
+    QueryResultModel,
 )
 from .query_context import QueryContext
 
@@ -75,13 +75,13 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     def _process_metric_reductions(self, context, df):
         assert (
-            len(context.model.metric_reductions) <= 1
+            len(context.model.result.metric_reductions) <= 1
         ), "More than one metric aggregation is not supported yet"
         cols = set(context.metric_columns)  # TODO DT: same as pivot columns?
         context.metric_columns = None
         # TODO: need to merge dataframes on each loop
         processed_first = False
-        for aggregation in context.model.metric_reductions:
+        for aggregation in context.model.result.metric_reductions:
             dimension_query_name = aggregation.dimension_query_name
             records = self._project.config.get_base_to_supplemental_mapping_records(
                 dimension_query_name
@@ -104,7 +104,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         return df
 
     def _replace_ids_with_names(self, context, df):
-        if not context.model.replace_ids_with_names:
+        if not context.model.result.replace_ids_with_names:
             return df
 
         orig = df
@@ -122,9 +122,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         assert df.count() == orig.count(), f"counts changed {df.count()} {orig.count()}"
         return df
 
-    def _run_query(
-        self, model: QueryResultBaseModel, load_cached_table, persist_intermediate_table
-    ):
+    def _run_query(self, model: QueryResultModel, load_cached_table, persist_intermediate_table):
         context = QueryContext(model)
         if context.model.project.version is not None:
             raise DSGInvalidParameter("Query version cannot be set by the user")
@@ -143,8 +141,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if persist_intermediate_table and not is_cached:
             df = self._persist_intermediate_result(context, df)
 
-        if context.model.supplemental_columns:
-            df = self._add_columns(df, context.model.supplemental_columns)
+        if context.model.result.supplemental_columns:
+            df = self._add_columns(df, context.model.result.supplemental_columns)
 
         return df, context
 
@@ -162,7 +160,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if aggregation_name is not None:
             output_dir /= aggregation_name
             output_dir.mkdir(exist_ok=True)
-        filename = output_dir / f"table.{context.model.output_format}"
+        filename = output_dir / f"table.{context.model.result.output_format}"
         self._save_result(context, df, filename, repartition)
 
     def _save_result(self, context, df, filename, repartition):
@@ -245,8 +243,8 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         """
         repartition = not persist_intermediate_table
         df, context = self._run_query(model, load_cached_table, persist_intermediate_table)
-        if context.model.aggregations:
-            for aggregation in context.model.aggregations:
+        if context.model.result.aggregations:
+            for aggregation in context.model.result.aggregations:
                 if isinstance(aggregation, ChainedAggregationModel):
                     # TODO: column name evolution is not handled.
                     assert False, "ChainedAggregationModel are currently unsupported"
@@ -276,7 +274,7 @@ class DerivedDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
     @track_timing(timer_stats_collector)
     def create_dataset(
         self,
-        model: CreateDerivedDatasetQueryModel,
+        model: DerivedDatasetQueryModel,
         persist_intermediate_table=False,
         load_cached_table=True,
         register_dataset=False,
@@ -285,7 +283,7 @@ class DerivedDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
 
         Parameters
         ----------
-        model : CreateDerivedDatasetQueryModel
+        model : DerivedDatasetQueryModel
         persist_intermediate_table : bool, optional
             Persist the intermediate consolidated table.
         load_cached_table : bool, optional
@@ -298,13 +296,13 @@ class DerivedDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
     @track_timing(timer_stats_collector)
     def submit(
         self,
-        query: DerivedDatasetQueryModel,
+        query: DerivedDatasetQueryResultModel,
     ):
         """Submit a query to a derived dataset and produce result tables.
 
         Parameters
         ----------
-        query : CreateDerivedDatasetQueryModel
+        query : DerivedDatasetQueryModel
         project : Project
         """
         # orig_query = self._load_derived_dataset_query(query.dataset_id)
@@ -313,12 +311,12 @@ class DerivedDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             query.dataset_id
         )
 
-        if query.metric_reductions:
+        if query.result.metric_reductions:
             df = self._process_metric_reductions(context, df)
 
         repartition = False
-        if context.model.aggregations:
-            for aggregation in context.model.aggregations:
+        if context.model.result.aggregations:
+            for aggregation in context.model.result.aggregations:
                 if isinstance(aggregation, ChainedAggregationModel):
                     # TODO: column name evolution is not handled.
                     assert False, "ChainedAggregationModel are currently unsupported"
@@ -346,7 +344,7 @@ class DerivedDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
 
     def _load_derived_dataset_query(self, dataset_id):
         filename = self._derived_datasets_dir() / dataset_id / "query.json"
-        return CreateDerivedDatasetQueryModel.from_file(filename)
+        return DerivedDatasetQueryModel.from_file(filename)
 
     def _read_dataset(self, dataset_id):
         filename = self._derived_datasets_dir() / dataset_id / "dataset.parquet"

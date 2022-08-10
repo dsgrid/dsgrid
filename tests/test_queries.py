@@ -15,11 +15,12 @@ from dsgrid.loggers import setup_logging
 from dsgrid.project import Project
 from dsgrid.query.models import (
     AggregationModel,
+    DerivedDatasetQueryModel,
+    DerivedDatasetQueryResultModel,
+    MetricReductionModel,
     ProjectQueryModel,
     ProjectQueryResultModel,
-    CreateDerivedDatasetQueryModel,
-    DerivedDatasetQueryModel,
-    MetricReductionModel,
+    QueryResultModel,
 )
 from dsgrid.dataset.dimension_filters import (
     DimensionFilterValueModel,
@@ -305,8 +306,10 @@ class QueryTestElectricityValues(QueryTestBase):
                 # drop_dimensions=[DimensionType.SUBSECTOR],
                 # filtered_datasets=[],
             ),
-            supplemental_columns=["state"],
-            replace_ids_with_names=True,
+            result=QueryResultModel(
+                supplemental_columns=["state"],
+                replace_ids_with_names=True,
+            ),
         )
         return self._model
 
@@ -322,17 +325,17 @@ class QueryTestElectricityValues(QueryTestBase):
         assert "natural_gas_heating" not in df.columns
         non_value_columns = set(self._project.config.get_base_dimension_query_names().values())
         non_value_columns.update({"id", "timestamp"})
-        non_value_columns.update(self._model.supplemental_columns)
+        non_value_columns.update(self._model.result.supplemental_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         # TODO: fraction will be removed eventually
         expected = ["electricity_cooling", "electricity_heating", "fraction"]
         success = value_columns == expected
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
-        if set(self._model.supplemental_columns).difference(df.columns):
+        if set(self._model.result.supplemental_columns).difference(df.columns):
             logger.error(
                 "supplemental_columns=%s are not present in table",
-                self._model.supplemental_columns,
+                self._model.result.supplemental_columns,
             )
             success = False
         if not df.select("county").distinct().filter(f"county == '{county_name}'").collect():
@@ -380,19 +383,21 @@ class QueryTestElectricityUseByCounty(QueryTestBase):
                     MetricReductionModel(dimension_query_name="electricity", operation="sum")
                 ],
             ),
-            aggregations=[
-                AggregationModel(
-                    group_by_columns=["county"],
-                    aggregation_function=F.sum,
-                    name="sum",
-                ),
-                AggregationModel(
-                    group_by_columns=["county"],
-                    aggregation_function=F.max,
-                    name="max",
-                ),
-            ],
-            output_format="csv",
+            result=QueryResultModel(
+                aggregations=[
+                    AggregationModel(
+                        group_by_columns=["county"],
+                        aggregation_function=F.sum,
+                        name="sum",
+                    ),
+                    AggregationModel(
+                        group_by_columns=["county"],
+                        aggregation_function=F.max,
+                        name="max",
+                    ),
+                ],
+                output_format="csv",
+            ),
         )
         return self._model
 
@@ -423,15 +428,17 @@ class QueryTestElectricityUseByState(QueryTestBase):
                     MetricReductionModel(dimension_query_name="electricity", operation="max")
                 ],
             ),
-            aggregations=[
-                AggregationModel(
-                    group_by_columns=["state"],
-                    aggregation_function=F.max,
-                    name="max",
-                ),
-            ],
-            replace_ids_with_names=True,
-            output_format="csv",
+            result=QueryResultModel(
+                aggregations=[
+                    AggregationModel(
+                        group_by_columns=["state"],
+                        aggregation_function=F.max,
+                        name="max",
+                    ),
+                ],
+                replace_ids_with_names=True,
+                output_format="csv",
+            ),
         )
         return self._model
 
@@ -470,7 +477,7 @@ class QueryTestElectricityValuesDerivedDataset(QueryTestBase):
     NAME = "electricity-values"
 
     def make_query(self):
-        self._model = CreateDerivedDatasetQueryModel(
+        self._model = DerivedDatasetQueryModel(
             name=self.NAME,
             dataset_id="com_res",
             project=ProjectQueryModel(
@@ -500,17 +507,17 @@ class QueryTestElectricityValuesDerivedDataset(QueryTestBase):
         assert "natural_gas_heating" not in df.columns
         non_value_columns = set(self._project.config.get_base_dimension_query_names().values())
         non_value_columns.update({"id", "timestamp"})
-        non_value_columns.update(self._model.supplemental_columns)
+        non_value_columns.update(self._model.result.supplemental_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         # TODO: fraction will be removed eventually
         expected = ["electricity_cooling", "electricity_heating", "fraction"]
         success = value_columns == expected
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
-        if set(self._model.supplemental_columns).difference(df.columns):
+        if set(self._model.result.supplemental_columns).difference(df.columns):
             logger.error(
                 "supplemental_columns=%s are not present in table",
-                self._model.supplemental_columns,
+                self._model.result.supplemental_columns,
             )
             success = False
 
@@ -544,28 +551,30 @@ class QueryTestElectricityValuesDerivedDatasetAgg(QueryTestBase):
         self._group_by_columns = group_by_columns or ["county"]
 
     def make_query(self):
-        self._model = DerivedDatasetQueryModel(
+        self._model = DerivedDatasetQueryResultModel(
             name=self.NAME,
             dataset_id="com_res",
-            metric_reductions=[
-                MetricReductionModel(
-                    dimension_query_name="electricity",
-                    operation="sum",
-                ),
-            ],
-            aggregations=[
-                AggregationModel(
-                    group_by_columns=self._group_by_columns,
-                    aggregation_function=F.sum,
-                    name="sum",
-                ),
-                AggregationModel(
-                    group_by_columns=self._group_by_columns,
-                    aggregation_function=F.max,
-                    name="max",
-                ),
-            ],
-            output_format="csv",
+            result=QueryResultModel(
+                metric_reductions=[
+                    MetricReductionModel(
+                        dimension_query_name="electricity",
+                        operation="sum",
+                    ),
+                ],
+                aggregations=[
+                    AggregationModel(
+                        group_by_columns=self._group_by_columns,
+                        aggregation_function=F.sum,
+                        name="sum",
+                    ),
+                    AggregationModel(
+                        group_by_columns=self._group_by_columns,
+                        aggregation_function=F.max,
+                        name="max",
+                    ),
+                ],
+                output_format="csv",
+            ),
         )
         return self._model
 

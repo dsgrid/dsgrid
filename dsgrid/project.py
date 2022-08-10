@@ -249,7 +249,7 @@ class Project:
                 )
             return dim, base_dim
 
-        for dimension_query_name in context.model.supplemental_columns:
+        for dimension_query_name in context.model.result.supplemental_columns:
             check_query_name(dimension_query_name, "supplemental_columns")
 
         for aggregation in context.model.project.metric_reductions:
@@ -261,7 +261,7 @@ class Project:
                 self._config.get_base_to_supplemental_mapping_records(dimension_query_name),
             )
 
-        for aggregation in context.model.aggregations:
+        for aggregation in context.model.result.aggregations:
             assert not isinstance(
                 aggregation, ChainedAggregationModel
             ), "ChainedAggregationModel is not supported yet"

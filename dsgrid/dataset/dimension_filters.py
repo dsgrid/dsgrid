@@ -162,3 +162,19 @@ class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
         if self.negate:
             return df.filter(~method(self.value))
         return df.filter(method(self.value))
+
+
+class SupplementalDimensionFilterModel(DimensionFilterBaseModel):
+    """Filters base dimension records that have a valid mapping to a supplemental dimension."""
+
+    negate: bool = Field(
+        title="negate",
+        description="Filter out valid mappings to this supplemental dimension.",
+        default=False,
+    )
+
+    def apply_filter(self, df, column=None):
+        assert (
+            column is None or column == "to_id"
+        ), f"if column is set, it must be 'to_id': {column}"
+        return df.filter("to_id is NULL" if self.negate else "to_id is not NULL")

@@ -383,6 +383,20 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return dim_config
         assert False, dimension_type
 
+    def get_base_dimension_record_ids(self, dimension_type: DimensionType):
+        """Return the record IDs for the base dimension.
+
+        Parameters
+        ----------
+        dimension_type : DimensionType
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+        return self.get_base_dimension(dimension_type).get_records_dataframe().select("id")
+
     def get_dimension(self, dimension_query_name: str):
         """Return an instance of DimensionBaseConfig.
 

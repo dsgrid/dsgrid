@@ -200,40 +200,37 @@ class Project:
         record_ids = {}
         base_dim_query_names = self._config.get_base_dimension_query_names()
 
-        def default_records(dimension_type):
-            return (
-                self._config.get_base_dimension(dimension_type)
-                .get_records_dataframe()
-                .select("id")
-            )
-
         for dim_filter in context.model.project.dimension_filters:
             dim_type = dim_filter.dimension_type
-            df = record_ids.get(dim_type, default_records(dim_type))
-            if dim_filter.dimension_query_name == base_dim_query_names[dim_type]:
-                df = dim_filter.apply_filter(df, column="id")
-            else:
-                mapping_records = self._config.get_base_to_supplemental_mapping_records(
-                    dim_filter.dimension_query_name
+            query_name = dim_filter.dimension_query_name
+            if query_name == base_dim_query_names[dim_type]:
+                df = dim_filter.apply_filter(
+                    self._config.get_base_dimension_record_ids(dim_type), column="id"
                 )
-                required_ids = mapping_records.select("from_id").distinct()
-                df = df.join(required_ids, on=df.id == required_ids.from_id).drop("from_id")
-                df = dim_filter.apply_filter(df, column="id")
-            # TODO DT: if dimension_type already exists in record_ids, make this an intersection of the two dataframes.
-            record_ids[dim_filter.dimension_type] = df
+            else:
+                df = self._config.get_base_to_supplemental_mapping_records(query_name)
+                df = (
+                    dim_filter.apply_filter(df, column="to_id")
+                    .selectExpr("from_id AS id")
+                    .distinct()
+                )
+            if dim_type in record_ids:
+                df = record_ids[dim_type].intersect(df)
+            record_ids[dim_type] = df
 
         for aggregation in context.model.project.metric_reductions:
             dim = self._config.get_dimension(aggregation.dimension_query_name)
             dim_type = dim.model.dimension_type
             mapping_records = self._config.get_base_to_supplemental_mapping_records(
                 aggregation.dimension_query_name
-            ).filter("to_id is not NULL")
+            )
             required_ids = mapping_records.select("from_id").distinct()
-            df = record_ids.get(dim_type, default_records(dim_type))
-            df = df.join(required_ids, on=df.id == required_ids.from_id).drop("from_id")
-            # TODO: We could truncate the mapping records with any record that just got removed
-            # for the life of this query. Save in the context.
-            record_ids[dim_type] = df
+            base_records = record_ids.get(
+                dim_type, self._config.get_base_dimension_record_ids(dim_type)
+            )
+            record_ids[dim_type] = base_records.join(
+                required_ids, on=base_records.id == required_ids.from_id
+            ).drop("from_id")
 
         for dimension_type, record_ids in record_ids.items():
             context.set_record_ids_by_dimension_type(dimension_type, record_ids)

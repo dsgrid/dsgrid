@@ -25,6 +25,7 @@ from dsgrid.query.models import (
 from dsgrid.dataset.dimension_filters import (
     DimensionFilterExpressionModel,
     DimensionFilterColumnOperatorModel,
+    SupplementalDimensionFilterModel,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, DerivedDatasetQuerySubmitter
 
@@ -290,17 +291,23 @@ class QueryTestElectricityValues(QueryTestBase):
                     # "tempo_conus_2022",
                 ],
                 dimension_filters=[
-                    DimensionFilterColumnOperatorModel(
+                    SupplementalDimensionFilterModel(
                         dimension_type=DimensionType.METRIC,
                         dimension_query_name="electricity",
-                        operator="like",
-                        value="%",
+                    ),
+                    # This is a nonsensical way to filter down to county 06037, but it tests
+                    # the code with combinations of base and supplemental dimension filters.
+                    DimensionFilterColumnOperatorModel(
+                        dimension_type=DimensionType.GEOGRAPHY,
+                        dimension_query_name="county",
+                        operator="isin",
+                        value=["06037", "36047"],
                     ),
                     DimensionFilterExpressionModel(
                         dimension_type=DimensionType.GEOGRAPHY,
-                        dimension_query_name="county",
+                        dimension_query_name="state",
                         operator="==",
-                        value="06037",
+                        value="CA",
                     ),
                 ],
                 # drop_dimensions=[DimensionType.SUBSECTOR],
@@ -314,7 +321,7 @@ class QueryTestElectricityValues(QueryTestBase):
         return self._model
 
     def validate(self):
-        county = self.get_filtered_county_id()
+        county = "06037"
         county_name = (
             self._project.config.get_dimension_records("county")
             .filter(f"id == {county}")

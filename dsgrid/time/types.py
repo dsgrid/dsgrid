@@ -26,7 +26,7 @@ class Season(DSGEnum):
 
 DatetimeTimestampType = namedtuple("DatetimeTimestampType", ["timestamp"])
 
-AnnualTimestampType = namedtuple("AnnualTimestampType", ["year"])
+AnnualTimestampType = namedtuple("AnnualTimestampType", ["time_year"])
 
 OneWeekPerMonthByHourType = namedtuple(
     "OneWeekPerMonthByHourType", ["month", "day_of_week", "hour"]

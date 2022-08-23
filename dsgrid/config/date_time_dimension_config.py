@@ -24,6 +24,13 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     @track_timing(timer_stats_collector)
     def check_dataset_time_consistency(self, load_data_df):
         logger.info("Check DateTimeDimensionConfig dataset time consistency.")
+        time_col = self.get_timestamp_load_data_columns()
+        if len(time_col) > 1:
+            raise ValueError(
+                "DateTimeDimensionConfig expects only one column from "
+                f"get_timestamp_load_data_columns, but has {time_col}"
+            )
+        time_col = time_col[0]
         tz = self.get_tzinfo()
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
@@ -32,15 +39,15 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
         expected_timestamps = time_range.list_time_range()
         actual_timestamps = [
-            x.timestamp.astimezone().astimezone(tz)
-            for x in load_data_df.select("timestamp").distinct().sort("timestamp").collect()
+            x[time_col].astimezone().astimezone(tz)
+            for x in load_data_df.select(time_col).distinct().sort(time_col).collect()
         ]
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(
                 set(expected_timestamps).symmetric_difference(set(actual_timestamps))
             )
             raise DSGInvalidDataset(
-                f"load_data timestamps do not match expected times. mismatch={mismatch}"
+                f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
     def convert_dataframe(self, df):
@@ -69,7 +76,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return ranges
 
     def get_timestamp_load_data_columns(self):
-        return ["timestamp"]
+        return list(DatetimeTimestampType._fields)
 
     def get_tzinfo(self):
         assert self.model.timezone is not TimeZone.LOCAL, self.model.timezone

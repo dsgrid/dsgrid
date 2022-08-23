@@ -131,12 +131,10 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
 
     def check_dataset_time_consistency(self, expected_timestamps, load_data_df):
         logger.info("Check OneWeekPerMonthByHourHandler dataset time consistency.")
+        time_cols = self.get_timestamp_load_data_columns()
         actual_timestamps = [
-            OneWeekPerMonthByHourType(month=x.month, day_of_week=x.day_of_week, hour=x.hour)
-            for x in load_data_df.select("month", "day_of_week", "hour")
-            .distinct()
-            .sort("month", "day_of_week", "hour")
-            .collect()
+            OneWeekPerMonthByHourType(*x.asDict().values())
+            for x in load_data_df.select(*time_cols).distinct().sort(*time_cols).collect()
         ]
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(
@@ -179,7 +177,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
 
     @staticmethod
     def get_timestamp_load_data_columns():
-        return ["month", "day_of_week", "hour"]
+        return list(OneWeekPerMonthByHourType._fields)
 
     def list_expected_dataset_timestamps(self, ranges):
         timestamps = []

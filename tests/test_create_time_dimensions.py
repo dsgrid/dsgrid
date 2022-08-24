@@ -158,8 +158,12 @@ def test_time_dimension_model4(annual_time_dimension_model):
 
 def test_time_dimension_model5(representative_time_dimension_model):
     config = RepresentativePeriodTimeDimensionConfig(representative_time_dimension_model)
-    config.list_expected_dataset_timestamps()
-    config.get_time_ranges()
+    if config.model.format.value == "one_week_per_month_by_hour":
+        n_times = len(config.list_expected_dataset_timestamps())
+        assert n_times == 24 * 7 * 12, n_times
+        assert config.get_frequency() == datetime.timedelta(hours=1)
+
+    config.get_time_ranges()  # TODO: this is not correct yet in terms of year, maybe this functionality should exist in project instead
 
 
 def test_time_dimension_model_lead_day_adj(time_dimension_model1):

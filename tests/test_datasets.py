@@ -167,7 +167,10 @@ def _setup_invalid_load_data_id_missing_timestamp(data_dir):
     # Remove one row/timestamp for one load data array.
     text = "\n".join(data_file.read_text().splitlines()[:-1])
     data_file.write_text(text)
-    return DSGInvalidDataset, r"All time arrays must have the same times.*unique timestamp counts"
+    return (
+        DSGInvalidDataset,
+        r"All time arrays must be repeated the same number of times: unique timestamp repeats =.*",
+    )
 
 
 def _setup_invalid_load_data_id_extra_timestamp(data_dir):

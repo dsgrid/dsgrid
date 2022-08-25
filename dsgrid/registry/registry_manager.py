@@ -212,7 +212,6 @@ class RegistryManager:
                     delete_local=True,
                 )
 
-        # TODO DT: use_remote_data does not work when registering data on Eagle.
         params = RegistryManagerParams(
             Path(path), remote_path, use_remote_data, fs_interface, cloud_interface, offline_mode
         )

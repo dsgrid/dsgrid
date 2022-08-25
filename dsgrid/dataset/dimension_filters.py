@@ -16,6 +16,9 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
 
     dimension_type: DimensionType
     dimension_query_name: str
+    column: str = Field(
+        title="column", description="Column of dimension records to use", default="id"
+    )
 
     @abc.abstractmethod
     def apply_filter(self, df):
@@ -79,8 +82,7 @@ class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
     value: Union[str, int, float]
 
     def where_clause(self, column=None):
-        if column is None:
-            column = self.dimension_type.value
+        column = column or self.column
         value = self._make_value_str(self.value)
         text = f"({column} {self.operator} {value})"
         return text
@@ -107,8 +109,7 @@ class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
     value: Union[str, int, float]
 
     def where_clause(self, column=None):
-        if column is None:
-            column = self.dimension_type.value
+        column = column or self.column
         text = f"({column} {self.value})"
         return text
 
@@ -124,6 +125,14 @@ DIMENSION_COLUMN_FILTER_OPERATORS = {
     "rlike",
     "startswith",
 }
+
+
+def check_operator(operator):
+    if operator not in DIMENSION_COLUMN_FILTER_OPERATORS:
+        raise ValueError(
+            f"operator={operator} is not supported. Allowed={DIMENSION_COLUMN_FILTER_OPERATORS}"
+        )
+    return operator
 
 
 class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
@@ -148,15 +157,10 @@ class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
 
     @validator("operator")
     def check_operator(cls, operator):
-        if operator not in DIMENSION_COLUMN_FILTER_OPERATORS:
-            raise ValueError(
-                f"operator={operator} is not supported. Allowed={DIMENSION_COLUMN_FILTER_OPERATORS}"
-            )
-        return operator
+        return check_operator(operator)
 
     def apply_filter(self, df, column=None):
-        if column is None:
-            column = self._dimension_type.value
+        column = column or self.column
         col = F.col(column)
         method = getattr(col, self.operator)
         if self.negate:
@@ -164,17 +168,29 @@ class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
         return df.filter(method(self.value))
 
 
-class SupplementalDimensionFilterModel(DimensionFilterBaseModel):
+class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
     """Filters base dimension records that have a valid mapping to a supplemental dimension."""
 
+    value: Any = Field(title="value", description="Value to filter on", default="%")
+    operator: str = Field(
+        title="operator",
+        description="Method on pyspark.sql.functions.col to invoke",
+        default="like",
+    )
     negate: bool = Field(
         title="negate",
         description="Filter out valid mappings to this supplemental dimension.",
         default=False,
     )
 
+    @validator("operator")
+    def check_operator(cls, operator):
+        return check_operator(operator)
+
     def apply_filter(self, df, column=None):
-        assert (
-            column is None or column == "to_id"
-        ), f"if column is set, it must be 'to_id': {column}"
-        return df.filter("to_id is NULL" if self.negate else "to_id is not NULL")
+        column = column or self.column
+        col = F.col(column)
+        method = getattr(col, self.operator)
+        if self.negate:
+            return df.filter(~method(self.value))
+        return df.filter(method(self.value))

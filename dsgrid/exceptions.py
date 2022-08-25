@@ -33,6 +33,10 @@ class DSGInvalidDimensionMapping(DSGBaseException):
     """Raised if a mapping is not stored or is invalid."""
 
 
+class DSGInvalidQuery(DSGBaseException):
+    """Raised if a query is invalid."""
+
+
 class DSGMissingDimensionMapping(DSGBaseException):
     """Raised if a mapping is not provided."""
 

@@ -1,3 +1,4 @@
+import itertools
 import logging
 from pathlib import Path
 from typing import List
@@ -7,14 +8,16 @@ import pyspark.sql.functions as F
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
+from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
+from dsgrid.query.models import TableFormatType
 from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import (
     check_null_value_in_unique_dimension_rows,
-    map_and_reduce_pivot_dimension,
 )
 from dsgrid.utils.spark import (
+    # create_dataframe_from_pandas,
     read_dataframe,
     get_unique_values,
     overwrite_dataframe_file,
@@ -54,49 +57,80 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         check_null_value_in_unique_dimension_rows(dim_table)
         return dim_table
 
-    def make_project_dataframe(
-        self, load_data_df=None, lookup_df=None, query_context: QueryContext = None
-    ):
-        ld_df = load_data_df or self._load_data
-        lk_df = lookup_df or self._load_data_lookup
-
-        if query_context is not None:
-            lk_df, ld_df = self._prefilter_dataset(query_context, lk_df, ld_df)
-
+    def make_project_dataframe(self):
+        # TODO: Can we remove NULLs at registration time?
+        lk_df = self._load_data_lookup.filter("id is not NULL")
         lk_df = self._remap_dimension_columns(lk_df)
         ld_df = self._remap_dimension_columns(
-            ld_df,
+            self._load_data,
             # Some pivot columns may have been removed.
-            pivot_columns=set(ld_df.columns).intersection(self.get_pivot_dimension_columns()),
+            pivoted_columns=set(self._load_data.columns).intersection(
+                self.get_pivot_dimension_columns()
+            ),
         )
+        # TODO: handle fraction application
+        # Currently this requires fraction = 1.0
+        ld_df = ld_df.join(lk_df, on="id").drop("id")
+        # Map the time here because some columns may have been collapsed above.
+        ld_df = self._convert_time_dimension(ld_df)
+        return ld_df
 
-        if query_context is not None:
-            ld_df = self._process_metric_aggregations(query_context, ld_df)
+    def make_project_dataframe_from_query(self, context: QueryContext, project_config):
+        ld_df = self._load_data
+        lk_df = self._load_data_lookup.filter("id is not NULL")
+
+        self._check_aggregations(context)
+        lk_df, ld_df = self._prefilter_dataset(context, lk_df, ld_df)
+
+        lk_df = self._remap_dimension_columns(lk_df)
+        # Some pivoted columns may have been removed in pre-filtering.
+        pivoted_columns = set(ld_df.columns).intersection(self.get_pivot_dimension_columns())
+        ld_df = self._remap_dimension_columns(ld_df, pivoted_columns=pivoted_columns)
+
+        pivoted_columns = set(ld_df.columns).intersection(
+            self.get_pivot_dimension_columns_mapped_to_project()
+        )
+        context.add_dataset_metadata(self.dataset_id)
+        context.set_pivoted_columns(pivoted_columns, dataset_id=self.dataset_id)
+        context.set_pivoted_dimension_type(
+            self.get_pivot_dimension_type(), dataset_id=self.dataset_id
+        )
+        context.set_table_format_type(TableFormatType.PIVOTED, dataset_id=self.dataset_id)
+        for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
+            context.add_dimension_query_name(dim_type, name, dataset_id=self.dataset_id)
+
+        # It should be cheaper to do this before the join with lookup.
+        table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
+        ld_df = table_handler.process_pivoted_aggregations(
+            ld_df, context.model.project.aggregations, context
+        )
 
         # TODO: handle fraction application
         # Currently this requires fraction = 1.0
         ld_df = ld_df.join(lk_df, on="id").drop("id")
 
+        ld_df = table_handler.convert_columns_to_query_names(ld_df)
+        ld_df = table_handler.process_stacked_aggregations(
+            ld_df, context.model.project.aggregations, context
+        )
+
         # Map the time here because some columns may have been collapsed above.
         ld_df = self._convert_time_dimension(ld_df)
 
-        # All dataset columns need to be in the same order.
-        pivot_columns = sorted(
-            set(ld_df.columns).intersection(self.get_pivot_dimension_columns_mapped_to_project())
-        )
-        dim_columns = sorted(set(ld_df.columns).intersection([x.value for x in DimensionType]))
-        covered = set(pivot_columns + dim_columns)
-        remaining = sorted((x for x in ld_df.columns if x not in covered))
-        final_columns = remaining + dim_columns + pivot_columns
-        return ld_df.select(*final_columns)
+        return ld_df
+
+    def _check_aggregations(self, context):
+        pivoted_type = self.get_pivot_dimension_type()
+        for agg in itertools.chain(
+            context.model.project.aggregations, context.model.result.aggregations
+        ):
+            if not getattr(agg.dimensions, pivoted_type.value):
+                raise DSGInvalidQuery(
+                    f"Pivoted dimension type {pivoted_type.value} is not included in an aggregation"
+                )
 
     def _prefilter_dataset(self, context: QueryContext, lk_df, ld_df):
         # TODO: prefilter time
-
-        # TODO: The required behavior here is unclear. Drop duplicates?
-        # if context.model.project.drop_dimensions:
-        #     columns = [x.value for x in context.model.project.drop_dimensions]
-        #     lk_df = lk_df.drop(*columns)
 
         for dim_type, project_record_ids in context.iter_record_ids_by_dimension_type():
             dataset_mapping = self._get_dataset_to_project_mapping_records(dim_type)
@@ -128,47 +162,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         return lk_df, ld_df
 
-    def _process_metric_aggregations(self, context: QueryContext, ld_df):
-        orig_project_pivot_columns = self.get_pivot_dimension_columns_mapped_to_project()
-        pivot_columns = set(ld_df.columns).intersection(orig_project_pivot_columns)
-        assert (
-            len(context.model.project.metric_reductions) <= 1
-        ), "More than one metric aggregation is not supported yet"
-        # TODO: need to merge dataframes on each loop
-        for aggregation in context.model.project.metric_reductions:
-            dimension_query_name = aggregation.dimension_query_name
-            dim_type, records = context.get_metric_reduction_records(dimension_query_name)
-            column = dim_type.value
-            assert column == self.get_pivot_dimension_type().value, self.get_pivot_dimension_type()
-            ld_df, columns = map_and_reduce_pivot_dimension(
-                ld_df,
-                records,
-                pivot_columns,
-                aggregation.operation,
-                rename=True,
-            )
-            if context.metric_columns is None:
-                context.metric_columns = columns
-            elif context.metric_columns != columns:
-                raise Exception(
-                    "BUG: metric_columns are different across datasets: "
-                    f"first={context.metric_columns} second={columns}"
-                )
-            logger.info("Replaced dimensions with supplemental records %s", column)
-
-        if context.metric_columns is None:
-            # No metric aggregations defined.
-            context.metric_columns = sorted(pivot_columns)
-        logger.info("Set Query Metric columns to %s", context.metric_columns)
-
-        return ld_df
-
     @track_timing(timer_stats_collector)
-    def get_dataframe(self, query_context: QueryContext):
-        return self.make_project_dataframe(
-            # TODO DT: Can we remove NULLs at registration time?
-            lookup_df=self._load_data_lookup.filter("id is not NULL"),
-            query_context=query_context,
+    def get_dataframe(self, query_context: QueryContext, project_config):
+        return self.make_project_dataframe_from_query(
+            context=query_context,
+            project_config=project_config,
         )
 
     @track_timing(timer_stats_collector)
@@ -197,7 +195,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
             raise DSGInvalidDataset(
-                f"load_data_lookup is missing dimensions: {missing_dimensions}. If these are trivial dimensions, make sure to specify them in the Dataset Config."
+                f"load_data_lookup is missing dimensions: {missing_dimensions}. "
+                "If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
 
         for dimension_type in dimension_types:

@@ -2,6 +2,8 @@ import logging
 import os
 from collections import defaultdict
 
+# from typing import List
+
 import pyspark.sql.functions as F
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
@@ -12,11 +14,11 @@ logger = logging.getLogger(__name__)
 
 
 @track_timing(timer_stats_collector)
-def map_and_reduce_non_pivot_dimension(df, records, column):
+def map_and_reduce_stacked_dimension(df, records, column):
     if "fraction" not in df.columns:
         df = df.withColumn("fraction", F.lit(1))
     # map and consolidate from_fraction only
-    # TODO DT: can remove this if we do it at registration time
+    # TODO: can remove this if we do it at registration time
     records = records.filter("to_id IS NOT NULL")
     df = (
         df.join(records, on=df[column] == records.from_id, how="inner")
@@ -35,7 +37,7 @@ def map_and_reduce_non_pivot_dimension(df, records, column):
 
 
 @track_timing(timer_stats_collector)
-def map_and_reduce_pivot_dimension(df, records, pivot_columns, operation, rename=False):
+def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, rename=False):
     """Maps the pivoted dimension columns as specified by records and operation. The operation
     is a row-wise aggregation.
 
@@ -48,7 +50,7 @@ def map_and_reduce_pivot_dimension(df, records, pivot_columns, operation, rename
     df : pyspark.sql.DataFrame
     records : pyspark.sql.DataFrame
         Dimension mapping records
-    pivot_columns : set
+    pivoted_columns : set
         Column names in df that are the pivoted dimension records
     operation : str
         Controls how to aggregate the the mapped columns.
@@ -60,22 +62,27 @@ def map_and_reduce_pivot_dimension(df, records, pivot_columns, operation, rename
     Returns
     -------
     tuple
-        pyspark.sql.DataFrame and sorted list of pivoted dimension columns in that table
+        pyspark.sql.DataFrame, sorted list of pivoted dimension columns in that table, dropped cols
 
     """
-    diff = pivot_columns.difference(df.columns)
+    diff = pivoted_columns.difference(df.columns)
     assert not diff, diff
-    nonvalue_cols = list(set(df.columns).difference(pivot_columns))
+    nonvalue_cols = list(set(df.columns).difference(pivoted_columns))
     columns = set(df.columns)
 
     records_dict = defaultdict(dict)
+    processed = set()
     for row in records.collect():
         if row.to_id is not None and row.from_id in columns:
             records_dict[row.to_id][row.from_id] = row.from_fraction
+            processed.add(row.from_id)
+
+    extra_pivoted_columns_to_keep = set(pivoted_columns).difference(processed)
 
     to_ids = sorted(records_dict)
     exprs = []
     final_columns = []
+    dropped = set()
     for tid in to_ids:
         column = f"{tid}_{operation}" if rename else tid
         final_columns.append(column)
@@ -95,8 +102,10 @@ def map_and_reduce_pivot_dimension(df, records, pivot_columns, operation, rename
         else:
             raise Exception(f"Unsupported operation: {operation}")
         exprs.append(expr)
+        dropped.update({x for x in records_dict[tid]})
 
-    return df.selectExpr(*nonvalue_cols, *exprs), sorted(final_columns)
+    extra_cols = sorted(extra_pivoted_columns_to_keep)
+    return df.selectExpr(*nonvalue_cols, *extra_cols, *exprs), sorted(final_columns), dropped
 
 
 @track_timing(timer_stats_collector)

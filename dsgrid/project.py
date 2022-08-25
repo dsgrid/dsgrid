@@ -2,14 +2,15 @@
 
 import logging
 
+import pyspark.sql.functions as F
 from pyspark.sql import SparkSession
+from pyspark.sql.types import DoubleType
 
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidParameter, DSGValueNotRegistered
+from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.query.query_context import QueryContext
-from dsgrid.query.models import ChainedAggregationModel
 from dsgrid.registry.registry_manager import RegistryManager, get_registry_path
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
@@ -171,19 +172,41 @@ class Project:
 
     @track_timing(timer_stats_collector)
     def process_query(self, context: QueryContext):
-        self._handle_supplemental_query_names(context)
         self._build_filtered_record_ids_by_dimension_type(context)
 
         dfs = []
         for dataset_id in context.model.project.dataset_ids:
             logger.info("Start processing query for dataset_id=%s", dataset_id)
             dataset = self.get_dataset(dataset_id)
-            dfs.append(dataset.get_dataframe(context))
+            dfs.append(dataset.get_dataframe(context, self._config))
             logger.info("Finished processing query for dataset_id=%s", dataset_id)
 
         if not dfs:
             logger.warning("No data matched %s", context.name)
             return None
+
+        # All dataset columns need to be in the same order.
+        context.consolidate_dataset_metadata()
+        # TODO: Change this when we support long format.
+        pivoted_columns = sorted(context.get_pivoted_columns())
+        dim_columns = context.get_all_dimension_query_names()
+        time_columns = context.get_dimension_query_names(DimensionType.TIME)
+        dim_columns -= time_columns
+        for col in dim_columns:
+            dimension_type = self._config.get_dimension(col).model.dimension_type
+            if dimension_type == context.get_pivoted_dimension_type():
+                dim_columns.remove(col)
+                break
+        dim_columns = sorted(dim_columns)
+        time_columns = sorted(time_columns)
+        expected_columns = time_columns + pivoted_columns + dim_columns
+        for dataset_id, i in zip(context.model.project.dataset_ids, range(len(dfs))):
+            remaining = sorted(set(dfs[i].columns).difference(expected_columns))
+            final_columns = time_columns + dim_columns + pivoted_columns + remaining
+            missing = context.get_pivoted_columns(dataset_id=dataset_id).difference(dfs[i].columns)
+            for column in missing:
+                dfs[i] = dfs[i].withColumn(column, F.lit(None).cast(DoubleType()))
+            dfs[i] = dfs[i].select(*final_columns)
 
         main_df = dfs[0]
         if len(dfs) > 1:
@@ -194,23 +217,21 @@ class Project:
                     )
                 main_df = main_df.union(df)
 
-        return self._convert_columns_to_query_names(main_df)
+        return main_df
 
     def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
         record_ids = {}
-        base_dim_query_names = self._config.get_base_dimension_query_names()
+        base_dim_to_query_name_mapping = self._config.get_base_dimension_to_query_name_mapping()
 
         for dim_filter in context.model.project.dimension_filters:
             dim_type = dim_filter.dimension_type
             query_name = dim_filter.dimension_query_name
-            if query_name == base_dim_query_names[dim_type]:
-                df = dim_filter.apply_filter(
-                    self._config.get_base_dimension_record_ids(dim_type), column="id"
-                )
-            else:
-                df = self._config.get_base_to_supplemental_mapping_records(query_name)
+            df = self._config.get_dimension_records(query_name)
+            df = dim_filter.apply_filter(df).select("id")
+            if query_name != base_dim_to_query_name_mapping[dim_type]:
+                mapping_records = self._config.get_base_to_supplemental_mapping_records(query_name)
                 df = (
-                    dim_filter.apply_filter(df, column="to_id")
+                    mapping_records.join(df, on=mapping_records.to_id == df.id)
                     .selectExpr("from_id AS id")
                     .distinct()
                 )
@@ -218,62 +239,5 @@ class Project:
                 df = record_ids[dim_type].intersect(df)
             record_ids[dim_type] = df
 
-        for aggregation in context.model.project.metric_reductions:
-            dim = self._config.get_dimension(aggregation.dimension_query_name)
-            dim_type = dim.model.dimension_type
-            mapping_records = self._config.get_base_to_supplemental_mapping_records(
-                aggregation.dimension_query_name
-            )
-            required_ids = mapping_records.select("from_id").distinct()
-            base_records = record_ids.get(
-                dim_type, self._config.get_base_dimension_record_ids(dim_type)
-            )
-            record_ids[dim_type] = base_records.join(
-                required_ids, on=base_records.id == required_ids.from_id
-            ).drop("from_id")
-
         for dimension_type, record_ids in record_ids.items():
             context.set_record_ids_by_dimension_type(dimension_type, record_ids)
-
-    def _handle_supplemental_query_names(self, context: QueryContext):
-        def check_query_name(dimension_query_name, tag):
-            dim = self._config.get_dimension(dimension_query_name)
-            base_dim = self._config.get_base_dimension(dim.model.dimension_type)
-            if dim.model.dimension_id == base_dim.model.dimension_id:
-                raise DSGInvalidParameter(
-                    f"{tag} cannot contain a base dimension: "
-                    f"{dim.model.dimension_type}/{dimension_query_name}"
-                )
-            return dim, base_dim
-
-        for dimension_query_name in context.model.result.supplemental_columns:
-            check_query_name(dimension_query_name, "supplemental_columns")
-
-        for aggregation in context.model.project.metric_reductions:
-            dimension_query_name = aggregation.dimension_query_name
-            dim, base_dim = check_query_name(dimension_query_name, "MetricReductionModel")
-            context.add_metric_reduction_records(
-                dimension_query_name,
-                dim.model.dimension_type,
-                self._config.get_base_to_supplemental_mapping_records(dimension_query_name),
-            )
-
-        for aggregation in context.model.result.aggregations:
-            assert not isinstance(
-                aggregation, ChainedAggregationModel
-            ), "ChainedAggregationModel is not supported yet"
-
-            for dimension_query_name in aggregation.group_by_columns:
-                dim = self._config.get_dimension(dimension_query_name)
-                base_dim = self._config.get_base_dimension(dim.model.dimension_type)
-                if dim.model.dimension_id != base_dim.model.dimension_id:
-                    context.add_required_dimension_mapping(aggregation.name, dimension_query_name)
-
-    def _convert_columns_to_query_names(self, df):
-        # All columns start off as base dimension names but need to be query names.
-        columns = set(df.columns)
-        base_query_names = self._config.get_base_dimension_query_names()
-        for dim_type in DimensionType:
-            if dim_type.value in columns:
-                df = df.withColumnRenamed(dim_type.value, base_query_names[dim_type])
-        return df

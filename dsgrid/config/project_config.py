@@ -1,7 +1,7 @@
 import itertools
 import logging
 import os
-from typing import Dict, List, Union
+from typing import Dict, List, Set, Union
 
 from pydantic import Field
 from pydantic import root_validator, validator
@@ -66,7 +66,7 @@ class DimensionsModel(DSGBaseModel):
         "during project registration and then converted to supplemental_dimension_references.",
         notes=(
             "Supplemental dimensions are used to support additional querying and transformations",
-            "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
+            "(e.g., dimensions_to_aggregate, disgaggregations, filtering, scaling, etc.) of the project's ",
             "base data.",
         ),
         default=[],
@@ -81,7 +81,7 @@ class DimensionsModel(DSGBaseModel):
         ),
         notes=(
             "Supplemental dimensions are used to support additional querying and transformations",
-            "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
+            "(e.g., dimensions_to_aggregate, disgaggregations, filtering, scaling, etc.) of the project's ",
             "base data.",
         ),
         default=[],
@@ -383,20 +383,6 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return dim_config
         assert False, dimension_type
 
-    def get_base_dimension_record_ids(self, dimension_type: DimensionType):
-        """Return the record IDs for the base dimension.
-
-        Parameters
-        ----------
-        dimension_type : DimensionType
-
-        Returns
-        -------
-        pyspark.sql.DataFrame
-
-        """
-        return self.get_base_dimension(dimension_type).get_records_dataframe().select("id")
-
     def get_dimension(self, dimension_query_name: str):
         """Return an instance of DimensionBaseConfig.
 
@@ -518,7 +504,11 @@ class ProjectConfig(ConfigWithDataFilesBase):
         """
         return sorted(self._dimensions_by_query_name.keys())
 
-    def get_base_dimension_query_names(self):
+    def get_base_dimension_query_names(self) -> Set[str]:
+        """Return the query names for the base dimensions."""
+        return set(self.get_base_dimension_to_query_name_mapping().values())
+
+    def get_base_dimension_to_query_name_mapping(self) -> Dict[DimensionType, str]:
         """Return a mapping of DimensionType to query name for base dimensions.
 
         Returns
@@ -526,11 +516,29 @@ class ProjectConfig(ConfigWithDataFilesBase):
         dict
 
         """
-        base_dim_query_names = {}
+        query_names = {}
         for dimension_type in DimensionType:
             dim = self.get_base_dimension(dimension_type)
-            base_dim_query_names[dimension_type] = dim.model.dimension_query_name
-        return base_dim_query_names
+            query_names[dimension_type] = dim.model.dimension_query_name
+        return query_names
+
+    def get_supplemental_dimension_to_query_name_mapping(self) -> Dict[DimensionType, List[str]]:
+        """Return a mapping of DimensionType to query name for supplemental dimensions.
+
+        Returns
+        -------
+        dict
+
+        """
+        query_names = {}
+        for dimension_type in DimensionType:
+            query_names[dimension_type] = sorted(
+                (
+                    x.model.dimension_query_name
+                    for x in self.get_supplemental_dimensions(dimension_type)
+                )
+            )
+        return query_names
 
     def load_dimension_associations(self):
         """Load all dimension associations."""

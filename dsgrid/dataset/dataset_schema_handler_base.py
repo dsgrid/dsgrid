@@ -8,7 +8,7 @@ from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.dimension.time import TimeDimensionType
-from dsgrid.utils.dataset import map_and_reduce_non_pivot_dimension, map_and_reduce_pivot_dimension
+from dsgrid.utils.dataset import map_and_reduce_stacked_dimension, map_and_reduce_pivoted_dimension
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -208,13 +208,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return
 
     @track_timing(timer_stats_collector)
-    def _remap_dimension_columns(self, df, pivot_columns=None):
-        # This will likely become a common activity when running queries.
-        # May need to cache the result. But that will likely be in Project, not here.
-        # This method could be moved elsewhere.
-
-        if pivot_columns is None:
-            pivot_columns = set(self.get_pivot_dimension_columns())
+    def _remap_dimension_columns(self, df, pivoted_columns=None):
+        if pivoted_columns is None:
+            pivoted_columns = set(self.get_pivot_dimension_columns())
         for ref in self._mapping_references:
             dim_type = ref.from_dimension_type
             column = dim_type.value
@@ -223,24 +219,25 @@ class DatasetSchemaHandlerBase(abc.ABC):
             )
             records = mapping_config.get_records_dataframe()
             if column in df.columns:
-                df = map_and_reduce_non_pivot_dimension(df, records, column)
-            elif column == self.get_pivot_dimension_type().value and not pivot_columns.difference(
-                df.columns
+                df = map_and_reduce_stacked_dimension(df, records, column)
+            elif (
+                column == self.get_pivot_dimension_type().value
+                and not pivoted_columns.difference(df.columns)
             ):
                 # TODO: Do we want operation to be configurable?
                 operation = "sum"
-                df, _ = map_and_reduce_pivot_dimension(
+                df, _, _ = map_and_reduce_pivoted_dimension(
                     df,
                     records,
-                    pivot_columns,
+                    pivoted_columns,
                     operation,
                     rename=False,
                 )
-            elif column == self.get_pivot_dimension_type().value and pivot_columns.intersection(
+            elif column == self.get_pivot_dimension_type().value and pivoted_columns.intersection(
                 df.columns
             ):
                 raise Exception(
-                    f"Unhandled case: column={column} pivot_columns={pivot_columns} "
+                    f"Unhandled case: column={column} pivot_columns={pivoted_columns} "
                     f"df.columns={df.columns}"
                 )
             # else nothing to do

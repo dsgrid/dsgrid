@@ -9,6 +9,7 @@ import click
 from semver import VersionInfo
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import VersionUpdateType
 
@@ -607,6 +608,59 @@ def update_project(
     )
 
 
+@click.command(name="list-dimension-query-names")
+@click.argument("project-id")
+@click.option(
+    "-b",
+    "--exclude-base",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Exclude base dimension query names.",
+)
+@click.option(
+    "-s",
+    "--exclude-supplemental",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Exclude supplemental dimension query names.",
+)
+@click.pass_obj
+def list_project_dimension_query_names(
+    registry_manager, project_id, exclude_base, exclude_supplemental
+):
+    """List the project's dimension query names."""
+    if exclude_base and exclude_supplemental:
+        print("exclude_base and exclude_supplemental cannot both be set", file=sys.stderr)
+        sys.exit(1)
+
+    manager = registry_manager.project_manager
+    project_config = manager.get_by_id(project_id)
+    base_query_names_by_type = project_config.get_base_dimension_query_names()
+    supp_query_names_by_type = project_config.get_supplemental_dimension_query_names()
+
+    dimensions = sorted(DimensionType, key=lambda x: x.value)
+    if not exclude_base and not exclude_supplemental:
+        print("Dimension query names for base and supplemental dimensions:")
+        for dimension_type in dimensions:
+            base_dim = base_query_names_by_type[dimension_type]
+            supp_dims = " ".join(supp_query_names_by_type[dimension_type])
+            print(f"  {dimension_type.value}: base={base_dim} supplemental=[{supp_dims}]")
+    elif exclude_supplemental:
+        print("Dimension query names for base dimensions:")
+        for dimension_type in dimensions:
+            base_dim = base_query_names_by_type[dimension_type]
+            print(f"  {dimension_type.value}: {base_dim}")
+    elif exclude_base:
+        print("Dimension query names for supplemental dimensions:")
+        for dimension_type in dimensions:
+            supp_dims = " ".join(supp_query_names_by_type[dimension_type])
+            print(f"  {dimension_type.value}: [{supp_dims}]")
+    else:
+        assert False
+
+
 """
 Dataset Commands
 """
@@ -757,6 +811,7 @@ projects.add_command(submit_dataset)
 projects.add_command(register_and_submit_dataset)
 projects.add_command(dump_project)
 projects.add_command(update_project)
+projects.add_command(list_project_dimension_query_names)
 
 datasets.add_command(list_datasets)
 datasets.add_command(register_dataset)

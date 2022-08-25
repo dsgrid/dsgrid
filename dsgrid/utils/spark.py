@@ -59,6 +59,11 @@ def create_dataframe(records, cache=False, require_unique=None):
     return df
 
 
+def create_dataframe_from_pandas(df):
+    """Create a spark DataFrame from a pandas DataFrame."""
+    return SparkSession.getActiveSession().createDataFrame(df)
+
+
 @track_timing(timer_stats_collector)
 def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=True):
     """Create a spark DataFrame from a file.

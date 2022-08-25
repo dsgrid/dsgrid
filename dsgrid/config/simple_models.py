@@ -29,6 +29,10 @@ class DimensionsSimpleModel(DSGBaseModel):
 
     @root_validator
     def check_supplemental_dimensions(cls, values):
+        supp = values.get("supplemental_dimensions")
+        if supp is None:
+            return values
+
         for dim in values["supplemental_dimensions"]:
             if dim.dimension_query_name is None:
                 raise ValueError(

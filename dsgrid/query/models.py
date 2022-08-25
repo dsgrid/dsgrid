@@ -1,6 +1,7 @@
 import abc
+import enum
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Set
 
 import pyspark.sql.functions as F
 from pydantic import Field, root_validator, validator
@@ -18,7 +19,7 @@ from dsgrid.utils.files import compute_hash, load_data
 
 class FilteredDatasetModel(DSGBaseModel):
 
-    dataset_id: str = Field(title="dataset_id", description="Dataset ID")
+    dataset_id: str = Field(description="Dataset ID")
     filters: List[Any] = Field(
         # Union[
         #     DimensionFilterExpressionModel,
@@ -26,52 +27,30 @@ class FilteredDatasetModel(DSGBaseModel):
         #     DimensionFilterColumnOperatorModel,
         # ]
         # ] = Field(
-        title="filters",
         description="Dimension filters to apply to the dataset'",
     )
 
 
-class MetricReductionModel(DSGBaseModel):
-    """Reduces the metric values for each set of unique dimension combinations, excluding
-    dimension_query_name."""
+class DimensionQueryNamesModel(DSGBaseModel):
 
-    dimension_query_name: str = Field(
-        title="dimension_query_name", description="Dimension query name"
-    )
-    operation: str = Field(
-        title="operation",
-        description="Operation to perform on the dimension.",
-    )
-
-    @validator("operation")
-    def check_operation(cls, operation):
-        allowed = ["avg", "min", "mean", "max", "sum"]
-        if operation not in allowed:
-            raise ValueError(f"operation={operation} is not supported. Allowed={allowed}")
-        return operation
+    data_source: List[str]
+    geography: List[str]
+    metric: List[str]
+    model_year: List[str]
+    scenario: List[str]
+    sector: List[str]
+    subsector: List[str]
+    time: List[str]
+    weather_year: List[str]
 
 
 class AggregationModel(DSGBaseModel):
+    """Aggregate on one or more dimensions."""
 
-    group_by_columns: List[str] = Field(
-        title="group_by_columns", description="Columns on which to group"
-    )
     aggregation_function: Any = Field(
-        title="aggregation_function",
         description="Must be a function name in pyspark.sql.functions",
     )
-    name: Optional[str]
-
-    def dict(self, *args, **kwargs):
-        data = super().dict(*args, **kwargs)
-        data["aggregation_function"] = data["aggregation_function"].__name__
-        return data
-
-    @validator("group_by_columns")
-    def check_group_by_columns(cls, group_by_columns):
-        if not group_by_columns:
-            raise ValueError("group_by_columns cannot be empty")
-        return group_by_columns
+    dimensions: DimensionQueryNamesModel = Field(description="Dimensions on which to aggregate")
 
     @validator("aggregation_function")
     def check_aggregation_function(cls, aggregation_function):
@@ -79,48 +58,101 @@ class AggregationModel(DSGBaseModel):
             aggregation_function = getattr(F, aggregation_function, None)
             if aggregation_function is None:
                 raise ValueError(f"{aggregation_function} is not defined in pyspark.sql.functions")
+        elif aggregation_function is None:
+            raise ValueError("aggregation_function cannot be None")
         return aggregation_function
+
+    def dict(self, *args, **kwargs):
+        data = super().dict(*args, **kwargs)
+        data["aggregation_function"] = data["aggregation_function"].__name__
+        return data
+
+    def iter_dimensions_to_keep(self):
+        """Yield the dimension type and query name for each dimension to keep."""
+        for field in DimensionQueryNamesModel.__fields__:
+            for val in getattr(self.dimensions, field):
+                yield DimensionType(field), val
 
 
 class ChainedAggregationModel(DSGBaseModel):
-    aggregations: List[AggregationModel]
+    dimensions_to_aggregate: List[AggregationModel]
 
-    @validator("aggregations")
-    def check_aggregations(cls, aggregations):
-        length = len(aggregations)
-        if len(aggregations) < 2:
+    @validator("dimensions_to_aggregate")
+    def check_aggregations(cls, dimensions_to_aggregate):
+        length = len(dimensions_to_aggregate)
+        if len(dimensions_to_aggregate) < 2:
             raise ValueError(f"length of ChainedAggregationModel must be at least 2: {length}")
-        if aggregations[-1].name is None:
+        if dimensions_to_aggregate[-1].name is None:
             raise ValueError("ChainedAggregationModel requires its last model to define a name.")
-        return aggregations
+        return dimensions_to_aggregate
+
+
+def check_aggregations(dimensions_to_aggregate):
+    for agg in dimensions_to_aggregate:
+        if isinstance(agg, AggregationModel) and agg.name is None:
+            raise ValueError("AggregationModel must define a name")
+    return dimensions_to_aggregate
 
 
 # TODO: Deserializing JSON into QueryModel probably won't work for all cases, notably the unions.
 
 
-class ProjectQueryModel(DSGBaseModel):
-    """Defines how to transform a project into a derived dataset"""
+class ReportType(enum.Enum):
+    """Pre-defined reports"""
 
-    project_id: str = Field(title="project_id", description="Project ID for query")
-    dataset_ids: List[str] = Field(
-        title="dataset_ids", description="Dataset IDs from which to read"
-    )
+    PEAK_LOAD = "peak_load"
+
+
+class ReportInputModel(DSGBaseModel):
+
+    report_type: ReportType
+    inputs: Any
+
+
+class TableFormatType(enum.Enum):
+    """Table format types"""
+
+    PIVOTED = "pivoted"
+    LONG = "long"
+
+
+class DatasetDimensionsMetadataModel(DSGBaseModel):
+    """Defines the dimensions of a dataset serialized to file."""
+
+    data_source: Set[str] = set()
+    geography: Set[str] = set()
+    metric: Set[str] = set()
+    model_year: Set[str] = set()
+    scenario: Set[str] = set()
+    sector: Set[str] = set()
+    subsector: Set[str] = set()
+    time: Set[str] = set()
+    weather_year: Set[str] = set()
+
+
+class PivotedDatasetMetadataModel(DSGBaseModel):
+
+    columns: Set[str] = set()
+    dimension_type: Optional[DimensionType]
+
+
+class DatasetMetadataModel(DSGBaseModel):
+    """Defines the metadata for a dataset serialized to file."""
+
+    dimensions: DatasetDimensionsMetadataModel = DatasetDimensionsMetadataModel()
+    pivoted: PivotedDatasetMetadataModel = PivotedDatasetMetadataModel()
+    table_format_type: Optional[TableFormatType]
+
+
+class ProjectQueryParamsModel(DSGBaseModel):
+    """Defines how to transform a project into a CompositeDataset"""
+
+    project_id: str = Field(description="Project ID for query")
+    dataset_ids: List[str] = Field(description="Dataset IDs from which to read")
     excluded_dataset_ids: List[str] = Field(
-        title="excluded_dataset_ids", description="Datasets to exclude from query", default=[]
+        description="Datasets to exclude from query", default=[]
     )
-    include_dsgrid_dataset_components: bool = Field(
-        title="include_dsgrid_dataset_components", description=""
-    )
-    metric_reductions: List[MetricReductionModel] = Field(
-        title="metric_reductions",
-        description="Specifies how metric values should be reduced.",
-        default=[],
-    )
-    drop_dimensions: List[DimensionType] = Field(
-        title="drop_dimensions",
-        description="Drop columns for these dimensions.",
-        default=[],
-    )
+    include_dsgrid_dataset_components: bool = Field(description="")
     dimension_filters: List[Any] = Field(
         # List[
         # Union[
@@ -129,16 +161,23 @@ class ProjectQueryModel(DSGBaseModel):
         #     DimensionFilterColumnOperatorModel,
         # ]
         # ] = Field(
-        title="dimension_filters",
         description="Filters to apply to all datasets",
+        default=[],
+    )
+    aggregations: List[AggregationModel] = Field(
+        description="Defines how to aggregate dimensions",
         default=[],
     )
     # TODO: When do we filter dimensions based on project vs dataset?
     # filtered_datasets: FilteredDatasetModel = Field(
-    #     title="filtered_datasets", description="", default=[]
+    #     description="", default=[]
     # )
+    # TODO: Should this be a result param instead of project? Or both?
+    table_format: TableFormatType = Field(
+        description="Controls table format",
+        default=TableFormatType.PIVOTED,
+    )
     version: Optional[str] = Field(
-        title="version",
         description="Version of project or dataset on which the query is based. "
         "Should not be set by the user",
     )
@@ -151,6 +190,9 @@ class ProjectQueryModel(DSGBaseModel):
             raise ValueError("drop_dimensions is not supported yet")
         if values.get("excluded_dataset_ids", []):
             raise ValueError("excluded_dataset_ids is not supported yet")
+        fmt = TableFormatType.PIVOTED.value
+        if values.get("table_format", fmt) not in (fmt, TableFormatType.PIVOTED):
+            raise ValueError(f"only table_format={fmt} is currently supported")
         return values
 
     @validator("excluded_dataset_ids")
@@ -168,7 +210,7 @@ class ProjectQueryModel(DSGBaseModel):
 class QueryBaseModel(DSGBaseModel, abc.ABC):
     """Base class for all queries"""
 
-    name: str = Field(title="name", description="Name of query")
+    name: str = Field(description="Name of query")
 
     @classmethod
     def from_file(cls, filename: Path):
@@ -188,47 +230,33 @@ class QueryBaseModel(DSGBaseModel, abc.ABC):
         return compute_hash(text.encode()), text
 
 
-def check_aggregations(aggregations):
-    for agg in aggregations:
-        if isinstance(agg, AggregationModel) and agg.name is None:
-            raise ValueError("AggregationModel must define a name")
-    return aggregations
-
-
-class QueryResultModel(DSGBaseModel):
-    """Defines fie queries that produce result tables"""
+class QueryResultParamsModel(DSGBaseModel):
+    """Controls post-processing and storage of CompositeDatasets"""
 
     supplemental_columns: List[str] = Field(
-        title="supplemental_columns",
         description="Add these supplemental dimension query names as columns in result tables. "
-        "Applies to all aggregations.",
+        "Applies to all dimensions_to_aggregate.",
         default=[],
     )
     replace_ids_with_names: bool = Field(
-        title="replace_ids_with_names",
         description="Replace dimension record IDs with their names in result tables.",
         default=False,
     )
-    metric_reductions: List[MetricReductionModel] = Field(
-        title="metric_reductions",
-        description="Specifies how metric values should be reduced.",
+    aggregations: List[AggregationModel] = Field(
+        description="Defines how to aggregate dimensions",
         default=[],
     )
-    aggregations: List[Union[AggregationModel, ChainedAggregationModel]] = Field(
-        title="aggregations", description="Informs how to groupBy and aggregate data.", default=[]
+    reports: List[ReportInputModel] = Field(
+        description="Run these pre-defined reports on the result.", default=[]
     )
-    output_format: str = Field(
-        title="output_format", description="Output file format: csv or parquet", default="parquet"
-    )
+    output_format: str = Field(description="Output file format: csv or parquet", default="parquet")
     # TODO: implement
     sort_dimensions: List = Field(
-        title="sort_dimensions",
         description="Sort the results by these dimensions.",
         default=[],
     )
     # TODO: implement
     time_zone: Optional[str] = Field(
-        title="time_zone",
         description="Convert the results to this time zone.",
         default=None,
     )
@@ -239,10 +267,6 @@ class QueryResultModel(DSGBaseModel):
             raise ValueError("Setting sort_dimensions is not supported yet")
         return values
 
-    @validator("aggregations")
-    def check_aggregations(cls, aggregations):
-        return check_aggregations(aggregations)
-
     @validator("output_format")
     def check_format(cls, fmt):
         allowed = {"csv", "parquet"}
@@ -251,27 +275,16 @@ class QueryResultModel(DSGBaseModel):
         return fmt
 
 
-class ProjectQueryResultModel(QueryBaseModel):
+class ProjectQueryModel(QueryBaseModel):
     """Represents a user query on a Project."""
 
-    project: ProjectQueryModel = Field(
-        title="project", description="Defines the datasets to use and how to transform them."
+    project: ProjectQueryParamsModel = Field(
+        description="Defines the datasets to use and how to transform them."
     )
-    result: QueryResultModel = Field(
-        title="result",
+    result: QueryResultParamsModel = Field(
         description="Controls the output results",
-        default=QueryResultModel(),
+        default=QueryResultParamsModel(),
     )
-
-    @root_validator
-    def check_metric_reductions(cls, values):
-        if "result" not in values or "project" not in values:
-            return values
-        if values["result"].metric_reductions and values["project"].metric_reductions:
-            raise ValueError(
-                "metric_reductions cannot be set within the project constraints as well as in the result"
-            )
-        return values
 
     def serialize_cached_content(self):
         # Exclude all result-oriented fields in orer to faciliate re-using queries.
@@ -279,21 +292,18 @@ class ProjectQueryResultModel(QueryBaseModel):
         return compute_hash(text.encode()), text
 
 
-class DerivedDatasetQueryModel(QueryBaseModel):
-    """Represents a user query to create a Derived Dataset. This dataset requires a Project
+class CreateCompositeDatasetQueryModel(QueryBaseModel):
+    """Represents a user query to create a Result Dataset. This dataset requires a Project
     in order to retrieve dimension records and dimension mapping records.
     """
 
-    dataset_id: str = Field(title="dataset_id", description="Derived Dataset ID for query")
-    project: ProjectQueryModel = Field(
-        title="project", description="Defines the datasets to use and how to transform them."
+    dataset_id: str = Field(description="Composite Dataset ID for query")
+    project: ProjectQueryParamsModel = Field(
+        description="Defines the datasets to use and how to transform them."
     )
-    # TODO: not all fields apply here. The differences between a derived dataset and result
-    # are still murky.
-    result: QueryResultModel = Field(
-        title="result",
+    result: QueryResultParamsModel = Field(
         description="Controls the output results",
-        default=QueryResultModel(),
+        default=QueryResultParamsModel(),
     )
 
     def serialize_cached_content(self):
@@ -302,17 +312,10 @@ class DerivedDatasetQueryModel(QueryBaseModel):
         return compute_hash(text.encode()), text
 
 
-# class CreateStandaloneDerivedDatasetQueryModel(QueryBaseModel):
-# """Represents a user query to create a Standalone Derived Dataset. This dataset contains
-# all dimension records and dimension mapping records. It does not need a Project.
-# """
-# TODO: create the format (config / .toml) that will define this object
+class CompositeDatasetQueryModel(QueryBaseModel):
+    """Represents a user query on a dataset."""
 
-
-class DerivedDatasetQueryResultModel(QueryBaseModel):
-    """Represents a user query on a Derived Dataset."""
-
-    dataset_id: str = Field(title="dataset_id", description="Derived Dataset ID for query")
-    result: QueryResultModel = Field(
-        title="result", description="Controls the output results", default=QueryResultModel()
+    dataset_id: str = Field(description="Aggregated Dataset ID for query")
+    result: QueryResultParamsModel = Field(
+        description="Controls the output results", default=QueryResultParamsModel()
     )

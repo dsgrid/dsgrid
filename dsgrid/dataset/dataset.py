@@ -27,8 +27,8 @@ class DatasetBase(abc.ABC):
     def dataset_id(self):
         return self._id
 
-    def get_dataframe(self, query: QueryContext):
-        return self._handler.get_dataframe(query)
+    def get_dataframe(self, query: QueryContext, project_config):
+        return self._handler.get_dataframe(query, project_config)
 
     def _make_view_name(self, name):
         return f"{self._id}__{name}"

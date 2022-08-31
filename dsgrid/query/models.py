@@ -9,11 +9,6 @@ from pydantic import Field, root_validator, validator
 from dsgrid.data_models import DSGBaseModel
 
 from dsgrid.dataset.dimension_filters import make_dimension_filter, DimensionFilterBaseModel
-
-#     DimensionFilterExpressionModel,
-#     DimensionFilterExpressionRawModel,
-#     DimensionFilterColumnOperatorModel,
-# )
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.files import compute_hash, load_data
 
@@ -22,12 +17,6 @@ class FilteredDatasetModel(DSGBaseModel):
 
     dataset_id: str = Field(description="Dataset ID")
     filters: List[Any] = Field(
-        # Union[
-        #     DimensionFilterExpressionModel,
-        #     DimensionFilterExpressionRawModel,
-        #     DimensionFilterColumnOperatorModel,
-        # ]
-        # ] = Field(
         description="Dimension filters to apply to the dataset'",
     )
 
@@ -73,29 +62,6 @@ class AggregationModel(DSGBaseModel):
         for field in DimensionQueryNamesModel.__fields__:
             for val in getattr(self.dimensions, field):
                 yield DimensionType(field), val
-
-
-class ChainedAggregationModel(DSGBaseModel):
-    dimensions_to_aggregate: List[AggregationModel]
-
-    @validator("dimensions_to_aggregate")
-    def check_aggregations(cls, dimensions_to_aggregate):
-        length = len(dimensions_to_aggregate)
-        if len(dimensions_to_aggregate) < 2:
-            raise ValueError(f"length of ChainedAggregationModel must be at least 2: {length}")
-        if dimensions_to_aggregate[-1].name is None:
-            raise ValueError("ChainedAggregationModel requires its last model to define a name.")
-        return dimensions_to_aggregate
-
-
-def check_aggregations(dimensions_to_aggregate):
-    for agg in dimensions_to_aggregate:
-        if isinstance(agg, AggregationModel) and agg.name is None:
-            raise ValueError("AggregationModel must define a name")
-    return dimensions_to_aggregate
-
-
-# TODO: Deserializing JSON into QueryModel probably won't work for all cases, notably the unions.
 
 
 class ReportType(enum.Enum):

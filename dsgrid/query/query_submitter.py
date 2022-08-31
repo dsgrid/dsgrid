@@ -217,7 +217,6 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         model: CreateCompositeDatasetQueryModel,
         persist_intermediate_table=False,
         load_cached_table=True,
-        register_dataset=False,
     ):
         """Create a composite dataset from a project.
 
@@ -229,7 +228,6 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         load_cached_table : bool, optional
             Load a cached consolidated table if the query matches an existing query.
         """
-        assert not register_dataset
         df, context = self._run_query(model, load_cached_table, persist_intermediate_table)
         self._save_composite_dataset(context, df, not persist_intermediate_table)
 

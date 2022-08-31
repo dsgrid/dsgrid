@@ -8,7 +8,8 @@ from pydantic import Field, root_validator, validator
 
 from dsgrid.data_models import DSGBaseModel
 
-# from dsgrid.dataset.dimension_filters import (
+from dsgrid.dataset.dimension_filters import make_dimension_filter, DimensionFilterBaseModel
+
 #     DimensionFilterExpressionModel,
 #     DimensionFilterExpressionRawModel,
 #     DimensionFilterColumnOperatorModel,
@@ -154,13 +155,7 @@ class ProjectQueryParamsModel(DSGBaseModel):
     )
     include_dsgrid_dataset_components: bool = Field(description="")
     dimension_filters: List[Any] = Field(
-        # List[
-        # Union[
-        #     DimensionFilterExpressionModel,
-        #     DimensionFilterExpressionRawModel,
-        #     DimensionFilterColumnOperatorModel,
-        # ]
-        # ] = Field(
+        # Use Any here because we don't want Pydantic to try to discern the types.
         description="Filters to apply to all datasets",
         default=[],
     )
@@ -205,6 +200,13 @@ class ProjectQueryParamsModel(DSGBaseModel):
             raise ValueError("excluded_dataset_ids and dataset_ids cannot both be set")
 
         return excluded_dataset_ids
+
+    @validator("dimension_filters")
+    def handle_dimension_filters(cls, dimension_filters):
+        for i, dimension_filter in enumerate(dimension_filters):
+            if not isinstance(dimension_filter, DimensionFilterBaseModel):
+                dimension_filters[i] = make_dimension_filter(dimension_filter)
+        return dimension_filters
 
 
 class QueryBaseModel(DSGBaseModel, abc.ABC):

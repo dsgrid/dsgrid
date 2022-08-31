@@ -106,6 +106,8 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
 
 
 def _read_with_spark(filename):
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"{filename} does not exist")
     spark = SparkSession.getActiveSession()
     suffix = Path(filename).suffix
     if suffix == ".csv":

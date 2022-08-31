@@ -1,9 +1,9 @@
 import abc
 import logging
-from typing import Any, Union
+from typing import Any, Dict, Union
 
 import pyspark.sql.functions as F
-from pydantic import Field, validator
+from pydantic import Field, validator, root_validator
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
+    """Base model for all filters"""
 
     dimension_type: DimensionType
     dimension_query_name: str
@@ -40,6 +41,17 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
             raise Exception(f"Unsupported type: {type(values[0])}")  # TODO: dsg exception
 
         return f"({text})"
+
+    def dict(self, *args, **kwargs):
+        # Add the type of the class so that we can deserialize with the right model.
+        data = super().dict(*args, **kwargs)
+        data["filter_type"] = self.__class__.__name__
+        return data
+
+    @root_validator(pre=True)
+    def remove_filter_type(cls, values):
+        values.pop("filter_type", None)
+        return values
 
 
 class _DimensionFilterWithWhereClauseModel(DimensionFilterBaseModel, abc.ABC):
@@ -194,3 +206,26 @@ class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
         if self.negate:
             return df.filter(~method(self.value))
         return df.filter(method(self.value))
+
+
+def _get_filter_subclasses(filter_class, subclasses=None):
+    if subclasses is None:
+        subclasses = {}
+    for cls in filter_class.__subclasses__():
+        if cls == _DimensionFilterWithWhereClauseModel:
+            # Recurse.
+            subclasses = _get_filter_subclasses(_DimensionFilterWithWhereClauseModel, subclasses)
+        else:
+            subclasses[str(cls.__name__)] = cls
+    return subclasses
+
+
+def make_dimension_filter(values: Dict):
+    """Construct the correct filter per the key filter_type"""
+    if values["filter_type"] not in _FILTER_SUBCLASSES:
+        raise Exception(f"{values['filter_type']} is not defined in dimension_filters.py")
+    return _FILTER_SUBCLASSES[values["filter_type"]](**values)
+
+
+# Keep this definition at the end of the file.
+_FILTER_SUBCLASSES = _get_filter_subclasses(DimensionFilterBaseModel)

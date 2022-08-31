@@ -32,6 +32,7 @@ from dsgrid.dataset.dimension_filters import (
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
 from dsgrid.query.peak_load_report import PeakLoadInputModel, PeakLoadReport
+from dsgrid.utils.run_command import check_run_command
 
 
 REGISTRY_PATH = (
@@ -144,6 +145,27 @@ def test_create_composite_dataset_query():
         )
         CompositeDatasetQuerySubmitter(project, output_dir).submit(query3.make_query())
         assert query3.validate()
+    finally:
+        if output_dir.exists():
+            shutil.rmtree(output_dir)
+
+
+def test_query_cli():
+    output_dir = Path(tempfile.gettempdir()) / "queries"
+    if output_dir.exists():
+        shutil.rmtree(output_dir)
+
+    project = get_project()
+    try:
+        query = QueryTestElectricityValues(True, REGISTRY_PATH, project, output_dir=output_dir)
+        filename = Path(tempfile.gettempdir()) / "query.json"
+        filename.write_text(query.make_query().json())
+        cmd = (
+            f"dsgrid query run project --offline --registry-path={REGISTRY_PATH} "
+            f"--output={output_dir} {filename}"
+        )
+        check_run_command(cmd)
+        assert query.validate()
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)

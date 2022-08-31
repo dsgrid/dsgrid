@@ -40,24 +40,24 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         """
         logger.info("Check one table dataset consistency.")
         dimension_types = set()
-        pivot_cols = set()
+        pivoted_cols = set()
 
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_columns = time_dim.get_timestamp_load_data_columns()
-        pivot_dim = self._config.model.data_schema.load_data_column_dimension
-        expected_pivot_columns = self.get_pivot_dimension_columns()
-        pivot_dim_found = False
+        pivoted_dim = self._config.model.data_schema.load_data_column_dimension
+        expected_pivoted_columns = self.get_pivoted_dimension_columns()
+        pivoted_dim_found = False
         for col in self._load_data.columns:
             if col in time_columns:
                 continue
-            elif col in expected_pivot_columns:
-                pivot_dim_found = True
-                pivot_cols.add(col)
+            elif col in expected_pivoted_columns:
+                pivoted_dim_found = True
+                pivoted_cols.add(col)
             else:
                 dimension_types.add(DimensionType.from_column(col))
 
-        if pivot_dim_found:
-            dimension_types.add(pivot_dim)
+        if pivoted_dim_found:
+            dimension_types.add(pivoted_dim)
 
         expected_dimensions = {d for d in DimensionType if d != DimensionType.TIME}
         missing_dimensions = expected_dimensions.difference(dimension_types)
@@ -71,8 +71,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             name = dimension_type.value
             dimension = self._config.get_dimension(dimension_type)
             dim_records = dimension.get_unique_ids()
-            if dimension_type == pivot_dim:
-                data_records = set(pivot_cols)
+            if dimension_type == pivoted_dim:
+                data_records = set(pivoted_cols)
             else:
                 data_records = get_unique_values(self._load_data, name)
             if dim_records != data_records:
@@ -90,7 +90,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         Check each col in combination for null value."""
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_cols = set(time_dim.get_timestamp_load_data_columns())
-        pivoted_cols = set(self.get_pivot_dimension_columns())
+        pivoted_cols = set(self.get_pivoted_dimension_columns())
         exclude = time_cols.union(pivoted_cols)
         dim_cols = [x for x in self._load_data.columns if x not in exclude]
         df = self._load_data.select(*dim_cols).distinct()

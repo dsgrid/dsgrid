@@ -66,7 +66,7 @@ class DimensionsModel(DSGBaseModel):
         "during project registration and then converted to supplemental_dimension_references.",
         notes=(
             "Supplemental dimensions are used to support additional querying and transformations",
-            "(e.g., dimensions_to_aggregate, disgaggregations, filtering, scaling, etc.) of the project's ",
+            "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
             "base data.",
         ),
         default=[],
@@ -81,7 +81,7 @@ class DimensionsModel(DSGBaseModel):
         ),
         notes=(
             "Supplemental dimensions are used to support additional querying and transformations",
-            "(e.g., dimensions_to_aggregate, disgaggregations, filtering, scaling, etc.) of the project's ",
+            "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
             "base data.",
         ),
         default=[],

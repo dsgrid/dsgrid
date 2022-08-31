@@ -85,7 +85,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         return self._config
 
-    def get_pivot_dimension_type(self):
+    def get_pivoted_dimension_type(self):
         """Return the DimensionType of the columns pivoted in the load_data table.
 
         Returns
@@ -95,7 +95,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         return self._config.model.data_schema.load_data_column_dimension
 
-    def get_pivot_dimension_columns(self):
+    def get_pivoted_dimension_columns(self):
         """Get cols for the dimension that is pivoted in load_data.
 
         Returns
@@ -107,7 +107,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return sorted(list(self._config.get_dimension(dim_type).get_unique_ids()))
 
     @track_timing(timer_stats_collector)
-    def get_pivot_dimension_columns_mapped_to_project(self):
+    def get_pivoted_dimension_columns_mapped_to_project(self):
         """Get columns for the dimension that is pivoted in load_data and remap them to the
         project's record names. The returned dict will not include columns that the project does
         not care about.
@@ -118,8 +118,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
             Mapping of pivoted dimension column names to project record names.
 
         """
-        columns = set(self.get_pivot_dimension_columns())
-        dim_type = self.get_pivot_dimension_type()
+        columns = set(self.get_pivoted_dimension_columns())
+        dim_type = self.get_pivoted_dimension_type()
         for ref in self._mapping_references:
             if ref.from_dimension_type == dim_type:
                 mapping_config = self._dimension_mapping_mgr.get_by_id(
@@ -148,8 +148,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         """
         time_col = time_dim.get_timestamp_load_data_columns()
-        pivot_cols = self.get_pivot_dimension_columns()
-        groupby_cols = list(set(load_data_df.columns).difference(set(pivot_cols + time_col)))
+        pivoted_cols = self.get_pivoted_dimension_columns()
+        groupby_cols = list(set(load_data_df.columns).difference(set(pivoted_cols + time_col)))
 
         return groupby_cols
 
@@ -210,7 +210,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @track_timing(timer_stats_collector)
     def _remap_dimension_columns(self, df, pivoted_columns=None):
         if pivoted_columns is None:
-            pivoted_columns = set(self.get_pivot_dimension_columns())
+            pivoted_columns = set(self.get_pivoted_dimension_columns())
         for ref in self._mapping_references:
             dim_type = ref.from_dimension_type
             column = dim_type.value
@@ -221,7 +221,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if column in df.columns:
                 df = map_and_reduce_stacked_dimension(df, records, column)
             elif (
-                column == self.get_pivot_dimension_type().value
+                column == self.get_pivoted_dimension_type().value
                 and not pivoted_columns.difference(df.columns)
             ):
                 # TODO: Do we want operation to be configurable?
@@ -233,11 +233,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     operation,
                     rename=False,
                 )
-            elif column == self.get_pivot_dimension_type().value and pivoted_columns.intersection(
-                df.columns
+            elif (
+                column == self.get_pivoted_dimension_type().value
+                and pivoted_columns.intersection(df.columns)
             ):
                 raise Exception(
-                    f"Unhandled case: column={column} pivot_columns={pivoted_columns} "
+                    f"Unhandled case: column={column} pivoted_columns={pivoted_columns} "
                     f"df.columns={df.columns}"
                 )
             # else nothing to do

@@ -679,8 +679,8 @@ class ProjectRegistryManager(RegistryManagerBase):
             mapping_references,
             project_time_dim=project_config.get_base_dimension(DimensionType.TIME),
         )
-        pivot_dimension = handler.get_pivot_dimension_type()
-        exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivot_dimension])
+        pivoted_dimension = handler.get_pivoted_dimension_type()
+        exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivoted_dimension])
 
         data_source_dim_id = [
             x.id for x in dataset_config.dimensions if x.type == DimensionType.DATA_SOURCE
@@ -696,8 +696,8 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         cols = [x.value for x in DimensionType if x not in exclude_dims]
         assoc_table = project_config.make_dimension_association_table(data_source=data_source)
-        if pivot_dimension.value in assoc_table.columns:
-            assoc_table = assoc_table.drop(pivot_dimension.value)
+        if pivoted_dimension.value in assoc_table.columns:
+            assoc_table = assoc_table.drop(pivoted_dimension.value)
         project_table = assoc_table.select(*cols).distinct()
         diff = project_table.exceptAll(dim_table.select(*cols).distinct())
         if not diff.rdd.isEmpty():
@@ -715,7 +715,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             raise DSGInvalidDataset(
                 f"Dataset {dataset_config.config_id} is missing required dimension records"
             )
-        self._check_pivot_dimension_columns(
+        self._check_pivoted_dimension_columns(
             project_config, handler, project_config.dimension_associations, data_source
         )
 
@@ -736,18 +736,18 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     @staticmethod
     @track_timing(timer_stats_collector)
-    def _check_pivot_dimension_columns(project_config, handler, associations, data_source):
+    def _check_pivoted_dimension_columns(project_config, handler, associations, data_source):
         """pivoted dimension record is the same as project's unless a relevant association is provided."""
         logger.info("Check pivoted dimension columns.")
-        d_dim_ids = handler.get_pivot_dimension_columns_mapped_to_project()
-        pivot_dim = handler.get_pivot_dimension_type()
-        p_dim_ids = associations.get_unique_ids(pivot_dim, data_source)
+        d_dim_ids = handler.get_pivoted_dimension_columns_mapped_to_project()
+        pivoted_dim = handler.get_pivoted_dimension_type()
+        p_dim_ids = associations.get_unique_ids(pivoted_dim, data_source)
         if p_dim_ids is None:
-            p_dim_ids = project_config.get_base_dimension(pivot_dim).get_unique_ids()
+            p_dim_ids = project_config.get_base_dimension(pivoted_dim).get_unique_ids()
 
         if d_dim_ids.symmetric_difference(p_dim_ids):
             raise DSGInvalidDataset(
-                f"Mismatch between project and {data_source} dataset pivoted {pivot_dim.value} dimension, "
+                f"Mismatch between project and {data_source} dataset pivoted {pivoted_dim.value} dimension, "
                 "please double-check data, and any relevant association_table and dimension_mapping. "
                 f"\n - Invalid column(s) in {data_source} load data according to project: {d_dim_ids.difference(p_dim_ids)}"
                 f"\n - Missing column(s) in {data_source} load data according to project: {p_dim_ids.difference(d_dim_ids)}"

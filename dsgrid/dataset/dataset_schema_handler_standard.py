@@ -65,7 +65,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             self._load_data,
             # Some pivot columns may have been removed.
             pivoted_columns=set(self._load_data.columns).intersection(
-                self.get_pivot_dimension_columns()
+                self.get_pivoted_dimension_columns()
             ),
         )
         # TODO: handle fraction application
@@ -84,16 +84,16 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         lk_df = self._remap_dimension_columns(lk_df)
         # Some pivoted columns may have been removed in pre-filtering.
-        pivoted_columns = set(ld_df.columns).intersection(self.get_pivot_dimension_columns())
+        pivoted_columns = set(ld_df.columns).intersection(self.get_pivoted_dimension_columns())
         ld_df = self._remap_dimension_columns(ld_df, pivoted_columns=pivoted_columns)
 
         pivoted_columns = set(ld_df.columns).intersection(
-            self.get_pivot_dimension_columns_mapped_to_project()
+            self.get_pivoted_dimension_columns_mapped_to_project()
         )
         context.add_dataset_metadata(self.dataset_id)
         context.set_pivoted_columns(pivoted_columns, dataset_id=self.dataset_id)
         context.set_pivoted_dimension_type(
-            self.get_pivot_dimension_type(), dataset_id=self.dataset_id
+            self.get_pivoted_dimension_type(), dataset_id=self.dataset_id
         )
         context.set_table_format_type(TableFormatType.PIVOTED, dataset_id=self.dataset_id)
         for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
@@ -120,7 +120,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return ld_df
 
     def _check_aggregations(self, context):
-        pivoted_type = self.get_pivot_dimension_type()
+        pivoted_type = self.get_pivoted_dimension_type()
         for agg in itertools.chain(
             context.model.project.aggregations, context.model.result.aggregations
         ):
@@ -146,10 +146,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     .selectExpr("dataset_record_id AS id")
                     .distinct()
                 )
-            if dim_type == self.get_pivot_dimension_type():
+            if dim_type == self.get_pivoted_dimension_type():
                 # Drop columns that don't match requested project record IDs.
                 cols_to_keep = {x.id for x in dataset_record_ids.collect()}
-                cols_to_drop = set(self.get_pivot_dimension_columns()).difference(cols_to_keep)
+                cols_to_drop = set(self.get_pivoted_dimension_columns()).difference(cols_to_keep)
                 if cols_to_drop:
                     ld_df = ld_df.drop(*cols_to_drop)
             else:
@@ -261,12 +261,12 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def _check_load_data_columns(self):
         logger.info("Check load data columns.")
         dim_type = self._config.model.data_schema.load_data_column_dimension
-        dimension_records = set(self.get_pivot_dimension_columns())
+        dimension_records = set(self.get_pivoted_dimension_columns())
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_columns = set(time_dim.get_timestamp_load_data_columns())
 
         found_id = False
-        pivot_cols = set()
+        pivoted_cols = set()
         for col in self._load_data.columns:
             if col == "id":
                 found_id = True
@@ -274,15 +274,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if col in time_columns:
                 continue
             if col in dimension_records:
-                pivot_cols.add(col)
+                pivoted_cols.add(col)
             else:
                 raise DSGInvalidDataset(f"column={col} is not expected in load_data.")
 
         if not found_id:
             raise DSGInvalidDataset("load_data does not include an 'id' column")
 
-        if dimension_records != pivot_cols:
-            missing = dimension_records.difference(pivot_cols)
+        if dimension_records != pivoted_cols:
+            missing = dimension_records.difference(pivoted_cols)
             raise DSGInvalidDataset(
                 f"load_data is missing {missing} columns for dimension={dim_type.value} based on records."
             )
@@ -291,15 +291,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def filter_data(self, dimensions: List[DatasetSimpleModel]):
         lookup = self._load_data_lookup
         lookup.cache()
-        pivot_dimension_type = self.get_pivot_dimension_type()
-        pivoted_columns = set(self.get_pivot_dimension_columns())
+        pivoted_dimension_type = self.get_pivoted_dimension_type()
+        pivoted_columns = set(self.get_pivoted_dimension_columns())
         pivoted_columns_to_keep = set()
         lookup_columns = set(lookup.columns)
         for dim in dimensions:
             column = dim.dimension_type.value
             if column in lookup_columns:
                 lookup = lookup.filter(lookup[column].isin(dim.record_ids))
-            elif dim.dimension_type == pivot_dimension_type:
+            elif dim.dimension_type == pivoted_dimension_type:
                 pivoted_columns_to_keep.update(set(dim.record_ids))
 
         drop_columns = []

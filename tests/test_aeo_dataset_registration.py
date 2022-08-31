@@ -95,8 +95,6 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
         logger.info("3. with a duplicated dimension: ")
         _modify_data_file(data_dir, duplicate_col="subsector")
         with pytest.raises((ValueError, DSGInvalidDimension)):
-            # (ValueError,  match=r"*is not a valid DimensionType"),
-            # (DSGInvalidDimension,  match=r"column.*is not expected or of a known dimension type")
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
         logger.info("4. with a duplicated pivot col: ")
@@ -111,7 +109,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
             _modify_data_file(data_dir, drop_first_row=True)
             with pytest.raises(
                 DSGInvalidDataset,
-                match=r"All time arrays must have the same times.*unique timestamp counts",
+                match=r"All time arrays must be repeated the same number of times: unique timestamp repeats =.*",
             ):
                 _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 

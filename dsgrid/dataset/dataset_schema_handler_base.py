@@ -180,13 +180,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
         distinct_counts = counts.select("count").distinct().collect()
         if len(distinct_counts) != 1:
             raise DSGInvalidDataset(
-                f"All time arrays must have the same times: unique timestamp counts = {len(distinct_counts)}"
+                "All time arrays must be repeated the same number of times: "
+                f"unique timestamp repeats = {len(distinct_counts)}"
             )
-        unique_ta_counts = load_data_df.select(*unique_array_cols).distinct().count()
-        if unique_ta_counts != distinct_counts[0]["count"]:
+        ta_counts = load_data_df.groupBy(*unique_array_cols).count().select("count")
+        distinct_ta_counts = ta_counts.select("count").distinct().collect()
+        if len(distinct_ta_counts) != 1:
             raise DSGInvalidDataset(
-                f"dataset has invalid timestamp counts, expected {unique_ta_counts} count for "
-                f"each timestamp in {time_cols} but found {distinct_counts[0]['count']} instead"
+                "All combinations of non-time dimensions must have the same time array length: "
+                f"unique time array lengths = {len(distinct_ta_counts)}"
             )
 
     def _get_dataset_to_project_mapping_records(self, dimension_type: DimensionType):

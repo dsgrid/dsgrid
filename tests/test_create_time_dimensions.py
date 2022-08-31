@@ -8,6 +8,9 @@ from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE_TIME
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
+from dsgrid.config.representative_period_time_dimension_config import (
+    RepresentativePeriodTimeDimensionConfig,
+)
 from dsgrid.dimension.time import LeapDayAdjustmentType
 
 
@@ -44,6 +47,14 @@ def annual_time_dimension_model():
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
     yield model.dimensions[3]  # AnnualTimeDimensionModel (annual time, correct format)
+
+
+@pytest.fixture
+def representative_time_dimension_model():
+    file = DIMENSION_CONFIG_FILE_TIME
+    config_as_dict = load_data(file)
+    model = DimensionsConfigModel(**config_as_dict)
+    yield model.dimensions[4]  # RepresentativeTimeDimensionModel
 
 
 def check_date_range_creation(time_dimension_model):
@@ -143,6 +154,16 @@ def test_time_dimension_model3(time_dimension_model3):
 
 def test_time_dimension_model4(annual_time_dimension_model):
     check_register_annual_time(annual_time_dimension_model)
+
+
+def test_time_dimension_model5(representative_time_dimension_model):
+    config = RepresentativePeriodTimeDimensionConfig(representative_time_dimension_model)
+    if config.model.format.value == "one_week_per_month_by_hour":
+        n_times = len(config.list_expected_dataset_timestamps())
+        assert n_times == 24 * 7 * 12, n_times
+        assert config.get_frequency() == datetime.timedelta(hours=1)
+
+    config.get_time_ranges()  # TODO: this is not correct yet in terms of year, maybe this functionality should exist in project instead
 
 
 def test_time_dimension_model_lead_day_adj(time_dimension_model1):

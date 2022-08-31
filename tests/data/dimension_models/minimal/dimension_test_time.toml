@@ -62,3 +62,17 @@ ranges = [{start = "2020", end = "2050"}]
 str_format = "%Y"
 include_leap_day = true
 measurement_type = "mean"
+
+
+[[dimensions]] #[5]
+class = "Time"
+type = "time"
+name = "Time of Week by Month"
+display_name = "Hourly for Representative Weeks"
+ranges = [{start = 1, end = 12}]
+time_interval_type = "period_ending"
+time_type = "representative_period"
+measurement_type = "total"
+format = "one_week_per_month_by_hour"
+description = """
+TEMPO Time - Month (representing seasons), day of week, and hour of day."""

@@ -24,21 +24,29 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     @track_timing(timer_stats_collector)
     def check_dataset_time_consistency(self, load_data_df):
         logger.info("Check AnnualTimeDimensionConfig dataset time consistency.")
+        time_col = self.get_timestamp_load_data_columns()
+        if len(time_col) > 1:
+            raise ValueError(
+                "AnnualTimeDimensionConfig expects only one column from "
+                f"get_timestamp_load_data_columns, but has {time_col}"
+            )
+        time_col = time_col[0]
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
         time_range = time_ranges[0]
         # TODO: need to support validation of multiple time ranges: DSGRID-173
+
         expected_timestamps = time_range.list_time_range()
         actual_timestamps = [
-            pd.Timestamp(str(x.year)).to_pydatetime()
-            for x in load_data_df.select("year").distinct().sort("year").collect()
+            pd.Timestamp(str(x[time_col])).to_pydatetime()
+            for x in load_data_df.select(time_col).distinct().sort(time_col).collect()
         ]
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(
                 set(expected_timestamps).symmetric_difference(set(actual_timestamps))
             )
             raise DSGInvalidDataset(
-                f"load_data timestamps do not match expected times. mismatch={mismatch}"
+                f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
     def convert_dataframe(self, df, project_time_dim):
@@ -67,7 +75,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         return ranges
 
     def get_timestamp_load_data_columns(self):
-        return ["year"]
+        return list(AnnualTimestampType._fields)
 
     def get_tzinfo(self):
         return None

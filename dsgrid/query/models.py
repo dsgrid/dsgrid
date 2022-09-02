@@ -9,8 +9,8 @@ from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
 
-from dsgrid.dataset.dimension_filters import make_dimension_filter, DimensionFilterBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.dimension_filters import make_dimension_filter, DimensionFilterBaseModel
 from dsgrid.utils.files import compute_hash, load_data
 
 

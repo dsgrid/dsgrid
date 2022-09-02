@@ -11,6 +11,11 @@ import pytest
 from pyspark.sql import SparkSession
 
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.dimension_filters import (
+    DimensionFilterExpressionModel,
+    DimensionFilterColumnOperatorModel,
+    SupplementalDimensionFilterColumnOperatorModel,
+)
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.loggers import setup_logging
 from dsgrid.project import Project
@@ -25,11 +30,6 @@ from dsgrid.query.models import (
     QueryResultParamsModel,
     ReportInputModel,
     ReportType,
-)
-from dsgrid.dataset.dimension_filters import (
-    DimensionFilterExpressionModel,
-    DimensionFilterColumnOperatorModel,
-    SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
 from dsgrid.query.peak_load_report import PeakLoadInputModel, PeakLoadReport

@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.dataset.dimension_filters import (
+from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
     DimensionFilterExpressionRawModel,
     DimensionFilterColumnOperatorModel,

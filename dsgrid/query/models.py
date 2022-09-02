@@ -266,7 +266,7 @@ class QueryBaseModel(DSGBaseModel, abc.ABC):
     # TODO: This field is not being used. Wait until development slows down.
     version: Union[str, VersionInfo] = Field(
         description="Version of the query structure. Changes to the major or minor version invalidate cached tables.",
-        default=QUERY_FORMAT_VERSION,
+        default=str(QUERY_FORMAT_VERSION),  # TODO: str shouldn't be required
     )
 
     @classmethod

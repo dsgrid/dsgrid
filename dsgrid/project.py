@@ -164,7 +164,7 @@ class Project:
         dataset.delete_views()
 
     def _iter_datasets(self):
-        for dataset in self.config.datasets:
+        for dataset in self.config.model.datasets:
             yield dataset
 
     def list_datasets(self):

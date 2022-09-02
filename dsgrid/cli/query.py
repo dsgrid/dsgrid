@@ -4,11 +4,22 @@ import sys
 from pathlib import Path
 
 import click
+from pydantic import ValidationError
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dataset.dimension_filters import (
+    DimensionFilterExpressionModel,
+    DimensionFilterExpressionRawModel,
+    DimensionFilterColumnOperatorModel,
+    SupplementalDimensionFilterColumnOperatorModel,
+)
 from dsgrid.project import Project
 from dsgrid.query.models import (
+    AggregationModel,
+    DimensionQueryNamesModel,
     ProjectQueryModel,
+    ProjectQueryParamsModel,
     CreateCompositeDatasetQueryModel,
     CompositeDatasetQueryModel,
 )
@@ -24,7 +35,7 @@ def add_options(options):
     return _add_options
 
 
-_COMMON_RUN_OPTIONS = (
+_COMMON_REGISTRY_OPTIONS = (
     click.option(
         "--registry-path",
         default=LOCAL_REGISTRY,
@@ -46,6 +57,10 @@ _COMMON_RUN_OPTIONS = (
         show_default=True,
         help="If offline is true, sync with the remote registry before running the query.",
     ),
+)
+
+
+_COMMON_RUN_OPTIONS = (
     click.option(
         "-o",
         "--output",
@@ -65,7 +80,158 @@ _COMMON_RUN_OPTIONS = (
 )
 
 
-@click.command()
+@click.command("create")
+@click.argument("query_name")
+@click.argument("project_id")
+@click.option(
+    "-F",
+    "--filters",
+    type=click.Choice(["expression", "column_operator", "supplemental_column_operator", "raw"]),
+    multiple=True,
+    help="Add a dimension filter. Requires user customization.",
+)
+@click.option(
+    "-a",
+    "--aggregation-function",
+    default="sum",
+    show_default=True,
+    help="Aggregation function for any included default aggregations.",
+)
+@click.option(
+    "-d",
+    "--default-per-dataset-aggregation",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Add default per-dataset aggregration.",
+)
+@click.option(
+    "-f",
+    "--query-file",
+    default="query.json",
+    show_default=True,
+    help="Query file to create.",
+    callback=lambda _, __, x: Path(x),
+)
+@click.option(
+    "-r",
+    "--default-result-aggregation",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Add default result aggregration.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite query file if it exists.",
+)
+@add_options(_COMMON_REGISTRY_OPTIONS)
+def create_project(
+    query_name,
+    project_id,
+    filters,
+    aggregation_function,
+    default_per_dataset_aggregation,
+    query_file,
+    default_result_aggregation,
+    force,
+    registry_path,
+    remote_path,
+    offline,
+):
+    """Create a default query file for a dsgrid project."""
+    if query_file.exists():
+        if force:
+            query_file.unlink()
+        else:
+            print(
+                f"{query_file} already exists. Choose a different name or pass --force to overwrite it.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    project = Project.load(
+        project_id,
+        registry_path=registry_path,
+        remote_path=remote_path,
+        offline_mode=offline,
+    )
+    query = ProjectQueryModel(
+        name=query_name,
+        project=ProjectQueryParamsModel(
+            project_id=project_id,
+            dataset_ids=project.config.list_registered_dataset_ids(),
+        ),
+    )
+
+    for dim_filter in filters:
+        if dim_filter == "expression":
+            flt = DimensionFilterExpressionModel(
+                dimension_type=DimensionType.GEOGRAPHY,
+                dimension_query_name="county",
+                operator="==",
+                value="",
+            )
+        elif dim_filter == "column_operator":
+            flt = DimensionFilterColumnOperatorModel(
+                dimension_type=DimensionType.GEOGRAPHY,
+                dimension_query_name="county",
+                value="",
+                operator="contains",
+            )
+        elif dim_filter == "supplemental_column_operator":
+            flt = SupplementalDimensionFilterColumnOperatorModel(
+                dimension_type=DimensionType.GEOGRAPHY,
+                dimension_query_name="state",
+            )
+        elif dim_filter == "raw":
+            flt = DimensionFilterExpressionRawModel(
+                dimension_type=DimensionType.GEOGRAPHY,
+                dimension_query_name="county",
+                value="== '06037'",
+            )
+        else:
+            assert False
+        query.project.dimension_filters.append(flt)
+
+    if default_per_dataset_aggregation or default_result_aggregation:
+        default_aggs = {}
+        for dim_type, name in project.config.get_base_dimension_to_query_name_mapping().items():
+            default_aggs[dim_type.value] = [name]
+        if default_per_dataset_aggregation:
+            query.project.per_dataset_aggregations = [
+                AggregationModel(
+                    dimensions=DimensionQueryNamesModel(**default_aggs),
+                    aggregation_function=aggregation_function,
+                ),
+            ]
+        if default_result_aggregation:
+            query.result.aggregations = [
+                AggregationModel(
+                    dimensions=DimensionQueryNamesModel(**default_aggs),
+                    aggregation_function=aggregation_function,
+                ),
+            ]
+
+    query_file.write_text(query.json(indent=2))
+    print(f"Wrote query to {query_file}")
+
+
+@click.command("validate")
+@click.argument("query_file", type=click.Path(exists=True), callback=lambda _, __, x: Path(x))
+def validate_project(query_file):
+    try:
+        ProjectQueryModel.from_file(query_file)
+        print(f"Validated {query_file}", file=sys.stderr)
+    except ValidationError:
+        print(f"Failed to validate query file {query_file}", file=sys.stderr)
+        raise
+
+
+@click.command("run")
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @click.option(
     "-p",
@@ -75,8 +241,9 @@ _COMMON_RUN_OPTIONS = (
     show_default=True,
     help="Persist the intermediate table to the filesystem to allow for reuse.",
 )
+@add_options(_COMMON_REGISTRY_OPTIONS)
 @add_options(_COMMON_RUN_OPTIONS)
-def project(
+def run_project(
     query_definition_file,
     persist_intermediate_table,
     registry_path,
@@ -100,7 +267,7 @@ def project(
     )
 
 
-@click.command()
+@click.command("create_dataset")
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @add_options(_COMMON_RUN_OPTIONS)
 def create_composite_dataset(
@@ -125,10 +292,10 @@ def create_composite_dataset(
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query)
 
 
-@click.command()
+@click.command("run")
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @add_options(_COMMON_RUN_OPTIONS)
-def composite_dataset(
+def query_composite_dataset(
     query_definition_file,
     registry_path,
     remote_path,
@@ -156,11 +323,19 @@ def query():
 
 
 @click.group()
-def run():
-    """Query run group commands"""
+def project():
+    """Project group commands"""
 
 
-query.add_command(run)
-run.add_command(project)
-run.add_command(create_composite_dataset)
-run.add_command(composite_dataset)
+@click.group()
+def composite_dataset():
+    """Composite dataset group commands"""
+
+
+query.add_command(composite_dataset)
+query.add_command(project)
+project.add_command(create_project)
+project.add_command(validate_project)
+project.add_command(run_project)
+composite_dataset.add_command(create_composite_dataset)
+composite_dataset.add_command(query_composite_dataset)

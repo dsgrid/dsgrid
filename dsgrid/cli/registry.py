@@ -628,7 +628,7 @@ def update_project(
 )
 @click.pass_obj
 def list_project_dimension_query_names(
-    registry_manager, project_id, exclude_base, exclude_supplemental
+    registry_manager: RegistryManager, project_id, exclude_base, exclude_supplemental
 ):
     """List the project's dimension query names."""
     if exclude_base and exclude_supplemental:
@@ -637,8 +637,8 @@ def list_project_dimension_query_names(
 
     manager = registry_manager.project_manager
     project_config = manager.get_by_id(project_id)
-    base_query_names_by_type = project_config.get_base_dimension_query_names()
-    supp_query_names_by_type = project_config.get_supplemental_dimension_query_names()
+    base_query_names_by_type = project_config.get_base_dimension_to_query_name_mapping()
+    supp_query_names_by_type = project_config.get_supplemental_dimension_to_query_name_mapping()
 
     dimensions = sorted(DimensionType, key=lambda x: x.value)
     if not exclude_base and not exclude_supplemental:

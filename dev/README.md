@@ -498,7 +498,38 @@ It assumes that you have synced the dsgrid registry to `/scratch/$USER/standard-
 $ dsgrid-admin make-filtered-registry /scratch/$USER/standard-registry small-registry ~/repos/dsgrid-test-data/filtered_registries/simple_standard_scenarios.json
 ```
 
-Follow examples in `~/repos/dsgrid/tests/test_queries.py`.
+### Create a query
+Create a default query file (JSON) with the dsgrid CLI and then custom it.
+
+Here is an example CLI command that will create a query file with default filter and aggregations.
+
+```
+$ dsgrid query project create \
+    --offline \
+    --registry-path=./dsgrid-test-data/filtered_registries/simple_standard_scenarios \
+    --filters expression \
+    --default-per-dataset-aggregation \
+    --default-result-aggregation \
+    my_query_name \
+    dsgrid_conus_2022
+```
+
+Customize the filter and aggregation values.
+
+### Run a query
+
+Submit the query with this command:
+
+```
+$ dsgrid query project run \
+    --offline \
+    --registry-path=./dsgrid-test-data/filtered_registries/simple_standard_scenarios \
+    query.json
+```
+
+### Programmatic queries
+It may be easier to develop and run queries in Python. Follow examples in `~/repos/dsgrid/tests/test_queries.py`.
+
 
 ## Publish Documentation
 

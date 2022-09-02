@@ -16,8 +16,9 @@ from dsgrid.loggers import setup_logging
 from dsgrid.project import Project
 from dsgrid.query.models import (
     AggregationModel,
-    CreateCompositeDatasetQueryModel,
+    ColumnModel,
     CompositeDatasetQueryModel,
+    CreateCompositeDatasetQueryModel,
     DimensionQueryNamesModel,
     ProjectQueryParamsModel,
     ProjectQueryModel,
@@ -71,6 +72,14 @@ def test_total_electrictity_use_by_state_and_pca():
     run_query_test(QueryTestElectricityUseByStateAndPCA)
 
 
+def test_diurnal_electrictity_use_by_pca_pre_post_concat():
+    run_query_test(QueryTestDiurnalElectricityUseByCountyPrePostConcat)
+
+
+def test_diurnal_electrictity_use_by_county_chained():
+    run_query_test(QueryTestDiurnalElectricityUseByCountyChained)
+
+
 def test_peak_load():
     run_query_test(QueryTestPeakLoadByStateSubsector)
 
@@ -99,7 +108,7 @@ def test_invalid_drop_pivoted_dimension():
                 "conus_2022_reference_comstock",
                 "conus_2022_reference_resstock",
             ],
-            aggregations=[],
+            per_dataset_aggregations=[],
         ),
         result=QueryResultParamsModel(
             output_format="parquet",
@@ -108,11 +117,11 @@ def test_invalid_drop_pivoted_dimension():
     project = get_project()
     output_dir = Path(tempfile.gettempdir()) / "queries"
 
-    query.project.aggregations = [invalid_agg]
+    query.project.per_dataset_aggregations = [invalid_agg]
     with pytest.raises(DSGInvalidQuery):
         ProjectQuerySubmitter(project, output_dir).submit(query)
 
-    query.project.aggregations = []
+    query.project.per_dataset_aggregations = []
     query.result.aggregations = [invalid_agg]
     with pytest.raises(DSGInvalidQuery):
         ProjectQuerySubmitter(project, output_dir).submit(query)
@@ -129,13 +138,11 @@ def test_create_composite_dataset_query():
             REGISTRY_PATH, project, output_dir=output_dir
         )
         CompositeDatasetQuerySubmitter(project, output_dir).create_dataset(query.make_query())
-        assert query.validate()
 
         query2 = QueryTestElectricityValuesCompositeDatasetAgg(
             REGISTRY_PATH, project, output_dir=output_dir, geography="county"
         )
         CompositeDatasetQuerySubmitter(project, output_dir).submit(query2.make_query())
-        assert query2.validate()
 
         query3 = QueryTestElectricityValuesCompositeDatasetAgg(
             REGISTRY_PATH,
@@ -144,13 +151,31 @@ def test_create_composite_dataset_query():
             geography="state",
         )
         CompositeDatasetQuerySubmitter(project, output_dir).submit(query3.make_query())
-        assert query3.validate()
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
 
 
-def test_query_cli():
+def test_query_cli_create_validate():
+    filename = Path(tempfile.gettempdir()) / "query.json"
+    try:
+        cmd = (
+            f"dsgrid query project create --offline --registry-path={REGISTRY_PATH} "
+            f"-d -r -f {filename} -F expression -F column_operator "
+            "-F supplemental_column_operator -F raw --force my_query dsgrid_conus_2022"
+        )
+        check_run_command(cmd)
+        query = ProjectQueryModel.from_file(filename)
+        assert query.name == "my_query"
+        assert query.project.per_dataset_aggregations
+        assert query.result.aggregations
+        check_run_command(f"dsgrid query project validate {filename}")
+    finally:
+        if filename.exists():
+            filename.unlink()
+
+
+def test_query_cli_run():
     output_dir = Path(tempfile.gettempdir()) / "queries"
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -161,11 +186,11 @@ def test_query_cli():
         filename = Path(tempfile.gettempdir()) / "query.json"
         filename.write_text(query.make_query().json())
         cmd = (
-            f"dsgrid query run project --offline --registry-path={REGISTRY_PATH} "
+            f"dsgrid query project run --offline --registry-path={REGISTRY_PATH} "
             f"--output={output_dir} {filename}"
         )
         check_run_command(cmd)
-        assert query.validate()
+        query.validate()
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -211,7 +236,6 @@ def run_query_test(test_query_cls, *args):
                 persist_intermediate_table=True,
                 load_cached_table=load_cached_table,
             )
-            assert query.validate()
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -358,7 +382,8 @@ class QueryTestElectricityValues(QueryTestBase):
         assert "natural_gas_heating" not in df.columns
         non_value_columns = self._project.config.get_base_dimension_query_names()
         non_value_columns.update({"id", "timestamp"})
-        non_value_columns.update(self._model.result.supplemental_columns)
+        supp_columns = {x.get_column_name() for x in self._model.result.supplemental_columns}
+        non_value_columns.update(supp_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         # TODO: fraction will be removed eventually
         expected = ["electricity_cooling", "electricity_heating", "fraction"]
@@ -366,11 +391,8 @@ class QueryTestElectricityValues(QueryTestBase):
         success = value_columns == expected
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
-        if set(self._model.result.supplemental_columns).difference(df.columns):
-            logger.error(
-                "supplemental_columns=%s are not present in table",
-                self._model.result.supplemental_columns,
-            )
+        if supp_columns.difference(df.columns):
+            logger.error("supplemental_columns=%s are not present in table", supp_columns)
             success = False
         if not df.select("county").distinct().filter(f"county == '{county_name}'").collect():
             logger.error("County name = %s is not present", county_name)
@@ -379,21 +401,8 @@ class QueryTestElectricityValues(QueryTestBase):
             total_cooling = df.agg(F.sum("electricity_cooling").alias("sum")).collect()[0].sum
             total_heating = df.agg(F.sum("electricity_heating").alias("sum")).collect()[0].sum
             expected = self.get_raw_stats()["by_county"][county]["comstock_resstock"]["sum"]
-            if not math.isclose(total_cooling, expected["electricity_cooling"]):
-                logger.error(
-                    "Mismatch in electricity_cooling: actual=%s expected=%s",
-                    total_cooling,
-                    expected["electricity_cooling"],
-                )
-                success = False
-            if not math.isclose(total_heating, expected["electricity_heating"]):
-                logger.error(
-                    "Mismatch in electricity_heating: actual=%s expected=%s",
-                    total_heating,
-                    expected["electricity_heating"],
-                )
-                success = False
-        return success
+            assert math.isclose(total_cooling, expected["electricity_cooling"])
+            assert math.isclose(total_heating, expected["electricity_heating"])
 
 
 class QueryTestElectricityUse(QueryTestBase):
@@ -415,7 +424,7 @@ class QueryTestElectricityUse(QueryTestBase):
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
                 ],
-                aggregations=[
+                per_dataset_aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
                             data_source=["data_source"],
@@ -456,14 +465,14 @@ class QueryTestElectricityUse(QueryTestBase):
 
     def validate(self):
         if self._geography == "county":
-            return validate_electricity_use_by_county(
+            validate_electricity_use_by_county(
                 self._op,
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
                 4,
             )
         elif self._geography == "state":
-            return validate_electricity_use_by_state(
+            validate_electricity_use_by_state(
                 self._op,
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
@@ -494,7 +503,7 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                         value="06037",
                     ),
                 ],
-                aggregations=[
+                per_dataset_aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
                             data_source=["data_source"],
@@ -534,12 +543,133 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
         return self._model
 
     def validate(self):
-        return validate_electricity_use_by_county(
+        validate_electricity_use_by_county(
             "sum",
             self.output_dir / self.name / "table.parquet",
             self.get_raw_stats(),
             1,
         )
+
+
+class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
+
+    NAME = "diurnal_electricity_use_by_county"
+
+    def make_query(self):
+        self._model = ProjectQueryModel(
+            name=self.NAME,
+            project=ProjectQueryParamsModel(
+                project_id="dsgrid_conus_2022",
+                include_dsgrid_dataset_components=False,
+                dataset_ids=[
+                    "conus_2022_reference_comstock",
+                    "conus_2022_reference_resstock",
+                ],
+            ),
+            result=QueryResultParamsModel(
+                aggregations=[
+                    AggregationModel(
+                        dimensions=DimensionQueryNamesModel(
+                            data_source=["data_source"],
+                            geography=["county"],
+                            metric=["electricity"],
+                            model_year=["model_year"],
+                            scenario=["scenario"],
+                            sector=["sector"],
+                            subsector=["subsector"],
+                            time=["time_est"],
+                            weather_year=["weather_2012"],
+                        ),
+                        aggregation_function="sum",
+                    ),
+                    AggregationModel(
+                        dimensions=DimensionQueryNamesModel(
+                            data_source=[],
+                            geography=["county"],
+                            metric=["electricity"],
+                            model_year=[],
+                            scenario=[],
+                            sector=[],
+                            subsector=[],
+                            time=[
+                                ColumnModel(
+                                    dimension_query_name="time_est", function="hour", alias="hour"
+                                )
+                            ],
+                            weather_year=[],
+                        ),
+                        aggregation_function="mean",
+                    ),
+                ],
+                sort_columns=["county", "hour"],
+                output_format="parquet",
+            ),
+        )
+        return self._model
+
+    def validate(self):
+        validate_county_diurnal_hourly(self.output_dir / self.name / "table.parquet")
+
+
+class QueryTestDiurnalElectricityUseByCountyPrePostConcat(QueryTestBase):
+
+    NAME = "diurnal_electricity_use_by_county_pre_post"
+
+    def make_query(self):
+        self._model = ProjectQueryModel(
+            name=self.NAME,
+            project=ProjectQueryParamsModel(
+                project_id="dsgrid_conus_2022",
+                include_dsgrid_dataset_components=False,
+                dataset_ids=[
+                    "conus_2022_reference_comstock",
+                    "conus_2022_reference_resstock",
+                ],
+                per_dataset_aggregations=[
+                    AggregationModel(
+                        dimensions=DimensionQueryNamesModel(
+                            data_source=["data_source"],
+                            geography=["county"],
+                            metric=["electricity"],
+                            model_year=["model_year"],
+                            scenario=["scenario"],
+                            sector=["sector"],
+                            subsector=["subsector"],
+                            time=["time_est"],
+                            weather_year=["weather_2012"],
+                        ),
+                        aggregation_function="sum",
+                    ),
+                ],
+            ),
+            result=QueryResultParamsModel(
+                aggregations=[
+                    AggregationModel(
+                        dimensions=DimensionQueryNamesModel(
+                            data_source=[],
+                            geography=["county"],
+                            metric=["electricity"],
+                            model_year=[],
+                            scenario=[],
+                            sector=[],
+                            subsector=[],
+                            time=[
+                                ColumnModel(
+                                    dimension_query_name="time_est", function="hour", alias="hour"
+                                )
+                            ],
+                            weather_year=[],
+                        ),
+                        aggregation_function="mean",
+                    ),
+                ],
+                output_format="parquet",
+            ),
+        )
+        return self._model
+
+    def validate(self):
+        validate_county_diurnal_hourly(self.output_dir / self.name / "table.parquet")
 
 
 class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
@@ -556,7 +686,7 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
                 ],
-                aggregations=[
+                per_dataset_aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
                             data_source=["data_source"],
@@ -581,7 +711,7 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
 
     def validate(self):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
-        return not {"all_electricity_sum", "reeds_pca", "state", "census_region"}.difference(
+        assert not {"all_electricity_sum", "reeds_pca", "state", "census_region"}.difference(
             df.columns
         )
 
@@ -600,7 +730,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
                 ],
-                aggregations=[
+                per_dataset_aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
                             data_source=["data_source"],
@@ -654,7 +784,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
             .max_val
         )
         actual = peak_load.filter(make_expr(peak_load)).collect()[0].all_electricity_sum
-        return math.isclose(actual, expected)
+        assert math.isclose(actual, expected)
 
 
 class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
@@ -695,35 +825,14 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
         # TODO: fraction will be removed eventually
         expected = ["electricity_cooling", "electricity_heating", "fraction"]
         # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating", "fraction"]
-        success = value_columns == expected
-        if not success:
-            logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
-        if set(self._model.result.supplemental_columns).difference(df.columns):
-            logger.error(
-                "supplemental_columns=%s are not present in table",
-                self._model.result.supplemental_columns,
-            )
-            success = False
+        assert value_columns == expected
+        assert not set(self._model.result.supplemental_columns).difference(df.columns)
 
-        if success:
-            total_cooling = df.agg(F.sum("electricity_cooling").alias("sum")).collect()[0].sum
-            total_heating = df.agg(F.sum("electricity_heating").alias("sum")).collect()[0].sum
-            expected = self.get_raw_stats()["overall"]["comstock_resstock"]["sum"]
-            if not math.isclose(total_cooling, expected["electricity_cooling"]):
-                logger.error(
-                    "Mismatch in electricity_cooling: actual=%s expected=%s",
-                    total_cooling,
-                    expected["electricity_cooling"],
-                )
-                success = False
-            if not math.isclose(total_heating, expected["electricity_heating"]):
-                logger.error(
-                    "Mismatch in electricity_heating: actual=%s expected=%s",
-                    total_heating,
-                    expected["electricity_heating"],
-                )
-                success = False
-        return success
+        total_cooling = df.agg(F.sum("electricity_cooling").alias("sum")).collect()[0].sum
+        total_heating = df.agg(F.sum("electricity_heating").alias("sum")).collect()[0].sum
+        expected = self.get_raw_stats()["overall"]["comstock_resstock"]["sum"]
+        assert math.isclose(total_cooling, expected["electricity_cooling"])
+        assert math.isclose(total_heating, expected["electricity_heating"])
 
 
 class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
@@ -762,14 +871,14 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
 
     def validate(self):
         if self._geography == "county":
-            return validate_electricity_use_by_county(
+            validate_electricity_use_by_county(
                 "sum",
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
                 4,
             )
         elif self._geography == "state":
-            return validate_electricity_use_by_state(
+            validate_electricity_use_by_state(
                 "sum",
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
@@ -778,7 +887,7 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
             "Validation is not supported with geography=%s",
             self._geography,
         )
-        return True
+        assert False
 
 
 def perform_op(df, column, operation):
@@ -792,22 +901,16 @@ def validate_electricity_use_by_county(op, results_path, raw_stats, expected_cou
     )
     counties = [str(x.county) for x in results.select("county").distinct().collect()]
     assert len(counties) == expected_county_count, counties
-    success = True
     stats = raw_stats["by_county"]
     for county in counties:
         col = "all_electricity_sum"
         actual = results.filter(f"county == '{county}'").collect()[0][col]
         expected = stats[county]["comstock_resstock"][op]["electricity"]
-        if not math.isclose(actual, expected):
-            logger.error("Mismatch in operation=%s actual=%s expected=%s", op, actual, expected)
-            success = False
-
-    return success
+        assert math.isclose(actual, expected)
 
 
 def validate_electricity_use_by_state(op, results_path, raw_stats):
     spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    success = True
     results = spark.read.parquet(str(results_path))
     if op == "sum":
         exp_ca = get_expected_ca_sum_electricity(raw_stats)
@@ -819,23 +922,20 @@ def validate_electricity_use_by_state(op, results_path, raw_stats):
     col = "all_electricity_sum"
     actual_ca = results.filter("state == 'CA'").collect()[0][col]
     actual_ny = results.filter("state == 'NY'").collect()[0][col]
-    if not math.isclose(actual_ca, exp_ca):
-        logger.error(
-            "Mismatch in CA %s electricity actual=%s expected=%s",
-            op,
-            actual_ca,
-            exp_ca,
-        )
-        success = False
-    if not math.isclose(actual_ny, exp_ny):
-        logger.error(
-            "Mismatch in NY %s electricity actual=%s expected=%s",
-            op,
-            actual_ny,
-            exp_ny,
-        )
-        success = False
-    return success
+    assert math.isclose(actual_ca, exp_ca)
+    assert math.isclose(actual_ny, exp_ny)
+
+
+def validate_county_diurnal_hourly(filename):
+    df = read_parquet(filename)
+    assert not {"all_electricity_sum", "county", "hour"}.difference(df.columns)
+
+    val = df.filter("county == '06037'").filter("hour == 16").collect()[0].all_electricity_sum
+    # Computed this value manually by reading a composite dataframe and running this
+    # df = df.withColumn("elec", df.electricity_cooling + df.electricity_heating).drop("electricity_cooling", "electricity_heating")
+    # df.groupBy("county", F.hour("time_est").alias("hour")).agg(F.mean(".elec")).sort("county", "hour").show()
+    expected = 223597.40584404464
+    assert math.isclose(val, expected)
 
 
 def get_expected_ca_max_electricity(raw_stats):

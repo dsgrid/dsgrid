@@ -76,13 +76,12 @@ class _DimensionFilterWithWhereClauseModel(DimensionFilterBaseModel, abc.ABC):
 
 class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
     """Filters a table where a dimension column matches an expression.
-    Builds the filter string based on inferred types.
 
     Example:
         DimensionFilterExpressionModel(
             dimension_type=DimensionType.GEOGRAPHY,
             dimension_query_name="county",
-            operator="=="
+            operator="==",
             value="06037",
         ),
     is equivalent to

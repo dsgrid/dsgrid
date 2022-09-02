@@ -22,10 +22,11 @@ class PivotedTableHandler(TableFormatHandlerBase):
     def __init__(self, project_config, dataset_id=None):
         super().__init__(project_config, dataset_id=dataset_id)
 
-    def add_columns(self, df, dimension_query_names, context: QueryContext, aggregation_allowed):
+    def add_columns(self, df, query_columns, context: QueryContext, aggregation_allowed):
         columns = set(df.columns)
         base_query_names = self.project_config.get_base_dimension_query_names()
-        for query_name in dimension_query_names:
+        for column in query_columns:
+            query_name = column.dimension_query_name
             if query_name in base_query_names:
                 assert query_name in columns, f"{query_name} {columns}"
                 continue
@@ -52,6 +53,11 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 )
             else:
                 records = records.drop("from_fraction")
+                if column.function is not None:
+                    # TODO: Do we want to allow this?
+                    raise Exception(
+                        f"Applying a SQL function to added column={query_name} is not supported yet"
+                    )
                 df = (
                     df.join(records, on=df[base_query_name] == records.from_id)
                     .drop("from_id")
@@ -94,13 +100,17 @@ class PivotedTableHandler(TableFormatHandlerBase):
         for agg in aggregations:
             base_query_names = self.project_config.get_base_dimension_query_names()
             dimension_query_name = None
-            for _, query_name in agg.iter_dimensions_to_keep():
+            for _, column in agg.iter_dimensions_to_keep():
+                query_name = column.dimension_query_name
                 # No work is required if the user requested the base dimension for the pivoted
                 # dimension.
                 if (
                     query_name not in base_query_names
                     and query_name not in context.get_dimension_query_names(pivoted_dim_type)
                 ):
+                    if column.function is not None:
+                        # TODO: Do we need to support this?
+                        raise Exception("column function cannot be set on {column}")
                     dim = self.project_config.get_dimension(query_name)
                     if dim.model.dimension_type == pivoted_dim_type:
                         dimension_query_name = query_name
@@ -148,18 +158,28 @@ class PivotedTableHandler(TableFormatHandlerBase):
         if not aggregations:
             return df
 
-        group_by_cols = []
+        group_by_query_names = []
         pivoted_dimension_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
         for agg in aggregations:
-            names = []
-            for dim_type, query_name in agg.iter_dimensions_to_keep():
+            columns = []
+            for dim_type, column in agg.iter_dimensions_to_keep():
                 if dim_type != pivoted_dimension_type:
-                    names.append(query_name)
-            if not names:
+                    columns.append(column)
+            if not columns:
                 continue
-            df = self.add_columns(df, names, context, True)
-            pivoted_columns = context.get_pivoted_columns(dataset_id=self.dataset_id)
-            group_by_cols = [x for x in names if x not in set(pivoted_columns)]
+            df = self.add_columns(df, columns, context, True)
+            pivoted_columns = set(context.get_pivoted_columns(dataset_id=self.dataset_id))
+            group_by_cols = []
+            for column in columns:
+                if column.dimension_query_name not in pivoted_columns:
+                    if column.function is None:
+                        expr = column.dimension_query_name
+                    else:
+                        expr = column.function(column.dimension_query_name)
+                        if column.alias is not None:
+                            expr = expr.alias(column.alias)
+                    group_by_cols.append(expr)
+                    group_by_query_names.append(column.dimension_query_name)
             op = agg.aggregation_function
             agg_expr = [op(x).alias(x) for x in pivoted_columns]
             df = df.groupBy(*group_by_cols).agg(*agg_expr)
@@ -168,10 +188,10 @@ class PivotedTableHandler(TableFormatHandlerBase):
             )
 
         final_query_names = {x: set() for x in DimensionType if x != pivoted_dimension_type}
-        for column in group_by_cols:
+        for column in group_by_query_names:
             dim = self.project_config.get_dimension(column)
             final_query_names[dim.model.dimension_type].add(column)
 
-        for dim_type, names in final_query_names.items():
-            context.replace_dimension_query_names(dim_type, names, dataset_id=self.dataset_id)
+        for dim_type, columns in final_query_names.items():
+            context.replace_dimension_query_names(dim_type, columns, dataset_id=self.dataset_id)
         return df

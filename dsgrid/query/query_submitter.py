@@ -97,7 +97,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     def _run_query(
         self,
-        model: CreateCompositeDatasetQueryModel,
+        model,
         load_cached_table,
         persist_intermediate_table,
     ):
@@ -127,8 +127,14 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             )
         df = handler.process_aggregations(df, context.model.result.aggregations, context)
 
+        if context.model.result.dimension_filters:
+            df = self._apply_filters(df, context)
+
         if context.model.result.replace_ids_with_names:
             df = handler.replace_ids_with_names(df)
+
+        if context.model.result.sort_columns:
+            df = df.sort(*context.model.result.sort_columns)
 
         repartition = not persist_intermediate_table
         table_filename = self._save_query_results(context, df, repartition)
@@ -140,6 +146,13 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 peak_load.generate(table_filename, output_dir, context, report.inputs)
 
         return df, context
+
+    def _apply_filters(self, df, context: QueryContext):
+        for dim_filter in context.model.result.dimension_filters:
+            raise Exception("Filtering result data is not supported yet")
+            # TODO: check column names, resolution, etc. Filter.
+            # Could be problems with aliases.
+        return df
 
     @track_timing(timer_stats_collector)
     def _save_query_results(self, context: QueryContext, df, repartition, aggregation_name=None):

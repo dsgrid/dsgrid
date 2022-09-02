@@ -1,10 +1,11 @@
 import abc
 import enum
 from pathlib import Path
-from typing import Any, List, Optional, Set
+from typing import Any, List, Optional, Set, Union
 
 import pyspark.sql.functions as F
 from pydantic import Field, root_validator, validator
+from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
 
@@ -21,17 +22,79 @@ class FilteredDatasetModel(DSGBaseModel):
     )
 
 
-class DimensionQueryNamesModel(DSGBaseModel):
+# TODO: setting alias on a groupBy column doesn't work on a per-dataset aggregation
 
-    data_source: List[str]
-    geography: List[str]
-    metric: List[str]
-    model_year: List[str]
-    scenario: List[str]
-    sector: List[str]
-    subsector: List[str]
-    time: List[str]
-    weather_year: List[str]
+
+class ColumnModel(DSGBaseModel):
+    """Defines one column in a SQL aggregation statement."""
+
+    dimension_query_name: str
+    function: Optional[Any] = Field(
+        description="Function or name of function in pyspark.sql.functions."
+    )
+    alias: Optional[str] = Field(description="Name of the resulting column.")
+
+    @validator("function")
+    def handle_function(cls, function_name):
+        if function_name is None:
+            return function_name
+        if not isinstance(function_name, str):
+            return function_name
+
+        func = getattr(F, function_name, None)
+        if func is None:
+            raise ValueError(f"function={function_name} is not defined in pyspark.sql.functions")
+        return func
+
+    @validator("alias")
+    def handle_alias(cls, alias, values):
+        if alias is not None:
+            return alias
+
+        func = values.get("function")
+        if func is not None:
+            name = values["dimension_query_name"]
+            return f"{func.__name__}__{name}"
+
+        return alias
+
+    def dict(self, *args, **kwargs):
+        data = super().dict(*args, **kwargs)
+        if data["function"] is not None:
+            data["function"] = data["function"].__name__
+        return data
+
+    def get_column_name(self):
+        if self.alias is not None:
+            return self.alias
+        if self.function is None:
+            return self.dimension_query_name
+        return f"{self.function.__name__}__{self.dimension_query_name})"
+
+
+class DimensionQueryNamesModel(DSGBaseModel):
+    """Defines columns to include in a SQL aggregation statement. If a value is empty, that
+    dimension will be aggregated and dropped from the table."""
+
+    data_source: List[Union[str, ColumnModel]]
+    geography: List[Union[str, ColumnModel]]
+    metric: List[Union[str, ColumnModel]]
+    model_year: List[Union[str, ColumnModel]]
+    scenario: List[Union[str, ColumnModel]]
+    sector: List[Union[str, ColumnModel]]
+    subsector: List[Union[str, ColumnModel]]
+    time: List[Union[str, ColumnModel]]
+    weather_year: List[Union[str, ColumnModel]]
+
+    @root_validator
+    def fix_columns(cls, values):
+        for dim_type in DimensionType:
+            field = dim_type.value
+            container = values[field]
+            for i, item in enumerate(container):
+                if isinstance(item, str):
+                    container[i] = ColumnModel(dimension_query_name=item)
+        return values
 
 
 class AggregationModel(DSGBaseModel):
@@ -58,7 +121,7 @@ class AggregationModel(DSGBaseModel):
         return data
 
     def iter_dimensions_to_keep(self):
-        """Yield the dimension type and query name for each dimension to keep."""
+        """Yield the dimension type and ColumnModel for each dimension to keep."""
         for field in DimensionQueryNamesModel.__fields__:
             for val in getattr(self.dimensions, field):
                 yield DimensionType(field), val
@@ -119,13 +182,14 @@ class ProjectQueryParamsModel(DSGBaseModel):
     excluded_dataset_ids: List[str] = Field(
         description="Datasets to exclude from query", default=[]
     )
-    include_dsgrid_dataset_components: bool = Field(description="")
+    # TODO: default needs to change
+    include_dsgrid_dataset_components: bool = Field(description="", default=False)
     dimension_filters: List[Any] = Field(
         # Use Any here because we don't want Pydantic to try to discern the types.
         description="Filters to apply to all datasets",
         default=[],
     )
-    aggregations: List[AggregationModel] = Field(
+    per_dataset_aggregations: List[AggregationModel] = Field(
         description="Defines how to aggregate dimensions",
         default=[],
     )
@@ -145,7 +209,7 @@ class ProjectQueryParamsModel(DSGBaseModel):
 
     @root_validator(pre=True)
     def check_unsupported_fields(cls, values):
-        if values.get("include_dsgrid_dataset_components", True):
+        if values.get("include_dsgrid_dataset_components", False):
             raise ValueError("Setting include_dsgrid_dataset_components=true is not supported yet")
         if values.get("drop_dimensions", []):
             raise ValueError("drop_dimensions is not supported yet")
@@ -174,11 +238,36 @@ class ProjectQueryParamsModel(DSGBaseModel):
                 dimension_filters[i] = make_dimension_filter(dimension_filter)
         return dimension_filters
 
+    @validator("per_dataset_aggregations")
+    def check_aggregations(cls, aggregations):
+        for agg in aggregations:
+            for dim_type in DimensionType:
+                field = dim_type.value
+                for item in getattr(agg.dimensions, field):
+                    # TODO: we could add support for this, but it does add some ambiguity.
+                    if item.function is not None:
+                        raise ValueError(
+                            f"function={item.function} cannot be set in ProjectQueryParamsModel"
+                        )
+                    if item.alias is not None:
+                        raise ValueError(
+                            f"alias={item.alias} cannot be set in ProjectQueryParamsModel"
+                        )
+        return aggregations
+
+
+QUERY_FORMAT_VERSION = VersionInfo.parse("0.1.0")
+
 
 class QueryBaseModel(DSGBaseModel, abc.ABC):
     """Base class for all queries"""
 
     name: str = Field(description="Name of query")
+    # TODO: This field is not being used. Wait until development slows down.
+    version: Union[str, VersionInfo] = Field(
+        description="Version of the query structure. Changes to the major or minor version invalidate cached tables.",
+        default=QUERY_FORMAT_VERSION,
+    )
 
     @classmethod
     def from_file(cls, filename: Path):
@@ -197,11 +286,17 @@ class QueryBaseModel(DSGBaseModel, abc.ABC):
         text = self.json(exclude={"name"}, indent=2)
         return compute_hash(text.encode()), text
 
+    def dict(self, *args, **kwargs):
+        data = super().dict(*args, **kwargs)
+        if data["version"] is not None:
+            data["version"] = str(data["version"])
+        return data
+
 
 class QueryResultParamsModel(DSGBaseModel):
     """Controls post-processing and storage of CompositeDatasets"""
 
-    supplemental_columns: List[str] = Field(
+    supplemental_columns: List[Union[str, ColumnModel]] = Field(
         description="Add these supplemental dimension query names as columns in result tables. "
         "Applies to all dimensions_to_aggregate.",
         default=[],
@@ -218,9 +313,13 @@ class QueryResultParamsModel(DSGBaseModel):
         description="Run these pre-defined reports on the result.", default=[]
     )
     output_format: str = Field(description="Output file format: csv or parquet", default="parquet")
-    # TODO: implement
-    sort_dimensions: List = Field(
-        description="Sort the results by these dimensions.",
+    sort_columns: List[str] = Field(
+        description="Sort the results by these dimension query names.",
+        default=[],
+    )
+    dimension_filters: List[Any] = Field(
+        # Use Any here because we don't want Pydantic to try to discern the types.
+        description="Filters to apply to the result. Must contain columns in the result.",
         default=[],
     )
     # TODO: implement
@@ -229,11 +328,12 @@ class QueryResultParamsModel(DSGBaseModel):
         default=None,
     )
 
-    @root_validator(pre=True)
-    def check_unsupported_fields(cls, values):
-        if values.get("sort_dimensions", []):
-            raise ValueError("Setting sort_dimensions is not supported yet")
-        return values
+    @validator("supplemental_columns")
+    def fix_supplemental_columns(cls, supplemental_columns):
+        for i, column in enumerate(supplemental_columns):
+            if isinstance(column, str):
+                supplemental_columns[i] = ColumnModel(dimension_query_name=column)
+        return supplemental_columns
 
     @validator("output_format")
     def check_format(cls, fmt):
@@ -242,12 +342,19 @@ class QueryResultParamsModel(DSGBaseModel):
             raise ValueError(f"output_format={fmt} is not supported. Allowed={allowed}")
         return fmt
 
+    @validator("dimension_filters")
+    def handle_dimension_filters(cls, dimension_filters):
+        for i, dimension_filter in enumerate(dimension_filters):
+            if not isinstance(dimension_filter, DimensionFilterBaseModel):
+                dimension_filters[i] = make_dimension_filter(dimension_filter)
+        return dimension_filters
+
 
 class ProjectQueryModel(QueryBaseModel):
     """Represents a user query on a Project."""
 
     project: ProjectQueryParamsModel = Field(
-        description="Defines the datasets to use and how to transform them."
+        description="Defines the datasets to use and how to transform them.",
     )
     result: QueryResultParamsModel = Field(
         description="Controls the output results",

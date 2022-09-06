@@ -64,19 +64,19 @@ def test_electricity_use_by_state():
     run_query_test(QueryTestElectricityUse, "state", "max")
 
 
-def test_total_electrictity_use_with_filter():
+def test_total_electricity_use_with_filter():
     run_query_test(QueryTestTotalElectricityUseWithFilter)
 
 
-def test_total_electrictity_use_by_state_and_pca():
+def test_total_electricity_use_by_state_and_pca():
     run_query_test(QueryTestElectricityUseByStateAndPCA)
 
 
-def test_diurnal_electrictity_use_by_pca_pre_post_concat():
+def test_diurnal_electricity_use_by_pca_pre_post_concat():
     run_query_test(QueryTestDiurnalElectricityUseByCountyPrePostConcat)
 
 
-def test_diurnal_electrictity_use_by_county_chained():
+def test_diurnal_electricity_use_by_county_chained():
     run_query_test(QueryTestDiurnalElectricityUseByCountyChained)
 
 
@@ -235,6 +235,7 @@ def run_query_test(test_query_cls, *args):
                 query.make_query(),
                 persist_intermediate_table=True,
                 load_cached_table=load_cached_table,
+                force=True,
             )
     finally:
         if output_dir.exists():
@@ -1136,6 +1137,7 @@ def run_query(
         query.make_query(),
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
+        force=True,
     )
     result = query.validate()
     print(f"Result of query {query.name} = {result}")

@@ -77,6 +77,13 @@ _COMMON_RUN_OPTIONS = (
         show_default=True,
         help="Try to load a cached table if one exists.",
     ),
+    click.option(
+        "--force",
+        is_flag=True,
+        default=False,
+        show_default=True,
+        help="Overwrite results directory if it exists.",
+    ),
 )
 
 
@@ -251,6 +258,7 @@ def run_project(
     offline,
     output,
     load_cached_table,
+    force,
 ):
     """Run a query on a dsgrid project."""
     query = ProjectQueryModel.from_file(query_definition_file)
@@ -264,6 +272,7 @@ def run_project(
         query,
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
+        force=force,
     )
 
 
@@ -277,6 +286,7 @@ def create_composite_dataset(
     offline,
     output,
     load_cached_table,
+    force,
 ):
     """Run a query to create a composite dataset."""
     CreateCompositeDatasetQueryModel.from_file(query_definition_file)
@@ -289,7 +299,7 @@ def create_composite_dataset(
     #     remote_path=remote_path,
     #     offline_mode=offline,
     # )
-    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query)
+    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
 
 
 @click.command("run")
@@ -302,6 +312,7 @@ def query_composite_dataset(
     offline,
     output,
     load_cached_table,
+    force,
 ):
     """Run a query on a composite dataset."""
     CompositeDatasetQueryModel.from_file(query_definition_file)
@@ -314,7 +325,7 @@ def query_composite_dataset(
     #     remote_path=remote_path,
     #     offline_mode=offline,
     # )
-    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query)
+    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
 
 
 @click.group()

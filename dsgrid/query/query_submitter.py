@@ -100,9 +100,17 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         model,
         load_cached_table,
         persist_intermediate_table,
+        force=False,
     ):
         context = QueryContext(model)
         context.model.project.version = str(self._project.version)
+        output_dir = self._output_dir / context.model.name
+        if output_dir.exists() and not force:
+            raise DSGInvalidParameter(
+                f"output directory {self._output_dir} and query name={context.model.name} will "
+                "overwrite an existing query results directory. "
+                "Choose a different path or pass force=True."
+            )
 
         df = None
         if load_cached_table:
@@ -192,6 +200,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         model: ProjectQueryModel,
         persist_intermediate_table=True,
         load_cached_table=True,
+        force=False,
     ):
         """Submits a project query to consolidate datasets and produce result tables.
 
@@ -202,6 +211,8 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
             Persist the intermediate consolidated table.
         load_cached_table : bool, optional
             Load a cached consolidated table if the query matches an existing query.
+        force : bool
+            If True, overwrite any existing output directory.
 
         Returns
         -------
@@ -215,7 +226,9 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
             Raised if the query is invalid
 
         """
-        return self._run_query(model, load_cached_table, persist_intermediate_table)[0]
+        return self._run_query(model, load_cached_table, persist_intermediate_table, force=force)[
+            0
+        ]
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
@@ -230,6 +243,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         model: CreateCompositeDatasetQueryModel,
         persist_intermediate_table=False,
         load_cached_table=True,
+        force=False,
     ):
         """Create a composite dataset from a project.
 
@@ -240,8 +254,13 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             Persist the intermediate consolidated table.
         load_cached_table : bool, optional
             Load a cached consolidated table if the query matches an existing query.
+        force : bool
+            If True, overwrite any existing output directory.
+
         """
-        df, context = self._run_query(model, load_cached_table, persist_intermediate_table)
+        df, context = self._run_query(
+            model, load_cached_table, persist_intermediate_table, force=force
+        )
         self._save_composite_dataset(context, df, not persist_intermediate_table)
 
     @track_timing(timer_stats_collector)

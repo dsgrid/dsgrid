@@ -1,5 +1,9 @@
 name: Documentation
 
+env:
+  ACCESS_KEY: ${{ secrets.ACCESS_PROJECTS_USER }}
+  ACCESS_TOKEN: ${{ secrets.ACCESS_PROJECTS_TOKEN }}
+
 on:
   push:
     branches: [main]

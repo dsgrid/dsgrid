@@ -1,19 +1,27 @@
 """Copy example configs from the US Project Repo to use for docs.
 """
-from dsgrid.filesystem.local_filesystem import LocalFilesystem
 import os
 from pathlib import Path
+
+from dsgrid.filesystem.local_filesystem import LocalFilesystem
+from dsgrid.utils.run_command import check_run_command
 
 
 # Specify source of configs
 if os.environ.get("CI") is not None:
-    username = os.environ["ACCESS_KEY"]
     token = os.environ["ACCESS_TOKEN"]
-    # TODO git clone SS repo
+    project_repo = Path(".") / "dsgrid-project-StandardScenarios"
+    assert not project_repo.exists()
+    cmd = f"git clone https://{token}/@github.com/dsgrid/dsgrid-project-StandardScenarios.git {project_repo}"
+    check_run_command(cmd)
+else:
+    project_repo = Path(os.environ.get("DSGRID_PROJECT_STANDARD_SCENARIOS_PATH"))
+    if project_repo is None:
+        raise Exception(
+            "The environment variable DSGRID_PROJECT_STANDARD_SCENARIOS_PATH must be defined when building docs locally."
+        )
 
-PROJECT_REPO = Path(__file__).resolve().parents[2] / "dsgrid" / "dsgrid-project-StandardScenarios"
-
-base_dir = PROJECT_REPO / "dsgrid_project"
+base_dir = project_repo / "dsgrid_project"
 dataset_dir = base_dir / "datasets" / "sector_models" / "comstock"
 
 project_config = base_dir / "project.toml"

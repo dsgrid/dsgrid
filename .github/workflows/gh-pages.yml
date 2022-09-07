@@ -23,13 +23,13 @@ jobs:
           sudo apt install -y pandoc
           python -m pip install --upgrade pip
           python -m pip install '.[admin]'
-          git clone https://${{ secrets.ACCESS_PROJECTS_TOKEN }}@github.com/dsgrid/dsgrid-project-StandardScenarios.git
       - name: build documentation
         run: |
           git submodule init
           git submodule update
           cd docs
           make clean
+          git clone https://${{ secrets.ACCESS_PROJECTS_TOKEN }}@github.com/dsgrid/dsgrid-project-StandardScenarios.git
           make html
       - name: deploy
         uses: peaceiris/actions-gh-pages@v3.6.1

@@ -4,16 +4,13 @@ import os
 from pathlib import Path
 
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
-from dsgrid.utils.run_command import check_run_command
 
 
 # Specify source of configs
 if os.environ.get("CI") is not None:
     token = os.environ["ACCESS_PROJECTS_TOKEN"]
     project_repo = Path(".") / "dsgrid-project-StandardScenarios"
-    assert not project_repo.exists()
-    cmd = f"git clone https://{token}/@github.com/dsgrid/dsgrid-project-StandardScenarios.git {project_repo}"
-    check_run_command(cmd)
+    assert project_repo.exists(), f"{project_repo} does not exist"
 else:
     project_repo = Path(os.environ.get("DSGRID_PROJECT_STANDARD_SCENARIOS_PATH"))
     if project_repo is None:

@@ -9,7 +9,7 @@ from dsgrid.utils.run_command import check_run_command
 
 # Specify source of configs
 if os.environ.get("CI") is not None:
-    token = os.environ["ACCESS_TOKEN"]
+    token = os.environ["ACCESS_PROJECTS_TOKEN"]
     project_repo = Path(".") / "dsgrid-project-StandardScenarios"
     assert not project_repo.exists()
     cmd = f"git clone https://{token}/@github.com/dsgrid/dsgrid-project-StandardScenarios.git {project_repo}"

@@ -1,7 +1,7 @@
 name: Documentation
 
 env:
-  ACCESS_TOKEN: ${{ secrets.ACCESS_PROJECTS_TOKEN }}
+  ACCESS_PROJECTS_TOKEN: ${{ secrets.ACCESS_PROJECTS_TOKEN }}
 
 on:
   push:

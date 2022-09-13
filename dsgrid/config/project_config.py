@@ -182,12 +182,13 @@ class InputDatasetModel(DSGBaseModel):
     )
     # TODO this model_sector must be validated in the dataset_config
     # TODO: this is only necessary for input_model types
-    model_sector: str = Field(  # TODO: should this be data_source instead?
+    model_sector: str = Field(  # TODO: should this be data_source instead? -- still relevant?
         # TODO: need to discuss with team why this is needed. One potential reason is because it is
         # helpful to query at some point which datasets have not yet been registered. Dataset_id may
         # not be all that descriptive, but the data_source is. We may also want the metric_type here too.
         title="model_sector",
         description="Model sector ID, required only if dataset type is ``sector_model``.",
+        # -- still relevant?
         optional=True,
         updateable=False,
     )
@@ -198,6 +199,7 @@ class InputDatasetModel(DSGBaseModel):
 
     @validator("model_sector")
     def check_model_sector(cls, model_sector, values):
+        # TODO: how does change to "modeled" get set here? is this validator still relevant?
         if "dataset_type" in values:
             if not values["dataset_type"] == InputDatasetType.SECTOR_MODEL:
                 raise ValueError("model_sector is only required if dataset_type is 'sector_model'")

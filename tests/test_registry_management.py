@@ -68,7 +68,7 @@ def test_register_project_and_dataset(make_test_project_dir):
 
         with pytest.raises(DSGDuplicateValueRegistered):
             dataset_config_file = (
-                make_test_project_dir / "datasets" / "sector_models" / "comstock" / "dataset.toml"
+                make_test_project_dir / "datasets" / "modeled" / "comstock" / "dataset.toml"
             )
             dataset_mgr.register(dataset_config_file, dataset_path, user, log_message)
 
@@ -181,7 +181,7 @@ def test_register_and_submit_rollback_on_failure(make_test_project_dir):
         manager = RegistryManager.load(path, offline_mode=True)
         project_file = src_dir / "project.toml"
         project_id = load_data(project_file)["project_id"]
-        dataset_dir = src_dir / "datasets" / "sector_models" / "comstock"
+        dataset_dir = src_dir / "datasets" / "modeled" / "comstock"
         dataset_config_file = dataset_dir / "dataset.toml"
         dataset_id = load_data(dataset_config_file)["dataset_id"]
         dataset_mapping_file = dataset_dir / "dimension_mappings.toml"
@@ -365,7 +365,7 @@ def test_register_submit_dataset_long_workflow(make_test_project_dir):
         project_id = load_data(project_config_file)["project_id"]
         project_dimension_mapping_config = src_dir / "dimension_mappings_with_ids.toml"
         project_dimension_file = src_dir / "dimensions.toml"
-        dataset_dir = src_dir / "datasets" / "sector_models" / "comstock"
+        dataset_dir = src_dir / "datasets" / "modeled" / "comstock"
         dataset_config_file = dataset_dir / "dataset_with_dimension_ids.toml"
         dataset_id = load_data(dataset_config_file)["dataset_id"]
         dataset_dimension_file = dataset_dir / "dimensions.toml"

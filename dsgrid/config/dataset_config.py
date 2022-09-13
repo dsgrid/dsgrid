@@ -94,7 +94,7 @@ def check_load_data_lookup_filename(path: str):
 
 
 class InputDatasetType(DSGEnum):
-    SECTOR_MODEL = "sector_model"
+    MODELED = "modeled"
     HISTORICAL = "historical"
     BENCHMARK = "benchmark"
 

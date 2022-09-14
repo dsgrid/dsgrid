@@ -22,9 +22,6 @@ class FilteredDatasetModel(DSGBaseModel):
     )
 
 
-# TODO: setting alias on a groupBy column doesn't work on a per-dataset aggregation
-
-
 class ColumnModel(DSGBaseModel):
     """Defines one column in a SQL aggregation statement."""
 
@@ -73,8 +70,9 @@ class ColumnModel(DSGBaseModel):
 
 
 class DimensionQueryNamesModel(DSGBaseModel):
-    """Defines columns to include in a SQL aggregation statement. If a value is empty, that
-    dimension will be aggregated and dropped from the table."""
+    """Defines the list of dimensions to which the value columns should be aggregated.
+    If a value is empty, that dimension will be aggregated and dropped from the table.
+    """
 
     data_source: List[Union[str, ColumnModel]]
     geography: List[Union[str, ColumnModel]]
@@ -250,6 +248,8 @@ class ProjectQueryParamsModel(DSGBaseModel):
                             f"function={item.function} cannot be set in ProjectQueryParamsModel"
                         )
                     if item.alias is not None:
+                        # TODO: need to support aliases here. The code that handles columns during
+                        # dataset concatenation doesn't support it.
                         raise ValueError(
                             f"alias={item.alias} cannot be set in ProjectQueryParamsModel"
                         )

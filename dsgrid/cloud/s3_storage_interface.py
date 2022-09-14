@@ -3,6 +3,7 @@ from datetime import datetime
 import json
 import logging
 import os
+import sys
 from pathlib import Path
 import time
 
@@ -29,16 +30,21 @@ class S3StorageInterface(CloudStorageInterface):
 
     def _sync(self, src, dst, exclude=None, is_file=False):
         start = time.time()
-        if is_file:
-            sync_command = f"aws s3 cp {src} {dst} --profile {self._s3_filesystem.profile}"
-        else:
-            sync_command = f"aws s3 sync {src} {dst} --profile {self._s3_filesystem.profile}"
+        aws_exec = self._get_aws_executable()
+        cmd = "cp" if is_file else "sync"
+        sync_command = f"{aws_exec} s3 {cmd} {src} {dst} --profile {self._s3_filesystem.profile}"
         if exclude:
             for x in exclude:
                 sync_command = sync_command + f" --exclude {x}"
         logger.info("Running %s", sync_command)
         check_run_command(sync_command)
         logger.info("Command took %s seconds", time.time() - start)
+
+    @staticmethod
+    def _get_aws_executable():
+        # subprocess.run cannot find the aws executable on Windows if shell is not True.
+        # That's probably an aws cli bug. We can workaround it here.
+        return "aws.cmd" if sys.platform == "win32" else "aws"
 
     def check_lock_file(self, path):
         self.check_valid_lock_file(path)

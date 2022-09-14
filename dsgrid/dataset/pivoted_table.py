@@ -46,7 +46,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
             from_fractions = get_unique_values(records, "from_fraction")
             if len(from_fractions) != 1 and float(next(iter(from_fractions))) != 1.0:
                 # TODO: This needs to apply from_fraction to each load value column.
-                # Also needs to handle all possible from_id/to_id combinationall possible from_id/to_id combinations
+                # Also needs to handle all possible from_id/to_id combinations
                 # If aggregation is not allowed then it should raise an error.
                 raise DSGInvalidParameter(
                     f"Mapping dimension query name {query_name} produced from_fractions other than 1.0: {from_fractions}"
@@ -110,7 +110,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 ):
                     if column.function is not None:
                         # TODO: Do we need to support this?
-                        raise Exception("column function cannot be set on {column}")
+                        raise Exception(f"column function cannot be set on {column}")
                     dim = self.project_config.get_dimension(query_name)
                     if dim.model.dimension_type == pivoted_dim_type:
                         dimension_query_name = query_name
@@ -160,6 +160,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
 
         group_by_query_names = []
         pivoted_dimension_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
+        pivoted_columns = set(context.get_pivoted_columns(dataset_id=self.dataset_id))
         for agg in aggregations:
             columns = []
             for dim_type, column in agg.iter_dimensions_to_keep():
@@ -168,20 +169,23 @@ class PivotedTableHandler(TableFormatHandlerBase):
             if not columns:
                 continue
             df = self.add_columns(df, columns, context, True)
-            pivoted_columns = set(context.get_pivoted_columns(dataset_id=self.dataset_id))
             group_by_cols = []
             for column in columns:
-                if column.dimension_query_name not in pivoted_columns:
-                    if column.function is None:
-                        expr = column.dimension_query_name
-                    else:
-                        expr = column.function(column.dimension_query_name)
-                        if column.alias is not None:
-                            expr = expr.alias(column.alias)
-                    group_by_cols.append(expr)
-                    group_by_query_names.append(column.dimension_query_name)
+                if column.function is None:
+                    expr = column.dimension_query_name
+                else:
+                    expr = column.function(column.dimension_query_name)
+                    if column.alias is not None:
+                        expr = expr.alias(column.alias)
+                group_by_cols.append(expr)
+                group_by_query_names.append(column.dimension_query_name)
             op = agg.aggregation_function
-            agg_expr = [op(x).alias(x) for x in pivoted_columns]
+            ordered_pivoted_columns = [
+                x
+                for x in context.get_pivoted_columns(dataset_id=self.dataset_id)
+                if x in pivoted_columns
+            ]
+            agg_expr = [op(x).alias(x) for x in ordered_pivoted_columns]
             df = df.groupBy(*group_by_cols).agg(*agg_expr)
             logger.info(
                 "Aggregated dimensions with groupBy %s and agg %s", group_by_cols, agg_expr

@@ -221,14 +221,14 @@ class Project:
 
     def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
         record_ids = {}
-        base_dim_to_query_name_mapping = self._config.get_base_dimension_to_query_name_mapping()
+        base_query_names = self._config.get_base_dimension_query_names()
 
         for dim_filter in context.model.project.dimension_filters:
             dim_type = dim_filter.dimension_type
             query_name = dim_filter.dimension_query_name
             df = self._config.get_dimension_records(query_name)
             df = dim_filter.apply_filter(df).select("id")
-            if query_name != base_dim_to_query_name_mapping[dim_type]:
+            if query_name not in base_query_names:
                 mapping_records = self._config.get_base_to_supplemental_mapping_records(query_name)
                 df = (
                     mapping_records.join(df, on=mapping_records.to_id == df.id)

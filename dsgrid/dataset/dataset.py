@@ -39,7 +39,7 @@ class DatasetBase(abc.ABC):
     def create_views(self):
         """Create views for each of the tables in this dataset."""
         # TODO: should we create these in a separate database?
-        # TODO DT: views should be created by the dataset handler
+        # TODO: views should be created by the dataset handler
         self.load_data_lookup.createOrReplaceTempView(self._make_view_name("load_data_lookup"))
         self.load_data.createOrReplaceTempView(self._make_view_name("load_data"))
 

@@ -103,7 +103,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
             for _, column in agg.iter_dimensions_to_keep():
                 query_name = column.dimension_query_name
                 # No work is required if the user requested the base dimension for the pivoted
-                # dimension.
+                # dimension or if this pivoted column has already been handled.
                 if (
                     query_name not in base_query_names
                     and query_name not in context.get_dimension_query_names(pivoted_dim_type)

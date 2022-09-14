@@ -200,9 +200,9 @@ class Project:
         dim_columns = sorted(dim_columns)
         time_columns = sorted(time_columns)
         expected_columns = time_columns + pivoted_columns + dim_columns
-        for dataset_id, i in zip(context.model.project.dataset_ids, range(len(dfs))):
+        for i, dataset_id in enumerate(context.model.project.dataset_ids):
             remaining = sorted(set(dfs[i].columns).difference(expected_columns))
-            final_columns = time_columns + dim_columns + pivoted_columns + remaining
+            final_columns = expected_columns + remaining
             missing = context.get_pivoted_columns(dataset_id=dataset_id).difference(dfs[i].columns)
             for column in missing:
                 dfs[i] = dfs[i].withColumn(column, F.lit(None).cast(DoubleType()))

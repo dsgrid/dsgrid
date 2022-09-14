@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 class DatasetBase(abc.ABC):
-    """Base clase for datasets"""
+    """Base class for datasets"""
 
     VIEW_NAMES = ("load_data_lookup", "load_data")
 

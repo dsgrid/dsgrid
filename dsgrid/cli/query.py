@@ -11,6 +11,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
     DimensionFilterExpressionRawModel,
+    DimensionFilterBetweenColumnOperatorModel,
     DimensionFilterColumnOperatorModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
@@ -93,7 +94,15 @@ _COMMON_RUN_OPTIONS = (
 @click.option(
     "-F",
     "--filters",
-    type=click.Choice(["expression", "column_operator", "supplemental_column_operator", "raw"]),
+    type=click.Choice(
+        [
+            "expression",
+            "between_column_operator",
+            "column_operator",
+            "supplemental_column_operator",
+            "raw",
+        ]
+    ),
     multiple=True,
     help="Add a dimension filter. Requires user customization.",
 )
@@ -181,6 +190,13 @@ def create_project(
                 dimension_query_name="county",
                 operator="==",
                 value="",
+            )
+        elif dim_filter == "between_column_operator":
+            flt = DimensionFilterBetweenColumnOperatorModel(
+                dimension_type=DimensionType.TIME,
+                dimension_query_name="time_est",
+                lower_bound="",
+                upper_bound="",
             )
         elif dim_filter == "column_operator":
             flt = DimensionFilterColumnOperatorModel(

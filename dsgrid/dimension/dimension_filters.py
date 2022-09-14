@@ -7,6 +7,7 @@ from pydantic import Field, validator, root_validator
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidField
 
 
 logger = logging.getLogger(__name__)
@@ -25,22 +26,16 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
     def apply_filter(self, df):
         """Apply the filter to a DataFrame"""
 
-    @staticmethod
-    def _make_value_str(value):
+    def _make_value_str(self, value):
         if isinstance(value, str):
             return f"'{value}'"
-        return str(value)
-
-    @staticmethod
-    def _make_values_str(values):
-        if isinstance(values[0], str):
-            text = ", ".join((f"'{x}'" for x in values))
-        elif isinstance(values[0], int) or isinstance(values[0], float):
-            text = ", ".join((f"{x}" for x in values))
+        elif isinstance(value, int) or isinstance(value, float):
+            return str(value)
         else:
-            raise Exception(f"Unsupported type: {type(values[0])}")  # TODO: dsg exception
+            raise DSGInvalidField(f"Unsupported type: {type(value)}")
 
-        return f"({text})"
+    def _make_values_str(self, values):
+        return ", ".join((f"{self._make_value_str(x)}" for x in values))
 
     def dict(self, *args, **kwargs):
         # Add the type of the class so that we can deserialize with the right model.
@@ -126,7 +121,6 @@ class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
 
 
 DIMENSION_COLUMN_FILTER_OPERATORS = {
-    "between",
     "contains",
     "endswith",
     "isNotNull",
@@ -153,12 +147,14 @@ class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
     import pyspark.sql.functions as F
     df.filter(F.col("geography").like("abc%"))
     df.filter(~F.col("sector").startswith("com"))
-    df.filter(F.col("timestamp").between("2012-07-01 00:00:00", "2012-08-01 00:00:00"))
     """
 
-    value: Any = Field(title="value", description="Value to filter on")
     operator: str = Field(
         title="operator", description="Method on pyspark.sql.functions.col to invoke"
+    )
+    value: Any = Field(
+        title="value",
+        description="Value to filter on. Use a two-element list for the between operator.",
     )
     negate: bool = Field(
         title="negate",
@@ -177,6 +173,30 @@ class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
         if self.negate:
             return df.filter(~method(self.value))
         return df.filter(method(self.value))
+
+
+class DimensionFilterBetweenColumnOperatorModel(DimensionFilterBaseModel):
+    """Filters a table where a dimension column is between the lower bound and upper bound,
+    inclusive.
+
+    Examples:
+    import pyspark.sql.functions as F
+    df.filter(F.col("timestamp").between("2012-07-01 00:00:00", "2012-08-01 00:00:00"))
+    """
+
+    lower_bound: Any = Field(title="lower_bound", description="Lower bound, inclusive")
+    upper_bound: Any = Field(title="upper_bound", description="Upper bound, inclusive")
+    negate: bool = Field(
+        title="negate",
+        description="Change the filter to match the negation of the value.",
+        default=False,
+    )
+
+    def apply_filter(self, df, column=None):
+        column = column or self.column
+        if self.negate:
+            return df.filter(~F.col(column).between(self.lower_bound, self.upper_bound))
+        return df.filter(F.col(column).between(self.lower_bound, self.upper_bound))
 
 
 class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
@@ -211,11 +231,10 @@ def _get_filter_subclasses(filter_class, subclasses=None):
     if subclasses is None:
         subclasses = {}
     for cls in filter_class.__subclasses__():
-        if cls == _DimensionFilterWithWhereClauseModel:
+        subclasses[str(cls.__name__)] = cls
+        if cls.__subclasses__():
             # Recurse.
-            subclasses = _get_filter_subclasses(_DimensionFilterWithWhereClauseModel, subclasses)
-        else:
-            subclasses[str(cls.__name__)] = cls
+            subclasses = _get_filter_subclasses(cls, subclasses)
     return subclasses
 
 

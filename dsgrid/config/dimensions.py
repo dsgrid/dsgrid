@@ -5,11 +5,10 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional
 
 from pydantic import validator, root_validator
 from pydantic import Field
-from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
@@ -542,7 +541,7 @@ class DimensionReferenceModel(DSGBaseModel):
             "Only alphanumerics and dashes are supported.",
         ),
     )
-    version: Union[str, VersionInfo] = Field(
+    version: str = Field(
         title="version",
         description="Version of the dimension",
         requirements=(
@@ -635,3 +634,26 @@ def _check_time_type_and_class_consistency(values):
             " * For class=NoOpTime, use time_type=noop. "
         )
     return values
+
+
+class DimensionCommonModel(DSGBaseModel):
+    """Common attributes for all dimensions"""
+
+    name: str
+    display_name: str
+    dimension_query_name: str
+    dimension_type: DimensionType
+    dimension_id: str
+    class_name: str
+    description: str
+
+
+def create_dimension_common_model(model):
+    """Constructs an instance of DimensionBaseModel from subclasses in order to give the API
+    one common model for all dimensions. Avoids the complexity of dealing with
+    DimensionBaseModel validators.
+    """
+    # TODO DT: make test to ensure that this is in sync with DimensionBaseModel.
+    fields = set(DimensionCommonModel.__fields__)
+    data = {x: getattr(model, x) for x in type(model).__fields__ if x in fields}
+    return DimensionCommonModel(**data)

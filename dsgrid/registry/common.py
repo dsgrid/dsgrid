@@ -6,7 +6,7 @@ import re
 import uuid
 from collections import namedtuple
 from datetime import datetime
-from typing import Optional, Union
+from typing import Optional
 
 from pydantic import Field
 from semver import VersionInfo
@@ -101,7 +101,7 @@ RegistryManagerParams = namedtuple(
 class ConfigRegistrationModel(DSGBaseModel):
     """Registration fields required by the ProjectConfig and DatasetConfig"""
 
-    version: Union[str, VersionInfo] = Field(
+    version: str = Field(
         title="version",
         description="Version resulting from the registration",
     )
@@ -130,7 +130,7 @@ def get_version_from_filename(filename):
 def make_initial_config_registration(submitter, log_message):
     version = VersionInfo(major=1)
     return ConfigRegistrationModel(
-        version=version,
+        version=str(version),
         submitter=submitter,
         date=datetime.now(),
         log_message=log_message,

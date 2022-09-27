@@ -236,7 +236,7 @@ class RegistryManagerBase(abc.ABC):
             registry_config.version = registry_config.version.bump_patch()
 
         registration = ConfigRegistrationModel(
-            version=registry_config.version,
+            version=str(registry_config.version),
             submitter=submitter,
             date=datetime.now(),
             log_message=log_message,

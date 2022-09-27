@@ -79,7 +79,7 @@ class TableFormatHandlerBase(abc.ABC):
 
     def replace_ids_with_names(self, df):
         orig = df
-        all_query_names = set(self._project_config.get_dimension_query_names())
+        all_query_names = set(self._project_config.list_dimension_query_names())
         for dimension_query_name in set(df.columns).intersection(all_query_names):
             assert not {"id", "name"}.intersection(df.columns), df.columns
             dim_config = self._project_config.get_dimension(dimension_query_name)

@@ -2,7 +2,7 @@
 
 import logging
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 from pydantic import Field
 from pydantic import validator
@@ -25,7 +25,7 @@ class ProjectDatasetRegistryModel(DSGBaseModel):
         title="dataset_id",
         description="Dataset identifier",
     )
-    version: Optional[Union[None, str, VersionInfo]] = Field(
+    version: Optional[str] = Field(
         title="dataset_version",
         description="Full dataset version to be used to find dataset registry",
     )

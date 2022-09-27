@@ -6,6 +6,7 @@ from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimensionMapping
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import TEST_REGISTRY
 
 
@@ -14,11 +15,8 @@ DATASET_ID = "test_efs_comstock"
 
 
 def test_project_load():
-    project = Project.load(PROJECT_ID, offline_mode=True, registry_path=TEST_REGISTRY)
-    assert isinstance(project, Project)
-    project = Project.load(
-        PROJECT_ID, version="1.0.0", offline_mode=True, registry_path=TEST_REGISTRY
-    )
+    mgr = RegistryManager.load(TEST_REGISTRY, offline_mode=True)
+    project = mgr.project_manager.load_project(PROJECT_ID)
     assert isinstance(project, Project)
 
     config = project.config
@@ -40,14 +38,13 @@ def test_project_load():
     assert table.select("data_source").distinct().collect()[0].data_source == "comstock"
 
     with pytest.raises(DSGValueNotRegistered):
-        project = Project.load(
-            PROJECT_ID, version="0.0.0", offline_mode=True, registry_path=TEST_REGISTRY
-        )
+        project = mgr.project_manager.load_project(PROJECT_ID, version="0.0.0")
         assert isinstance(project, Project)
 
 
 def test_dataset_load():
-    project = Project.load(PROJECT_ID, offline_mode=True, registry_path=TEST_REGISTRY)
+    mgr = RegistryManager.load(TEST_REGISTRY, offline_mode=True)
+    project = mgr.project_manager.load_project(PROJECT_ID)
     project.load_dataset(DATASET_ID)
     dataset = project.get_dataset(DATASET_ID)
 
@@ -60,7 +57,9 @@ def test_dataset_load():
     assert "subsector" in lookup.columns
     assert "id" in lookup.columns
 
-    query_names = sorted(project.config.list_dimension_query_names(DimensionType.GEOGRAPHY))
+    query_names = sorted(
+        project.config.list_dimension_query_names_by_type(DimensionType.GEOGRAPHY)
+    )
     assert query_names == ["census_division", "census_region", "county", "state"]
     records = project.config.get_dimension_records("state")
     assert records.filter("id = 'CO'").count() > 0
@@ -70,7 +69,8 @@ def test_dataset_load():
 
 
 def test_dimension_map_and_reduce_in_dataset():
-    project = Project.load(PROJECT_ID, offline_mode=True, registry_path=TEST_REGISTRY)
+    mgr = RegistryManager.load(TEST_REGISTRY, offline_mode=True)
+    project = mgr.project_manager.load_project(PROJECT_ID)
     project.load_dataset(DATASET_ID)
     dataset = project.get_dataset(DATASET_ID)
 

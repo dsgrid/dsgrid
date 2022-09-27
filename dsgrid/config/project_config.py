@@ -1,13 +1,12 @@
 import itertools
 import logging
 import os
-from typing import Dict, List, Set, Union
+from typing import Dict, List, Set
 
 from pydantic import Field
 from pydantic import root_validator, validator
-from semver import VersionInfo
 
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, serialize_model_data
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension, DSGInvalidParameter
 from dsgrid.registry.common import (
@@ -152,7 +151,7 @@ class InputDatasetModel(DSGBaseModel):
         options=InputDatasetType.format_for_docs(),
         updateable=False,
     )
-    version: Union[str, None, VersionInfo] = Field(
+    version: str = Field(
         title="version",
         description="Version of the registered dataset",
         default=None,
@@ -321,6 +320,32 @@ class ProjectConfigModel(DSGBaseModel):
 
         check_config_id_strict(project_id, "Project")
         return project_id
+
+    def dict(self, *args, **kwargs):
+        data = super().dict(*args, **kwargs)
+        return serialize_model_data(data)
+
+
+class _DimensionQueryNamesModel(DSGBaseModel):
+    base: str
+    supplemental: List[str]
+
+
+class ProjectDimensionQueryNamesModel(DSGBaseModel):
+    """Defines the query names for all base and supplemental dimensions in the project."""
+
+    data_source: _DimensionQueryNamesModel
+    geography: _DimensionQueryNamesModel
+    metric: _DimensionQueryNamesModel
+    model_year: _DimensionQueryNamesModel
+    scenario: _DimensionQueryNamesModel
+    sector: _DimensionQueryNamesModel
+    subsector: _DimensionQueryNamesModel
+    time: _DimensionQueryNamesModel
+    weather_year: _DimensionQueryNamesModel
+
+
+# TODO DT: make a test that verifies all dimensions are covered
 
 
 class ProjectConfig(ConfigWithDataFilesBase):
@@ -493,7 +518,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return True
         return False
 
-    def get_dimension_query_names(self):
+    def list_dimension_query_names(self):
         """Return query names for all dimensions in the project.
 
         Returns
@@ -539,6 +564,18 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 )
             )
         return query_names
+
+    def get_dimension_query_names_model(self):
+        """Return an instance of ProjectDimensionQueryNamesModel for the project."""
+        base_query_names_by_type = self.get_base_dimension_to_query_name_mapping()
+        supp_query_names_by_type = self.get_supplemental_dimension_to_query_name_mapping()
+        model = {}
+        for dimension_type in DimensionType:
+            model[dimension_type.value] = {
+                "base": base_query_names_by_type[dimension_type],
+                "supplemental": supp_query_names_by_type[dimension_type],
+            }
+        return ProjectDimensionQueryNamesModel(**model)
 
     def load_dimension_associations(self):
         """Load all dimension associations."""
@@ -672,7 +709,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
             self.base_dimensions.values(), self.supplemental_dimensions.values()
         )
 
-    def list_dimension_query_names(self, dimension_type: DimensionType):
+    def list_dimension_query_names_by_type(self, dimension_type: DimensionType):
         """List the query names available for a dimension type."""
         return [
             x.model.dimension_query_name

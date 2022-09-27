@@ -38,7 +38,7 @@ def test_register_project_and_dataset(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
         path = Path(tmpdir) / "registry"
         check_run_command(f"dsgrid-admin create-registry {path}")
-        dataset_dir = Path("datasets/sector_models/comstock")
+        dataset_dir = Path("datasets/modeled/comstock")
 
         src_dir = make_test_project_dir
         project_config = src_dir / "project.toml"

@@ -54,7 +54,7 @@ def make_test_data_registry(
         dataset_path = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY)
     dataset_path = Path(dataset_path)
     path = create_local_test_registry(registry_path)
-    dataset_dir = Path("datasets/sector_models/comstock")
+    dataset_dir = Path("datasets/modeled/comstock")
 
     user = getpass.getuser()
     log_message = "Initial registration"

@@ -9,7 +9,7 @@ from pathlib import Path
 PROJECT_REPO = Path(__file__).resolve().parent.parent / "dsgrid-test-data" / "test_efs"
 
 base_dir = PROJECT_REPO / "dsgrid_project"
-dataset_dir = base_dir / "datasets" / "sector_models" / "comstock"
+dataset_dir = base_dir / "datasets" / "modeled" / "comstock"
 
 project_config = base_dir / "project.toml"
 dimensions_config = base_dir / "dimensions.toml"

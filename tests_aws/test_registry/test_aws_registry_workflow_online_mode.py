@@ -40,7 +40,7 @@ def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data
                 include_datasets=True,
                 offline_mode=False,
             )
-            dataset_dir = make_test_project_dir / "datasets" / "sector_models" / "comstock"
+            dataset_dir = make_test_project_dir / "datasets" / "modeled" / "comstock"
             assert dataset_dir.exists()
             dimension_mapping_refs = dataset_dir / "dimension_mapping_references.toml"
             assert dimension_mapping_refs.exists()

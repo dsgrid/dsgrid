@@ -16,7 +16,7 @@ from dsgrid.loggers import setup_logging
 from dsgrid.utils.spark import init_spark
 
 SS_PROJECT = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/project.toml"
-RS_DATASET = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/datasets/sector_models/resstock/dataset.toml"
+RS_DATASET = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/datasets/modeled/resstock/dataset.toml"
 
 logger = logging.getLogger(__name__)
 

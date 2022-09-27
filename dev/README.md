@@ -251,8 +251,8 @@ app = RegistrationGui(
     defaults={
        "local_registry": "/my-local-registry",
         "project_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/project.toml",
-        "dataset_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/sector_models/comstock/dataset.toml",
-        "dimension_mapping_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/sector_models/comstock/dimension_mappings.toml",
+        "dataset_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dataset.toml",
+        "dimension_mapping_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dimension_mappings.toml",
         "dataset_path": "/dsgrid-data/data-StandardScenarios/conus_2022_reference_comstock",
         "log_message": "log message",
     }

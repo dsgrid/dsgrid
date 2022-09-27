@@ -166,27 +166,6 @@ class DataClassificationType(DSGEnum):
     )
 
 
-# TODO will need to rename this as it really should be more generic inputs
-#   and not just sector inputs. "InputSectorDataset" is already taken in
-#   project_config.py
-# TODO: this already assumes that the data is formatted for DSG, however,
-#       we may want the dataset config to be "before" any DSG parquets get
-#       formatted.
-class InputSectorDataset(DSGBaseModel):
-    """Input dataset configuration class"""
-
-    data_type: DSGDatasetParquetType = Field(
-        title="data_type",
-        alias="type",
-        description="DSG parquet input dataset type",
-        options=DSGDatasetParquetType.format_for_docs(),
-    )
-    directory: str = Field(
-        title="directory",
-        description="Directory with parquet files",
-    )
-
-
 class StandardDataSchemaModel(DSGBaseModel):
     load_data_column_dimension: DimensionType = Field(
         title="load_data_column_dimension",
@@ -247,6 +226,11 @@ class DatasetConfigModel(DSGBaseModel):
     dataset_qualifier_metadata: Optional[GrowthRateModel] = Field(
         title="dataset_qualifier_metadata",
         description="Additional metadata to include related to the dataset_qualifier",
+    )
+    sector_description: Optional[str] = Field(
+        title="sector_description",
+        description="Sectoral description (e.g., residential, commercial, industrial, "
+        "transportation, electricity)",
     )
     data_source: str = Field(
         title="data_source",

@@ -65,6 +65,10 @@ class DSGValueNotRegistered(DSGBaseException):
     """Raised if a value is not registered."""
 
 
+class DSGValueNotStored(DSGBaseException):
+    """Raised if a value is not stored."""
+
+
 class DSGConfigWarning(DSGBaseWarning):
     """Warning for unclear or default configuration inputs"""
 

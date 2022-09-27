@@ -531,6 +531,53 @@ $ dsgrid query project run \
 It may be easier to develop and run queries in Python. Follow examples in `~/repos/dsgrid/tests/test_queries.py`.
 
 
+## API server
+Set these environment variables with your desired values.
+```
+$ export DSGRID_LOCAL_REGISTRY=~/.dsgrid-registry
+$ export DSGRID_QUERY_OUTPUT_DIR=api_query_output
+$ export DSGRID_API_SERVER_STORE_DIR=.
+```
+
+Start the API server with this command:
+```
+$ uvicorn dsgrid.api.app:app
+```
+When developing the API, add this option in order to automatically reload the server when you save a file.
+```
+$ uvicorn dsgrid.api.app:app --reload
+```
+
+Check the output for the address and port.
+The examples below assume that the server is running at http://127.0.0.1:8000.
+
+Send commands in the terminal with `curl`, in a browser (be sure to install an extension to pretty-print the JSON output),
+or in an API-specific tool. `Insomnia` has a free version here: https://insomnia.rest/download. There are many other tools.
+
+Here are some `curl` examples that you can run in a terminal. Install `jq` from https://stedolan.github.io/jq/download/
+in order to be able to pretty-print and filter the output.
+
+View the projects.
+```
+$ curl -s http://127.0.0.1:8000/projects | jq .
+```
+
+View all dimension IDs.
+```
+$ curl -s http://127.0.0.1:8000/dimensions | jq '.dimensions | .[].dimension_id'
+```
+
+Show all dimension query names for a project.
+```
+$ curl -s http://127.0.0.1:8000/projects/dsgrid_conus_2022/dimensions/dimension_query_names | jq .
+```
+
+### API documentation
+FastAPI generates API documentation at these links:
+- http://127.0.0.1:8000/docs (with Swagger)
+- http://127.0.0.1:8000/docs (with Redocly)
+
+
 ## Publish Documentation
 
 The documentation is built with [Sphinx](http://sphinx-doc.org/index.html). There are several steps to creating and publishing the documentation:

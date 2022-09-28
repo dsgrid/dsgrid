@@ -5,14 +5,11 @@ from pathlib import Path
 from typing import Optional
 
 from pydantic import Field
-from pydantic import validator
-from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.registry.common import (
     DatasetRegistryStatus,
 )
-from dsgrid.utils.versioning import make_version
 from .registry_base import RegistryBaseModel, RegistryBase
 
 logger = logging.getLogger(__name__)
@@ -33,12 +30,6 @@ class ProjectDatasetRegistryModel(DSGBaseModel):
         title="status",
         description="Dataset status within the project",
     )
-
-    @validator("version")
-    def check_version(cls, version):
-        if isinstance(version, VersionInfo) or version is None:
-            return version
-        return make_version(version)
 
 
 class ProjectRegistryModel(RegistryBaseModel):

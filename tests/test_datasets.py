@@ -37,7 +37,7 @@ def test_invalid_datasets(make_test_project_dir, make_test_data_dir):
             dataset_path=make_test_data_dir,
             include_datasets=False,
         )
-        dataset_dir = make_test_project_dir / "datasets" / "sector_models" / "comstock"
+        dataset_dir = make_test_project_dir / "datasets" / "modeled" / "comstock"
         assert dataset_dir.exists()
         dataset_config_file = dataset_dir / "dataset.toml"
         dataset_id = load_data(dataset_config_file)["dataset_id"]

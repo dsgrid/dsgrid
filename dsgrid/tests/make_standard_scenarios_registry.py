@@ -44,7 +44,7 @@ def make_standard_scenarios_registry(
 
     path = create_local_test_registry(registry_path)
     project_config_file = src_dir / "project.toml"
-    dataset_base = Path("datasets/sector_models")
+    dataset_base = Path("datasets/modeled")
     dataset_ids = (
         "conus_2022_reference_comstock",
         "conus_2022_reference_resstock",

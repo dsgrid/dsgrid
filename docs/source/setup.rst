@@ -101,7 +101,7 @@ We recommend that dsgrid project repositories use the following directory organi
             ├── datasets
             │   ├── benchmark
             │   ├── historical
-            │   └── sector_models
+            │   └── modeled
             │       ├── comstock
             │       │   ├── dimension_mappings
             │       │   ├── dimensions
@@ -115,7 +115,7 @@ We recommend that dsgrid project repositories use the following directory organi
 
 In the directory structure above, all project files are stored in the ``dsgrid_project`` root directory. And within this root directory we have:
 
-    * ``datasets``: This is where we define input datasets, oranized first by type (i.e., ``datasets/historical``, ``datasets/benchmark``, ``datasets/sector_models``) and then by source (e.g., ``datasets/sector_models/comstock``) for the dsgrid project
+    * ``datasets``: This is where we define input datasets, oranized first by type (i.e., ``datasets/historical``, ``datasets/benchmark``, ``datasets/modeled``) and then by source (e.g., ``datasets/modeled/comstock``) for the dsgrid project
     * ``dimension_mappings``: This where we store :under:`project-level` dimension mapping records (csv or json)
     * ``dimensons``: This is where we store :under:`project-level` dimension records (csv or json)
     * ``project.toml``: This is the main project configuration file. See ::ref

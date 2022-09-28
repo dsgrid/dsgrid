@@ -24,7 +24,7 @@ def test_trivial_dimension_bad(make_test_project_dir, make_test_data_dir):
         project_config_file = make_test_project_dir / "project.toml"
         manager.project_manager.register(project_config_file, "user", "log")
 
-        dataset_dir = make_test_project_dir / "datasets" / "sector_models" / "comstock"
+        dataset_dir = make_test_project_dir / "datasets" / "modeled" / "comstock"
         assert dataset_dir.exists()
         dataset_config_file = dataset_dir / "dataset.toml"
         replace_dimension_uuids_from_registry(base_dir, (dataset_config_file,))

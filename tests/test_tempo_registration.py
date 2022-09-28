@@ -52,7 +52,7 @@ def make_registry_for_tempo(registry_path, src_dir, dataset_path=None) -> Regist
     if dataset_path is None:
         dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
     path = create_local_test_registry(registry_path)
-    dataset_dir = Path("datasets/sector_models/tempo_standard_scenarios_2021")
+    dataset_dir = Path("datasets/modeled/tempo_standard_scenarios_2021")
     user = getpass.getuser()
     log_message = "Initial registration"
     manager = RegistryManager.load(path, offline_mode=True)

@@ -17,7 +17,7 @@ from .models import (
     TableFormatType,
 )
 from .query_context import QueryContext
-from .peak_load_report import PeakLoadReport
+from .report_peak_load import PeakLoadReport
 
 
 logger = logging.getLogger(__name__)

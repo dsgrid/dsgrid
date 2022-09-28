@@ -32,7 +32,7 @@ from dsgrid.query.models import (
     ReportType,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
-from dsgrid.query.peak_load_report import PeakLoadInputModel, PeakLoadReport
+from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
 from dsgrid.utils.run_command import check_run_command
 
 

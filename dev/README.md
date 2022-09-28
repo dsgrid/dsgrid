@@ -541,7 +541,11 @@ $ which dsgrid
 ```
 $ spark-submit --master spark://hostname:7077 \
     --conf spark.sql.shuffle.partitions=500 \
-    /Users/dthom/miniconda3/envs/dsgrid/bin/dsgrid
+    /Users/dthom/miniconda3/envs/dsgrid/bin/dsgrid-cli.py \
+    query project run \
+    --offline \
+    --registry-path=./dsgrid-test-data/filtered_registries/simple_standard_scenarios \
+    query.json
 ```
 
 ### Programmatic queries

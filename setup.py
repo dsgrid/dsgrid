@@ -51,6 +51,9 @@ setup(
     entry_points={
         "console_scripts": [
             "dsgrid=dsgrid.cli.dsgrid:cli",
+            # This exists because spark-submit does not recognize the above 'dsgrid' as a Python
+            # application.
+            "dsgrid-cli.py=dsgrid.cli.dsgrid:cli",
             "dsgrid-admin=dsgrid.cli.dsgrid_admin:cli",
         ],
     },

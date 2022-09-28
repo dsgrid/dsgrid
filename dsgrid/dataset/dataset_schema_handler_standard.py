@@ -244,6 +244,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 diff = ld_ids.unionAll(ldl_ids).exceptAll(ld_ids.intersect(ldl_ids))
                 # TODO: Starting with Python 3.10 and Spark 3.3.0, this fails unless we call cache.
                 # Works fine on Python 3.9 and Spark 3.2.0. Haven't debugged further.
+                # The size should not cause a problem.
                 diff.cache()
                 diff_count = diff.count()
                 limit = 100

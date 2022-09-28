@@ -653,7 +653,6 @@ def create_dimension_common_model(model):
     one common model for all dimensions. Avoids the complexity of dealing with
     DimensionBaseModel validators.
     """
-    # TODO DT: make test to ensure that this is in sync with DimensionBaseModel.
     fields = set(DimensionCommonModel.__fields__)
     data = {x: getattr(model, x) for x in type(model).__fields__ if x in fields}
     return DimensionCommonModel(**data)

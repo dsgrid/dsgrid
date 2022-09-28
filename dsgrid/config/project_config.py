@@ -327,9 +327,6 @@ class ProjectDimensionQueryNamesModel(DSGBaseModel):
     weather_year: _DimensionQueryNamesModel
 
 
-# TODO DT: make a test that verifies all dimensions are covered
-
-
 class ProjectConfig(ConfigWithDataFilesBase):
     """Provides an interface to a ProjectConfigModel."""
 

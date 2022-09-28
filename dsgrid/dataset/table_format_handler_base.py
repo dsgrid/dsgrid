@@ -63,7 +63,7 @@ class TableFormatHandlerBase(abc.ABC):
             if dim_type == DimensionType.TIME:
                 time_dim = self._project_config.get_base_dimension(dim_type)
                 time_cols = time_dim.get_timestamp_load_data_columns()
-                # TODO DT: Should we enforce that projects can only have one time column?
+                # TODO: Should we enforce that projects can only have one time column?
                 assert len(time_cols) == 1, time_cols
                 existing_col = time_cols[0]
             elif dim_type.value in columns:

@@ -1,3 +1,4 @@
+import json
 import logging
 import os
 import shutil
@@ -10,7 +11,7 @@ import pandas as pd
 from fastapi.testclient import TestClient
 
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.api.models import AsyncTaskStatus
+from dsgrid.api.models import AsyncTaskStatus, SparkSubmitProjectQueryRequest
 from dsgrid.api.response_models import (
     GetAsyncTaskResponse,
     GetDatasetResponse,
@@ -27,7 +28,7 @@ from dsgrid.api.response_models import (
     ListProjectsResponse,
     ListReportTypesResponse,
     ListTableFormatTypesResponse,
-    SubmitProjectQueryResponse,
+    SparkSubmitProjectQueryResponse,
 )
 from dsgrid.query.models import (
     ReportType,
@@ -171,9 +172,12 @@ def test_list_table_format_types():
 
 
 def test_submit_project_query(setup_api_server):
-    data = load_data(Path(__file__).parent / "data" / "project_query.json")
-    async_task_id = SubmitProjectQueryResponse(
-        **check_response("/queries/projects", data=data).json()
+    query = SparkSubmitProjectQueryRequest(
+        use_spark_submit=False,
+        query=load_data(Path(__file__).parent / "data" / "project_query.json"),
+    )
+    async_task_id = SparkSubmitProjectQueryResponse(
+        **check_response("/queries/projects", data=json.loads(query.json())).json()
     ).async_task_id
     status = GetAsyncTaskResponse(
         **check_response(f"/async_tasks/status/{async_task_id}").json()

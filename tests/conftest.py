@@ -43,8 +43,10 @@ def pytest_sessionstart(session):
             f"-d {TEST_DATASET_DIRECTORY}"
         )
         if ret == 0:
+            print("make script returned 0")
             commit_file.write_text(latest_commit + "\n")
         elif TEST_REGISTRY.exists():
+            print("make script returned non-zero:", ret)
             # Delete it because it is invalid.
             shutil.rmtree(TEST_REGISTRY)
             sys.exit(1)

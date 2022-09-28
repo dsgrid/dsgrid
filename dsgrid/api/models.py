@@ -1,7 +1,10 @@
 import enum
 from datetime import datetime
 
+from pydantic import Field
+
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.query.models import ProjectQueryModel
 
 
 class AsyncTaskStatus(enum.Enum):
@@ -44,3 +47,17 @@ class StoreModel(DSGBaseModel):
     next_async_task_id: int = 1
     async_tasks: dict[int, AsyncTaskModel] = {}
     outstanding_async_tasks: set[int] = set()
+
+
+class SparkSubmitProjectQueryRequest(DSGBaseModel):
+
+    use_spark_submit: bool = Field(
+        default=True,
+        description="If True, run the query command through spark-submit. If False, run the "
+        "command directly in dsgrid.",
+    )
+    spark_submit_options: dict[str, str] = Field(
+        default={},
+        description="Options to forward to the spark-submit command (e.g., --master spark://hostname:7077",
+    )
+    query: ProjectQueryModel

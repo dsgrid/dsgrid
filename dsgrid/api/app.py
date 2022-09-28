@@ -1,6 +1,6 @@
 import os
-import tempfile
-import uuid
+import sys
+from tempfile import NamedTemporaryFile
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Query
@@ -12,23 +12,23 @@ from fastapi.responses import Response, FileResponse
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.config.dimensions import create_dimension_common_model
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGValueNotStored, DSGBaseException
+from dsgrid.exceptions import DSGValueNotStored
 from dsgrid.loggers import setup_logging
 from dsgrid.query.models import (
     ReportType,
     TableFormatType,
-    ProjectQueryModel,
 )
 
-from dsgrid.query.query_submitter import ProjectQuerySubmitter
 from dsgrid.registry.registry_manager import RegistryManager
 
+from dsgrid.utils.run_command import run_command
 from dsgrid.utils.spark import init_spark
 from .api_manager import ApiManager
 from .models import (
     AsyncTaskStatus,
     AsyncTaskType,
     ProjectQueryAsyncResultModel,
+    SparkSubmitProjectQueryRequest,
 )
 from .response_models import (
     GetAsyncTaskResponse,
@@ -46,13 +46,13 @@ from .response_models import (
     ListProjectsResponse,
     ListReportTypesResponse,
     ListTableFormatTypesResponse,
-    SubmitProjectQueryResponse,
+    SparkSubmitProjectQueryResponse,
 )
 
 
 logger = setup_logging(__name__, "dsgrid_api.log")
-PATH = os.environ.get("DSGRID_LOCAL_REGISTRY")
-if PATH is None:
+REGISTRY_PATH = os.environ.get("DSGRID_LOCAL_REGISTRY")
+if REGISTRY_PATH is None:
     raise Exception("The environment variable DSGRID_LOCAL_REGISTRY must be set.")
 QUERY_OUTPUT_DIR = os.environ.get("DSGRID_QUERY_OUTPUT_DIR")
 if QUERY_OUTPUT_DIR is None:
@@ -64,11 +64,13 @@ offline_mode = True
 no_prompts = True
 spark = init_spark("dsgrid_api")
 manager = RegistryManager.load(
-    PATH, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts
+    REGISTRY_PATH, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts
 )
 api_mgr = ApiManager(
     API_SERVER_STORE_DIR,
-    RegistryManager.load(PATH, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts),
+    RegistryManager.load(
+        REGISTRY_PATH, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts
+    ),
 )
 
 # Current limitations:
@@ -241,21 +243,20 @@ async def list_table_format_types():
     return ListTableFormatTypesResponse(types=_list_enums(TableFormatType))
 
 
-@app.post("/queries/projects", response_model=SubmitProjectQueryResponse)
-async def submit_project_query(query: ProjectQueryModel, background_tasks: BackgroundTasks):
+@app.post("/queries/projects", response_model=SparkSubmitProjectQueryResponse)
+async def submit_project_query(
+    query: SparkSubmitProjectQueryRequest, background_tasks: BackgroundTasks
+):
     """Submit a project query for execution."""
     if not api_mgr.can_start_new_async_task():
         # TODO: queue the task and run it later.
-        raise HTTPException("Too many async tasks are already running")
+        raise HTTPException(422, "Too many async tasks are already running")
     async_task_id = api_mgr.initialize_async_task(AsyncTaskType.PROJECT_QUERY)
-    project = api_mgr.get_project(query.project.project_id)
     # TODO: how to handle the output directory on the server?
     # TODO: force should not be True
     # TODO: how do we manage the number of background tasks?
-    background_tasks.add_task(_submit_project_query, project, query, async_task_id)
-    return SubmitProjectQueryResponse(
-        async_task_id=async_task_id,
-    )
+    background_tasks.add_task(_submit_project_query, query, async_task_id)
+    return SparkSubmitProjectQueryResponse(async_task_id=async_task_id)
 
 
 @app.get("/async_tasks/status", response_model=ListAsyncTasksResponse)
@@ -315,38 +316,59 @@ def download_async_task_archive_file(async_task_id: int):
     return FileResponse(task.result.archive_file)
 
 
-def _submit_project_query(project, query, async_task_id):
-    # This runs in a worker thread. We may want to create a new SparkSession to perform the
-    # query.
-    # Possibilities:
-    # - A second backend process runs queries.
-    # - Run the query in a dsgrid query CLI command with subprocess.Popen and avoid threading.
-    query_file = Path(tempfile.gettempdir()) / f"{uuid.uuid4()}.json"
-    query_file.write_text(query.json())
-    output_dir = Path(QUERY_OUTPUT_DIR)
-    ret = 0
-    try:
-        ProjectQuerySubmitter(project, output_dir).submit(query, zip=True, force=True)
-        logger.info("Query is complete")
-        data_dir = output_dir / query.name / "table.parquet"
-        zip_filename = str(output_dir / query.name) + ".zip"
-        result = ProjectQueryAsyncResultModel(
-            # metadata=load_data(output_dir / query.name / "metadata.json"),
-            data_file=str(data_dir),
-            archive_file=str(zip_filename),
-            archive_file_size_mb=os.stat(zip_filename).st_size / 1_000_000,
+def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_task_id):
+    with NamedTemporaryFile(mode="w", suffix=".json") as fp:
+        query = spark_query.query
+        fp.write(query.json())
+        fp.write("\n")
+        fp.flush()
+        output_dir = Path(QUERY_OUTPUT_DIR)
+        dsgrid_exec = "dsgrid-cli.py"
+        base_cmd = (
+            f"query project run --offline "
+            f"--registry-path={REGISTRY_PATH} {fp.name} "
+            f"--output={output_dir} --zip --force"
         )
-    except DSGBaseException:
-        logger.exception("Failed to submit a project query.")
-        ret = 1
-        result = ProjectQueryAsyncResultModel(
-            # metadata={},
-            data_file="",
-            archive_file="",
-            archive_file_size_mb=0,
-        )
+        if spark_query.use_spark_submit:
+            # Need to find the full path to pass to spark-submit.
+            dsgrid_exec = _find_exec(dsgrid_exec)
+            spark_cmd = "spark-submit"
+            if spark_query.spark_submit_options:
+                spark_cmd += " " + " ".join(
+                    (f"{k} {v}" for k, v in spark_query.spark_submit_options.items())
+                )
+            cmd = f"{spark_cmd} {dsgrid_exec} {base_cmd}"
+        else:
+            cmd = f"{dsgrid_exec} {base_cmd}"
+        logger.info(f"Submitting project query command: {cmd}")
+        ret = run_command(cmd)
+        if ret == 0:
+            data_dir = output_dir / query.name / "table.parquet"
+            zip_filename = str(output_dir / query.name) + ".zip"
+            result = ProjectQueryAsyncResultModel(
+                # metadata=load_data(output_dir / query.name / "metadata.json"),
+                data_file=str(data_dir),
+                archive_file=str(zip_filename),
+                archive_file_size_mb=os.stat(zip_filename).st_size / 1_000_000,
+            )
+        else:
+            logger.error("Failed to submit a project query: return_code=%s", ret)
+            result = ProjectQueryAsyncResultModel(
+                # metadata={},
+                data_file="",
+                archive_file="",
+                archive_file_size_mb=0,
+            )
 
     api_mgr.complete_async_task(async_task_id, ret, result=result)
+
+
+def _find_exec(name):
+    for path in sys.path:
+        exec_path = Path(path) / name
+        if exec_path.exists():
+            return exec_path
+    raise Exception(f"Did not find {name}")
 
 
 def _list_enums(enum_type):

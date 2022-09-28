@@ -29,11 +29,17 @@ def init_spark(name="dsgrid"):
         conf = SparkConf().setAppName(name).setMaster(cluster)
         spark = SparkSession.builder.config(conf=conf).getOrCreate()
     else:
-        logger.info("Create SparkSession %s in local-mode cluster", name)
-        spark = SparkSession.builder.master("local").appName(name).getOrCreate()
+        spark = SparkSession.builder.appName(name).getOrCreate()
 
-    logger.info("Spark conf: %s", str(spark.sparkContext.getConf().getAll()))
+    log_spark_conf(spark)
     return spark
+
+
+def log_spark_conf(spark: SparkSession):
+    """Log the Spark configuration details."""
+    conf = spark.sparkContext.getConf().getAll()
+    conf.sort(key=lambda x: x[0])
+    logger.info("Spark conf: %s", "\n".join([f"{x} = {y}" for x, y in conf]))
 
 
 @track_timing(timer_stats_collector)
@@ -399,6 +405,5 @@ def _get_spark_session():
     if spark is None:
         logger.warning("Could not find a SparkSession. Create a new one.")
         spark = SparkSession.builder.getOrCreate()
-        # TODO: confirm that these settings are the same as the original on a real cluster.
-        logger.info("New settings: %s", spark.sparkContext.getConf().getAll())
+        log_spark_conf(spark)
     return spark

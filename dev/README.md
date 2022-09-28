@@ -317,11 +317,9 @@ Monitor cluster tasks in your browser.
 
 ## Use existing Spark cluster
 
-If you set the environment variable `SPARK_CLUSTER` to a cluster's address then dsgrid will attach
-to it rather than run create a new driver and run from it.
-
+Start `spark-submit` or `pyspark` with the master assigned to the cluster URL.
 ```
-$ export SPARK_CLUSTER=spark://<hostname>:<port>
+$ pyspark --master spark://hostname:7077
 ```
 
 ## Running a Spark cluster on Eagle
@@ -417,26 +415,26 @@ cancel them. Run `jade cancel-jobs <output-dir>`.
 ### Executing scripts
 There are two basic ways to submit scripts to a Spark cluster.
 
-1. Connect to a SparkSession from within Python. Here is an example. Refer to the Spark
-documentation for other options.
+1. [RECOMMENDED] Submit your script with `spark-submit` or start an interactive session with `pyspark` and run code.
+Those will create the SparkSession automatically based on the CLI inputs. Refer to its help. You can
+customize any part of the configuration.
 
-Be sure to set the executor memory to an appropriate value for your application.
+2. Connect to a SparkSession from within Python. Here is an example. Refer to the Spark
+documentation for other options. Note that you cannot affect some settings from within Python.
+`spark.driver.memory` and `spark.executor.instances` are two examples. Those have to be set
+before the Spark JVM is started. Those can only be modified through `pyspark` or `spark-submit`.
 
 ```
     from pyspark.sql import SparkSession
     from pyspark import SparkConf, SparkContext
     conf = SparkConf().setAppName("my_app") \
-        .setMaster("spark://<node_name>:7077") \
-	.set("spark.executor.memory", "20G")
+        .setMaster("spark://<node_name>:7077")
     sc = SparkContext(conf=conf)
     spark = (
             SparkSession.builder.config(conf=conf)
             .getOrCreate()
         )
 ```
-
-2. Submit your script with `pyspark`. It will create the SparkSession automatically based on the
-CLI inputs. Refer to its help.
 
 ## dsgrid container
 
@@ -525,6 +523,25 @@ $ dsgrid query project run \
     --offline \
     --registry-path=./dsgrid-test-data/filtered_registries/simple_standard_scenarios \
     query.json
+```
+
+If you need to customize the Spark configuration then you will want to run the command through `spark-submit`.
+This is a bit more complicated because that tool needs to be able to locate the Python script (`dsgrid` in this case)
+and detect that it is a Python script.
+
+1. Find the location of your `dsgrid` command.
+```
+$ which dsgrid
+/Users/dthom/miniconda3/envs/dsgrid/bin/dsgrid
+```
+
+2. Substitute `dsgrid-cli.py` for the usual `dsgrid`. This allows `spark-submit` to detect that it is Python.
+(If you know of something more clever and less irritating, please share it with us.)
+
+```
+$ spark-submit --master spark://hostname:7077 \
+    --conf spark.sql.shuffle.partitions=500 \
+    /Users/dthom/miniconda3/envs/dsgrid/bin/dsgrid
 ```
 
 ### Programmatic queries

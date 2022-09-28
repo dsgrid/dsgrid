@@ -1,16 +1,18 @@
 """Provides access to a dataset."""
 
+import abc
 import logging
 
 from pyspark.sql import SparkSession
 
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
+from dsgrid.query.query_context import QueryContext
 
 logger = logging.getLogger(__name__)
 
 
-class Dataset:
-    """Contains metadata and data for a sector."""
+class DatasetBase(abc.ABC):
+    """Base class for datasets"""
 
     VIEW_NAMES = ("load_data_lookup", "load_data")
 
@@ -25,28 +27,8 @@ class Dataset:
     def dataset_id(self):
         return self._id
 
-    @classmethod
-    def load(cls, config, dimension_mgr, dimension_mapping_mgr, mapping_references=None):
-        """Load a dataset from a store.
-
-        Parameters
-        ----------
-        config : DatasetConfig
-        dimension_mgr : DimensionRegistryManager
-        dimension_mapping_mgr : DimensionMappingRegistryManager
-        mapping_references: None | List[DimensionMappingReferenceListModel]
-            This is required when loading a dataset for use in a project.
-
-        Returns
-        -------
-        Dataset
-
-        """
-        return cls(
-            make_dataset_schema_handler(
-                config, dimension_mgr, dimension_mapping_mgr, mapping_references=mapping_references
-            )
-        )
+    def get_dataframe(self, query: QueryContext, project_config):
+        return self._handler.get_dataframe(query, project_config)
 
     def _make_view_name(self, name):
         return f"{self._id}__{name}"
@@ -57,6 +39,7 @@ class Dataset:
     def create_views(self):
         """Create views for each of the tables in this dataset."""
         # TODO: should we create these in a separate database?
+        # TODO: views should be created by the dataset handler
         self.load_data_lookup.createOrReplaceTempView(self._make_view_name("load_data_lookup"))
         self.load_data.createOrReplaceTempView(self._make_view_name("load_data"))
 
@@ -77,44 +60,55 @@ class Dataset:
     def load_data_lookup(self):
         return self._handler._load_data_lookup
 
-    # TODO: this is likely throwaway code
 
-    # def compute_sum_by_sector_id(self):
-    #    """Compute the sum for each sector.
+class Dataset(DatasetBase):
+    """Represents a dataset used within a project."""
 
-    #    Returns
-    #    -------
-    #    pyspark.sql.dataframe.DataFrame
+    @classmethod
+    def load(
+        cls, config, dimension_mgr, dimension_mapping_mgr, mapping_references, project_time_dim
+    ):
+        """Load a dataset from a store.
 
-    #    """
-    #    sums = self._load_data.groupby("id") \
-    #        .sum() \
-    #        .drop("sum(id)") \
-    #        .withColumnRenamed("id", "data_id")
-    #    expr = [F.col(x) * F.col("scale_factor") for x in sums.columns]
-    #    expr += ["id", "sector_id"]
-    #    return self._load_data_lookup.join(sums, "data_id").select(expr)
+        Parameters
+        ----------
+        config : DatasetConfig
+        dimension_mgr : DimensionRegistryManager
+        dimension_mapping_mgr : DimensionMappingRegistryManager
+        mapping_references: List[DimensionMappingReferenceListModel]
+        project_time_dim: TimeDimensionBaseConfig
 
-    # def aggregate_sector_sums_by_dimension(self, from_dimension, to_dimension):
-    #    """Aggregate the sums for each sector for a dimension.
+        Returns
+        -------
+        Dataset
 
-    #    Parameters
-    #    ----------
-    #    from_dimension : class
-    #    to_dimension : class
+        """
+        return cls(
+            make_dataset_schema_handler(
+                config,
+                dimension_mgr,
+                dimension_mapping_mgr,
+                mapping_references=mapping_references,
+                project_time_dim=project_time_dim,
+            )
+        )
 
-    #    Returns
-    #    -------
-    #    pyspark.sql.dataframe.DataFrame
 
-    #    Examples
-    #    --------
-    #    >>> df = dataset.aggregate_sum_by_dimension(County, State)
+class StandaloneDataset(DatasetBase):
+    """Represents a dataset used outside of a project."""
 
-    #    """
-    #    #self_store.get_scale_factor(from_dimension, to_dimension)
-    #    from_df = self._store.get_dataframe(from_dimension)
-    #    data_by_sector_id = self.compute_sum_by_sector_id()
-    #    key = self._store.get_dimension_mapping_key(from_dimension, to_dimension)
-    #    df = data_by_sector_id.join(from_df.select("id", key), "id")
-    #    return df.groupby("sector_id", key).sum()
+    @classmethod
+    def load(cls, config, dimension_mgr):
+        """Load a dataset from a store.
+
+        Parameters
+        ----------
+        config : DatasetConfig
+        dimension_mgr : DimensionRegistryManager
+
+        Returns
+        -------
+        Dataset
+
+        """
+        return cls(make_dataset_schema_handler(config, dimension_mgr, None))

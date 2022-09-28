@@ -46,7 +46,7 @@ class DimensionBaseModel(DSGBaseModel):
     )
     display_name: str = Field(
         title="display_name",
-        description="Display name. Source for auto-generated query_name.",
+        description="Display name. Source for auto-generated dimension_query_name.",
         note="Dimension display names should be singular noun phrases that are concise and "
         "distinguish the dimension across all dimensions within a project, inclusive of dataset "
         "dimensions, project base dimensions, and project supplemental dimensions. This uniqueness "
@@ -61,8 +61,8 @@ class DimensionBaseModel(DSGBaseModel):
             "enforce valid dimension display names.",
         ),
     )
-    query_name: Optional[str] = Field(
-        title="query_name",
+    dimension_query_name: Optional[str] = Field(
+        title="dimension_query_name",
         description="Auto-generated query name for SQL queries.",
     )
     dimension_type: DimensionType = Field(
@@ -158,15 +158,17 @@ class DimensionBaseModel(DSGBaseModel):
             raise ValueError(f"display_name={display_name} does not meet the requirements")
         return display_name
 
-    @validator("query_name")
-    def check_query_name(cls, query_name, values):
+    @validator("dimension_query_name")
+    def check_query_name(cls, dimension_query_name, values):
         if "display_name" not in values:
-            return query_name
+            return dimension_query_name
 
         generated_query_name = values["display_name"].lower().replace(" ", "_").replace("-", "_")
 
-        if query_name is not None and query_name != generated_query_name:
-            raise ValueError(f"query_name cannot be set by the user: {query_name}")
+        if dimension_query_name is not None and dimension_query_name != generated_query_name:
+            raise ValueError(
+                f"dimension_query_name cannot be set by the user: {dimension_query_name}"
+            )
 
         return generated_query_name
 

@@ -15,6 +15,7 @@ from dsgrid.common import (
     LOCAL_REGISTRY,
     REMOTE_REGISTRY,
     SYNC_EXCLUDE_LIST,
+    on_hpc,
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
 from dsgrid.config.mapping_tables import MappingTableConfig
@@ -175,7 +176,7 @@ class RegistryManager:
         fs_interface = make_filesystem_interface(path)
 
         if use_remote_data is None:
-            use_remote_data = _should_use_remote_data()
+            use_remote_data = _should_use_remote_data(remote_path)
 
         cloud_interface = make_cloud_storage_interface(
             path, remote_path, offline=offline_mode, uuid=uid, user=user
@@ -598,17 +599,19 @@ def get_registry_class(registry_type):
     return _REGISTRY_TYPE_TO_CLASS[registry_type]
 
 
-def _should_use_remote_data():
+def _should_use_remote_data(remote_path):
+    if not str(remote_path).lower().startswith("s3"):
+        # We are on a local filesystem. Use the remote path.
+        return True
+
     use_remote_data = False
-    if sys.platform in ("darwin", "win32"):
+    if "DSGRID_USE_LOCAL_DATA" in os.environ:
+        pass
+    elif sys.platform in ("darwin", "win32"):
         # Local systems need to sync all load data files.
         pass
-    elif "DSGRID_USE_LOCAL_DATA" in os.environ:
+    elif on_hpc():
         pass
-    elif "NREL_CLUSTER" in os.environ:
-        # All Eagle compute nodes have access to the shared load data files.
-        logger.info("Use remote data on NREL_CLUSTER %s", os.environ["NREL_CLUSTER"])
-        use_remote_data = True
     elif "GITHUB_ACTION" in os.environ:
         logger.info("Do not use remote data on GitHub CI")
     else:

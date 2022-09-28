@@ -1,6 +1,7 @@
 """Spark helper functions"""
 
 import logging
+import math
 import os
 import shutil
 from pathlib import Path
@@ -12,7 +13,7 @@ from pyspark.sql import Row, SparkSession
 from pyspark.sql.types import StructType, StringType
 from pyspark import SparkConf
 
-from dsgrid.exceptions import DSGInvalidField
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 
@@ -58,6 +59,11 @@ def create_dataframe(records, cache=False, require_unique=None):
     return df
 
 
+def create_dataframe_from_pandas(df):
+    """Create a spark DataFrame from a pandas DataFrame."""
+    return SparkSession.getActiveSession().createDataFrame(df)
+
+
 @track_timing(timer_stats_collector)
 def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=True):
     """Create a spark DataFrame from a file.
@@ -100,6 +106,8 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
 
 
 def _read_with_spark(filename):
+    if not os.path.exists(filename):
+        raise FileNotFoundError(f"{filename} does not exist")
     spark = SparkSession.getActiveSession()
     suffix = Path(filename).suffix
     if suffix == ".csv":
@@ -262,19 +270,96 @@ def check_for_nulls(df, exclude_columns=None):
 
 
 def overwrite_dataframe_file(filename, df):
+    """Perform an in-place overwrite of a Spark DataFrame, accounting for different file types
+    and symlinks.
+
+    Do not attempt to access the original dataframe unless it was fully cached.
+
+    Parameters
+    ----------
+    filename : str
+    df : pyspark.sql.DataFrame
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    """
+    spark = SparkSession.getActiveSession()
     suffix = Path(filename).suffix
     tmp = str(filename) + ".tmp"
     if suffix == ".parquet":
         df.write.parquet(tmp)
+        read_method = spark.read.parquet
+        kwargs = {}
     elif suffix == ".csv":
-        df.write.csv(tmp, header=True)
+        df.write.csv(str(tmp), header=True)
+        read_method = spark.read.csv
+        kwargs = {"header": True, "inferSchema": True}
     elif suffix == ".json":
-        df.write.json(tmp)
+        df.write.json(str(tmp))
+        read_method = spark.read.json
+        kwargs = {}
     if os.path.isfile(filename) or os.path.islink(filename):
         os.unlink(filename)
     else:
         shutil.rmtree(filename)
     os.rename(tmp, str(filename))
+    return read_method(str(filename), **kwargs)
+
+
+def write_dataframe_and_auto_partition(df, filename, partition_size_mb=128, columns=None):
+    """Write a dataframe to a file and then automatically coalesce or repartition it if needed.
+    If the file already exists, it will be overwritten.
+
+    Only Parquet files are supported.
+
+    Parameters
+    ----------
+    df : pyspark.sql.DataFrame
+    filename : Path
+    partition_size_mb : int
+        Target size in MB for each partition
+    columns : None, list
+        If not None and repartitioning is needed, partition on these columns.
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    Raises
+    ------
+    DSGInvalidParameter
+        Raised if a non-Parquet file is passed
+
+    """
+    if filename.suffix != ".parquet":
+        raise DSGInvalidParameter(f"Only parquet files are supported: {filename}")
+    spark = SparkSession.getActiveSession()
+    if filename.exists():
+        df = overwrite_dataframe_file(filename, df)
+    else:
+        df.write.parquet(str(filename))
+        df = spark.read.parquet(str(filename))
+    partition_size_bytes = partition_size_mb * 1024 * 1024
+    total_size = sum((x.stat().st_size for x in filename.glob("*.parquet")))
+    desired = math.ceil(total_size / partition_size_bytes)
+    actual = df.rdd.getNumPartitions()
+    if actual > desired:
+        df = df.coalesce(desired)
+        df = overwrite_dataframe_file(filename, df)
+        logger.info("Coalesced %s to partition count %s", filename, desired)
+    elif actual < desired:
+        if columns is None:
+            df = df.repartition(desired)
+        else:
+            df = df.repartition(desired, *columns)
+        df = overwrite_dataframe_file(filename, df)
+        logger.info("Repartitioned %s to partition count", filename, desired)
+    else:
+        logger.info("No change in number of partitions is needed for %s.", filename)
+
+    return df
 
 
 def sql(query):

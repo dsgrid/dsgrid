@@ -24,7 +24,7 @@ FILTER_CONFIG = {
                 "base_dimensions": [{"dimension_type": "geography", "record_ids": [COUNTY_ID]}],
                 "supplemental_dimensions": [
                     {
-                        "query_name": QUERY_NAME,
+                        "dimension_query_name": QUERY_NAME,
                         "dimension_type": "geography",
                         "record_ids": [STATE_ID],
                     }
@@ -68,7 +68,7 @@ def test_filter_registry():
 
         found_mapping_records = False
         for dim in project.config.get_supplemental_dimensions(DimensionType.GEOGRAPHY):
-            if dim.model.query_name == QUERY_NAME:
+            if dim.model.dimension_query_name == QUERY_NAME:
                 for mapping in project.config.get_base_to_supplemental_dimension_mappings_by_types(
                     DimensionType.GEOGRAPHY
                 ):

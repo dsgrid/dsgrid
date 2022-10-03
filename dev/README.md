@@ -596,7 +596,7 @@ $ curl -s http://127.0.0.1:8000/projects/dsgrid_conus_2022/dimensions/dimension_
 ### API documentation
 FastAPI generates API documentation at these links:
 - http://127.0.0.1:8000/docs (with Swagger)
-- http://127.0.0.1:8000/docs (with Redocly)
+- http://127.0.0.1:8000/redoc (with Redocly)
 
 
 ## Publish Documentation

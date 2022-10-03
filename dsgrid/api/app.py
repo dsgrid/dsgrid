@@ -140,6 +140,7 @@ async def get_project_base_dimension_query_name(project_id: str, dimension_type:
     mgr = manager.project_manager
     config = mgr.get_by_id(project_id)
     return GetProjectBaseDimensionQueryNameResponse(
+        dimension_type=dimension_type,
         dimension_query_name=config.get_base_dimension(dimension_type).model.dimension_query_name,
     )
 
@@ -155,12 +156,13 @@ async def list_project_supplemental_dimension_query_names(
     mgr = manager.project_manager
     config = mgr.get_by_id(project_id)
     return ListProjectSupplementalDimensionQueryNames(
-        dimension_query_names=sorted(
-            (
-                x.model.dimension_query_name
-                for x in config.get_supplemental_dimensions(dimension_type)
+        dimension_type=dimension_type,
+        dimension_query_names=[
+            x.model.dimension_query_name
+            for x in config.list_supplemental_dimensions(
+                dimension_type, sort_by="dimension_query_name"
             )
-        ),
+        ],
     )
 
 

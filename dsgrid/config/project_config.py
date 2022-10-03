@@ -418,19 +418,24 @@ class ProjectConfig(ConfigWithDataFilesBase):
         """
         return self.get_dimension(dimension_query_name).get_records_dataframe()
 
-    def get_supplemental_dimensions(self, dimension_type: DimensionType):
+    def list_supplemental_dimensions(self, dimension_type: DimensionType, sort_by=None):
         """Return the supplemental dimensions matching dimension (if any).
 
         Parameters
         ----------
         dimension_type : DimensionType
+        sort_by : str | None
+            If set, sort the dimensions by this dimension attribute.
 
         Returns
         -------
         List[DimensionConfig]
 
         """
-        return [v for k, v in self.supplemental_dimensions.items() if k.type == dimension_type]
+        dims = [v for k, v in self.supplemental_dimensions.items() if k.type == dimension_type]
+        if sort_by is not None:
+            dims.sort(key=lambda x: getattr(x.model, sort_by))
+        return dims
 
     def get_base_to_supplemental_dimension_mappings_by_types(self, dimension_type: DimensionType):
         """Return the base-to-supplemental dimension mappings for the dimension (if any).
@@ -536,12 +541,12 @@ class ProjectConfig(ConfigWithDataFilesBase):
         """
         query_names = {}
         for dimension_type in DimensionType:
-            query_names[dimension_type] = sorted(
-                (
-                    x.model.dimension_query_name
-                    for x in self.get_supplemental_dimensions(dimension_type)
+            query_names[dimension_type] = [
+                x.model.dimension_query_name
+                for x in self.list_supplemental_dimensions(
+                    dimension_type, sort_by="dimension_query_name"
                 )
-            )
+            ]
         return query_names
 
     def get_dimension_query_names_model(self):

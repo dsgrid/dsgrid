@@ -22,7 +22,7 @@ def test_project_load():
     config = project.config
     dim = config.get_base_dimension(DimensionType.GEOGRAPHY)
     assert dim.model.dimension_type == DimensionType.GEOGRAPHY
-    supp_dims = config.get_supplemental_dimensions(DimensionType.GEOGRAPHY)
+    supp_dims = config.list_supplemental_dimensions(DimensionType.GEOGRAPHY)
     assert len(supp_dims) == 3
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.GEOGRAPHY)
     mappings = config.get_base_to_supplemental_dimension_mappings_by_types(DimensionType.GEOGRAPHY)

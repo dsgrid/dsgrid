@@ -54,7 +54,7 @@ class FilterRegistryManager(RegistryManager):
                 handle_dimension(simple_dim, dim)
 
             for simple_dim in project.dimensions.supplemental_dimensions:
-                for dim in project_config.get_supplemental_dimensions(simple_dim.dimension_type):
+                for dim in project_config.list_supplemental_dimensions(simple_dim.dimension_type):
                     if dim.model.dimension_query_name == simple_dim.dimension_query_name:
                         handle_dimension(simple_dim, dim)
 

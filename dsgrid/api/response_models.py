@@ -43,12 +43,14 @@ class GetProjectDimensionQueryNamesResponse(DSGBaseModel):
 class GetProjectBaseDimensionQueryNameResponse(DSGBaseModel):
     """Defines the reponse to the get_project_dimension_query_name command."""
 
+    dimension_type: DimensionType
     dimension_query_name: str
 
 
 class ListProjectSupplementalDimensionQueryNames(DSGBaseModel):
     """Defines the response to the list_project_supplemental_dimension_query_names command"""
 
+    dimension_type: DimensionType
     dimension_query_names: list[str]
 
 

@@ -29,11 +29,17 @@ def init_spark(name="dsgrid"):
         conf = SparkConf().setAppName(name).setMaster(cluster)
         spark = SparkSession.builder.config(conf=conf).getOrCreate()
     else:
-        logger.info("Create SparkSession %s in local-mode cluster", name)
-        spark = SparkSession.builder.master("local").appName(name).getOrCreate()
+        spark = SparkSession.builder.appName(name).getOrCreate()
 
-    logger.info("Spark conf: %s", str(spark.sparkContext.getConf().getAll()))
+    log_spark_conf(spark)
     return spark
+
+
+def log_spark_conf(spark: SparkSession):
+    """Log the Spark configuration details."""
+    conf = spark.sparkContext.getConf().getAll()
+    conf.sort(key=lambda x: x[0])
+    logger.info("Spark conf: %s", "\n".join([f"{x} = {y}" for x, y in conf]))
 
 
 @track_timing(timer_stats_collector)
@@ -54,14 +60,14 @@ def create_dataframe(records, cache=False, require_unique=None):
     spark.sql.DataFrame
 
     """
-    df = SparkSession.getActiveSession().createDataFrame(records)
+    df = _get_spark_session().createDataFrame(records)
     _post_process_dataframe(df, cache=cache, require_unique=require_unique)
     return df
 
 
 def create_dataframe_from_pandas(df):
     """Create a spark DataFrame from a pandas DataFrame."""
-    return SparkSession.getActiveSession().createDataFrame(df)
+    return _get_spark_session().createDataFrame(df)
 
 
 @track_timing(timer_stats_collector)
@@ -108,7 +114,7 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
 def _read_with_spark(filename):
     if not os.path.exists(filename):
         raise FileNotFoundError(f"{filename} does not exist")
-    spark = SparkSession.getActiveSession()
+    spark = _get_spark_session()
     suffix = Path(filename).suffix
     if suffix == ".csv":
         df = spark.read.csv(filename, inferSchema=True, header=True)
@@ -134,7 +140,7 @@ def _read_natively(filename):
         obj = load_data(filename)
     else:
         assert False, f"Unsupported file extension: {filename}"
-    return SparkSession.getActiveSession().createDataFrame(obj)
+    return _get_spark_session().createDataFrame(obj)
 
 
 def _post_process_dataframe(df, cache=False, require_unique=None):
@@ -198,7 +204,7 @@ def models_to_dataframe(models, cache=False):
             dct[f] = val
         rows.append(Row(**dct))
 
-    df = SparkSession.getActiveSession().createDataFrame(rows)
+    df = _get_spark_session().createDataFrame(rows)
 
     if cache:
         df.cache()
@@ -224,7 +230,7 @@ def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True):
     schema = StructType()
     for dimension_type in dimension_types:
         schema.add(dimension_type.value, StringType(), nullable=False)
-    df = SparkSession.getActiveSession().createDataFrame(records, schema=schema)
+    df = _get_spark_session().createDataFrame(records, schema=schema)
     if cache:
         df.cache()
     return df
@@ -285,7 +291,7 @@ def overwrite_dataframe_file(filename, df):
     pyspark.sql.DataFrame
 
     """
-    spark = SparkSession.getActiveSession()
+    spark = _get_spark_session()
     suffix = Path(filename).suffix
     tmp = str(filename) + ".tmp"
     if suffix == ".parquet":
@@ -335,7 +341,7 @@ def write_dataframe_and_auto_partition(df, filename, partition_size_mb=128, colu
     """
     if filename.suffix != ".parquet":
         raise DSGInvalidParameter(f"Only parquet files are supported: {filename}")
-    spark = SparkSession.getActiveSession()
+    spark = _get_spark_session()
     if filename.exists():
         df = overwrite_dataframe_file(filename, df)
     else:
@@ -375,7 +381,7 @@ def sql(query):
 
     """
     logger.debug("Run SQL query [%s]", query)
-    return SparkSession.getActiveSession().sql(query)
+    return _get_spark_session().sql(query)
 
 
 def sql_from_sqlalchemy(query):
@@ -392,3 +398,12 @@ def sql_from_sqlalchemy(query):
     """
     logger.debug("sqlchemy query = %s", query)
     return sql(str(query).replace('"', ""))
+
+
+def _get_spark_session():
+    spark = SparkSession.getActiveSession()
+    if spark is None:
+        logger.warning("Could not find a SparkSession. Create a new one.")
+        spark = SparkSession.builder.getOrCreate()
+        log_spark_conf(spark)
+    return spark

@@ -33,6 +33,7 @@ from dsgrid.query.models import (
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.run_command import check_run_command
 
 
@@ -214,12 +215,11 @@ def get_project():
     global _project
     if _project is not None:
         return _project
-    _project = Project.load(
-        "dsgrid_conus_2022",
+    mgr = RegistryManager.load(
+        REGISTRY_PATH,
         offline_mode=True,
-        registry_path=REGISTRY_PATH,
     )
-    return _project
+    return mgr.project_manager.load_project("dsgrid_conus_2022")
 
 
 def run_query_test(test_query_cls, *args):
@@ -1152,11 +1152,11 @@ def run_composite_dataset(
     setup_logging(
         "dsgrid", "query.log", console_level=logging.INFO, file_level=logging.INFO, mode="w"
     )
-    project = Project.load(
-        "dsgrid_conus_2022",
+    mgr = RegistryManager.load(
         offline_mode=True,
         registry_path=registry_path,
     )
+    project = mgr.project_manager.load_project("dsgrid_conus_2022")
     query = QueryTestElectricityValuesCompositeDataset(
         registry_path, project, output_dir=output_dir
     )

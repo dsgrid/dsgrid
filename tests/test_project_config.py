@@ -1,8 +1,9 @@
 import pytest
 
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
-from dsgrid.config.project_config import ProjectConfigModel
+from dsgrid.config.project_config import ProjectConfigModel, ProjectDimensionQueryNamesModel
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import TEST_REGISTRY
 from tests.data.dimension_models.minimal.models import PROJECT_CONFIG_FILE
@@ -60,3 +61,9 @@ def test_project_duplicate_type(config_as_dict, dimension_manager):
 
     with pytest.raises(ValueError):
         ProjectConfigModel(**config_as_dict)
+
+
+def test_project_dimension_query_names_model():
+    assert not {x.value for x in DimensionType}.difference(
+        ProjectDimensionQueryNamesModel.__fields__
+    )

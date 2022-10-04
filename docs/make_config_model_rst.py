@@ -4,7 +4,6 @@ import os
 from pathlib import Path
 
 import click
-from semver import VersionInfo
 
 from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.config.dimension_mapping_base import (
@@ -47,23 +46,6 @@ def get_class_path(cls_name):
                         return mod.__name__
         except Exception:
             pass
-
-
-@classmethod
-def modify_schema(cls, field_schema):
-    field_schema.update(
-        # This is a simplified regex with no prerelease or build.
-        # Refer to semver.VersionInfo if a full one is needed.
-        pattern=r"^\d+\.\d+\.\d+$",
-        examples=["1.0.0"],
-    )
-
-
-# Hack
-# This is required to allow Pydantic.BaseModel.schema() to work with models
-# that contain VersionInfo.  Choosing to do it here for documentation rather
-# than in the main code which could affect normal operation.
-VersionInfo.__modify_schema__ = modify_schema
 
 
 def _get_output(_, __, value):

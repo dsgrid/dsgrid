@@ -51,6 +51,9 @@ setup(
     entry_points={
         "console_scripts": [
             "dsgrid=dsgrid.cli.dsgrid:cli",
+            # This exists because spark-submit does not recognize the above 'dsgrid' as a Python
+            # application.
+            "dsgrid-cli.py=dsgrid.cli.dsgrid:cli",
             "dsgrid-admin=dsgrid.cli.dsgrid_admin:cli",
         ],
     },
@@ -63,24 +66,25 @@ setup(
         "Intended Audience :: Modelers",
         "License :: OSI Approved :: BSD License",
         "Natural Language :: English",
-        "Programming Language :: Python :: 3.8",
+        "Programming Language :: Python :: 3.10",
     ],
     test_suite="tests",
     install_requires=[
         "awscli",
         "boto3",
         "click>=8",
+        "fastapi",
         "numpy",
         "pandas",
         "prettytable",
         "pydantic",
-        "pyspark==3.2.2",  # Keep this synced with the spark version in Dockerfile.
+        "pyspark==3.3",  # Keep this synced with the spark version in Dockerfile.
         "requests",
         "s3path",
         "semver",
         "sqlalchemy",
         "toml",
-        "flake8",
+        "uvicorn",
     ],
     extras_require={
         "test": test_requires,

@@ -37,6 +37,7 @@ from dsgrid.config.mapping_tables import (
     DatasetBaseToProjectMappingTableListModel,
 )
 from dsgrid.config.project_config import ProjectConfig
+from dsgrid.project import Project
 from dsgrid.registry.common import (
     make_initial_config_registration,
     ConfigKey,
@@ -154,6 +155,36 @@ class ProjectRegistryManager(RegistryManagerBase):
         )
         self._projects[key] = project
         return project
+
+    def load_project(self, project_id: str, version=None) -> Project:
+        """Load a project from the registry.
+
+        Parameters
+        ----------
+        project_id : str
+        version : VersionInfo
+
+        Returns
+        -------
+        Project
+        """
+        dataset_manager = self._dataset_mgr
+        config = self.get_by_id(project_id, version=version)
+        if version is None:
+            version = self.get_current_version(project_id)
+
+        dataset_configs = {}
+        for dataset_id in config.list_registered_dataset_ids():
+            dataset_config = dataset_manager.get_by_id(dataset_id)
+            dataset_configs[dataset_id] = dataset_config
+
+        return Project(
+            config,
+            version,
+            dataset_configs,
+            self._dimension_mgr,
+            self._dimension_mapping_mgr,
+        )
 
     def acquire_registry_locks(self, config_ids: List[str]):
         for project_id in config_ids:
@@ -617,7 +648,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         from_dimension_type=mapping_config.model.from_dimension.dimension_type,
                         to_dimension_type=mapping_config.model.to_dimension.dimension_type,
                         mapping_id=mapping_id,
-                        version=self._dimension_mapping_mgr.get_current_version(mapping_id),
+                        version=str(self._dimension_mapping_mgr.get_current_version(mapping_id)),
                     )
                 )
         elif dimension_mapping_references_file is not None:

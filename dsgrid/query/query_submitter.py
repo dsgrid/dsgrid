@@ -2,6 +2,7 @@ import abc
 import logging
 import shutil
 from pathlib import Path
+from zipfile import ZipFile
 
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.exceptions import DSGInvalidParameter
@@ -100,6 +101,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         model,
         load_cached_table,
         persist_intermediate_table,
+        zip=False,
         force=False,
     ):
         context = QueryContext(model)
@@ -145,7 +147,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             df = df.sort(*context.model.result.sort_columns)
 
         repartition = not persist_intermediate_table
-        table_filename = self._save_query_results(context, df, repartition)
+        table_filename = self._save_query_results(context, df, repartition, zip=zip)
 
         for report in context.model.result.reports:
             output_dir = self._output_dir / context.model.name
@@ -163,7 +165,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         return df
 
     @track_timing(timer_stats_collector)
-    def _save_query_results(self, context: QueryContext, df, repartition, aggregation_name=None):
+    def _save_query_results(
+        self, context: QueryContext, df, repartition, aggregation_name=None, zip=False
+    ):
         output_dir = self._output_dir / context.model.name
         output_dir.mkdir(exist_ok=True)
         if aggregation_name is not None:
@@ -171,6 +175,11 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             output_dir.mkdir(exist_ok=True)
         filename = output_dir / f"table.{context.model.result.output_format}"
         self._save_result(context, df, filename, repartition)
+        if zip:
+            zip_name = Path(str(output_dir) + ".zip")
+            with ZipFile(zip_name, "w") as zipf:
+                for path in output_dir.rglob("*"):
+                    zipf.write(path)
         return filename
 
     def _save_result(self, context, df, filename, repartition):
@@ -200,6 +209,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         model: ProjectQueryModel,
         persist_intermediate_table=True,
         load_cached_table=True,
+        zip=False,
         force=False,
     ):
         """Submits a project query to consolidate datasets and produce result tables.
@@ -211,6 +221,8 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
             Persist the intermediate consolidated table.
         load_cached_table : bool, optional
             Load a cached consolidated table if the query matches an existing query.
+        zip : bool, optional
+            Create a zip file with all output files.
         force : bool
             If True, overwrite any existing output directory.
 
@@ -226,9 +238,9 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
             Raised if the query is invalid
 
         """
-        return self._run_query(model, load_cached_table, persist_intermediate_table, force=force)[
-            0
-        ]
+        return self._run_query(
+            model, load_cached_table, persist_intermediate_table, zip=zip, force=force
+        )[0]
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):

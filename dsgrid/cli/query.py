@@ -15,7 +15,6 @@ from dsgrid.dimension.dimension_filters import (
     DimensionFilterColumnOperatorModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
-from dsgrid.project import Project
 from dsgrid.query.models import (
     AggregationModel,
     DimensionQueryNamesModel,
@@ -25,6 +24,7 @@ from dsgrid.query.models import (
     CompositeDatasetQueryModel,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter  # , CompositeDatasetQuerySubmitter
+from dsgrid.registry.registry_manager import RegistryManager
 
 
 def add_options(options):
@@ -169,12 +169,12 @@ def create_project(
             )
             sys.exit(1)
 
-    project = Project.load(
-        project_id,
-        registry_path=registry_path,
+    registry_manager = RegistryManager.load(
+        registry_path,
         remote_path=remote_path,
         offline_mode=offline,
     )
+    project = registry_manager.project_manager.load_project(project_id)
     query = ProjectQueryModel(
         name=query_name,
         project=ProjectQueryParamsModel(
@@ -264,11 +264,20 @@ def validate_project(query_file):
     show_default=True,
     help="Persist the intermediate table to the filesystem to allow for reuse.",
 )
+@click.option(
+    "-z",
+    "--zip",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Create a zip file containing all output files.",
+)
 @add_options(_COMMON_REGISTRY_OPTIONS)
 @add_options(_COMMON_RUN_OPTIONS)
 def run_project(
     query_definition_file,
     persist_intermediate_table,
+    zip,
     registry_path,
     remote_path,
     offline,
@@ -278,16 +287,17 @@ def run_project(
 ):
     """Run a query on a dsgrid project."""
     query = ProjectQueryModel.from_file(query_definition_file)
-    project = Project.load(
-        query.project.project_id,
-        registry_path=registry_path,
+    registry_manager = RegistryManager.load(
+        registry_path,
         remote_path=remote_path,
         offline_mode=offline,
     )
+    project = registry_manager.project_manager.load_project(query.project.project_id)
     ProjectQuerySubmitter(project, output).submit(
         query,
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
+        zip=zip,
         force=force,
     )
 
@@ -309,12 +319,12 @@ def create_composite_dataset(
     # TODO
     print("not implemented yet")
     sys.exit(1)
-    # project = Project.load(
-    #     query.project.project_id,
-    #     registry_path=registry_path,
+    # registry_manager = RegistryManager.load(
+    #     registry_path,
     #     remote_path=remote_path,
     #     offline_mode=offline,
     # )
+    # project = registry_manager.project_manager.load_project(query.project.project_id)
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
 
 
@@ -335,12 +345,12 @@ def query_composite_dataset(
     # TODO
     print("not implemented yet")
     sys.exit(1)
-    # project = Project.load(
-    #     query.project.project_id,
-    #     registry_path=registry_path,
+    # registry_manager = RegistryManager.load(
+    #     registry_path,
     #     remote_path=remote_path,
     #     offline_mode=offline,
     # )
+    # project = registry_manager.project_manager.load_project(query.project.project_id)
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
 
 

@@ -16,7 +16,7 @@ Python API for contributing to and accessing demand-side grid model (dsgrid) dat
 Create a virtual environment in which to install dsgrid. Miniconda is recommended.
 
 ```
-conda create -n dsgrid python=3.8
+conda create -n dsgrid python=3.10
 conda activate dsgrid
 ```
 

@@ -43,8 +43,10 @@ def pytest_sessionstart(session):
             f"-d {TEST_DATASET_DIRECTORY}"
         )
         if ret == 0:
+            print("make script returned 0")
             commit_file.write_text(latest_commit + "\n")
         elif TEST_REGISTRY.exists():
+            print("make script returned non-zero:", ret)
             # Delete it because it is invalid.
             shutil.rmtree(TEST_REGISTRY)
             sys.exit(1)
@@ -57,6 +59,14 @@ def _get_latest_commit():
     assert match, output
     commit = match.group(1)
     return commit
+
+
+@pytest.fixture(scope="module")
+def setup_api_server():
+    yield
+    for path in (os.environ["DSGRID_QUERY_OUTPUT_DIR"], os.environ["DSGRID_API_SERVER_STORE_DIR"]):
+        if os.path.exists(path):
+            shutil.rmtree(path)
 
 
 @pytest.fixture

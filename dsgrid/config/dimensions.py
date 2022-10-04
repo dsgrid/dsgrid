@@ -5,11 +5,10 @@ import logging
 import os
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional
 
 from pydantic import validator, root_validator
 from pydantic import Field
-from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
@@ -46,7 +45,7 @@ class DimensionBaseModel(DSGBaseModel):
     )
     display_name: str = Field(
         title="display_name",
-        description="Display name. Source for auto-generated query_name.",
+        description="Display name. Source for auto-generated dimension_query_name.",
         note="Dimension display names should be singular noun phrases that are concise and "
         "distinguish the dimension across all dimensions within a project, inclusive of dataset "
         "dimensions, project base dimensions, and project supplemental dimensions. This uniqueness "
@@ -61,8 +60,8 @@ class DimensionBaseModel(DSGBaseModel):
             "enforce valid dimension display names.",
         ),
     )
-    query_name: Optional[str] = Field(
-        title="query_name",
+    dimension_query_name: Optional[str] = Field(
+        title="dimension_query_name",
         description="Auto-generated query name for SQL queries.",
     )
     dimension_type: DimensionType = Field(
@@ -158,15 +157,17 @@ class DimensionBaseModel(DSGBaseModel):
             raise ValueError(f"display_name={display_name} does not meet the requirements")
         return display_name
 
-    @validator("query_name")
-    def check_query_name(cls, query_name, values):
+    @validator("dimension_query_name")
+    def check_query_name(cls, dimension_query_name, values):
         if "display_name" not in values:
-            return query_name
+            return dimension_query_name
 
         generated_query_name = values["display_name"].lower().replace(" ", "_").replace("-", "_")
 
-        if query_name is not None and query_name != generated_query_name:
-            raise ValueError(f"query_name cannot be set by the user: {query_name}")
+        if dimension_query_name is not None and dimension_query_name != generated_query_name:
+            raise ValueError(
+                f"dimension_query_name cannot be set by the user: {dimension_query_name}"
+            )
 
         return generated_query_name
 
@@ -540,7 +541,7 @@ class DimensionReferenceModel(DSGBaseModel):
             "Only alphanumerics and dashes are supported.",
         ),
     )
-    version: Union[str, VersionInfo] = Field(
+    version: str = Field(
         title="version",
         description="Version of the dimension",
         requirements=(
@@ -633,3 +634,37 @@ def _check_time_type_and_class_consistency(values):
             " * For class=NoOpTime, use time_type=noop. "
         )
     return values
+
+
+class DimensionCommonModel(DSGBaseModel):
+    """Common attributes for all dimensions"""
+
+    name: str
+    display_name: str
+    dimension_query_name: str
+    dimension_type: DimensionType
+    dimension_id: str
+    class_name: str
+    description: str
+
+
+class ProjectDimensionModel(DimensionCommonModel):
+    """Common attributes for all dimensions that are assigned to a project"""
+
+    is_base: bool
+
+
+def create_dimension_common_model(model):
+    """Constructs an instance of DimensionBaseModel from subclasses in order to give the API
+    one common model for all dimensions. Avoids the complexity of dealing with
+    DimensionBaseModel validators.
+    """
+    fields = set(DimensionCommonModel.__fields__)
+    data = {x: getattr(model, x) for x in type(model).__fields__ if x in fields}
+    return DimensionCommonModel(**data)
+
+
+def create_project_dimension_model(model, is_base):
+    data = create_dimension_common_model(model).dict()
+    data["is_base"] = is_base
+    return ProjectDimensionModel(**data)

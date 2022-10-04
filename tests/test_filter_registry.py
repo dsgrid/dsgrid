@@ -4,7 +4,6 @@ from pathlib import Path
 
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.project import Project
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.tests.common import TEST_REGISTRY
@@ -24,7 +23,7 @@ FILTER_CONFIG = {
                 "base_dimensions": [{"dimension_type": "geography", "record_ids": [COUNTY_ID]}],
                 "supplemental_dimensions": [
                     {
-                        "query_name": QUERY_NAME,
+                        "dimension_query_name": QUERY_NAME,
                         "dimension_type": "geography",
                         "record_ids": [STATE_ID],
                     }
@@ -47,7 +46,8 @@ def test_filter_registry():
     RegistryManager.copy(TEST_REGISTRY, dst, force=True)
     try:
         FilterRegistryManager.load(dst, offline_mode=True).filter(simple_model)
-        project = Project.load(PROJECT_ID, offline_mode=True, registry_path=dst)
+        mgr = RegistryManager.load(dst, offline_mode=True)
+        project = mgr.project_manager.load_project(PROJECT_ID)
 
         # Verify that the dataset, dimensions, and dimension mappings are all filtered.
         project.load_dataset(DATASET_ID)
@@ -67,8 +67,8 @@ def test_filter_registry():
         assert supp_dim[0].id == STATE_ID
 
         found_mapping_records = False
-        for dim in project.config.get_supplemental_dimensions(DimensionType.GEOGRAPHY):
-            if dim.model.query_name == QUERY_NAME:
+        for dim in project.config.list_supplemental_dimensions(DimensionType.GEOGRAPHY):
+            if dim.model.dimension_query_name == QUERY_NAME:
                 for mapping in project.config.get_base_to_supplemental_dimension_mappings_by_types(
                     DimensionType.GEOGRAPHY
                 ):

@@ -1,0 +1,58 @@
+{
+  "name": "electricity-values-06037",
+  "version": "0.1.0",
+  "project": {
+    "project_id": "dsgrid_conus_2022",
+    "dataset_ids": [
+      "conus_2022_reference_resstock"
+    ],
+    "excluded_dataset_ids": [],
+    "include_dsgrid_dataset_components": false,
+    "dimension_filters": [
+      {
+        "dimension_type": "geography",
+        "dimension_query_name": "county",
+        "column": "id",
+        "operator": "isin",
+        "value": [
+          "06037"
+        ],
+        "negate": false,
+        "filter_type": "DimensionFilterColumnOperatorModel"
+      },
+      {
+        "dimension_type": "subsector",
+        "dimension_query_name": "subsector",
+        "column": "id",
+        "operator": "isin",
+        "value": [
+          "single_family_detached"
+        ],
+        "negate": false,
+        "filter_type": "DimensionFilterColumnOperatorModel"
+      },
+      {
+        "dimension_type": "metric",
+        "dimension_query_name": "electricity",
+        "column": "id",
+        "value": "%",
+        "operator": "like",
+        "negate": false,
+        "filter_type": "SupplementalDimensionFilterColumnOperatorModel"
+      }
+    ],
+    "per_dataset_aggregations": [],
+    "table_format": "pivoted",
+    "version": "1.3.0"
+  },
+  "result": {
+    "supplemental_columns": [],
+    "replace_ids_with_names": false,
+    "aggregations": [],
+    "reports": [],
+    "output_format": "parquet",
+    "sort_columns": [],
+    "dimension_filters": [],
+    "time_zone": null
+  }
+}

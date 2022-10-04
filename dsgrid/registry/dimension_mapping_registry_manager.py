@@ -305,7 +305,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                     from_dimension_type=mapping.model.from_dimension.dimension_type,
                     to_dimension_type=mapping.model.to_dimension.dimension_type,
                     mapping_id=mapping_id,
-                    version=self.get_current_version(mapping_id),
+                    version=str(self.get_current_version(mapping_id)),
                 )
             )
         return refs
@@ -357,7 +357,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
                 registry_model = DimensionMappingRegistryModel(
                     dimension_mapping_id=mapping.mapping_id,
-                    version=registration.version,
+                    version=str(registration.version),
                     description=mapping.description.strip(),
                     registration_history=[registration],
                 )

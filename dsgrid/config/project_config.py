@@ -1,13 +1,12 @@
 import itertools
 import logging
 import os
-from typing import Dict, List, Union
+from typing import Dict, List, Set
 
 from pydantic import Field
 from pydantic import root_validator, validator
-from semver import VersionInfo
 
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseModel, serialize_model_data
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension, DSGInvalidParameter
 from dsgrid.registry.common import (
@@ -152,7 +151,7 @@ class InputDatasetModel(DSGBaseModel):
         options=InputDatasetType.format_for_docs(),
         updateable=False,
     )
-    version: Union[str, None, VersionInfo] = Field(
+    version: str = Field(
         title="version",
         description="Version of the registered dataset",
         default=None,
@@ -304,6 +303,29 @@ class ProjectConfigModel(DSGBaseModel):
         check_config_id_strict(project_id, "Project")
         return project_id
 
+    def dict(self, *args, **kwargs):
+        data = super().dict(*args, **kwargs)
+        return serialize_model_data(data)
+
+
+class _DimensionQueryNamesModel(DSGBaseModel):
+    base: str
+    supplemental: List[str]
+
+
+class ProjectDimensionQueryNamesModel(DSGBaseModel):
+    """Defines the query names for all base and supplemental dimensions in the project."""
+
+    data_source: _DimensionQueryNamesModel
+    geography: _DimensionQueryNamesModel
+    metric: _DimensionQueryNamesModel
+    model_year: _DimensionQueryNamesModel
+    scenario: _DimensionQueryNamesModel
+    sector: _DimensionQueryNamesModel
+    subsector: _DimensionQueryNamesModel
+    time: _DimensionQueryNamesModel
+    weather_year: _DimensionQueryNamesModel
+
 
 class ProjectConfig(ConfigWithDataFilesBase):
     """Provides an interface to a ProjectConfigModel."""
@@ -365,50 +387,55 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return dim_config
         assert False, dimension_type
 
-    def get_dimension(self, query_name: str):
+    def get_dimension(self, dimension_query_name: str):
         """Return an instance of DimensionBaseConfig.
 
         Parameters
         ----------
-        query_name : str
+        dimension_query_name : str
 
         Returns
         -------
         DimensionBaseConfig
 
         """
-        dim = self._dimensions_by_query_name.get(query_name)
+        dim = self._dimensions_by_query_name.get(dimension_query_name)
         if dim is None:
-            raise DSGInvalidDimension(f"query_name={query_name} is not stored")
+            raise DSGInvalidDimension(f"dimension_query_name={dimension_query_name} is not stored")
         return dim
 
-    def get_dimension_records(self, query_name: str):
+    def get_dimension_records(self, dimension_query_name: str):
         """Return a DataFrame containing the records for a dimension.
 
         Parameters
         ----------
-        query_name : str
+        dimension_query_name : str
 
         Returns
         -------
-        pyspark.sql.DataFrame
+        DimensionBaseConfig
 
         """
-        return self.get_dimension(query_name).get_records_dataframe()
+        return self.get_dimension(dimension_query_name).get_records_dataframe()
 
-    def get_supplemental_dimensions(self, dimension_type: DimensionType):
+    def list_supplemental_dimensions(self, dimension_type: DimensionType, sort_by=None):
         """Return the supplemental dimensions matching dimension (if any).
 
         Parameters
         ----------
         dimension_type : DimensionType
+        sort_by : str | None
+            If set, sort the dimensions by this dimension attribute.
 
         Returns
         -------
         List[DimensionConfig]
 
         """
-        return [v for k, v in self.supplemental_dimensions.items() if k.type == dimension_type]
+        dims = [v for k, v in self.supplemental_dimensions.items() if k.type == dimension_type]
+        if sort_by is not None:
+            dims.sort(key=lambda x: getattr(x.model, sort_by))
+        return dims
 
     def get_base_to_supplemental_dimension_mappings_by_types(self, dimension_type: DimensionType):
         """Return the base-to-supplemental dimension mappings for the dimension (if any).
@@ -429,29 +456,33 @@ class ProjectConfig(ConfigWithDataFilesBase):
             if x.model.from_dimension.dimension_type == dimension_type
         ]
 
-    def get_base_to_supplemental_mapping_records(self, query_name: str):
+    def get_base_to_supplemental_mapping_records(self, dimension_query_name: str):
         """Return the project's base-to-supplemental dimension mapping records.
 
         Parameters
         ----------
-        query_name : str
+        dimension_query_name : str
 
         Returns
         -------
         pyspark.sql.DataFrame
 
         """
-        dim = self.get_dimension(query_name)
+        dim = self.get_dimension(dimension_query_name)
         dimension_type = dim.model.dimension_type
         base_dim = self.get_base_dimension(dimension_type)
         if dim.model.dimension_id == base_dim.model.dimension_id:
-            raise DSGInvalidParameter(f"Cannot pass base dimension: {dimension_type}/{query_name}")
+            raise DSGInvalidParameter(
+                f"Cannot pass base dimension: {dimension_type}/{dimension_query_name}"
+            )
 
         for mapping in self._base_to_supplemental_mappings.values():
             if mapping.model.to_dimension.dimension_id == dim.model.dimension_id:
                 return mapping.get_records_dataframe().filter("to_id is not NULL")
 
-        raise DSGInvalidParameter(f"No mapping is stored for {dimension_type}/{query_name}")
+        raise DSGInvalidParameter(
+            f"No mapping is stored for {dimension_type}/{dimension_query_name}"
+        )
 
     def has_base_to_supplemental_dimension_mapping_types(self, dimension_type):
         """Return True if the config has these base-to-supplemental mappings."""
@@ -471,7 +502,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
                 return True
         return False
 
-    def get_dimension_query_names(self):
+    def list_dimension_query_names(self):
         """Return query names for all dimensions in the project.
 
         Returns
@@ -482,7 +513,11 @@ class ProjectConfig(ConfigWithDataFilesBase):
         """
         return sorted(self._dimensions_by_query_name.keys())
 
-    def get_base_dimension_query_names(self):
+    def get_base_dimension_query_names(self) -> Set[str]:
+        """Return the query names for the base dimensions."""
+        return set(self.get_base_dimension_to_query_name_mapping().values())
+
+    def get_base_dimension_to_query_name_mapping(self) -> Dict[DimensionType, str]:
         """Return a mapping of DimensionType to query name for base dimensions.
 
         Returns
@@ -490,11 +525,41 @@ class ProjectConfig(ConfigWithDataFilesBase):
         dict
 
         """
-        base_dim_query_names = {}
+        query_names = {}
         for dimension_type in DimensionType:
             dim = self.get_base_dimension(dimension_type)
-            base_dim_query_names[dimension_type] = dim.model.query_name
-        return base_dim_query_names
+            query_names[dimension_type] = dim.model.dimension_query_name
+        return query_names
+
+    def get_supplemental_dimension_to_query_name_mapping(self) -> Dict[DimensionType, List[str]]:
+        """Return a mapping of DimensionType to query name for supplemental dimensions.
+
+        Returns
+        -------
+        dict
+
+        """
+        query_names = {}
+        for dimension_type in DimensionType:
+            query_names[dimension_type] = [
+                x.model.dimension_query_name
+                for x in self.list_supplemental_dimensions(
+                    dimension_type, sort_by="dimension_query_name"
+                )
+            ]
+        return query_names
+
+    def get_dimension_query_names_model(self):
+        """Return an instance of ProjectDimensionQueryNamesModel for the project."""
+        base_query_names_by_type = self.get_base_dimension_to_query_name_mapping()
+        supp_query_names_by_type = self.get_supplemental_dimension_to_query_name_mapping()
+        model = {}
+        for dimension_type in DimensionType:
+            model[dimension_type.value] = {
+                "base": base_query_names_by_type[dimension_type],
+                "supplemental": supp_query_names_by_type[dimension_type],
+            }
+        return ProjectDimensionQueryNamesModel(**model)
 
     def load_dimension_associations(self):
         """Load all dimension associations."""
@@ -523,12 +588,12 @@ class ProjectConfig(ConfigWithDataFilesBase):
         self._supplemental_dimensions.update(supplemental_dimensions)
         self._dimensions_by_query_name.clear()
         for dim in self.iter_dimensions():
-            if dim.model.query_name in self._dimensions_by_query_name:
+            if dim.model.dimension_query_name in self._dimensions_by_query_name:
                 raise DSGInvalidDimension(
-                    f"query_name={dim.model.query_name} exists multiple times in project "
+                    f"dimension_query_name={dim.model.dimension_query_name} exists multiple times in project "
                     f"{self.config_id}"
                 )
-            self._dimensions_by_query_name[dim.model.query_name] = dim
+            self._dimensions_by_query_name[dim.model.dimension_query_name] = dim
 
     def load_dimension_mappings(self, dimension_mapping_manager: DimensionMappingRegistryManager):
         """Load all dimension mappings.
@@ -628,10 +693,10 @@ class ProjectConfig(ConfigWithDataFilesBase):
             self.base_dimensions.values(), self.supplemental_dimensions.values()
         )
 
-    def list_dimension_query_names(self, dimension_type: DimensionType):
+    def list_dimension_query_names_by_type(self, dimension_type: DimensionType):
         """List the query names available for a dimension type."""
         return [
-            x.model.query_name
+            x.model.dimension_query_name
             for x in self.iter_dimensions()
             if x.model.dimension_type == dimension_type
         ]

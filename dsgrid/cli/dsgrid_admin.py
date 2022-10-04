@@ -183,7 +183,7 @@ def _path_cb(_, __, val):
 @click.option(
     "-m",
     "--mode",
-    default="copy",
+    default="data-symlinks",
     type=click.Choice(["copy", "data-symlinks", "rsync"]),
     show_default=True,
     help="Controls whether to copy all data, make symlinks to data files, or sync data with the "

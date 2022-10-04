@@ -15,6 +15,7 @@ from dsgrid.common import (
     LOCAL_REGISTRY,
     REMOTE_REGISTRY,
     SYNC_EXCLUDE_LIST,
+    on_hpc,
 )
 from dsgrid.cloud.factory import make_cloud_storage_interface
 from dsgrid.config.mapping_tables import MappingTableConfig
@@ -175,7 +176,7 @@ class RegistryManager:
         fs_interface = make_filesystem_interface(path)
 
         if use_remote_data is None:
-            use_remote_data = _should_use_remote_data()
+            use_remote_data = _should_use_remote_data(remote_path)
 
         cloud_interface = make_cloud_storage_interface(
             path, remote_path, offline=offline_mode, uuid=uid, user=user
@@ -427,14 +428,14 @@ class RegistryManager:
         for mapping in self.dimension_mapping_manager.iter_configs():
             updated = False
             if mapping.model.from_dimension.dimension_id in updated_dimensions:
-                mapping.model.from_dimension.version = updated_dimensions[
-                    mapping.model.from_dimension.dimension_id
-                ]
+                mapping.model.from_dimension.version = str(
+                    updated_dimensions[mapping.model.from_dimension.dimension_id]
+                )
                 updated = True
             elif mapping.model.to_dimension.dimension_id in updated_dimensions:
-                mapping.model.to_dimension.version = updated_dimensions[
-                    mapping.model.to_dimension.dimension_id
-                ]
+                mapping.model.to_dimension.version = str(
+                    updated_dimensions[mapping.model.to_dimension.dimension_id]
+                )
                 updated = True
             if updated and mapping.config_id not in updated_mappings:
                 updated_mappings[mapping.config_id] = mapping
@@ -446,7 +447,7 @@ class RegistryManager:
             updated = False
             for dimension_ref in dataset.model.dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
-                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    dimension_ref.version = str(updated_dimensions[dimension_ref.dimension_id])
                     updated = True
             if updated and dataset.config_id not in updated_datasets:
                 updated_datasets[dataset.config_id] = dataset
@@ -458,11 +459,11 @@ class RegistryManager:
             updated = False
             for dimension_ref in project.model.dimensions.base_dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
-                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    dimension_ref.version = str(updated_dimensions[dimension_ref.dimension_id])
                     updated = True
             for dimension_ref in project.model.dimensions.supplemental_dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
-                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    dimension_ref.version = str(updated_dimensions[dimension_ref.dimension_id])
                     updated = True
             if updated and project.config_id not in updated_projects:
                 updated_projects[project.config_id] = project
@@ -474,12 +475,12 @@ class RegistryManager:
             updated = False
             for mapping_ref in project.model.dimension_mappings.base_to_supplemental_references:
                 if mapping_ref.mapping_id in updated_mappings:
-                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                    mapping_ref.version = str(updated_mappings[mapping_ref.mapping_id])
                     updated = True
             for mapping_list in project.model.dimension_mappings.dataset_to_project.values():
                 for mapping_ref in mapping_list:
                     if mapping_ref.mapping_id in updated_mappings:
-                        mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                        mapping_ref.version = str(updated_mappings[mapping_ref.mapping_id])
             if updated and project.config_id not in updated_projects:
                 updated_projects[project.config_id] = project
 
@@ -491,7 +492,7 @@ class RegistryManager:
             for dataset in project.model.datasets:
                 # TODO: does dataset status matter? update unregistered?
                 if dataset.dataset_id in updated_datasets:
-                    dataset.version = updated_datasets[dataset.dataset_id]
+                    dataset.version = str(updated_datasets[dataset.dataset_id])
                     updated = True
             if updated and project.config_id not in updated_projects:
                 updated_projects[project.config_id] = project
@@ -598,17 +599,19 @@ def get_registry_class(registry_type):
     return _REGISTRY_TYPE_TO_CLASS[registry_type]
 
 
-def _should_use_remote_data():
+def _should_use_remote_data(remote_path):
+    if not str(remote_path).lower().startswith("s3"):
+        # We are on a local filesystem. Use the remote path.
+        return True
+
     use_remote_data = False
-    if sys.platform in ("darwin", "win32"):
+    if "DSGRID_USE_LOCAL_DATA" in os.environ:
+        pass
+    elif sys.platform in ("darwin", "win32"):
         # Local systems need to sync all load data files.
         pass
-    elif "DSGRID_USE_LOCAL_DATA" in os.environ:
+    elif on_hpc():
         pass
-    elif "NREL_CLUSTER" in os.environ:
-        # All Eagle compute nodes have access to the shared load data files.
-        logger.info("Use remote data on NREL_CLUSTER %s", os.environ["NREL_CLUSTER"])
-        use_remote_data = True
     elif "GITHUB_ACTION" in os.environ:
         logger.info("Do not use remote data on GitHub CI")
     else:

@@ -44,8 +44,10 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             self._format_handler.list_expected_dataset_timestamps(self.model.ranges), load_data_df
         )
 
-    def convert_dataframe(self, df):
-        # TODO: broken
+    def convert_dataframe(self, df, project_time_dim):
+        # TODO: Create a dataframe with timestamps covering project_time_dim.model.ranges
+        # for all model_years in the df, then join the df to that dataframe on the time columns.
+        # Account for time zone.
         return df
 
     def get_frequency(self):

@@ -50,7 +50,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def convert_dataframe(self, df):
+    def convert_dataframe(self, df, project_time_dim):
+        # TODO: handle time zone
         return df
 
     def get_frequency(self):

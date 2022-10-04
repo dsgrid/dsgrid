@@ -20,7 +20,6 @@ class FilterRegistryManager(RegistryManager):
         ----------
         simple_model : RegistrySimpleModel
             Filter all configs and data according to this model.
-
         """
         project_ids_to_keep = {x.project_id for x in simple_model.projects}
         to_remove = [x for x in self._project_mgr.list_ids() if x not in project_ids_to_keep]
@@ -55,8 +54,8 @@ class FilterRegistryManager(RegistryManager):
                 handle_dimension(simple_dim, dim)
 
             for simple_dim in project.dimensions.supplemental_dimensions:
-                for dim in project_config.get_supplemental_dimensions(simple_dim.dimension_type):
-                    if dim.model.query_name == simple_dim.query_name:
+                for dim in project_config.list_supplemental_dimensions(simple_dim.dimension_type):
+                    if dim.model.dimension_query_name == simple_dim.dimension_query_name:
                         handle_dimension(simple_dim, dim)
 
         logger.info("Filter dataset dimensions")

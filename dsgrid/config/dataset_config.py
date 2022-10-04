@@ -1,12 +1,12 @@
 import logging
 from pathlib import Path
-from typing import List, Optional, Dict, Union, Any
+from typing import List, Optional, Dict, Any
 
 from pydantic import Field
 from pydantic import validator
 import pyspark.sql.functions as F
-from semver import VersionInfo
 
+from dsgrid.data_models import serialize_model_data
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
@@ -29,6 +29,7 @@ ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.csv",
     "load_data_lookup.json",
 )
+ALLOWED_DATA_FILES = ALLOWED_LOAD_DATA_FILENAMES + ALLOWED_LOAD_DATA_LOOKUP_FILENAMES
 
 logger = logging.getLogger(__name__)
 
@@ -250,7 +251,7 @@ class DatasetConfigModel(DSGBaseModel):
         title="data_schema",
         description="Schema (table layouts) used for writing out the dataset",
     )
-    dataset_version: Optional[Union[VersionInfo, str]] = Field(
+    dataset_version: Optional[str] = Field(
         title="dataset_version",
         description="The version of the dataset.",
     )
@@ -270,7 +271,7 @@ class DatasetConfigModel(DSGBaseModel):
         title="origin_contributors",
         description="List of origin data contributor's first and last names"
         """ e.g., ["Harry Potter", "Ronald Weasley"]""",
-        required=False,
+        default=[],
     )
     origin_project: str = Field(
         title="origin_project",
@@ -294,10 +295,10 @@ class DatasetConfigModel(DSGBaseModel):
         description="Data security classification (e.g., low, moderate, high)",
         options=DataClassificationType.format_for_docs(),
     )
-    tags: Optional[List[str]] = Field(
+    tags: List[str] = Field(
         title="source",
         description="List of data tags",
-        required=False,
+        default=[],
     )
     dimensions: List = Field(
         title="dimensions",
@@ -323,11 +324,10 @@ class DatasetConfigModel(DSGBaseModel):
         # TODO: Add to notes - link to registering dimensions page
         # TODO: Add to notes - link to example of how to list dimensions to find existing registered dimensions
     )
-    user_defined_metadata: Optional[Dict] = Field(
+    user_defined_metadata: Dict = Field(
         title="user_defined_metadata",
         description="Additional user defined metadata fields",
         default={},
-        required=False,
     )
     trivial_dimensions: Optional[List[DimensionType]] = Field(
         title="trivial_dimensions",
@@ -404,6 +404,10 @@ class DatasetConfigModel(DSGBaseModel):
     @validator("dimensions", pre=True, each_item=True, always=True)
     def handle_dimension_union(cls, values):
         return handle_dimension_union(values)
+
+    def dict(self, *args, **kwargs):
+        data = super().dict(*args, **kwargs)
+        return serialize_model_data(data)
 
 
 class DatasetConfig(ConfigBase):

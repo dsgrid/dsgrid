@@ -648,6 +648,12 @@ class DimensionCommonModel(DSGBaseModel):
     description: str
 
 
+class ProjectDimensionModel(DimensionCommonModel):
+    """Common attributes for all dimensions that are assigned to a project"""
+
+    is_base: bool
+
+
 def create_dimension_common_model(model):
     """Constructs an instance of DimensionBaseModel from subclasses in order to give the API
     one common model for all dimensions. Avoids the complexity of dealing with
@@ -656,3 +662,9 @@ def create_dimension_common_model(model):
     fields = set(DimensionCommonModel.__fields__)
     data = {x: getattr(model, x) for x in type(model).__fields__ if x in fields}
     return DimensionCommonModel(**data)
+
+
+def create_project_dimension_model(model, is_base):
+    data = create_dimension_common_model(model).dict()
+    data["is_base"] = is_base
+    return ProjectDimensionModel(**data)

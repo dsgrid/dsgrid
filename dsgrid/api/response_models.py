@@ -1,5 +1,5 @@
 from dsgrid.config.dataset_config import DatasetConfigModel
-from dsgrid.config.dimensions import DimensionCommonModel
+from dsgrid.config.dimensions import DimensionCommonModel, ProjectDimensionModel
 from dsgrid.config.project_config import ProjectConfigModel, ProjectDimensionQueryNamesModel
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
@@ -34,15 +34,24 @@ class GetDatasetResponse(DSGBaseModel):
     dataset: DatasetConfigModel
 
 
+class ListProjectDimensionsResponse(DSGBaseModel):
+    """Defines the reponse to the list_project_dimensions command."""
+
+    project_id: str
+    dimensions: list[ProjectDimensionModel]
+
+
 class GetProjectDimensionQueryNamesResponse(DSGBaseModel):
     """Defines the reponse to the get_project_dimension_query_names command."""
 
+    project_id: str
     dimension_query_names: ProjectDimensionQueryNamesModel
 
 
 class GetProjectBaseDimensionQueryNameResponse(DSGBaseModel):
     """Defines the reponse to the get_project_dimension_query_name command."""
 
+    project_id: str
     dimension_type: DimensionType
     dimension_query_name: str
 
@@ -50,6 +59,7 @@ class GetProjectBaseDimensionQueryNameResponse(DSGBaseModel):
 class ListProjectSupplementalDimensionQueryNames(DSGBaseModel):
     """Defines the response to the list_project_supplemental_dimension_query_names command"""
 
+    project_id: str
     dimension_type: DimensionType
     dimension_query_names: list[str]
 

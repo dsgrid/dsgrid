@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, FileResponse
 
 from dsgrid.common import REMOTE_REGISTRY
-from dsgrid.config.dimensions import create_dimension_common_model
+from dsgrid.config.dimensions import create_dimension_common_model, create_project_dimension_model
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotStored
 from dsgrid.loggers import setup_logging
@@ -36,6 +36,7 @@ from .response_models import (
     GetDimensionResponse,
     GetProjectBaseDimensionQueryNameResponse,
     GetProjectDimensionQueryNamesResponse,
+    ListProjectDimensionsResponse,
     GetProjectResponse,
     ListAsyncTasksResponse,
     ListDatasetsResponse,
@@ -119,6 +120,27 @@ async def get_project(project_id: str):
 
 
 @app.get(
+    "/projects/{project_id}/dimensions",
+    response_model=ListProjectDimensionsResponse,
+)
+async def list_project_dimensions(project_id: str):
+    """List the project's dimensions."""
+    mgr = manager.project_manager
+    project = mgr.get_by_id(project_id)
+    dimensions = []
+    for item in project.get_dimension_query_names_model().dict().values():
+        dimension = create_project_dimension_model(project.get_dimension(item["base"]).model, True)
+        dimensions.append(dimension)
+        for query_name in item["supplemental"]:
+            dimension = create_project_dimension_model(
+                project.get_dimension(query_name).model, False
+            )
+            dimensions.append(dimension)
+
+    return ListProjectDimensionsResponse(project_id=project_id, dimensions=dimensions)
+
+
+@app.get(
     "/projects/{project_id}/dimensions/dimension_query_names",
     response_model=GetProjectDimensionQueryNamesResponse,
 )
@@ -127,6 +149,7 @@ async def get_project_dimension_query_names(project_id: str):
     mgr = manager.project_manager
     project = mgr.get_by_id(project_id)
     return GetProjectDimensionQueryNamesResponse(
+        project_id=project_id,
         dimension_query_names=project.get_dimension_query_names_model(),
     )
 
@@ -140,6 +163,7 @@ async def get_project_base_dimension_query_name(project_id: str, dimension_type:
     mgr = manager.project_manager
     config = mgr.get_by_id(project_id)
     return GetProjectBaseDimensionQueryNameResponse(
+        project_id=project_id,
         dimension_type=dimension_type,
         dimension_query_name=config.get_base_dimension(dimension_type).model.dimension_query_name,
     )
@@ -156,6 +180,7 @@ async def list_project_supplemental_dimension_query_names(
     mgr = manager.project_manager
     config = mgr.get_by_id(project_id)
     return ListProjectSupplementalDimensionQueryNames(
+        project_id=project_id,
         dimension_type=dimension_type,
         dimension_query_names=[
             x.model.dimension_query_name

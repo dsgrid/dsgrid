@@ -26,6 +26,7 @@ from dsgrid.api.response_models import (
     ListDimensionsResponse,
     ListProjectSupplementalDimensionQueryNames,
     ListProjectsResponse,
+    ListProjectDimensionsResponse,
     ListReportTypesResponse,
     ListTableFormatTypesResponse,
     SparkSubmitProjectQueryResponse,
@@ -92,6 +93,14 @@ def test_get_dataset():
         **check_response("/datasets/conus_2022_reference_comstock").json()
     )
     assert response.dataset.dataset_id == "conus_2022_reference_comstock"
+
+
+def test_list_project_dimensions():
+    response = ListProjectDimensionsResponse(
+        **check_response(f"/projects/{PROJECT_ID}/dimensions").json()
+    )
+    assert response.project_id == PROJECT_ID
+    assert response.dimensions
 
 
 def test_get_project_dimension_query_names():

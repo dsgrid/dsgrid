@@ -204,8 +204,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             .agg(F.sum("from_fraction").alias("sum_fraction"))
             .sort(F.desc("sum_fraction"), group_by)
         )
-        fracs_greater_than_one = mapping_sum_df.filter(F.col("sum_fraction") > 1)
-        fracs_less_than_one = mapping_sum_df.filter(F.col("sum_fraction") < 1)
+        fracs_greater_than_one = mapping_sum_df.filter((F.col("sum_fraction") - 1.0) > 0.000001)
+        fracs_less_than_one = mapping_sum_df.filter(1.0 - F.col("sum_fraction") > 0.000001)
         if fracs_greater_than_one.count() > 0:
             id_greater_than_one = {
                 x[group_by] for x in fracs_greater_than_one[[group_by]].distinct().collect()

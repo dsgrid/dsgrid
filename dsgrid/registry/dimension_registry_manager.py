@@ -313,7 +313,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 DimensionReferenceModel(
                     dimension_id=dim_id,
                     dimension_type=dim.model.dimension_type,
-                    version=self.get_current_version(dim_id),
+                    version=str(self.get_current_version(dim_id)),
                 )
             )
         return refs

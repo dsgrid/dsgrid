@@ -63,7 +63,7 @@ class TableFormatHandlerBase(abc.ABC):
             if dim_type == DimensionType.TIME:
                 time_dim = self._project_config.get_base_dimension(dim_type)
                 time_cols = time_dim.get_timestamp_load_data_columns()
-                # TODO DT: Should we enforce that projects can only have one time column?
+                # TODO: Should we enforce that projects can only have one time column?
                 assert len(time_cols) == 1, time_cols
                 existing_col = time_cols[0]
             elif dim_type.value in columns:
@@ -79,7 +79,7 @@ class TableFormatHandlerBase(abc.ABC):
 
     def replace_ids_with_names(self, df):
         orig = df
-        all_query_names = set(self._project_config.get_dimension_query_names())
+        all_query_names = set(self._project_config.list_dimension_query_names())
         for dimension_query_name in set(df.columns).intersection(all_query_names):
             assert not {"id", "name"}.intersection(df.columns), df.columns
             dim_config = self._project_config.get_dimension(dimension_query_name)

@@ -428,14 +428,14 @@ class RegistryManager:
         for mapping in self.dimension_mapping_manager.iter_configs():
             updated = False
             if mapping.model.from_dimension.dimension_id in updated_dimensions:
-                mapping.model.from_dimension.version = updated_dimensions[
-                    mapping.model.from_dimension.dimension_id
-                ]
+                mapping.model.from_dimension.version = str(
+                    updated_dimensions[mapping.model.from_dimension.dimension_id]
+                )
                 updated = True
             elif mapping.model.to_dimension.dimension_id in updated_dimensions:
-                mapping.model.to_dimension.version = updated_dimensions[
-                    mapping.model.to_dimension.dimension_id
-                ]
+                mapping.model.to_dimension.version = str(
+                    updated_dimensions[mapping.model.to_dimension.dimension_id]
+                )
                 updated = True
             if updated and mapping.config_id not in updated_mappings:
                 updated_mappings[mapping.config_id] = mapping
@@ -447,7 +447,7 @@ class RegistryManager:
             updated = False
             for dimension_ref in dataset.model.dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
-                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    dimension_ref.version = str(updated_dimensions[dimension_ref.dimension_id])
                     updated = True
             if updated and dataset.config_id not in updated_datasets:
                 updated_datasets[dataset.config_id] = dataset
@@ -459,11 +459,11 @@ class RegistryManager:
             updated = False
             for dimension_ref in project.model.dimensions.base_dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
-                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    dimension_ref.version = str(updated_dimensions[dimension_ref.dimension_id])
                     updated = True
             for dimension_ref in project.model.dimensions.supplemental_dimension_references:
                 if dimension_ref.dimension_id in updated_dimensions:
-                    dimension_ref.version = updated_dimensions[dimension_ref.dimension_id]
+                    dimension_ref.version = str(updated_dimensions[dimension_ref.dimension_id])
                     updated = True
             if updated and project.config_id not in updated_projects:
                 updated_projects[project.config_id] = project
@@ -475,12 +475,12 @@ class RegistryManager:
             updated = False
             for mapping_ref in project.model.dimension_mappings.base_to_supplemental_references:
                 if mapping_ref.mapping_id in updated_mappings:
-                    mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                    mapping_ref.version = str(updated_mappings[mapping_ref.mapping_id])
                     updated = True
             for mapping_list in project.model.dimension_mappings.dataset_to_project.values():
                 for mapping_ref in mapping_list:
                     if mapping_ref.mapping_id in updated_mappings:
-                        mapping_ref.version = updated_mappings[mapping_ref.mapping_id]
+                        mapping_ref.version = str(updated_mappings[mapping_ref.mapping_id])
             if updated and project.config_id not in updated_projects:
                 updated_projects[project.config_id] = project
 
@@ -492,7 +492,7 @@ class RegistryManager:
             for dataset in project.model.datasets:
                 # TODO: does dataset status matter? update unregistered?
                 if dataset.dataset_id in updated_datasets:
-                    dataset.version = updated_datasets[dataset.dataset_id]
+                    dataset.version = str(updated_datasets[dataset.dataset_id])
                     updated = True
             if updated and project.config_id not in updated_projects:
                 updated_projects[project.config_id] = project

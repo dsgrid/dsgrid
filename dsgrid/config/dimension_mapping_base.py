@@ -1,8 +1,7 @@
 import logging
-from typing import List, Optional, Union
+from typing import List, Optional
 
 from pydantic import Field, validator
-from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.dimension.base_models import DimensionType
@@ -287,7 +286,7 @@ class DimensionMappingReferenceModel(DSGBaseModel):
         description="Unique ID of the dimension mapping",
         updateable=False,
     )
-    version: Union[str, VersionInfo] = Field(
+    version: str = Field(
         title="version",
         description="Version of the dimension",
         # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148

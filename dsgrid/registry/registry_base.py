@@ -1,11 +1,10 @@
 import abc
 import logging
-from typing import List, Optional, Union
+from typing import List, Optional
 
 
 from pydantic import Field
 from pydantic import validator
-from semver import VersionInfo
 
 from dsgrid.config.config_base import ConfigBase
 from dsgrid.data_models import DSGBaseModel
@@ -24,7 +23,7 @@ logger = logging.getLogger(__name__)
 class RegistryBaseModel(DSGBaseModel):
     """Base class for models that get registered in the registry"""
 
-    version: Union[str, VersionInfo] = Field(
+    version: str = Field(
         title="version",
         description="Dimension version",
     )
@@ -83,4 +82,4 @@ class RegistryBase(ConfigBase, abc.ABC):
 
     @version.setter
     def version(self, val):
-        self._model.version = val
+        self._model.version = str(val)

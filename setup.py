@@ -48,6 +48,7 @@ setup(
             "notebooks/*.ipynb",
         ]
     },
+    python_requires=">=3.10",
     entry_points={
         "console_scripts": [
             "dsgrid=dsgrid.cli.dsgrid:cli",

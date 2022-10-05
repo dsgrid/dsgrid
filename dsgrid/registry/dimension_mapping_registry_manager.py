@@ -168,11 +168,16 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                     mapping.records,
                     mapping.filename,
                     mapping.mapping_type.value,
+                    tolerance=mapping.from_fraction_tolerance,
                     group_by="from_id",
                 )
             if mapping.archetype.check_fraction_sum_eq1_to_id:
                 self._check_fraction_sum(
-                    mapping.records, mapping.filename, mapping.mapping_type.value, group_by="to_id"
+                    mapping.records,
+                    mapping.filename,
+                    mapping.mapping_type.value,
+                    tolerance=mapping.to_fraction_tolerance,
+                    group_by="to_id",
                 )
 
             if mapping.mapping_type.value == "duplication":
@@ -197,21 +202,24 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             )
 
     @staticmethod
-    def _check_fraction_sum(mapping_records, mapping_name, mapping_type, group_by="from_id"):
+    def _check_fraction_sum(
+        mapping_records, mapping_name, mapping_type, tolerance, group_by="from_id"
+    ):
         mapping_df = models_to_dataframe(mapping_records)
         mapping_sum_df = (
             mapping_df.groupBy(group_by)
             .agg(F.sum("from_fraction").alias("sum_fraction"))
             .sort(F.desc("sum_fraction"), group_by)
         )
-        fracs_greater_than_one = mapping_sum_df.filter((F.col("sum_fraction") - 1.0) > 0.000001)
-        fracs_less_than_one = mapping_sum_df.filter(1.0 - F.col("sum_fraction") > 0.000001)
+        fracs_greater_than_one = mapping_sum_df.filter((F.col("sum_fraction") - 1.0) > tolerance)
+        fracs_less_than_one = mapping_sum_df.filter(1.0 - F.col("sum_fraction") > tolerance)
         if fracs_greater_than_one.count() > 0:
             id_greater_than_one = {
                 x[group_by] for x in fracs_greater_than_one[[group_by]].distinct().collect()
             }
             raise DSGInvalidDimensionMapping(
-                f"dimension_mapping={mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
+                f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a"
+                f"tolerance of {tolerance}, which does not allow from_fraction sum <> 1. "
                 f"Mapping contains from_fraction sum greater than 1 for {group_by}={id_greater_than_one}. "
             )
         elif fracs_less_than_one.count() > 0:
@@ -219,7 +227,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 x[group_by] for x in fracs_less_than_one[[group_by]].distinct().collect()
             }
             raise DSGInvalidDimensionMapping(
-                f"{mapping_name} has mapping_type={mapping_type}, which does not allow from_fraction sum <> 1. "
+                f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a"
+                f" tolerance of {tolerance}, which does not allow from_fraction sum <> 1. "
                 f"Mapping contains from_fraction sum less than 1 for {group_by}={id_less_than_one}. "
             )
 

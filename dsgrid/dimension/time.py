@@ -1,6 +1,6 @@
 """Dimensions related to time"""
 import datetime
-import pytz
+from zoneinfo import ZoneInfo
 import logging
 
 from dsgrid.data_models import DSGEnum, EnumValue
@@ -98,83 +98,100 @@ class MeasurementType(DSGEnum):
 
 
 class TimeZone(DSGEnum):
-    """Time zone enum types"""
+    """Time zone enum types
+        - tz: zoneinfo.available_timezones()
+        - tz_name: spark uses Java timezones: https://jenkov.com/tutorials/java-date-time/java-util-timezone.html
+    """
 
     UTC = EnumValue(
         value="UTC",
         description="Coordinated Universal Time",
-        tz=datetime.timezone(datetime.timedelta()),
+        tz=ZoneInfo("UTC"),
+        tz_name="UTC",
     )
     HST = EnumValue(
         value="HawaiiAleutianStandard",
         description="Hawaii Standard Time (UTC=-10). Does not include DST shifts.",
-        tz=datetime.timedelta(hours=-10),
+        tz=ZoneInfo("US/Hawaii"),
+        tz_name="HST",
     )
     AST = EnumValue(
         value="AlaskaStandard",
         description="Alaskan Standard Time (UTC=-9). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-9)),
+        tz=ZoneInfo("Etc/GMT+9"),
+        tz_name="AST",
     )
     APT = EnumValue(
         value="AlaskaPrevailing",
         description="Alaska Prevailing Time. Commonly called Alaska Local Time. Includes DST"
         " shifts during DST times.",
-        tz=pytz.timezone("US/Alaska"),
+        tz=ZoneInfo("US/Alaska"),
+        tz_name="US/Alaska",
     )
     PST = EnumValue(
         value="PacificStandard",
         description="Pacific Standard Time (UTC=-8). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-8)),
+        tz=ZoneInfo("Etc/GMT+8"),
+        tz_name="PST",
     )
     PPT = EnumValue(
         value="PacificPrevailing",
         description="Pacific Prevailing Time. Commonly called Pacific Local Time. Includes DST"
         " shifts ,during DST times.",
-        tz=pytz.timezone("US/Pacific"),
+        tz=ZoneInfo("US/Pacific"),
+        tz_name="US/Pacific",
     )
     MST = EnumValue(
         value="MountainStandard",
         description="Mountain Standard Time (UTC=-7). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-7)),
+        tz=ZoneInfo("Etc/GMT+7"),
+        tz_name="MST",
     )
     MPT = EnumValue(
         value="MountainPrevailing",
         description="Mountain Prevailing Time. Commonly called Mountain Local Time. Includes DST"
         " shifts during DST times.",
-        tz=pytz.timezone("US/Mountain"),
+        tz=ZoneInfo("US/Mountain"),
+        tz_name="US/Mountain",
     )
     CST = EnumValue(
         value="CentralStandard",
         description="Central Standard Time (UTC=-6). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-6)),
+        tz=ZoneInfo("Etc/GMT+6"),
+        tz_name="CST",
     )
     CPT = EnumValue(
         value="CentralPrevailing",
         description="Central Prevailing Time. Commonly called Central Local Time. Includes DST"
         " shifts during DST times.",
-        tz=pytz.timezone("US/Central"),
+        tz=ZoneInfo("US/Central"),
+        tz_name="US/Central",
     )
     EST = EnumValue(
         value="EasternStandard",
         description="Eastern Standard Time (UTC=-5). Does not include DST shifts.",
-        tz=datetime.timezone(datetime.timedelta(hours=-5)),
+        tz=ZoneInfo("Etc/GMT+5"),
+        tz_name="EST",
     )
     EPT = EnumValue(
         value="EasternPrevailing",
         description="Eastern Prevailing Time. Commonly called Eastern Local Time. Includes DST"
         " shifts during DST times.",
-        tz=pytz.timezone("US/Eastern"),
+        tz=ZoneInfo("US/Eastern"),
+        tz_name="US/Eastern",
     )
     NONE = EnumValue(
         value="none",
         description="No timezone, suitable for temporally aggregated data",
         tz=None,
+        tz_name="none",
     )
     LOCAL = EnumValue(
         value="LOCAL",
         description="Local time. Implies that the geography's timezone will be dynamically applied"
         " when converting loca time to other time zones.",
         tz=None,  # TODO: needs handling: DSGRID-171
+        tz_name="local",
     )
 
     def get_standard_time(self):
@@ -200,6 +217,40 @@ class TimeZone(DSGEnum):
             logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
             return TimeZone.LOCAL
 
+    def get_prevailing_time(self):
+        """ get equivalent standard time """
+        if self == TimeZone.UTC:
+            return TimeZone.UTC
+        if self == TimeZone.HST:
+            return TimeZone.HST
+        if self in [TimeZone.AST, TimeZone.APT]:
+            return TimeZone.APT
+        if self in [TimeZone.PST, TimeZone.PPT]:
+            return TimeZone.PPT
+        if self in [TimeZone.MST, TimeZone.MPT]:
+            return TimeZone.MPT
+        if self in [TimeZone.CST, TimeZone.CPT]:
+            return TimeZone.CPT
+        if self in [TimeZone.EST, TimeZone.EPT]:
+            return TimeZone.EPT
+        if self == TimeZone.NONE:
+            logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
+            return TimeZone.NONE
+        if self == TimeZone.LOCAL:
+            logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
+            return TimeZone.LOCAL
+
+    def is_standard(self):
+        lst = [TimeZone.UTC, TimeZone.HST, TimeZone.AST, TimeZone.PST, TimeZone.MST, TimeZone.CST, TimeZone.EST]
+        if self in lst:
+            return True
+        return False
+
+    def is_prevailing(self):
+        lst = [TimeZone.APT, TimeZone.PPT, TimeZone.MPT, TimeZone.CPT, TimeZone.EPT]
+        if self in lst:
+            return True
+        return False
 
 class DatetimeRange:
     def __init__(self, start, end, frequency, leap_day_adjustment: LeapDayAdjustmentType):
@@ -291,3 +342,27 @@ def make_time_range(start, end, frequency, leap_day_adjustment):
     elif frequency == datetime.timedelta(days=0):
         return NoOpTimeRange(start, end, frequency, leap_day_adjustment)
     return DatetimeRange(start, end, frequency, leap_day_adjustment)
+
+
+def get_timezone(tz_value: str) -> TimeZone:
+    """ convert GEOGRAPHY record time_zone col str to dsgrid TimeZone object """
+    for tzo in TimeZone:
+        if tz_value == tzo.value:
+            return tzo
+    raise ValueError(f"tz={tz_value} cannot be converted to a TimeZone object")
+
+
+def get_equivalent_standard_system_timezone(sys_tz: str) -> str:
+    """
+    - input "sys_tz" needs to be supported by zoneinfo.available_timezones()
+    - output "sys_tz_standard" needs to be a java-supported timezone for pyspark
+    """
+    sys_tz_name = datetime.datetime.now(ZoneInfo(sys_tz)).tzname()
+    sys_tz_standard = sys_tz_name.replace("DT", "ST")
+
+    if sys_tz_standard == "AKST":
+        sys_tz_standard = "AST"
+
+    # TODO: is there a dictionary out there to look up equivalent standard timezone for a given real timezone?
+
+    return sys_tz_standard

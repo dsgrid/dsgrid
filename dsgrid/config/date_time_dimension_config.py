@@ -1,9 +1,16 @@
 import logging
 from datetime import datetime
+from pyspark.sql.types import StructType, StructField, StringType, TimestampType
+from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
 
 import pandas as pd
 
-from dsgrid.dimension.time import TimeZone, make_time_range
+from dsgrid.dimension.time import (
+    get_equivalent_standard_system_timezone,
+    TimeZone,
+    make_time_range,
+)
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -50,8 +57,64 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def convert_dataframe(self, df, project_time_dim):
-        # TODO: handle time zone
+    def get_time_dataframe(self):
+        time_col = self.get_timestamp_load_data_columns()
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+        schema = StructType([StructField(time_col, TimestampType(), False)])
+
+        if self.model.timezone in [TimeZone.LOCAL, TimeZone.NONE]:
+            # TODO: handle time zone
+            ### need to bring in geography to lookup tz
+            ### need to ensure TEMPO rep time is set to local
+            schema = StructType(
+                [
+                    StructField(time_col, StringType(), False),
+                    StructField("timezone", StringType(), False),
+                ]
+            )
+            raise ValueError("TimeZone = LOCAL or NONE needs fixing")
+
+        model_time = self.list_expected_dataset_timestamps()
+        spark = SparkSession.builder.appName("dgrid").getOrCreate()
+        sys_tz = spark.conf.get("spark.sql.session.timeZone")
+
+        # this is not required if we maintain UTC as session time
+        # if self.model.timezone.is_standard():
+        #     sys_tz = get_equivalent_standard_system_timezone(sys_tz)
+
+        # this is in local system time
+        df_time = spark.createDataFrame(model_time, schema=schema)
+
+        # TO BE DELETED
+        # model_time2 = model_time[1668:1668+24] # <----
+        # model_time2 = model_time[7385:7385+24]
+        # df_time2 = spark.createDataFrame(model_time2, schema=schema)
+        # test = df_time2.withColumn("UTC", F.to_utc_timestamp(F.col("timestamp"), sys_tz)).withColumn("project", F.from_utc_timestamp(F.col("UTC"), self.model.timezone.tz_name))
+        # test.write.parquet("/Users/lliu2/Downloads/time_pyspark.parquet")
+        # test.toPandas().head(20)
+        # import pandas as pd; pd.DataFrame(test.collect()).head(20)
+        # breakpoint()
+
+        # convert to project time
+        df_time = df_time.select(
+            F.from_utc_timestamp(
+                F.to_utc_timestamp(F.col("timestamp"), sys_tz), self.model.timezone.tz_name
+            ).alias("timestamp")
+        )
+
+        return df_time
+
+    def convert_dataframe(self, df=None, project_time_dim=None, project_geography_dim=None):
+        if project_time_dim is None:
+            return df
+        if project_time_dim.get_time_ranges == self.get_time_ranges:
+            return df
+
+        df = self.get_time_dataframe()
+        # timezone conversion
+        # TODO: Figure out what to do when project_time_dim is different than "dataset_time_dim"
+
         return df
 
     def get_frequency(self):

@@ -85,6 +85,8 @@ setup(
         "sqlalchemy",
         "toml",
         "uvicorn",
+        "tzdata", # time zone stuff
+        "pyarrow",
     ],
     extras_require={
         "test": test_requires,

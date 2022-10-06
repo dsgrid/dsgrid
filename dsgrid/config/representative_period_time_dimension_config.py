@@ -2,16 +2,13 @@ import abc
 import calendar
 import logging
 from datetime import datetime, timedelta
-from pyspark.sql.types import (
-    StructType, StructField, IntegerType
-    )
+from pyspark.sql.types import StructType, StructField, IntegerType
 from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 
 import pandas as pd
 
 from dsgrid.dimension.time import (
-    TimeZone,
     get_timezone,
     RepresentativePeriodFormat,
     DatetimeRange,
@@ -53,17 +50,15 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_time_dataframe(self):
         time_cols = self.get_timestamp_load_data_columns()
-        schema = StructType([
-                StructField(time_col, IntegerType(), False) for
-                time_col in time_cols
-            ])
+        schema = StructType(
+            [StructField(time_col, IntegerType(), False) for time_col in time_cols]
+        )
 
         model_time = self.list_expected_dataset_timestamps()
         spark = SparkSession.builder.appName("dgrid").getOrCreate()
         df_time = spark.createDataFrame(model_time, schema=schema)
 
         return df_time
-
 
     def convert_dataframe(self, df=None, project_time_dim=None):
         # TODO: Create a dataframe with timestamps covering project_time_dim.model.ranges
@@ -72,7 +67,10 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
         if project_time_dim is None:
             return df
-        if project_time_dim.list_expected_dataset_timestamps() == self.list_expected_dataset_timestamps():
+        if (
+            project_time_dim.list_expected_dataset_timestamps()
+            == self.list_expected_dataset_timestamps()
+        ):
             return df
 
         time_cols = self.get_timestamp_load_data_columns()
@@ -89,15 +87,13 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         project_tz = project_time_dim.model.timezone.tz_name
         idx = 0
         for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
-            local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_value))\
-            .withColumn("local_time",
-                F.from_utc_timestamp(
-                    F.to_utc_timestamp(F.col(ptime_col), project_tz),
-                    tz_name
-                    ))
+            local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_value)).withColumn(
+                "local_time",
+                F.from_utc_timestamp(F.to_utc_timestamp(F.col(ptime_col), project_tz), tz_name),
+            )
             select = [ptime_col, "time_zone"]
             for col in time_cols:
-                func = col.replace("_","")
+                func = col.replace("_", "")
                 expr = f"{func}(local_time) AS {col}"
                 if func == "dayofweek":
                     expr = f"{func}(local_time)-1 AS {col}"
@@ -111,7 +107,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
         # join all
         join_keys = time_cols + ["time_zone"]
-        select = [col if col not in time_cols else F.col(col).cast(IntegerType()) for col in df.columns]
+        select = [
+            col if col not in time_cols else F.col(col).cast(IntegerType()) for col in df.columns
+        ]
         df = df.select(*select).join(time_df, on=join_keys, how="left").drop(*join_keys)
 
         # QC
@@ -142,7 +140,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         return self._format_handler.get_timestamp_load_data_columns()
 
     def get_tzinfo(self):
-        ### TBD
+        # TBD
         return None
 
     def list_expected_dataset_timestamps(self):

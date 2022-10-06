@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 from pyspark.sql.types import StructType, StructField, IntegerType
+from pyspark.sql import SparkSession
 
 import pandas as pd
 

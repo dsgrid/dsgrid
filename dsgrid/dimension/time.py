@@ -99,8 +99,8 @@ class MeasurementType(DSGEnum):
 
 class TimeZone(DSGEnum):
     """Time zone enum types
-        - tz: zoneinfo.available_timezones()
-        - tz_name: spark uses Java timezones: https://jenkov.com/tutorials/java-date-time/java-util-timezone.html
+    - tz: zoneinfo.available_timezones()
+    - tz_name: spark uses Java timezones: https://jenkov.com/tutorials/java-date-time/java-util-timezone.html
     """
 
     UTC = EnumValue(
@@ -195,7 +195,7 @@ class TimeZone(DSGEnum):
     )
 
     def get_standard_time(self):
-        """ get equivalent standard time """
+        """get equivalent standard time"""
         if self == TimeZone.UTC:
             return TimeZone.UTC
         if self == TimeZone.HST:
@@ -218,7 +218,7 @@ class TimeZone(DSGEnum):
             return TimeZone.LOCAL
 
     def get_prevailing_time(self):
-        """ get equivalent standard time """
+        """get equivalent standard time"""
         if self == TimeZone.UTC:
             return TimeZone.UTC
         if self == TimeZone.HST:
@@ -241,7 +241,15 @@ class TimeZone(DSGEnum):
             return TimeZone.LOCAL
 
     def is_standard(self):
-        lst = [TimeZone.UTC, TimeZone.HST, TimeZone.AST, TimeZone.PST, TimeZone.MST, TimeZone.CST, TimeZone.EST]
+        lst = [
+            TimeZone.UTC,
+            TimeZone.HST,
+            TimeZone.AST,
+            TimeZone.PST,
+            TimeZone.MST,
+            TimeZone.CST,
+            TimeZone.EST,
+        ]
         if self in lst:
             return True
         return False
@@ -251,6 +259,7 @@ class TimeZone(DSGEnum):
         if self in lst:
             return True
         return False
+
 
 class DatetimeRange:
     def __init__(self, start, end, frequency, leap_day_adjustment: LeapDayAdjustmentType):
@@ -345,7 +354,7 @@ def make_time_range(start, end, frequency, leap_day_adjustment):
 
 
 def get_timezone(tz_value: str) -> TimeZone:
-    """ convert GEOGRAPHY record time_zone col str to dsgrid TimeZone object """
+    """convert GEOGRAPHY record time_zone col str to dsgrid TimeZone object"""
     for tzo in TimeZone:
         if tz_value == tzo.value:
             return tzo

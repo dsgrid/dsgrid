@@ -7,7 +7,7 @@ import pyspark.sql.functions as F
 import pandas as pd
 
 from dsgrid.dimension.time import (
-    get_equivalent_standard_system_timezone,
+    # get_equivalent_standard_system_timezone,
     TimeZone,
     make_time_range,
 )
@@ -95,19 +95,21 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         # breakpoint()
 
         # convert to dataset timezone
-        df_time = self._convert_time_zone(df_time, time_col, session_tz, self.model.timezone.tz_name)
+        df_time = self._convert_time_zone(
+            df_time, time_col, session_tz, self.model.timezone.tz_name
+        )
 
         return df_time
 
-
     @staticmethod
     def _convert_time_zone(df, time_col: str, from_tz, to_tz):
-        """ convert dataframe from one single time zone to another """
+        """convert dataframe from one single time zone to another"""
         nontime_cols = [col for col in df.columns if col != time_col]
         df = df.select(
-            F.from_utc_timestamp(
-                F.to_utc_timestamp(F.col(time_col), from_tz), to_tz
-            ).alias(time_col), *nontime_cols
+            F.from_utc_timestamp(F.to_utc_timestamp(F.col(time_col), from_tz), to_tz).alias(
+                time_col
+            ),
+            *nontime_cols,
         )
         return df
 

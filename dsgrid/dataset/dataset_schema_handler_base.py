@@ -9,10 +9,10 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.dataset import (
-    map_and_reduce_stacked_dimension, 
+    map_and_reduce_stacked_dimension,
     map_and_reduce_pivoted_dimension,
     add_column_from_records,
-    )
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -251,7 +251,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return df
 
-
     @track_timing(timer_stats_collector)
     def _add_time_zone(self, load_data_df):
         geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
@@ -260,13 +259,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         load_data_df = add_column_from_records(load_data_df, geo_records, geo_name, "time_zone")
         return load_data_df
 
-
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(self, load_data_df):
         # This needs to convert the time format as well as time zone (TODO).
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_dim.convert_dataframe(
-            load_data_df, 
-            project_time_dim=self._project_time_dim, 
-            )
+            load_data_df,
+            project_time_dim=self._project_time_dim,
+        )
         return load_data_df

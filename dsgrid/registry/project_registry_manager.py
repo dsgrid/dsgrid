@@ -268,7 +268,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 )
             if model.dimensions.all_in_one_supplemental_dimensions:
                 supp_dir = src_dir / _SUPPLEMENTAL_TMP_DIR
-                assert not supp_dir.exists()
+                assert not supp_dir.exists(), f"{supp_dir} exists"
                 supp_dir.mkdir()
                 tmp_dirs.append(supp_dir)
                 model.dimension_mappings.base_to_supplemental += (

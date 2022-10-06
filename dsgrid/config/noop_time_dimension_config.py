@@ -15,6 +15,9 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def check_dataset_time_consistency(self, load_data_df):
         pass
 
+    def get_time_dataframe(self):
+        pass
+
     def convert_dataframe(self, df, project_time_dim=None, project_geography_dim=None):
         return df
 

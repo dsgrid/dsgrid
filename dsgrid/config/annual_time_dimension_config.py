@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from pyspark.sql.types import StructType, StructField, IntegerType
 
 import pandas as pd
 
@@ -49,7 +50,18 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def convert_dataframe(self, df, project_time_dim=None, project_geography_dim=None):
+    def get_time_dataframe(self):
+        time_col = self.get_timestamp_load_data_columns()
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+        schema = StructType([StructField(time_col, IntegerType(), False)])
+
+        model_time = self.list_expected_dataset_timestamps()
+        spark = SparkSession.builder.appName("dgrid").getOrCreate()
+        df_time = spark.createDataFrame(model_time, schema=schema)
+        return df_time
+
+    def convert_dataframe(self, df=None, project_time_dim=None):
         return df
 
     def get_frequency(self):

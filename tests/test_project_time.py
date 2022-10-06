@@ -33,15 +33,9 @@ logger = logging.getLogger(__name__)
 def registry_mgr():
     return RegistryManager.load(REGISTRY_PATH, offline_mode=True)
 
-def test_project_time(registry_mgr):
-    # spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    project_mgr = registry_mgr.project_manager
-    dataset_mgr = registry_mgr.dataset_manager
-    dim_map_mgr = registry_mgr.dimension_mapping_manager
-    dim_mgr = registry_mgr.dimension_manager
-
+def test_convert_to_project_time(registry_mgr):
     project_id = "dsgrid_conus_2022"
-    project = project_mgr.load_project(project_id)
+    project = registry_mgr.project_manager.load_project(project_id)
 
     dataset_id = "tempo_conus_2022"
     project.load_dataset(dataset_id)
@@ -55,24 +49,39 @@ def test_project_time(registry_mgr):
     project_time_dim = project.config.get_base_dimension(DimensionType.TIME) # or tempo._handler._project_time_dim
     comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
     tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
-    tempo_geography_dim = tempo._handler.config.get_dimension(DimensionType.GEOGRAPHY)
 
-    # test get_time_dataframe()
-    check_time_data_frame(project_time_dim)
-    check_time_data_frame(comstock_time_dim)
+    # [1] test get_time_dataframe()
+    check_time_dataframe(project_time_dim)
+    check_time_dataframe(comstock_time_dim)
     tempo_time_dim.get_time_dataframe()
+    # TODO: could add test for annual_time_dimension_config when AEO data is ready
 
-    # time explosion
-    load_data = tempo_time_dim.convert_dataframe(
-        df=tempo.load_data,
+
+    # [2] test convert_dataframe()
+    # tempo time explosion
+    tempo_data = tempo._handler._add_time_zone(tempo.load_data_lookup)
+    tempo_data = tempo.load_data.join(tempo_data, on="id")
+    tempo_data = tempo_time_dim.convert_dataframe(
+        df=tempo_data,
         project_time_dim=project_time_dim,
-        dataset_geography_dim=tempo_geography_dim,
-        df_meta=tempo.load_data_lookup
         )
-    check_exploded_tempo_time(project_time_dim, load_data)
+    check_exploded_tempo_time(project_time_dim, tempo_data)
 
 
-def check_time_data_frame(time_dim):
+    # comstock time conversion
+    comstock_data = comstock._handler._add_time_zone(comstock.load_data_lookup)
+    comstock_data = comstock.load_data.join(comstock_data, on="id")
+    comstock_data = comstock_time_dim.convert_dataframe(
+        df=comstock_data,
+        project_time_dim=project_time_dim,
+        )
+
+    # [3] test make_project_dataframe()
+    tempo._handler.make_project_dataframe()
+    comstock._handler.make_project_dataframe()
+
+
+def check_time_dataframe(time_dim):
     time_df = time_dim.get_time_dataframe().toPandas() # pyspark df
     time_range = time_dim.get_time_ranges()[0]
 
@@ -83,6 +92,7 @@ def check_time_data_frame(time_dim):
     time_df_ts = time_df.iloc[-1,0]
     time_range_ts = time_range.end.tz_localize(None)
     assert time_df_ts == time_range_ts, f"Ending timestamp does not match: {time_df_ts} vs. {time_range_ts}"
+
 
 def check_exploded_tempo_time(project_time_dim, load_data):
     """

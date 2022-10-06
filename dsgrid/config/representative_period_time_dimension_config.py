@@ -64,36 +64,25 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return df_time
 
-    @staticmethod
-    def _create_time_map(project_time_dim):
-        pass
 
-
-    def convert_dataframe(self, df=None, project_time_dim=None, dataset_geography_dim=None, df_meta=None):
+    def convert_dataframe(self, df=None, project_time_dim=None):
         # TODO: Create a dataframe with timestamps covering project_time_dim.model.ranges
         # for all model_years in the df, then join the df to that dataframe on the time columns.
         # Account for time zone.
 
-        # TODO: remove df_meta, add timezone to df before convert_dataframe
-
         if project_time_dim is None:
             return df
-        if project_time_dim.get_time_ranges == self.get_time_ranges:
+        if project_time_dim.list_expected_dataset_timestamps() == self.list_expected_dataset_timestamps():
             return df
 
         time_cols = self.get_timestamp_load_data_columns()
+        ptime_col = project_time_dim.get_timestamp_load_data_columns()
+        assert len(ptime_col) == 1, ptime_col
+        ptime_col = ptime_col[0]
 
         # get unique timezones
-        geo_records = dataset_geography_dim.get_records_dataframe()
-        geo_tz_values = [row.time_zone for row in geo_records.select("time_zone").distinct().collect()]
+        geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
         geo_tz_names = [get_timezone(tz).tz_name for tz in geo_tz_values]
-
-        # create timezone map
-        tz_df = df_meta.select(F.col("id").alias("map_id"), "geography").join(
-            geo_records.select(F.col("id").alias("geography"), "time_zone"),
-            on = "geography",
-            how = "left"
-            ).drop("geography")
 
         # create time map
         project_time_df = project_time_dim.get_time_dataframe()
@@ -103,10 +92,10 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_value))\
             .withColumn("local_time",
                 F.from_utc_timestamp(
-                    F.to_utc_timestamp(F.col("timestamp"), project_tz),
+                    F.to_utc_timestamp(F.col(ptime_col), project_tz),
                     tz_name
                     ))
-            select = ["timestamp", "time_zone"]
+            select = [ptime_col, "time_zone"]
             for col in time_cols:
                 func = col.replace("_","")
                 expr = f"{func}(local_time) AS {col}"
@@ -121,18 +110,27 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             idx += 1
 
         # join all
-        df = df.join(tz_df, on=df["id"]==tz_df["map_id"], how="left").drop("map_id")
         join_keys = time_cols + ["time_zone"]
         select = [col if col not in time_cols else F.col(col).cast(IntegerType()) for col in df.columns]
-        dfn = df.select(*select).join(time_df, on=join_keys, how="left").drop(*join_keys)
+        df = df.select(*select).join(time_df, on=join_keys, how="left").drop(*join_keys)
 
         # QC
-        time_len = project_time_df.count()
-        id_len = df.select("id").distinct().count()
-        df_len = dfn.count()
-        assert df_len == time_len * id_len, f"df with exploded time has len={df_len}, but expecting {time_len*id_len}, check join logic!"
+        # project_time_len = project_time_df.count()
+        # dataset_time_len = self.get_time_dataframe().count()
+        # df_len = df.count()
+        # dfn_len = dfn.count()
+        # expected_len = df_len / dataset_time_len * project_time_len
+        # assert dfn_len == expected_len, f"df with exploded time has len={dfn_len}, but expecting {expected_len}, check join logic!"
 
-        return dfn
+        df_check = df.groupBy(ptime_col).count().sort(ptime_col)
+        freq_count = df_check.select("count").distinct().collect()
+        assert len(freq_count) == 1, freq_count
+
+        project_ts = set(project_time_df.select(ptime_col).collect())
+        df_ts = set(df_check.select(ptime_col).collect())
+        assert df_ts == project_ts, df_ts.symmetric_difference(project_ts)
+
+        return df
 
     def get_frequency(self):
         return self._format_handler.get_frequency()

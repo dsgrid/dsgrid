@@ -168,14 +168,14 @@ class DimensionMappingBaseModel(DSGBaseModel):
         title="to_dimension",
         description="To dimension",
     )
-    from_fraction_tolerance: Optional[float] = Field(
+    from_fraction_tolerance: float = Field(
         title="from_fraction_tolerance",
-        description="Tolerance value to apply to the from_fraction column",
+        description="Tolerance to apply when checking from_fraction column sums",
         default=1e-9,
     )
-    to_fraction_tolerance: Optional[float] = Field(
+    to_fraction_tolerance: float = Field(
         title="to_fraction_tolerance",
-        description="Tolerance value to apply to the to_fraction column",
+        description="Tolerance to apply when checking to_fraction column sums",
         default=1e-9,
     )
     description: str = Field(

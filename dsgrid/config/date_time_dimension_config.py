@@ -1,19 +1,18 @@
 import logging
 from datetime import datetime
 from pyspark.sql.types import StructType, StructField, StringType, TimestampType
-from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 
 import pandas as pd
 
 from dsgrid.dimension.time import (
-    # get_equivalent_standard_system_timezone,
     TimeZone,
     make_time_range,
 )
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.spark import _get_spark_session
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -58,6 +57,10 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             )
 
     def get_time_dataframe(self):
+        """Note: DF.show() displays time in session time, which may be confusing.
+        But timestamps are stored correctly here
+
+        """
         time_col = self.get_timestamp_load_data_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
@@ -74,27 +77,18 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             raise ValueError("TimeZone = LOCAL or NONE needs fixing")
 
         model_time = self.list_expected_dataset_timestamps()
-        spark = SparkSession.builder.appName("dgrid").getOrCreate()
-        session_tz = spark.conf.get("spark.sql.session.timeZone")
+        df_time = _get_spark_session().createDataFrame(model_time, schema=schema)
 
-        # this is not required if we maintain UTC as session time
-        # if self.model.timezone.is_standard():
-        #     session_tz = get_equivalent_standard_system_timezone(session_tz)
+        return df_time
 
-        # this is in local system time
-        df_time = spark.createDataFrame(model_time, schema=schema)
+    def get_time_dataframe_in_model_timezone(self):
+        """convert time so it displays in config.model timezone"""
+        time_col = self.get_timestamp_load_data_columns()
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
 
-        # TO BE DELETED
-        # model_time2 = model_time[1668:1668+24] # <----
-        # model_time2 = model_time[7385:7385+24]
-        # df_time2 = spark.createDataFrame(model_time2, schema=schema)
-        # test = df_time2.withColumn("UTC", F.to_utc_timestamp(F.col("timestamp"), session_tz)).withColumn("project", F.from_utc_timestamp(F.col("UTC"), self.model.timezone.tz_name))
-        # test.write.parquet("/Users/lliu2/Downloads/time_pyspark.parquet")
-        # test.toPandas().head(20)
-        # import pandas as pd; pd.DataFrame(test.collect()).head(20)
-        # breakpoint()
-
-        # convert to dataset timezone
+        df_time = self.get_time_dataframe()
+        session_tz = _get_spark_session().conf.get("spark.sql.session.timeZone")
         df_time = self._convert_time_zone(
             df_time, time_col, session_tz, self.model.timezone.tz_name
         )
@@ -113,33 +107,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         )
         return df
 
-    def convert_dataframe(self, df=None, project_time_dim=None):
-        if project_time_dim is None:
-            return df
-
-        spark = SparkSession.builder.appName("dgrid").getOrCreate()
-        session_tz = spark.conf.get("spark.sql.session.timeZone")
-        project_tz = project_time_dim.model.timezone.tz_name
-
-        time_col = self.get_timestamp_load_data_columns()
-        assert len(time_col) == 1, time_col
-        time_col = time_col[0]
-
-        # I think whether project_time_dim is the same as dataset_time_dim, or different
-        # or dataset_time_dim is in local time, we only need to do conversion once to project
-        # I think time_zone is required only for validation at registration...
-        df = self._convert_time_zone(df, time_col, session_tz, project_tz)
-
-        # QC
-        project_time_df = project_time_dim.get_time_dataframe()
-        df_check = df.groupBy(time_col).count().sort(time_col)
-        freq_count = df_check.select("count").distinct().collect()
-        assert len(freq_count) == 1, freq_count
-
-        project_ts = set(project_time_df.select(time_col).collect())
-        df_ts = set(df_check.select(time_col).collect())
-        assert df_ts == project_ts, df_ts.symmetric_difference(project_ts)
-
+    def convert_dataframe(self, df=None, project_time_dim=None, df_meta=None):
+        """we may have to do somethine special with local timezone, but can't think of it yet"""
         return df
 
     def get_frequency(self):

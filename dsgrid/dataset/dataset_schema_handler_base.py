@@ -260,11 +260,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return load_data_df
 
     @track_timing(timer_stats_collector)
-    def _convert_time_dimension(self, load_data_df):
+    def _convert_time_dimension(self, load_data_df, load_data_lookup=None):
         # This needs to convert the time format as well as time zone (TODO).
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_dim.convert_dataframe(
-            load_data_df,
+        load_data_df = time_dim.convert_dataframe(
+            df=load_data_df,
             project_time_dim=self._project_time_dim,
+            df_meta=load_data_lookup,
         )
         return load_data_df

@@ -60,6 +60,7 @@ def representative_time_dimension_model():
 def check_date_range_creation(time_dimension_model):
     config = DateTimeDimensionConfig(time_dimension_model)  # TimeDimensionConfig
     time_range = config.get_time_ranges()
+    tz = config.get_tzinfo()
 
     # create date range for time dimension
     df = pd.DataFrame()
@@ -81,7 +82,6 @@ def check_date_range_creation(time_dimension_model):
         freq = "AS"
     else:
         freq = f"{int(hours)}h"
-    tz = config.get_tzinfo()
     ts = pd.date_range(start, end, freq=freq, tz=tz)
 
     # make necessary adjustments for leap_day_adjustment
@@ -122,7 +122,6 @@ def check_date_range_creation(time_dimension_model):
     # compare two date range creation
     df["delta"] = df["pd_dt"] - df["dim_dt"]
     num_ts_diff = (df["delta"] != datetime.timedelta(0)).sum()
-
     assert num_ts_diff == 0
 
 
@@ -139,6 +138,16 @@ def check_register_annual_time(annual_time_dimension_model):
 
 
 # Test funcs:
+
+
+def test_none_timezone_in_datetime_config():
+    file = DIMENSION_CONFIG_FILE_TIME
+    config_as_dict = load_data(file)
+    config_as_dict["dimensions"][1]["timezone"] = "none"
+    with pytest.raises(ValidationError):
+        DimensionsConfigModel(**config_as_dict)
+
+
 def test_time_dimension_model1(time_dimension_model1):
     check_date_range_creation(time_dimension_model1)
 

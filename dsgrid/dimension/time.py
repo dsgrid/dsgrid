@@ -265,6 +265,7 @@ class DatetimeRange:
     def __init__(self, start, end, frequency, leap_day_adjustment: LeapDayAdjustmentType):
         self.start = start
         self.end = end
+        self.tzinfo = start.tzinfo
         self.frequency = frequency
         self.leap_day_adjustment = leap_day_adjustment
 
@@ -294,24 +295,26 @@ class DatetimeRange:
         datetime
 
         """
-        cur = self.start.to_pydatetime()
-        end = self.end.to_pydatetime() + self.frequency  # to make end time inclusive
+        cur = self.start.to_pydatetime().astimezone(ZoneInfo("UTC"))
+        end = (
+            self.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + self.frequency
+        )  # to make end time inclusive
 
         while cur < end:
             if not (
                 self.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
-                and cur.month == 2
-                and cur.day == 29
+                and cur.astimezone(self.tzinfo).month == 2
+                and cur.astimezone(self.tzinfo).day == 29
             ):
                 if not (
                     self.leap_day_adjustment == LeapDayAdjustmentType.DROP_DEC31
-                    and cur.month == 12
-                    and cur.day == 31
+                    and cur.astimezone(self.tzinfo).month == 12
+                    and cur.astimezone(self.tzinfo).day == 31
                 ):
                     if not (
                         self.leap_day_adjustment == LeapDayAdjustmentType.DROP_JAN1
-                        and cur.month == 1
-                        and cur.day == 1
+                        and cur.astimezone(self.tzinfo).month == 1
+                        and cur.astimezone(self.tzinfo).day == 1
                     ):
                         yield cur
             cur += self.frequency
@@ -324,17 +327,25 @@ class DatetimeRange:
             list of datetime
 
         """
-        return list(self.iter_timestamps())
+        utc_list = list(self.iter_timestamps())
+        return [ts.astimezone(self.tzinfo) for ts in utc_list]
 
 
 class AnnualTimeRange(DatetimeRange):
     def iter_timestamps(self):
-        """Return a list of years (datetime obj) on Jan 1st"""
+        """
+        Return a list of years (datetime obj) on Jan 1st
+        Might be okay to not convert to UTC for iteration, since it's annual
+
+        """
         start = self.start.to_pydatetime()
         end = self.end.to_pydatetime()
-        tz = start.tzinfo
+        tz = self.tzinfo
         for year in range(start.year, end.year + 1):
             yield datetime.datetime(year=year, month=1, day=1, tzinfo=tz)
+
+    def list_time_range(self):
+        return list(self.iter_timestamps())
 
 
 class NoOpTimeRange(DatetimeRange):
@@ -359,19 +370,3 @@ def get_timezone(tz_value: str) -> TimeZone:
         if tz_value == tzo.value:
             return tzo
     raise ValueError(f"tz={tz_value} cannot be converted to a TimeZone object")
-
-
-def get_equivalent_standard_system_timezone(sys_tz: str) -> str:
-    """
-    - input "sys_tz" needs to be supported by zoneinfo.available_timezones()
-    - output "sys_tz_standard" needs to be a java-supported timezone for pyspark
-    """
-    sys_tz_name = datetime.datetime.now(ZoneInfo(sys_tz)).tzname()
-    sys_tz_standard = sys_tz_name.replace("DT", "ST")
-
-    if sys_tz_standard == "AKST":
-        sys_tz_standard = "AST"
-
-    # TODO: is there a dictionary out there to look up equivalent standard timezone for a given real timezone?
-
-    return sys_tz_standard

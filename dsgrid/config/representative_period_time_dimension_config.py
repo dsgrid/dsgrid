@@ -3,7 +3,6 @@ import calendar
 import logging
 from datetime import datetime, timedelta
 from pyspark.sql.types import StructType, StructField, IntegerType
-from pyspark.sql import SparkSession
 import pyspark.sql.functions as F
 
 import pandas as pd
@@ -17,6 +16,7 @@ from dsgrid.dimension.time import (
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import OneWeekPerMonthByHourType
 from dsgrid.utils.timing import track_timing, timer_stats_collector
+from dsgrid.utils.spark import _get_spark_session
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -55,16 +55,17 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         )
 
         model_time = self.list_expected_dataset_timestamps()
-        spark = SparkSession.builder.appName("dgrid").getOrCreate()
-        df_time = spark.createDataFrame(model_time, schema=schema)
+        df_time = _get_spark_session().createDataFrame(model_time, schema=schema)
 
         return df_time
 
-    def convert_dataframe(self, df=None, project_time_dim=None):
-        # TODO: Create a dataframe with timestamps covering project_time_dim.model.ranges
-        # for all model_years in the df, then join the df to that dataframe on the time columns.
-        # Account for time zone.
+    def get_time_dataframe_in_model_timezone(self):
+        return self.get_time_dataframe()
 
+    def convert_dataframe(self, df=None, project_time_dim=None, df_meta=None):
+        """convert df time column(s) based on project_time_dim.
+        df_meta is load_data_lookup with time_zone column
+        """
         if project_time_dim is None:
             return df
         if (
@@ -79,24 +80,26 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         ptime_col = ptime_col[0]
 
         # get unique timezones
+        if df_meta is not None:
+            df = df.join(df_meta.select("id", "time_zone"), on="id")
         geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
         geo_tz_names = [get_timezone(tz).tz_name for tz in geo_tz_values]
 
         # create time map
         project_time_df = project_time_dim.get_time_dataframe()
-        project_tz = project_time_dim.model.timezone.tz_name
+        session_tz = _get_spark_session().conf.get("spark.sql.session.timeZone")
         idx = 0
         for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
             local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_value)).withColumn(
                 "local_time",
-                F.from_utc_timestamp(F.to_utc_timestamp(F.col(ptime_col), project_tz), tz_name),
+                F.from_utc_timestamp(F.to_utc_timestamp(F.col(ptime_col), session_tz), tz_name),
             )
             select = [ptime_col, "time_zone"]
             for col in time_cols:
                 func = col.replace("_", "")
                 expr = f"{func}(local_time) AS {col}"
-                if func == "dayofweek":
-                    expr = f"{func}(local_time)-1 AS {col}"
+                if col == "day_of_week":
+                    expr = f"dayofweek(local_time)-1 AS {col}"
                 select.append(expr)
             local_time_df = local_time_df.selectExpr(*select)
             if idx == 0:
@@ -110,23 +113,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         select = [
             col if col not in time_cols else F.col(col).cast(IntegerType()) for col in df.columns
         ]
-        df = df.select(*select).join(time_df, on=join_keys, how="left").drop(*join_keys)
-
-        # QC
-        # project_time_len = project_time_df.count()
-        # dataset_time_len = self.get_time_dataframe().count()
-        # df_len = df.count()
-        # dfn_len = dfn.count()
-        # expected_len = df_len / dataset_time_len * project_time_len
-        # assert dfn_len == expected_len, f"df with exploded time has len={dfn_len}, but expecting {expected_len}, check join logic!"
-
-        df_check = df.groupBy(ptime_col).count().sort(ptime_col)
-        freq_count = df_check.select("count").distinct().collect()
-        assert len(freq_count) == 1, freq_count
-
-        project_ts = set(project_time_df.select(ptime_col).collect())
-        df_ts = set(df_check.select(ptime_col).collect())
-        assert df_ts == project_ts, df_ts.symmetric_difference(project_ts)
+        df = df.select(*select).join(time_df, on=join_keys).drop(*join_keys)
 
         return df
 

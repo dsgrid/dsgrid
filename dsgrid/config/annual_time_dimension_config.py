@@ -1,7 +1,6 @@
 import logging
 from datetime import datetime, timedelta
 from pyspark.sql.types import StructType, StructField, IntegerType
-from pyspark.sql import SparkSession
 
 import pandas as pd
 
@@ -9,6 +8,7 @@ from dsgrid.dimension.time import make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.spark import _get_spark_session
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -40,7 +40,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
         expected_timestamps = time_range.list_time_range()
         actual_timestamps = [
-            pd.Timestamp(str(x[time_col])).to_pydatetime()
+            pd.Timestamp(str(x[time_col]), tz=self.get_tzinfo()).to_pydatetime()
             for x in load_data_df.select(time_col).distinct().sort(time_col).collect()
         ]
         if expected_timestamps != actual_timestamps:
@@ -58,11 +58,13 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         schema = StructType([StructField(time_col, IntegerType(), False)])
 
         model_time = self.list_expected_dataset_timestamps()
-        spark = SparkSession.builder.appName("dgrid").getOrCreate()
-        df_time = spark.createDataFrame(model_time, schema=schema)
+        df_time = _get_spark_session.createDataFrame(model_time, schema=schema)
         return df_time
 
-    def convert_dataframe(self, df=None, project_time_dim=None):
+    def get_time_dataframe_in_model_timezone(self):
+        return self.get_time_dataframe()
+
+    def convert_dataframe(self, df=None, project_time_dim=None, df_meta=None):
         return df
 
     def get_frequency(self):

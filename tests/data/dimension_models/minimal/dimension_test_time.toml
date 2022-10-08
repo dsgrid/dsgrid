@@ -28,7 +28,7 @@ display_name = "Daily"
 time_interval_type = "instantaneous"
 ranges = [{start = "2018-01-01", end = "2020-01-01"}]
 str_format = "%Y-%m-%d"
-timezone = "none"
+timezone = "UTC"
 measurement_type = "total"
 
 

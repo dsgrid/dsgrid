@@ -18,7 +18,10 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_dataframe(self):
         pass
 
-    def convert_dataframe(self, df, project_time_dim=None, project_geography_dim=None):
+    def get_time_dataframe_in_model_timezone(self):
+        pass
+
+    def convert_dataframe(self, df=None, project_time_dim=None, df_meta=None):
         return df
 
     def get_frequency(self):

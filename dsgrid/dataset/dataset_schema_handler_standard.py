@@ -60,10 +60,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def make_project_dataframe(self):
         # TODO: Can we remove NULLs at registration time?
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        lk_df = self._add_time_zone(lk_df)
+        ld_df = self._convert_time_dimension(self._load_data, self._add_time_zone(lk_df))
         lk_df = self._remap_dimension_columns(lk_df)
         ld_df = self._remap_dimension_columns(
-            self._load_data,
+            ld_df,
             # Some pivot columns may have been removed.
             pivoted_columns=set(self._load_data.columns).intersection(
                 self.get_pivoted_dimension_columns()
@@ -72,13 +72,12 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         # TODO: handle fraction application
         # Currently this requires fraction = 1.0
         ld_df = ld_df.join(lk_df, on="id")
-        # Map the time here because some columns may have been collapsed above.
-        ld_df = self._convert_time_dimension(ld_df)
         return ld_df
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
         ld_df = self._load_data
         lk_df = self._load_data_lookup.filter("id is not NULL")
+        ld_df = self._convert_time_dimension(ld_df, lk_df)
 
         self._check_aggregations(context)
         lk_df, ld_df = self._prefilter_dataset(context, lk_df, ld_df)
@@ -114,9 +113,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = table_handler.process_stacked_aggregations(
             ld_df, context.model.project.per_dataset_aggregations, context
         )
-
-        # Map the time here because some columns may have been collapsed above.
-        ld_df = self._convert_time_dimension(ld_df)
 
         return ld_df
 

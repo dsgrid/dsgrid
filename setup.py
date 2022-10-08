@@ -74,6 +74,7 @@ setup(
         "awscli",
         "boto3",
         "click>=8",
+        "dash",
         "fastapi",
         "numpy",
         "pandas",

@@ -65,6 +65,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def convert_dataframe(self, df=None, project_time_dim=None, df_meta=None):
         """convert df time column(s) based on project_time_dim.
         df_meta is load_data_lookup with time_zone column
+        in pyspark: 1=Sunday, 7=Saturday
+        in pandas: 0:Monday, 6:Sunday
+        the mapping is: day_of_week = [(i+7-2)%7 for i in pyspark.dayofweek]
         """
         if project_time_dim is None:
             return df
@@ -99,7 +102,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                 func = col.replace("_", "")
                 expr = f"{func}(local_time) AS {col}"
                 if col == "day_of_week":
-                    expr = f"dayofweek(local_time)-1 AS {col}"
+                    expr = f"mod(dayofweek(local_time)+7-2, 7) AS {col}"
                 select.append(expr)
             local_time_df = local_time_df.selectExpr(*select)
             if idx == 0:

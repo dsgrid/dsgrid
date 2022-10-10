@@ -74,6 +74,7 @@ setup(
         "boto3",
         "click>=8",
         "dash",
+        "dash_bootstrap_components",
         "fastapi",
         "numpy",
         "pandas",

@@ -25,7 +25,7 @@ dsgrid uses [Apache Spark](#https://spark.apache.org/) to manage big data.
 
 #### Windows
 
-To install Apache Spark on Windows, follow [these instructions](https://sparkbyexamples.com/pyspark-tutorial/#pyspark-installation).
+To install Apache Spark on Windows, follow [these instructions](https://towardsdatascience.com/installing-apache-pyspark-on-windows-10-f5f0c506bea1).
 
 #### Mac
 

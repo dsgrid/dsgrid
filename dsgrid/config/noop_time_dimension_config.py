@@ -18,8 +18,8 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def build_time_dataframe(self):
         pass
 
-    def build_time_dataframe_with_time_zone(self):
-        pass
+    # def build_time_dataframe_with_time_zone(self):
+    #     pass
 
     def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
         return df

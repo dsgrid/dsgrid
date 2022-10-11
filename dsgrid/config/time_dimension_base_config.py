@@ -31,15 +31,16 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         """
 
-    @abc.abstractmethod
-    def build_time_dataframe_with_time_zone(self):
-        """Build time dataframe so it displays in the config model time zone (as opposed to spark.sql.session.timeZone).
+    # @abc.abstractmethod
+    # def build_time_dataframe_with_time_zone(self):
+    #     """Build time dataframe so that relative to spark.sql.session.timeZone, it
+    #     appears as expected in config time zone.
 
-        Returns
-        -------
-        pyspark.sql.DataFrame
+    #     Returns
+    #     -------
+    #     pyspark.sql.DataFrame
 
-        """
+    #     """
 
     @abc.abstractmethod
     def convert_dataframe(self, df, project_time_dim, time_zone_mapping):

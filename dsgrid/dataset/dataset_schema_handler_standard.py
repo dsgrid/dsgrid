@@ -79,9 +79,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return ld_df
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
-        ld_df = self._load_data
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._convert_time_dimension(ld_df, self.get_time_zone_mapping())
+        ld_df = self._convert_time_dimension(self._load_data, self.get_time_zone_mapping())
 
         self._check_aggregations(context)
         lk_df, ld_df = self._prefilter_dataset(context, lk_df, ld_df)

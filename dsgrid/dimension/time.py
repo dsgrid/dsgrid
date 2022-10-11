@@ -218,7 +218,7 @@ class TimeZone(DSGEnum):
             return TimeZone.LOCAL
 
     def get_prevailing_time(self):
-        """get equivalent standard time"""
+        """get equivalent prevailing time"""
         if self == TimeZone.UTC:
             return TimeZone.UTC
         if self == TimeZone.HST:

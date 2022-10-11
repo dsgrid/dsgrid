@@ -1,0 +1,23 @@
+{
+  "create_registry": true,
+  "registry_path": "tests/data/registry",
+  "projects": [
+    {
+      "project_id": "test_efs",
+      "config_file": "dsgrid-test-data/test_efs/dsgrid_project/project.toml",
+      "register_project": true,
+      "datasets": [
+        {
+          "dataset_id": "test_efs_comstock",
+          "dataset_path": "dsgrid-test-data/datasets/test_efs_comstock",
+          "config_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dataset.toml",
+          "dimension_mapping_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dimension_mappings.toml",
+          "register_dataset": true,
+          "submit_to_project": true,
+          "fix_dimension_uuids": true,
+          "fix_dimension_mapping_uuids": true
+        }
+      ]
+    }
+  ]
+}

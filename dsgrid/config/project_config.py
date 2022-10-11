@@ -6,9 +6,18 @@ from typing import Dict, List, Set
 from pydantic import Field
 from pydantic import root_validator, validator
 
+from dsgrid.config.dimension_association_manager import (
+    try_load_dimension_associations,
+    save_dimension_associations,
+)
 from dsgrid.data_models import DSGBaseModel, serialize_model_data
 from dsgrid.dimension.base_models import check_required_dimensions
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension, DSGInvalidParameter
+from dsgrid.exceptions import (
+    DSGInvalidField,
+    DSGInvalidDimension,
+    DSGInvalidParameter,
+    DSGInvalidDimensionAssociation,
+)
 from dsgrid.registry.common import (
     ProjectRegistryStatus,
     DatasetRegistryStatus,
@@ -16,6 +25,7 @@ from dsgrid.registry.common import (
 )
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
@@ -330,6 +340,8 @@ class ProjectDimensionQueryNamesModel(DSGBaseModel):
 class ProjectConfig(ConfigWithDataFilesBase):
     """Provides an interface to a ProjectConfigModel."""
 
+    _DIMENSION_ASSOCIATIONS_TABLE = "dimension_associations"
+
     def __init__(self, model):
         super().__init__(model)
         self._base_dimensions = {}  # DimensionKey to DimensionConfig
@@ -362,7 +374,6 @@ class ProjectConfig(ConfigWithDataFilesBase):
         return config
 
     def load_dimensions_and_mappings(self, dimension_manager, dimension_mapping_manager):
-        self.load_dimension_associations()
         self.load_dimensions(dimension_manager)
         self.load_dimension_mappings(dimension_mapping_manager)
 
@@ -561,15 +572,6 @@ class ProjectConfig(ConfigWithDataFilesBase):
             }
         return ProjectDimensionQueryNamesModel(**model)
 
-    def load_dimension_associations(self):
-        """Load all dimension associations."""
-        # Find out what dimension have no associations which means that all dimension recrods from
-        # the project must be used
-        self._dimension_associations = DimensionAssociations.load(
-            self.src_dir,
-            self.model.dimension_associations,
-        )
-
     def load_dimensions(self, dimension_manager: DimensionRegistryManager):
         """Load all Base Dimensions.
 
@@ -730,43 +732,142 @@ class ProjectConfig(ConfigWithDataFilesBase):
             if dataset.status == status:
                 yield dataset
 
-    @track_timing(timer_stats_collector)
-    def make_dimension_association_table(self, data_source=None):
-        """Return a table with associations across all dimensions.
+    def load_dimension_associations(self, data_source, try_load_cache=True):
+        """Return a table with required dimension associations.
 
         Parameters
         ----------
-        data_source : DimensionType, optional
-            Filter table by data_source, by default None.
+        data_source : str
+        try_load_cache : bool
+            Try to load table from Spark warehouse, defaults to True.
 
         Returns
         -------
         pyspark.sql.DataFrame
 
         """
+        if try_load_cache:
+            table = try_load_dimension_associations(self.config_id, data_source)
+        else:
+            table = None
+        if table is None:
+            logger.info(
+                "No dimension associations table exists for project_id=%s data_source=%s "
+                "Build table and save it. try_load_cache=%s",
+                self.config_id,
+                data_source,
+                try_load_cache,
+            )
+            table = self._make_dimension_association_table(data_source)
+            save_dimension_associations(table, self.config_id, data_source)
+        else:
+            logger.info("Loaded cached dimension associations for %s", self.config_id)
+        return table
+
+    @track_timing(timer_stats_collector)
+    def _make_dimension_association_table(self, data_source):
+        table = self._join_config_associations_with_dimensions(data_source)
+        return self._replace_supplemental_records_with_base_records(table)
+
+    def _join_config_associations_with_dimensions(self, data_source):
+        associations = DimensionAssociations.load(
+            self.src_dir,
+            self.model.dimension_associations,
+        )
         ds = DimensionType.DATA_SOURCE.value
-        table = self.dimension_associations.table
+        table = associations.table
+        if table is not None:
+            table = table.filter(f"{ds} == '{data_source}'").drop(ds).distinct()
         table_columns = set()
         # table is None when the project doesn't define any dimension associations.
         if table is not None:
-            if ds in table.columns and data_source is not None:
-                table = table.filter(f"{ds} = '{data_source}'").drop(ds)
             table_columns.update(table.columns)
 
-        all_dimensions = {d.value for d in DimensionType if d != DimensionType.TIME}
+        all_dimensions = {d.value for d in DimensionType if d not in (DimensionType.DATA_SOURCE, DimensionType.TIME)}
         missing_dimensions = all_dimensions.difference(table_columns)
+        table_count = 0 if table is None else table.count()
+        other_dims = {}
         for dim in missing_dimensions:
-            table_count = 0 if table is None else table.count()
-            other = (
+            other_dims[dim] = (
                 self.get_base_dimension(DimensionType(dim))
                 .get_records_dataframe()
                 .selectExpr(f"id as {dim}")
-            )
+            ).cache()
+
+        # Building the table in order of increasing unique counts was the fastest in one test.
+        # That may not always be the case. If we don't pick an order, it could be different
+        # each time, which isn't good. So, go with this.
+        keys = sorted(other_dims.keys(), key=lambda x: other_dims[x].count())
+        for dim in keys:
+            other = other_dims[dim]
+            logger.info("Start processing dimension=%s table_count=%s", dim, table_count)
             if table is None:
                 table = other
             else:
                 table = table.crossJoin(other)
-                assert table.count() == other.count() * table_count
+                count = table.count()
+                assert count == other.count() * table_count
+                table_count = count
+            other.unpersist()
+
+        logger.info("Dimension association table_count=%s", table_count)
+        return table
+
+    def _replace_supplemental_records_with_base_records(self, table):
+        supp_dim_query_names = self.get_supplemental_dimension_to_query_name_mapping()
+        # TODO DT: assert that query names aren't data_sources
+        exclude = (DimensionType.DATA_SOURCE, DimensionType.TIME)
+        for dim_type in (x for x in DimensionType if x not in exclude):
+            unique_ids = get_unique_values(table, dim_type.value)
+            if unique_ids:
+                base_records = self.get_base_dimension(dim_type).get_unique_ids()
+                supplemental_ids = unique_ids.difference(base_records)
+                for supplemental_id in supplemental_ids:
+                    table = self._replace_supplemental_record_with_base_records(
+                        table,
+                        supp_dim_query_names,
+                        dim_type,
+                        supplemental_id,
+                    )
+        return table
+
+    def _replace_supplemental_record_with_base_records(
+        self, table, supp_dim_query_names, dim_type, supplemental_id
+    ):
+        found = False
+        for query_name in supp_dim_query_names[dim_type]:
+            mapping_records = (
+                self.get_base_to_supplemental_mapping_records(query_name)
+                .select("from_id", "to_id")
+                .filter(f"to_id == '{supplemental_id}'")
+                .cache()
+            )
+            if not mapping_records.rdd.isEmpty():
+                if found:
+                    raise DSGInvalidDimensionAssociation(
+                        f"dimension association for {dim_type} has supplemental record ID "
+                        "{supplemental_id} defined in at least two supplemental dimensions"
+                    )
+                found = True
+                new_records = (
+                    table.join(
+                        mapping_records,
+                        on=table[dim_type.value] == mapping_records.to_id,
+                    )
+                    .drop(dim_type.value, "to_id")
+                    .withColumnRenamed("from_id", dim_type.value)
+                )
+                assert sorted(table.columns) == sorted(new_records.columns)
+                table = table.filter(f"{dim_type.value} != '{supplemental_id}'").union(
+                    new_records.select(*table.columns)
+                )
+            mapping_records.unpersist()
+
+        if not found:
+            raise Exception(
+                f"Did not find {dim_type} supplemental dimension with record ID {supplemental_id} "
+                "while attempting to substitute the records with base records."
+            )
 
         return table
 

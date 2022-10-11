@@ -5,6 +5,7 @@ import math
 import os
 import shutil
 from pathlib import Path
+from this import d
 from typing import AnyStr, List, Union
 import enum
 
@@ -21,7 +22,7 @@ from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 logger = logging.getLogger(__name__)
 
 
-def init_spark(name="dsgrid"):
+def init_spark(name="dsgrid", log_conf=False):
     """Initialize a SparkSession."""
     cluster = os.environ.get("SPARK_CLUSTER")
     if cluster is not None:
@@ -31,7 +32,8 @@ def init_spark(name="dsgrid"):
     else:
         spark = SparkSession.builder.appName(name).getOrCreate()
 
-    log_spark_conf(spark)
+    if log_conf:
+        log_spark_conf(spark)
     return spark
 
 
@@ -407,3 +409,102 @@ def _get_spark_session():
         spark = SparkSession.builder.getOrCreate()
         log_spark_conf(spark)
     return spark
+
+
+def try_load_stored_table(table_name, database="default"):
+    """Return a table stored in the Spark warehouse.
+
+    Parameters
+    ----------
+    table_name : str
+    database : str, optional
+        database, by default "default"
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    """
+    spark = _get_spark_session()
+    if spark.catalog.tableExists(table_name, dbName=database):
+        return spark.table(table_name)
+    table = try_load_stored_table_from_warehouse(table_name)
+    if table is not None:
+        logger.warning("Table %s was in warehouse but not spark catalog", table_name)
+    return table
+
+
+def is_table_stored(table_name, database="default"):
+    return table_name in list_tables(database=database)
+
+
+def _is_table_stored_in_spark_db(table_name, database="default"):
+    spark = _get_spark_session()
+    return table_name in (x.name for x in spark.catalog.listTables(dbName=database))
+
+
+def save_table(table, table_name, overwrite=True):
+    _delete_table_if_present_but_not_stored(table_name)
+    if overwrite:
+        table.write.mode("overwrite").saveAsTable(table_name)
+    else:
+        table.write.saveAsTable(table_name)
+
+
+def list_tables(database="default"):
+    spark = _get_spark_session()
+    tables = set((x.name for x in spark.catalog.listTables(dbName=database)))
+    warehouse_path = _get_warehouse_path()
+    for path in warehouse_path.iterdir():
+        tables.add(path.name)
+    return sorted(tables)
+
+
+def drop_table(table_name, database="default"):
+    spark = _get_spark_session()
+    if not _delete_table_if_present_but_not_stored(table_name) and _is_table_stored_in_spark_db(
+        table_name, database=database
+    ):
+        spark.sql(f"DROP TABLE {table_name}")
+        logger.info("Dropped table %s", table_name)
+
+
+# TODO
+# The next functions are workarounds for a problem where a new SparkSession does not load
+# tables saved in a previous session. Need to debug.
+
+
+def try_load_stored_table_from_warehouse(table_name):
+    if not _is_warehouse_local():
+        return None
+    for table in _get_warehouse_path().iterdir():
+        if table.name == table_name:
+            spark = _get_spark_session()
+            return spark.read.parquet(str(table))
+    return None
+
+
+def _delete_table_if_present_but_not_stored(table_name):
+    if not _is_table_stored_in_spark_db(table_name):
+        for table in list(_get_warehouse_path().iterdir()):
+            if table.name == table_name:
+                shutil.rmtree(table)
+                return True
+    return False
+
+
+def _is_table_stored_in_spark_warehouse(table_name):
+    for table in _get_warehouse_path().iterdir():
+        if table.name == table_name:
+            return True
+    return False
+
+
+def _get_warehouse_path():
+    spark = _get_spark_session()
+    return Path(spark.conf.get("spark.sql.warehouse.dir").replace("file:", ""))
+
+
+def _is_warehouse_local():
+    spark = _get_spark_session()
+    return spark.conf.get("spark.sql.warehouse.dir").startswith("file:")

@@ -8,6 +8,7 @@ import pyspark
 import pytest
 from semver import VersionInfo
 
+from dsgrid.config.dimension_association_manager import _ASSOCIATIONS_DATA_TABLE
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
@@ -25,6 +26,7 @@ from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.spark import is_table_stored
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
@@ -448,6 +450,9 @@ def check_update_project_dimension(tmpdir, manager):
             dim["version"] = str(new_version)
             break
     dump_data(project_data, project_config_file)
+    data_source = "comstock"
+    table_name = project_id + "__" + data_source + "__" + _ASSOCIATIONS_DATA_TABLE
+    assert is_table_stored(table_name)
     project_mgr.update_from_file(
         project_config_file,
         project_id,
@@ -458,6 +463,8 @@ def check_update_project_dimension(tmpdir, manager):
     )
     _check_dataset_statuses(project_mgr, project_id, DatasetRegistryStatus.UNREGISTERED)
     assert project_mgr.get_by_id(project_id).model.status == ProjectRegistryStatus.IN_PROGRESS
+    # The update should delete this table.
+    assert not is_table_stored(table_name)
 
 
 def _check_dataset_statuses(project_mgr, project_id, expected_status):

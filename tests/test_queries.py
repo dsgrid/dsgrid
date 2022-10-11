@@ -1052,7 +1052,7 @@ def accumulate_stats(stats):
         },
         "max": {
             "electricity": max(
-                (com["max"]["electricity"], res["max"]["electricity"], tem["sum"]["electricity"])
+                (com["max"]["electricity"], res["max"]["electricity"], tem["max"]["electricity"])
             ),
         },
     }
@@ -1062,9 +1062,26 @@ def read_datasets(path):
     datasets = Datasets(
         comstock=read_table(path / "data" / "conus_2022_reference_comstock" / "1.0.0"),
         resstock=read_table(path / "data" / "conus_2022_reference_resstock" / "1.0.0"),
-        tempo=read_table(path / "data" / "tempo_conus_2022" / "1.0.0"),
+        tempo=read_dataset_tempo(),
     )
     return datasets
+
+
+def read_dataset_tempo():
+    project = get_project()
+    dataset_id = dataset_id = "tempo_conus_2022"
+    project.load_dataset(dataset_id)
+    tempo = project.get_dataset(dataset_id)
+
+    lookup = tempo.load_data_lookup
+    tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
+    load_data = tempo_time_dim.convert_dataframe(
+        df=tempo.load_data,
+        project_time_dim=project.config.get_base_dimension(DimensionType.TIME),
+        time_zone_mapping=tempo._handler.get_time_zone_mapping(),
+    )
+    table = load_data.join(lookup, on="id").drop("id")
+    return Tables(load_data.cache(), lookup.cache(), table.cache())
 
 
 def read_table(path):

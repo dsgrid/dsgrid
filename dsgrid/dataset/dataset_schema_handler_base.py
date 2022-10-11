@@ -253,19 +253,27 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     @track_timing(timer_stats_collector)
     def _add_time_zone(self, load_data_df):
+        """Add time_zone col to load_data_df"""
         geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
         geo_records = geography_dim.get_records_dataframe()
         geo_name = geography_dim.model.dimension_type.value
         load_data_df = add_column_from_records(load_data_df, geo_records, geo_name, "time_zone")
         return load_data_df
 
+    def get_time_zone_mapping(self):
+        """Get time_zone mapping to map to load_data_df
+        Returns
+        -------
+        pyspark.sql.DataFrame
+            a two-column df containing time_zone and a mapping key column
+        """
+
     @track_timing(timer_stats_collector)
-    def _convert_time_dimension(self, load_data_df, load_data_lookup=None):
-        # This needs to convert the time format as well as time zone (TODO).
+    def _convert_time_dimension(self, load_data_df, time_zone_mapping):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         load_data_df = time_dim.convert_dataframe(
             df=load_data_df,
             project_time_dim=self._project_time_dim,
-            df_meta=load_data_lookup,
+            time_zone_mapping=time_zone_mapping,
         )
         return load_data_df

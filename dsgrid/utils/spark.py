@@ -40,11 +40,6 @@ def log_spark_conf(spark: SparkSession):
     conf = spark.sparkContext.getConf().getAll()
     conf.sort(key=lambda x: x[0])
     logger.info("Spark conf: %s", "\n".join([f"{x} = {y}" for x, y in conf]))
-    session_tz = spark.conf.get("spark.sql.session.timeZone")
-    if session_tz != "UTC":
-        logger.warning(
-            f"pyspark.sql.session.timeZone={session_tz}, but should be in UTC for safe time-handling, proceed with WARNING!"
-        )
 
 
 @track_timing(timer_stats_collector)

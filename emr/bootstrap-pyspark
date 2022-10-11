@@ -104,7 +104,6 @@ pyarrow \
 s3fs \
 boto3 \
 pandas \
-tzdata \
 matplotlib \
 $EXTRA_CONDA_PACKAGES
 

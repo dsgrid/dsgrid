@@ -48,7 +48,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             self._format_handler.list_expected_dataset_timestamps(self.model.ranges), load_data_df
         )
 
-    def get_time_dataframe(self):
+    def build_time_dataframe(self):
         time_cols = self.get_timestamp_load_data_columns()
         schema = StructType(
             [StructField(time_col, IntegerType(), False) for time_col in time_cols]
@@ -59,16 +59,14 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return df_time
 
-    def get_time_dataframe_in_model_timezone(self):
-        return self.get_time_dataframe()
+    def build_time_dataframe_with_time_zone(self):
+        return self.build_time_dataframe()
 
-    def convert_dataframe(self, df=None, project_time_dim=None, df_meta=None):
-        """convert df time column(s) based on project_time_dim.
-        df_meta is load_data_lookup with time_zone column
-        in pyspark: 1=Sunday, 7=Saturday
-        in pandas: 0:Monday, 6:Sunday
-        the mapping is: day_of_week = [(i+7-2)%7 for i in pyspark.dayofweek]
-        """
+    def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
+        # in spark.dayofweek: 1=Sunday, 7=Saturday
+        # in pandas.dt.day_of_week: 0=Monday, 6=Sunday
+        # the mapping is: pandas.dt.day_of_week = [(i+7-2)%7 for i in spark.dayofweek]
+
         if project_time_dim is None:
             return df
         if (
@@ -83,33 +81,52 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         ptime_col = ptime_col[0]
 
         # get unique timezones
-        if df_meta is not None:
-            df = df.join(df_meta.select("id", "time_zone"), on="id")
+        if time_zone_mapping is not None:
+            key = [col for col in time_zone_mapping.columns if col != "time_zone"]
+            df = df.join(time_zone_mapping, on=key)
         geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
         geo_tz_names = [get_timezone(tz).tz_name for tz in geo_tz_values]
 
         # create time map
-        project_time_df = project_time_dim.get_time_dataframe()
-        session_tz = _get_spark_session().conf.get("spark.sql.session.timeZone")
-        idx = 0
-        for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
-            local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_value)).withColumn(
-                "local_time",
-                F.from_utc_timestamp(F.to_utc_timestamp(F.col(ptime_col), session_tz), tz_name),
-            )
-            select = [ptime_col, "time_zone"]
-            for col in time_cols:
-                func = col.replace("_", "")
-                expr = f"{func}(local_time) AS {col}"
-                if col == "day_of_week":
-                    expr = f"mod(dayofweek(local_time)+7-2, 7) AS {col}"
-                select.append(expr)
-            local_time_df = local_time_df.selectExpr(*select)
-            if idx == 0:
-                time_df = local_time_df
-            else:
-                time_df = time_df.union(local_time_df)
-            idx += 1
+        # temporarily set session time to UTC for timeinfo extraction
+        # Note: timeinfo is extracted from local_time column exactly in DF.show(),
+        # and only UTC seems to convert to local_time correctly for DF.show().
+        # Even though UTC does not always lead to correct time output when DF.toPandas()
+        # the underlying time data is correctly stored when saved to file
+        spark = _get_spark_session()
+        session_tz_orig = spark.conf.get("spark.sql.session.timeZone")
+        spark.conf.set("spark.sql.session.timeZone", "UTC")
+        session_tz = spark.conf.get("spark.sql.session.timeZone")
+
+        try:
+            project_time_df = project_time_dim.build_time_dataframe()
+            idx = 0
+            for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
+                local_time_df = project_time_df.withColumn(
+                    "time_zone", F.lit(tz_value)
+                ).withColumn(
+                    "local_time",
+                    F.from_utc_timestamp(
+                        F.to_utc_timestamp(F.col(ptime_col), session_tz), tz_name
+                    ),
+                )
+                select = [ptime_col, "time_zone"]
+                for col in time_cols:
+                    func = col.replace("_", "")
+                    expr = f"{func}(local_time) AS {col}"
+                    if col == "day_of_week":
+                        expr = f"mod(dayofweek(local_time)+7-2, 7) AS {col}"
+                    select.append(expr)
+                local_time_df = local_time_df.selectExpr(*select)
+                if idx == 0:
+                    time_df = local_time_df
+                else:
+                    time_df = time_df.union(local_time_df)
+                idx += 1
+        finally:
+            # reset session timezone
+            spark.conf.set("spark.sql.session.timeZone", session_tz_orig)
+            assert spark.conf.get("spark.sql.session.timeZone") == session_tz_orig
 
         # join all
         join_keys = time_cols + ["time_zone"]

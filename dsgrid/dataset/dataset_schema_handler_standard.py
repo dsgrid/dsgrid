@@ -57,10 +57,14 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         check_null_value_in_unique_dimension_rows(dim_table)
         return dim_table
 
+    def get_time_zone_mapping(self):
+        lk_df = self._load_data_lookup.filter("id is not NULL")
+        return self._add_time_zone(lk_df).select("id", "time_zone").distinct()
+
     def make_project_dataframe(self):
         # TODO: Can we remove NULLs at registration time?
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._convert_time_dimension(self._load_data, self._add_time_zone(lk_df))
+        ld_df = self._convert_time_dimension(self._load_data, self.get_time_zone_mapping())
         lk_df = self._remap_dimension_columns(lk_df)
         ld_df = self._remap_dimension_columns(
             ld_df,
@@ -71,13 +75,13 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         )
         # TODO: handle fraction application
         # Currently this requires fraction = 1.0
-        ld_df = ld_df.join(lk_df, on="id")
+        ld_df = ld_df.join(lk_df, on="id").drop("id")
         return ld_df
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
         ld_df = self._load_data
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._convert_time_dimension(ld_df, lk_df)
+        ld_df = self._convert_time_dimension(ld_df, self.get_time_zone_mapping())
 
         self._check_aggregations(context)
         lk_df, ld_df = self._prefilter_dataset(context, lk_df, ld_df)

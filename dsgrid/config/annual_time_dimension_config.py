@@ -51,7 +51,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def get_time_dataframe(self):
+    def build_time_dataframe(self):
         time_col = self.get_timestamp_load_data_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
@@ -61,10 +61,10 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         df_time = _get_spark_session.createDataFrame(model_time, schema=schema)
         return df_time
 
-    def get_time_dataframe_in_model_timezone(self):
-        return self.get_time_dataframe()
+    def build_time_dataframe_with_time_zone(self):
+        return self.build_time_dataframe()
 
-    def convert_dataframe(self, df=None, project_time_dim=None, df_meta=None):
+    def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
         return df
 
     def get_frequency(self):

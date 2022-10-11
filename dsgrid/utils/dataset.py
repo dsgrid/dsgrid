@@ -112,7 +112,7 @@ def add_column_from_records(df, dimension_records, dimension_name, column_to_add
     df = df.join(
         dimension_records.select(F.col("id").alias("record_id"), column_to_add),
         on=F.col(dimension_name) == F.col("record_id"),
-        how="left",
+        how="inner",
     ).drop("record_id")
     return df
 

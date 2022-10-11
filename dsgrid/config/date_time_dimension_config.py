@@ -56,11 +56,10 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def get_time_dataframe(self):
-        """Note: DF.show() displays time in session time, which may be confusing.
-        But timestamps are stored correctly here
+    def build_time_dataframe(self):
+        # Note: DF.show() displays time in session time, which may be confusing.
+        # But timestamps are stored correctly here
 
-        """
         time_col = self.get_timestamp_load_data_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
@@ -74,20 +73,20 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                     StructField("timezone", StringType(), False),
                 ]
             )
-            raise ValueError("TimeZone = LOCAL or NONE needs fixing")
+            raise NotImplementedError("TimeZone = LOCAL or NONE needs fixing")
 
         model_time = self.list_expected_dataset_timestamps()
         df_time = _get_spark_session().createDataFrame(model_time, schema=schema)
 
         return df_time
 
-    def get_time_dataframe_in_model_timezone(self):
+    def build_time_dataframe_with_time_zone(self):
         """convert time so it displays in config.model timezone"""
         time_col = self.get_timestamp_load_data_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
 
-        df_time = self.get_time_dataframe()
+        df_time = self.build_time_dataframe()
         session_tz = _get_spark_session().conf.get("spark.sql.session.timeZone")
         df_time = self._convert_time_zone(
             df_time, time_col, session_tz, self.model.timezone.tz_name
@@ -107,8 +106,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         )
         return df
 
-    def convert_dataframe(self, df=None, project_time_dim=None, df_meta=None):
-        """we may have to do somethine special with local timezone, but can't think of it yet"""
+    def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
+        # TODO: we may have to do something special with local timezone
         return df
 
     def get_frequency(self):
@@ -145,4 +144,4 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
         time_range = time_ranges[0]
-        return [DatetimeTimestampType(x) for x in time_range.iter_timestamps()]
+        return [DatetimeTimestampType(x) for x in time_range.list_time_range()]

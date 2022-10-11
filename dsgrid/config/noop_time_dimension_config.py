@@ -15,13 +15,13 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def check_dataset_time_consistency(self, load_data_df):
         pass
 
-    def get_time_dataframe(self):
+    def build_time_dataframe(self):
         pass
 
-    def get_time_dataframe_in_model_timezone(self):
+    def build_time_dataframe_with_time_zone(self):
         pass
 
-    def convert_dataframe(self, df=None, project_time_dim=None, df_meta=None):
+    def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
         return df
 
     def get_frequency(self):

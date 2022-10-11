@@ -23,6 +23,15 @@ conda activate dsgrid
 ### Dependencies
 dsgrid uses [Apache Spark](#https://spark.apache.org/) to manage big data.
 
+Spark requires Java 8 or later with the `JAVA_HOME` environment variable set to the Java installation directory.
+
+On Linux you can install OpenJDK with conda:
+```
+conda install openjdk
+```
+
+Windows install instructions are below.
+
 #### Windows
 
 To install Apache Spark on Windows, follow [these instructions](https://towardsdatascience.com/installing-apache-pyspark-on-windows-10-f5f0c506bea1).

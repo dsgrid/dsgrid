@@ -301,20 +301,22 @@ class DatetimeRange:
         )  # to make end time inclusive
 
         while cur < end:
+            month = cur.astimezone(self.tzinfo).month
+            day = cur.astimezone(self.tzinfo).day
             if not (
                 self.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
-                and cur.astimezone(self.tzinfo).month == 2
-                and cur.astimezone(self.tzinfo).day == 29
+                and month == 2
+                and day == 29
             ):
                 if not (
                     self.leap_day_adjustment == LeapDayAdjustmentType.DROP_DEC31
-                    and cur.astimezone(self.tzinfo).month == 12
-                    and cur.astimezone(self.tzinfo).day == 31
+                    and month == 12
+                    and day == 31
                 ):
                     if not (
                         self.leap_day_adjustment == LeapDayAdjustmentType.DROP_JAN1
-                        and cur.astimezone(self.tzinfo).month == 1
-                        and cur.astimezone(self.tzinfo).day == 1
+                        and month == 1
+                        and day == 1
                     ):
                         yield cur.astimezone(self.tzinfo)
             cur += self.frequency

@@ -35,7 +35,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     # def build_time_dataframe_with_time_zone(self):
     #     """Build time dataframe so that relative to spark.sql.session.timeZone, it
     #     appears as expected in config time zone.
-
+    #     Notes: the converted time will need to be converted back to session.timeZone
+    #        so spark can intepret it correctly when saving to file in UTC.
     #     Returns
     #     -------
     #     pyspark.sql.DataFrame

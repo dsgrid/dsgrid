@@ -8,7 +8,7 @@ import pyspark.sql.functions as F
 import pandas as pd
 
 from dsgrid.dimension.time import (
-    get_timezone,
+    TimeZone,
     RepresentativePeriodFormat,
     DatetimeRange,
     LeapDayAdjustmentType,
@@ -64,8 +64,8 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
         # in spark.dayofweek: 1=Sunday, 7=Saturday
-        # in pandas.dt.day_of_week: 0=Monday, 6=Sunday
-        # the mapping is: pandas.dt.day_of_week = [(i+7-2)%7 for i in spark.dayofweek]
+        # dsgrid uses python standard library (same for pandas), which has day_of_week: 0=Monday, 6=Sunday
+        # the mapping is: python.dt.day_of_week = [(i+7-2)%7 for i in spark.dayofweek]
 
         if project_time_dim is None:
             return df
@@ -85,7 +85,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             key = [col for col in time_zone_mapping.columns if col != "time_zone"]
             df = df.join(time_zone_mapping, on=key)
         geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
-        geo_tz_names = [get_timezone(tz).tz_name for tz in geo_tz_values]
+        geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
 
         # create time map
         # temporarily set session time to UTC for timeinfo extraction

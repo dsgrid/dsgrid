@@ -316,7 +316,7 @@ class DatetimeRange:
                         and cur.astimezone(self.tzinfo).month == 1
                         and cur.astimezone(self.tzinfo).day == 1
                     ):
-                        yield cur
+                        yield cur.astimezone(self.tzinfo)
             cur += self.frequency
 
     def list_time_range(self):
@@ -327,8 +327,7 @@ class DatetimeRange:
             list of datetime
 
         """
-        utc_list = list(self.iter_timestamps())
-        return [ts.astimezone(self.tzinfo) for ts in utc_list]
+        return list(self.iter_timestamps())
 
 
 class AnnualTimeRange(DatetimeRange):
@@ -343,9 +342,6 @@ class AnnualTimeRange(DatetimeRange):
         tz = self.tzinfo
         for year in range(start.year, end.year + 1):
             yield datetime.datetime(year=year, month=1, day=1, tzinfo=tz)
-
-    def list_time_range(self):
-        return list(self.iter_timestamps())
 
 
 class NoOpTimeRange(DatetimeRange):
@@ -362,11 +358,3 @@ def make_time_range(start, end, frequency, leap_day_adjustment):
     elif frequency == datetime.timedelta(days=0):
         return NoOpTimeRange(start, end, frequency, leap_day_adjustment)
     return DatetimeRange(start, end, frequency, leap_day_adjustment)
-
-
-def get_timezone(tz_value: str) -> TimeZone:
-    """convert GEOGRAPHY record time_zone col str to dsgrid TimeZone object"""
-    for tzo in TimeZone:
-        if tz_value == tzo.value:
-            return tzo
-    raise ValueError(f"tz={tz_value} cannot be converted to a TimeZone object")

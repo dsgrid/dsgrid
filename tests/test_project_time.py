@@ -10,7 +10,7 @@ import numpy as np
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.dimension.time import TimeZone, get_timezone
+from dsgrid.dimension.time import TimeZone
 from dsgrid.utils.spark import _get_spark_session
 
 
@@ -158,7 +158,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     model_time[ptime_col] = model_time[ptime_col].dt.tz_convert(session_tz)
 
     geo_tz_values = [row.time_zone for row in raw_data.select("time_zone").distinct().collect()]
-    geo_tz_names = [get_timezone(tz).tz_name for tz in geo_tz_values]
+    geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
 
     model_time_df = []
     for tzv, tz in zip(geo_tz_values, geo_tz_names):

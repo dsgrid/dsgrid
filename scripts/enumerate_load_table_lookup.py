@@ -43,7 +43,7 @@ class EnumerateTable:
 
     @timed_info
     def relocate_original_file(self, lookup_file):
-        """ copy load_data_lookup to new location """
+        """copy load_data_lookup to new location"""
         # define path for relocation
         file_rename = list(os.path.splitext(os.path.basename(lookup_file)))
         file_rename[0] = file_rename[0] + "_orig"
@@ -136,7 +136,7 @@ class EnumerateTable:
 
     @timed_info
     def run(self, relocated_file, lookup_file):
-        """ read from relocated_file, replace lookup_file with new output """
+        """read from relocated_file, replace lookup_file with new output"""
 
         spark = init_spark("dsgrid-load")
 

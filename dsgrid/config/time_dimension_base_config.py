@@ -22,13 +22,37 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def convert_dataframe(self, df, project_time_dim):
-        """Convert a dataframe to use project's time format and time zone.
+    def build_time_dataframe(self):
+        """Build time dimension as specified in config in a spark dataframe.
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+
+    # @abc.abstractmethod
+    # def build_time_dataframe_with_time_zone(self):
+    #     """Build time dataframe so that relative to spark.sql.session.timeZone, it
+    #     appears as expected in config time zone.
+    #     Notes: the converted time will need to be converted back to session.timeZone
+    #        so spark can intepret it correctly when saving to file in UTC.
+    #     Returns
+    #     -------
+    #     pyspark.sql.DataFrame
+
+    #     """
+
+    @abc.abstractmethod
+    def convert_dataframe(self, df, project_time_dim, time_zone_mapping):
+        """Convert input df to use project's time format and time zone.
 
         Parameters
         ----------
         df : pyspark.sql.DataFrame
         project_time_dim : TimeDimensionBaseConfig
+        time_zone_mapping : pyspark.sql.DataFrame
+            dataframe containing time_zone and a key column mappable to df
 
         Returns
         -------

@@ -9,7 +9,7 @@ repos:
         args: ["--maxkb=50000"]
 
   - repo: https://github.com/psf/black
-    rev: 20.8b1 # Replace by any tag/version: https://github.com/psf/black/tags
+    rev: 22.8.0 # Replace by any tag/version: https://github.com/psf/black/tags
     hooks:
       - id: black
         language_version: python # Should be a command that runs python3.6+

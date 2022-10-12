@@ -4,6 +4,7 @@ import abc
 import logging
 import os
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import List
 
@@ -238,7 +239,7 @@ class RegistryManagerBase(abc.ABC):
         registration = ConfigRegistrationModel(
             version=str(registry_config.version),
             submitter=submitter,
-            date=datetime.now(),
+            date=datetime.now(ZoneInfo("UTC")),
             log_message=log_message,
         )
         registry_config.registration_history.insert(0, registration)

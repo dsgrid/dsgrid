@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from pyspark.sql.types import StructType, StructField, IntegerType
 
 import pandas as pd
 
@@ -7,6 +8,7 @@ from dsgrid.dimension.time import make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.spark import _get_spark_session
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -38,7 +40,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
         expected_timestamps = time_range.list_time_range()
         actual_timestamps = [
-            pd.Timestamp(str(x[time_col])).to_pydatetime()
+            pd.Timestamp(str(x[time_col]), tz=self.get_tzinfo()).to_pydatetime()
             for x in load_data_df.select(time_col).distinct().sort(time_col).collect()
         ]
         if expected_timestamps != actual_timestamps:
@@ -49,7 +51,20 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def convert_dataframe(self, df, project_time_dim):
+    def build_time_dataframe(self):
+        time_col = self.get_timestamp_load_data_columns()
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+        schema = StructType([StructField(time_col, IntegerType(), False)])
+
+        model_time = self.list_expected_dataset_timestamps()
+        df_time = _get_spark_session.createDataFrame(model_time, schema=schema)
+        return df_time
+
+    # def build_time_dataframe_with_time_zone(self):
+    #     return self.build_time_dataframe()
+
+    def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
         return df
 
     def get_frequency(self):

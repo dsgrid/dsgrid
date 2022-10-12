@@ -63,8 +63,8 @@ def test_register_project_and_dataset(make_test_project_dir):
         )
         output = {}
         check_run_command(f"dsgrid registry --path={path} --offline list", output)
-        regex_project = re.compile(fr"{project_id}.*1\.1\.0")
-        regex_dataset = re.compile(fr"{dataset_id}.*1\.0\.0")
+        regex_project = re.compile(rf"{project_id}.*1\.1\.0")
+        regex_dataset = re.compile(rf"{dataset_id}.*1\.0\.0")
         assert regex_project.search(output["stdout"]) is not None, output["stdout"]
         assert regex_dataset.search(output["stdout"]) is not None, output["stdout"]
         dim_map_id = next((path / "configs" / "dimension_mappings").iterdir()).name

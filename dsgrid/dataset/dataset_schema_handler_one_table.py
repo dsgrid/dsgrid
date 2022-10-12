@@ -1,6 +1,8 @@
 import logging
 from typing import List
 
+import pyspark.sql.functions as F
+
 from dsgrid.config.dataset_config import (
     DatasetConfig,
 )
@@ -99,6 +101,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         check_null_value_in_unique_dimension_rows(dim_table)
 
         return dim_table
+
+    def get_time_zone_mapping(self):
+        geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
+        geo_records = geography_dim.get_records_dataframe()
+        geo_name = geography_dim.model.dimension_type.value
+        return geo_records.select(F.col("id").alias(geo_name), "time_zone")
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: List[DatasetSimpleModel]):

@@ -5,7 +5,6 @@ import math
 import os
 import shutil
 from pathlib import Path
-from this import d
 from typing import AnyStr, List, Union
 import enum
 

@@ -108,6 +108,15 @@ def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, re
     return df.selectExpr(*nonvalue_cols, *extra_cols, *exprs), sorted(final_columns), dropped
 
 
+def add_column_from_records(df, dimension_records, dimension_name, column_to_add):
+    df = df.join(
+        dimension_records.select(F.col("id").alias("record_id"), column_to_add),
+        on=F.col(dimension_name) == F.col("record_id"),
+        how="inner",
+    ).drop("record_id")
+    return df
+
+
 @track_timing(timer_stats_collector)
 def check_null_value_in_unique_dimension_rows(dim_table):
     if os.environ.get("__DSGRID_SKIP_NULL_UNIQUE_DIMENSION_CHECK__"):

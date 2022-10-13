@@ -168,6 +168,16 @@ class DimensionMappingBaseModel(DSGBaseModel):
         title="to_dimension",
         description="To dimension",
     )
+    from_fraction_tolerance: float = Field(
+        title="from_fraction_tolerance",
+        description="Tolerance to apply when checking from_fraction column sums",
+        default=1e-9,
+    )
+    to_fraction_tolerance: float = Field(
+        title="to_fraction_tolerance",
+        description="Tolerance to apply when checking to_fraction column sums",
+        default=1e-9,
+    )
     description: str = Field(
         title="description",
         description="Description of dimension mapping",
@@ -239,6 +249,16 @@ class DimensionMappingPreRegisteredBaseModel(DSGBaseModel):
         title="description",
         description="Description of dimension mapping",
     )
+    from_fraction_tolerance: Optional[float] = Field(
+        title="from_fraction_tolerance",
+        description="Tolerance value to apply to the from_fraction column",
+        default=1e-9,
+    )
+    to_fraction_tolerance: Optional[float] = Field(
+        title="to_fraction_tolerance",
+        description="Tolerance value to apply to the to_fraction column",
+        default=1e-9,
+    )
 
 
 class DimensionMappingByNameBaseModel(DimensionMappingPreRegisteredBaseModel):
@@ -260,7 +280,8 @@ class DimensionMappingDatasetToProjectBaseModel(DimensionMappingPreRegisteredBas
     """
 
     dimension_type: DimensionType = Field(
-        title="dimension_type", description="Dimension types that will be mapped"
+        title="dimension_type",
+        description="Dimension types that will be mapped",
     )
 
 

@@ -148,6 +148,8 @@ class MappingTableModel(DimensionMappingBaseModel):
             to_dimension=to_dimension,
             description=model.description,
             filename=model.filename,
+            from_fraction_tolerance=model.from_fraction_tolerance,
+            to_fraction_tolerance=model.to_fraction_tolerance,
         )
 
 

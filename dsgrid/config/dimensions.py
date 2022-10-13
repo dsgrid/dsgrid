@@ -428,6 +428,15 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         return _check_time_type_and_class_consistency(values)
 
     @root_validator(pre=False, skip_on_failure=True)
+    def check_timezone(cls, values):
+        if values["timezone"] == TimeZone.NONE:
+            raise ValueError(
+                f'timezone={values["timezone"]} is not allowed, '
+                "DateTimeDimensionModel must have a timezone other than 'none'"
+            )
+        return values
+
+    @root_validator(pre=False, skip_on_failure=True)
     def check_frequency(cls, values):
         if values["frequency"] in [timedelta(days=365), timedelta(days=366)]:
             raise ValueError(

@@ -15,6 +15,7 @@ from dsgrid.tests.common import (
     TEST_PROJECT_REPO,
     TEST_REGISTRY,
     TEST_STANDARD_SCENARIOS_PROJECT_REPO,
+    TEST_EFS_REGISTRATION_FILE,
 )
 
 
@@ -38,10 +39,7 @@ def pytest_sessionstart(session):
     else:
         if TEST_REGISTRY.exists():
             shutil.rmtree(TEST_REGISTRY)
-        ret = run_command(
-            f"python dsgrid/tests/make_us_data_registry.py {TEST_REGISTRY} -p {TEST_PROJECT_REPO} "
-            f"-d {TEST_DATASET_DIRECTORY}"
-        )
+        ret = run_command(f"python dsgrid/tests/register.py {TEST_EFS_REGISTRATION_FILE}")
         if ret == 0:
             print("make script returned 0")
             commit_file.write_text(latest_commit + "\n")

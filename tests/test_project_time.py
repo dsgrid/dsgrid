@@ -11,7 +11,7 @@ import numpy as np
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone
-from dsgrid.utils.spark import _get_spark_session
+from dsgrid.utils.spark import get_spark_session
 
 
 REGISTRY_PATH = (
@@ -107,7 +107,7 @@ def test_convert_to_project_time(registry_mgr):
 
 
 def check_time_dataframe(time_dim):
-    session_tz = _get_spark_session().conf.get("spark.sql.session.timeZone")
+    session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
     time_df = time_dim.build_time_dataframe().toPandas()  # pyspark df
     time_range = time_dim.get_time_ranges()[0]
 
@@ -129,7 +129,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     """check that annual sum from tempo data is the same when mapped in pyspark,
     and when mapped in pandas to get the frequency each value in raw_data gets mapped
     """
-    spark = _get_spark_session()
+    spark = get_spark_session()
     session_tz_orig = session_tz = spark.conf.get("spark.sql.session.timeZone")
 
     ptime_col = project_time_dim.get_timestamp_load_data_columns()
@@ -317,7 +317,7 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     assert len(freq_count) == 1, freq_count
 
     # QC 2: model_time == project_time == tempo_time
-    session_tz = _get_spark_session().conf.get("spark.sql.session.timeZone")
+    session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
     model_time[time_col] = model_time[time_col].dt.tz_convert(session_tz)
     project_time = project_time.toPandas()
     project_time[time_col] = project_time[time_col].dt.tz_localize(session_tz, ambiguous="infer")

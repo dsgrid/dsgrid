@@ -108,7 +108,6 @@ We recommend that dsgrid project repositories use the following directory organi
             │       │   ├── dataset.toml
             │       │   ├── dimension_mappings.toml
             │       └── ...
-            ├── dimension_associations
             ├── dimension_mappings
             ├── dimensions
             └── project.toml

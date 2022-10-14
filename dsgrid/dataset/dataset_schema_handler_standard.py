@@ -294,7 +294,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: List[DatasetSimpleModel]):
         lookup = self._load_data_lookup
-        lookup.cache()
+        # lookup.cache()
         pivoted_dimension_type = self.get_pivoted_dimension_type()
         pivoted_columns = set(self.get_pivoted_dimension_columns())
         pivoted_columns_to_keep = set()

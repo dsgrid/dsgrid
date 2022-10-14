@@ -5,7 +5,6 @@ from tempfile import TemporaryDirectory
 
 import pytest
 
-from dsgrid.exceptions import DSGInvalidField
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
@@ -21,7 +20,7 @@ def test_invalid_projects(make_test_project_dir):
 
         user = getpass.getuser()
         log_message = "test log message"
-        register_tests = (_setup_invalid_dimension_associations,)
+        register_tests = []
 
         # This is arranged in this way to avoid having to re-create the registry every time,
         # which is quite slow. There is one downside: if one test is able to register the
@@ -37,10 +36,3 @@ def test_invalid_projects(make_test_project_dir):
             finally:
                 if test_dir.exists():
                     shutil.rmtree(test_dir)
-
-
-def _setup_invalid_dimension_associations(project_dir):
-    association_file = project_dir / "dimension_associations" / "sector__subsector.csv"
-    with open(association_file, "a", encoding="utf8") as f_out:
-        f_out.write("invalid,invalid\n")
-    return DSGInvalidField, r"DataFrame contains NULL value"

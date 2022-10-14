@@ -3,6 +3,7 @@
 import getpass
 import itertools
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Union, List, Dict
@@ -12,7 +13,6 @@ from prettytable import PrettyTable
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
-    DSGInvalidDimensionAssociation,
     DSGInvalidParameter,
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
@@ -44,7 +44,7 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     ProjectRegistryStatus,
 )
-from dsgrid.utils.spark import create_dataframe_from_dimension_ids
+from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, run_in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
@@ -247,6 +247,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         tmp_dirs = []
         try:
             if model.dimensions.base_dimensions:
+                logger.info("Register base dimensions")
                 self._register_dimensions_from_models(
                     src_dir,
                     model.dimensions.base_dimensions,
@@ -257,6 +258,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     force,
                 )
             if model.dimensions.supplemental_dimensions:
+                logger.info("Register supplemental dimensions")
                 self._register_dimensions_from_models(
                     src_dir,
                     model.dimensions.supplemental_dimensions,
@@ -266,22 +268,20 @@ class ProjectRegistryManager(RegistryManagerBase):
                     log_message,
                     force,
                 )
-            if model.dimensions.all_in_one_supplemental_dimensions:
-                supp_dir = src_dir / _SUPPLEMENTAL_TMP_DIR
-                assert not supp_dir.exists(), f"{supp_dir} exists"
-                supp_dir.mkdir()
-                tmp_dirs.append(supp_dir)
-                model.dimension_mappings.base_to_supplemental += (
-                    self._register_all_in_one_dimensions(
-                        src_dir,
-                        supp_dir,
-                        model,
-                        context,
-                        submitter,
-                        log_message,
-                        force,
-                    )
-                )
+            logger.info("Register all-in-one supplemental dimensions")
+            supp_dir = src_dir / _SUPPLEMENTAL_TMP_DIR
+            assert not supp_dir.exists(), f"{supp_dir} exists"
+            supp_dir.mkdir()
+            tmp_dirs.append(supp_dir)
+            model.dimension_mappings.base_to_supplemental += self._register_all_in_one_dimensions(
+                src_dir,
+                supp_dir,
+                model,
+                context,
+                submitter,
+                log_message,
+                force,
+            )
             if model.dimension_mappings.base_to_supplemental:
                 self._register_base_to_supplemental_mappings(
                     src_dir,
@@ -358,6 +358,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         # Order of the next two is required for Pydantic validation.
         dimension_references += self._dimension_mgr.make_dimension_references(dimension_ids)
         dimensions.clear()
+        return dimension_references
 
     def _register_all_in_one_dimensions(
         self,
@@ -372,20 +373,18 @@ class ProjectRegistryManager(RegistryManagerBase):
         new_dimensions = []
         new_mappings = {}
         dim_type_to_ref = {x.dimension_type: x for x in model.dimensions.base_dimension_references}
-        for dimension_type in model.dimensions.all_in_one_supplemental_dimensions:
-            if dimension_type == DimensionType.TIME:
-                raise DSGInvalidParameter("Cannot have time in all_in_one_supplemental_dimensions")
-            if dimension_type in new_mappings:
-                raise DSGInvalidParameter(
-                    f"{dimension_type} is listed twice in all_in_one_supplemental_dimensions"
-                )
-
+        for dimension_type in (x for x in DimensionType if x != DimensionType.TIME):
             dim_ref = dim_type_to_ref[dimension_type]
             dim_config = self._dimension_mgr.get_by_id(dim_ref.dimension_id)
             dt_str = dimension_type.value
-            dt_plural = f"all_{dt_str}s"
-            dt_plural_dash = f"all-{dt_str}s"
-            dt_plural_formal = f"All {dt_str.title()}s"
+            if dt_str.endswith("y"):
+                dt_str = dt_str[:-1]
+                suffix = "ies"
+            else:
+                suffix = "s"
+            dt_plural = f"all_{dt_str}{suffix}"
+            dt_plural_dash = f"all-{dt_str}{suffix}"
+            dt_plural_formal = f"All {dt_str.title()}{suffix}"
             dim_record_file = supp_dir / f"{dt_plural}.csv"
             dim_text = f"id,name\n{dt_plural},{dt_plural_formal}\n"
             dim_record_file.write_text(dim_text)
@@ -405,8 +404,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                 name=dt_plural_dash,
                 display_name=dt_plural_formal,
                 dimension_type=dimension_type,
-                module=dim_config.model.module,
-                class_name=dim_config.model.class_name,
+                module="dsgrid.dimension.base_models",
+                class_name="DimensionRecordBaseModel",
                 description=dt_plural_formal,
             )
             new_dimensions.append(new_dim)
@@ -440,9 +439,12 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     @track_timing(timer_stats_collector)
     def _register(self, config, submitter, log_message, force):
-        self._run_checks(config)
-
         registration = make_initial_config_registration(submitter, log_message)
+        if os.environ.get("__DSGRID_USE_CACHED_DIMENSION_ASSOCIATIONS_FOR_PROJECT_REGISTRATION__"):
+            try_load_cache = True
+        else:
+            try_load_cache = False
+        self._run_checks(config, check_dimension_associations=True, try_load_cache=try_load_cache)
 
         registry_model = ProjectRegistryModel(
             project_id=config.model.project_id,
@@ -458,8 +460,8 @@ class ProjectRegistryManager(RegistryManagerBase):
         self.fs_interface.mkdir(data_dir)
         registry_filename = registry_dir / REGISTRY_FILENAME
         registry_config.serialize(registry_filename, force=force)
-        config.serialize(self.get_config_directory(config.config_id, registry_config.version))
-
+        config_directory = self.get_config_directory(config.config_id, registry_config.version)
+        config.serialize(config_directory)
         self._update_registry_cache(config.model.project_id, registry_config)
 
         logger.info(
@@ -470,7 +472,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         )
 
     @track_timing(timer_stats_collector)
-    def _run_checks(self, config: ProjectConfig):
+    def _run_checks(
+        self, config: ProjectConfig, check_dimension_associations=True, try_load_cache=True
+    ):
         dims = [x for x in config.iter_dimensions()]
         check_uniqueness((x.model.name for x in dims), "dimension name")
         check_uniqueness((x.model.display_name for x in dims), "dimension display name")
@@ -478,19 +482,10 @@ class ProjectRegistryManager(RegistryManagerBase):
             (getattr(x.model, "cls") for x in config.model.dimensions.base_dimensions),
             "dimension cls",
         )
-        self._check_dimension_associations(config)
-
-    @track_timing(timer_stats_collector)
-    def _check_dimension_associations(self, config: ProjectConfig):
-        for dimension_type in config.dimension_associations.dimension_types:
-            assoc_ids = config.dimension_associations.get_unique_ids(dimension_type)
-            dim = config.get_base_dimension(dimension_type)
-            dim_record_ids = dim.get_unique_ids()
-            diff = assoc_ids.difference(dim_record_ids)
-            if diff:
-                raise DSGInvalidDimensionAssociation(
-                    f"Dimension association for {dimension_type} has invalid records: {diff}"
-                )
+        if check_dimension_associations:
+            # This will raise an exception if the associations are invalid.
+            for dataset_id in config.list_unregistered_dataset_ids():
+                config.load_dimension_associations(dataset_id, try_load_cache=try_load_cache)
 
     @track_timing(timer_stats_collector)
     def register_and_submit_dataset(
@@ -684,7 +679,13 @@ class ProjectRegistryManager(RegistryManagerBase):
         else:
             new_status = ProjectRegistryStatus.IN_PROGRESS
         project_config.set_status(new_status)
-        version = self._update(project_config, submitter, VersionUpdateType.MINOR, log_message)
+        version = self._update(
+            project_config,
+            submitter,
+            VersionUpdateType.MINOR,
+            log_message,
+            check_dimension_associations=False,
+        )
 
         logger.info(
             "%s Registered dataset %s with version=%s in project %s",
@@ -726,13 +727,11 @@ class ProjectRegistryManager(RegistryManagerBase):
         )
 
         cols = [x.value for x in DimensionType if x not in exclude_dims]
-        assoc_table = project_config.make_dimension_association_table(data_source=data_source)
-        if pivoted_dimension.value in assoc_table.columns:
-            assoc_table = assoc_table.drop(pivoted_dimension.value)
+        dataset_id = dataset_config.config_id
+        assoc_table = project_config.load_dimension_associations(dataset_id)
         project_table = assoc_table.select(*cols).distinct()
         diff = project_table.exceptAll(dim_table.select(*cols).distinct())
         if not diff.rdd.isEmpty():
-            dataset_id = dataset_config.config_id
             project_id = project_config.config_id
             out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
             diff.write.options(header=True).mode("overwrite").csv(out_file)
@@ -746,42 +745,23 @@ class ProjectRegistryManager(RegistryManagerBase):
             raise DSGInvalidDataset(
                 f"Dataset {dataset_config.config_id} is missing required dimension records"
             )
-        self._check_pivoted_dimension_columns(
-            project_config, handler, project_config.dimension_associations, data_source
-        )
+        project_pivoted_ids = get_unique_values(assoc_table, pivoted_dimension.value)
+        self._check_pivoted_dimension_columns(handler, project_pivoted_ids, data_source)
 
     @staticmethod
     @track_timing(timer_stats_collector)
-    def _get_project_dimensions_table(project_config, type1, type2, associations, data_source):
-        """for each dimension type x, record is the same as project's unless a relevant association is provided."""
-        pdim1_ids = associations.get_unique_ids(type1, data_source)
-        if pdim1_ids is None:
-            pdim1_ids = project_config.get_base_dimension(type1).get_unique_ids()
-
-        pdim2_ids = associations.get_unique_ids(type2, data_source)
-        if pdim2_ids is None:
-            pdim2_ids = project_config.get_base_dimension(type2).get_unique_ids()
-
-        records = itertools.product(pdim1_ids, pdim2_ids)
-        return create_dataframe_from_dimension_ids(records, type1, type2)
-
-    @staticmethod
-    @track_timing(timer_stats_collector)
-    def _check_pivoted_dimension_columns(project_config, handler, associations, data_source):
+    def _check_pivoted_dimension_columns(handler, project_pivoted_ids, data_source):
         """pivoted dimension record is the same as project's unless a relevant association is provided."""
         logger.info("Check pivoted dimension columns.")
         d_dim_ids = handler.get_pivoted_dimension_columns_mapped_to_project()
         pivoted_dim = handler.get_pivoted_dimension_type()
-        p_dim_ids = associations.get_unique_ids(pivoted_dim, data_source)
-        if p_dim_ids is None:
-            p_dim_ids = project_config.get_base_dimension(pivoted_dim).get_unique_ids()
 
-        if d_dim_ids.symmetric_difference(p_dim_ids):
+        if d_dim_ids.symmetric_difference(project_pivoted_ids):
             raise DSGInvalidDataset(
                 f"Mismatch between project and {data_source} dataset pivoted {pivoted_dim.value} dimension, "
                 "please double-check data, and any relevant association_table and dimension_mapping. "
-                f"\n - Invalid column(s) in {data_source} load data according to project: {d_dim_ids.difference(p_dim_ids)}"
-                f"\n - Missing column(s) in {data_source} load data according to project: {p_dim_ids.difference(d_dim_ids)}"
+                f"\n - Invalid column(s) in {data_source} load data according to project: {d_dim_ids.difference(project_pivoted_ids)}"
+                f"\n - Missing column(s) in {data_source} load data according to project: {project_pivoted_ids.difference(d_dim_ids)}"
             )
 
     def update_from_file(
@@ -801,13 +781,18 @@ class ProjectRegistryManager(RegistryManagerBase):
         with self.cloud_interface.make_lock_file_managed(lock_file_path):
             return self._update(config, submitter, update_type, log_message)
 
-    def _update(self, config, submitter, update_type, log_message):
+    def _update(
+        self, config, submitter, update_type, log_message, check_dimension_associations=False
+    ):
+        registry = self.get_registry_config(config.config_id)
         old_config = self.get_by_id(config.config_id)
         checker = ProjectUpdateChecker(old_config.model, config.model)
         checker.run()
-        self._run_checks(config)
+        self._run_checks(
+            config,
+            check_dimension_associations=check_dimension_associations,
+        )
 
-        registry = self.get_registry_config(config.config_id)
         old_key = ConfigKey(config.config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)
         new_key = ConfigKey(config.config_id, version)

@@ -16,7 +16,7 @@ from dsgrid.dimension.time import (
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import OneWeekPerMonthByHourType
 from dsgrid.utils.timing import track_timing, timer_stats_collector
-from dsgrid.utils.spark import _get_spark_session
+from dsgrid.utils.spark import get_spark_session
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -55,7 +55,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         )
 
         model_time = self.list_expected_dataset_timestamps()
-        df_time = _get_spark_session().createDataFrame(model_time, schema=schema)
+        df_time = get_spark_session().createDataFrame(model_time, schema=schema)
 
         return df_time
 
@@ -93,7 +93,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         # and only UTC seems to convert to local_time correctly for DF.show().
         # Even though UTC does not always lead to correct time output when DF.toPandas()
         # the underlying time data is correctly stored when saved to file
-        spark = _get_spark_session()
+        spark = get_spark_session()
         session_tz_orig = spark.conf.get("spark.sql.session.timeZone")
         spark.conf.set("spark.sql.session.timeZone", "UTC")
         session_tz = spark.conf.get("spark.sql.session.timeZone")

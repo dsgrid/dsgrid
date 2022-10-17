@@ -74,6 +74,13 @@ def spark_session():
     spark.stop()
 
 
+@pytest.fixture(scope="module")
+def make_test_project_dir_module():
+    tmpdir = _make_project_dir(TEST_PROJECT_REPO)
+    yield tmpdir / "dsgrid_project"
+    shutil.rmtree(tmpdir)
+
+
 @pytest.fixture
 def make_test_project_dir():
     tmpdir = _make_project_dir(TEST_PROJECT_REPO)
@@ -85,6 +92,18 @@ def make_test_project_dir():
 def make_standard_scenarios_project_dir():
     tmpdir = _make_project_dir(TEST_STANDARD_SCENARIOS_PROJECT_REPO)
     yield tmpdir / "dsgrid_project"
+    shutil.rmtree(tmpdir)
+
+
+@pytest.fixture(scope="module")
+def make_test_data_dir_module():
+    tmpdir = Path(gettempdir()) / "test_data"
+    if os.path.exists(tmpdir):
+        shutil.rmtree(tmpdir)
+    os.mkdir(tmpdir)
+    dst_path = tmpdir / "datasets"
+    shutil.copytree(Path(TEST_DATASET_DIRECTORY), dst_path)
+    yield dst_path
     shutil.rmtree(tmpdir)
 
 

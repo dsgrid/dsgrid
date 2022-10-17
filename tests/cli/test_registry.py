@@ -2,7 +2,6 @@ import re
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.files import load_data
 from dsgrid.tests.common import TEST_DATASET_DIRECTORY
@@ -46,8 +45,8 @@ def test_register_project_and_dataset(make_test_project_dir):
         dataset_config = src_dir / dataset_dir / "dataset.toml"
         dataset_map_file = src_dir / dataset_dir / "dimension_mappings.toml"
         dataset_id = load_data(dataset_config)["dataset_id"]
-
         dataset_path = TEST_DATASET_DIRECTORY / dataset_id
+
         check_run_command(
             f"dsgrid registry --path={path} --offline projects register {project_config} "
             "--log-message log"
@@ -62,6 +61,7 @@ def test_register_project_and_dataset(make_test_project_dir):
             f"--log-message log"
         )
         output = {}
+
         check_run_command(f"dsgrid registry --path={path} --offline list", output)
         regex_project = re.compile(rf"{project_id}.*1\.1\.0")
         regex_dataset = re.compile(rf"{dataset_id}.*1\.0\.0")

@@ -440,7 +440,11 @@ class ProjectRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def _register(self, config, submitter, log_message, force):
         registration = make_initial_config_registration(submitter, log_message)
-        if os.environ.get("__DSGRID_USE_CACHED_DIMENSION_ASSOCIATIONS_FOR_PROJECT_REGISTRATION__"):
+        if (
+            os.environ.get("__DSGRID_USE_CACHED_DIMENSION_ASSOCIATIONS_FOR_PROJECT_REGISTRATION__")
+            is not None
+        ):
+            logger.warning("Try to use cached dimension associations for project registration.")
             try_load_cache = True
         else:
             try_load_cache = False
@@ -473,7 +477,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     @track_timing(timer_stats_collector)
     def _run_checks(
-        self, config: ProjectConfig, check_dimension_associations=True, try_load_cache=True
+        self, config: ProjectConfig, check_dimension_associations=True, try_load_cache=False
     ):
         dims = [x for x in config.iter_dimensions()]
         check_uniqueness((x.model.name for x in dims), "dimension name")
@@ -483,7 +487,6 @@ class ProjectRegistryManager(RegistryManagerBase):
             "dimension cls",
         )
         if check_dimension_associations:
-            # This will raise an exception if the associations are invalid.
             for dataset_id in config.list_unregistered_dataset_ids():
                 config.load_dimension_associations(dataset_id, try_load_cache=try_load_cache)
 
@@ -665,11 +668,14 @@ class ProjectRegistryManager(RegistryManagerBase):
         mapping_references: List[DimensionMappingReferenceModel],
     ):
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
-        self._check_dataset_base_to_project_base_mappings(
-            project_config,
-            dataset_config,
-            mapping_references,
-        )
+        if os.environ.get("__DSGRID_SKIP_DATASET_TO_PROJECT_MAPPING_CHECKS__") is not None:
+            logger.warning("Skip dataset-to-project mapping checks")
+        else:
+            self._check_dataset_base_to_project_base_mappings(
+                project_config,
+                dataset_config,
+                mapping_references,
+            )
 
         dataset_model = project_config.get_dataset(dataset_config.model.dataset_id)
         dataset_model.mapping_references = mapping_references
@@ -779,10 +785,14 @@ class ProjectRegistryManager(RegistryManagerBase):
             submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(config.config_id)
         with self.cloud_interface.make_lock_file_managed(lock_file_path):
-            return self._update(config, submitter, update_type, log_message)
+            # We could be more intelligent about check_dimension_associations. It's not necessary
+            # for some updates.
+            return self._update(
+                config, submitter, update_type, log_message, check_dimension_associations=True
+            )
 
     def _update(
-        self, config, submitter, update_type, log_message, check_dimension_associations=False
+        self, config, submitter, update_type, log_message, check_dimension_associations=True
     ):
         registry = self.get_registry_config(config.config_id)
         old_config = self.get_by_id(config.config_id)

@@ -48,7 +48,7 @@ def setup_registry(make_test_project_dir_module, make_test_data_dir_module):
 @pytest.fixture
 def register_dataset(setup_registry):
     manager, base_dir, dataset_config_path, dataset_path = setup_registry
-    test_dir = base_dir / f"test_data_dir"
+    test_dir = base_dir / "test_data_dir"
     shutil.copytree(dataset_path, test_dir)
     dataset_config_file = dataset_config_path / "dataset.toml"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
@@ -72,7 +72,7 @@ def register_dataset(setup_registry):
 @pytest.fixture
 def register_and_submit_dataset(setup_registry):
     manager, base_dir, dataset_config_path, dataset_path = setup_registry
-    test_dir = base_dir / f"test_data_dir"
+    test_dir = base_dir / "test_data_dir"
     shutil.copytree(dataset_path, test_dir)
     dataset_config_file = dataset_config_path / "dataset.toml"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
@@ -160,9 +160,9 @@ def test_invalid_load_data_id_missing_timestamp(register_dataset):
     text = "\n".join(data_file.read_text().splitlines()[:-1])
     data_file.write_text(text)
     expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = (
-        r"All time arrays must be repeated the same number of times: unique timestamp repeats =.*"
-    )
+    expected_errors[
+        "match_msg"
+    ] = r"All time arrays must be repeated the same number of times: unique timestamp repeats =.*"
 
 
 def test_invalid_load_data_id_extra_timestamp(register_dataset):

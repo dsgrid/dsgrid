@@ -1,6 +1,8 @@
 """
 Caches project dimension association tables in the Spark warehouse.
-One table per project can be stored. Multiple versions of one project can share the same table.
+One table per project can be stored. That table gets deleted whenever a project update
+invalidates it.
+
 The purpose is to allow dataset submissions to reuse existing tables.
 """
 

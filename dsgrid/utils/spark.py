@@ -20,7 +20,10 @@ from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 
 logger = logging.getLogger(__name__)
 
-DSGRID_DB_NAME = "dsgrid_db"
+# Consider using our own database. Would need to manage creation with
+# spark.sql(f"CREATE DATABASE IF NOT EXISTS {database}")
+# Doing so has caused conflicts in tests with the Derby db.
+DSGRID_DB_NAME = "default"
 
 
 def init_spark(name="dsgrid", log_conf=False):
@@ -29,17 +32,13 @@ def init_spark(name="dsgrid", log_conf=False):
     if cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf = SparkConf().setAppName(name).setMaster(cluster)
-        # spark = SparkSession.builder.config(conf=conf).getOrCreate()
         spark = SparkSession.builder.config(conf=conf).enableHiveSupport().getOrCreate()
     else:
-        # spark = SparkSession.builder.appName(name).getOrCreate()
         spark = SparkSession.builder.appName(name).enableHiveSupport().getOrCreate()
 
     if log_conf:
         log_spark_conf(spark)
 
-    spark.sql(f"CREATE DATABASE IF NOT EXISTS {DSGRID_DB_NAME}")
-    spark.sql(f"USE {DSGRID_DB_NAME}")
     return spark
 
 
@@ -462,7 +461,7 @@ def is_table_stored(table_name, database=DSGRID_DB_NAME):
     return spark.catalog.tableExists(table_name, dbName=database)
 
 
-def save_table(table, table_name, overwrite=True):
+def save_table(table, table_name, overwrite=True, database=DSGRID_DB_NAME):
     if overwrite:
         table.write.mode("overwrite").saveAsTable(table_name)
     else:

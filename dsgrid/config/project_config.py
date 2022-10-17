@@ -396,7 +396,7 @@ class ProjectConfig(ConfigBase):
         self._supplemental_dimensions = {}  # DimensionKey to DimensionConfig
         self._base_to_supplemental_mappings = {}
         self._dimensions_by_query_name = {}
-        self.src_dir = None  # TODO DT: property, setter
+        self._src_dir = None
 
     @staticmethod
     def model_class():
@@ -406,9 +406,13 @@ class ProjectConfig(ConfigBase):
     def config_filename():
         return "project.toml"
 
-    @staticmethod
-    def data_file_fields():
-        return []
+    @property
+    def src_dir(self):
+        return self._src_dir
+
+    @src_dir.setter
+    def src_dir(self, val):
+        self._src_dir = val
 
     @classmethod
     def load(cls, config_file, dimension_manager, dimension_mapping_manager):
@@ -799,7 +803,10 @@ class ProjectConfig(ConfigBase):
                 try_load_cache,
             )
             table = self._make_dimension_association_table(dataset_id)
-            save_dimension_associations(table, self.config_id, dataset_id)
+            if os.environ.get("__DSGRID_SKIP_SAVING_DIMENSION_ASSOCIATIONS__") is not None:
+                logger.warning("Skip saving dimension associations.")
+            else:
+                save_dimension_associations(table, self.config_id, dataset_id)
         else:
             logger.info("Loaded cached dimension associations for %s", self.config_id)
         return table
@@ -809,9 +816,40 @@ class ProjectConfig(ConfigBase):
         spark = get_spark_session()
         required_dimensions = self.get_dataset(dataset_id).required_dimensions
         supp_dim_query_names = self.get_supplemental_dimension_to_query_name_mapping()
+        dfs = self._build_multi_dim_requirement_associations(
+            required_dimensions.multi_dimensional,
+            supp_dim_query_names,
+        )
+
+        # Project config construction asserts that there is no intersection of dimensions in
+        # multi and single.
         existing = set()
+        for df in dfs:
+            existing.update(set(df.columns))
+
+        for field in (x for x in RequiredDimensionRecordsModel.__fields__ if x not in existing):
+            dim_type = DimensionType(field)
+            record_ids = self._replace_supplemental_record_ids_with_base(
+                set(getattr(required_dimensions.single_dimensional, field)),
+                dim_type,
+                supp_dim_query_names,
+            )
+            dfs.append(spark.createDataFrame([tuple([x]) for x in record_ids], [field]))
+
+        return cross_join_dfs(dfs)
+
+    def _build_multi_dim_requirement_associations(self, multi_dim_reqs, supp_dim_query_names):
+        spark = get_spark_session()
         dfs_by_dim_combo = {}
-        for item in required_dimensions.multi_dimensional:
+
+        # Example: Partial sector and subsector combinations are required.
+        # [
+        #     {"sector": "com", "subsector": ["commercial_subsector_supplemental"]},
+        #     {"sector": "res", "subsector": ["MidriseApartment"]},
+        # ]
+        # This code will replace supplemental records with base records and return a list of
+        # dataframes of those combinations - one per unique combination of dimensions.
+        for item in multi_dim_reqs:
             dim_combo = []
             item_dfs = []
             for field in RequiredDimensionRecordsModel.__fields__:
@@ -823,7 +861,6 @@ class ProjectConfig(ConfigBase):
                         dim_type,
                         supp_dim_query_names,
                     )
-                    existing.add(dim_type)
                     dim_combo.append(dim_type.value)
                     df = spark.createDataFrame([(x,) for x in record_ids], [dim_type.value])
                     item_dfs.append(df)
@@ -834,20 +871,7 @@ class ProjectConfig(ConfigBase):
             else:
                 dfs_by_dim_combo[dim_combo] = df
 
-        dfs = list(dfs_by_dim_combo.values())
-        # Project config construction asserts that there is no intersection of multi and single.
-        for field in RequiredDimensionRecordsModel.__fields__:
-            dim_type = DimensionType(field)
-            if dim_type in existing:
-                continue
-            record_ids = self._replace_supplemental_record_ids_with_base(
-                set(getattr(required_dimensions.single_dimensional, field)),
-                dim_type,
-                supp_dim_query_names,
-            )
-            dfs.append(spark.createDataFrame([tuple([x]) for x in record_ids], [dim_type.value]))
-
-        return cross_join_dfs(dfs)
+        return list(dfs_by_dim_combo.values())
 
     def _replace_supplemental_record_ids_with_base(
         self, record_ids, dim_type, supp_dim_query_names

@@ -26,10 +26,22 @@ logger = logging.getLogger(__name__)
 DSGRID_DB_NAME = "default"
 
 
-def init_spark(name="dsgrid", log_conf=False):
-    """Initialize a SparkSession."""
+def init_spark(name="dsgrid", log_conf=False, check_env=True):
+    """Initialize a SparkSession.
+
+    Parameters
+    ----------
+    name : str
+    log_conf : bool
+        If True, log the Spark configuration
+    check_env : bool
+        If True, which is default, check for the SPARK_CLUSTER environment variable and attach to
+        it. Otherwise, create a local-mode cluster or attach to the SparkSession that was created
+        by pyspark/spark-submit prior to starting the current process.
+
+    """
     cluster = os.environ.get("SPARK_CLUSTER")
-    if cluster is not None:
+    if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf = SparkConf().setAppName(name).setMaster(cluster)
         spark = SparkSession.builder.config(conf=conf).enableHiveSupport().getOrCreate()

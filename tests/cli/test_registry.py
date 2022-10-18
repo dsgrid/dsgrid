@@ -1,4 +1,5 @@
 import re
+import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -39,6 +40,11 @@ def test_register_project_and_dataset(make_test_project_dir):
         check_run_command(f"dsgrid-admin create-registry {path}")
         dataset_dir = Path("datasets/modeled/comstock")
 
+        def clear_spark_files():
+            for path in (Path("spark-warehouse"), Path("metastore_db")):
+                if path.exists():
+                    shutil.rmtree(path)
+
         src_dir = make_test_project_dir
         project_config = src_dir / "project.toml"
         project_id = load_data(project_config)["project_id"]
@@ -47,6 +53,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         dataset_id = load_data(dataset_config)["dataset_id"]
         dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
+        clear_spark_files()
         check_run_command(
             f"dsgrid registry --path={path} --offline projects register {project_config} "
             "--log-message log"
@@ -62,6 +69,7 @@ def test_register_project_and_dataset(make_test_project_dir):
         )
         output = {}
 
+        clear_spark_files()
         check_run_command(f"dsgrid registry --path={path} --offline list", output)
         regex_project = re.compile(rf"{project_id}.*1\.1\.0")
         regex_dataset = re.compile(rf"{dataset_id}.*1\.0\.0")

@@ -878,9 +878,9 @@ class ProjectConfig(ConfigBase):
                 if record_ids:
                     dim_type = DimensionType(field)
                     if dim_type == pivoted_dimension:
-                        raise Exception(
-                            f"BUG: unhandled condition with multi_dimensional requirement "
-                            f"dimension={dim_type} records={record_ids}"
+                        raise NotImplementedError(
+                            f"Unhandled condition: multi_dimensional requirement cannot contain "
+                            f"the pivoted dimension: dimension={dim_type} records={record_ids}"
                         )
                     record_ids = self._replace_supplemental_record_ids_with_base(
                         record_ids,
@@ -948,6 +948,19 @@ class ProjectConfig(ConfigBase):
         return record_ids
 
     def get_required_dimension_record_ids(self, dataset_id, dimension_type: DimensionType):
+        """Return the required base dimension record IDs for the dataset and dimension type.
+        Replaces supplemental records with base records.
+
+        Parameters
+        ----------
+        dataset_id : str
+        dimension_type : DimensionType
+
+        Returns
+        -------
+        set(str)
+
+        """
         dataset = self.get_dataset(dataset_id)
         supp_dim_query_names = self.get_supplemental_dimension_to_query_name_mapping()
         record_ids = getattr(dataset.required_dimensions.single_dimensional, dimension_type.value)

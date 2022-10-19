@@ -21,7 +21,7 @@ class DimensionRecords:
         """
         df = self._spark.createDataFrame((Row(**x) for x in dimension.records))
         # This should not overwhelm memory and should speed-up queries.
-        # df.cache()
+        df.cache()
         assert dimension.cls not in self._store, dimension.cls.__name__
         self._store[dimension.cls] = df
         # This is now duplicate information.

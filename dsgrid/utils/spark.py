@@ -226,8 +226,8 @@ def models_to_dataframe(models, cache=False):
 
     df = get_spark_session().createDataFrame(rows)
 
-    # if cache:
-    #     df.cache()
+    if cache:
+        df.cache()
     return df
 
 
@@ -251,8 +251,8 @@ def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True):
     for dimension_type in dimension_types:
         schema.add(dimension_type.value, StringType(), nullable=False)
     df = get_spark_session().createDataFrame(records, schema=schema)
-    # if cache:
-    #     df.cache()
+    if cache:
+        df.cache()
     return df
 
 

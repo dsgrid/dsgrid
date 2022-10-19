@@ -20,6 +20,7 @@ from dsgrid.exceptions import (
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dimension_association_manager import remove_project_dimension_associations
 from dsgrid.config.dimensions import DimensionModel, DimensionReferenceByNameModel
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.config.dimension_mapping_base import (
@@ -36,7 +37,7 @@ from dsgrid.config.mapping_tables import (
     MappingTableByNameModel,
     DatasetBaseToProjectMappingTableListModel,
 )
-from dsgrid.config.project_config import ProjectConfig
+from dsgrid.config.project_config import ProjectConfig, RequiredDimensionRecordsModel
 from dsgrid.project import Project
 from dsgrid.registry.common import (
     make_initial_config_registration,
@@ -44,7 +45,6 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     ProjectRegistryStatus,
 )
-from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, run_in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
@@ -440,15 +440,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def _register(self, config, submitter, log_message, force):
         registration = make_initial_config_registration(submitter, log_message)
-        if (
-            os.environ.get("__DSGRID_USE_CACHED_DIMENSION_ASSOCIATIONS_FOR_PROJECT_REGISTRATION__")
-            is not None
-        ):
-            logger.warning("Try to use cached dimension associations for project registration.")
-            try_load_cache = True
-        else:
-            try_load_cache = False
-        self._run_checks(config, check_dimension_associations=True, try_load_cache=try_load_cache)
+        self._run_checks(config)
 
         registry_model = ProjectRegistryModel(
             project_id=config.model.project_id,
@@ -476,9 +468,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         )
 
     @track_timing(timer_stats_collector)
-    def _run_checks(
-        self, config: ProjectConfig, check_dimension_associations=True, try_load_cache=False
-    ):
+    def _run_checks(self, config: ProjectConfig):
         dims = [x for x in config.iter_dimensions()]
         check_uniqueness((x.model.name for x in dims), "dimension name")
         check_uniqueness((x.model.display_name for x in dims), "dimension display name")
@@ -486,9 +476,11 @@ class ProjectRegistryManager(RegistryManagerBase):
             (getattr(x.model, "cls") for x in config.model.dimensions.base_dimensions),
             "dimension cls",
         )
-        if check_dimension_associations:
-            for dataset_id in config.list_unregistered_dataset_ids():
-                config.load_dimension_associations(dataset_id, try_load_cache=try_load_cache)
+        for dataset_id in config.list_unregistered_dataset_ids():
+            for field in RequiredDimensionRecordsModel.__fields__:
+                # This will check that all dimension record IDs listed in the requirements
+                # exist in the project.
+                config.get_required_dimension_record_ids(dataset_id, DimensionType(field))
 
     @track_timing(timer_stats_collector)
     def register_and_submit_dataset(
@@ -690,7 +682,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             submitter,
             VersionUpdateType.MINOR,
             log_message,
-            check_dimension_associations=False,
+            clear_cached_association_tables=False,
         )
 
         logger.info(
@@ -720,21 +712,13 @@ class ProjectRegistryManager(RegistryManagerBase):
         pivoted_dimension = handler.get_pivoted_dimension_type()
         exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivoted_dimension])
 
-        data_source_dim_id = [
-            x.id for x in dataset_config.dimensions if x.type == DimensionType.DATA_SOURCE
-        ][0]
-        data_source = [
-            x.id for x in self._dimension_mgr.get_by_id(data_source_dim_id).model.records
-        ][
-            0
-        ]  # this assumes only data_source per dataset
         dim_table = (
             handler.get_unique_dimension_rows().drop("id").drop(DimensionType.DATA_SOURCE.value)
         )
 
         cols = [x.value for x in DimensionType if x not in exclude_dims]
         dataset_id = dataset_config.config_id
-        assoc_table = project_config.load_dimension_associations(dataset_id)
+        assoc_table = project_config.load_dimension_associations(dataset_id, pivoted_dimension)
         project_table = assoc_table.select(*cols).distinct()
         diff = project_table.exceptAll(dim_table.select(*cols).distinct())
         if not diff.rdd.isEmpty():
@@ -751,11 +735,12 @@ class ProjectRegistryManager(RegistryManagerBase):
             raise DSGInvalidDataset(
                 f"Dataset {dataset_config.config_id} is missing required dimension records"
             )
-        project_pivoted_ids = get_unique_values(assoc_table, pivoted_dimension.value)
-        self._check_pivoted_dimension_columns(handler, project_pivoted_ids, data_source)
+        project_pivoted_ids = project_config.get_required_dimension_record_ids(
+            dataset_id, pivoted_dimension
+        )
+        self._check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id)
 
     @staticmethod
-    @track_timing(timer_stats_collector)
     def _check_pivoted_dimension_columns(handler, project_pivoted_ids, data_source):
         """pivoted dimension record is the same as project's unless a relevant association is provided."""
         logger.info("Check pivoted dimension columns.")
@@ -785,23 +770,22 @@ class ProjectRegistryManager(RegistryManagerBase):
             submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(config.config_id)
         with self.cloud_interface.make_lock_file_managed(lock_file_path):
-            # We could be more intelligent about check_dimension_associations. It's not necessary
-            # for some updates.
+            # Until we have robust checking of changes to dimension requirements, always clear
+            # the cached association tables in a user update.
             return self._update(
-                config, submitter, update_type, log_message, check_dimension_associations=True
+                config, submitter, update_type, log_message, clear_cached_association_tables=True
             )
 
     def _update(
-        self, config, submitter, update_type, log_message, check_dimension_associations=True
+        self, config, submitter, update_type, log_message, clear_cached_association_tables
     ):
+        if clear_cached_association_tables:
+            remove_project_dimension_associations(config.config_id)
         registry = self.get_registry_config(config.config_id)
         old_config = self.get_by_id(config.config_id)
         checker = ProjectUpdateChecker(old_config.model, config.model)
         checker.run()
-        self._run_checks(
-            config,
-            check_dimension_associations=check_dimension_associations,
-        )
+        self._run_checks(config)
 
         old_key = ConfigKey(config.config_id, registry.version)
         version = self._update_config(config, submitter, update_type, log_message)

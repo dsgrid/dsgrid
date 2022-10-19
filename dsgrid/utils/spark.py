@@ -1,5 +1,6 @@
 """Spark helper functions"""
 
+import itertools
 import logging
 import math
 import os
@@ -431,11 +432,35 @@ def cross_join_dfs(dfs):
 
     """
     if len(dfs) == 1:
-        return dfs
+        return dfs[0]
 
     df = dfs[0]
     for other in dfs[1:]:
         df = df.crossJoin(other)
+    return df
+
+
+@track_timing(timer_stats_collector)
+def create_dataframe_from_product(data: dict):
+    """Create a dataframe by taking a product of values/columns in a dict. This is significantly
+    faster than creating a dataframe from each column and cross-joining them with Spark.
+
+    Parameters
+    ----------
+    data : dict
+        Columns on which to perform a cross product.
+        {"sector": [com], "subsector": ["SmallOffice", "LargeOffice"]}
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    """
+    spark = get_spark_session()
+    columns = list(data.keys())
+    df = spark.createDataFrame(
+        spark.sparkContext.parallelize(itertools.product(*(data.values()))), columns
+    )
     return df
 
 
@@ -448,18 +473,33 @@ def get_spark_session():
     return spark
 
 
-def try_load_stored_table(table_name, database=DSGRID_DB_NAME):
+def load_stored_table(table_name):
     """Return a table stored in the Spark warehouse.
 
     Parameters
     ----------
     table_name : str
-    database : str, optional
-        database, by default dsgrid_db
 
     Returns
     -------
     pyspark.sql.DataFrame
+
+    """
+    spark = get_spark_session()
+    return spark.table(table_name)
+
+
+def try_load_stored_table(table_name, database=DSGRID_DB_NAME):
+    """Return a table if it is stored in the Spark warehouse.
+
+    Parameters
+    ----------
+    table_name : str
+    database : str, optional
+
+    Returns
+    -------
+    pyspark.sql.DataFrame | None
 
     """
     spark = get_spark_session()

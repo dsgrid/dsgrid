@@ -34,7 +34,7 @@ def test_project_load():
     assert len(records) == 1
     assert records[0].id == "all_subsectors"
 
-    table = project.config.load_dimension_associations(DATASET_ID)
+    table = project.config.load_dimension_associations(DATASET_ID, DimensionType.METRIC)
     assert table.count() > 0
 
     with pytest.raises(DSGValueNotRegistered):

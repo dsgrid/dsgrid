@@ -26,7 +26,12 @@ from dsgrid.registry.common import (
 )
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
-from dsgrid.utils.spark import get_unique_values, get_spark_session, cross_join_dfs
+from dsgrid.utils.spark import (
+    get_unique_values,
+    cross_join_dfs,
+    create_dataframe_from_product,
+    load_stored_table,
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
@@ -776,12 +781,13 @@ class ProjectConfig(ConfigBase):
             if dataset.status == status:
                 yield dataset
 
-    def load_dimension_associations(self, dataset_id, try_load_cache=True):
+    def load_dimension_associations(self, dataset_id, pivoted_dimension, try_load_cache=True):
         """Return a table with required dimension associations.
 
         Parameters
         ----------
         dataset_id : str
+        pivoted_dimension : DimensionType
         try_load_cache : bool
             Try to load table from Spark warehouse, defaults to True.
 
@@ -791,42 +797,54 @@ class ProjectConfig(ConfigBase):
 
         """
         if try_load_cache:
-            table = try_load_dimension_associations(self.config_id, dataset_id)
+            table = try_load_dimension_associations(self.config_id, dataset_id, pivoted_dimension)
         else:
             table = None
         if table is None:
             logger.info(
                 "No dimension associations table exists for project_id=%s dataset_id=%s "
-                "Build table and save it. try_load_cache=%s",
+                "pivoted_dimension=%s. Build table and save it. try_load_cache=%s",
                 self.config_id,
                 dataset_id,
+                pivoted_dimension,
                 try_load_cache,
             )
-            table = self._make_dimension_association_table(dataset_id)
+            table = self._make_dimension_association_table(dataset_id, pivoted_dimension)
             if os.environ.get("__DSGRID_SKIP_SAVING_DIMENSION_ASSOCIATIONS__") is not None:
                 logger.warning("Skip saving dimension associations.")
             else:
-                save_dimension_associations(table, self.config_id, dataset_id)
+                # We expect these tables to be very small in files because of compression.
+                table_name = save_dimension_associations(
+                    table.coalesce(1), self.config_id, dataset_id, pivoted_dimension
+                )
+                # It will be much faster to load the persisted table.
+                table = load_stored_table(table_name)
         else:
-            logger.info("Loaded cached dimension associations for %s", self.config_id)
+            logger.info(
+                "Loaded cached dimension associations for %s dataset_id=%s pivoted_dimension=%s",
+                self.config_id,
+                dataset_id,
+                pivoted_dimension,
+            )
         return table
 
     @track_timing(timer_stats_collector)
-    def _make_dimension_association_table(self, dataset_id):
-        spark = get_spark_session()
+    def _make_dimension_association_table(self, dataset_id, pivoted_dimension):
         required_dimensions = self.get_dataset(dataset_id).required_dimensions
         supp_dim_query_names = self.get_supplemental_dimension_to_query_name_mapping()
-        dfs = self._build_multi_dim_requirement_associations(
+        multi_dfs = self._build_multi_dim_requirement_associations(
             required_dimensions.multi_dimensional,
+            pivoted_dimension,
             supp_dim_query_names,
         )
 
         # Project config construction asserts that there is no intersection of dimensions in
         # multi and single.
-        existing = set()
-        for df in dfs:
+        existing = set([pivoted_dimension.value])
+        for df in multi_dfs:
             existing.update(set(df.columns))
 
+        single_dfs = {}
         for field in (x for x in RequiredDimensionRecordsModel.__fields__ if x not in existing):
             dim_type = DimensionType(field)
             record_ids = self._replace_supplemental_record_ids_with_base(
@@ -834,12 +852,13 @@ class ProjectConfig(ConfigBase):
                 dim_type,
                 supp_dim_query_names,
             )
-            dfs.append(spark.createDataFrame([tuple([x]) for x in record_ids], [field]))
+            single_dfs[field] = list(record_ids)
+        single_df = create_dataframe_from_product(single_dfs)
+        return cross_join_dfs(multi_dfs + [single_df])
 
-        return cross_join_dfs(dfs)
-
-    def _build_multi_dim_requirement_associations(self, multi_dim_reqs, supp_dim_query_names):
-        spark = get_spark_session()
+    def _build_multi_dim_requirement_associations(
+        self, multi_dim_reqs, pivoted_dimension, supp_dim_query_names
+    ):
         dfs_by_dim_combo = {}
 
         # Example: Partial sector and subsector combinations are required.
@@ -851,20 +870,26 @@ class ProjectConfig(ConfigBase):
         # dataframes of those combinations - one per unique combination of dimensions.
         for item in multi_dim_reqs:
             dim_combo = []
-            item_dfs = []
+            columns = {}
             for field in RequiredDimensionRecordsModel.__fields__:
                 record_ids = set(getattr(item, field))
                 if record_ids:
                     dim_type = DimensionType(field)
+                    if dim_type == pivoted_dimension:
+                        raise Exception(
+                            f"BUG: unhandled condition with multi_dimensional requirement "
+                            f"dimension={dim_type} records={record_ids}"
+                        )
                     record_ids = self._replace_supplemental_record_ids_with_base(
                         record_ids,
                         dim_type,
                         supp_dim_query_names,
                     )
                     dim_combo.append(dim_type.value)
-                    df = spark.createDataFrame([(x,) for x in record_ids], [dim_type.value])
-                    item_dfs.append(df)
-            df = cross_join_dfs(item_dfs)
+                    columns[field] = list(record_ids)
+            df = create_dataframe_from_product(columns)
+            df = df.select(*sorted(df.columns))
+
             dim_combo = tuple(sorted(dim_combo))
             if dim_combo in dfs_by_dim_combo:
                 dfs_by_dim_combo[dim_combo] = dfs_by_dim_combo[dim_combo].union(df)
@@ -917,6 +942,25 @@ class ProjectConfig(ConfigBase):
                 f"Did not find {dim_type} supplemental dimension with record ID {supplemental_id} "
                 "while attempting to substitute the records with base records."
             )
+
+        return record_ids
+
+    def get_required_dimension_record_ids(self, dataset_id, dimension_type: DimensionType):
+        dataset = self.get_dataset(dataset_id)
+        supp_dim_query_names = self.get_supplemental_dimension_to_query_name_mapping()
+        record_ids = getattr(dataset.required_dimensions.single_dimensional, dimension_type.value)
+        record_ids = self._replace_supplemental_record_ids_with_base(
+            set(record_ids), dimension_type, supp_dim_query_names
+        )
+        for item in dataset.required_dimensions.multi_dimensional:
+            multi_record_ids = set(getattr(item, dimension_type.value))
+            if multi_record_ids:
+                multi_record_ids = self._replace_supplemental_record_ids_with_base(
+                    multi_record_ids,
+                    dimension_type,
+                    supp_dim_query_names,
+                )
+                record_ids.update(multi_record_ids)
 
         return record_ids
 

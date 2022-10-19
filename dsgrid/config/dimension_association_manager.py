@@ -34,7 +34,7 @@ def try_load_dimension_associations(
     ----------
     project_id : str
     dataset_id : str
-    pivoted_dimension : DimensionType
+    pivoted_dimension : DimensionType | None
 
     Returns
     -------
@@ -55,7 +55,7 @@ def save_dimension_associations(table, project_id, dataset_id, pivoted_dimension
     table : pyspark.sql.DataFrame
     project_id : str
     dataset_id : str
-    pivoted_dimension : DimensionType
+    pivoted_dimension : DimensionType | None
 
     Returns
     -------
@@ -89,4 +89,5 @@ def remove_project_dimension_associations(project_id):
 
 
 def _make_dimension_associations_table_name(project_id, dataset_id, pivoted_dimension):
-    return "__".join((project_id, dataset_id, pivoted_dimension.value, _ASSOCIATIONS_DATA_TABLE))
+    dim_value = "None" if pivoted_dimension is None else pivoted_dimension.value
+    return "__".join((project_id, dataset_id, dim_value, _ASSOCIATIONS_DATA_TABLE))

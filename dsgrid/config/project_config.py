@@ -781,13 +781,13 @@ class ProjectConfig(ConfigBase):
             if dataset.status == status:
                 yield dataset
 
-    def load_dimension_associations(self, dataset_id, pivoted_dimension, try_load_cache=True):
+    def load_dimension_associations(self, dataset_id, pivoted_dimension=None, try_load_cache=True):
         """Return a table with required dimension associations.
 
         Parameters
         ----------
         dataset_id : str
-        pivoted_dimension : DimensionType
+        pivoted_dimension : DimensionType | None
         try_load_cache : bool
             Try to load table from Spark warehouse, defaults to True.
 
@@ -840,7 +840,9 @@ class ProjectConfig(ConfigBase):
 
         # Project config construction asserts that there is no intersection of dimensions in
         # multi and single.
-        existing = set([pivoted_dimension.value])
+        existing = set()
+        if pivoted_dimension is not None:
+            existing.add(pivoted_dimension.value)
         for df in multi_dfs:
             existing.update(set(df.columns))
 

@@ -12,6 +12,7 @@ class DatasetRegistrationModel(DSGBaseModel):
     dataset_path: str | Path
     config_file: str | Path
     dimension_mapping_file: str | Path | None
+    dimension_mapping_references_file: str | Path | None
     fix_dimension_uuids: bool = False
     fix_dimension_mapping_uuids: bool = False
     register_dataset: bool = True

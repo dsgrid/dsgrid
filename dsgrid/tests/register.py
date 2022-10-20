@@ -81,22 +81,30 @@ def _run_registration(registration: RegistrationModel, tmp_files):
                 )
 
             if dataset.submit_to_project:
-                if dataset.fix_dimension_mapping_uuids:
-                    suffix = dataset.dimension_mapping_file.suffix
-                    mapping_file = Path(
-                        str(dataset.dimension_mapping_file).replace(suffix, "__tmp" + suffix)
+                if (
+                    dataset.fix_dimension_mapping_uuids
+                    and dataset.dimension_mapping_references_file is not None
+                ):
+                    suffix = dataset.dimension_mapping_references_file.suffix
+                    refs_file = Path(
+                        str(dataset.dimension_mapping_references_file).replace(
+                            suffix, "__tmp" + suffix
+                        )
                     )
-                    mapping_file = shutil.copyfile(dataset.dimension_mapping_file, mapping_file)
-                    tmp_files.append(mapping_file)
-                    replace_dimension_mapping_uuids_from_registry(reg_path, [mapping_file])
+                    refs_file = shutil.copyfile(
+                        dataset.dimension_mapping_references_file, refs_file
+                    )
+                    tmp_files.append(refs_file)
+                    replace_dimension_mapping_uuids_from_registry(reg_path, [refs_file])
                 else:
-                    mapping_file = dataset.dimension_mapping_file
+                    refs_file = dataset.dimension_mapping_references_file
                 project_mgr.submit_dataset(
                     project.project_id,
                     dataset.dataset_id,
                     user,
                     log_message,
-                    dimension_mapping_file=mapping_file,
+                    dimension_mapping_file=dataset.dimension_mapping_file,
+                    dimension_mapping_references_file=refs_file,
                 )
                 pass
 

@@ -13,7 +13,6 @@ from prettytable import PrettyTable
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
-    DSGInvalidParameter,
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
 )
@@ -441,6 +440,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _register(self, config, submitter, log_message, force):
         registration = make_initial_config_registration(submitter, log_message)
         self._run_checks(config)
+        remove_project_dimension_associations(config.config_id)
 
         registry_model = ProjectRegistryModel(
             project_id=config.model.project_id,
@@ -537,8 +537,6 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimension_mapping_file : Path or None
             Base-to-base dimension mapping file
         dimension_mapping_references_file : Path or None
-            Mutually exclusive with dimension_mapping_file. Use it when mappings are already
-            registered.
         submitter : str
             Submitter name
         log_message : str
@@ -554,11 +552,6 @@ class ProjectRegistryManager(RegistryManagerBase):
             Raised if the project does not contain this dataset.
 
         """
-        if dimension_mapping_file is not None and dimension_mapping_references_file is not None:
-            raise DSGInvalidParameter(
-                "dimension_mapping_file and dimension_mapping_references_file cannot both be passed"
-            )
-
         need_to_finalize = context is None
         error_occurred = False
         if context is None:
@@ -641,7 +634,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         version=str(self._dimension_mapping_mgr.get_current_version(mapping_id)),
                     )
                 )
-        elif dimension_mapping_references_file is not None:
+        if dimension_mapping_references_file is not None:
             for ref in DimensionMappingReferenceListModel.load(
                 dimension_mapping_references_file
             ).references:

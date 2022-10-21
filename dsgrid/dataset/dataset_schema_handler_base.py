@@ -13,6 +13,7 @@ from dsgrid.utils.dataset import (
     map_and_reduce_pivoted_dimension,
     add_column_from_records,
 )
+from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -230,6 +231,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 column == self.get_pivoted_dimension_type().value
                 and not pivoted_columns.difference(df.columns)
             ):
+                # The dataset might have columns unwanted by the project.
+                columns_to_remove = get_unique_values(records.filter("to_id IS NULL"), "from_id")
+                if columns_to_remove:
+                    df = df.drop(*columns_to_remove)
+                    pivoted_columns.difference_update(columns_to_remove)
                 # TODO: Do we want operation to be configurable?
                 operation = "sum"
                 df, _, _ = map_and_reduce_pivoted_dimension(

@@ -136,7 +136,8 @@ class Project:
         # All dataset columns need to be in the same order.
         context.consolidate_dataset_metadata()
         # TODO: Change this when we support long format.
-        pivoted_columns = sorted(context.get_pivoted_columns())
+        pivoted_columns = context.get_pivoted_columns()
+        pivoted_columns_sorted = sorted(pivoted_columns)
         dim_columns = context.get_all_dimension_query_names()
         time_columns = context.get_dimension_query_names(DimensionType.TIME)
         dim_columns -= time_columns
@@ -147,11 +148,11 @@ class Project:
                 break
         dim_columns = sorted(dim_columns)
         time_columns = sorted(time_columns)
-        expected_columns = time_columns + pivoted_columns + dim_columns
+        expected_columns = time_columns + pivoted_columns_sorted + dim_columns
         for i, dataset_id in enumerate(context.model.project.dataset_ids):
             remaining = sorted(set(dfs[i].columns).difference(expected_columns))
             final_columns = expected_columns + remaining
-            missing = context.get_pivoted_columns(dataset_id=dataset_id).difference(dfs[i].columns)
+            missing = pivoted_columns.difference(dfs[i].columns)
             for column in missing:
                 dfs[i] = dfs[i].withColumn(column, F.lit(None).cast(DoubleType()))
             dfs[i] = dfs[i].select(*final_columns)
@@ -161,7 +162,8 @@ class Project:
             for df in dfs[1:]:
                 if df.columns != main_df.columns:
                     raise Exception(
-                        f"BUG: dataset columns must match. main={main_df.columns} new={df.columns}"
+                        f"BUG: dataset columns must match. main={main_df.columns} new={df.columns} "
+                        f"diff={set(main_df.columns).symmetric_difference(df.columns)}"
                     )
                 main_df = main_df.union(df)
 

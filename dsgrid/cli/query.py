@@ -218,14 +218,14 @@ def create_project(
             )
         else:
             assert False
-        query.project.dimension_filters.append(flt)
+        query.project.dataset_params.dimension_filters.append(flt)
 
     if default_per_dataset_aggregation or default_result_aggregation:
         default_aggs = {}
         for dim_type, name in project.config.get_base_dimension_to_query_name_mapping().items():
             default_aggs[dim_type.value] = [name]
         if default_per_dataset_aggregation:
-            query.project.per_dataset_aggregations = [
+            query.project.dataset_params.per_dataset_aggregations = [
                 AggregationModel(
                     dimensions=DimensionQueryNamesModel(**default_aggs),
                     aggregation_function=aggregation_function,

@@ -32,6 +32,12 @@ class QuerySubmitterBase:
         self._cached_tables_dir().mkdir(exist_ok=True, parents=True)
         self._composite_datasets_dir().mkdir(exist_ok=True, parents=True)
 
+        # TODO: This location will need more consideration.
+        # We might want to store cached datasets in the spark-warehouse and let Spark manage it
+        # for us. However, would we share them on Eagle? What happens on Eagle walltime timeouts
+        # where the tables are left in intermediate states?
+        self._cached_project_mapped_datasets_dir().mkdir(exist_ok=True, parents=True)
+
     @abc.abstractmethod
     def submit(self, *args, **kwargs):
         """Submit a query for execution"""
@@ -41,6 +47,9 @@ class QuerySubmitterBase:
 
     def _cached_tables_dir(self):
         return self._output_dir / "cached_tables"
+
+    def _cached_project_mapped_datasets_dir(self):
+        return self._output_dir / "cached_project_mapped_datasets"
 
     @staticmethod
     def _metadata_filename(path: Path):
@@ -118,7 +127,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if load_cached_table:
             df, metadata = self._try_read_cache(context)
         if df is None:
-            df = self._project.process_query(context)
+            df = self._project.process_query(context, self._cached_project_mapped_datasets_dir())
             is_cached = False
         else:
             context.metadata = metadata

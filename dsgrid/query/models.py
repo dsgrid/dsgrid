@@ -1,6 +1,5 @@
 import abc
 import enum
-from pathlib import Path
 from typing import Any, List, Optional, Set, Union
 
 import pyspark.sql.functions as F
@@ -11,7 +10,7 @@ from dsgrid.data_models import DSGBaseModel
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import make_dimension_filter, DimensionFilterBaseModel
-from dsgrid.utils.files import compute_hash, load_data
+from dsgrid.utils.files import compute_hash
 
 
 class FilteredDatasetModel(DSGBaseModel):
@@ -172,16 +171,22 @@ class DatasetMetadataModel(DSGBaseModel):
     table_format_type: Optional[TableFormatType]
 
 
-class ProjectQueryParamsModel(DSGBaseModel):
-    """Defines how to transform a project into a CompositeDataset"""
+class CacheableQueryBaseModel(DSGBaseModel):
+    def serialize(self):
+        """Return a JSON representation of the model along with a hash that uniquely identifies it."""
+        text = self.json(indent=2)
+        return compute_hash(text.encode()), text
 
-    project_id: str = Field(description="Project ID for query")
-    dataset_ids: List[str] = Field(description="Dataset IDs from which to read")
-    excluded_dataset_ids: List[str] = Field(
-        description="Datasets to exclude from query", default=[]
-    )
-    # TODO: default needs to change
-    include_dsgrid_dataset_components: bool = Field(description="", default=False)
+
+class SparkConfByDataset(DSGBaseModel):
+
+    dataset_id: str
+    conf: dict[str, Any]
+
+
+class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
+    """Parameters in a project query that only apply to datasets"""
+
     dimension_filters: List[Any] = Field(
         # Use Any here because we don't want Pydantic to try to discern the types.
         description="Filters to apply to all datasets",
@@ -200,34 +205,6 @@ class ProjectQueryParamsModel(DSGBaseModel):
         description="Controls table format",
         default=TableFormatType.PIVOTED,
     )
-    version: Optional[str] = Field(
-        description="Version of project or dataset on which the query is based. "
-        "Should not be set by the user",
-    )
-
-    @root_validator(pre=True)
-    def check_unsupported_fields(cls, values):
-        if values.get("include_dsgrid_dataset_components", False):
-            raise ValueError("Setting include_dsgrid_dataset_components=true is not supported yet")
-        if values.get("drop_dimensions", []):
-            raise ValueError("drop_dimensions is not supported yet")
-        if values.get("excluded_dataset_ids", []):
-            raise ValueError("excluded_dataset_ids is not supported yet")
-        fmt = TableFormatType.PIVOTED.value
-        if values.get("table_format", fmt) not in (fmt, TableFormatType.PIVOTED):
-            raise ValueError(f"only table_format={fmt} is currently supported")
-        return values
-
-    @validator("excluded_dataset_ids")
-    def check_dataset_ids(cls, excluded_dataset_ids, values):
-        dataset_ids = values.get("dataset_ids")
-        if dataset_ids is None:
-            return excluded_dataset_ids
-
-        if excluded_dataset_ids and dataset_ids:
-            raise ValueError("excluded_dataset_ids and dataset_ids cannot both be set")
-
-        return excluded_dataset_ids
 
     @validator("dimension_filters")
     def handle_dimension_filters(cls, dimension_filters):
@@ -256,10 +233,65 @@ class ProjectQueryParamsModel(DSGBaseModel):
         return aggregations
 
 
+class ProjectQueryParamsModel(CacheableQueryBaseModel):
+    """Defines how to transform a project into a CompositeDataset"""
+
+    project_id: str = Field(description="Project ID for query")
+    dataset_ids: List[str] = Field(description="Dataset IDs from which to read")
+    excluded_dataset_ids: List[str] = Field(
+        description="Datasets to exclude from query", default=[]
+    )
+    # TODO: default needs to change
+    include_dsgrid_dataset_components: bool = Field(description="", default=False)
+    dataset_params: ProjectQueryDatasetParamsModel = Field(
+        description="Parameters affecting datasets. Will be used for caching intermediate tables.",
+        default=ProjectQueryDatasetParamsModel(),
+    )
+    version: Optional[str] = Field(
+        description="Version of project or dataset on which the query is based. "
+        "Should not be set by the user",
+    )
+    spark_conf_per_dataset: list[SparkConfByDataset] = Field(
+        description="Apply these Spark configuration settings while a dataset is being processed.",
+        default=[],
+    )
+
+    @root_validator(pre=True)
+    def check_unsupported_fields(cls, values):
+        if values.get("include_dsgrid_dataset_components", False):
+            raise ValueError("Setting include_dsgrid_dataset_components=true is not supported yet")
+        if values.get("drop_dimensions", []):
+            raise ValueError("drop_dimensions is not supported yet")
+        if values.get("excluded_dataset_ids", []):
+            raise ValueError("excluded_dataset_ids is not supported yet")
+        fmt = TableFormatType.PIVOTED.value
+        if values.get("table_format", fmt) not in (fmt, TableFormatType.PIVOTED):
+            raise ValueError(f"only table_format={fmt} is currently supported")
+        return values
+
+    @validator("excluded_dataset_ids")
+    def check_dataset_ids(cls, excluded_dataset_ids, values):
+        dataset_ids = values.get("dataset_ids")
+        if dataset_ids is None:
+            return excluded_dataset_ids
+
+        if excluded_dataset_ids and dataset_ids:
+            raise ValueError("excluded_dataset_ids and dataset_ids cannot both be set")
+
+        return excluded_dataset_ids
+
+    def get_spark_conf(self, dataset_id) -> dict[str, Any]:
+        """Return the Spark settings to apply while processing dataset_id."""
+        for dataset in self.spark_conf_per_dataset:
+            if dataset.dataset_id == dataset_id:
+                return dataset.conf
+        return {}
+
+
 QUERY_FORMAT_VERSION = VersionInfo.parse("0.1.0")
 
 
-class QueryBaseModel(DSGBaseModel, abc.ABC):
+class QueryBaseModel(CacheableQueryBaseModel, abc.ABC):
     """Base class for all queries"""
 
     name: str = Field(description="Name of query")
@@ -269,15 +301,11 @@ class QueryBaseModel(DSGBaseModel, abc.ABC):
         default=str(QUERY_FORMAT_VERSION),  # TODO: str shouldn't be required
     )
 
-    @classmethod
-    def from_file(cls, filename: Path):
-        """Deserialize the query model from a file."""
-        return cls(**load_data(filename))
-
-    def serialize(self):
-        """Return a JSON representation of the model along with a hash that uniquely identifies it."""
-        text = self.json(indent=2)
-        return compute_hash(text.encode()), text
+    def dict(self, *args, **kwargs):
+        data = super().dict(*args, **kwargs)
+        if data["version"] is not None:
+            data["version"] = str(data["version"])
+        return data
 
     def serialize_cached_content(self):
         """Return a JSON representation of the model that can be used for caching purposes along
@@ -286,14 +314,8 @@ class QueryBaseModel(DSGBaseModel, abc.ABC):
         text = self.json(exclude={"name"}, indent=2)
         return compute_hash(text.encode()), text
 
-    def dict(self, *args, **kwargs):
-        data = super().dict(*args, **kwargs)
-        if data["version"] is not None:
-            data["version"] = str(data["version"])
-        return data
 
-
-class QueryResultParamsModel(DSGBaseModel):
+class QueryResultParamsModel(CacheableQueryBaseModel):
     """Controls post-processing and storage of CompositeDatasets"""
 
     supplemental_columns: List[Union[str, ColumnModel]] = Field(

@@ -1,3 +1,5 @@
+"""Contains data models to control registration of test projects and datasets."""
+
 from pathlib import Path
 
 from pydantic import validator
@@ -18,7 +20,12 @@ class DatasetRegistrationModel(DSGBaseModel):
     register_dataset: bool = True
     submit_to_project: bool = True
 
-    @validator("dataset_path", "config_file", "dimension_mapping_file")
+    @validator(
+        "dataset_path",
+        "config_file",
+        "dimension_mapping_file",
+        "dimension_mapping_references_file",
+    )
     def fix_path(cls, val):
         return Path(val) if isinstance(val, str) else val
 

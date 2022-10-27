@@ -54,6 +54,7 @@ class RegistryManager:
     """
 
     def __init__(self, params: RegistryManagerParams):
+        self._check_environment_variables(params)
         if SparkSession.getActiveSession() is None:
             init_spark("registry")
         self._params = params
@@ -543,6 +544,15 @@ class RegistryManager:
                 shutil.copytree(src, dst, symlinks=True)
         else:
             raise DSGInvalidParameter(f"mode={mode} is not supported")
+
+    @staticmethod
+    def _check_environment_variables(params):
+        if not params.offline:
+            illegal_vars = [x for x in os.environ if x.startswith("__DSGRID")]
+            if illegal_vars:
+                raise Exception(
+                    f"Internal environment variables are not allowed to be set in online mode: {illegal_vars}"
+                )
 
 
 def _make_data_symlinks(src, dst):

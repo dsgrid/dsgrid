@@ -106,7 +106,6 @@ def _run_registration(registration: RegistrationModel, tmp_files):
                     dimension_mapping_file=dataset.dimension_mapping_file,
                     dimension_mapping_references_file=refs_file,
                 )
-                pass
 
 
 if __name__ == "__main__":

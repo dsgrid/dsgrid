@@ -65,6 +65,7 @@ offline_mode = True
 no_prompts = True
 # There could be collisions on the only-allowed SparkSession between the main process and
 # subprocesses that run queries.
+# If both processes try to use the Hive metastore, a crash will occur.
 spark = init_spark("dsgrid_api", check_env=False)
 manager = RegistryManager.load(
     REGISTRY_PATH, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts

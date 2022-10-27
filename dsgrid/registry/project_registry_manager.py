@@ -712,7 +712,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         cols = [x.value for x in DimensionType if x not in exclude_dims]
         dataset_id = dataset_config.config_id
         assoc_table = project_config.load_dimension_associations(
-            dataset_id, pivoted_dimension=pivoted_dimension
+            dataset_id, pivoted_dimension=pivoted_dimension, try_load_cache=False
         )
         project_table = assoc_table.select(*cols).distinct()
         diff = project_table.exceptAll(dim_table.select(*cols).distinct())

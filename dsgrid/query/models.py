@@ -222,13 +222,13 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
                     # TODO: we could add support for this, but it does add some ambiguity.
                     if item.function is not None:
                         raise ValueError(
-                            f"function={item.function} cannot be set in ProjectQueryParamsModel"
+                            f"function={item.function} cannot be set in ProjectQueryDatasetParamsModel"
                         )
                     if item.alias is not None:
                         # TODO: need to support aliases here. The code that handles columns during
                         # dataset concatenation doesn't support it.
                         raise ValueError(
-                            f"alias={item.alias} cannot be set in ProjectQueryParamsModel"
+                            f"alias={item.alias} cannot be set in ProjectQueryDatasetParamsModel"
                         )
         return aggregations
 

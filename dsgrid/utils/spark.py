@@ -332,7 +332,7 @@ def write_dataframe_and_auto_partition(
     columns : None, list
         If not None and repartitioning is needed, partition on these columns.
     rtol_pct : int
-        Don't repartition or coalesce if the relative difference between target and desired
+        Don't repartition or coalesce if the relative difference between desired and actual
         partitions is within this tolerance as a percentage.
 
     Returns
@@ -357,7 +357,7 @@ def write_dataframe_and_auto_partition(
     total_size = sum((x.stat().st_size for x in filename.glob("*.parquet")))
     desired = math.ceil(total_size / partition_size_bytes)
     actual = df.rdd.getNumPartitions()
-    if abs(actual - desired) / min(actual, desired) * 100 < rtol_pct:
+    if abs(actual - desired) / desired * 100 < rtol_pct:
         logger.info("No change in number of partitions is needed for %s.", filename)
     elif actual > desired:
         df = df.coalesce(desired)

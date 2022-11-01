@@ -8,7 +8,7 @@ from dsgrid.dimension.time import make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.spark import _get_spark_session
+from dsgrid.utils.spark import get_spark_session
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -58,7 +58,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         schema = StructType([StructField(time_col, IntegerType(), False)])
 
         model_time = self.list_expected_dataset_timestamps()
-        df_time = _get_spark_session.createDataFrame(model_time, schema=schema)
+        df_time = get_spark_session.createDataFrame(model_time, schema=schema)
         return df_time
 
     # def build_time_dataframe_with_time_zone(self):

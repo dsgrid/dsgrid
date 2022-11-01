@@ -8,6 +8,8 @@ from zoneinfo import ZoneInfo
 from pathlib import Path
 from typing import List
 
+from semver import VersionInfo
+
 from dsgrid import timer_stats_collector
 from dsgrid.common import REGISTRY_FILENAME, SYNC_EXCLUDE_LIST
 from dsgrid.exceptions import (
@@ -225,16 +227,20 @@ class RegistryManagerBase(abc.ABC):
         if version != cur_version:
             raise DSGInvalidParameter(f"version={version} is not current. Current={cur_version}")
 
+    @staticmethod
+    def get_next_version(version: VersionInfo, update_type: VersionUpdateType):
+        if update_type == VersionUpdateType.MAJOR:
+            return version.bump_major()
+        elif update_type == VersionUpdateType.MINOR:
+            return version.bump_minor()
+        elif update_type == VersionUpdateType.PATCH:
+            return version.bump_patch()
+        raise Exception(f"invalid version update type {update_type}")
+
     def _update_config(self, config, submitter, update_type, log_message):
         config_id = config.config_id
         registry_config = self.get_registry_config(config_id)
-
-        if update_type == VersionUpdateType.MAJOR:
-            registry_config.version = registry_config.version.bump_major()
-        elif update_type == VersionUpdateType.MINOR:
-            registry_config.version = registry_config.version.bump_minor()
-        elif update_type == VersionUpdateType.PATCH:
-            registry_config.version = registry_config.version.bump_patch()
+        registry_config.version = self.get_next_version(registry_config.version, update_type)
 
         registration = ConfigRegistrationModel(
             version=str(registry_config.version),

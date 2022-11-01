@@ -1,6 +1,7 @@
 """Spark helper functions"""
 
 import enum
+import itertools
 import logging
 import math
 import os
@@ -21,18 +22,37 @@ from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 
 logger = logging.getLogger(__name__)
 
+# Consider using our own database. Would need to manage creation with
+# spark.sql(f"CREATE DATABASE IF NOT EXISTS {database}")
+# Doing so has caused conflicts in tests with the Derby db.
+DSGRID_DB_NAME = "default"
 
-def init_spark(name="dsgrid"):
-    """Initialize a SparkSession."""
+
+def init_spark(name="dsgrid", log_conf=False, check_env=True):
+    """Initialize a SparkSession.
+
+    Parameters
+    ----------
+    name : str
+    log_conf : bool
+        If True, log the Spark configuration
+    check_env : bool
+        If True, which is default, check for the SPARK_CLUSTER environment variable and attach to
+        it. Otherwise, create a local-mode cluster or attach to the SparkSession that was created
+        by pyspark/spark-submit prior to starting the current process.
+
+    """
     cluster = os.environ.get("SPARK_CLUSTER")
-    if cluster is not None:
+    if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf = SparkConf().setAppName(name).setMaster(cluster)
-        spark = SparkSession.builder.config(conf=conf).getOrCreate()
+        spark = SparkSession.builder.config(conf=conf).enableHiveSupport().getOrCreate()
     else:
-        spark = SparkSession.builder.appName(name).getOrCreate()
+        spark = SparkSession.builder.appName(name).enableHiveSupport().getOrCreate()
 
-    log_spark_conf(spark)
+    if log_conf:
+        log_spark_conf(spark)
+
     return spark
 
 
@@ -61,14 +81,14 @@ def create_dataframe(records, cache=False, require_unique=None):
     spark.sql.DataFrame
 
     """
-    df = _get_spark_session().createDataFrame(records)
+    df = get_spark_session().createDataFrame(records)
     _post_process_dataframe(df, cache=cache, require_unique=require_unique)
     return df
 
 
 def create_dataframe_from_pandas(df):
     """Create a spark DataFrame from a pandas DataFrame."""
-    return _get_spark_session().createDataFrame(df)
+    return get_spark_session().createDataFrame(df)
 
 
 @track_timing(timer_stats_collector)
@@ -115,7 +135,7 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
 def _read_with_spark(filename):
     if not os.path.exists(filename):
         raise FileNotFoundError(f"{filename} does not exist")
-    spark = _get_spark_session()
+    spark = get_spark_session()
     suffix = Path(filename).suffix
     if suffix == ".csv":
         df = spark.read.csv(filename, inferSchema=True, header=True)
@@ -141,7 +161,7 @@ def _read_natively(filename):
         obj = load_data(filename)
     else:
         assert False, f"Unsupported file extension: {filename}"
-    return _get_spark_session().createDataFrame(obj)
+    return get_spark_session().createDataFrame(obj)
 
 
 def _post_process_dataframe(df, cache=False, require_unique=None):
@@ -205,7 +225,7 @@ def models_to_dataframe(models, cache=False):
             dct[f] = val
         rows.append(Row(**dct))
 
-    df = _get_spark_session().createDataFrame(rows)
+    df = get_spark_session().createDataFrame(rows)
 
     if cache:
         df.cache()
@@ -231,7 +251,7 @@ def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True):
     schema = StructType()
     for dimension_type in dimension_types:
         schema.add(dimension_type.value, StringType(), nullable=False)
-    df = _get_spark_session().createDataFrame(records, schema=schema)
+    df = get_spark_session().createDataFrame(records, schema=schema)
     if cache:
         df.cache()
     return df
@@ -292,7 +312,7 @@ def overwrite_dataframe_file(filename, df):
     pyspark.sql.DataFrame
 
     """
-    spark = _get_spark_session()
+    spark = get_spark_session()
     suffix = Path(filename).suffix
     tmp = str(filename) + ".tmp"
     if suffix == ".parquet":
@@ -347,7 +367,7 @@ def write_dataframe_and_auto_partition(
     """
     if filename.suffix != ".parquet":
         raise DSGInvalidParameter(f"Only parquet files are supported: {filename}")
-    spark = _get_spark_session()
+    spark = get_spark_session()
     if filename.exists():
         df = overwrite_dataframe_file(filename, df)
     else:
@@ -387,7 +407,7 @@ def sql(query):
 
     """
     logger.debug("Run SQL query [%s]", query)
-    return _get_spark_session().sql(query)
+    return get_spark_session().sql(query)
 
 
 def sql_from_sqlalchemy(query):
@@ -406,6 +426,59 @@ def sql_from_sqlalchemy(query):
     return sql(str(query).replace('"', ""))
 
 
+def cross_join_dfs(dfs):
+    """Perform a cross join of all dataframes in dfs.
+
+    Parameters
+    ----------
+    dfs : list[pyspark.sql.DataFrame]
+
+    Returns
+    pyspark.sql.DataFrame
+
+    """
+    if len(dfs) == 1:
+        return dfs[0]
+
+    df = dfs[0]
+    for other in dfs[1:]:
+        df = df.crossJoin(other)
+    return df
+
+
+@track_timing(timer_stats_collector)
+def create_dataframe_from_product(data: dict):
+    """Create a dataframe by taking a product of values/columns in a dict. This is significantly
+    faster than creating a dataframe from each column and cross-joining them with Spark.
+
+    Parameters
+    ----------
+    data : dict
+        Columns on which to perform a cross product.
+        {"sector": [com], "subsector": ["SmallOffice", "LargeOffice"]}
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    """
+    spark = get_spark_session()
+    columns = list(data.keys())
+    df = spark.createDataFrame(
+        spark.sparkContext.parallelize(itertools.product(*(data.values()))), columns
+    )
+    return df
+
+
+def get_spark_session():
+    spark = SparkSession.getActiveSession()
+    if spark is None:
+        logger.warning("Could not find a SparkSession. Create a new one.")
+        spark = SparkSession.builder.getOrCreate()
+        log_spark_conf(spark)
+    return spark
+
+
 @contextmanager
 def custom_spark_conf(conf):
     """Apply a custom Spark configuration for the duration of a code block.
@@ -416,7 +489,7 @@ def custom_spark_conf(conf):
         Key-value pairs to set on the spark configuration.
 
     """
-    spark = _get_spark_session()
+    spark = get_spark_session()
     orig_settings = {}
 
     try:
@@ -430,10 +503,60 @@ def custom_spark_conf(conf):
             spark.conf.set(key, val)
 
 
-def _get_spark_session():
-    spark = SparkSession.getActiveSession()
-    if spark is None:
-        logger.warning("Could not find a SparkSession. Create a new one.")
-        spark = SparkSession.builder.getOrCreate()
-        log_spark_conf(spark)
-    return spark
+def load_stored_table(table_name):
+    """Return a table stored in the Spark warehouse.
+
+    Parameters
+    ----------
+    table_name : str
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    """
+    spark = get_spark_session()
+    return spark.table(table_name)
+
+
+def try_load_stored_table(table_name, database=DSGRID_DB_NAME):
+    """Return a table if it is stored in the Spark warehouse.
+
+    Parameters
+    ----------
+    table_name : str
+    database : str, optional
+
+    Returns
+    -------
+    pyspark.sql.DataFrame | None
+
+    """
+    spark = get_spark_session()
+    if spark.catalog.tableExists(table_name, dbName=database):
+        return spark.table(table_name)
+    return None
+
+
+def is_table_stored(table_name, database=DSGRID_DB_NAME):
+    spark = get_spark_session()
+    return spark.catalog.tableExists(table_name, dbName=database)
+
+
+def save_table(table, table_name, overwrite=True, database=DSGRID_DB_NAME):
+    if overwrite:
+        table.write.mode("overwrite").saveAsTable(table_name)
+    else:
+        table.write.saveAsTable(table_name)
+
+
+def list_tables(database=DSGRID_DB_NAME):
+    spark = get_spark_session()
+    return [x.name for x in spark.catalog.listTables(dbName=database)]
+
+
+def drop_table(table_name, database=DSGRID_DB_NAME):
+    spark = get_spark_session()
+    if is_table_stored(table_name, database=database):
+        spark.sql(f"DROP TABLE {table_name}")
+        logger.info("Dropped table %s", table_name)

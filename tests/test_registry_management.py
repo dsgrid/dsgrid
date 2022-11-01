@@ -8,6 +8,8 @@ import pyspark
 import pytest
 from semver import VersionInfo
 
+from dsgrid.config.dimension_association_manager import _make_dimension_associations_table_name
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
@@ -25,6 +27,7 @@ from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.spark import is_table_stored
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
@@ -81,8 +84,13 @@ def test_register_project_and_dataset(make_test_project_dir):
         dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
         assert len(dimension_mapping_mgr.list_ids()) == len(mapping_ids)
 
+        table_name = _make_dimension_associations_table_name(
+            project_id, dataset_id, DimensionType.METRIC
+        )
+        assert is_table_stored(table_name)
         check_configs_update(base_dir, manager)
-        check_update_project_dimension(base_dir, manager)
+        assert not is_table_stored(table_name)
+        check_update_project_dimension(base_dir, manager, dataset_id)
         # Note that the dataset is now unregistered.
 
         # Test removals.
@@ -416,7 +424,7 @@ def register_dataset(dataset_mgr, config_file, dataset_id, user, log_message):
     assert dataset_mgr.list_ids() == [dataset_id]
 
 
-def check_update_project_dimension(tmpdir, manager):
+def check_update_project_dimension(tmpdir, manager, dataset_id):
     """Verify that updating a project's dimension causes all datasets to go unregistered."""
     project_mgr = manager.project_manager
     project_id = project_mgr.list_ids()[0]

@@ -15,6 +15,7 @@ from dsgrid.tests.common import (
     TEST_PROJECT_REPO,
     TEST_REGISTRY,
     TEST_STANDARD_SCENARIOS_PROJECT_REPO,
+    TEST_EFS_REGISTRATION_FILE,
 )
 
 
@@ -38,10 +39,7 @@ def pytest_sessionstart(session):
     else:
         if TEST_REGISTRY.exists():
             shutil.rmtree(TEST_REGISTRY)
-        ret = run_command(
-            f"python dsgrid/tests/make_us_data_registry.py {TEST_REGISTRY} -p {TEST_PROJECT_REPO} "
-            f"-d {TEST_DATASET_DIRECTORY}"
-        )
+        ret = run_command(f"python dsgrid/tests/register.py {TEST_EFS_REGISTRATION_FILE}")
         if ret == 0:
             print("make script returned 0")
             commit_file.write_text(latest_commit + "\n")
@@ -76,6 +74,13 @@ def spark_session():
     spark.stop()
 
 
+@pytest.fixture(scope="module")
+def make_test_project_dir_module():
+    tmpdir = _make_project_dir(TEST_PROJECT_REPO)
+    yield tmpdir / "dsgrid_project"
+    shutil.rmtree(tmpdir)
+
+
 @pytest.fixture
 def make_test_project_dir():
     tmpdir = _make_project_dir(TEST_PROJECT_REPO)
@@ -87,6 +92,18 @@ def make_test_project_dir():
 def make_standard_scenarios_project_dir():
     tmpdir = _make_project_dir(TEST_STANDARD_SCENARIOS_PROJECT_REPO)
     yield tmpdir / "dsgrid_project"
+    shutil.rmtree(tmpdir)
+
+
+@pytest.fixture(scope="module")
+def make_test_data_dir_module():
+    tmpdir = Path(gettempdir()) / "test_data"
+    if os.path.exists(tmpdir):
+        shutil.rmtree(tmpdir)
+    os.mkdir(tmpdir)
+    dst_path = tmpdir / "datasets"
+    shutil.copytree(Path(TEST_DATASET_DIRECTORY), dst_path)
+    yield dst_path
     shutil.rmtree(tmpdir)
 
 

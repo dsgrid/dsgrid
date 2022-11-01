@@ -1,14 +1,24 @@
 import itertools
 import logging
 import os
+from pathlib import Path
 from typing import Dict, List, Set
 
 from pydantic import Field
 from pydantic import root_validator, validator
 
+from dsgrid.config.dimension_association_manager import (
+    try_load_dimension_associations,
+    save_dimension_associations,
+)
 from dsgrid.data_models import DSGBaseModel, serialize_model_data
 from dsgrid.dimension.base_models import check_required_dimensions
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimension, DSGInvalidParameter
+from dsgrid.exceptions import (
+    DSGInvalidField,
+    DSGInvalidDimension,
+    DSGInvalidParameter,
+    DSGInvalidDimensionAssociation,
+)
 from dsgrid.registry.common import (
     ProjectRegistryStatus,
     DatasetRegistryStatus,
@@ -16,12 +26,17 @@ from dsgrid.registry.common import (
 )
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from dsgrid.utils.spark import (
+    get_unique_values,
+    cross_join_dfs,
+    create_dataframe_from_product,
+    load_stored_table,
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.utils.versioning import handle_version_or_str
-from .config_base import ConfigWithDataFilesBase
+from .config_base import ConfigBase
 from .dataset_config import InputDatasetType
-from .dimension_associations import DimensionAssociations
 from .dimension_mapping_base import DimensionMappingReferenceModel
 from .mapping_tables import MappingTableByNameModel
 from .dimensions import (
@@ -85,12 +100,6 @@ class DimensionsModel(DSGBaseModel):
         ),
         default=[],
     )
-    all_in_one_supplemental_dimensions: List[DimensionType] = Field(
-        title="all_in_one_supplemental_dimensions",
-        description="dsgrid will auto-generate dimensions that aggregate across all records for "
-        "the base dimensions of these types.",
-        default=[],
-    )
 
     @root_validator(pre=False)
     def check_dimensions(cls, values):
@@ -137,6 +146,82 @@ class DimensionsModel(DSGBaseModel):
         return handle_dimension_union(values)
 
 
+class RequiredSupplementalDimensionRecordsModel(DSGBaseModel):
+
+    name: str = Field(description="Name of a supplemental dimension")
+    record_ids: list[str] = Field(
+        description="One or more record IDs in the supplemental dimension"
+    )
+
+
+class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
+
+    base: list[str] = []
+    supplemental: list[RequiredSupplementalDimensionRecordsModel] = []
+
+
+class RequiredDimensionRecordsModel(DSGBaseModel):
+
+    # data_source and time are excluded
+    geography: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
+    metric: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
+    model_year: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
+    scenario: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
+    sector: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
+    subsector: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
+    weather_year: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
+
+
+class RequiredDimensionsModel(DSGBaseModel):
+    """Defines required record IDs that must exist for each dimension in a dataset.
+    Record IDs can reside in the project's base or supplemental dimensions. Using supplemental
+    dimensions is recommended. dsgrid will substitute base records for mapped supplemental records
+    at runtime. If no records are listed for a dimension then all project base records are
+    required.
+    """
+
+    single_dimensional: RequiredDimensionRecordsModel = Field(
+        description="Required records for a single dimension.",
+        default=RequiredDimensionRecordsModel(),
+    )
+    multi_dimensional: list[RequiredDimensionRecordsModel] = Field(
+        description="Required records for a combination of dimensions. For example, there may be "
+        "a dataset requirement for only one subsector for a given sector instead of a cross "
+        "product.",
+        default=[],
+    )
+
+    @validator("multi_dimensional")
+    def check_for_duplicates(cls, multi_dimensional, values):
+        existing = set()
+        for field in RequiredDimensionRecordsModel.__fields__:
+            req = getattr(values["single_dimensional"], field)
+            existing.update(req.base)
+            for supp in req.supplemental:
+                existing.update(supp.record_ids)
+
+        for item in multi_dimensional:
+            num_dims = 0
+            for field in RequiredDimensionRecordsModel.__fields__:
+                req = getattr(item, field)
+                num_dims += len(req.base)
+                record_ids = set(req.base)
+                for supp in req.supplemental:
+                    num_dims += len(supp.record_ids)
+                    record_ids.update(supp.record_ids)
+                intersect = existing.intersection(record_ids)
+                if intersect:
+                    raise ValueError(
+                        f"dimensions cannot be defined in both single_dimensional and multi_dimensional: {intersect}"
+                    )
+            if num_dims < 2:
+                raise ValueError(
+                    f"A multi_dimensional dimension requirement must contain at least two dimensions: {item}"
+                )
+
+        return multi_dimensional
+
+
 class InputDatasetModel(DSGBaseModel):
     """Defines an input dataset for the project config."""
 
@@ -165,6 +250,11 @@ class InputDatasetModel(DSGBaseModel):
         ),
         updateable=False,
         # TODO: add notes about warnings for outdated versions? DSGRID-189.
+    )
+    required_dimensions: RequiredDimensionsModel = Field(
+        title="required_dimenions",
+        description="Defines required record IDs that must exist for each dimension.",
+        default=RequiredDimensionsModel(),
     )
     mapping_references: List[DimensionMappingReferenceModel] = Field(
         title="mapping_references",
@@ -266,12 +356,6 @@ class ProjectConfigModel(DSGBaseModel):
         default=DimensionMappingsModel(),
         notes=("`[dimension_mappings]` are optional at the project level.",),
     )
-    dimension_associations: List = Field(
-        title="dimension_associations",
-        description="List of tabular files that specify required dimension associations. The "
-        "files will be joined in the given order to produce a single table.",
-        default=[],
-    )
 
     @root_validator(pre=False, skip_on_failure=True)
     def check_mappings_with_dimensions(cls, values):
@@ -327,7 +411,7 @@ class ProjectDimensionQueryNamesModel(DSGBaseModel):
     weather_year: _DimensionQueryNamesModel
 
 
-class ProjectConfig(ConfigWithDataFilesBase):
+class ProjectConfig(ConfigBase):
     """Provides an interface to a ProjectConfigModel."""
 
     def __init__(self, model):
@@ -335,8 +419,8 @@ class ProjectConfig(ConfigWithDataFilesBase):
         self._base_dimensions = {}  # DimensionKey to DimensionConfig
         self._supplemental_dimensions = {}  # DimensionKey to DimensionConfig
         self._base_to_supplemental_mappings = {}
-        self._dimension_associations = None
         self._dimensions_by_query_name = {}
+        self._src_dir = None
 
     @staticmethod
     def model_class():
@@ -346,29 +430,24 @@ class ProjectConfig(ConfigWithDataFilesBase):
     def config_filename():
         return "project.toml"
 
-    @staticmethod
-    def data_file_fields():
-        return []
+    @property
+    def src_dir(self):
+        return self._src_dir
 
-    @staticmethod
-    def data_files_fields():
-        return ["dimension_associations"]
+    @src_dir.setter
+    def src_dir(self, val):
+        self._src_dir = val
 
     @classmethod
     def load(cls, config_file, dimension_manager, dimension_mapping_manager):
         config = super().load(config_file)
-        config.src_dir = os.path.dirname(config_file)
+        config.src_dir = Path(os.path.dirname(config_file))
         config.load_dimensions_and_mappings(dimension_manager, dimension_mapping_manager)
         return config
 
     def load_dimensions_and_mappings(self, dimension_manager, dimension_mapping_manager):
-        self.load_dimension_associations()
         self.load_dimensions(dimension_manager)
         self.load_dimension_mappings(dimension_mapping_manager)
-
-    @property
-    def dimension_associations(self):
-        return self._dimension_associations
 
     def get_base_dimension(self, dimension_type: DimensionType):
         """Return the base dimension matching dimension_type.
@@ -561,15 +640,6 @@ class ProjectConfig(ConfigWithDataFilesBase):
             }
         return ProjectDimensionQueryNamesModel(**model)
 
-    def load_dimension_associations(self):
-        """Load all dimension associations."""
-        # Find out what dimension have no associations which means that all dimension recrods from
-        # the project must be used
-        self._dimension_associations = DimensionAssociations.load(
-            self.src_dir,
-            self.model.dimension_associations,
-        )
-
     def load_dimensions(self, dimension_manager: DimensionRegistryManager):
         """Load all Base Dimensions.
 
@@ -645,7 +715,7 @@ class ProjectConfig(ConfigWithDataFilesBase):
     def config_id(self):
         return self._model.project_id
 
-    def get_dataset(self, dataset_id):
+    def get_dataset(self, dataset_id) -> InputDatasetModel:
         """Return a dataset by ID."""
         for dataset in self.model.datasets:
             if dataset.dataset_id == dataset_id:
@@ -730,45 +800,214 @@ class ProjectConfig(ConfigWithDataFilesBase):
             if dataset.status == status:
                 yield dataset
 
-    @track_timing(timer_stats_collector)
-    def make_dimension_association_table(self, data_source=None):
-        """Return a table with associations across all dimensions.
+    def get_required_dimension_record_ids(self, dataset_id, dimension_type: DimensionType):
+        """Return the required base dimension record IDs for the dataset and dimension type.
 
         Parameters
         ----------
-        data_source : DimensionType, optional
-            Filter table by data_source, by default None.
+        dataset_id : str
+        dimension_type : DimensionType
+
+        Returns
+        -------
+        set[str]
+
+        """
+        dataset = self.get_dataset(dataset_id)
+        requirements = getattr(
+            dataset.required_dimensions.single_dimensional, dimension_type.value
+        )
+        record_ids = self._get_required_record_ids_from_base(requirements, dimension_type)
+        record_ids.update(
+            self._get_required_record_ids_from_supplementals(requirements, dimension_type)
+        )
+
+        for multi_req in dataset.required_dimensions.multi_dimensional:
+            req = getattr(multi_req, dimension_type.value)
+            record_ids.update(req.base)
+            record_ids.update(
+                self._get_required_record_ids_from_supplementals(req, dimension_type)
+            )
+
+        return record_ids
+
+    def load_dimension_associations(self, dataset_id, pivoted_dimension=None, try_load_cache=True):
+        """Return a table with required dimension associations.
+
+        Parameters
+        ----------
+        dataset_id : str
+        pivoted_dimension : DimensionType | None
+        try_load_cache : bool
+            Try to load table from Spark warehouse, defaults to True.
 
         Returns
         -------
         pyspark.sql.DataFrame
 
         """
-        ds = DimensionType.DATA_SOURCE.value
-        table = self.dimension_associations.table
-        table_columns = set()
-        # table is None when the project doesn't define any dimension associations.
-        if table is not None:
-            if ds in table.columns and data_source is not None:
-                table = table.filter(f"{ds} = '{data_source}'").drop(ds)
-            table_columns.update(table.columns)
-
-        all_dimensions = {d.value for d in DimensionType if d != DimensionType.TIME}
-        missing_dimensions = all_dimensions.difference(table_columns)
-        for dim in missing_dimensions:
-            table_count = 0 if table is None else table.count()
-            other = (
-                self.get_base_dimension(DimensionType(dim))
-                .get_records_dataframe()
-                .selectExpr(f"id as {dim}")
+        if try_load_cache:
+            table = try_load_dimension_associations(self.config_id, dataset_id, pivoted_dimension)
+        else:
+            table = None
+        if table is None:
+            logger.info(
+                "Build dimension associations table for project_id=%s dataset_id=%s "
+                "pivoted_dimension=%s.",
+                self.config_id,
+                dataset_id,
+                pivoted_dimension,
             )
-            if table is None:
-                table = other
+            table = self._make_dimension_association_table(dataset_id, pivoted_dimension)
+            if os.environ.get("__DSGRID_SKIP_SAVING_DIMENSION_ASSOCIATIONS__") is not None:
+                logger.warning("Skip saving dimension associations.")
             else:
-                table = table.crossJoin(other)
-                assert table.count() == other.count() * table_count
-
+                # We expect these tables to be very small in files because of compression.
+                table_name = save_dimension_associations(
+                    table.coalesce(1), self.config_id, dataset_id, pivoted_dimension
+                )
+                # It will be much faster to load the persisted table.
+                table = load_stored_table(table_name)
+        else:
+            logger.info(
+                "Loaded cached dimension associations for %s dataset_id=%s pivoted_dimension=%s",
+                self.config_id,
+                dataset_id,
+                pivoted_dimension,
+            )
         return table
+
+    def _build_multi_dim_requirement_associations(self, multi_dim_reqs, pivoted_dimension):
+        dfs_by_dim_combo = {}
+
+        # Example: Partial sector and subsector combinations are required.
+        # [
+        #     {{"sector": {"base": ["com"]},
+        #       "subsector": "supplemental":
+        #         {"name": "commercial-subsectors",
+        #          "record_ids": ["commercial_subsectors"]}},
+        #     {"sector": {"base": ["res"]}, "subsector": {"base": ["MidriseApartment"]}},
+        # ]
+        # This code will replace supplemental records with base records and return a list of
+        # dataframes of those combinations - one per unique combination of dimensions.
+        for multi_req in multi_dim_reqs:
+            dim_combo = []
+            columns = {}
+            for field in RequiredDimensionRecordsModel.__fields__:
+                dim_type = DimensionType(field)
+                req = getattr(multi_req, field)
+                record_ids = set(req.base)
+                if record_ids:
+                    if dim_type == pivoted_dimension:
+                        raise NotImplementedError(
+                            f"Unhandled condition: multi_dimensional requirement cannot contain "
+                            f"the pivoted dimension: dimension={dim_type} records={record_ids}"
+                        )
+                record_ids.update(self._get_required_record_ids_from_supplementals(req, dim_type))
+                dim_combo.append(dim_type.value)
+                if record_ids:
+                    columns[field] = list(record_ids)
+            df = create_dataframe_from_product(columns)
+            df = df.select(*sorted(df.columns))
+
+            dim_combo = tuple(sorted(dim_combo))
+            if dim_combo in dfs_by_dim_combo:
+                dfs_by_dim_combo[dim_combo] = dfs_by_dim_combo[dim_combo].union(df)
+            else:
+                dfs_by_dim_combo[dim_combo] = df
+
+        return list(dfs_by_dim_combo.values())
+
+    def _get_required_record_ids_from_base(
+        self, req: RequiredDimensionRecordsByTypeModel, dimension_type: DimensionType
+    ):
+        if req.base:
+            record_ids = set(req.base)
+        elif not req.supplemental:
+            record_ids = self.get_base_dimension(dimension_type).get_unique_ids()
+        else:
+            record_ids = set()
+
+        return record_ids
+
+    def _get_required_record_ids_from_supplementals(
+        self, req: RequiredDimensionRecordsByTypeModel, dimension_type: DimensionType
+    ):
+        record_ids = set()
+        supp_name_to_dim = {
+            x.model.name: x for x in self.list_supplemental_dimensions(dimension_type)
+        }
+
+        for supp in req.supplemental:
+            dim = supp_name_to_dim.get(supp.name)
+            if dim is None:
+                raise DSGInvalidDimensionAssociation(
+                    f"Supplemental dimension of type={dimension_type} with name={req.name} "
+                    "does not exist"
+                )
+            supp_replacements = self._get_record_ids_from_one_supplemental(supp, dim)
+            record_ids.update(supp_replacements)
+
+        return record_ids
+
+    def _get_record_ids_from_one_supplemental(
+        self, req: RequiredSupplementalDimensionRecordsModel, dim
+    ):
+        record_ids = set()
+        for supplemental_record_id in req.record_ids:
+            base_record_ids = self._map_supplemental_record_to_base_records(
+                dim,
+                supplemental_record_id,
+            )
+            record_ids.update(base_record_ids)
+
+        return record_ids
+
+    @track_timing(timer_stats_collector)
+    def _make_dimension_association_table(self, dataset_id, pivoted_dimension):
+        required_dimensions = self.get_dataset(dataset_id).required_dimensions
+        multi_dfs = self._build_multi_dim_requirement_associations(
+            required_dimensions.multi_dimensional,
+            pivoted_dimension,
+        )
+
+        # Project config construction asserts that there is no intersection of dimensions in
+        # multi and single.
+        existing = set()
+        if pivoted_dimension is not None:
+            existing.add(pivoted_dimension.value)
+        for df in multi_dfs:
+            existing.update(set(df.columns))
+
+        single_dfs = {}
+        for field in (x for x in RequiredDimensionRecordsModel.__fields__ if x not in existing):
+            dimension_type = DimensionType(field)
+            req = getattr(required_dimensions.single_dimensional, field)
+            record_ids = self._get_required_record_ids_from_base(req, dimension_type)
+            record_ids.update(
+                self._get_required_record_ids_from_supplementals(req, dimension_type)
+            )
+            single_dfs[field] = list(record_ids)
+
+        single_df = create_dataframe_from_product(single_dfs)
+        return cross_join_dfs(multi_dfs + [single_df])
+
+    def _map_supplemental_record_to_base_records(self, dim, supplemental_id):
+        mapping_records = self.get_base_to_supplemental_mapping_records(
+            dim.model.dimension_query_name
+        ).filter(f"to_id == '{supplemental_id}'")
+        if mapping_records.rdd.isEmpty():
+            raise DSGInvalidDimensionAssociation(
+                f"Did not find {dim.model.dimension_type} supplemental dimension with record ID "
+                f"{supplemental_id} while attempting to substitute the records with base records."
+            )
+
+        if get_unique_values(mapping_records, "from_fraction") != {1}:
+            raise DSGInvalidDimensionAssociation(
+                "Supplemental dimensions used for associations must all have fraction=1"
+            )
+
+        return get_unique_values(mapping_records, "from_id")
 
     def are_all_datasets_submitted(self):
         """Return True if all datasets have been submitted.

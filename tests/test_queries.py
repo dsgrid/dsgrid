@@ -165,6 +165,7 @@ def test_query_cli_create_validate():
             f"-d -r -f {filename} -F expression -F column_operator "
             "-F supplemental_column_operator -F raw --force my_query dsgrid_conus_2022"
         )
+        shutdown_project()
         check_run_command(cmd)
         query = ProjectQueryModel.from_file(filename)
         assert query.name == "my_query"
@@ -190,6 +191,7 @@ def test_query_cli_run():
             f"dsgrid query project run --offline --registry-path={REGISTRY_PATH} "
             f"--output={output_dir} {filename}"
         )
+        shutdown_project()
         check_run_command(cmd)
         query.validate()
     finally:
@@ -220,6 +222,17 @@ def get_project():
         offline_mode=True,
     )
     return mgr.project_manager.load_project("dsgrid_conus_2022")
+
+
+def shutdown_project():
+    """Shutdown a project and stop the SparkSession so that another process can create one."""
+    global _project
+    if _project is not None:
+        _project = None
+
+    spark = SparkSession.getActiveSession()
+    if spark is not None:
+        spark.stop()
 
 
 def run_query_test(test_query_cls, *args):

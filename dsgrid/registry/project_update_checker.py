@@ -1,5 +1,6 @@
 import logging
 
+from dsgrid.config.dimension_association_manager import remove_project_dimension_associations
 from dsgrid.exceptions import DSGInvalidRegistryState
 from .config_update_checker_base import ConfigUpdateCheckerBase
 from .common import DatasetRegistryStatus, ProjectRegistryStatus
@@ -19,7 +20,10 @@ class ProjectUpdateChecker(ConfigUpdateCheckerBase):
     _REQUIRES_DATASET_UNREGISTRATION = (
         "dimensions",
         "dimension_mappings",
-        "dimension_associations",
+    )
+    _REQUIRES_DIMENSION_ASSOCIATION_CACHE_INVALIDATION = (
+        "dimensions",
+        "dimension_mappings",
     )
 
     def check_preconditions(self):
@@ -29,6 +33,7 @@ class ProjectUpdateChecker(ConfigUpdateCheckerBase):
             )
 
     def handle_postconditions(self):
+        # TODO: detect changes to required dimensions for each dataset.
         changes = set(self._REQUIRES_DATASET_UNREGISTRATION).intersection(self._changed_fields)
         if changes:
             for dataset in self._new_model.datasets:
@@ -47,3 +52,9 @@ class ProjectUpdateChecker(ConfigUpdateCheckerBase):
                     self._new_model.status,
                     changes,
                 )
+
+        changes = set(self._REQUIRES_DIMENSION_ASSOCIATION_CACHE_INVALIDATION).intersection(
+            self._changed_fields
+        )
+        if changes:
+            remove_project_dimension_associations(self._new_model.project_id)

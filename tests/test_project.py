@@ -23,10 +23,10 @@ def test_project_load():
     dim = config.get_base_dimension(DimensionType.GEOGRAPHY)
     assert dim.model.dimension_type == DimensionType.GEOGRAPHY
     supp_dims = config.list_supplemental_dimensions(DimensionType.GEOGRAPHY)
-    assert len(supp_dims) == 3
+    assert len(supp_dims) == 4
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.GEOGRAPHY)
     mappings = config.get_base_to_supplemental_dimension_mappings_by_types(DimensionType.GEOGRAPHY)
-    assert len(mappings) == 3
+    assert len(mappings) == 4
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SECTOR)
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SUBSECTOR)
 
@@ -34,8 +34,8 @@ def test_project_load():
     assert len(records) == 1
     assert records[0].id == "all_subsectors"
 
-    table = project.config.make_dimension_association_table()
-    assert table.select("data_source").distinct().collect()[0].data_source == "comstock"
+    table = project.config.load_dimension_associations(DATASET_ID, DimensionType.METRIC)
+    assert table.count() > 0
 
     with pytest.raises(DSGValueNotRegistered):
         project = mgr.project_manager.load_project(PROJECT_ID, version="0.0.0")
@@ -60,12 +60,20 @@ def test_dataset_load():
     query_names = sorted(
         project.config.list_dimension_query_names_by_type(DimensionType.GEOGRAPHY)
     )
-    assert query_names == ["census_division", "census_region", "county", "state"]
+    assert query_names == [
+        "all_geographies",
+        "census_division",
+        "census_region",
+        "county",
+        "state",
+    ]
     records = project.config.get_dimension_records("state")
     assert records.filter("id = 'CO'").count() > 0
 
+    table_name = DATASET_ID + "__" + "load_data"
+    assert spark.catalog.tableExists(table_name)
     project.unload_dataset(DATASET_ID)
-    assert spark.sql("show tables").rdd.isEmpty()
+    assert not spark.catalog.tableExists(table_name)
 
 
 def test_dimension_map_and_reduce_in_dataset():

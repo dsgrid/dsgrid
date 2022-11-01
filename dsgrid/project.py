@@ -129,12 +129,13 @@ class Project:
         self._build_filtered_record_ids_by_dimension_type(context)
 
         dfs = []
+        project_version = f"{context.model.project.project_id}__{context.model.project.version}"
         for dataset_id in context.model.project.dataset_ids:
             logger.info("Start processing query for dataset_id=%s", dataset_id)
             model_hash, text = context.model.project.dataset_params.serialize()
-            hash_dir = cached_project_mapped_datasets_dir / model_hash
+            hash_dir = cached_project_mapped_datasets_dir / project_version / model_hash
             if not hash_dir.exists():
-                hash_dir.mkdir()
+                hash_dir.mkdir(parents=True)
                 model_file = hash_dir / "model.json"
                 model_file.write_text(text)
             cached_dataset = hash_dir / (dataset_id + ".parquet")

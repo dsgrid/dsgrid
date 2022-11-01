@@ -1,12 +1,13 @@
 """Spark helper functions"""
 
+import enum
 import logging
 import math
 import os
 import shutil
+from contextlib import contextmanager
 from pathlib import Path
 from typing import AnyStr, List, Union
-import enum
 
 import pandas as pd
 from pyspark.sql import Row, SparkSession
@@ -314,7 +315,9 @@ def overwrite_dataframe_file(filename, df):
     return read_method(str(filename), **kwargs)
 
 
-def write_dataframe_and_auto_partition(df, filename, partition_size_mb=128, columns=None):
+def write_dataframe_and_auto_partition(
+    df, filename, partition_size_mb=128, columns=None, rtol_pct=50
+):
     """Write a dataframe to a file and then automatically coalesce or repartition it if needed.
     If the file already exists, it will be overwritten.
 
@@ -328,6 +331,9 @@ def write_dataframe_and_auto_partition(df, filename, partition_size_mb=128, colu
         Target size in MB for each partition
     columns : None, list
         If not None and repartitioning is needed, partition on these columns.
+    rtol_pct : int
+        Don't repartition or coalesce if the relative difference between desired and actual
+        partitions is within this tolerance as a percentage.
 
     Returns
     -------
@@ -351,19 +357,19 @@ def write_dataframe_and_auto_partition(df, filename, partition_size_mb=128, colu
     total_size = sum((x.stat().st_size for x in filename.glob("*.parquet")))
     desired = math.ceil(total_size / partition_size_bytes)
     actual = df.rdd.getNumPartitions()
-    if actual > desired:
+    if abs(actual - desired) / desired * 100 < rtol_pct:
+        logger.info("No change in number of partitions is needed for %s.", filename)
+    elif actual > desired:
         df = df.coalesce(desired)
         df = overwrite_dataframe_file(filename, df)
         logger.info("Coalesced %s to partition count %s", filename, desired)
-    elif actual < desired:
+    else:
         if columns is None:
             df = df.repartition(desired)
         else:
             df = df.repartition(desired, *columns)
         df = overwrite_dataframe_file(filename, df)
         logger.info("Repartitioned %s to partition count", filename, desired)
-    else:
-        logger.info("No change in number of partitions is needed for %s.", filename)
 
     return df
 
@@ -398,6 +404,30 @@ def sql_from_sqlalchemy(query):
     """
     logger.debug("sqlchemy query = %s", query)
     return sql(str(query).replace('"', ""))
+
+
+@contextmanager
+def custom_spark_conf(conf):
+    """Apply a custom Spark configuration for the duration of a code block.
+
+    Parameters
+    ----------
+    conf : dict
+        Key-value pairs to set on the spark configuration.
+
+    """
+    spark = _get_spark_session()
+    orig_settings = {}
+
+    try:
+        for key, val in conf.items():
+            orig_settings[key] = spark.conf.get(key)
+            spark.conf.set(key, val)
+            logger.info("Set %s=%s while running", key, val)
+        yield
+    finally:
+        for key, val in orig_settings.items():
+            spark.conf.set(key, val)
 
 
 def _get_spark_session():

@@ -25,6 +25,7 @@ from dsgrid.query.models import (
     CompositeDatasetQueryModel,
     CreateCompositeDatasetQueryModel,
     DimensionQueryNamesModel,
+    ProjectQueryDatasetParamsModel,
     ProjectQueryParamsModel,
     ProjectQueryModel,
     QueryResultParamsModel,
@@ -109,7 +110,6 @@ def test_invalid_drop_pivoted_dimension():
                 "conus_2022_reference_comstock",
                 "conus_2022_reference_resstock",
             ],
-            per_dataset_aggregations=[],
         ),
         result=QueryResultParamsModel(
             output_format="parquet",
@@ -118,11 +118,11 @@ def test_invalid_drop_pivoted_dimension():
     project = get_project()
     output_dir = Path(tempfile.gettempdir()) / "queries"
 
-    query.project.per_dataset_aggregations = [invalid_agg]
+    query.project.dataset_params.per_dataset_aggregations = [invalid_agg]
     with pytest.raises(DSGInvalidQuery):
         ProjectQuerySubmitter(project, output_dir).submit(query)
 
-    query.project.per_dataset_aggregations = []
+    query.project.dataset_params.per_dataset_aggregations = []
     query.result.aggregations = [invalid_agg]
     with pytest.raises(DSGInvalidQuery):
         ProjectQuerySubmitter(project, output_dir).submit(query)
@@ -168,7 +168,7 @@ def test_query_cli_create_validate():
         check_run_command(cmd)
         query = ProjectQueryModel.from_file(filename)
         assert query.name == "my_query"
-        assert query.project.per_dataset_aggregations
+        assert query.project.dataset_params.per_dataset_aggregations
         assert query.result.aggregations
         check_run_command(f"dsgrid query project validate {filename}")
     finally:
@@ -303,7 +303,7 @@ class QueryTestBase(abc.ABC):
         """
 
     def get_filtered_county_id(self):
-        filters = self._model.project.dimension_filters
+        filters = self._model.project.dataset_params.dimension_filters
         counties = [x.value for x in filters if x.dimension_query_name == "county"]
         assert len(counties) == 1, f"Unexpected length of filtered counties: {len(counties)}"
         return counties[0]
@@ -328,24 +328,25 @@ class QueryTestElectricityValues(QueryTestBase):
                     "conus_2022_reference_resstock",
                     # "tempo_conus_2022",
                 ],
-                dimension_filters=[
-                    # This is a nonsensical way to filter down to county 06037, but it tests
-                    # the code with combinations of base and supplemental dimension filters.
-                    DimensionFilterColumnOperatorModel(
-                        dimension_type=DimensionType.GEOGRAPHY,
-                        dimension_query_name="county",
-                        operator="isin",
-                        value=["06037", "36047"],
-                    ),
-                    DimensionFilterExpressionModel(
-                        dimension_type=DimensionType.GEOGRAPHY,
-                        dimension_query_name="state",
-                        operator="==",
-                        column="name",
-                        value="California",
-                    ),
-                ],
-                # filtered_datasets=[],
+                dataset_params=ProjectQueryDatasetParamsModel(
+                    dimension_filters=[
+                        # This is a nonsensical way to filter down to county 06037, but it tests
+                        # the code with combinations of base and supplemental dimension filters.
+                        DimensionFilterColumnOperatorModel(
+                            dimension_type=DimensionType.GEOGRAPHY,
+                            dimension_query_name="county",
+                            operator="isin",
+                            value=["06037", "36047"],
+                        ),
+                        DimensionFilterExpressionModel(
+                            dimension_type=DimensionType.GEOGRAPHY,
+                            dimension_query_name="state",
+                            operator="==",
+                            column="name",
+                            value="California",
+                        ),
+                    ],
+                ),
             ),
             result=QueryResultParamsModel(
                 supplemental_columns=["state"],
@@ -353,14 +354,14 @@ class QueryTestElectricityValues(QueryTestBase):
             ),
         )
         if self._use_supplemental_dimension:
-            self._model.project.dimension_filters.append(
+            self._model.project.dataset_params.dimension_filters.append(
                 SupplementalDimensionFilterColumnOperatorModel(
                     dimension_type=DimensionType.METRIC,
                     dimension_query_name="electricity",
                 )
             )
         else:
-            self._model.project.dimension_filters.append(
+            self._model.project.dataset_params.dimension_filters.append(
                 DimensionFilterExpressionModel(
                     dimension_type=DimensionType.METRIC,
                     dimension_query_name="end_use",
@@ -425,22 +426,24 @@ class QueryTestElectricityUse(QueryTestBase):
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
                 ],
-                per_dataset_aggregations=[
-                    AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
-                            geography=["county"],
-                            metric=["electricity"],
-                            model_year=["model_year"],
-                            scenario=["scenario"],
-                            sector=["sector"],
-                            subsector=[],
-                            time=["time_est"],
-                            weather_year=["weather_2012"],
+                dataset_params=ProjectQueryDatasetParamsModel(
+                    per_dataset_aggregations=[
+                        AggregationModel(
+                            dimensions=DimensionQueryNamesModel(
+                                data_source=["data_source"],
+                                geography=["county"],
+                                metric=["electricity"],
+                                model_year=["model_year"],
+                                scenario=["scenario"],
+                                sector=["sector"],
+                                subsector=[],
+                                time=["time_est"],
+                                weather_year=["weather_2012"],
+                            ),
+                            aggregation_function="sum",
                         ),
-                        aggregation_function="sum",
-                    ),
-                ],
+                    ],
+                ),
             ),
             result=QueryResultParamsModel(
                 aggregations=[
@@ -496,30 +499,32 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
                 ],
-                dimension_filters=[
-                    DimensionFilterExpressionModel(
-                        dimension_type=DimensionType.GEOGRAPHY,
-                        dimension_query_name="county",
-                        operator="==",
-                        value="06037",
-                    ),
-                ],
-                per_dataset_aggregations=[
-                    AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
-                            geography=["county"],
-                            metric=["electricity"],
-                            model_year=["model_year"],
-                            scenario=["scenario"],
-                            sector=["sector"],
-                            subsector=["subsector"],
-                            time=["time_est"],
-                            weather_year=["weather_2012"],
+                dataset_params=ProjectQueryDatasetParamsModel(
+                    dimension_filters=[
+                        DimensionFilterExpressionModel(
+                            dimension_type=DimensionType.GEOGRAPHY,
+                            dimension_query_name="county",
+                            operator="==",
+                            value="06037",
                         ),
-                        aggregation_function="sum",
-                    ),
-                ],
+                    ],
+                    per_dataset_aggregations=[
+                        AggregationModel(
+                            dimensions=DimensionQueryNamesModel(
+                                data_source=["data_source"],
+                                geography=["county"],
+                                metric=["electricity"],
+                                model_year=["model_year"],
+                                scenario=["scenario"],
+                                sector=["sector"],
+                                subsector=["subsector"],
+                                time=["time_est"],
+                                weather_year=["weather_2012"],
+                            ),
+                            aggregation_function="sum",
+                        ),
+                    ],
+                ),
             ),
             result=QueryResultParamsModel(
                 aggregations=[
@@ -626,22 +631,24 @@ class QueryTestDiurnalElectricityUseByCountyPrePostConcat(QueryTestBase):
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
                 ],
-                per_dataset_aggregations=[
-                    AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
-                            geography=["county"],
-                            metric=["electricity"],
-                            model_year=["model_year"],
-                            scenario=["scenario"],
-                            sector=["sector"],
-                            subsector=["subsector"],
-                            time=["time_est"],
-                            weather_year=["weather_2012"],
+                dataset_params=ProjectQueryDatasetParamsModel(
+                    per_dataset_aggregations=[
+                        AggregationModel(
+                            dimensions=DimensionQueryNamesModel(
+                                data_source=["data_source"],
+                                geography=["county"],
+                                metric=["electricity"],
+                                model_year=["model_year"],
+                                scenario=["scenario"],
+                                sector=["sector"],
+                                subsector=["subsector"],
+                                time=["time_est"],
+                                weather_year=["weather_2012"],
+                            ),
+                            aggregation_function="sum",
                         ),
-                        aggregation_function="sum",
-                    ),
-                ],
+                    ],
+                ),
             ),
             result=QueryResultParamsModel(
                 aggregations=[
@@ -687,22 +694,24 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
                 ],
-                per_dataset_aggregations=[
-                    AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
-                            geography=["state", "reeds_pca", "census_region"],
-                            metric=["electricity"],
-                            model_year=["model_year"],
-                            scenario=["scenario"],
-                            sector=["sector"],
-                            subsector=[],
-                            time=["time_est"],
-                            weather_year=["weather_2012"],
+                dataset_params=ProjectQueryDatasetParamsModel(
+                    per_dataset_aggregations=[
+                        AggregationModel(
+                            dimensions=DimensionQueryNamesModel(
+                                data_source=["data_source"],
+                                geography=["state", "reeds_pca", "census_region"],
+                                metric=["electricity"],
+                                model_year=["model_year"],
+                                scenario=["scenario"],
+                                sector=["sector"],
+                                subsector=[],
+                                time=["time_est"],
+                                weather_year=["weather_2012"],
+                            ),
+                            aggregation_function="sum",
                         ),
-                        aggregation_function="sum",
-                    ),
-                ],
+                    ],
+                ),
             ),
             result=QueryResultParamsModel(
                 output_format="parquet",
@@ -731,22 +740,24 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                     "conus_2022_reference_comstock",
                     "conus_2022_reference_resstock",
                 ],
-                per_dataset_aggregations=[
-                    AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
-                            geography=["state"],
-                            metric=["electricity"],
-                            model_year=["model_year"],
-                            scenario=["scenario"],
-                            sector=["sector"],
-                            subsector=["subsector"],
-                            time=["time_est"],
-                            weather_year=["weather_2012"],
+                dataset_params=ProjectQueryDatasetParamsModel(
+                    per_dataset_aggregations=[
+                        AggregationModel(
+                            dimensions=DimensionQueryNamesModel(
+                                data_source=["data_source"],
+                                geography=["state"],
+                                metric=["electricity"],
+                                model_year=["model_year"],
+                                scenario=["scenario"],
+                                sector=["sector"],
+                                subsector=["subsector"],
+                                time=["time_est"],
+                                weather_year=["weather_2012"],
+                            ),
+                            aggregation_function="sum",
                         ),
-                        aggregation_function="sum",
-                    ),
-                ],
+                    ],
+                ),
             ),
             result=QueryResultParamsModel(
                 reports=[
@@ -804,12 +815,14 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                     "conus_2022_reference_resstock",
                     # "tempo_conus_2022",
                 ],
-                dimension_filters=[
-                    SupplementalDimensionFilterColumnOperatorModel(
-                        dimension_type=DimensionType.METRIC,
-                        dimension_query_name="electricity",
-                    ),
-                ],
+                dataset_params=ProjectQueryDatasetParamsModel(
+                    dimension_filters=[
+                        SupplementalDimensionFilterColumnOperatorModel(
+                            dimension_type=DimensionType.METRIC,
+                            dimension_query_name="electricity",
+                        ),
+                    ],
+                ),
             ),
         )
         return self._model

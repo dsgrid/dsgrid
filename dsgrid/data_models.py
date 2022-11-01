@@ -70,6 +70,13 @@ class DSGBaseModel(BaseModel):
                 fields.add(f)
         return fields
 
+    @classmethod
+    def from_file(cls, filename: Path):
+        """Deserialize the model from a file. Unlike the load method,
+        this does not change directories.
+        """
+        return cls(**load_data(filename))
+
 
 class EnumValue:
     """Class to define a DSGEnum value"""

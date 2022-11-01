@@ -105,7 +105,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         # It should be cheaper to do this before the join with lookup.
         table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
         ld_df = table_handler.process_pivoted_aggregations(
-            ld_df, context.model.project.per_dataset_aggregations, context
+            ld_df, context.model.project.dataset_params.per_dataset_aggregations, context
         )
 
         # TODO: handle fraction application
@@ -114,7 +114,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         ld_df = table_handler.convert_columns_to_query_names(ld_df)
         ld_df = table_handler.process_stacked_aggregations(
-            ld_df, context.model.project.per_dataset_aggregations, context
+            ld_df, context.model.project.dataset_params.per_dataset_aggregations, context
         )
 
         return ld_df
@@ -122,7 +122,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def _check_aggregations(self, context):
         pivoted_type = self.get_pivoted_dimension_type()
         for agg in itertools.chain(
-            context.model.project.per_dataset_aggregations, context.model.result.aggregations
+            context.model.project.dataset_params.per_dataset_aggregations,
+            context.model.result.aggregations,
         ):
             if not getattr(agg.dimensions, pivoted_type.value):
                 raise DSGInvalidQuery(

@@ -1,6 +1,7 @@
 """Interface to a dsgrid project."""
 
 import logging
+from pathlib import Path
 
 import pyspark.sql.functions as F
 from pyspark.sql import SparkSession
@@ -11,6 +12,11 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.query.query_context import QueryContext
 
+from dsgrid.utils.spark import (
+    read_dataframe,
+    custom_spark_conf,
+    write_dataframe_and_auto_partition,
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 
@@ -119,18 +125,34 @@ class Project:
         return [x.dataset_id for x in self._iter_datasets()]
 
     @track_timing(timer_stats_collector)
-    def process_query(self, context: QueryContext):
+    def process_query(self, context: QueryContext, cached_project_mapped_datasets_dir: Path):
         self._build_filtered_record_ids_by_dimension_type(context)
 
         dfs = []
+        project_version = f"{context.model.project.project_id}__{context.model.project.version}"
         for dataset_id in context.model.project.dataset_ids:
             logger.info("Start processing query for dataset_id=%s", dataset_id)
-            dataset = self.get_dataset(dataset_id)
-            dfs.append(dataset.get_dataframe(context, self._config))
+            model_hash, text = context.model.project.dataset_params.serialize()
+            hash_dir = cached_project_mapped_datasets_dir / project_version / model_hash
+            if not hash_dir.exists():
+                hash_dir.mkdir(parents=True)
+                model_file = hash_dir / "model.json"
+                model_file.write_text(text)
+            cached_dataset = hash_dir / (dataset_id + ".parquet")
+            if cached_dataset.exists():
+                logger.info("Use cached project-mapped dataset %s", dataset_id)
+                df = read_dataframe(cached_dataset)
+            else:
+                logger.info("Build project-mapped dataset %s", dataset_id)
+                dataset = self.get_dataset(dataset_id)
+                df = dataset.get_dataframe(context, self._config)
+                with custom_spark_conf(context.model.project.get_spark_conf(dataset_id)):
+                    df = write_dataframe_and_auto_partition(df, cached_dataset)
+            dfs.append(df)
             logger.info("Finished processing query for dataset_id=%s", dataset_id)
 
         if not dfs:
-            logger.warning("No data matched %s", context.name)
+            logger.warning("No data matched %s", context.model.name)
             return None
 
         # All dataset columns need to be in the same order.
@@ -149,13 +171,14 @@ class Project:
         dim_columns = sorted(dim_columns)
         time_columns = sorted(time_columns)
         expected_columns = time_columns + pivoted_columns_sorted + dim_columns
-        for i, dataset_id in enumerate(context.model.project.dataset_ids):
-            remaining = sorted(set(dfs[i].columns).difference(expected_columns))
+        for i, df in enumerate(dfs):
+            remaining = sorted(set(df.columns).difference(expected_columns))
             final_columns = expected_columns + remaining
-            missing = pivoted_columns.difference(dfs[i].columns)
+            missing = pivoted_columns.difference(df.columns)
             for column in missing:
-                dfs[i] = dfs[i].withColumn(column, F.lit(None).cast(DoubleType()))
-            dfs[i] = dfs[i].select(*final_columns)
+                df = df.withColumn(column, F.lit(None).cast(DoubleType()))
+            df = df.select(*final_columns)
+            dfs[i] = df
 
         main_df = dfs[0]
         if len(dfs) > 1:
@@ -173,7 +196,7 @@ class Project:
         record_ids = {}
         base_query_names = self._config.get_base_dimension_query_names()
 
-        for dim_filter in context.model.project.dimension_filters:
+        for dim_filter in context.model.project.dataset_params.dimension_filters:
             dim_type = dim_filter.dimension_type
             query_name = dim_filter.dimension_query_name
             df = self._config.get_dimension_records(query_name)

@@ -218,7 +218,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 x[group_by] for x in fracs_greater_than_one[[group_by]].distinct().collect()
             }
             raise DSGInvalidDimensionMapping(
-                f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a"
+                f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a "
                 f"tolerance of {tolerance}, which does not allow from_fraction sum <> 1. "
                 f"Mapping contains from_fraction sum greater than 1 for {group_by}={id_greater_than_one}. "
             )

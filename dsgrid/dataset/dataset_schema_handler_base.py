@@ -130,16 +130,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 mapping_config = self._dimension_mapping_mgr.get_by_id(
                     ref.mapping_id, version=ref.version
                 )
-                mapping = {
-                    x.from_id: x.to_id for x in mapping_config.model.records if x.to_id is not None
-                }
+                from_ids = set()
+                to_ids = set()
+                for record in mapping_config.model.records:
+                    if record.to_id is not None:
+                        from_ids.add(record.from_id)
+                        to_ids.add(record.to_id)
 
-                diff = set(mapping.keys()).difference(columns)
+                diff = from_ids.difference(columns)
                 if diff:
                     raise DSGInvalidDataset(
                         f"Dimension_mapping={mapping_config.config_id} has more from_id records than the dataset pivoted {dim_type.value} dimension: {diff}"
                     )
-                return set(mapping.values())
+                return to_ids
 
         return columns
 

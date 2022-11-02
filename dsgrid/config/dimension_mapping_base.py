@@ -70,7 +70,7 @@ class DimensionMappingArchetype(DSGEnum):
         check_fraction_sum_eq1_to_id=False,
     )
     MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_FROM_ID = EnumValue(
-        value="many_to_many_map_fraction_sum_eq1",
+        value="many_to_many_map_fraction_sum_from_id_eq1",
         description="Many-to-many dimension mapping with sum of from_fraction = 1 when grouped by from_id",
         allow_dup_from_records=True,
         allow_dup_to_records=True,
@@ -103,7 +103,7 @@ class DimensionMappingArchetype(DSGEnum):
         check_fraction_sum_eq1_to_id=True,
     )
     MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_TO_ID = EnumValue(
-        value="many_to_many_map_fraction_sum_eq1",
+        value="many_to_many_map_fraction_sum_to_id_eq1",
         description="Many-to-many dimension mapping with sum of from_fraction = 1 when grouped by to_id",
         allow_dup_from_records=True,
         allow_dup_to_records=True,

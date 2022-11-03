@@ -5,14 +5,17 @@ import itertools
 import logging
 import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Union, List, Dict
 
+import pandas as pd
 from prettytable import PrettyTable
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
+    DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
 )
@@ -45,8 +48,9 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
 )
 from dsgrid.utils.timing import track_timing, timer_stats_collector
-from dsgrid.utils.files import load_data, run_in_other_dir
+from dsgrid.utils.files import dump_data, load_data, run_in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
+from dsgrid.utils.spark import models_to_dataframe, get_unique_values
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
     VersionUpdateType,
@@ -55,6 +59,7 @@ from .common import (
 from .registration_context import RegistrationContext
 from .project_update_checker import ProjectUpdateChecker
 from .dataset_registry_manager import DatasetRegistryManager
+from .dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from .dimension_registry_manager import DimensionRegistryManager
 from .project_registry import ProjectRegistry, ProjectRegistryModel
 from .registry_manager_base import RegistryManagerBase
@@ -110,7 +115,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         return self._dimension_mapping_mgr
 
     @dimension_mapping_manager.setter
-    def dimension_mapping_manager(self, val: DimensionRegistryManager):
+    def dimension_mapping_manager(self, val: DimensionMappingRegistryManager):
         self._dimension_mapping_mgr = val
 
     @staticmethod
@@ -596,44 +601,14 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         references = []
         if dimension_mapping_file is not None:
-            src_dir = dimension_mapping_file.parent
-            mappings = DatasetBaseToProjectMappingTableListModel(
-                **load_data(dimension_mapping_file)
-            ).mappings
-            dataset_mapping = {
-                x.dimension_type: x for x in dataset_config.model.dimension_references
-            }
-            project_mapping = {
-                x.dimension_type: x
-                for x in project_config.model.dimensions.base_dimension_references
-            }
-            mapping_tables = []
-            for mapping in mappings:
-                mapping_table = run_in_other_dir(
-                    src_dir,
-                    MappingTableModel.from_pre_registered_model,
-                    mapping,
-                    dataset_mapping[mapping.dimension_type],
-                    project_mapping[mapping.dimension_type],
-                )
-                mapping_tables.append(mapping_table)
-
-            mappings_config = DimensionMappingsConfig.load_from_model(
-                DimensionMappingsConfigModel(mappings=mapping_tables), src_dir
+            references += self._register_mappings_from_file(
+                project_config,
+                dataset_config,
+                dimension_mapping_file,
+                submitter,
+                log_message,
+                context,
             )
-            mapping_ids = self._dimension_mapping_mgr.register_from_config(
-                mappings_config, submitter, log_message, context=context
-            )
-            for mapping_id in mapping_ids:
-                mapping_config = self._dimension_mapping_mgr.get_by_id(mapping_id)
-                references.append(
-                    DimensionMappingReferenceModel(
-                        from_dimension_type=mapping_config.model.from_dimension.dimension_type,
-                        to_dimension_type=mapping_config.model.to_dimension.dimension_type,
-                        mapping_id=mapping_id,
-                        version=str(self._dimension_mapping_mgr.get_current_version(mapping_id)),
-                    )
-                )
         if dimension_mapping_references_file is not None:
             for ref in DimensionMappingReferenceListModel.load(
                 dimension_mapping_references_file
@@ -642,7 +617,144 @@ class ProjectRegistryManager(RegistryManagerBase):
                     raise DSGValueNotRegistered(f"mapping_id={ref.mapping_id}")
                 references.append(ref)
 
+        references += self._auto_register_missing_mappings(
+            project_config, dataset_config, references, submitter, log_message, context
+        )
         self._submit_dataset(project_config, dataset_config, submitter, log_message, references)
+
+    def _register_mappings_from_file(
+        self,
+        project_config,
+        dataset_config,
+        dimension_mapping_file,
+        submitter,
+        log_message,
+        context,
+    ):
+        references = []
+        src_dir = dimension_mapping_file.parent
+        mappings = DatasetBaseToProjectMappingTableListModel(
+            **load_data(dimension_mapping_file)
+        ).mappings
+        dataset_mapping = {x.dimension_type: x for x in dataset_config.model.dimension_references}
+        project_mapping = {
+            x.dimension_type: x for x in project_config.model.dimensions.base_dimension_references
+        }
+        mapping_tables = []
+        for mapping in mappings:
+            mapping_table = run_in_other_dir(
+                src_dir,
+                MappingTableModel.from_pre_registered_model,
+                mapping,
+                dataset_mapping[mapping.dimension_type],
+                project_mapping[mapping.dimension_type],
+            )
+            mapping_tables.append(mapping_table)
+
+        mappings_config = DimensionMappingsConfig.load_from_model(
+            DimensionMappingsConfigModel(mappings=mapping_tables), src_dir
+        )
+        mapping_ids = self._dimension_mapping_mgr.register_from_config(
+            mappings_config, submitter, log_message, context=context
+        )
+        for mapping_id in mapping_ids:
+            mapping_config = self._dimension_mapping_mgr.get_by_id(mapping_id)
+            references.append(
+                DimensionMappingReferenceModel(
+                    from_dimension_type=mapping_config.model.from_dimension.dimension_type,
+                    to_dimension_type=mapping_config.model.to_dimension.dimension_type,
+                    mapping_id=mapping_id,
+                    version=str(self._dimension_mapping_mgr.get_current_version(mapping_id)),
+                )
+            )
+
+        return references
+
+    def _auto_register_missing_mappings(
+        self,
+        project_config: ProjectConfig,
+        dataset_config: DatasetConfig,
+        mapping_references: List[DimensionMappingReferenceModel],
+        submitter,
+        log_message,
+        context,
+    ):
+        references = []
+        p_model = project_config.model
+        p_base_dim_ids = {x.dimension_id for x in p_model.dimensions.base_dimension_references}
+        p_supp_dim_ids = {
+            x.dimension_id for x in p_model.dimensions.supplemental_dimension_references
+        }
+        d_dim_from_ids = set()
+        for ref in mapping_references:
+            mapping_config = self._dimension_mapping_mgr.get_by_id(ref.mapping_id)
+            d_dim_from_ids.add(mapping_config.model.from_dimension.dimension_id)
+
+        needs_mapping = []
+        for dim in dataset_config.model.dimension_references:
+            if dim.dimension_id not in p_base_dim_ids and dim.dimension_id not in d_dim_from_ids:
+                if dim.dimension_id in p_supp_dim_ids:
+                    needs_mapping.append(dim.dimension_id)
+                # else the dataset may only need to provide a subset of records, and those are
+                # checked in the dimension association table.
+
+        new_mappings = []
+        for from_id in needs_mapping:
+            from_dim = self._dimension_mgr.get_by_id(from_id)
+            to_dim = project_config.get_base_dimension(from_dim.model.dimension_type)
+            mapping, version = self._dimension_mapping_mgr.try_get_mapping(from_dim, to_dim)
+            if mapping is None:
+                p_mapping, _ = self._dimension_mapping_mgr.try_get_mapping(to_dim, from_dim)
+                assert p_mapping is not None, f"from={to_dim.model.dimension_id} to={from_dim.model.dimension_id}"
+                records = models_to_dataframe(p_mapping.model.records)
+                fraction_vals = get_unique_values(records, "from_fraction")
+                if len(fraction_vals) != 1 and next(iter(fraction_vals)) != 1.0:
+                    raise DSGInvalidDimensionMapping(
+                        f"Cannot auto-generate a dataset-to-project mapping from from a project "
+                        "supplemental dimension unless the from_fraction column is empty or only "
+                        f"has values of 1.0: {p_mapping.model.mapping_id} - {fraction_vals}"
+                    )
+                reverse_records = (
+                    records.drop("from_fraction")
+                    .selectExpr("to_id AS from_id", "from_id AS to_id")
+                    .toPandas()
+                )
+                dst = Path(tempfile.gettempdir()) / f"reverse_{p_mapping.config_id}.csv"
+                # Use pandas because spark creates a CSV directory.
+                reverse_records.to_csv(dst, index=False)
+                dimension_type = from_dim.model.dimension_type.value
+                new_mappings.append(
+                    {
+                        "description": f"Maps {dataset_config.config_id} {dimension_type} to project",
+                        "dimension_type": dimension_type,
+                        "file": str(dst),
+                        "mapping_type": "duplication",
+                    }
+                )
+            else:
+                reference = DimensionMappingReferenceModel(
+                    from_dimension_type=from_dim.model.dimension_type,
+                    to_dimension_type=from_dim.model.dimension_type,
+                    mapping_id=mapping.model.mapping_id,
+                    version=version,
+                )
+                references.append(reference)
+
+        if new_mappings:
+            # We don't currently have a way to register a single dimension mapping. It would be
+            # better to register these mappings directly. But, this code was already here.
+            mapping_file = Path(tempfile.gettempdir()) / "dimension_mappings.toml"
+            dump_data({"mappings": new_mappings}, mapping_file)
+            references += self._register_mappings_from_file(
+                project_config,
+                dataset_config,
+                mapping_file,
+                submitter,
+                log_message,
+                context,
+            )
+
+        return references
 
     def _submit_dataset(
         self,

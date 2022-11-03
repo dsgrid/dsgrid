@@ -9,7 +9,6 @@ import tempfile
 from pathlib import Path
 from typing import Union, List, Dict
 
-import pandas as pd
 from prettytable import PrettyTable
 
 from dsgrid.dimension.base_models import DimensionType
@@ -387,7 +386,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             else:
                 suffix = "s"
             dt_plural = f"all_{dt_str}{suffix}"
-            dt_plural_dash = f"all-{dt_str}{suffix}"
+            dt_plural_dash = f"all-{model.project_id}-{dt_str}{suffix}"
             dt_plural_formal = f"All {dt_str.title()}{suffix}"
             dim_record_file = supp_dir / f"{dt_plural}.csv"
             dim_text = f"id,name\n{dt_plural},{dt_plural_formal}\n"
@@ -617,7 +616,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     raise DSGValueNotRegistered(f"mapping_id={ref.mapping_id}")
                 references.append(ref)
 
-        references += self._auto_register_missing_mappings(
+        references += self._auto_register_reverse_supplemental_mappings(
             project_config, dataset_config, references, submitter, log_message, context
         )
         self._submit_dataset(project_config, dataset_config, submitter, log_message, references)
@@ -670,7 +669,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         return references
 
-    def _auto_register_missing_mappings(
+    def _auto_register_reverse_supplemental_mappings(
         self,
         project_config: ProjectConfig,
         dataset_config: DatasetConfig,
@@ -694,18 +693,28 @@ class ProjectRegistryManager(RegistryManagerBase):
         for dim in dataset_config.model.dimension_references:
             if dim.dimension_id not in p_base_dim_ids and dim.dimension_id not in d_dim_from_ids:
                 if dim.dimension_id in p_supp_dim_ids:
-                    needs_mapping.append(dim.dimension_id)
+                    needs_mapping.append((dim.dimension_id, dim.version))
                 # else the dataset may only need to provide a subset of records, and those are
                 # checked in the dimension association table.
 
         new_mappings = []
-        for from_id in needs_mapping:
-            from_dim = self._dimension_mgr.get_by_id(from_id)
-            to_dim = project_config.get_base_dimension(from_dim.model.dimension_type)
+        for from_id, from_version in needs_mapping:
+            from_dim = self._dimension_mgr.get_by_id(from_id, version=from_version)
+            to_dim, to_version = project_config.get_base_dimension_and_version(
+                from_dim.model.dimension_type
+            )
+            # TODO: Our dimension mappings don't store versions of the underlying dimensions.
+            # Investigate whether this needs to be fixed.
+            # We could make a rule whereby a dimension is not upgraded; a new dimension is
+            # created.
+            assert str(from_version) == "1.0.0", from_version
+            assert str(to_version) == "1.0.0", to_version
             mapping, version = self._dimension_mapping_mgr.try_get_mapping(from_dim, to_dim)
             if mapping is None:
                 p_mapping, _ = self._dimension_mapping_mgr.try_get_mapping(to_dim, from_dim)
-                assert p_mapping is not None, f"from={to_dim.model.dimension_id} to={from_dim.model.dimension_id}"
+                assert (
+                    p_mapping is not None
+                ), f"from={to_dim.model.dimension_id} to={from_dim.model.dimension_id}"
                 records = models_to_dataframe(p_mapping.model.records)
                 fraction_vals = get_unique_values(records, "from_fraction")
                 if len(fraction_vals) != 1 and next(iter(fraction_vals)) != 1.0:
@@ -745,14 +754,19 @@ class ProjectRegistryManager(RegistryManagerBase):
             # better to register these mappings directly. But, this code was already here.
             mapping_file = Path(tempfile.gettempdir()) / "dimension_mappings.toml"
             dump_data({"mappings": new_mappings}, mapping_file)
-            references += self._register_mappings_from_file(
-                project_config,
-                dataset_config,
-                mapping_file,
-                submitter,
-                log_message,
-                context,
-            )
+            to_delete = [mapping_file] + [x["file"] for x in new_mappings]
+            try:
+                references += self._register_mappings_from_file(
+                    project_config,
+                    dataset_config,
+                    mapping_file,
+                    submitter,
+                    log_message,
+                    context,
+                )
+            finally:
+                for filename in to_delete:
+                    Path(filename).unlink()
 
         return references
 

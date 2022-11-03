@@ -548,16 +548,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         display_table(table)
 
     def try_get_mapping(self, from_dimension, to_dimension):
+        """Return the mapping config and version for from and to dimension, if one exists."""
         from_id = from_dimension.model.dimension_id
-        #from_version = from_dimension.model.version
         to_id = to_dimension.model.dimension_id
-        #to_version = to_dimension.model.version
         for key, mapping in self._mappings.items():
             if (
                 mapping.model.from_dimension.dimension_id == from_id
-                #and mapping.from_dimension.version == from_version
                 and mapping.model.to_dimension.dimension_id == to_id
-                #and mapping.to_dimension.version == to_version
             ):
                 return mapping, key.version
 

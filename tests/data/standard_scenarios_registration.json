@@ -1,6 +1,6 @@
 {
   "create_registry": true,
-  "registry_path": "updated-standard-scenarios-registry",
+  "registry_path": "standard-scenarios-registry",
   "projects": [
     {
       "project_id": "dsgrid_conus_2022",
@@ -22,6 +22,26 @@
           "dataset_path": "../dsgrid-data/conus_2022_reference_resstock",
           "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/resstock/dataset.toml",
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/resstock/dimension_mappings.toml",
+          "register_dataset": true,
+          "submit_to_project": true,
+          "fix_dimension_uuids": false,
+          "fix_dimension_mapping_uuids": false
+        },
+        {
+          "dataset_id": "aeo2021_ref_res_end_use_growth_factors",
+          "dataset_path": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/data",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dataset.toml",
+          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dimension_mappings.toml",
+          "register_dataset": true,
+          "submit_to_project": true,
+          "fix_dimension_uuids": true,
+          "fix_dimension_mapping_uuids": false
+        },
+        {
+          "dataset_id": "aeo2021_ref_com_energy_end_use_growth_factors",
+          "dataset_path": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/data",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/dataset.toml",
+          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/dimension_mappings.toml",
           "register_dataset": true,
           "submit_to_project": true,
           "fix_dimension_uuids": false,

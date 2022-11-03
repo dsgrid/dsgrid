@@ -119,12 +119,12 @@ def get_field_details(cls):
                 mod = None
                 subfields = None
 
-            if vals["description"].lower().startswith("list of"):
+            if vals.get("description", "").lower().startswith("list of"):
                 dtype = f"[{dtype}]"
 
             field_items = {
                 "Field": field_name,
-                "Description": vals["description"],
+                "Description": vals.get("description", ""),
                 "Type": dtype,
                 "Value Options": vals.get("options", None),
                 "Default": vals.get("default", "None"),

@@ -703,15 +703,13 @@ class ProjectRegistryManager(RegistryManagerBase):
             to_dim, to_version = project_config.get_base_dimension_and_version(
                 from_dim.model.dimension_type
             )
-            # TODO: Our dimension mappings don't store versions of the underlying dimensions.
-            # Investigate whether this needs to be fixed.
-            # We could make a rule whereby a dimension is not upgraded; a new dimension is
-            # created.
-            assert str(from_version) == "1.0.0", from_version
-            assert str(to_version) == "1.0.0", to_version
-            mapping, version = self._dimension_mapping_mgr.try_get_mapping(from_dim, to_dim)
+            mapping, version = self._dimension_mapping_mgr.try_get_mapping(
+                from_dim, from_version, to_dim, to_version
+            )
             if mapping is None:
-                p_mapping, _ = self._dimension_mapping_mgr.try_get_mapping(to_dim, from_dim)
+                p_mapping, _ = self._dimension_mapping_mgr.try_get_mapping(
+                    to_dim, to_version, from_dim, from_version
+                )
                 assert (
                     p_mapping is not None
                 ), f"from={to_dim.model.dimension_id} to={from_dim.model.dimension_id}"

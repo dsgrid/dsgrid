@@ -28,6 +28,16 @@
           "fix_dimension_mapping_uuids": false
         },
         {
+          "dataset_id": "tempo_conus_2022",
+          "dataset_path": "../dsgrid-data/tempo_conus_2022",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/tempo/dataset.toml",
+          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/tempo/dimension_mappings.toml",
+          "register_dataset": false,
+          "submit_to_project": false,
+          "fix_dimension_uuids": false,
+          "fix_dimension_mapping_uuids": false
+        },
+        {
           "dataset_id": "aeo2021_ref_res_end_use_growth_factors",
           "dataset_path": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/data",
           "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dataset.toml",

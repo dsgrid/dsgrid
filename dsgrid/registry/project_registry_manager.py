@@ -495,6 +495,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         submitter,
         log_message,
         dimension_mapping_file=None,
+        autogen_reverse_supplemental_mappings=None,
     ):
         context = RegistrationContext()
         error_occurred = False
@@ -512,6 +513,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 submitter,
                 log_message,
                 dimension_mapping_file=dimension_mapping_file,
+                autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
                 context=context,
             )
         except Exception:
@@ -529,6 +531,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         log_message,
         dimension_mapping_file=None,
         dimension_mapping_references_file=None,
+        autogen_reverse_supplemental_mappings=None,
         context=None,
     ):
         """Registers a dataset with a project. This can only be performed on the
@@ -541,6 +544,8 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimension_mapping_file : Path or None
             Base-to-base dimension mapping file
         dimension_mapping_references_file : Path or None
+        autogen_reverse_supplemental_mappings : set[DimensionType] or None
+            Dimensions on which to attempt create reverse mappings from supplemental dimensions.
         submitter : str
             Submitter name
         log_message : str
@@ -570,6 +575,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 log_message,
                 dimension_mapping_file,
                 dimension_mapping_references_file,
+                autogen_reverse_supplemental_mappings,
                 context,
             )
         except Exception:
@@ -587,6 +593,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         log_message,
         dimension_mapping_file,
         dimension_mapping_references_file,
+        autogen_reverse_supplemental_mappings,
         context,
     ):
         logger.info("Submit dataset=%s to project=%s.", dataset_id, project_config.config_id)
@@ -616,9 +623,16 @@ class ProjectRegistryManager(RegistryManagerBase):
                     raise DSGValueNotRegistered(f"mapping_id={ref.mapping_id}")
                 references.append(ref)
 
-        references += self._auto_register_reverse_supplemental_mappings(
-            project_config, dataset_config, references, submitter, log_message, context
-        )
+        if autogen_reverse_supplemental_mappings:
+            references += self._auto_register_reverse_supplemental_mappings(
+                project_config,
+                dataset_config,
+                references,
+                autogen_reverse_supplemental_mappings,
+                submitter,
+                log_message,
+                context,
+            )
         self._submit_dataset(project_config, dataset_config, submitter, log_message, references)
 
     def _register_mappings_from_file(
@@ -674,6 +688,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         project_config: ProjectConfig,
         dataset_config: DatasetConfig,
         mapping_references: List[DimensionMappingReferenceModel],
+        autogen_reverse_supplemental_mappings,
         submitter,
         log_message,
         context,
@@ -692,7 +707,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         needs_mapping = []
         for dim in dataset_config.model.dimension_references:
             if dim.dimension_id not in p_base_dim_ids and dim.dimension_id not in d_dim_from_ids:
-                if dim.dimension_id in p_supp_dim_ids:
+                if (
+                    dim.dimension_id in p_supp_dim_ids
+                    and dim.dimension_type in autogen_reverse_supplemental_mappings
+                ):
                     needs_mapping.append((dim.dimension_id, dim.version))
                 # else the dataset may only need to provide a subset of records, and those are
                 # checked in the dimension association table.

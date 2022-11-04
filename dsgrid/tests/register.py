@@ -105,6 +105,7 @@ def _run_registration(registration: RegistrationModel, tmp_files):
                     log_message,
                     dimension_mapping_file=dataset.dimension_mapping_file,
                     dimension_mapping_references_file=refs_file,
+                    autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
                 )
 
 

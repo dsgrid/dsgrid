@@ -5,6 +5,7 @@ from pathlib import Path
 from pydantic import validator
 
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.files import load_data
 
 
@@ -19,6 +20,7 @@ class DatasetRegistrationModel(DSGBaseModel):
     fix_dimension_mapping_uuids: bool = False
     register_dataset: bool = True
     submit_to_project: bool = True
+    autogen_reverse_supplemental_mappings: set[str | DimensionType] = set()
 
     @validator(
         "dataset_path",
@@ -28,6 +30,10 @@ class DatasetRegistrationModel(DSGBaseModel):
     )
     def fix_path(cls, val):
         return Path(val) if isinstance(val, str) else val
+
+    @validator("autogen_reverse_supplemental_mappings")
+    def fix_autogen_reverse_supplemental_mappings(cls, val):
+        return {DimensionType(x) for x in val}
 
 
 class ProjectRegistrationModel(DSGBaseModel):

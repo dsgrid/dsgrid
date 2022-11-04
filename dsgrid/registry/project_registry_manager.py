@@ -688,7 +688,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         project_config: ProjectConfig,
         dataset_config: DatasetConfig,
         mapping_references: List[DimensionMappingReferenceModel],
-        autogen_reverse_supplemental_mappings,
+        autogen_reverse_supplemental_mappings: set[str],
         submitter,
         log_message,
         context,
@@ -714,6 +714,12 @@ class ProjectRegistryManager(RegistryManagerBase):
                     needs_mapping.append((dim.dimension_id, dim.version))
                 # else the dataset may only need to provide a subset of records, and those are
                 # checked in the dimension association table.
+
+        if len(needs_mapping) != len(autogen_reverse_supplemental_mappings):
+            raise DSGInvalidDimensionMapping(
+                f"Mappings to autgen [{needs_mapping}] does not match user-specified "
+                f"autogen_reverse_supplemental_mappings={autogen_reverse_supplemental_mappings}"
+            )
 
         new_mappings = []
         for from_id, from_version in needs_mapping:

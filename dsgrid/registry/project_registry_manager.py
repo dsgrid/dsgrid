@@ -757,7 +757,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         "description": f"Maps {dataset_config.config_id} {dimension_type} to project",
                         "dimension_type": dimension_type,
                         "file": str(dst),
-                        "mapping_type": "duplication",
+                        "mapping_type": DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS,
                     }
                 )
             else:

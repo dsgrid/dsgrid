@@ -381,35 +381,34 @@ class ProjectRegistryManager(RegistryManagerBase):
             dim_config = self._dimension_mgr.get_by_id(dim_ref.dimension_id)
             dt_str = dimension_type.value
             if dt_str.endswith("y"):
-                dt_str = dt_str[:-1]
-                suffix = "ies"
+                dt_plural = dt_str[:-1] + "ies"
             else:
-                suffix = "s"
-            dt_plural = f"all_{dt_str}{suffix}"
-            dt_plural_dash = f"all-{model.project_id}-{dt_str}{suffix}"
-            dt_plural_formal = f"All {dt_str.title()}{suffix}"
-            dim_record_file = supp_dir / f"{dt_plural}.csv"
-            dim_text = f"id,name\n{dt_plural},{dt_plural_formal}\n"
+                dt_plural = dt_str + "s"
+            dt_all_plural = f"all_{dt_plural}"
+            dim_name = f"all-{model.project_id}-{dt_plural}"
+            dim_name_formal = f"All {dt_plural.title()}"
+            dim_record_file = supp_dir / f"{dt_all_plural}.csv"
+            dim_text = f"id,name\n{dt_all_plural},{dim_name_formal}\n"
             dim_record_file.write_text(dim_text)
-            map_record_file = supp_dir / f"lookup_{dt_str}_to_{dt_plural}.csv"
+            map_record_file = supp_dir / f"lookup_{dt_str}_to_{dt_all_plural}.csv"
             with open(map_record_file, "w") as f_out:
                 f_out.write("from_id,to_id\n")
                 for record in dim_config.get_unique_ids():
                     f_out.write(record)
                     f_out.write(",")
-                    f_out.write(dt_plural)
+                    f_out.write(dt_all_plural)
                     f_out.write("\n")
 
             new_dim = run_in_other_dir(
                 src_dir,
                 DimensionModel,
                 filename=str(Path(_SUPPLEMENTAL_TMP_DIR) / dim_record_file.name),
-                name=dt_plural_dash,
-                display_name=dt_plural_formal,
+                name=dim_name,
+                display_name=dim_name_formal,
                 dimension_type=dimension_type,
                 module="dsgrid.dimension.base_models",
                 class_name="DimensionRecordBaseModel",
-                description=dt_plural_formal,
+                description=dim_name_formal,
             )
             new_dimensions.append(new_dim)
             new_mappings[dimension_type] = run_in_other_dir(
@@ -423,7 +422,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 ),
                 to_dimension=DimensionReferenceByNameModel(
                     dimension_type=dimension_type,
-                    name=dt_plural_dash,
+                    name=dim_name,
                 ),
                 description=f"Aggregation map for all {dt_str}s",
             )

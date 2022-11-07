@@ -695,7 +695,6 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         references = []
         p_model = project_config.model
-        p_base_dim_ids = {x.dimension_id for x in p_model.dimensions.base_dimension_references}
         p_supp_dim_ids = {
             x.dimension_id for x in p_model.dimensions.supplemental_dimension_references
         }
@@ -706,14 +705,17 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         needs_mapping = []
         for dim in dataset_config.model.dimension_references:
-            if dim.dimension_id not in p_base_dim_ids and dim.dimension_id not in d_dim_from_ids:
-                if (
-                    dim.dimension_id in p_supp_dim_ids
-                    and dim.dimension_type in autogen_reverse_supplemental_mappings
-                ):
-                    needs_mapping.append((dim.dimension_id, dim.version))
-                # else the dataset may only need to provide a subset of records, and those are
-                # checked in the dimension association table.
+            if (
+                dim.dimension_type in autogen_reverse_supplemental_mappings
+                and dim.dimension_id in p_supp_dim_ids
+                and dim.dimension_id not in d_dim_from_ids
+            ):
+                needs_mapping.append((dim.dimension_id, dim.version))
+            # else:
+            #     This dimension is the same as a project base dimension.
+            #     or
+            #     The dataset may only need to provide a subset of records, and those are
+            #     checked in the dimension association table.
 
         if len(needs_mapping) != len(autogen_reverse_supplemental_mappings):
             raise DSGInvalidDimensionMapping(
@@ -727,13 +729,9 @@ class ProjectRegistryManager(RegistryManagerBase):
             to_dim, to_version = project_config.get_base_dimension_and_version(
                 from_dim.model.dimension_type
             )
-            mapping, version = self._dimension_mapping_mgr.try_get_mapping(
-                from_dim, from_version, to_dim, to_version
-            )
+            mapping, version = self._try_get_mapping(project_config, from_dim, from_version, to_dim, to_version)
             if mapping is None:
-                p_mapping, _ = self._dimension_mapping_mgr.try_get_mapping(
-                    to_dim, to_version, from_dim, from_version
-                )
+                p_mapping, _ = self._try_get_mapping(project_config, to_dim, to_version, from_dim, from_version)
                 assert (
                     p_mapping is not None
                 ), f"from={to_dim.model.dimension_id} to={from_dim.model.dimension_id}"
@@ -791,6 +789,24 @@ class ProjectRegistryManager(RegistryManagerBase):
                     Path(filename).unlink()
 
         return references
+
+    def _try_get_mapping(self, project_config, from_dim, from_version, to_dim, to_version):
+        dimension_type = from_dim.model.dimension_type
+        for ref in project_config.model.dimension_mappings.base_to_supplemental_references:
+            if (
+                ref.from_dimension_type == dimension_type
+                and ref.to_dimension_type == dimension_type
+            ):
+                mapping_config = self._dimension_mapping_mgr.get_by_id(ref.mapping_id)
+                if (
+                    mapping_config.model.from_dimension.dimension_id == from_dim.model.dimension_id
+                    and mapping_config.model.from_dimension.version == from_version
+                    and mapping_config.model.to_dimension.dimension_id == to_dim.model.dimension_id
+                    and mapping_config.model.to_dimension.version == to_version
+                ):
+                    return mapping_config, ref.version
+
+        return None, None
 
     def _submit_dataset(
         self,

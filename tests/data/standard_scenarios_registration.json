@@ -46,7 +46,7 @@
           "submit_to_project": true,
           "fix_dimension_uuids": true,
           "fix_dimension_mapping_uuids": false,
-          "autogen_reverse_supplemental_mappings": "geography"
+          "autogen_reverse_supplemental_mappings": ["geography"]
         },
         {
           "dataset_id": "aeo2021_ref_com_energy_end_use_growth_factors",
@@ -57,7 +57,7 @@
           "submit_to_project": true,
           "fix_dimension_uuids": false,
           "fix_dimension_mapping_uuids": false,
-          "autogen_reverse_supplemental_mappings": "geography"
+          "autogen_reverse_supplemental_mappings": ["geography"]
         }
       ]
     }

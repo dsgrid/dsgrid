@@ -385,7 +385,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             else:
                 dt_plural = dt_str + "s"
             dt_all_plural = f"all_{dt_plural}"
-            dim_name = f"all-{model.project_id}-{dt_plural}"
+            dim_name = f"all_{model.project_id}_{dt_plural}"
             dim_name_formal = f"All {dt_plural.title()}"
             dim_record_file = supp_dir / f"{dt_all_plural}.csv"
             dim_text = f"id,name\n{dt_all_plural},{dim_name_formal}\n"
@@ -756,7 +756,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         "description": f"Maps {dataset_config.config_id} {dimension_type} to project",
                         "dimension_type": dimension_type,
                         "file": str(dst),
-                        "mapping_type": DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS,
+                        "mapping_type": "many_to_many_explicit_multipliers",
                     }
                 )
             else:

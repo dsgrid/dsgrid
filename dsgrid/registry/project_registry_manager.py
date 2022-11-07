@@ -728,9 +728,13 @@ class ProjectRegistryManager(RegistryManagerBase):
             to_dim, to_version = project_config.get_base_dimension_and_version(
                 from_dim.model.dimension_type
             )
-            mapping, version = self._try_get_mapping(project_config, from_dim, from_version, to_dim, to_version)
+            mapping, version = self._try_get_mapping(
+                project_config, from_dim, from_version, to_dim, to_version
+            )
             if mapping is None:
-                p_mapping, _ = self._try_get_mapping(project_config, to_dim, to_version, from_dim, from_version)
+                p_mapping, _ = self._try_get_mapping(
+                    project_config, to_dim, to_version, from_dim, from_version
+                )
                 assert (
                     p_mapping is not None
                 ), f"from={to_dim.model.dimension_id} to={from_dim.model.dimension_id}"
@@ -756,7 +760,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         "description": f"Maps {dataset_config.config_id} {dimension_type} to project",
                         "dimension_type": dimension_type,
                         "file": str(dst),
-                        "mapping_type": "many_to_many_explicit_multipliers",
+                        "mapping_type": DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS.value,
                     }
                 )
             else:

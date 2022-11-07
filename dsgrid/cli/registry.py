@@ -450,6 +450,16 @@ def register_project(
     callback=_path_callback,
 )
 @click.option(
+    "-a",
+    "--autogen-reverse-supplemental-mappings",
+    type=click.Choice([x.value for x in DimensionType]),
+    callback=lambda _, __, x: [DimensionType(y) for y in x],
+    multiple=True,
+    help="For any dimension listed here, if the dataset's dimension is a project's supplemental "
+    "dimension and no mapping is provided, create a reverse mapping from that supplemental "
+    "dimension.",
+)
+@click.option(
     "-l",
     "--log-message",
     required=True,
@@ -463,6 +473,7 @@ def submit_dataset(
     project_id,
     dimension_mapping_file,
     dimension_mapping_references_file,
+    autogen_reverse_supplemental_mappings,
     log_message,
 ):
     """Submit a dataset to a dsgrid project."""
@@ -475,6 +486,7 @@ def submit_dataset(
         log_message,
         dimension_mapping_file=dimension_mapping_file,
         dimension_mapping_references_file=dimension_mapping_references_file,
+        autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
     )
 
 
@@ -502,6 +514,16 @@ def submit_dataset(
     callback=_path_callback,
 )
 @click.option(
+    "-a",
+    "--autogen-reverse-supplemental-mappings",
+    type=click.Choice([x.value for x in DimensionType]),
+    callback=lambda _, __, x: [DimensionType(y) for y in x],
+    multiple=True,
+    help="For any dimension listed here, if the dataset's dimension is a project's supplemental "
+    "dimension and no mapping is provided, create a reverse mapping from that supplemental "
+    "dimension.",
+)
+@click.option(
     "-p",
     "--project-id",
     required=True,
@@ -521,6 +543,7 @@ def register_and_submit_dataset(
     dataset_config_file,
     dataset_path,
     dimension_mapping_file,
+    autogen_reverse_supplemental_mappings,
     project_id,
     log_message,
 ):
@@ -534,6 +557,7 @@ def register_and_submit_dataset(
         submitter,
         log_message,
         dimension_mapping_file=dimension_mapping_file,
+        autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
     )
 
 

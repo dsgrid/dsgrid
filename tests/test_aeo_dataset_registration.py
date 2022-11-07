@@ -41,7 +41,7 @@ def _make_project_dir(project):
 
 # set up registry for AEO data
 def make_registry_for_aeo(
-    registry_path, src_dir, dataset_name: str, dataset_path=None, include_datasets=False
+    registry_path, src_dir, dataset_name: str, dataset_path=None
 ) -> RegistryManager:
     """Creates a local registry to test registration of AEO dimensions and dataset.
 
@@ -123,7 +123,6 @@ def _test_dataset_registration(make_test_project_dir, data_dir, dataset):
             make_test_project_dir,
             dataset,
             dataset_path=data_dir,
-            include_datasets=False,
         )
 
 

@@ -466,6 +466,23 @@ class ProjectConfig(ConfigBase):
                 return dim_config
         assert False, dimension_type
 
+    def get_base_dimension_and_version(self, dimension_type: DimensionType):
+        """Return the base dimension and version matching dimension_type.
+
+        Parameters
+        ----------
+        dimension_type : DimensionType
+
+        Returns
+        -------
+        DimensionConfig, str
+
+        """
+        for key, dim_config in self.base_dimensions.items():
+            if key.type == dimension_type:
+                return dim_config, key.version
+        assert False, dimension_type
+
     def get_dimension(self, dimension_query_name: str):
         """Return an instance of DimensionBaseConfig.
 

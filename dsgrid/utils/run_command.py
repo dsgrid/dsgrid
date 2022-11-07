@@ -27,22 +27,26 @@ def check_run_command(*args, **kwargs):
 
 def run_command(cmd, output=None, cwd=None):
     """Runs a command as a subprocess.
+
+    Caution: Capturing stdout and stderr in memory can be hazardous with
+    long-running processes that output lots of text. In those cases consider
+    running subprocess.Popen with stdout and/or stderr set to a pre-configured
+    file descriptor.
+
     Parameters
     ----------
     cmd : str
         command to run
     output : None | dict
         If a dict is passed then return stdout and stderr as keys.
-    cwd: str, default None
+    cwd: str | default None
         Change the working directory to cwd before executing the process.
+
     Returns
     -------
     int
         return code from system; usually zero is good, non-zero is error
-    Caution: Capturing stdout and stderr in memory can be hazardous with
-    long-running processes that output lots of text. In those cases consider
-    running subprocess.Popen with stdout and/or stderr set to a pre-configured
-    file descriptor.
+
     """
     logger.debug(cmd)
     # Disable posix if on Windows.

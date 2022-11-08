@@ -136,13 +136,13 @@ def check_required_dimensions(dimensions, tag):
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 
 
-def check_timezone_in_base_geography(dim_config):
+def check_timezone_in_geography(dimension):
     """Check that a project's base geography dimension contains valid timezones
     in records.
 
     Parameters
     ----------
-    dimension : DimensionType
+    dimension : DimensionModel
 
     Raises
     ------
@@ -150,19 +150,20 @@ def check_timezone_in_base_geography(dim_config):
         Raised if a required dimension is not provided.
 
     """
-    dimension = dim_config.model
     if dimension.dimension_type != DimensionType.GEOGRAPHY:
         raise DSGInvalidDimension(
             f"Dimension has type {dimension.dimension_type}, "
             "Can only check timezone for Geography."
         )
 
-    tz = set(TimeZone) - TimeZone.NONE
-    record_tz = {rec.time_zone for rec in dimension.records}
+    if not hasattr(dimension.records[0], "time_zone"):
+        raise ValueError("These geography dimension records must include a 'time_zone' column.")
 
+    tz = set(TimeZone) - {TimeZone.NONE}
+    record_tz = {rec.time_zone for rec in dimension.records}
     diff = record_tz.difference(tz)
     if diff:
         raise DSGInvalidDimension(
-            f"Base Geography dimension {dimension.display} has invalid timezone(s) in "
-            f"records: {dimension.filename}. Use dsgrid TimeZone enum values only."
+            f"Geography dimension {dimension.dimension_id} has invalid timezone(s) in records: "
+            f"{dimension.filename}: {diff}. Use dsgrid TimeZone enum values only."
         )

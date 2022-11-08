@@ -12,7 +12,7 @@ from dsgrid.config.dimension_association_manager import (
     save_dimension_associations,
 )
 from dsgrid.data_models import DSGBaseModel, serialize_model_data
-from dsgrid.dimension.base_models import check_required_dimensions
+from dsgrid.dimension.base_models import check_required_dimensions, check_timezone_in_geography
 from dsgrid.exceptions import (
     DSGInvalidField,
     DSGInvalidDimension,
@@ -124,7 +124,7 @@ class DimensionsModel(DSGBaseModel):
         return values
 
     @validator("base_dimensions")
-    def check_files(cls, values: dict) -> dict:
+    def check_files(cls, values: list) -> list:
         """Validate dimension files are unique across all dimensions"""
         check_uniqueness(
             (x.filename for x in values if isinstance(x, DimensionModel)),
@@ -133,12 +133,20 @@ class DimensionsModel(DSGBaseModel):
         return values
 
     @validator("base_dimensions")
-    def check_names(cls, values: dict) -> dict:
+    def check_names(cls, values: list) -> list:
         """Validate dimension names are unique across all dimensions."""
         check_uniqueness(
             [dim.name for dim in values],
             "dimension record name",
         )
+        return values
+
+    @validator("base_dimensions")
+    def check_time_zone(cls, values: list) -> list:
+        """Validate dimension names are unique across all dimensions."""
+        for dimension in values:
+            if dimension.dimension_type == DimensionType.GEOGRAPHY:
+                check_timezone_in_geography(dimension)
         return values
 
     @validator("base_dimensions", "supplemental_dimensions", pre=True, each_item=True, always=True)

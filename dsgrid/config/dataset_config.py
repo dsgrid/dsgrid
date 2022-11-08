@@ -7,7 +7,8 @@ from pydantic import validator
 import pyspark.sql.functions as F
 
 from dsgrid.data_models import serialize_model_data
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
+from dsgrid.dimension.time import TimeZone
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
@@ -384,7 +385,7 @@ class DatasetConfigModel(DSGBaseModel):
         return trivial_dimensions
 
     @validator("dimensions")
-    def check_files(cls, values: dict) -> dict:
+    def check_files(cls, values: list) -> list:
         """Validate dimension files are unique across all dimensions"""
         check_uniqueness(
             (x.filename for x in values if isinstance(x, DimensionModel)),
@@ -393,7 +394,7 @@ class DatasetConfigModel(DSGBaseModel):
         return values
 
     @validator("dimensions")
-    def check_names(cls, values: dict) -> dict:
+    def check_names(cls, values: list) -> list:
         """Validate dimension names are unique across all dimensions."""
         check_uniqueness(
             [dim.name for dim in values],
@@ -404,6 +405,23 @@ class DatasetConfigModel(DSGBaseModel):
     @validator("dimensions", pre=True, each_item=True, always=True)
     def handle_dimension_union(cls, values):
         return handle_dimension_union(values)
+
+    @validator("dimensions")
+    def check_time_zone(cls, values: list) -> list:
+        """Validate whether required time zone information is present."""
+        geo_requires_time_zone = False
+        for dimension in values:
+            if dimension.dimension_type == DimensionType.TIME and (
+                not hasattr(dimension, "timezone") or dimension.timezone == TimeZone.LOCAL
+            ):
+                geo_requires_time_zone = True
+
+        if geo_requires_time_zone:
+            for dimension in values:
+                if dimension.dimension_type == DimensionType.GEOGRAPHY:
+                    check_timezone_in_geography(dimension)
+
+        return values
 
     def dict(self, *args, **kwargs):
         data = super().dict(*args, **kwargs)

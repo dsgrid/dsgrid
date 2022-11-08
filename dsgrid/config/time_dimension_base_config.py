@@ -44,14 +44,14 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     #     """
 
     @abc.abstractmethod
-    def convert_dataframe(self, df, project_time_dim, time_zone_mapping):
+    def convert_dataframe(self, df, project_time_dim, time_zone_mapping=None):
         """Convert input df to use project's time format and time zone.
 
         Parameters
         ----------
         df : pyspark.sql.DataFrame
         project_time_dim : TimeDimensionBaseConfig
-        time_zone_mapping : pyspark.sql.DataFrame
+        time_zone_mapping : pyspark.sql.DataFrame | None
             dataframe containing time_zone and a key column mappable to df
 
         Returns

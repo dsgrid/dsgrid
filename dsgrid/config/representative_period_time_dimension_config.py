@@ -84,6 +84,8 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         if time_zone_mapping is not None:
             key = [col for col in time_zone_mapping.columns if col != "time_zone"]
             df = df.join(time_zone_mapping, on=key)
+        else:
+            assert "time_zone" in df.columns, df.columns
         geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
         geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
 

@@ -298,14 +298,14 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         lookup.cache()
         pivoted_dimension_type = self.get_pivoted_dimension_type()
         pivoted_columns = set(self.get_pivoted_dimension_columns())
-        pivoted_columns_to_keep = set()
+        pivoted_columns_to_remove = set()
         lookup_columns = set(lookup.columns)
         for dim in dimensions:
             column = dim.dimension_type.value
             if column in lookup_columns:
                 lookup = lookup.filter(lookup[column].isin(dim.record_ids))
             elif dim.dimension_type == pivoted_dimension_type:
-                pivoted_columns_to_keep.update(set(dim.record_ids))
+                pivoted_columns_to_remove = pivoted_columns.difference(dim.record_ids)
 
         drop_columns = []
         for dim in self._config.model.trivial_dimensions:
@@ -322,7 +322,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ids = next(iter(lookup2.select("id").distinct().select(F.collect_list("id")).first()))
 
         load_df = self._load_data.filter(self._load_data.id.isin(ids))
-        pivoted_columns_to_remove = list(pivoted_columns.difference(pivoted_columns_to_keep))
         load_df = load_df.drop(*pivoted_columns_to_remove)
         path = Path(self._config.load_data_path)
         if path.suffix == ".csv":

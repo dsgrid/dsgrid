@@ -119,14 +119,14 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         load_df = self._load_data
         pivoted_dimension_type = self.get_pivoted_dimension_type()
         pivoted_columns = set(self.get_pivoted_dimension_columns())
-        pivoted_columns_to_keep = set()
+        pivoted_columns_to_remove = set()
         df_columns = set(load_df.columns)
         for dim in dimensions:
             column = dim.dimension_type.value
             if column in df_columns:
                 load_df = load_df.filter(load_df[column].isin(dim.record_ids))
             elif dim.dimension_type == pivoted_dimension_type:
-                pivoted_columns_to_keep.update(set(dim.record_ids))
+                pivoted_columns_to_remove = pivoted_columns.difference(dim.record_ids)
 
         drop_columns = []
         for dim in self._config.model.trivial_dimensions:
@@ -136,7 +136,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             drop_columns.append(col)
         load_df = load_df.drop(*drop_columns)
 
-        pivoted_columns_to_remove = list(pivoted_columns.difference(pivoted_columns_to_keep))
         load_df = load_df.drop(*pivoted_columns_to_remove)
         path = Path(self._config.load_data_path)
         if path.suffix == ".csv":

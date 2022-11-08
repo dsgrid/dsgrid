@@ -6,7 +6,7 @@ from typing import List
 import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.config.simple_models import DatasetSimpleModel
+from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.dimension.base_models import DimensionType
@@ -293,7 +293,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
 
     @track_timing(timer_stats_collector)
-    def filter_data(self, dimensions: List[DatasetSimpleModel]):
+    def filter_data(self, dimensions: List[DimensionSimpleModel]):
         lookup = self._load_data_lookup
         lookup.cache()
         pivoted_dimension_type = self.get_pivoted_dimension_type()

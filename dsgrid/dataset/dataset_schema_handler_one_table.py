@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import List
 
 import pyspark.sql.functions as F
@@ -6,9 +7,9 @@ import pyspark.sql.functions as F
 from dsgrid.config.dataset_config import (
     DatasetConfig,
 )
-from dsgrid.config.simple_models import DatasetSimpleModel
+from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
-from dsgrid.utils.spark import read_dataframe, get_unique_values
+from dsgrid.utils.spark import read_dataframe, get_unique_values, overwrite_dataframe_file, write_dataframe_and_auto_partition
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
@@ -109,5 +110,33 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return geo_records.select(F.col("id").alias(geo_name), "time_zone")
 
     @track_timing(timer_stats_collector)
-    def filter_data(self, dimensions: List[DatasetSimpleModel]):
-        assert False, "not supported yet"
+    def filter_data(self, dimensions: List[DimensionSimpleModel]):
+        load_df = self._load_data
+        pivoted_dimension_type = self.get_pivoted_dimension_type()
+        pivoted_columns = set(self.get_pivoted_dimension_columns())
+        pivoted_columns_to_keep = set()
+        df_columns = set(load_df.columns)
+        for dim in dimensions:
+            column = dim.dimension_type.value
+            if column in df_columns:
+                load_df = load_df.filter(load_df[column].isin(dim.record_ids))
+            elif dim.dimension_type == pivoted_dimension_type:
+                pivoted_columns_to_keep.update(set(dim.record_ids))
+
+        drop_columns = []
+        for dim in self._config.model.trivial_dimensions:
+            col = dim.value
+            count = load_df.select(col).distinct().count()
+            assert count == 1, f"{dim}: count"
+            drop_columns.append(col)
+        load_df = load_df.drop(*drop_columns)
+
+        pivoted_columns_to_remove = list(pivoted_columns.difference(pivoted_columns_to_keep))
+        load_df = load_df.drop(*pivoted_columns_to_remove)
+        path = Path(self._config.load_data_path)
+        if path.suffix == ".csv":
+            # write_dataframe_and_auto_partition doesn't support CSV yet
+            overwrite_dataframe_file(path, load_df)
+        else:
+            write_dataframe_and_auto_partition(load_df, path)
+        logger.info("Rewrote simplified %s", self._config.load_data_path)

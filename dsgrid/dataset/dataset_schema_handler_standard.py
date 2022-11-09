@@ -64,7 +64,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def make_project_dataframe(self):
         # TODO: Can we remove NULLs at registration time?
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._convert_time_dimension(self._load_data, self.get_time_zone_mapping())
+        ld_df = self._convert_time_dimension(self._load_data)
         lk_df = self._remap_dimension_columns(lk_df)
         ld_df = self._remap_dimension_columns(
             ld_df,
@@ -80,7 +80,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._convert_time_dimension(self._load_data, self.get_time_zone_mapping())
+        ld_df = self._convert_time_dimension(self._load_data)
 
         self._check_aggregations(context)
         lk_df, ld_df = self._prefilter_dataset(context, lk_df, ld_df)
@@ -162,13 +162,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 ).drop("dataset_record_id")
 
         return lk_df, ld_df
-
-    @track_timing(timer_stats_collector)
-    def get_dataframe(self, query_context: QueryContext, project_config):
-        return self.make_project_dataframe_from_query(
-            context=query_context,
-            project_config=project_config,
-        )
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):

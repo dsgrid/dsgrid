@@ -102,7 +102,6 @@ class Project:
             mapping_references=input_dataset.mapping_references,
             project_time_dim=self._config.get_base_dimension(DimensionType.TIME),
         )
-        dataset.create_views()
         self._datasets[dataset_id] = dataset
         return dataset
 
@@ -145,7 +144,7 @@ class Project:
             else:
                 logger.info("Build project-mapped dataset %s", dataset_id)
                 dataset = self.get_dataset(dataset_id)
-                df = dataset.get_dataframe(context, self._config)
+                df = dataset.make_project_dataframe_from_query(context, self._config)
                 with custom_spark_conf(context.model.project.get_spark_conf(dataset_id)):
                     df = write_dataframe_and_auto_partition(df, cached_dataset)
             dfs.append(df)

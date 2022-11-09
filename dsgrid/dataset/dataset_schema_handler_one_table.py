@@ -19,6 +19,7 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.query.query_context import QueryContext
 
 logger = logging.getLogger(__name__)
 
@@ -144,3 +145,17 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         else:
             write_dataframe_and_auto_partition(load_df, path)
         logger.info("Rewrote simplified %s", self._config.load_data_path)
+
+    def make_project_dataframe(self):
+        ld_df = self._convert_time_dimension(self._load_data)
+        ld_df = self._remap_dimension_columns(
+            ld_df,
+            # Some pivot columns may have been removed.
+            pivoted_columns=set(self._load_data.columns).intersection(
+                self.get_pivoted_dimension_columns()
+            ),
+        )
+        return ld_df
+
+    def make_project_dataframe_from_query(self, context: QueryContext, project_config):
+        assert False, "not implemented yet"

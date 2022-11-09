@@ -6,6 +6,7 @@ from typing import List
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.time import TimeZone
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.dataset import (
@@ -161,6 +162,32 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return groupby_cols
 
+    @abc.abstractmethod
+    def make_project_dataframe(self):
+        """Return a load_data dataframe with dimensions mapped to the project's.
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+
+    @abc.abstractmethod
+    def make_project_dataframe_from_query(self, context, project_config):
+        """Return a load_data dataframe with dimensions mapped to the project's with filters
+        as specified by the QueryContext.
+
+        Parameters
+        ----------
+        context : QueryContext
+        project_config : ProjectConfig
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+
     @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency(self, load_data_df):
         """Check dataset time consistency such that:
@@ -278,8 +305,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @track_timing(timer_stats_collector)
-    def _convert_time_dimension(self, load_data_df, time_zone_mapping):
+    def _convert_time_dimension(self, load_data_df):
         time_dim = self._config.get_dimension(DimensionType.TIME)
+        if (
+            time_dim.model.time_type == TimeDimensionType.NOOP
+            or getattr(time_dim.model, "timezone", None) == TimeZone.LOCAL
+        ):
+            time_zone_mapping = None
+        else:
+            time_zone_mapping = self.get_time_zone_mapping()
+
         load_data_df = time_dim.convert_dataframe(
             df=load_data_df,
             project_time_dim=self._project_time_dim,

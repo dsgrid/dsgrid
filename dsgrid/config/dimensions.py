@@ -1,3 +1,4 @@
+import abc
 import csv
 import enum
 import importlib
@@ -332,7 +333,7 @@ class MonthRangeModel(DSGBaseModel):
     )
 
 
-class TimeDimensionBaseModel(DimensionBaseModel):
+class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
     """Defines a base model common to all time dimensions."""
 
     time_type: TimeDimensionType = Field(
@@ -356,6 +357,10 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         data["dimension_class"] = None
         _convert_for_serialization(data)
         return data
+
+    @abc.abstractmethod
+    def does_geography_require_time_zone(self):
+        """Returns True if the geography dimension records must contain a time_zone column."""
 
 
 class DateTimeDimensionModel(TimeDimensionBaseModel):
@@ -451,6 +456,9 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             return ranges
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
+    def does_geography_require_time_zone(self):
+        return self.timezone == TimeZone.LOCAL
+
 
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     """Defines an annual time dimension where timestamps are years."""
@@ -494,6 +502,9 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
             return ranges
         return _check_time_ranges(ranges, values["str_format"], timedelta(days=365))
 
+    def does_geography_require_time_zone(self):
+        return False
+
 
 class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a representative time dimension."""
@@ -521,6 +532,9 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         options=TimeInvervalType.format_descriptions_for_docs(),
     )
 
+    def does_geography_require_time_zone(self):
+        return True
+
 
 class NoOpTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a NoOp time dimension."""
@@ -530,6 +544,9 @@ class NoOpTimeDimensionModel(TimeDimensionBaseModel):
     @root_validator(pre=False)
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
+
+    def does_geography_require_time_zone(self):
+        return False
 
 
 class DimensionReferenceModel(DSGBaseModel):

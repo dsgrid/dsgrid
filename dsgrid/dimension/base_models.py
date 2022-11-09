@@ -136,13 +136,15 @@ def check_required_dimensions(dimensions, tag):
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 
 
-def check_timezone_in_geography(dimension):
+def check_timezone_in_geography(dimension, err_msg=None):
     """Check that a project's base geography dimension contains valid timezones
     in records.
 
     Parameters
     ----------
     dimension : DimensionModel
+    err_msg : str | None
+        Optional error message
 
     Raises
     ------
@@ -157,7 +159,9 @@ def check_timezone_in_geography(dimension):
         )
 
     if not hasattr(dimension.records[0], "time_zone"):
-        raise ValueError("These geography dimension records must include a 'time_zone' column.")
+        if err_msg is None:
+            err_msg = "These geography dimension records must include a time_zone column."
+        raise ValueError(err_msg)
 
     tz = set(TimeZone)
     record_tz = {rec.time_zone for rec in dimension.records}

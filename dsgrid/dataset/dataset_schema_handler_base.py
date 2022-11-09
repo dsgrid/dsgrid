@@ -6,7 +6,6 @@ from typing import List
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.dimension.time import TimeZone
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.dataset import (
@@ -307,13 +306,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(self, load_data_df):
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        if (
-            time_dim.model.time_type == TimeDimensionType.NOOP
-            or getattr(time_dim.model, "timezone", None) == TimeZone.LOCAL
-        ):
-            time_zone_mapping = None
-        else:
+        if time_dim.model.does_geography_require_time_zone():
             time_zone_mapping = self.get_time_zone_mapping()
+        else:
+            time_zone_mapping = None
 
         load_data_df = time_dim.convert_dataframe(
             df=load_data_df,

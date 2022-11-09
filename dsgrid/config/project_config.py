@@ -146,7 +146,10 @@ class DimensionsModel(DSGBaseModel):
         """Validate dimension names are unique across all dimensions."""
         for dimension in values:
             if dimension.dimension_type == DimensionType.GEOGRAPHY:
-                check_timezone_in_geography(dimension)
+                check_timezone_in_geography(
+                    dimension,
+                    err_msg="Project geography dimension records must include a time_zone column",
+                )
         return values
 
     @validator("base_dimensions", "supplemental_dimensions", pre=True, each_item=True, always=True)

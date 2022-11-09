@@ -1,5 +1,4 @@
 import pytest
-from pyspark.sql import SparkSession
 from collections import defaultdict
 
 from dsgrid.project import Project

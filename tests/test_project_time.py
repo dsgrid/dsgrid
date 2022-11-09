@@ -54,6 +54,8 @@ def test_convert_to_project_time(registry_mgr):
     dataset_id = "tempo_conus_2022"
     project.load_dataset(dataset_id)
     tempo = project.get_dataset(dataset_id)
+    tempo_load_data = tempo._handler._load_data
+    tempo_load_data_lookup = tempo._handler._load_data_lookup
 
     # different ways to access project_time_dim:
     project_time_dim = project.config.get_base_dimension(
@@ -72,13 +74,13 @@ def test_convert_to_project_time(registry_mgr):
     # [2] test convert_dataframe()
     # Method 1: tempo time explosion - input df contains all info
     tempo_time_dim.convert_dataframe(
-        df=tempo._handler._add_time_zone(tempo.load_data_lookup).join(tempo.load_data, on="id"),
+        df=tempo._handler._add_time_zone(tempo_load_data_lookup).join(tempo_load_data, on="id"),
         project_time_dim=project_time_dim,
         time_zone_mapping=None,
     )
 
     # Method 2: tempo time explosion - time_zone_mapping is passed in
-    tempo_data = tempo.load_data.join(tempo.load_data_lookup, on="id")
+    tempo_data = tempo_load_data.join(tempo_load_data_lookup, on="id")
     tempo_data_mapped = tempo_time_dim.convert_dataframe(
         df=tempo_data,
         project_time_dim=project_time_dim,
@@ -93,8 +95,8 @@ def test_convert_to_project_time(registry_mgr):
     )
 
     # comstock time conversion
-    comstock_data = comstock._handler._add_time_zone(comstock.load_data_lookup)
-    comstock_data = comstock.load_data.join(comstock_data, on="id")
+    comstock_data = comstock._handler._add_time_zone(comstock._handler._load_data_lookup)
+    comstock_data = comstock._handler._load_data.join(comstock_data, on="id")
     comstock_data = comstock_time_dim.convert_dataframe(
         df=comstock_data,
         project_time_dim=project_time_dim,

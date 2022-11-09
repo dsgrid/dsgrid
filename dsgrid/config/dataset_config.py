@@ -8,7 +8,7 @@ import pyspark.sql.functions as F
 
 from dsgrid.data_models import serialize_model_data
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
-from dsgrid.dimension.time import TimeZone
+from dsgrid.dimension.time import TimeZone, TimeDimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
@@ -409,12 +409,14 @@ class DatasetConfigModel(DSGBaseModel):
     @validator("dimensions")
     def check_time_zone(cls, values: list) -> list:
         """Validate whether required time zone information is present."""
-        geo_requires_time_zone = False
+        geo_requires_time_zone = True
         for dimension in values:
-            if dimension.dimension_type == DimensionType.TIME and (
-                not hasattr(dimension, "timezone") or dimension.timezone == TimeZone.LOCAL
+            if (
+                dimension.dimension_type == DimensionType.TIME
+                and dimension.time_type == TimeDimensionType.NOOP
+                and getattr(dimension, "timezone", None) == TimeZone.LOCAL
             ):
-                geo_requires_time_zone = True
+                geo_requires_time_zone = False
 
         if geo_requires_time_zone:
             for dimension in values:

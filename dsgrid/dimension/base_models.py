@@ -169,5 +169,5 @@ def check_timezone_in_geography(dimension, err_msg=None):
     if diff:
         raise DSGInvalidDimension(
             f"Geography dimension {dimension.dimension_id} has invalid timezone(s) in records: "
-            f"{dimension.filename}: {diff}. Use dsgrid TimeZone enum values only."
+            f"{dimension.filename}: {diff}. Use dsgrid TimeZone enum values only ({tz})."
         )

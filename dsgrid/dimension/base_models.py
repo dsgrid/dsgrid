@@ -159,7 +159,7 @@ def check_timezone_in_geography(dimension):
     if not hasattr(dimension.records[0], "time_zone"):
         raise ValueError("These geography dimension records must include a 'time_zone' column.")
 
-    tz = set(TimeZone) - {TimeZone.NONE}
+    tz = set(TimeZone)
     record_tz = {rec.time_zone for rec in dimension.records}
     diff = record_tz.difference(tz)
     if diff:

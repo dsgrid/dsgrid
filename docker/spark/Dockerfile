@@ -1,19 +1,22 @@
+# This container only provides Spark. At some point when we stop churning so much we will make one
+# that includes dsgrid software.
+
 # USAGE:
 # Do not run this while connected to the VPN. You may get a certificate error while downloading spark.
-# docker build --tag dsgrid --build-arg VERSION=x.y.z .
+# docker build --tag spark_py310 --build-arg VERSION=x.y.z .
 
 # This container can be converted to a Singularity container on Eagle with these commands:
 # Save and upload the docker image to Eagle.
-# $ docker save -o dsgrid_vx.y.z.tar dsgrid
-# $ scp dsgrid_vx.y.z.tar <username>@eagle.hpc.nrel.gov:/projects/dsgrid/containers
+# $ docker save -o spark_py310_vx.y.z.tar spark_py310
+# $ scp spark_py310_vx.y.z.tar <username>@eagle.hpc.nrel.gov:/projects/dsgrid/containers
 # Acquire a compute node.
 # $ export SINGULARITY_TMPDIR=/tmp/scratch
 # $ module load singularity-container
 # Create writable image for testing and development or read-only image for production.
 # Writable
-# $ singularity build --sandbox dsgrid docker-archive://dsgrid_v0.1.0.tar
+# $ singularity build --sandbox spark_py310 docker-archive://spark_py310_v0.1.0.tar
 # Read-only
-# $ singularity build dsgrid_v0.1.0.sif docker-archive://dsgrid_v0.1.0.tar
+# $ singularity build spark_py310_v0.1.0.sif docker-archive://spark_py310_v0.1.0.tar
 
 # Note: Apache provides a container with Spark and Python installed, but as of now it is Python 3.9
 # and dsgrid requires 3.10. Whenever they have a newer Python, we can simplify this.

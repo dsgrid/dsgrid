@@ -365,7 +365,7 @@ Created HPC config file hpc_config.toml
 container on Eagle.
 
 ```
-jade config spark -c /projects/dsgrid/containers/dsgrid  --update-config-file=config.json
+jade spark config -c /projects/dsgrid/containers/dsgrid  --update-config-file=config.json
 ```
 
 6. Optionally, customize Spark configuration parameters in the `spark/conf` folder created in the

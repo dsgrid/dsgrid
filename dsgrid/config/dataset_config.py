@@ -300,6 +300,13 @@ class DatasetConfigModel(DSGBaseModel):
         description="List of data tags",
         default=[],
     )
+    # This field must be listed before dimensions.
+    use_project_geography_time_zone: bool = Field(
+        default=False,
+        description="If true, time zones will be applied from the project's geography dimension. "
+        "If false and if the dataset's time dimension does not contain a time zone, the "
+        "dataset's geography dimension records must provide a time zone column.",
+    )
     dimensions: List = Field(
         title="dimensions",
         description="List of dimensions that make up the dimensions of dataset. They will be "
@@ -406,18 +413,19 @@ class DatasetConfigModel(DSGBaseModel):
         return handle_dimension_union(values)
 
     @validator("dimensions")
-    def check_time_zone(cls, values: list) -> list:
+    def check_time_zone(cls, dimensions: list, values: dict) -> list:
         """Validate whether required time zone information is present."""
         geo_requires_time_zone = True
         time_dim = None
-        for dimension in values:
-            if dimension.dimension_type == DimensionType.TIME:
-                geo_requires_time_zone = dimension.does_geography_require_time_zone()
-                time_dim = dimension
-                break
+        if values["use_project_geography_time_zone"]:
+            for dimension in dimensions:
+                if dimension.dimension_type == DimensionType.TIME:
+                    geo_requires_time_zone = dimension.does_geography_require_time_zone()
+                    time_dim = dimension
+                    break
 
         if geo_requires_time_zone:
-            for dimension in values:
+            for dimension in dimensions:
                 if dimension.dimension_type == DimensionType.GEOGRAPHY:
                     check_timezone_in_geography(
                         dimension,
@@ -425,7 +433,7 @@ class DatasetConfigModel(DSGBaseModel):
                         "geography dimension records include a time_zone column.",
                     )
 
-        return values
+        return dimensions
 
     def dict(self, *args, **kwargs):
         data = super().dict(*args, **kwargs)

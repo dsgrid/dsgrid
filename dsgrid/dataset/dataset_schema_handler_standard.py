@@ -15,6 +15,7 @@ from dsgrid.query.models import TableFormatType
 from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import (
     check_null_value_in_unique_dimension_rows,
+    add_column_from_records,
 )
 from dsgrid.utils.spark import (
     # create_dataframe_from_pandas,
@@ -57,22 +58,35 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         check_null_value_in_unique_dimension_rows(dim_table)
         return dim_table
 
-    def get_time_zone_mapping(self):
-        lk_df = self._load_data_lookup.filter("id is not NULL")
-        return self._add_time_zone(lk_df).select("id", "time_zone").distinct()
+    def _get_table_with_dimensions(self):
+        return self._load_data_lookup.filter("id is not NULL")
 
-    def make_project_dataframe(self):
+    def get_time_zone_mapping(self, geography_dim):
+        lk_df = self._load_data_lookup.filter("id is not NULL")
+        geo_records = geography_dim.get_records_dataframe()
+        geo_name = geography_dim.model.dimension_type.value
+        return (
+            add_column_from_records(lk_df, geo_records, geo_name, "time_zone")
+            .select("id", "time_zone")
+            .distinct()
+        )
+
+    def make_project_dataframe(self, project_config):
         # TODO: Can we remove NULLs at registration time?
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._convert_time_dimension(self._load_data)
+        ld_df = self._load_data
+        if self._convert_time_before_other_dimensions():
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
         lk_df = self._remap_dimension_columns(lk_df)
         ld_df = self._remap_dimension_columns(
             ld_df,
             # Some pivot columns may have been removed.
-            pivoted_columns=set(self._load_data.columns).intersection(
-                self.get_pivoted_dimension_columns()
-            ),
+            pivoted_columns=set(ld_df.columns).intersection(self.get_pivoted_dimension_columns()),
         )
+        if not self._convert_time_before_other_dimensions():
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
         # TODO: handle fraction application
         # Currently this requires fraction = 1.0
         ld_df = ld_df.join(lk_df, on="id").drop("id")
@@ -80,7 +94,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._convert_time_dimension(self._load_data)
+        ld_df = self._load_data
+        if self._convert_time_before_other_dimensions():
+            ld_df = self._convert_time_dimension(ld_df, project_config)
 
         self._check_aggregations(context)
         lk_df, ld_df = self._prefilter_dataset(context, lk_df, ld_df)
@@ -89,6 +105,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         # Some pivoted columns may have been removed in pre-filtering.
         pivoted_columns = set(ld_df.columns).intersection(self.get_pivoted_dimension_columns())
         ld_df = self._remap_dimension_columns(ld_df, pivoted_columns=pivoted_columns)
+
+        if not self._convert_time_before_other_dimensions():
+            ld_df = self._convert_time_dimension(ld_df, project_config)
 
         pivoted_columns = set(ld_df.columns).intersection(
             self.get_pivoted_dimension_columns_mapped_to_project()

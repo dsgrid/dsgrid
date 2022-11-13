@@ -56,8 +56,8 @@ class Dataset(DatasetBase):
             )
         )
 
-    def make_project_dataframe(self):
-        return self._handler.make_project_dataframe()
+    def make_project_dataframe(self, project_config):
+        return self._handler.make_project_dataframe(project_config)
 
     def make_project_dataframe_from_query(self, query: QueryContext, project_config):
         return self._handler.make_project_dataframe_from_query(query, project_config)

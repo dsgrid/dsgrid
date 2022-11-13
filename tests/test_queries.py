@@ -1103,14 +1103,17 @@ def read_dataset_tempo():
     dataset_id = dataset_id = "tempo_conus_2022"
     project.load_dataset(dataset_id)
     tempo = project.get_dataset(dataset_id)
+    # table = tempo.make_project_dataframe(project.config)
 
     lookup = tempo._handler._load_data_lookup
-    tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
-    load_data = tempo_time_dim.convert_dataframe(
-        df=tempo._handler._load_data,
-        project_time_dim=project.config.get_base_dimension(DimensionType.TIME),
-        time_zone_mapping=tempo._handler.get_time_zone_mapping(),
-    )
+    load_data = tempo._handler._load_data
+    # tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
+    load_data = tempo._handler._convert_time_dimension(load_data, project.config)
+    # load_data = tempo_time_dim.convert_dataframe(
+    #    df=tempo._handler._load_data,
+    #    project_time_dim=project.config.get_base_dimension(DimensionType.TIME),
+    #    time_zone_mapping=tempo._handler.get_time_zone_mapping(project.config),
+    # )
     table = load_data.join(lookup, on="id").drop("id")
     return Tables(load_data.cache(), lookup.cache(), table.cache())
 

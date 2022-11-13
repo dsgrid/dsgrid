@@ -162,8 +162,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return groupby_cols
 
     @abc.abstractmethod
-    def make_project_dataframe(self):
+    def make_project_dataframe(self, project_config):
         """Return a load_data dataframe with dimensions mapped to the project's.
+
+        Parameters
+        ----------
+        project_config: ProjectConfig
 
         Returns
         -------
@@ -286,28 +290,47 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return df
 
-    @track_timing(timer_stats_collector)
-    def _add_time_zone(self, load_data_df):
-        """Add time_zone col to load_data_df"""
-        geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
-        geo_records = geography_dim.get_records_dataframe()
-        geo_name = geography_dim.model.dimension_type.value
-        load_data_df = add_column_from_records(load_data_df, geo_records, geo_name, "time_zone")
-        return load_data_df
+    @abc.abstractmethod
+    def _get_table_with_dimensions(self):
+        """Return the table that contains dimension columns."""
 
-    def get_time_zone_mapping(self):
+    def get_time_zone_mapping(self, geography_dim):
         """Get time_zone mapping to map to load_data_df
+
+        Parameters
+        ----------
+        geography_dim: DimensionConfig
+
         Returns
         -------
         pyspark.sql.DataFrame
             a two-column df containing time_zone and a mapping key column
         """
+        df = self._get_table_with_dimensions()
+        geo_records = geography_dim.get_records_dataframe()
+        geo_name = geography_dim.model.dimension_type.value
+        return (
+            add_column_from_records(df, geo_records, geo_name, "time_zone")
+            .select("id", "time_zone")
+            .distinct()
+        )
+
+    def _convert_time_before_other_dimensions(self):
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        return (
+            time_dim.model.does_geography_require_time_zone()
+            and not self._config.model.use_project_geography_time_zone
+        )
 
     @track_timing(timer_stats_collector)
-    def _convert_time_dimension(self, load_data_df):
+    def _convert_time_dimension(self, load_data_df, project_config):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if time_dim.model.does_geography_require_time_zone():
-            time_zone_mapping = self.get_time_zone_mapping()
+            if self._config.model.use_project_geography_time_zone:
+                geography_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
+            else:
+                geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
+            time_zone_mapping = self.get_time_zone_mapping(geography_dim)
         else:
             time_zone_mapping = None
 

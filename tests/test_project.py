@@ -48,7 +48,7 @@ def test_dataset_load():
     dataset = project.get_dataset(DATASET_ID)
 
     assert isinstance(dataset, Dataset)
-    data = dataset.make_project_dataframe()
+    data = dataset.make_project_dataframe(project.config)
     assert "timestamp" in data.columns
     assert "cooling" in data.columns
     assert "fans" in data.columns

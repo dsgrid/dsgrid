@@ -2,8 +2,6 @@ import logging
 from pathlib import Path
 from typing import List
 
-import pyspark.sql.functions as F
-
 from dsgrid.config.dataset_config import (
     DatasetConfig,
 )
@@ -109,11 +107,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         return dim_table
 
-    def get_time_zone_mapping(self):
-        geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
-        geo_records = geography_dim.get_records_dataframe()
-        geo_name = geography_dim.model.dimension_type.value
-        return geo_records.select(F.col("id").alias(geo_name), "time_zone")
+    def _get_table_with_dimensions(self):
+        return self._load_data
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: List[DimensionSimpleModel]):
@@ -146,8 +141,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             write_dataframe_and_auto_partition(load_df, path)
         logger.info("Rewrote simplified %s", self._config.load_data_path)
 
-    def make_project_dataframe(self):
-        ld_df = self._convert_time_dimension(self._load_data)
+    def make_project_dataframe(self, project_config):
+        if self._convert_time_before_other_dimensions():
+            ld_df = self._convert_time_dimension(self._load_data, project_config)
+        else:
+            ld_df = self._load_data
+
         ld_df = self._remap_dimension_columns(
             ld_df,
             # Some pivot columns may have been removed.
@@ -155,6 +154,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 self.get_pivoted_dimension_columns()
             ),
         )
+
+        if not self._convert_time_before_other_dimensions():
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
         return ld_df
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):

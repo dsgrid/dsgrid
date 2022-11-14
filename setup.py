@@ -18,7 +18,11 @@ with open(here / "README.md", encoding="utf-8") as f:
 
 dev_requires = ["black>=22.3.0", "pre-commit", "devtools", "jupyter", "flake8", "pyarrow"]
 
-test_requires = ["pytest", "pytest-cov"]
+test_requires = [
+    "httpx",  # starlette, used by fastapi, requires this as an optional dependency for testing.
+    "pytest",
+    "pytest-cov",
+]
 
 doc_requires = [
     "ghp-import",

@@ -10,7 +10,7 @@ from dsgrid.cli.download import download
 from dsgrid.cli.install_notebooks import install_notebooks
 from dsgrid.cli.query import query
 from dsgrid.cli.registry import registry
-from dsgrid.loggers import setup_logging, check_log_file_size
+from dsgrid.loggers import setup_logging, check_log_file_size, disable_console_logging
 
 
 logger = logging.getLogger(__name__)
@@ -35,16 +35,8 @@ def cli(ctx, log_file, no_prompts, verbose):
 
 @cli.result_callback()
 def callback(*args, **kwargs):
-    # Raise the console level so that timer stats only go to the log file.
-    dsgrid_logger = logging.getLogger("dsgrid")
-    for i, handler in enumerate(dsgrid_logger.handlers):
-        if handler.name == "console":
-            handler.setLevel(logging.WARNING)
-            break
-
-    timer_stats_collector.log_stats()
-
-    # Leave the console logger changed because the process will now exit.
+    with disable_console_logging(name="dsgrid"):
+        timer_stats_collector.log_stats()
 
 
 cli.add_command(download)

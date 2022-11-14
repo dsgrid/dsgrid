@@ -3,6 +3,7 @@
 import logging
 import logging.config
 import os
+from contextlib import contextmanager
 
 
 # ETH@20210325 - What if you want to set up logging for all loggers, or for all
@@ -98,3 +99,23 @@ def check_log_file_size(filename, limit_mb=10, no_prompts=False):
         val = input(msg)
         if val == "" or val.lower() == "y":
             os.remove(filename)
+
+
+@contextmanager
+def disable_console_logging(name="dsgrid"):
+    logger = logging.getLogger(name)
+    if logger.handlers:
+        console_level = None
+        try:
+            for handler in logger.handlers:
+                if handler.name == "console":
+                    console_level = handler.level
+                    handler.setLevel(logging.FATAL)
+                    break
+            yield
+        finally:
+            for handler in logger.handlers:
+                if handler.name == "console":
+                    assert console_level is not None
+                    handler.setLevel(console_level)
+                    break

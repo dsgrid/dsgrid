@@ -1,6 +1,6 @@
 # dsgrid Developer README
 
-[Dependencies](#developer-dependencies) | [Tests](#tests) | [EFS Project Repository](#testingexploring-with-the-efs-project-repository) | [Interactive Exploration](#interactive-exploration) | [Existing Spark Cluster](#use-existing-spark-cluster) | [Spark Standalone Cluster](#spark-standalone-cluster) | [Publish Documentation](#publish-documentation)
+[Dependencies](#developer-dependencies) | [Tests](#tests) | [Spark](#spark) | [EFS Project Repository](#testingexploring-with-the-efs-project-repository) | [Interactive Exploration](#interactive-exploration) | [Publish Documentation](#publish-documentation)
 
 ## Developer Dependencies
 
@@ -18,6 +18,21 @@ pip install -e .[dev] # includes what is needed for tests and code development
 pip install -e .[admin] # dev plus what is needed for creating documentation and releasing packages
 ```
 
+**Java**
+Spark requires Java. Most people already have Java installed on their personal computers, so this
+is typically only a problem on Eagle or the cloud. Check if you have it. Both of these commands
+must work.
+```
+$ java --version
+openjdk 11.0.12 2021-07-20
+$ echo $JAVA_HOME
+/Users/dthom/brew/Cellar/openjdk@11/11.0.12
+```
+If you don't have java installed:
+```
+$ conda install openjdk
+```
+
 **Setting up pre-commit hooks**
 
 ```
@@ -27,6 +42,11 @@ pre-commit install
 **Additional software required for publishing documentation:**
 
 - [Pandoc](https://pandoc.org/installing.html)
+
+## Spark
+You need to have some familiarity with Spark in order to run non-trivial tasks in dsgrid.
+This [page](spark_overview.md) provides an overview and explains various ways to use Spark in
+dsgrid.
 
 ## Tests
 
@@ -185,10 +205,17 @@ export DSGRID_LOCAL_DATA_DIRECTORY=~/.dsgrid-data
 
 Create and populate the registry.
 ```
-python tests/make_us_data_registry.py $DSGRID_REGISTRY_PATH -p $HOME/dsgrid-project-EFS -d $DSGRID_LOCAL_DATA_DIRECTORY
+python dsgrid/tests/register.py tests/data/test_efs_registration.json
 ```
 
 Now you can run any `dsgrid registry` command.
+
+## Register projects and datasets under development
+When developing projects and datasets you will likely have to run the registration commands man
+times. dsgrid provides a helper script for this purpose. Refer to `dsgrid/tests/register.py` and
+the data models in `dsgrid/tests/registration_models.py`. They automate the registration process
+so that you don't have to write your own scripts. Example config files are
+`tests/data/test_efs_registration.json` and `tests/data/standard_scenarios_registration.json`.
 
 ## Interactive Exploration
 
@@ -237,7 +264,7 @@ That copies the dsgrid notebooks to `~/dsgrid-notebooks`.
 If you are running a Spark cluster then set the environment variable `SPARK_CLUSTER`.
 
 ```
-$ export SPARK_CLUSTER=spark://<hostname>:7077
+$ export SPARK_CLUSTER=spark://$(hostname):7077
 ```
 
 Start Jupyter and open `registration.ipynb`.
@@ -275,210 +302,6 @@ You can debug Pydantic data models with the devtools package.
 from devtools import debug
 debug(project_config.model)
 debug(geography_dim.model)
-```
-
-## Spark Standalone Cluster
-
-It can be advantageous to create a standalone cluster instead of starting Spark from within a
-Python process for these reasons:
-- Easier to tune Spark parameters for performance and monitoring.
-- Use the Spark web UI to inspect job details.
-
-Note that while most unit tests work with a standalone cluster the tests in
-`tests/cli/test_registry.py` do not. It's likely because that test will attempt to create multiple
-clusters on the same system.
-
-The full instructions to create a cluster are at http://spark.apache.org/docs/latest/spark-standalone.html.
-The rest of this section documents a limited set that should work on your system.
-
-Install Spark locally rather than rely on the pyspark installation from pip.
-Refer to https://spark.apache.org/docs/latest/ for installation instructions.
-
-Here is one way to configure and start a cluster.
-
-1. Ensure that the environment variable `SPARK_HOME` is set to your installation directory.
-2. Customize values in `$SPARK_HOME/conf/spark-defaults.conf` and/or `$SPARK_HOME/conf/spark-env.sh`.
-
-3. Start the master with this command:
-```
-$SPARK_HOME/sbin/start-master.sh
-```
-
-4. Open http://localhost:8080/ in your browser and copy the cluster URL and port. It will be
-something like `spark://hostname:7077`.
-
-5. Start a worker with this command. Give the worker as much memory as you can afford. You can also
-configure this in step #2.
-```
-$SPARK_HOME/sbin/start-worker.sh -m 16g spark://<hostname>:<port>
-```
-
-Monitor cluster tasks in your browser.
-
-## Use existing Spark cluster
-
-Start `spark-submit` or `pyspark` with the master assigned to the cluster URL.
-```
-$ pyspark --master spark://hostname:7077
-```
-
-## Running a Spark cluster on Eagle
-
-This section describes how you can run scripts on any number of Eagle compute nodes. You can use
-JADE to
-- Allocate compute nodes.
-- Create a Spark cluster on those nodes.
-- Run one or more scripts on the cluster.
-- Collect resource utilization metrics from each node.
-
-1. Install JADE. Requires at least v0.6.3. JADE documentation is here: https://nrel.github.io/jade/index.html.
-Documentation for the Spark configuration is here: https://nrel.github.io/jade/spark_jobs.html.
-
-```
-$ pip install NREL-jade
-```
-
-2. Put your scripts in a text file like this:
-
-```
-$ cat commands.txt
-python my_script.py
-```
-
-3. Create the JADE configuration
-
-```
-$ jade config create commands.txt
-Created configuration with 1 jobs.
-Dumped configuration to config.json.
-```
-
-4. Create an HPC configuration file. The default behavior is to allocate a single node. You can edit
-the resulting file to use more nodes.
-
-```
-jade config hpc -c hpc_config.toml -t slurm -a <your-allocation> --partition=debug --walltime=01:00:00
-Created HPC config file hpc_config.toml
-```
-
-5. Add a Spark configuration. The `-c` option specifies the path to the dsgrid Singularity
-container on Eagle.
-
-```
-jade spark config -c /projects/dsgrid/containers/dsgrid  --update-config-file=config.json
-```
-
-6. Optionally, customize Spark configuration parameters in the `spark/conf` folder created in the
-previous step.
-
-7. Submit the jobs to SLURM. You will likely want to include resource monitoring as shown here.
-
-```
-jade submit-jobs config.json -R periodic -r1
-```
-
-8. Monitor log files as needed:
-
-- `<output-dir>/*.o` contains stdout.
-- `<output-dir>/*.e` contains stderr.
-- Refer to https://nrel.github.io/jade/tutorial.html#job-status for help with JADE status checking.
-- After all jobs finish `<output-dir>/spark_logs` will contain Spark log files.
-- After all jobs finish `<output-dir>/stats` will interactive resource utilization plots.
-- In the future we will have Spark metrics recorded in JSON files.
-
-## Connecting a Jupyter notebook to a Spark cluster on Eagle
-
-Make sure you have already installed the dsgrid notebooks in your scratch directory. That installs
-notebooks as well as a script that will start a Jupyter notebook on Eagle. It is called `start_notebook.sh`.
-
-1. Create a JADE configuration per the above steps. However, the command passed to JADE must be
-`bash dsgrid-notebooks/start_notebook.sh`.
-2. Consider whether you want to run the notebook server from the container or from your local conda environment.
-Set the JADE config parameter `run_user_script_outside_container` appropriately in `config.json`.
-3. Submit the JADE job. Once the job starts run `tail -f <output-dir>/*.e`. It will eventually show
-the Jupyter notebook URL as well as the the command you need to run to open an SSH tunnel.
-4. Open the SSH tunnel.
-5. Connect to the notebook.
-
-When you are done with your work, save and close the notebook. You can release the Eagle compute node
-allocation in one of these ways:
-
-1. Stop the Jupyter server and allow JADE to shutdown cleanly. Do this if you care about collecting
-Spark logs or compute node resource utilization stats. ssh to the Spark master node (this is the compute
-node in the ssh tunnel commmand) and run `jupyter notebook stop 8889`. If you used a different port to
-start the notebook server, adjust accordingly.
-2. Use JADE to cancel the job. Do this if you have other other jobs running and don't want to accidentally
-cancel them. Run `jade cancel-jobs <output-dir>`.
-3. Use SLURM to cancel the job. Find the job ID with `squeue` and then run `scancel <job-id>`.
-4. Are you confident that you have no other jobs running? `scancel -u $USER`
-
-### Executing scripts
-There are two basic ways to submit scripts to a Spark cluster.
-
-1. [RECOMMENDED] Submit your script with `spark-submit` or start an interactive session with `pyspark` and run code.
-Those will create the SparkSession automatically based on the CLI inputs. Refer to its help. You can
-customize any part of the configuration.
-
-2. Connect to a SparkSession from within Python. Here is an example. Refer to the Spark
-documentation for other options. Note that you cannot affect some settings from within Python.
-`spark.driver.memory` and `spark.executor.instances` are two examples. Those have to be set
-before the Spark JVM is started. Those can only be modified through `pyspark` or `spark-submit`.
-
-```
-    from pyspark.sql import SparkSession
-    from pyspark import SparkConf, SparkContext
-    conf = SparkConf().setAppName("my_app") \
-        .setMaster("spark://<node_name>:7077")
-    sc = SparkContext(conf=conf)
-    spark = (
-            SparkSession.builder.config(conf=conf)
-            .getOrCreate()
-        )
-```
-
-## dsgrid container
-
-The dsgrid team maintains a Docker container built with the Dockerfile in the root of this
-repository. It includes the dsgrid software, Spark, as well as secondary tools like Jupyter. This
-can be used to run dsgrid software on any computer (local, Eagle, or the cloud). The team converts
-the container to Singularity so that it can be used on Eagle. The container images are located at
-`/projects/dsgrid/containers/`. Here's how to start a shell with important directories
-mounted:
-
-```
-$ module load singularity-container
-$ singularity shell \
-    -B /scratch:/scratch \
-    -B /projects:/projects \
-    /projects/dsgrid/containers/nvidia_spark_v0.0.3.sif
-```
-
-Here's how to run a script in the container:
-
-```
-$ module load singularity-container
-$ singularity exec \
-    -B /scratch:/scratch \
-    -B /projects:/projects \
-    /projects/dsgrid/containers/nvidia_spark_v0.0.3.sif \
-    my-script.sh
-```
-
-## Attach to a Spark cluster from a conda environment
-
-There are cases where you may want to run scripts against a Spark cluster from your own conda
-environment. For example, you may have new code in a dsgrid branch that is not in the container.
-
-Ensure that you have Java installed in your conda environment. Most people already have Java
-installed on their personal computers, so this is typically only a problem on Eagle or the cloud.
-
-```
-$ conda install openjdk
-```
-
-Verify the installation by checking that this environment variable is set:
-```
-$ echo $JAVA_HOME
 ```
 
 ## Queries
@@ -536,7 +359,6 @@ $ which dsgrid
 ```
 
 2. Substitute `dsgrid-cli.py` for the usual `dsgrid`. This allows `spark-submit` to detect that it is Python.
-(If you know of something more clever and less irritating, please share it with us.)
 
 ```
 $ spark-submit --master spark://hostname:7077 \

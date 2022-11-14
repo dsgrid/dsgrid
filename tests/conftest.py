@@ -27,6 +27,13 @@ def pytest_sessionstart(session):
         )
         print("git submodule init")
         print("git submodule update")
+        sys.exit(1)
+
+    # Saving these tables during tests doesn't add any value and adds complications whenever
+    # multiple processes try to access the Hive metastore, particularly when we inject errors.
+    # We only need this when we submit datasets to projects and users want to inspect the
+    # outcomes. This feature may become opt-in if we encounter similar problems.
+    os.environ["__DSGRID_SKIP_SAVING_DIMENSION_ASSOCIATIONS__"] = "1"
 
     commit_file = TEST_REGISTRY / "commit.txt"
     latest_commit = _get_latest_commit()

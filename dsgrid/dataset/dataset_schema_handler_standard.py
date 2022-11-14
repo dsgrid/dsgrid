@@ -39,7 +39,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @classmethod
     def load(cls, config: DatasetConfig, *args, **kwargs):
         load_data_df = read_dataframe(config.load_data_path)
-        load_data_lookup = read_dataframe(config.load_data_lookup_path, cache=True)
+        load_data_lookup = read_dataframe(config.load_data_lookup_path)
         load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)
 

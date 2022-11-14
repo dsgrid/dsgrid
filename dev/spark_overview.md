@@ -162,7 +162,7 @@ settings like `spark.driver.memory`, which, as stated earlier, must be set befor
 created.
 
 
-## Installing a Spark Standalone Cluster on Your Laptop
+## Installing a Spark Standalone Cluster on your laptop
 Download your desired version from https://spark.apache.org/downloads.html and extract it on
 your system.
 
@@ -174,30 +174,50 @@ Here is an example:
 $ cd
 $ wget https://dlcdn.apache.org/spark/spark-3.3.1/spark-3.3.1-bin-hadoop3.tgz
 $ tar -xzf spark-3.3.1-bin-hadoop3.tgz && rm spark-3.3.1-bin-hadoop3.tgz
-# Consider adding this to your shell rc file.
-$ export SPARK_HOME=~/spark-3.3.1-bin-hadoop3
 ```
 
 The full instructions to create a cluster are at
 http://spark.apache.org/docs/latest/spark-standalone.html. The rest of this section documents a
 limited set that should work on your system.
 
-1. Ensure that the environment variable `SPARK_HOME` is set to your installation directory.
-2. Customize values in `$SPARK_HOME/conf/spark-defaults.conf` and `$SPARK_HOME/conf/spark-env.sh`.
+### Set environment variables
 
-3. Start the master with this command:
+```
+# Consider adding these to your shell rc file (.bashrc or .zshrc, for example).
+# so that they are always set.
+$ export SPARK_HOME=~/spark-3.3.1-bin-hadoop3
+$ export PATH=$PATH:$SPARK_HOME/sbin
+```
+
+**Warning**: Setting `SPARK_HOME` will affect `pyspark` operation in local mode.
+
+### Customize Spark configuration settings
+```
+$ cp $SPARK_HOME/conf/spark-defaults.conf.template $SPARK_HOME/conf/spark-defaults.conf
+$ cp $SPARK_HOME/conf/spark-env.sh.template $SPARK_HOME/conf/spark-env.sh
+```
+Set `spark.driver.memory` and `spark.driver.maxResultSize` in `spark-defaults.conf` to the maximum
+values that you expect to pull from Spark to Python, such as if you call `df.toPandas()`.
+`1g` is probably reasonable.
+
+Set `spark.sql.shuffle.partitions` to 1-4x the number of cores in your system.
+
+Set `spark.executor.cores` and `spark.executor.memory` to numbers that allow creation of your
+desired number of executors. Those are per-executor values.
+
+### Start the Spark processes
 ```
 $SPARK_HOME/sbin/start-master.sh
 ```
-
-4. Open http://localhost:8080/ in your browser and copy the cluster URL and port. It will be
-something like `spark://$(hostname):7077`.
-
-5. Start a worker with this command. Give the worker as much memory as you can afford. You can also
-configure this in step #2.
+Start a worker with this command. Give the worker as much memory as you can afford. You can also
+configure this in `spark-env.sh`.
 ```
 $SPARK_HOME/sbin/start-worker.sh -m 16g spark://$(hostname):7077
 ```
+
+### Spark UI
+Open http://localhost:8080/ in your browser and copy the cluster URL and port. It will be
+something like `spark://$(hostname):7077`.
 
 If you add the `sbin` to your `PATH` environment variable, here is a one-liner:
 ```
@@ -206,7 +226,8 @@ $ start-master.sh && start-worker.sh -m 24g spark://$(hostname):7077
 
 Monitor cluster tasks in your browser.
 
-6. Stop all of the processes when you complete your work.
+## Stop the Spark processes
+Stop all of the processes when you complete your work.
 ```
 $ stop-worker.sh && stop-master.sh
 ```

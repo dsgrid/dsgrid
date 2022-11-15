@@ -67,13 +67,15 @@ customize the execution environment. More details follow
 [below](#tuning-spark-configuration-settings).
 
 1. `spark-submit`
-This will create a SparkSession, make that session available to the Python process, and run your
+
+This command will create a SparkSession, make that session available to the Python process, and run your
 code.
 ```
 $ spark-submit [options] your_script.py [your_script_options]
 ```
 2. `pyspark`
-This will create a SparkSession, make that session available to the Python process, and leave you
+
+This command will create a SparkSession, make that session available to the Python process, and leave you
 in the Python interpreter for an interactive session.
 ```
 $ pyspark [options]
@@ -87,7 +89,7 @@ $ python
 ```
 
 ### Spark UI
-The Spark master starts a web application at http://<master_hostname>:8080. The worker is available
+The Spark master starts a web application at `http://<master_hostname>:8080`. The worker is available
 at port 4040. You can monitor and debug all aspects of your jobs in this application. You can also
 inspect all cluster configuration settings.
 
@@ -102,6 +104,11 @@ $ ssh -L 4040:$COMPUTE_NODE:4040 -L 8080:$COMPUTE_NODE:8080 $USER@eagle.hpc.nrel
 
 
 ## Installing a Spark Standalone Cluster on your laptop
+
+**Note**: As stated earlier, the scripts mentioned in this section do not work in a native Windows
+environment. You can still start a cluster in Windows; you just have to run the java commands
+yourself.
+
 Download your desired version from https://spark.apache.org/downloads.html and extract it on
 your system.
 

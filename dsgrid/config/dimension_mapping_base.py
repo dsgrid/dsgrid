@@ -16,6 +16,7 @@ class DimensionMappingType(DSGEnum):
     # optional from_fraction col, FRACTION_SUM_EQ1 when grouped by from_id
     ONE_TO_ONE = "one_to_one"  # includes rename, down-selection
     MANY_TO_ONE_AGGREGATION = "many_to_one_aggregation"
+    MANY_TO_ONE_REASSIGNMENT = "many_to_one_reassignment"
 
     # optional from_fraction col, no FRACTION_SUM check
     DUPLICATION = "duplication"
@@ -197,6 +198,7 @@ class DimensionMappingBaseModel(DSGBaseModel):
             # optional from_fraction col, FRACTION_SUM_EQ1 when grouped by from_id
             DimensionMappingType.ONE_TO_ONE: DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_EQ1_FROM_ID,
             DimensionMappingType.MANY_TO_ONE_AGGREGATION: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1_FROM_ID,
+            DimensionMappingType.MANY_TO_ONE_REASSIGNMENT: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1_FROM_ID,
             # optional from_fraction col, no FRACTION_SUM check
             DimensionMappingType.DUPLICATION: DimensionMappingArchetype.ONE_TO_MANY_MAP,
             # required from_fraction col, FRACTION_SUM_EQ1 when grouped by from_id
@@ -205,7 +207,7 @@ class DimensionMappingBaseModel(DSGBaseModel):
             DimensionMappingType.MANY_TO_MANY_DISAGGREGATION: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_FROM_ID,
             # required from_fraction col, FRACTION_SUM_EQ1 when grouped by to_id
             DimensionMappingType.ONE_TO_MANY_ASSIGNMENT: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_EQ1_TO_ID,
-            DimensionMappingType.MANY_TO_ONE_ASSIGNMENT: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_TO_ID,
+            DimensionMappingType.MANY_TO_ONE_ASSIGNMENT: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1_TO_ID,
             DimensionMappingType.MANY_TO_MANY_ASSIGNMENT: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_TO_ID,
             # required from_fraction col, no FRACTION_SUM check
             DimensionMappingType.ONE_TO_ONE_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.ONE_TO_ONE_MAP,

@@ -183,7 +183,7 @@ on NREL's Eagle cluster.
 NREL's HPC GitHub repository contains scripts that will create an ephemeral Spark cluster
 on compute nodes that you allocate.
 
-1. The repository as setup instructions that are not currently correct because the branch
+1. The repository has setup instructions that are not currently correct because the branch
    is still under review. Follow
    https://github.com/daniel-thom/HPC/blob/apache-spark-clusters/applications/spark/README.md
    except substitute step 1 with the steps below.
@@ -360,9 +360,9 @@ This section explains some common problems.
 ### spark.sql.shuffle.partitions
 The most common performance issue we encounter when running complex queries is due to a non-ideal
 setting for `spark.sql.shuffle.partitions`. The default Spark value is 200. Some online sources
-recommend setting it to 1-4x the total number of CPUs in your cluster. For example, if you have two
-Eagle nodes, 72 - 288. This [video](https://www.youtube.com/watch?v=daXEp4HmS-E&t=4251s) by a Spark
-developer offers a recommendation that has worked out better.
+recommend setting it to 1-4x the total number of CPUs in your cluster. This
+[video](https://www.youtube.com/watch?v=daXEp4HmS-E&t=4251s) by a Spark developer offers a
+recommendation that has worked out better.
 
 Use this formula:
 ```
@@ -408,7 +408,7 @@ We have not observed any downside to having this feature enabled.
 ### Slow local storage
 Spark will write lots of temporary data to local storage during shuffle operations. If your joins
 cause lots of shuffling, it is very important that your local storage be fast. If you use an Eagle
-node with a slow spinning disk (130 MB/s), your job will likelly fail. Use a `bigmem` or `gpu`
+node with a slow spinning disk (130 MB/s), your job will likely fail. Use a `bigmem` or `gpu`
 node. They have SSDs that can write data at 2 GB/s.
 
 ### Too many executors are involved in a job

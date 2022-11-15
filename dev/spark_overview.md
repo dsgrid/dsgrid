@@ -1,24 +1,37 @@
 # Apache Spark Overview
 This page describes Spark concepts that are important to understand when using dsgrid.
 
-[Cluster Mode Overview](#cluster-mode-overview) |
-[Run pyspark through iPython or Jupyter](#run-pyspark-through-ipython-or-jupyter) |
+[Spark Overview](#spark-overview) |
+[Run pyspark through IPython or Jupyter](#run-pyspark-through-ipython-or-jupyter) |
 [Creating a SparkSession with dsgrid](#creating-a-sparksession-with-dsgrid) |
 [Installing a Spark Standalone Cluster on Your Laptop](#installing-a-spark-standalong-cluster-on-your-laptop) |
 [Installing a Spark Standalone Cluster on an HPC](#installing-a-spark-standalong-cluster-on-an-hpc) |
 [Spark Configuration Problems](#spark-configuration-problems)
 
-**Windows users**: Spark does not offer a great user experience in Windows.
-The developers provide cluster management scripts in bash, and so they do not work in Windows.
-We have experienced other installation headaches as well. We recommend that you use dsgrid in
-a Windows Subsystem for Linux (WSL2) environment instead of a native Windows environment.
-Furthermore, this page uses the UNIX conventions for environment variables and running
-commands in a shell. If you do run any of these commands in a native Windows environment,
-you will have to adjust depending on whether you are running PowerShell or the old Command
-shell.
+**Windows users**: Spark does not offer a great user experience in Windows. While `pyspark` and
+`spark-submit` work in local mode, running a cluster requires manual configuration. The developers
+provide cluster management scripts in bash, and so they do not work in Windows. When running a
+cluster on your laptop we recommend that you use dsgrid in a Windows Subsystem for Linux (WSL2)
+environment instead of a native Windows environment.
+
+## Conventions
+This page uses the UNIX conventions for environment variables and running commands in
+a shell. If you do run any of these commands in a native Windows environment, you will have to
+adjust depending on whether you are running PowerShell or the old Command shell.
+
+Explanation of bash functionality used here:
+- `$VARIABLE_NAME` or `${VARIABLE_NAME}`: This uses the environment variable `VARIABLE_NAME`. If
+the variable isn't defined, bash will use an empty string.
+- `export VARIABLE_NAME=x`: This sets the environment variable `VARIABLE_NAME` to the value `x` in
+the current shell. If you want to set this variable for all future shells as well, add the
+statement to your shell rc file (`$HOME/.bashrc` or `$HOME/.zshrc`).
+- `export VARIABLE_NAME=$(hostname)`: This sets the environment variable `VARIABLE_NAME` to the
+string returned by the command `hostname`.
 
 
-## Cluster Mode Overview
+## Spark Overview
+
+### Cluster Mode
 Apache provides an overview at https://spark.apache.org/docs/3.3.1/cluster-overview.html
 
 The important parts to understand are how dsgrid uses different cluster modes in different
@@ -33,48 +46,86 @@ environments.
   performance on your system. It also allows you to debug your jobs in the Spark UI before or after
   they complete.
 
-- HPC compute node in local mode: In general this is not recommended. It's easy to create a
-  standalone cluster. But, for some quick checks, it is fine. Run `pyspark` in the terminal
-  and do your work. Just remember that you won't get to use all CPUs.
+- HPC compute node in local mode: Use this only for quick checks. Same points above for local
+  computer in local mode apply. Create a standalone for real work.
 
-- HPC compute node(s) with a standalone cluster: Use the HPC repository scripts to create a
-  cluster on any number of compute nodes and then use all CPUs for your jobs. Refer to the
-  installation instructions.
+- HPC compute node(s) with a standalone cluster: Create a cluster on any number of compute nodes
+  and then use all CPUs for your jobs. Refer to the [installation
+  instructions](#installing-a-spark-standalong-cluster-on-an-hpc).
 
-- AWS EMR cluster: The scripts in the dsgrid repo will create a Spark cluster with a Yarn cluster
-  manager. The YARN cluster manager allows multiple users to access a single cluster and offers
-  better job scheduling.
+- AWS EMR cluster: The EMR scripts in the dsgrid repo at `/emr` will create a Spark cluster on EC2
+  compute nodes with a cluster manager. The cluster managers allow multiple users to access a
+  single cluster and offer better job scheduling. Refer to the [instructions](../emr/README.md).
 
-## Run pyspark through iPython or Jupyter
-Here is how to run all pyspark sessions through iPython or Jupyter.
 
-### iPython
+### Run Spark Applications
+There are three ways of running Spark applications in Python. The first two use scripts provided by
+the Spark and pyspark installations.
+
+1. `spark-submit`
+```
+$ spark-submit [options] your_script.py [your_script_options]
+```
+This will create a SparkSession, make that session available to the Python process, and run your
+code.
+
+2. `pyspark`
+```
+$ pyspark [options]
+```
+This will create a SparkSession, make that session available to the Python process, and leave you
+in the Python interpreter for an interactive session.
+
+3. Inside Python
+```
+$ python
+>>> from pyspark.sql import SparkSession
+>>> spark = SparkSession.builder.appName("your_app_name").getOrCreate()
+```
+
+### Spark UI
+The Spark master starts a web application at http://<master_hostname>:8080. You can monitor and
+debug all aspects of your jobs in this application. You can also inspect all configuration
+settings used by the cluster.
+
+
+## Run pyspark through IPython or Jupyter
+You can configure `pyspark` to start `IPython` or `Jupyter` instead of the standard Python
+interpreter by setting the environment variables `PYSPARK_DRIVER_PYTHON` and
+`PYSPARK_DRIVER_PYTHON_OPTS`.
+
+### IPython
 ```
 $ export PYSPARK_DRIVER_PYTHON=ipython
+# local mode
+$ pyspark
+# cluster mode
 $ pyspark --master=spark://$(hostname):7077
 ```
-Now you are in ipython instead of the standard Python interpreter.
+Now you are in IPython instead of the standard Python interpreter.
 
 ### Jupyter
 ```
 $ export PYSPARK_DRIVER_PYTHON=jupyter
 $ export PYSPARK_DRIVER_PYTHON_OPTS="notebook --no-browser --port=8889 --ip=0.0.0.0"
+# local mode
+$ pyspark
+# cluster mode
 $ pyspark --master=spark://$(hostname):7077
 ```
-Pyspark will start a Jupyter notebook. Enter the following in a cell in order to attach to
-this cluster:
+Pyspark will start a Jupyter notebook and you'll see the URL printed in the terminal. If you're on
+a remote server, like in an HPC environment, you'll need to create an ssh tunnel in order to
+connect in a browser.
+
+Once you connect in a brower enter the following in a cell in order to attach to this cluster:
 ```
-from IPython.core.display import display, HTML
 from pyspark.sql import SparkSession
-display(HTML("<style>.container { width:100% !important; }</style>"))
-
-spark = SparkSession.builder.appName("my_app").getOrCreate()
+spark = SparkSession.builder.appName("your_app_name").getOrCreate()
 ```
-
 
 ## Tuning Spark Configuration Settings
 In general you want to run Spark with as many executors as possible on each worker node. The
-Amazon orchestration software along with the YARN cluster manager *may* take care of that when
+Amazon orchestration software along with the cluster manager *may* take care of that when
 running on AWS (you will still have to adjust `spark.sql.shuffle.partitions`). You will have to
 perform more customizations when running a standalone cluster on your laptop or an HPC.
 
@@ -91,9 +142,10 @@ methods will override the earlier methods when allowed.
    settings across jobs. Note that some settings must be made before the Spark JVM starts, like
    `spark.driver.memory`, and so this is your last chance to customize those values.
 
-3. SparkSession construction: You can customize things like executor settings when you construct
-   the `SparkSession` in Python. This example will ensure that the job will start a single executor
-   with a single core and use all available memory.
+3. SparkSession construction inside a Python process: You can customize things like executor
+   settings when you construct the `SparkSession` in Python. For example, this code block will
+   create a session where the job starts a single executor with a single core that uses all
+   available memory.
 ```
 from pyspark import SparkConf
 from pyspark.sql import SparkSession
@@ -107,8 +159,8 @@ spark = SparkSession.builder.config(conf=conf).getOrCreate()
 
 4. Dynamic changes: You can make changes to a limited number of settings at runtime.
    You can't change the number of executor cores because those have already been allocated. You
-   can change the number of shuffle partitions that Spark will use. You may want ot change that
-   value if the size of the dataframes you're working on change dramatically.
+   can change the number of shuffle partitions that Spark will use. You may want to change that
+   value if the sizes of the dataframes you're working on change dramatically.
 ```
 from pyspark.sql import SparkSession
 
@@ -125,10 +177,11 @@ using the correct settings in the Spark UI.
 This is the recommended procedure because you can customize any setting.
 
 Suppose that you want to run a query with a CLI command and use custom settings.
-This example assumes that you are on the HPC compute node that is the Spark master.
+This example assumes that you are logged into the compute node that is the Spark master.
 
 **Note**: `spark-submit` needs to be able to detect that the script is Python, and so you must
-substitute `dsgrid-cli.py` for the usual `dsgrid`. You also need to specify its full path.
+substitute `dsgrid-cli.py` for the usual `dsgrid`. You also need to specify its full path
+(accomplished below with the `which` utility).
 
 ```
 $ spark-submit --master spark://$(hostname):7077 \
@@ -161,7 +214,6 @@ The upside of this approach is that it is a bit simpler. The downside is that yo
 settings like `spark.driver.memory`, which, as stated earlier, must be set before the JVM is
 created.
 
-
 ## Installing a Spark Standalone Cluster on your laptop
 Download your desired version from https://spark.apache.org/downloads.html and extract it on
 your system.
@@ -171,21 +223,19 @@ versions must match.
 
 Here is an example:
 ```
-$ cd
+$ cd <your-preferred-base-directory>  # directions below assume $HOME
 $ wget https://dlcdn.apache.org/spark/spark-3.3.1/spark-3.3.1-bin-hadoop3.tgz
 $ tar -xzf spark-3.3.1-bin-hadoop3.tgz && rm spark-3.3.1-bin-hadoop3.tgz
 ```
 
 The full instructions to create a cluster are at
 http://spark.apache.org/docs/latest/spark-standalone.html. The rest of this section documents a
-limited set that should work on your system.
+limited set of instructions that should work on your system.
 
 ### Set environment variables
 
 ```
-# Consider adding these to your shell rc file (.bashrc or .zshrc, for example).
-# so that they are always set.
-$ export SPARK_HOME=~/spark-3.3.1-bin-hadoop3
+$ export SPARK_HOME=$HOME/spark-3.3.1-bin-hadoop3
 $ export PATH=$PATH:$SPARK_HOME/sbin
 ```
 
@@ -203,30 +253,27 @@ values that you expect to pull from Spark to Python, such as if you call `df.toP
 Set `spark.sql.shuffle.partitions` to 1-4x the number of cores in your system.
 
 Set `spark.executor.cores` and `spark.executor.memory` to numbers that allow creation of your
-desired number of executors. Those are per-executor values.
+desired number of executors. Spark will try to create the most number of executors such that each
+executor has those resources. For example, if your system has 16 cores and you assigned 16g of
+memory to the worker, `spark.executor.cores 3` and `spark.executor.memory 5g` will result in 3
+executors.
 
 ### Start the Spark processes
 ```
 $SPARK_HOME/sbin/start-master.sh
 ```
-Start a worker with this command. Give the worker as much memory as you can afford. You can also
-configure this in `spark-env.sh`.
+Start a worker with this command. Give the worker as much memory as you can afford. Executor memory
+comes from this pool. You can also configure this in `spark-env.sh`.
 ```
 $SPARK_HOME/sbin/start-worker.sh -m 16g spark://$(hostname):7077
 ```
-
-### Spark UI
-Open http://localhost:8080/ in your browser and copy the cluster URL and port. It will be
-something like `spark://$(hostname):7077`.
 
 If you add the `sbin` to your `PATH` environment variable, here is a one-liner:
 ```
 $ start-master.sh && start-worker.sh -m 24g spark://$(hostname):7077
 ```
 
-Monitor cluster tasks in your browser.
-
-## Stop the Spark processes
+### Stop the Spark processes
 Stop all of the processes when you complete your work.
 ```
 $ stop-worker.sh && stop-master.sh
@@ -257,20 +304,25 @@ $ git checkout apache-spark-clusters
 ```
 $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --mem=730G
 ```
+Given that this example uses `salloc`, once SLURM allocates a node it will log you into the
+compute node. If you choose more than one node, you will be logged into the node that will be used
+as the Spark master node.
+
 Notes:
-- Eagle will let you allocate two debug jobs each with two nodes. So, you can use these scripts
-  to create a four-node cluster for one hour.
+- NREL's Eagle cluster will let you allocate two debug jobs each with two nodes. So, you can use
+  these scripts to create a four-node cluster for one hour.
 - If the debug partition is not too full, you can append `--qos=standby` to the command above
   and not be charged any AUs.
 
-3. Setup the environment in a directory in `/scratch/$USER`.
+3. Add the setup scripts to your path.
 ```
 $ export PATH=$PATH:<your-repo-path>/HPC/applications/spark/spark_scripts
 ```
 
-4. Select a container valid for use with dsgrid, which currently requires Spark v3.3.x and
+4. Select a Spark container compatible with dsgrid, which currently requires Spark v3.3.x and
    Python 3.10. The team has validated the container below. It was created with this Dockerfile
-   in dsgrid: `docker/spark/Dockerfile`
+   in dsgrid: `docker/spark/Dockerfile`. The container includes ipython, jupyter, pyspark, pandas,
+   and pyarrow, but not dsgrid.
 ```
 $ create_config.sh -c `/projects/dsgrid/containers/spark_py310.sif`
 ```
@@ -285,9 +337,6 @@ The cluster URL will be `spark://$(hostname):7077`.
 
 7. Activate your dsgrid conda environment. You will connect to the cluster with the `pyspark`
    package in that environment.
-
-**Note**: The container includes ipython, pyspark, pandas, and pyarrow, but not dsgrid.
-That may change when we have stable versions of dsgrid software.
 
 8. Use your preferred method to connect to the cluster in dsgrid software. Your options are as
    follows:
@@ -307,7 +356,7 @@ $ export SPARK_CLUSTER=spark://$(hostname):7077
 $ dsgrid registry --offline --path=<your-registry-path> --help
 ```
 
-- Run dsgrid software in an ipython session.
+- Run dsgrid software in an IPython session.
 ```
 $ export PYSPARK_DRIVER_PYTHON=ipython
 $ pyspark --master=spark://$(hostname):7077
@@ -334,8 +383,8 @@ Connect to the Jupyter notebook in your browser.
 
 
 ## Spark Configuration Problems
-Get used to monitoring Spark jobs in the Spark UI. The master is at http://hostname:8080 and the
-worker is at http://hostname:4040. If a job seems stuck or slow, explore why.
+Get used to monitoring Spark jobs in the Spark UI. The master is at http://<hostname>:8080 and the
+worker is at http://<hostname>:4040. If a job seems stuck or slow, explore why.
 Then kill the job, make config changes, and retry. A misconfigured job will take too long or never
 finish.
 
@@ -350,7 +399,7 @@ developer offers a recommendation that has worked out better.
 
 Use this formula:
 ```
-num_partitions = max_shufffle_write_size / target_partition_size
+num_partitions = max_shuffle_write_size / target_partition_size
 ```
 You will have to run your job once to determine `max_shuffle_write_size`. You can find it on the
 Spark UI Stages tab in the Shuffle Write column. Your `target_partition_size` should be between
@@ -387,13 +436,13 @@ spark.dynamicAllocation.shuffleTracking.enabled true
 spark.shuffle.service.enabled true
 ```
 
+We have not observed any downside to having this feature enabled.
+
 ### Slow local storage
 Spark will write lots of temporary data to local storage during shuffle operations. If your joins
 cause lots of shuffling, it is very important that your local storage be fast. If you use an Eagle
 node with a slow spinning disk (130 MB/s), your job will likelly fail. Use a `bigmem` or `gpu`
 node. They have SSDs that can write data at 2 GB/s.
-
-We have not observed any downside to having this feature enabled.
 
 ### Too many executors are involved in a job
 Some of our Spark jobs, particularly those that create large, in-memory tables from dimension
@@ -419,16 +468,21 @@ Check your partition sizes with this command:
 $ find <path_to_top_level_data.parquet> -name "*.parquet" -exec ls -lh {} +
 ```
 
-If you are not partitioning by column and know the target number of partitions:
+Check the total size with this command:
+```
+$ du -sh <path_to_top_level_data.parquet>
+```
+
+Divide the total size by the target partition size to get the desired number of partitions.
 
 If there are too few partitions currently:
 ```
-df.repartition(X).write.parquet("data.parquet")
+df.repartition(target_partitions).write.parquet("data.parquet")
 ```
 
 If there are too many partitions currently:
 ```
-df.coalesce(X).write.parquet("data.parquet")
+df.coalesce(target_partitions).write.parquet("data.parquet")
 ```
 
 If you are partitioning by a column and find that there are many very small partition files,
@@ -442,11 +496,11 @@ We have not yet experienced problems with data skew, but expect to. It is covere
 sources.
 
 If your query will produce high data skew, such as can happen with a query that produces results
-from large and small counties, you can use a salting technique to balance the data. For example, 
+from large and small counties, you can use a salting technique to balance the data. For example,
 
 ```
-df.withColumn("salt_column", F.lit(F.rand() * (num_partitions - 1))) \ 
-    .groupBy("county", "salt_column") \ 
-    .agg(F.sum("county")) \ 
+df.withColumn("salt_column", F.lit(F.rand() * (num_partitions - 1))) \
+    .groupBy("county", "salt_column") \
+    .agg(F.sum("county")) \
     .drop("salt_column")
 ```

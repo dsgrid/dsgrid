@@ -211,7 +211,7 @@ python dsgrid/tests/register.py tests/data/test_efs_registration.json
 Now you can run any `dsgrid registry` command.
 
 ## Register projects and datasets under development
-When developing projects and datasets you will likely have to run the registration commands man
+When developing projects and datasets you will likely have to run the registration commands many
 times. dsgrid provides a helper script for this purpose. Refer to `dsgrid/tests/register.py` and
 the data models in `dsgrid/tests/registration_models.py`. They automate the registration process
 so that you don't have to write your own scripts. Example config files are

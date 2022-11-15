@@ -234,6 +234,11 @@ def shutdown_project():
     if spark is not None:
         spark.stop()
 
+    # There could be collisions with the Hive metastore.
+    for path in ("metastore_db", "spark-warehouse"):
+        if Path(path).exists():
+            shutil.rmtree(path)
+
 
 def run_query_test(test_query_cls, *args):
     output_dir = Path(tempfile.gettempdir()) / "queries"

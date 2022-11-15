@@ -116,7 +116,6 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._src_dir = None
-        self._records_dataframe = None
 
     @staticmethod
     @abc.abstractmethod
@@ -142,11 +141,13 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
 
     def get_records_dataframe(self):
         """Return the records in a spark dataframe. Cached on first call."""
-        if self._records_dataframe is None:
-            self._records_dataframe = models_to_dataframe(self.model.records, cache=True)
-            logger.debug("Loaded %s records dataframe", self.config_id)
-
-        return self._records_dataframe
+        # id provides uniqueness and the config_id could help inspect what's in cache in case we
+        # ever need that.
+        # Spark doesn't allow dashes in the table name.
+        table_name = f"{self.config_id}__{id(self)}".replace("-", "_")
+        df = models_to_dataframe(self.model.records, table_name=table_name)
+        logger.debug("Loaded %s records dataframe", self.config_id)
+        return df
 
     @classmethod
     def load(cls, config_file):

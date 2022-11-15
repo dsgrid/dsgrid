@@ -49,7 +49,11 @@ from dsgrid.registry.common import (
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import dump_data, load_data, run_in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.utils.spark import models_to_dataframe, get_unique_values
+from dsgrid.utils.spark import (
+    models_to_dataframe,
+    get_unique_values,
+    restart_spark_with_custom_conf,
+)
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
     VersionUpdateType,
@@ -823,11 +827,22 @@ class ProjectRegistryManager(RegistryManagerBase):
         if os.environ.get("__DSGRID_SKIP_DATASET_TO_PROJECT_MAPPING_CHECKS__") is not None:
             logger.warning("Skip dataset-to-project mapping checks")
         else:
-            self._check_dataset_base_to_project_base_mappings(
-                project_config,
-                dataset_config,
-                mapping_references,
-            )
+            # This operation can be very problematic if there are many executors and runs much
+            # faster with a single executor on a single core.
+            # The dynamic allocation settings will only take effect if the worker was started
+            # with spark.shuffle.service.enabled=true
+            conf = {
+                "spark.dynamicAllocation.enabled": True,
+                "spark.dynamicAllocation.shuffleTracking.enabled": True,
+                "spark.dynamicAllocation.maxExecutors": 1,
+                "spark.executor.cores": 1,
+            }
+            with restart_spark_with_custom_conf(conf):
+                self._check_dataset_base_to_project_base_mappings(
+                    project_config,
+                    dataset_config,
+                    mapping_references,
+                )
 
         dataset_model = project_config.get_dataset(dataset_config.model.dataset_id)
         dataset_model.mapping_references = mapping_references

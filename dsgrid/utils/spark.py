@@ -16,6 +16,7 @@ from pyspark.sql.types import StructType, StringType
 from pyspark import SparkConf
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
+from dsgrid.loggers import disable_console_logging
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 
@@ -28,30 +29,67 @@ logger = logging.getLogger(__name__)
 DSGRID_DB_NAME = "default"
 
 
-def init_spark(name="dsgrid", log_conf=False, check_env=True):
+def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     """Initialize a SparkSession.
 
     Parameters
     ----------
     name : str
-    log_conf : bool
-        If True, log the Spark configuration
     check_env : bool
         If True, which is default, check for the SPARK_CLUSTER environment variable and attach to
         it. Otherwise, create a local-mode cluster or attach to the SparkSession that was created
         by pyspark/spark-submit prior to starting the current process.
+    spark_conf : dict | None, defaults to None
+        If set, Spark configuration parameters
 
     """
     cluster = os.environ.get("SPARK_CLUSTER")
+    conf = SparkConf().setAppName(name)
+    if spark_conf is not None:
+        for name, val in spark_conf.items():
+            conf.set(name, val)
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
-        conf = SparkConf().setAppName(name).setMaster(cluster)
-        spark = SparkSession.builder.config(conf=conf).enableHiveSupport().getOrCreate()
-    else:
-        spark = SparkSession.builder.appName(name).enableHiveSupport().getOrCreate()
+        conf.setMaster(cluster)
+    spark = SparkSession.builder.config(conf=conf).enableHiveSupport().getOrCreate()
 
-    if log_conf:
+    with disable_console_logging():
         log_spark_conf(spark)
+        logger.info("Custom configuration settings: %s", spark_conf)
+
+    return spark
+
+
+def restart_spark(*args, force=False, **kwargs):
+    """Restart a SparkSession with new config parameters. Refer to init_spark for parameters.
+
+    Parameters
+    ----------
+    force : bool
+        If True, restart the session even if the config parameters haven't changed.
+        You might want to do this in order to clear cached tables.
+
+    Returns
+    -------
+    pyspark.sql.SparkSession
+
+    """
+    spark = SparkSession.getActiveSession()
+    needs_restart = force
+    if not force:
+        conf = kwargs.get("spark_conf", {})
+        for name, val in conf.items():
+            current = spark.conf.get(name, None)
+            if current is not None and current != val:
+                needs_restart = True
+                break
+
+    if needs_restart:
+        spark.stop()
+        logger.info("Stopped the SparkSession so that it can be restarted with a new config.")
+        spark = init_spark(*args, **kwargs)
+    else:
+        logger.info("No restart of Spark is needed.")
 
     return spark
 
@@ -64,15 +102,15 @@ def log_spark_conf(spark: SparkSession):
 
 
 @track_timing(timer_stats_collector)
-def create_dataframe(records, cache=False, require_unique=None):
+def create_dataframe(records, table_name=None, require_unique=None):
     """Create a spark DataFrame from a list of records.
 
     Parameters
     ----------
     records : list
         list of spark.sql.Row
-    cache : bool
-        If True, cache the DataFrame in memory.
+    table_name : str | None
+        If set, cache the DataFrame in memory with this name. Must be unique.
     require_unique : list
         list of column names (str) to check for uniqueness
 
@@ -82,7 +120,7 @@ def create_dataframe(records, cache=False, require_unique=None):
 
     """
     df = get_spark_session().createDataFrame(records)
-    _post_process_dataframe(df, cache=cache, require_unique=require_unique)
+    _post_process_dataframe(df, table_name=table_name, require_unique=require_unique)
     return df
 
 
@@ -92,7 +130,7 @@ def create_dataframe_from_pandas(df):
 
 
 @track_timing(timer_stats_collector)
-def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=True):
+def read_dataframe(filename, table_name=None, require_unique=None, read_with_spark=True):
     """Create a spark DataFrame from a file.
 
     Supported formats when read_with_spark=True: .csv, .json, .parquet
@@ -108,8 +146,8 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
     ----------
     filename : str | Path
         path to file
-    cache : bool
-        If True, cache the DataFrame in memory.
+    table_name : str | None
+        If set, cache the DataFrame in memory. Must be unique.
     require_unique : list
         list of column names (str) to check for uniqueness
     read_with_spark : bool
@@ -128,7 +166,7 @@ def read_dataframe(filename, cache=False, require_unique=None, read_with_spark=T
     """
     func = _read_with_spark if read_with_spark else _read_natively
     df = func(str(filename))
-    _post_process_dataframe(df, cache=cache, require_unique=require_unique)
+    _post_process_dataframe(df, table_name=table_name, require_unique=require_unique)
     return df
 
 
@@ -164,10 +202,10 @@ def _read_natively(filename):
     return get_spark_session().createDataFrame(obj)
 
 
-def _post_process_dataframe(df, cache=False, require_unique=None):
-    # TODO This is causing Spark warning messages. Disable until we know why.
-    # if cache:
-    #     df = df.cache()
+def _post_process_dataframe(df, table_name=None, require_unique=None):
+    if table_name is not None:
+        df.createOrReplaceTempView(table_name)
+        df.cache()
 
     if require_unique is not None:
         with Timer(timer_stats_collector, "check_unique"):
@@ -200,19 +238,28 @@ def get_unique_values(df, columns: Union[AnyStr, List]):
 
 
 @track_timing(timer_stats_collector)
-def models_to_dataframe(models, cache=False):
+def models_to_dataframe(models, table_name=None):
     """Converts a list of Pydantic models to a Spark DataFrame.
 
     Parameters
     ----------
     models : list
-    cache : If True, cache the DataFrame.
+    table_name : str | None
+        If set, a unique ID to use as the cached table name. Return from cache if already stored.
 
     Returns
     -------
     pyspark.sql.DataFrame
 
     """
+    spark = get_spark_session()
+    if (
+        table_name is not None
+        and spark.catalog.tableExists(table_name)
+        and spark.catalog.isCached(table_name)
+    ):
+        return spark.table(table_name)
+
     assert models
     cls = type(models[0])
     rows = []
@@ -225,10 +272,12 @@ def models_to_dataframe(models, cache=False):
             dct[f] = val
         rows.append(Row(**dct))
 
-    df = get_spark_session().createDataFrame(rows)
+    df = spark.createDataFrame(rows)
 
-    if cache:
+    if table_name is not None:
+        df.createOrReplaceTempView(table_name)
         df.cache()
+
     return df
 
 
@@ -470,7 +519,8 @@ def create_dataframe_from_product(data: dict):
     return df
 
 
-def get_spark_session():
+def get_spark_session() -> SparkSession:
+    """Return the active SparkSession or create a new one is none is active."""
     spark = SparkSession.getActiveSession()
     if spark is None:
         logger.warning("Could not find a SparkSession. Create a new one.")
@@ -496,11 +546,36 @@ def custom_spark_conf(conf):
         for key, val in conf.items():
             orig_settings[key] = spark.conf.get(key)
             spark.conf.set(key, val)
-            logger.info("Set %s=%s while running", key, val)
+            logger.info("Set %s=%s temporarily", key, val)
         yield
     finally:
         for key, val in orig_settings.items():
             spark.conf.set(key, val)
+
+
+@contextmanager
+def restart_spark_with_custom_conf(conf: dict):
+    """Restart the SparkSession with a custom configuration for the duration of a code block.
+
+    Parameters
+    ----------
+    conf : dict
+        Key-value pairs to set on the spark configuration.
+
+    """
+    spark = get_spark_session()
+    app_name = spark.conf.get("spark.app.name")
+    orig_settings = {}
+
+    try:
+        for name in conf:
+            current = spark.conf.get(name, None)
+            if current is not None:
+                orig_settings[name] = current
+        restart_spark(name=app_name, spark_conf=conf)
+        yield
+    finally:
+        restart_spark(name=app_name, spark_conf=orig_settings)
 
 
 def load_stored_table(table_name):

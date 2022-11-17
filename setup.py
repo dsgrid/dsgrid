@@ -91,7 +91,6 @@ setup(
         "s3path",
         "semver",
         "sqlalchemy",
-        "toml",  # TODO: @DTHOM do we keep this?
         "uvicorn",
         "tzdata",  # time zone stuff
     ],

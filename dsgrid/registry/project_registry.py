@@ -48,7 +48,7 @@ class ProjectRegistry(RegistryBase):
 
     @staticmethod
     def config_filename():
-        return "project.toml"
+        return "project.json5"
 
     @property
     def config_id(self):

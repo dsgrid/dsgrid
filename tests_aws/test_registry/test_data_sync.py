@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-import toml
+import json5
 
 from dsgrid.cloud.s3_storage_interface import S3StorageInterface
 from dsgrid.exceptions import DSGValueNotRegistered
@@ -31,36 +31,36 @@ def local_registry(make_test_project_dir):
         shutil.copytree(
             base_dir / "data" / "test_efs_comstock", base_dir / "data" / "test_efs_resstock"
         )
-        registry_toml = toml.load(base_dir / "data" / "test_efs_resstock" / "registry.toml")
-        registry_toml["dataset_id"] = "test_efs_resstock"
-        with open(base_dir / "data" / "test_efs_resstock" / "registry.toml", "w") as f:
-            toml.dump(registry_toml, f)
+        registry_json5 = json5.load(base_dir / "data" / "test_efs_resstock" / "registry.json5")
+        registry_json5["dataset_id"] = "test_efs_resstock"
+        with open(base_dir / "data" / "test_efs_resstock" / "registry.json5", "w") as f:
+            json5.dump(registry_json5, f)
 
         # create resstock dataset config
         shutil.copytree(
             base_dir / "configs" / "datasets" / "test_efs_comstock",
             base_dir / "configs" / "datasets" / "test_efs_resstock",
         )
-        registry_toml = toml.load(
-            base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.toml"
+        registry_json5 = json5.load(
+            base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.json5"
         )
-        registry_toml["dataset_id"] = "test_efs_resstock"
+        registry_json5["dataset_id"] = "test_efs_resstock"
         with open(
-            base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.toml", "w"
+            base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.json5", "w"
         ) as f:
-            toml.dump(registry_toml, f)
+            json5.dump(registry_json5, f)
 
         # add ressotck dataset to the project config
-        registry_toml = toml.load(
-            base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.toml"
+        registry_json5 = json5.load(
+            base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.json5"
         )
-        x = registry_toml["datasets"][0].copy()
+        x = registry_json5["datasets"][0].copy()
         x["dataset_id"] = "test_efs_resstock"
-        registry_toml["datasets"] = [registry_toml["datasets"][0], x]
+        registry_json5["datasets"] = [registry_json5["datasets"][0], x]
         with open(
-            base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.toml", "w"
+            base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.json5", "w"
         ) as f:
-            toml.dump(registry_toml, f)
+            json5.dump(registry_json5, f)
 
         yield base_dir
 

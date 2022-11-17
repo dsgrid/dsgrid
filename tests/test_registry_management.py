@@ -63,19 +63,19 @@ def test_register_project_and_dataset(make_test_project_dir):
         assert dataset.status == DatasetRegistryStatus.UNREGISTERED
 
         with pytest.raises(DSGDuplicateValueRegistered):
-            project_config_file = make_test_project_dir / "project.toml"
+            project_config_file = make_test_project_dir / "project.json5"
             project_mgr.register(project_config_file, user, log_message)
 
         with pytest.raises(DSGDuplicateValueRegistered):
             dataset_config_file = (
-                make_test_project_dir / "datasets" / "modeled" / "comstock" / "dataset.toml"
+                make_test_project_dir / "datasets" / "modeled" / "comstock" / "dataset.json5"
             )
             dataset_mgr.register(dataset_config_file, dataset_path, user, log_message)
 
         # Duplicate mappings get re-used.
         mapping_ids = dimension_mapping_mgr.list_ids()
         dimension_mapping_mgr.dump(dimension_mapping_id, base_dir)
-        dimension_mapping_config = base_dir / "dimension_mapping.toml"
+        dimension_mapping_config = base_dir / "dimension_mapping.json5"
         data = load_data(dimension_mapping_config)
         dump_data({"mappings": [data]}, dimension_mapping_config)
         dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
@@ -100,13 +100,13 @@ def test_duplicate_dimensions(make_test_project_dir):
         manager = RegistryManager.load(path, offline_mode=True)
 
         dimension_mgr = manager.dimension_manager
-        dimension_mgr.register(make_test_project_dir / "dimensions.toml", user, log_message)
+        dimension_mgr.register(make_test_project_dir / "dimensions.json5", user, log_message)
 
         # Registering duplicate dimensions and mappings are allowed.
         # If names are the same, they are replaced. Otherwise, new ones get registered.
         # Time dimension has more fields checked.
         dimension_ids = dimension_mgr.list_ids()
-        dim_config_file = make_test_project_dir / "dimensions.toml"
+        dim_config_file = make_test_project_dir / "dimensions.json5"
 
         dimension_mgr.register(dim_config_file, user, log_message)
         assert len(dimension_mgr.list_ids()) == len(dimension_ids)
@@ -136,7 +136,7 @@ def test_duplicate_project_dimension_display_names(make_test_project_dir):
         log_message = "Initial registration"
         manager = RegistryManager.load(path, offline_mode=True)
 
-        project_file = make_test_project_dir / "project.toml"
+        project_file = make_test_project_dir / "project.json5"
         data = load_data(project_file)
         for dim in data["dimensions"]["supplemental_dimensions"]:
             if dim["display_name"] == "State":
@@ -153,7 +153,7 @@ def test_register_duplicate_project_rollback_dimensions(make_test_project_dir):
         manager = make_test_data_registry(
             base_dir, src_dir, include_projects=False, include_datasets=False
         )
-        project_file = src_dir / "project.toml"
+        project_file = src_dir / "project.json5"
         orig_dimension_ids = manager.dimension_manager.list_ids()
 
         data = load_data(project_file)
@@ -179,12 +179,12 @@ def test_register_and_submit_rollback_on_failure(make_test_project_dir):
         base_dir = Path(tmpdir)
         path = create_local_test_registry(base_dir)
         manager = RegistryManager.load(path, offline_mode=True)
-        project_file = src_dir / "project.toml"
+        project_file = src_dir / "project.json5"
         project_id = load_data(project_file)["project_id"]
         dataset_dir = src_dir / "datasets" / "modeled" / "comstock"
-        dataset_config_file = dataset_dir / "dataset.toml"
+        dataset_config_file = dataset_dir / "dataset.json5"
         dataset_id = load_data(dataset_config_file)["dataset_id"]
-        dataset_mapping_file = dataset_dir / "dimension_mappings.toml"
+        dataset_mapping_file = dataset_dir / "dimension_mappings.json5"
         dataset_path = (
             Path(os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY))
             / "test_efs_comstock"
@@ -312,9 +312,9 @@ def test_invalid_dimension_mapping(make_test_project_dir):
         manager = RegistryManager.load(path, offline_mode=True)
 
         dim_mgr = manager.dimension_manager
-        dim_mgr.register(make_test_project_dir / "dimensions.toml", user, log_message)
+        dim_mgr.register(make_test_project_dir / "dimensions.json5", user, log_message)
         dim_mapping_mgr = manager.dimension_mapping_manager
-        dimension_mapping_file = make_test_project_dir / "dimension_mappings_with_ids.toml"
+        dimension_mapping_file = make_test_project_dir / "dimension_mappings_with_ids.json5"
         replace_dimension_uuids_from_registry(path, [dimension_mapping_file])
 
         record_file = (
@@ -361,16 +361,16 @@ def test_register_submit_dataset_long_workflow(make_test_project_dir):
             base_dir, src_dir, include_projects=False, include_datasets=False
         )
         dim_mapping_mgr = manager.dimension_mapping_manager
-        project_config_file = src_dir / "project_with_dimension_ids.toml"
+        project_config_file = src_dir / "project_with_dimension_ids.json5"
         project_id = load_data(project_config_file)["project_id"]
-        project_dimension_mapping_config = src_dir / "dimension_mappings_with_ids.toml"
-        project_dimension_file = src_dir / "dimensions.toml"
+        project_dimension_mapping_config = src_dir / "dimension_mappings_with_ids.json5"
+        project_dimension_file = src_dir / "dimensions.json5"
         dataset_dir = src_dir / "datasets" / "modeled" / "comstock"
-        dataset_config_file = dataset_dir / "dataset_with_dimension_ids.toml"
+        dataset_config_file = dataset_dir / "dataset_with_dimension_ids.json5"
         dataset_id = load_data(dataset_config_file)["dataset_id"]
-        dataset_dimension_file = dataset_dir / "dimensions.toml"
-        dimension_mapping_config = dataset_dir / "dimension_mapping_config_with_ids.toml"
-        dimension_mapping_refs = dataset_dir / "dimension_mapping_references.toml"
+        dataset_dimension_file = dataset_dir / "dimensions.json5"
+        dimension_mapping_config = dataset_dir / "dimension_mapping_config_with_ids.json5"
+        dimension_mapping_refs = dataset_dir / "dimension_mapping_references.json5"
         user = getpass.getuser()
         log_message = "register"
 

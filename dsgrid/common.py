@@ -16,9 +16,9 @@ else:
     LOCAL_REGISTRY = Path.home() / ".dsgrid-registry"
 
 LOCAL_REGISTRY_DATA = LOCAL_REGISTRY / "data"
-PROJECT_FILENAME = "project.toml"
-REGISTRY_FILENAME = "registry.toml"
-DATASET_FILENAME = "dataset.toml"
-DIMENSIONS_FILENAME = "dimensions.toml"
+PROJECT_FILENAME = "project.json5"
+REGISTRY_FILENAME = "registry.json5"
+DATASET_FILENAME = "dataset.json5"
+DIMENSIONS_FILENAME = "dimensions.json5"
 
 SYNC_EXCLUDE_LIST = ["*.DS_Store", "**/*.lock"]

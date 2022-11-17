@@ -1,4 +1,4 @@
-"""Example script to programmatically generate dimenions.toml
+"""Example script to programmatically generate dimenions.json5
 """
 import os
 
@@ -26,4 +26,4 @@ dimX = DimensionModel(
 dimensions.append(dimX)
 config = DimensionsConfigModel(dimensions=[dimX])
 x = serialize_user_model(config)
-dump_data(x, "examples_dimensions.toml")
+dump_data(x, "examples_dimensions.json5")

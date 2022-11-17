@@ -29,7 +29,7 @@ def test_invalid_projects(make_test_project_dir):
             test_dir = base_dir / f"test_data_dir_{i}"
             try:
                 shutil.copytree(make_test_project_dir, test_dir)
-                project_config_file = test_dir / "project.toml"
+                project_config_file = test_dir / "project.json5"
                 exc, match_msg = setup_test(test_dir)
                 with pytest.raises(exc, match=match_msg):
                     manager.project_manager.register(project_config_file, user, log_message)

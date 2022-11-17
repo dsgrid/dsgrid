@@ -428,7 +428,7 @@ class ProjectConfig(ConfigBase):
 
     @staticmethod
     def config_filename():
-        return "project.toml"
+        return "project.json5"
 
     @property
     def src_dir(self):

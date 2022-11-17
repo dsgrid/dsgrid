@@ -8,7 +8,7 @@ A dataset config is required for each input dataset. The config must contain the
 
 .. include:: ../../_build/config_rsts/DatasetConfigModel.rst
 
-Example dataset.toml
+Example dataset.json5
 ====================
-.. literalinclude:: ../../_build/example_configs/dataset.toml
-   :language: toml
+.. literalinclude:: ../../_build/example_configs/dataset.json5
+   :language: json

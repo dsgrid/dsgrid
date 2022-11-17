@@ -29,18 +29,18 @@ def check_config_dimensions(s3, F, msg):
             except Exception:
                 raise DSGInvalidRegistryState(msg.format(file=get_joined_file(parts, 3)))
         if level == 4:
-            # L4: /configs/dimensions/{dimension_type}/{dimension_id}__{uuid}/registry.toml | ...{version}
-            # check that registry.toml and 1.0.0 intial version dir exists
-            dimension_registry_toml = get_joined_file(parts, 3) + "/registry.toml"
+            # L4: /configs/dimensions/{dimension_type}/{dimension_id}__{uuid}/registry.json5 | ...{version}
+            # check that registry.json5 and 1.0.0 intial version dir exists
+            dimension_registry_json5 = get_joined_file(parts, 3) + "/registry.json5"
             version_1_folder = get_joined_file(parts, 3) + "/1.0.0"
-            for file in (dimension_registry_toml, version_1_folder):
+            for file in (dimension_registry_json5, version_1_folder):
                 if not s3._s3_filesystem.path(file).exists():
                     raise DSGInvalidRegistryState(msg.format(file=file))
             # make sure all versions are semver
             files = [
                 str(x)
                 for x in s3._s3_filesystem.listdir(get_joined_file(parts, 3))
-                if x != "registry.toml"
+                if x != "registry.json5"
             ]
             for x in files:
                 from dsgrid.utils.versioning import handle_version_or_str
@@ -50,17 +50,19 @@ def check_config_dimensions(s3, F, msg):
                 except Exception:
                     raise DSGInvalidRegistryState(msg.format(get_joined_file(parts, 3) / x))
         if level == 5:
-            # L5: /configs/dimensions/{dimension_type}/{dimension_id}__{uuid}/{version}/dimension.toml | ...{dimension}.csv (or json)
-            # confirm that dimension.toml exists
-            dimension_toml = s3._s3_filesystem.path(get_joined_file(parts, 4) + "/dimension.toml")
-            if not dimension_toml.exists():
-                raise DSGInvalidRegistryState(msg.format(file=dimension_toml))
+            # L5: /configs/dimensions/{dimension_type}/{dimension_id}__{uuid}/{version}/dimension.json5 | ...{dimension}.csv (or json)
+            # confirm that dimension.json5 exists
+            dimension_json5 = s3._s3_filesystem.path(
+                get_joined_file(parts, 4) + "/dimension.json5"
+            )
+            if not dimension_json5.exists():
+                raise DSGInvalidRegistryState(msg.format(file=dimension_json5))
             # confirm that one dimension record is provided (unless dimension type == time)
             if parts[2] != "time":
                 files = [
                     x
                     for x in s3._s3_filesystem.listdir(directory=get_joined_file(parts, 4))
-                    if x != "dimension.toml"
+                    if x != "dimension.json5"
                 ]
                 if len(files) != 1:
                     raise DSGInvalidRegistryState(msg.format(file=get_joined_file(parts, 4)))
@@ -106,15 +108,15 @@ def test_registry_path_expectations():
                     if level_1 == "projects":
                         pass
                         # L2: {project_id}
-                        # L3: {project_id}/registry.toml | {project_id}/{version}
-                        # L4: {project_id}/{version}/project.toml
+                        # L3: {project_id}/registry.json5 | {project_id}/{version}
+                        # L4: {project_id}/{version}/project.json5
                     if level_1 == "datasets":
                         pass
                         # L2: {dataset_id}
-                        # L3: {dataset_id}/registry.toml | {dataset_id}/{version}
-                        # L4: {dataset_id}/{version}/dataset.toml
+                        # L3: {dataset_id}/registry.json5 | {dataset_id}/{version}
+                        # L4: {dataset_id}/{version}/dataset.json5
                     if level_1 == "dimension-mappings":
                         pass
                         # L2: {dimension_mapping_id}__{uuid}
-                        # L3: {dimension_mapping_id}__{uuid}/registry.toml | {dimension_mapping_id}__{uuid}/{version}
-                        # L4: {dimension_mapping_id}__{uuid}/{version}/dimension_mapping.toml | {dimension_mapping_id}__{uuid}/{version}/{dimension_mapping}.csv (or json)
+                        # L3: {dimension_mapping_id}__{uuid}/registry.json5 | {dimension_mapping_id}__{uuid}/{version}
+                        # L4: {dimension_mapping_id}__{uuid}/{version}/dimension_mapping.json5 | {dimension_mapping_id}__{uuid}/{version}/{dimension_mapping}.csv (or json)

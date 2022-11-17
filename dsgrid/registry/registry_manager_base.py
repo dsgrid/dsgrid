@@ -429,7 +429,7 @@ class RegistryManagerBase(abc.ABC):
         """
 
     def get_registry_directory(self, config_id):
-        """Return the directory containing config info for config_id (registry.toml and versions).
+        """Return the directory containing config info for config_id (registry.json5 and versions).
 
         Parameters
         ----------

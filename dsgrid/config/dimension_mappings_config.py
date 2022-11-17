@@ -32,7 +32,7 @@ class DimensionMappingsConfig(ConfigBase):
 
     @staticmethod
     def config_filename():
-        return "dimension_mappings.toml"
+        return "dimension_mappings.json5"
 
     @property
     def config_id(self):

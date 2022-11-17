@@ -21,14 +21,14 @@ Dataset Registration
 ====================
 
 Dataset registration is required before it can be ingested into
-``dsgrid``. Registration is facilitated by .toml file(s) as shown below.
+``dsgrid``. Registration is facilitated by .json5 file(s) as shown below.
 Registration entries are stored on S3.
 
-- ``dataset.toml``:
+- ``dataset.json5``:
 
    - Configuration file that holds all other metadata details
 
-- ``project.toml``:
+- ``project.json5``:
 
    - Defines project requirements and any mapping required to map
      datasets to Base Dimensions.
@@ -36,10 +36,10 @@ Registration entries are stored on S3.
      ``association table``, or
      ``association table with a scaling factor``
    - If ``no mapping``, Base Dimensions must match dataset dimensions.
-   - Submit ``association table`` as an input .toml file for
+   - Submit ``association table`` as an input .json5 file for
       ``dataset-submit``.
 
-- ``dimension_mapping.toml``:
+- ``dimension_mapping.json5``:
 
    - Defines ``association table`` to map dataset to Base Dimensions.
 
@@ -53,7 +53,7 @@ Data Tables
 
 - ``load_data``: Contains load time series by the columns of one dimension.
 
-  - The column dimension must be specified in the ``dataset.toml``. The example below uses the
+  - The column dimension must be specified in the ``dataset.json5``. The example below uses the
     ``metric`` dimension.
   - The ``id`` column represents one unique time array.
 
@@ -94,7 +94,7 @@ Data Tables
 
 - ``Trivial dimensions``: 1-element dimensions that are not present in the data files. Dsgrid
   dynamically adds them to ``load_data_lookup`` as an alias column. These dimensions must be
-  defined in the ``dataset.toml``.
+  defined in the ``dataset.json5``.
 
 - ``dataset_dimension_mapping`` (optional): defines the conversion mapping from base data file
   dimensions to dataset dimensions (e.g., ComStock locational multipliers)

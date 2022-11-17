@@ -69,7 +69,7 @@ class DimensionsConfig(ConfigBase):
 
     @staticmethod
     def config_filename():
-        return "dimensions.toml"
+        return "dimensions.json5"
 
     @property
     def config_id(self):

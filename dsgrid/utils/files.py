@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 
 import toml
+import json5
 
 
 logger = logging.getLogger(__name__)
@@ -55,7 +56,7 @@ def dump_data(data, filename, **kwargs):
 
 def load_data(filename, **kwargs):
     """Load data from the file.
-    Supports JSON, TOML, or custom via kwargs.
+    Supports JSON, JSON5, TOML, or custom via kwargs.
 
     Parameters
     ----------
@@ -146,6 +147,8 @@ def _get_module_from_extension(filename, **kwargs):
     ext = os.path.splitext(filename)[1].lower()
     if ext == ".json":
         mod = json
+    elif ext == ".json5":
+        mod = json5
     elif ext == ".toml":
         mod = toml
     elif "mod" in kwargs:

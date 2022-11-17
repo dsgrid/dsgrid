@@ -290,8 +290,8 @@ class DimensionMappingDatasetToProjectBaseModel(DimensionMappingPreRegisteredBas
 class DimensionMappingReferenceModel(DSGBaseModel):
     """Reference to a dimension mapping stored in the registry.
 
-    The DimensionMappingReferenceModel is utilized by the project configuration (project.toml) as well as by the
-    dimension mapping reference configuration (dimension_mapping_references.toml) that may be required when submitting a dataset to a project.
+    The DimensionMappingReferenceModel is utilized by the project configuration (project.json5) as well as by the
+    dimension mapping reference configuration (dimension_mapping_references.json5) that may be required when submitting a dataset to a project.
     """
 
     from_dimension_type: DimensionType = Field(
@@ -332,7 +332,7 @@ class DimensionMappingReferenceModel(DSGBaseModel):
 
 
 class DimensionMappingReferenceListModel(DSGBaseModel):
-    """List of dimension mapping references used by the dimensions_mappings.toml config"""
+    """List of dimension mapping references used by the dimensions_mappings.json5 config"""
 
     references: List[DimensionMappingReferenceModel] = Field(
         title="references",

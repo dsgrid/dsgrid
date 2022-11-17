@@ -250,9 +250,9 @@ avoid having to re-enter them every time.
 app = RegistrationGui(
     defaults={
        "local_registry": "/my-local-registry",
-        "project_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/project.toml",
-        "dataset_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dataset.toml",
-        "dimension_mapping_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dimension_mappings.toml",
+        "project_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/project.json5",
+        "dataset_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dataset.json5",
+        "dimension_mapping_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dimension_mappings.json5",
         "dataset_path": "/dsgrid-data/data-StandardScenarios/conus_2022_reference_comstock",
         "log_message": "log message",
     }

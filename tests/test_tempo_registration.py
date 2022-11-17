@@ -57,12 +57,12 @@ def make_registry_for_tempo(registry_path, src_dir, dataset_path=None) -> Regist
     log_message = "Initial registration"
     manager = RegistryManager.load(path, offline_mode=True)
     dim_mgr = manager.dimension_manager
-    dim_mgr.register_from_config(src_dir / src_dir / "dimensions.toml", user, log_message)
-    dim_mgr.register_from_config(src_dir / dataset_dir / "dimensions.toml", user, log_message)
+    dim_mgr.register_from_config(src_dir / src_dir / "dimensions.json5", user, log_message)
+    dim_mgr.register_from_config(src_dir / dataset_dir / "dimensions.json5", user, log_message)
 
-    project_config_file = src_dir / "project.toml"
+    project_config_file = src_dir / "project.json5"
     project_id = load_data(project_config_file)["project_id"]
-    dataset_config_file = src_dir / dataset_dir / "dataset.toml"
+    dataset_config_file = src_dir / dataset_dir / "dataset.json5"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
     replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
     replace_dimension_uuids_from_registry(path, (dataset_config_file,))

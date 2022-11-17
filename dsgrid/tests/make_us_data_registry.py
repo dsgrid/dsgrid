@@ -65,10 +65,10 @@ def make_test_data_registry(
             path, remote_path=TEST_REMOTE_REGISTRY, offline_mode=offline_mode
         )
 
-    project_config_file = src_dir / "project.toml"
+    project_config_file = src_dir / "project.json5"
     project_id = load_data(project_config_file)["project_id"]
-    dataset_config_file = src_dir / dataset_dir / "dataset.toml"
-    dataset_mapping_file = src_dir / dataset_dir / "dimension_mappings.toml"
+    dataset_config_file = src_dir / dataset_dir / "dataset.json5"
+    dataset_mapping_file = src_dir / dataset_dir / "dimension_mappings.json5"
     if not dataset_mapping_file.exists():
         dataset_mapping_file = None
     dataset_id = load_data(dataset_config_file)["dataset_id"]

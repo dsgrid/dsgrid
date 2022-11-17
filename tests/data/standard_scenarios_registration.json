@@ -4,14 +4,14 @@
   "projects": [
     {
       "project_id": "dsgrid_conus_2022",
-      "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/project.toml",
+      "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/project.json5",
       "register_project": true,
       "datasets": [
         {
           "dataset_id": "conus_2022_reference_comstock",
           "dataset_path": "../dsgrid-data/conus_2022_reference_comstock",
-          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dataset.toml",
-          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dimension_mappings.toml",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dataset.json5",
+          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
           "fix_dimension_uuids": false,
@@ -20,8 +20,8 @@
         {
           "dataset_id": "conus_2022_reference_resstock",
           "dataset_path": "../dsgrid-data/conus_2022_reference_resstock",
-          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/resstock/dataset.toml",
-          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/resstock/dimension_mappings.toml",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/resstock/dataset.json5",
+          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/resstock/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
           "fix_dimension_uuids": false,
@@ -30,8 +30,8 @@
         {
           "dataset_id": "tempo_conus_2022",
           "dataset_path": "../dsgrid-data/tempo_conus_2022",
-          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/tempo/dataset.toml",
-          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/tempo/dimension_mappings.toml",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/tempo/dataset.json5",
+          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/tempo/dimension_mappings.json5",
           "register_dataset": false,
           "submit_to_project": false,
           "fix_dimension_uuids": false,
@@ -40,8 +40,8 @@
         {
           "dataset_id": "aeo2021_ref_res_end_use_growth_factors",
           "dataset_path": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/data",
-          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dataset.toml",
-          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dimension_mappings.toml",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dataset.json5",
+          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
           "fix_dimension_uuids": true,
@@ -51,8 +51,8 @@
         {
           "dataset_id": "aeo2021_ref_com_energy_end_use_growth_factors",
           "dataset_path": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/data",
-          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/dataset.toml",
-          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/dimension_mappings.toml",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/dataset.json5",
+          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
           "fix_dimension_uuids": false,

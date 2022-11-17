@@ -65,7 +65,7 @@ def read_dimension_mapping_uuid_mapping(registry_dir):
 
 def replace_dimension_mapping_uuids(filename, uuids):
     regex = re.compile(
-        r"mapping_id = \"(?P<from_dimension>[-\w]+)__(?P<to_dimension>[-\w]+)__(?P<uuid>[-0-9a-f]+)\""
+        r"mapping_id: \"(?P<from_dimension>[-\w]+)__(?P<to_dimension>[-\w]+)__(?P<uuid>[-0-9a-f]+)\""
     )
     with fileinput.input(files=[filename], inplace=True) as f:
         for line in f:
@@ -108,7 +108,7 @@ def read_dimension_uuid_mapping(registry_dir):
 
 
 def replace_dimension_uuids(filename, uuids):
-    regex = re.compile(r"^dimension_id = \"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)\"")
+    regex = re.compile(r"dimension_id: \"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)\"")
     with fileinput.input(files=[filename], inplace=True) as f:
         for line in f:
             if line.strip().startswith("#"):
@@ -119,7 +119,7 @@ def replace_dimension_uuids(filename, uuids):
             else:
                 dimension_type = match.groupdict()["dimension_type"]
                 new_uuid = uuids[dimension_type]
-                print(f'dimension_id = "{dimension_type}__{new_uuid}"')
+                print(f'      dimension_id: "{dimension_type}__{new_uuid}",')
 
 
 def check_configs_update(base_dir, manager):

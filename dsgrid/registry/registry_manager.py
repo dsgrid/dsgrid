@@ -56,7 +56,7 @@ class RegistryManager:
     def __init__(self, params: RegistryManagerParams):
         self._check_environment_variables(params)
         if SparkSession.getActiveSession() is None:
-            init_spark("registry")
+            init_spark("dsgrid")
         self._params = params
         self._dimension_mgr = DimensionRegistryManager.load(
             params.base_path / DimensionRegistry.registry_path(), params

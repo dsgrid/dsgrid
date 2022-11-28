@@ -46,7 +46,7 @@ class DimensionMappingArchetype(DSGEnum):
         - whether sum of from_fraction should be = 1 when group by to_id
     """
 
-    ONE_TO_ONE_MAP_FRACTION_SUM_EQ1_FROM_ID = EnumValue(
+    ONE_TO_ONE_MAP_FRACTION_SUM_FROM_ID_EQ1 = EnumValue(
         value="one_to_one_map_fraction_sum_from_id_eq1",
         description="One-to-one dimension mapping with sum of from_fraction = 1 when grouped by from_id",
         allow_dup_from_records=False,
@@ -54,7 +54,7 @@ class DimensionMappingArchetype(DSGEnum):
         check_fraction_sum_eq1_from_id=True,
         check_fraction_sum_eq1_to_id=False,
     )
-    ONE_TO_MANY_MAP_FRACTION_SUM_EQ1_FROM_ID = EnumValue(
+    ONE_TO_MANY_MAP_FRACTION_SUM_FROM_ID_EQ1 = EnumValue(
         value="one_to_many_map_fraction_sum_from_id_eq1",
         description="One-to-many dimension mapping with sum of from_fraction = 1 when grouped by from_id",
         allow_dup_from_records=True,
@@ -62,7 +62,7 @@ class DimensionMappingArchetype(DSGEnum):
         check_fraction_sum_eq1_from_id=True,
         check_fraction_sum_eq1_to_id=False,
     )
-    MANY_TO_ONE_MAP_FRACTION_SUM_EQ1_FROM_ID = EnumValue(
+    MANY_TO_ONE_MAP_FRACTION_SUM_FROM_ID_EQ1 = EnumValue(
         value="many_to_one_map_fraction_sum_from_id_eq1",
         description="Many-to-one dimension mapping with sum of from_fraction = 1 when grouped by from_id",
         allow_dup_from_records=False,
@@ -70,7 +70,7 @@ class DimensionMappingArchetype(DSGEnum):
         check_fraction_sum_eq1_from_id=True,
         check_fraction_sum_eq1_to_id=False,
     )
-    MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_FROM_ID = EnumValue(
+    MANY_TO_MANY_MAP_FRACTION_SUM_FROM_ID_EQ1 = EnumValue(
         value="many_to_many_map_fraction_sum_from_id_eq1",
         description="Many-to-many dimension mapping with sum of from_fraction = 1 when grouped by from_id",
         allow_dup_from_records=True,
@@ -79,7 +79,7 @@ class DimensionMappingArchetype(DSGEnum):
         check_fraction_sum_eq1_to_id=False,
     )
 
-    ONE_TO_ONE_MAP_FRACTION_SUM_EQ1_TO_ID = EnumValue(
+    ONE_TO_ONE_MAP_FRACTION_SUM_TO_ID_EQ1 = EnumValue(
         value="one_to_one_map_fraction_sum_to_id_eq1",
         description="One-to-one dimension mapping with sum of from_fraction = 1 when grouped by to_id",
         allow_dup_from_records=False,
@@ -87,7 +87,7 @@ class DimensionMappingArchetype(DSGEnum):
         check_fraction_sum_eq1_from_id=False,
         check_fraction_sum_eq1_to_id=True,
     )
-    ONE_TO_MANY_MAP_FRACTION_SUM_EQ1_TO_ID = EnumValue(
+    ONE_TO_MANY_MAP_FRACTION_SUM_TO_ID_EQ1 = EnumValue(
         value="one_to_many_map_fraction_sum_to_id_eq1",
         description="One-to-many dimension mapping with sum of from_fraction = 1 when grouped by to_id",
         allow_dup_from_records=True,
@@ -95,7 +95,7 @@ class DimensionMappingArchetype(DSGEnum):
         check_fraction_sum_eq1_from_id=False,
         check_fraction_sum_eq1_to_id=True,
     )
-    MANY_TO_ONE_MAP_FRACTION_SUM_EQ1_TO_ID = EnumValue(
+    MANY_TO_ONE_MAP_FRACTION_SUM_TO_ID_EQ1 = EnumValue(
         value="many_to_one_map_fraction_sum_to_id_eq1",
         description="Many-to-one dimension mapping with sum of from_fraction = 1 when grouped by to_id",
         allow_dup_from_records=False,
@@ -103,7 +103,7 @@ class DimensionMappingArchetype(DSGEnum):
         check_fraction_sum_eq1_from_id=False,
         check_fraction_sum_eq1_to_id=True,
     )
-    MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_TO_ID = EnumValue(
+    MANY_TO_MANY_MAP_FRACTION_SUM_TO_ID_EQ1 = EnumValue(
         value="many_to_many_map_fraction_sum_to_id_eq1",
         description="Many-to-many dimension mapping with sum of from_fraction = 1 when grouped by to_id",
         allow_dup_from_records=True,
@@ -196,19 +196,19 @@ class DimensionMappingBaseModel(DSGBaseModel):
 
         archetype_assignment = {
             # optional from_fraction col, FRACTION_SUM_EQ1 when grouped by from_id
-            DimensionMappingType.ONE_TO_ONE: DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_EQ1_FROM_ID,
-            DimensionMappingType.MANY_TO_ONE_AGGREGATION: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1_FROM_ID,
-            DimensionMappingType.MANY_TO_ONE_REASSIGNMENT: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1_FROM_ID,
+            DimensionMappingType.ONE_TO_ONE: DimensionMappingArchetype.ONE_TO_ONE_MAP_FRACTION_SUM_FROM_ID_EQ1,
+            DimensionMappingType.MANY_TO_ONE_AGGREGATION: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_FROM_ID_EQ1,
+            DimensionMappingType.MANY_TO_ONE_REASSIGNMENT: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_FROM_ID_EQ1,
             # optional from_fraction col, no FRACTION_SUM check
             DimensionMappingType.DUPLICATION: DimensionMappingArchetype.ONE_TO_MANY_MAP,
             # required from_fraction col, FRACTION_SUM_EQ1 when grouped by from_id
-            DimensionMappingType.ONE_TO_MANY_DISAGGREGATION: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_EQ1_FROM_ID,
-            DimensionMappingType.MANY_TO_MANY_AGGREGATION: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_FROM_ID,
-            DimensionMappingType.MANY_TO_MANY_DISAGGREGATION: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_FROM_ID,
+            DimensionMappingType.ONE_TO_MANY_DISAGGREGATION: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_FROM_ID_EQ1,
+            DimensionMappingType.MANY_TO_MANY_AGGREGATION: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_FROM_ID_EQ1,
+            DimensionMappingType.MANY_TO_MANY_DISAGGREGATION: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_FROM_ID_EQ1,
             # required from_fraction col, FRACTION_SUM_EQ1 when grouped by to_id
-            DimensionMappingType.ONE_TO_MANY_ASSIGNMENT: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_EQ1_TO_ID,
-            DimensionMappingType.MANY_TO_ONE_ASSIGNMENT: DimensionMappingArchetype.MANY_TO_ONE_MAP_FRACTION_SUM_EQ1_TO_ID,
-            DimensionMappingType.MANY_TO_MANY_ASSIGNMENT: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_EQ1_TO_ID,
+            DimensionMappingType.ONE_TO_MANY_ASSIGNMENT: DimensionMappingArchetype.ONE_TO_MANY_MAP_FRACTION_SUM_TO_ID_EQ1,
+            DimensionMappingType.MANY_TO_ONE_ASSIGNMENT: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_TO_ID_EQ1,
+            DimensionMappingType.MANY_TO_MANY_ASSIGNMENT: DimensionMappingArchetype.MANY_TO_MANY_MAP_FRACTION_SUM_TO_ID_EQ1,
             # required from_fraction col, no FRACTION_SUM check
             DimensionMappingType.ONE_TO_ONE_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.ONE_TO_ONE_MAP,
             DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS: DimensionMappingArchetype.ONE_TO_MANY_MAP,
@@ -223,8 +223,8 @@ class DimensionMappingBaseModel(DSGBaseModel):
             else:
                 if archetype != assigned_archetype:
                     raise DSGInvalidDimensionMapping(
-                        '"mapping_type" and "archetype" are both defined. '
-                        'To assign archetype based on mapping_type, remove "archetype" from config. '
+                        '"mapping_type" and "archetype" are both defined AND they DO NOT correspond to each other. '
+                        "archetype can be removed from config so that it can be assigned automatically based on mapping_type. "
                         f'Otherwise, mapping_type={values["mapping_type"]} should have archetype={assigned_archetype} '
                     )
         return archetype

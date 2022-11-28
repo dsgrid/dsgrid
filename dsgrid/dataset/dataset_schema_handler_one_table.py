@@ -107,9 +107,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         return dim_table
 
-    def _get_table_with_dimensions(self):
-        return self._load_data
-
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: List[DimensionSimpleModel]):
         load_df = self._load_data

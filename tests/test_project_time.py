@@ -11,6 +11,7 @@ import numpy as np
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone
+from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.spark import get_spark_session
 
 
@@ -63,7 +64,9 @@ def test_convert_to_project_time(registry_mgr):
     )  # or tempo._handler._project_time_dim
     resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
     comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
+    comstock_geo_dim = comstock._handler.config.get_dimension(DimensionType.GEOGRAPHY)
     tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
+    tempo_geo_dim = tempo._handler.config.get_dimension(DimensionType.GEOGRAPHY)
 
     # [1] test build_time_dataframe()
     check_time_dataframe(project_time_dim)
@@ -71,37 +74,25 @@ def test_convert_to_project_time(registry_mgr):
     check_time_dataframe(comstock_time_dim)
     tempo_time_dim.build_time_dataframe()
 
-    # [2] test convert_dataframe()
-    # Method 1: tempo time explosion - input df contains all info
-    tempo._handler._convert_time_dimension(tempo_load_data, project.config)
-    # tempo_time_dim.convert_dataframe(
-    #    df=tempo._handler._add_time_zone(tempo_load_data_lookup).join(tempo_load_data, on="id"),
-    #    project_time_dim=project_time_dim,
-    #    time_zone_mapping=None,
-    # )
-
-    # Method 2: tempo time explosion - time_zone_mapping is passed in
-    tempo_data = tempo_load_data.join(tempo_load_data_lookup, on="id")
-    tempo_data_mapped = tempo._handler._convert_time_dimension(tempo_data, project.config)
-    #    df=tempo_data,
-    #    project_time_dim=project_time_dim,
-    #    time_zone_mapping=tempo._handler.get_time_zone_mapping(),
-    # )
-    check_exploded_tempo_time(project_time_dim, tempo_data_mapped)
-    # check_tempo_load_sum(
-    #    project_time_dim,
-    #    tempo,
-    #    raw_data=tempo._handler._add_time_zone(tempo_data),
-    #    converted_data=tempo_data_mapped,
-    # )
+    # [2] test convert time
+    tempo_data = tempo_load_data.join(tempo_load_data_lookup, on="id").drop("id")
+    tempo_data_mapped_time = tempo._handler._convert_time_dimension(tempo_data, project.config)
+    tempo_data_with_tz = add_time_zone(tempo_data, tempo_geo_dim)
+    check_exploded_tempo_time(project_time_dim, tempo_data_mapped_time)
+    check_tempo_load_sum(
+        project_time_dim,
+        tempo,
+        raw_data=tempo_data_with_tz,
+        converted_data=tempo_data_mapped_time,
+    )
 
     # comstock time conversion
-    # comstock_data = comstock._handler._add_time_zone(comstock._handler._load_data_lookup)
-    # comstock_data = comstock._handler._load_data.join(comstock_data, on="id")
-    # comstock_data = comstock_time_dim.convert_dataframe(
-    #    df=comstock_data,
-    #    project_time_dim=project_time_dim,
-    # )
+    comstock_data = comstock._handler._load_data.join(comstock._handler._load_data_lookup, on="id")
+    comstock_data_with_tz = add_time_zone(comstock_data, comstock_geo_dim)
+    comstock_time_dim.convert_dataframe(
+        df=comstock_data_with_tz,
+        project_time_dim=project_time_dim,
+    )
 
     # [3] test make_project_dataframe()
     tempo._handler.make_project_dataframe(project.config)

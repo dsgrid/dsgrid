@@ -106,7 +106,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     #     )
     #     return df2
 
-    def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
+    def convert_dataframe(self, df=None, project_time_dim=None):
         # TODO: we may have to do something special with local timezone
         return df
 

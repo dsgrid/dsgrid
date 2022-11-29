@@ -423,7 +423,6 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             MountainStandard, MountainPrevailing,
             CentralStandard, CentralPrevailing,
             EasternStandard, EasternPrevailing,
-            LOCAL
         """,
         options=TimeZone.format_descriptions_for_docs(),
     )
@@ -457,7 +456,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
     def is_time_zone_required_in_geography(self):
-        return self.timezone == TimeZone.LOCAL
+        return False
 
 
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):

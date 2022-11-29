@@ -32,7 +32,7 @@ def registry_mgr():
 
 def test_no_unexpected_timezone():
     for tzo in TimeZone:
-        if tzo in [TimeZone.NONE, TimeZone.LOCAL]:
+        if tzo == TimeZone.NONE:
             assert tzo.is_standard() + tzo.is_prevailing() == 0
         else:
             assert (

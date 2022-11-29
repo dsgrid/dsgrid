@@ -307,7 +307,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
             load_data_df = add_time_zone(load_data_df, geography_dim)
 
-        return time_dim.convert_dataframe(
+        load_data_df = time_dim.convert_dataframe(
             df=load_data_df,
             project_time_dim=self._project_time_dim,
         )
+
+        if time_dim.model.is_time_zone_required_in_geography():
+            load_data_df = load_data_df.drop("time_zone")
+        return load_data_df

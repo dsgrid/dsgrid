@@ -82,7 +82,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
         assert "time_zone" in df.columns, df.columns
         geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
+        assert geo_tz_values
         geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
+        assert geo_tz_names
 
         # create time map
         # temporarily set session time to UTC for timeinfo extraction
@@ -95,6 +97,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         spark.conf.set("spark.sql.session.timeZone", "UTC")
         session_tz = spark.conf.get("spark.sql.session.timeZone")
 
+        time_df = None
         try:
             project_time_df = project_time_dim.build_time_dataframe()
             idx = 0
@@ -130,7 +133,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         select = [
             col if col not in time_cols else F.col(col).cast(IntegerType()) for col in df.columns
         ]
-        df = df.select(*select).join(time_df, on=join_keys).drop(*join_keys)
+        df = df.select(*select).join(time_df, on=join_keys).drop(*time_cols)
 
         return df
 

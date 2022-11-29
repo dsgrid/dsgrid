@@ -64,7 +64,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         # Currently this requires fraction = 1.0
         ld_df = ld_df.join(lk_df, on="id").drop("id")
 
-        if self._convert_time_before_project_mapping():
+        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
+        if convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         lk_df = self._remap_dimension_columns(lk_df)
@@ -73,7 +74,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             # Some pivot columns may have been removed.
             pivoted_columns=set(ld_df.columns).intersection(self.get_pivoted_dimension_columns()),
         )
-        if not self._convert_time_before_project_mapping():
+        if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         return ld_df
@@ -89,14 +90,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         # Currently this requires fraction = 1.0
         ld_df = ld_df.join(lk_df, on="id").drop("id")
 
-        if self._convert_time_before_project_mapping():
+        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
+        if convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         # Some pivoted columns may have been removed in pre-filtering.
         pivoted_columns = set(ld_df.columns).intersection(self.get_pivoted_dimension_columns())
         ld_df = self._remap_dimension_columns(ld_df, pivoted_columns=pivoted_columns)
 
-        if not self._convert_time_before_project_mapping():
+        if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         pivoted_columns = set(ld_df.columns).intersection(

@@ -58,7 +58,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         logger.info("Run dataset registration checks.")
         check_required_dimensions(config.model.dimension_references, "dataset dimensions")
         check_uniqueness((x.model.name for x in config.model.dimensions), "dimension name")
-        if not os.environ.get("__DSGRID_SKIP_DATASET_CONSISTENCY_CHECKS__"):
+        if not os.environ.get("__DSGRID_SKIP_CHECK_DATASET_CONSISTENCY__"):
             self._check_dataset_consistency(config)
 
     def _check_dataset_consistency(self, config: DatasetConfig):

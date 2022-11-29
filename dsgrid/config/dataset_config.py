@@ -414,9 +414,9 @@ class DatasetConfigModel(DSGBaseModel):
     @validator("dimensions")
     def check_time_zone(cls, dimensions: list, values: dict) -> list:
         """Validate whether required time zone information is present."""
-        geo_requires_time_zone = True
+        geo_requires_time_zone = False
         time_dim = None
-        if values["use_project_geography_time_zone"]:
+        if not values["use_project_geography_time_zone"]:
             for dimension in dimensions:
                 if dimension.dimension_type == DimensionType.TIME:
                     geo_requires_time_zone = dimension.is_time_zone_required_in_geography()

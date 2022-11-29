@@ -35,7 +35,7 @@ string returned by the command `hostname`.
 ### Cluster Mode
 Apache provides an overview at https://spark.apache.org/docs/3.3.1/cluster-overview.html
 
-The important parts to understand are how dsgrid uses different cluster modes in different
+The most important parts to understand are how dsgrid uses different cluster modes in different
 environments.
 
 - Local computer in local mode: All Spark components run in a single process. This is
@@ -56,8 +56,8 @@ environments.
   instructions](#installing-a-spark-standalone-cluster-on-an-hpc).
 
 - AWS EMR cluster: The EMR scripts in the dsgrid repo at `/emr` will create a Spark cluster on EC2
-  compute nodes with a cluster manager. The cluster managers allow multiple users to access a
-  single cluster and offer better job scheduling. Refer to the README.md in that directory.
+  compute nodes with a cluster manager. The cluster manager allows multiple users to access a
+  single cluster and offers better job scheduling. Refer to the README.md in that directory.
 
 
 ### Run Spark Applications
@@ -89,9 +89,9 @@ $ python
 ```
 
 ### Spark UI
-The Spark master starts a web application at `http://<master_hostname>:8080`. The worker is available
-at port 4040. You can monitor and debug all aspects of your jobs in this application. You can also
-inspect all cluster configuration settings.
+The Spark master starts a web application at `http://<master_hostname>:8080`. Job information is
+available at port 4040. You can monitor and debug all aspects of your jobs in this application. You
+can also inspect all cluster configuration settings.
 
 If your Spark cluster is running on a remote system, like an HPC, you may need to open an ssh tunnel to
 the master node. Here is how to do that on NREL's Eagle cluster.
@@ -153,7 +153,8 @@ Set `spark.driver.memory` and `spark.driver.maxResultSize` in `spark-defaults.co
 data sizes that you expect to pull from Spark to Python, such as if you call `df.toPandas()`.
 `1g` is probably reasonable.
 
-Set `spark.sql.shuffle.partitions` to 1-4x the number of cores in your system.
+Set `spark.sql.shuffle.partitions` to 1-4x the number of cores in your system. Note that the
+default value is 200, and you probably don't want that.
 
 Set `spark.executor.cores` and `spark.executor.memory` to numbers that allow creation of your
 desired number of executors. Spark will try to create the most number of executors such that each
@@ -232,7 +233,17 @@ $ export PATH=$PATH:<your-repo-path>/HPC/applications/spark/spark_scripts
 $ create_config.sh -c `/projects/dsgrid/containers/spark_py310.sif`
 ```
 
-5. Customize the Spark configuration files in `./conf` as necessary per the HPC instructions.
+5. Configure Spark parameters based on the amount of memory and CPU in each compute node. dsgrid
+   jobs on Eagle seem to work better with dynamic allocation enabled.
+
+```
+$ configure_spark.sh --dynamic-allocation
+```
+
+   Run `configure_spark.sh --help` to see all options.
+
+   Alternatively, or in conjunction with the above command, customize the Spark configuration files
+   in `./conf` as necessary per the HPC instructions.
 
 6. Start the cluster.
 ```
@@ -358,7 +369,7 @@ $ spark-submit --master spark://$(hostname):7077 \
 
 ## Spark Configuration Problems
 Get used to monitoring Spark jobs in the Spark UI. The master is at `http://<master_hostname>:8080`
-and the worker is at `http://<master_hostname>:4040`. If a job seems stuck or slow, explore why.
+and jobs are at `http://<master_hostname>:4040`. If a job seems stuck or slow, explore why.
 Then kill the job, make config changes, and retry. A misconfigured job will take too long or never
 finish.
 
@@ -408,6 +419,8 @@ you start the workers.
 spark.dynamicAllocation.enabled true
 spark.dynamicAllocation.shuffleTracking.enabled true
 spark.shuffle.service.enabled true
+spark.shuffle.service.db.enabled = true
+spark.worker.cleanup.enabled = true
 ```
 
 We have not observed any downside to having this feature enabled.

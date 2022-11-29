@@ -168,7 +168,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         2. all dimension combinations return the same set of time range(s).
 
         """
-        if os.environ.get("__DSGRID_SKIP_DATASET_TIME_CONSISTENCY_CHECKS__"):
+        if os.environ.get("__DSGRID_SKIP_CHECK_DATASET_TIME_CONSISTENCY__"):
             logger.warning("Skip dataset time consistency checks.")
             return
 

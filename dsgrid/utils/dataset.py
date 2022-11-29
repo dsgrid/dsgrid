@@ -119,7 +119,7 @@ def add_column_from_records(df, dimension_records, dimension_name, column_to_add
 
 @track_timing(timer_stats_collector)
 def check_null_value_in_unique_dimension_rows(dim_table):
-    if os.environ.get("__DSGRID_SKIP_NULL_UNIQUE_DIMENSION_CHECK__"):
+    if os.environ.get("__DSGRID_SKIP_CHECK_NULL_UNIQUE_DIMENSION__"):
         # This has intermittently caused GC-related timeouts for TEMPO.
         # Leave a backdoor to skip these checks, which may eventually be removed.
         logger.warning("Skip check_null_value_in_unique_dimension_rows")

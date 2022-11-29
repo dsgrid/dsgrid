@@ -548,10 +548,11 @@ class RegistryManager:
     @staticmethod
     def _check_environment_variables(params):
         if not params.offline:
-            illegal_vars = [x for x in os.environ if x.startswith("__DSGRID")]
+            illegal_vars = [x for x in os.environ if x.startswith("__DSGRID_SKIP_CHECK")]
             if illegal_vars:
                 raise Exception(
-                    f"Internal environment variables are not allowed to be set in online mode: {illegal_vars}"
+                    f"Internal environment variables to skip checks are not allowed to be set "
+                    f"in online mode: {illegal_vars}"
                 )
 
 

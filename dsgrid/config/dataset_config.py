@@ -304,8 +304,7 @@ class DatasetConfigModel(DSGBaseModel):
     use_project_geography_time_zone: bool = Field(
         default=False,
         description="If true, time zones will be applied from the project's geography dimension. "
-        "If false and if the dataset's time dimension does not contain a time zone, the "
-        "dataset's geography dimension records must provide a time zone column.",
+        "If false, the dataset's geography dimension records must provide a time zone column.",
     )
     dimensions: List = Field(
         title="dimensions",

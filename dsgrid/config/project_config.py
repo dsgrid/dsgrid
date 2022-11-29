@@ -143,7 +143,7 @@ class DimensionsModel(DSGBaseModel):
 
     @validator("base_dimensions")
     def check_time_zone(cls, values: list) -> list:
-        """Validate dimension names are unique across all dimensions."""
+        """Validate the time zone column in geography records."""
         for dimension in values:
             if dimension.dimension_type == DimensionType.GEOGRAPHY:
                 check_timezone_in_geography(

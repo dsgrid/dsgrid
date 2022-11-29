@@ -137,8 +137,7 @@ def check_required_dimensions(dimensions, tag):
 
 
 def check_timezone_in_geography(dimension, err_msg=None):
-    """Check that a project's base geography dimension contains valid timezones
-    in records.
+    """Check that a geography dimension contains valid time zones in records.
 
     Parameters
     ----------

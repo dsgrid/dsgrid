@@ -293,14 +293,14 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _convert_time_before_project_mapping(self):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         return (
-            time_dim.model.does_geography_require_time_zone()
+            time_dim.model.is_time_zone_required_in_geography()
             and not self._config.model.use_project_geography_time_zone
         )
 
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(self, load_data_df, project_config):
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        if time_dim.model.does_geography_require_time_zone():
+        if time_dim.model.is_time_zone_required_in_geography():
             if self._config.model.use_project_geography_time_zone:
                 geography_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
             else:

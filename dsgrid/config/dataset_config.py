@@ -419,7 +419,7 @@ class DatasetConfigModel(DSGBaseModel):
         if values["use_project_geography_time_zone"]:
             for dimension in dimensions:
                 if dimension.dimension_type == DimensionType.TIME:
-                    geo_requires_time_zone = dimension.does_geography_require_time_zone()
+                    geo_requires_time_zone = dimension.is_time_zone_required_in_geography()
                     time_dim = dimension
                     break
 

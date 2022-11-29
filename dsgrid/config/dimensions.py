@@ -359,7 +359,7 @@ class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
         return data
 
     @abc.abstractmethod
-    def does_geography_require_time_zone(self):
+    def is_time_zone_required_in_geography(self):
         """Returns True if the geography dimension records must contain a time_zone column."""
 
 
@@ -456,7 +456,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             return ranges
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
 
-    def does_geography_require_time_zone(self):
+    def is_time_zone_required_in_geography(self):
         return self.timezone == TimeZone.LOCAL
 
 
@@ -502,7 +502,7 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
             return ranges
         return _check_time_ranges(ranges, values["str_format"], timedelta(days=365))
 
-    def does_geography_require_time_zone(self):
+    def is_time_zone_required_in_geography(self):
         return False
 
 
@@ -532,7 +532,7 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         options=TimeInvervalType.format_descriptions_for_docs(),
     )
 
-    def does_geography_require_time_zone(self):
+    def is_time_zone_required_in_geography(self):
         return True
 
 
@@ -545,7 +545,7 @@ class NoOpTimeDimensionModel(TimeDimensionBaseModel):
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
 
-    def does_geography_require_time_zone(self):
+    def is_time_zone_required_in_geography(self):
         return False
 
 

@@ -140,14 +140,6 @@ def check_register_annual_time(annual_time_dimension_model):
 # Test funcs:
 
 
-def test_none_timezone_in_datetime_config():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    config_as_dict["dimensions"][1]["timezone"] = "none"
-    with pytest.raises(ValidationError):
-        DimensionsConfigModel(**config_as_dict)
-
-
 def test_time_dimension_model1(time_dimension_model1):
     check_date_range_creation(time_dimension_model1)
 

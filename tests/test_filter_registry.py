@@ -52,8 +52,10 @@ def test_filter_registry():
         # Verify that the dataset, dimensions, and dimension mappings are all filtered.
         project.load_dataset(DATASET_ID)
         dataset = project.get_dataset(DATASET_ID)
-        load_data = dataset.load_data.join(dataset.load_data_lookup, on="id").drop("id")
-        dataset_geos = load_data.select("geography").distinct().collect()
+        load_data_df = dataset._handler._load_data
+        load_data_lookup_df = dataset._handler._load_data_lookup
+        df = load_data_df.join(load_data_lookup_df, on="id").drop("id")
+        dataset_geos = df.select("geography").distinct().collect()
         assert len(dataset_geos) == 1
         assert dataset_geos[0].geography == COUNTY_ID
 

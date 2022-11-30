@@ -62,7 +62,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     return self.build_time_dataframe()
 
-    def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
+    def convert_dataframe(self, df=None, project_time_dim=None):
         # in spark.dayofweek: 1=Sunday, 7=Saturday
         # dsgrid uses python standard library (same for pandas), which has day_of_week: 0=Monday, 6=Sunday
         # the mapping is: python.dt.day_of_week = [(i+7-2)%7 for i in spark.dayofweek]
@@ -80,12 +80,11 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         assert len(ptime_col) == 1, ptime_col
         ptime_col = ptime_col[0]
 
-        # get unique timezones
-        if time_zone_mapping is not None:
-            key = [col for col in time_zone_mapping.columns if col != "time_zone"]
-            df = df.join(time_zone_mapping, on=key)
+        assert "time_zone" in df.columns, df.columns
         geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
+        assert geo_tz_values
         geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
+        assert geo_tz_names
 
         # create time map
         # temporarily set session time to UTC for timeinfo extraction
@@ -98,6 +97,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         spark.conf.set("spark.sql.session.timeZone", "UTC")
         session_tz = spark.conf.get("spark.sql.session.timeZone")
 
+        time_df = None
         try:
             project_time_df = project_time_dim.build_time_dataframe()
             idx = 0
@@ -133,7 +133,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         select = [
             col if col not in time_cols else F.col(col).cast(IntegerType()) for col in df.columns
         ]
-        df = df.select(*select).join(time_df, on=join_keys).drop(*join_keys)
+        df = df.select(*select).join(time_df, on=join_keys).drop(*time_cols)
 
         return df
 

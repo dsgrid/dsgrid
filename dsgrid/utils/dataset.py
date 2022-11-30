@@ -108,6 +108,25 @@ def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, re
     return df.selectExpr(*nonvalue_cols, *extra_cols, *exprs), sorted(final_columns), dropped
 
 
+def add_time_zone(load_data_df, geography_dim):
+    """Add a time_zone column to a load_data dataframe from a geography dimension.
+
+    Parameters
+    ----------
+    load_data_df : pyspark.sql.DataFrame
+    geography_dim: DimensionConfig
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    """
+    geo_records = geography_dim.get_records_dataframe()
+    geo_name = geography_dim.model.dimension_type.value
+    assert "time_zone" not in load_data_df.columns
+    return add_column_from_records(load_data_df, geo_records, geo_name, "time_zone")
+
+
 def add_column_from_records(df, dimension_records, dimension_name, column_to_add):
     df = df.join(
         dimension_records.select(F.col("id").alias("record_id"), column_to_add),

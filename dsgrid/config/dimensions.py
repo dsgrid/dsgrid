@@ -1,3 +1,4 @@
+import abc
 import csv
 import enum
 import importlib
@@ -332,7 +333,7 @@ class MonthRangeModel(DSGBaseModel):
     )
 
 
-class TimeDimensionBaseModel(DimensionBaseModel):
+class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
     """Defines a base model common to all time dimensions."""
 
     time_type: TimeDimensionType = Field(
@@ -356,6 +357,10 @@ class TimeDimensionBaseModel(DimensionBaseModel):
         data["dimension_class"] = None
         _convert_for_serialization(data)
         return data
+
+    @abc.abstractmethod
+    def is_time_zone_required_in_geography(self):
+        """Returns True if the geography dimension records must contain a time_zone column."""
 
 
 class DateTimeDimensionModel(TimeDimensionBaseModel):
@@ -418,7 +423,6 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             MountainStandard, MountainPrevailing,
             CentralStandard, CentralPrevailing,
             EasternStandard, EasternPrevailing,
-            LOCAL
         """,
         options=TimeZone.format_descriptions_for_docs(),
     )
@@ -426,15 +430,6 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     @root_validator(pre=False, skip_on_failure=True)
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
-
-    @root_validator(pre=False, skip_on_failure=True)
-    def check_timezone(cls, values):
-        if values["timezone"] == TimeZone.NONE:
-            raise ValueError(
-                f'timezone={values["timezone"]} is not allowed, '
-                "DateTimeDimensionModel must have a timezone other than 'none'"
-            )
-        return values
 
     @root_validator(pre=False, skip_on_failure=True)
     def check_frequency(cls, values):
@@ -450,6 +445,9 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         if "str_format" not in values or "frequency" not in values:
             return ranges
         return _check_time_ranges(ranges, values["str_format"], values["frequency"])
+
+    def is_time_zone_required_in_geography(self):
+        return self.timezone == TimeZone.NONE
 
 
 class AnnualTimeDimensionModel(TimeDimensionBaseModel):
@@ -494,6 +492,9 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
             return ranges
         return _check_time_ranges(ranges, values["str_format"], timedelta(days=365))
 
+    def is_time_zone_required_in_geography(self):
+        return False
+
 
 class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a representative time dimension."""
@@ -521,6 +522,9 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         options=TimeInvervalType.format_descriptions_for_docs(),
     )
 
+    def is_time_zone_required_in_geography(self):
+        return True
+
 
 class NoOpTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a NoOp time dimension."""
@@ -530,6 +534,9 @@ class NoOpTimeDimensionModel(TimeDimensionBaseModel):
     @root_validator(pre=False)
     def check_time_type_and_class_consistency(cls, values):
         return _check_time_type_and_class_consistency(values)
+
+    def is_time_zone_required_in_geography(self):
+        return False
 
 
 class DimensionReferenceModel(DSGBaseModel):

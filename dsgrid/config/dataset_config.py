@@ -7,7 +7,7 @@ from pydantic import validator
 import pyspark.sql.functions as F
 
 from dsgrid.data_models import serialize_model_data
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
@@ -300,6 +300,12 @@ class DatasetConfigModel(DSGBaseModel):
         description="List of data tags",
         default=[],
     )
+    # This field must be listed before dimensions.
+    use_project_geography_time_zone: bool = Field(
+        default=False,
+        description="If true, time zones will be applied from the project's geography dimension. "
+        "If false, the dataset's geography dimension records must provide a time zone column.",
+    )
     dimensions: List = Field(
         title="dimensions",
         description="List of dimensions that make up the dimensions of dataset. They will be "
@@ -384,7 +390,7 @@ class DatasetConfigModel(DSGBaseModel):
         return trivial_dimensions
 
     @validator("dimensions")
-    def check_files(cls, values: dict) -> dict:
+    def check_files(cls, values: list) -> list:
         """Validate dimension files are unique across all dimensions"""
         check_uniqueness(
             (x.filename for x in values if isinstance(x, DimensionModel)),
@@ -393,7 +399,7 @@ class DatasetConfigModel(DSGBaseModel):
         return values
 
     @validator("dimensions")
-    def check_names(cls, values: dict) -> dict:
+    def check_names(cls, values: list) -> list:
         """Validate dimension names are unique across all dimensions."""
         check_uniqueness(
             [dim.name for dim in values],
@@ -404,6 +410,29 @@ class DatasetConfigModel(DSGBaseModel):
     @validator("dimensions", pre=True, each_item=True, always=True)
     def handle_dimension_union(cls, values):
         return handle_dimension_union(values)
+
+    @validator("dimensions")
+    def check_time_zone(cls, dimensions: list, values: dict) -> list:
+        """Validate whether required time zone information is present."""
+        geo_requires_time_zone = False
+        time_dim = None
+        if not values["use_project_geography_time_zone"]:
+            for dimension in dimensions:
+                if dimension.dimension_type == DimensionType.TIME:
+                    geo_requires_time_zone = dimension.is_time_zone_required_in_geography()
+                    time_dim = dimension
+                    break
+
+        if geo_requires_time_zone:
+            for dimension in dimensions:
+                if dimension.dimension_type == DimensionType.GEOGRAPHY:
+                    check_timezone_in_geography(
+                        dimension,
+                        err_msg=f"Dataset with time dimension {time_dim} requires that its "
+                        "geography dimension records include a time_zone column.",
+                    )
+
+        return dimensions
 
     def dict(self, *args, **kwargs):
         data = super().dict(*args, **kwargs)

@@ -8,7 +8,7 @@
       "register_project": true,
       "datasets": [
         {
-          "dataset_id": "conus_2022_reference_comstock",
+          "dataset_id": "comstock_conus_2022_reference",
           "dataset_path": "../dsgrid-data/conus_2022_reference_comstock",
           "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dataset.toml",
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dimension_mappings.toml",
@@ -19,7 +19,7 @@
         },
         {
           "dataset_id": "conus_2022_reference_resstock",
-          "dataset_path": "../dsgrid-data/conus_2022_reference_resstock",
+          "dataset_path": "../dsgrid-data/resstock_conus_2022_reference",
           "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/resstock/dataset.toml",
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/resstock/dimension_mappings.toml",
           "register_dataset": true,
@@ -38,7 +38,7 @@
           "fix_dimension_mapping_uuids": false
         },
         {
-          "dataset_id": "aeo2021_ref_res_end_use_growth_factors",
+          "dataset_id": "aeo2021_reference_residential_energy_use_growth_factors",
           "dataset_path": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/data",
           "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dataset.toml",
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dimension_mappings.toml",
@@ -49,7 +49,7 @@
           "autogen_reverse_supplemental_mappings": ["geography"]
         },
         {
-          "dataset_id": "aeo2021_ref_com_energy_end_use_growth_factors",
+          "dataset_id": "aeo2021_reference_commercial_energy_use_growth_factors",
           "dataset_path": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/data",
           "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/dataset.toml",
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/dimension_mappings.toml",

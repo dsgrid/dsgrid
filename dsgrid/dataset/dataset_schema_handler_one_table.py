@@ -139,7 +139,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         logger.info("Rewrote simplified %s", self._config.load_data_path)
 
     def make_project_dataframe(self, project_config):
-        if self._convert_time_before_project_mapping():
+        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
+        if convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(self._load_data, project_config)
         else:
             ld_df = self._load_data
@@ -152,7 +153,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ),
         )
 
-        if not self._convert_time_before_project_mapping():
+        if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         return ld_df

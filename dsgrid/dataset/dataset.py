@@ -3,8 +3,6 @@
 import abc
 import logging
 
-from pyspark.sql import SparkSession
-
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.query.query_context import QueryContext
 
@@ -13,8 +11,6 @@ logger = logging.getLogger(__name__)
 
 class DatasetBase(abc.ABC):
     """Base class for datasets"""
-
-    VIEW_NAMES = ("load_data_lookup", "load_data")
 
     def __init__(self, schema_handler):
         self._handler = schema_handler
@@ -26,39 +22,6 @@ class DatasetBase(abc.ABC):
     @property
     def dataset_id(self):
         return self._id
-
-    def get_dataframe(self, query: QueryContext, project_config):
-        return self._handler.get_dataframe(query, project_config)
-
-    def _make_view_name(self, name):
-        return f"{self._id}__{name}"
-
-    def _make_view_names(self):
-        return (f"{self._id}__{name}" for name in self.VIEW_NAMES)
-
-    def create_views(self):
-        """Create views for each of the tables in this dataset."""
-        # TODO: should we create these in a separate database?
-        # TODO: views should be created by the dataset handler
-        self.load_data_lookup.createOrReplaceTempView(self._make_view_name("load_data_lookup"))
-        self.load_data.createOrReplaceTempView(self._make_view_name("load_data"))
-
-    def delete_views(self):
-        """Delete views of the tables in this dataset."""
-        spark = SparkSession.getActiveSession()
-        for view in self._make_view_names():
-            spark.catalog.dropTempView(view)
-
-    # TODO: the following two methods need to abstract load_data_lookup
-    # They can only be used with Standard dataset schema.
-
-    @property
-    def load_data(self):
-        return self._handler._load_data
-
-    @property
-    def load_data_lookup(self):
-        return self._handler._load_data_lookup
 
 
 class Dataset(DatasetBase):
@@ -92,6 +55,12 @@ class Dataset(DatasetBase):
                 project_time_dim=project_time_dim,
             )
         )
+
+    def make_project_dataframe(self, project_config):
+        return self._handler.make_project_dataframe(project_config)
+
+    def make_project_dataframe_from_query(self, query: QueryContext, project_config):
+        return self._handler.make_project_dataframe_from_query(query, project_config)
 
 
 class StandaloneDataset(DatasetBase):

@@ -824,7 +824,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         mapping_references: List[DimensionMappingReferenceModel],
     ):
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
-        if os.environ.get("__DSGRID_SKIP_DATASET_TO_PROJECT_MAPPING_CHECKS__") is not None:
+        if os.environ.get("__DSGRID_SKIP_CHECK_DATASET_TO_PROJECT_MAPPING__") is not None:
             logger.warning("Skip dataset-to-project mapping checks")
         else:
             # This operation can be very problematic if there are many executors and runs much

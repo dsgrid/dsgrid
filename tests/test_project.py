@@ -1,5 +1,4 @@
 import pytest
-from pyspark.sql import SparkSession
 from collections import defaultdict
 
 from dsgrid.project import Project
@@ -49,13 +48,11 @@ def test_dataset_load():
     dataset = project.get_dataset(DATASET_ID)
 
     assert isinstance(dataset, Dataset)
-    spark = SparkSession.getActiveSession()
-    data = spark.sql(f"select * from {DATASET_ID}__load_data")
+    data = dataset.make_project_dataframe(project.config)
     assert "timestamp" in data.columns
-    assert "com_fans" in data.columns
-    lookup = spark.sql(f"select * from {DATASET_ID}__load_data_lookup")
-    assert "subsector" in lookup.columns
-    assert "id" in lookup.columns
+    assert "cooling" in data.columns
+    assert "fans" in data.columns
+    assert "geography" in data.columns
 
     query_names = sorted(
         project.config.list_dimension_query_names_by_type(DimensionType.GEOGRAPHY)
@@ -70,11 +67,6 @@ def test_dataset_load():
     records = project.config.get_dimension_records("state")
     assert records.filter("id = 'CO'").count() > 0
 
-    table_name = DATASET_ID + "__" + "load_data"
-    assert spark.catalog.tableExists(table_name)
-    project.unload_dataset(DATASET_ID)
-    assert not spark.catalog.tableExists(table_name)
-
 
 def test_dimension_map_and_reduce_in_dataset():
     mgr = RegistryManager.load(TEST_REGISTRY, offline_mode=True)
@@ -82,8 +74,10 @@ def test_dimension_map_and_reduce_in_dataset():
     project.load_dataset(DATASET_ID)
     dataset = project.get_dataset(DATASET_ID)
 
-    mapped_load_data = dataset._handler._remap_dimension_columns(dataset.load_data)
-    mapped_load_data_lookup = dataset._handler._remap_dimension_columns(dataset.load_data_lookup)
+    load_data_df = dataset._handler._load_data
+    load_data_lookup_df = dataset._handler._load_data_lookup
+    mapped_load_data = dataset._handler._remap_dimension_columns(load_data_df)
+    mapped_load_data_lookup = dataset._handler._remap_dimension_columns(load_data_lookup_df)
 
     # [1] check that mapped tables contain all to_id records from mappings
     table_is_lookup = False
@@ -145,7 +139,7 @@ def test_dimension_map_and_reduce_in_dataset():
             sum_query = [
                 f"SUM({col}) AS {col}" for col in dataset._handler.get_pivoted_dimension_columns()
             ]
-            load_data_sum = dataset.load_data.selectExpr(*sum_query)
+            load_data_sum = load_data_df.selectExpr(*sum_query)
 
             sum_query = [f"SUM({col}) AS {col}" for col in mapping_config.get_unique_to_ids()]
             mapped_load_data_sum = mapped_load_data.selectExpr(*sum_query).toPandas()
@@ -177,13 +171,3 @@ def test_dimension_map_and_reduce_in_dataset():
 
         else:
             pass
-
-
-# def test_aggregate_load_by_state():
-#    store = DimensionStore.load(PROJECT_CONFIG_FILE)
-#    dataset = Dataset.load(store)
-#    df = dataset.aggregate_sector_sums_by_dimension(County, State)
-#    assert "state" in df.columns
-#    assert "sum((sum(fans) * scale_factor))" in df.columns
-#    # For now just ensure this doesn't fail.
-#    df.count()

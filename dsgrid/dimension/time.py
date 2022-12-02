@@ -186,13 +186,6 @@ class TimeZone(DSGEnum):
         tz=None,
         tz_name="none",
     )
-    LOCAL = EnumValue(
-        value="LOCAL",
-        description="Local time. Implies that the geography's timezone will be dynamically applied"
-        " when converting loca time to other time zones.",
-        tz=None,  # TODO: needs handling: DSGRID-171
-        tz_name="local",
-    )
 
     def get_standard_time(self):
         """get equivalent standard time"""
@@ -211,11 +204,8 @@ class TimeZone(DSGEnum):
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EST
         if self == TimeZone.NONE:
-            logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
             return TimeZone.NONE
-        if self == TimeZone.LOCAL:
-            logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
-            return TimeZone.LOCAL
+        raise Exception(f"BUG: case not covered: {self}")
 
     def get_prevailing_time(self):
         """get equivalent prevailing time"""
@@ -236,9 +226,7 @@ class TimeZone(DSGEnum):
         if self == TimeZone.NONE:
             logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
             return TimeZone.NONE
-        if self == TimeZone.LOCAL:
-            logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
-            return TimeZone.LOCAL
+        raise Exception(f"BUG: case not covered: {self}")
 
     def is_standard(self):
         lst = [

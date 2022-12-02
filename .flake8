@@ -1,7 +1,11 @@
 [flake8]
 max-line-length = 99
 ignore =
-    E203 # whitespace before ':' (black does that and is better)
-    E501 # line too long (suppressed for long comments)
-    W503 # line break occurred before binary operator
-    W504 # line break occurred before binary operator
+    E203
+    # whitespace before ':' (black does that and is better)
+    E501
+    # line too long (suppressed for long comments)
+    W503
+    # line break occurred before binary operator
+    W504
+    # line break occurred before binary operator

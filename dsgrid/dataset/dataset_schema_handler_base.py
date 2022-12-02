@@ -11,7 +11,7 @@ from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.dataset import (
     map_and_reduce_stacked_dimension,
     map_and_reduce_pivoted_dimension,
-    add_column_from_records,
+    add_time_zone,
 )
 from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -161,6 +161,36 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return groupby_cols
 
+    @abc.abstractmethod
+    def make_project_dataframe(self, project_config):
+        """Return a load_data dataframe with dimensions mapped to the project's.
+
+        Parameters
+        ----------
+        project_config: ProjectConfig
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+
+    @abc.abstractmethod
+    def make_project_dataframe_from_query(self, context, project_config):
+        """Return a load_data dataframe with dimensions mapped to the project's with filters
+        as specified by the QueryContext.
+
+        Parameters
+        ----------
+        context : QueryContext
+        project_config : ProjectConfig
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+
     @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency(self, load_data_df):
         """Check dataset time consistency such that:
@@ -168,7 +198,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         2. all dimension combinations return the same set of time range(s).
 
         """
-        if os.environ.get("__DSGRID_SKIP_DATASET_TIME_CONSISTENCY_CHECKS__"):
+        if os.environ.get("__DSGRID_SKIP_CHECK_DATASET_TIME_CONSISTENCY__"):
             logger.warning("Skip dataset time consistency checks.")
             return
 
@@ -260,29 +290,28 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return df
 
-    @track_timing(timer_stats_collector)
-    def _add_time_zone(self, load_data_df):
-        """Add time_zone col to load_data_df"""
-        geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
-        geo_records = geography_dim.get_records_dataframe()
-        geo_name = geography_dim.model.dimension_type.value
-        load_data_df = add_column_from_records(load_data_df, geo_records, geo_name, "time_zone")
-        return load_data_df
-
-    def get_time_zone_mapping(self):
-        """Get time_zone mapping to map to load_data_df
-        Returns
-        -------
-        pyspark.sql.DataFrame
-            a two-column df containing time_zone and a mapping key column
-        """
-
-    @track_timing(timer_stats_collector)
-    def _convert_time_dimension(self, load_data_df, time_zone_mapping):
+    def _convert_time_before_project_mapping(self):
         time_dim = self._config.get_dimension(DimensionType.TIME)
+        return (
+            time_dim.model.is_time_zone_required_in_geography()
+            and not self._config.model.use_project_geography_time_zone
+        )
+
+    @track_timing(timer_stats_collector)
+    def _convert_time_dimension(self, load_data_df, project_config):
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        if time_dim.model.is_time_zone_required_in_geography():
+            if self._config.model.use_project_geography_time_zone:
+                geography_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
+            else:
+                geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
+            load_data_df = add_time_zone(load_data_df, geography_dim)
+
         load_data_df = time_dim.convert_dataframe(
             df=load_data_df,
             project_time_dim=self._project_time_dim,
-            time_zone_mapping=time_zone_mapping,
         )
+
+        if time_dim.model.is_time_zone_required_in_geography():
+            load_data_df = load_data_df.drop("time_zone")
         return load_data_df

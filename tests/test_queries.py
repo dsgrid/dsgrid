@@ -86,7 +86,7 @@ def test_peak_load():
     run_query_test(QueryTestPeakLoadByStateSubsector)
 
 
-def test_invalid_drop_pivoted_dimension():
+def test_invalid_drop_pivoted_dimension(tmp_path):
     invalid_agg = AggregationModel(
         dimensions=DimensionQueryNamesModel(
             data_source=["data_source"],
@@ -116,7 +116,7 @@ def test_invalid_drop_pivoted_dimension():
         ),
     )
     project = get_project()
-    output_dir = Path(tempfile.gettempdir()) / "queries"
+    output_dir = tmp_path / "queries"
 
     query.project.dataset_params.per_dataset_aggregations = [invalid_agg]
     with pytest.raises(DSGInvalidQuery):
@@ -128,75 +128,57 @@ def test_invalid_drop_pivoted_dimension():
         ProjectQuerySubmitter(project, output_dir).submit(query)
 
 
-def test_create_composite_dataset_query():
-    output_dir = Path(tempfile.gettempdir()) / "queries"
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
-
+def test_create_composite_dataset_query(tmp_path):
+    output_dir = tmp_path / "queries"
     project = get_project()
-    try:
-        query = QueryTestElectricityValuesCompositeDataset(
-            REGISTRY_PATH, project, output_dir=output_dir
-        )
-        CompositeDatasetQuerySubmitter(project, output_dir).create_dataset(query.make_query())
+    query = QueryTestElectricityValuesCompositeDataset(
+        REGISTRY_PATH, project, output_dir=output_dir
+    )
+    CompositeDatasetQuerySubmitter(project, output_dir).create_dataset(query.make_query())
 
-        query2 = QueryTestElectricityValuesCompositeDatasetAgg(
-            REGISTRY_PATH, project, output_dir=output_dir, geography="county"
-        )
-        CompositeDatasetQuerySubmitter(project, output_dir).submit(query2.make_query())
+    query2 = QueryTestElectricityValuesCompositeDatasetAgg(
+        REGISTRY_PATH, project, output_dir=output_dir, geography="county"
+    )
+    CompositeDatasetQuerySubmitter(project, output_dir).submit(query2.make_query())
 
-        query3 = QueryTestElectricityValuesCompositeDatasetAgg(
-            REGISTRY_PATH,
-            project,
-            output_dir=output_dir,
-            geography="state",
-        )
-        CompositeDatasetQuerySubmitter(project, output_dir).submit(query3.make_query())
-    finally:
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
+    query3 = QueryTestElectricityValuesCompositeDatasetAgg(
+        REGISTRY_PATH,
+        project,
+        output_dir=output_dir,
+        geography="state",
+    )
+    CompositeDatasetQuerySubmitter(project, output_dir).submit(query3.make_query())
 
 
-def test_query_cli_create_validate():
-    filename = Path(tempfile.gettempdir()) / "query.json"
-    try:
-        cmd = (
-            f"dsgrid query project create --offline --registry-path={REGISTRY_PATH} "
-            f"-d -r -f {filename} -F expression -F column_operator "
-            "-F supplemental_column_operator -F raw --force my_query dsgrid_conus_2022"
-        )
-        shutdown_project()
-        check_run_command(cmd)
-        query = ProjectQueryModel.from_file(filename)
-        assert query.name == "my_query"
-        assert query.project.dataset_params.per_dataset_aggregations
-        assert query.result.aggregations
-        check_run_command(f"dsgrid query project validate {filename}")
-    finally:
-        if filename.exists():
-            filename.unlink()
+def test_query_cli_create_validate(tmp_path):
+    filename = tmp_path / "query.json"
+    cmd = (
+        f"dsgrid query project create --offline --registry-path={REGISTRY_PATH} "
+        f"-d -r -f {filename} -F expression -F column_operator "
+        "-F supplemental_column_operator -F raw --force my_query dsgrid_conus_2022"
+    )
+    shutdown_project()
+    check_run_command(cmd)
+    query = ProjectQueryModel.from_file(filename)
+    assert query.name == "my_query"
+    assert query.project.dataset_params.per_dataset_aggregations
+    assert query.result.aggregations
+    check_run_command(f"dsgrid query project validate {filename}")
 
 
-def test_query_cli_run():
-    output_dir = Path(tempfile.gettempdir()) / "queries"
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
-
+def test_query_cli_run(tmp_path):
+    output_dir = tmp_path / "queries"
     project = get_project()
-    try:
-        query = QueryTestElectricityValues(True, REGISTRY_PATH, project, output_dir=output_dir)
-        filename = Path(tempfile.gettempdir()) / "query.json"
-        filename.write_text(query.make_query().json())
-        cmd = (
-            f"dsgrid query project run --offline --registry-path={REGISTRY_PATH} "
-            f"--output={output_dir} {filename}"
-        )
-        shutdown_project()
-        check_run_command(cmd)
-        query.validate()
-    finally:
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
+    query = QueryTestElectricityValues(True, REGISTRY_PATH, project, output_dir=output_dir)
+    filename = tmp_path / "query.json"
+    filename.write_text(query.make_query().json())
+    cmd = (
+        f"dsgrid query project run --offline --registry-path={REGISTRY_PATH} "
+        f"--output={output_dir} {filename}"
+    )
+    shutdown_project()
+    check_run_command(cmd)
+    query.validate()
 
 
 def test_dimension_query_names_model():

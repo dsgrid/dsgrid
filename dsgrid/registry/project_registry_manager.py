@@ -498,6 +498,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         submitter,
         log_message,
         dimension_mapping_file=None,
+        dimension_mapping_references_file=None,
         autogen_reverse_supplemental_mappings=None,
     ):
         context = RegistrationContext()
@@ -516,6 +517,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 submitter,
                 log_message,
                 dimension_mapping_file=dimension_mapping_file,
+                dimension_mapping_references_file=dimension_mapping_references_file,
                 autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
                 context=context,
             )

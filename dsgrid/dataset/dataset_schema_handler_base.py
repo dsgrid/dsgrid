@@ -130,17 +130,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 mapping_config = self._dimension_mapping_mgr.get_by_id(
                     ref.mapping_id, version=ref.version
                 )
-                from_ids = set()
-                to_ids = set()
-                for record in mapping_config.model.records:
-                    if record.to_id is not None:
-                        from_ids.add(record.from_id)
-                        to_ids.add(record.to_id)
-
-                diff = from_ids.difference(columns)
+                records = mapping_config.get_records_dataframe()
+                from_ids = get_unique_values(records, "from_id")
+                to_ids = get_unique_values(
+                    records.select("to_id").filter("to_id IS NOT NULL"), "to_id"
+                )
+                diff = from_ids.symmetric_difference(columns)
                 if diff:
                     raise DSGInvalidDataset(
-                        f"Dimension_mapping={mapping_config.config_id} has more from_id records than the dataset pivoted {dim_type.value} dimension: {diff}"
+                        f"Dimension_mapping={mapping_config.config_id} does not have the same "
+                        f"record IDs as the dataset={self._config.config_id} columns: {diff}"
                     )
                 return to_ids
 

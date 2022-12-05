@@ -112,15 +112,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return sorted(list(self._config.get_dimension(dim_type).get_unique_ids()))
 
     @track_timing(timer_stats_collector)
-    def get_pivoted_dimension_columns_mapped_to_project(self):
+    def get_pivoted_dimension_columns_mapped_to_project(self) -> set[str]:
         """Get columns for the dimension that is pivoted in load_data and remap them to the
-        project's record names. The returned dict will not include columns that the project does
+        project's record names. The returned set will not include columns that the project does
         not care about.
 
         Returns
         -------
-        dict
-            Mapping of pivoted dimension column names to project record names.
+        set
+            Pivoted dimension column names as defined by the project
 
         """
         columns = set(self.get_pivoted_dimension_columns())

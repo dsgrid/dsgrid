@@ -20,6 +20,8 @@ jobs:
         python -m pip install '.[dev]'
     - name: Generate coverage report
       run: |
+        git submodule init
+        git submodule update
         python -m  pytest --disable-warnings --cov=./ --cov-report=xml:coverage.xml
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

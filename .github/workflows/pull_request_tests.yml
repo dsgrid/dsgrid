@@ -30,4 +30,13 @@ jobs:
         # Credentials would need to be configured.
         git submodule init
         git submodule update
-        python -m pytest -v --disable-warnings tests
+        python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        env_vars: OS,PYTHON
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        verbose: true

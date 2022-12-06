@@ -2,7 +2,7 @@ name: Codecov
 
 on:
   push:
-    branches: [codecov]
+    branches: [main]
 
 jobs:
   run:

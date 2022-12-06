@@ -20,9 +20,11 @@ jobs:
         python -m pip install '.[dev]'
     - name: Generate coverage report
       run: |
+        # This does not run the AWS tests.
+        # Credentials would need to be configured.
         git submodule init
         git submodule update
-        python -m  pytest --disable-warnings --cov=./ --cov-report=xml:coverage.xml
+        python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:

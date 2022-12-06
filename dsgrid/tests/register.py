@@ -64,6 +64,8 @@ def _run_registration(registration: RegistrationModel, tmp_files):
             project_mgr.register(project.config_file, user, log_message)
 
         for dataset in project.datasets:
+            refs_file = None
+            config_file = None
             if dataset.register_dataset:
                 if dataset.fix_dimension_uuids:
                     suffix = dataset.config_file.suffix
@@ -73,12 +75,6 @@ def _run_registration(registration: RegistrationModel, tmp_files):
                     replace_dimension_uuids_from_registry(reg_path, [config_file])
                 else:
                     config_file = dataset.config_file
-                dataset_mgr.register(
-                    config_file,
-                    dataset.dataset_path,
-                    user,
-                    log_message,
-                )
 
             if dataset.submit_to_project:
                 if (
@@ -98,6 +94,27 @@ def _run_registration(registration: RegistrationModel, tmp_files):
                     replace_dimension_mapping_uuids_from_registry(reg_path, [refs_file])
                 else:
                     refs_file = dataset.dimension_mapping_references_file
+
+            if dataset.register_dataset and dataset.submit_to_project:
+                # If something fails in the submit stage, dsgrid will delete the dataset.
+                project_mgr.register_and_submit_dataset(
+                    config_file,
+                    dataset.dataset_path,
+                    project.project_id,
+                    user,
+                    log_message,
+                    dimension_mapping_file=dataset.dimension_mapping_file,
+                    dimension_mapping_references_file=refs_file,
+                    autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
+                )
+            elif dataset.register_dataset:
+                dataset_mgr.register(
+                    config_file,
+                    dataset.dataset_path,
+                    user,
+                    log_message,
+                )
+            elif dataset.submit_to_project:
                 project_mgr.submit_dataset(
                     project.project_id,
                     dataset.dataset_id,

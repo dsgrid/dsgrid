@@ -14,10 +14,10 @@ from dsgrid.query.query_context import QueryContext
 
 from dsgrid.utils.spark import (
     read_dataframe,
-    custom_spark_conf,
+    restart_spark_with_custom_conf,
     write_dataframe_and_auto_partition,
 )
-from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.timing import timer_stats_collector, track_timing, Timer
 
 
 logger = logging.getLogger(__name__)
@@ -102,7 +102,6 @@ class Project:
             mapping_references=input_dataset.mapping_references,
             project_time_dim=self._config.get_base_dimension(DimensionType.TIME),
         )
-        dataset.create_views()
         self._datasets[dataset_id] = dataset
         return dataset
 
@@ -128,7 +127,7 @@ class Project:
     def process_query(self, context: QueryContext, cached_project_mapped_datasets_dir: Path):
         self._build_filtered_record_ids_by_dimension_type(context)
 
-        dfs = []
+        df_filenames = []
         project_version = f"{context.model.project.project_id}__{context.model.project.version}"
         for dataset_id in context.model.project.dataset_ids:
             logger.info("Start processing query for dataset_id=%s", dataset_id)
@@ -141,19 +140,32 @@ class Project:
             cached_dataset = hash_dir / (dataset_id + ".parquet")
             if cached_dataset.exists():
                 logger.info("Use cached project-mapped dataset %s", dataset_id)
-                df = read_dataframe(cached_dataset)
             else:
-                logger.info("Build project-mapped dataset %s", dataset_id)
-                dataset = self.get_dataset(dataset_id)
-                df = dataset.get_dataframe(context, self._config)
-                with custom_spark_conf(context.model.project.get_spark_conf(dataset_id)):
-                    df = write_dataframe_and_auto_partition(df, cached_dataset)
-            dfs.append(df)
+                # An alternative solution is to call custom_spark_conf instead.
+                # That changes some settings without restarting the SparkSession.
+                # Results were not as good with that solution.
+                # Observations on queries with comstock and resstock showed that Spark
+                # used many fewer executors on the second query. That was with a standalone
+                # cluster on Eagle with dynamic allocation enabled.
+                # We don't understand why that is the case. It may not be an issue with YARN as
+                # the cluster manager on AWS.
+                # Queries on standalone clusters will be easier to debug if we restart the session
+                # for each big job.
+                with restart_spark_with_custom_conf(
+                    conf=context.model.project.get_spark_conf(dataset_id)
+                ):
+                    logger.info("Build project-mapped dataset %s", dataset_id)
+                    dataset = self.get_dataset(dataset_id)
+                    df = dataset.make_project_dataframe_from_query(context, self._config)
+                    with Timer(timer_stats_collector, "build_project_mapped_dataset"):
+                        write_dataframe_and_auto_partition(df, cached_dataset)
+            df_filenames.append(cached_dataset)
             logger.info("Finished processing query for dataset_id=%s", dataset_id)
 
-        if not dfs:
+        if not df_filenames:
             logger.warning("No data matched %s", context.model.name)
             return None
+        dfs = [read_dataframe(x) for x in df_filenames]
 
         # All dataset columns need to be in the same order.
         context.consolidate_dataset_metadata()

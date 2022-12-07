@@ -1,15 +1,12 @@
 import logging
 from datetime import datetime
-from pyspark.sql.types import StructType, StructField, StringType, TimestampType
+from pyspark.sql.types import StructType, StructField, TimestampType
 
 # import pyspark.sql.functions as F
 
 import pandas as pd
 
-from dsgrid.dimension.time import (
-    TimeZone,
-    make_time_range,
-)
+from dsgrid.dimension.time import make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -65,17 +62,6 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         schema = StructType([StructField(time_col, TimestampType(), False)])
-
-        if self.model.timezone in [TimeZone.LOCAL, TimeZone.NONE]:
-            # TODO: handle local time zone
-            schema = StructType(
-                [
-                    StructField(time_col, StringType(), False),
-                    StructField("timezone", StringType(), False),
-                ]
-            )
-            raise NotImplementedError("TimeZone = LOCAL or NONE needs fixing")
-
         model_time = self.list_expected_dataset_timestamps()
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
 
@@ -106,7 +92,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     #     )
     #     return df2
 
-    def convert_dataframe(self, df=None, project_time_dim=None, time_zone_mapping=None):
+    def convert_dataframe(self, df=None, project_time_dim=None):
         # TODO: we may have to do something special with local timezone
         return df
 
@@ -136,7 +122,6 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return list(DatetimeTimestampType._fields)
 
     def get_tzinfo(self):
-        assert self.model.timezone is not TimeZone.LOCAL, self.model.timezone
         return self.model.timezone.tz
 
     def list_expected_dataset_timestamps(self):

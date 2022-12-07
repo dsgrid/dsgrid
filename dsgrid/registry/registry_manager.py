@@ -56,7 +56,7 @@ class RegistryManager:
     def __init__(self, params: RegistryManagerParams):
         self._check_environment_variables(params)
         if SparkSession.getActiveSession() is None:
-            init_spark("registry")
+            init_spark("dsgrid")
         self._params = params
         self._dimension_mgr = DimensionRegistryManager.load(
             params.base_path / DimensionRegistry.registry_path(), params
@@ -548,10 +548,11 @@ class RegistryManager:
     @staticmethod
     def _check_environment_variables(params):
         if not params.offline:
-            illegal_vars = [x for x in os.environ if x.startswith("__DSGRID")]
+            illegal_vars = [x for x in os.environ if x.startswith("__DSGRID_SKIP_CHECK")]
             if illegal_vars:
                 raise Exception(
-                    f"Internal environment variables are not allowed to be set in online mode: {illegal_vars}"
+                    f"Internal environment variables to skip checks are not allowed to be set "
+                    f"in online mode: {illegal_vars}"
                 )
 
 

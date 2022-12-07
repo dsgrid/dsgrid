@@ -13,8 +13,12 @@ from dsgrid.tests.common import (
     TEST_PROJECT_PATH,
     create_local_test_registry,
 )
+from dsgrid.config.simple_models import RegistrySimpleModel
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
+from dsgrid.utils.spark import get_unique_values
 
 
 logger = logging.getLogger()
@@ -23,11 +27,17 @@ logger = logging.getLogger()
 TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_aeo"
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def make_test_project_dir():
     tmpdir = _make_project_dir(TEST_PROJECT_REPO)
     yield tmpdir / "dsgrid_project"
     shutil.rmtree(tmpdir)
+
+    # These can cause failures in later tests.
+    for name in ("spark-warehouse", "metastore_db"):
+        path = Path(name)
+        if path.exists():
+            shutil.rmtree(path)
 
 
 def _make_project_dir(project):
@@ -70,60 +80,94 @@ def make_registry_for_aeo(
 
 
 # set up tests for AEO data
-def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir):
-    if "test_aeo_data" not in os.listdir(make_test_data_dir):
+def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_module):
+    if "test_aeo_data" not in os.listdir(make_test_data_dir_module):
         logger.info("test_invalid_datasets requires the dsgrid-test-data repository")
         sys.exit(1)
 
-    datasets = os.listdir(make_test_data_dir / "test_aeo_data")
+    datasets = os.listdir(make_test_data_dir_module / "test_aeo_data")
     for i, dataset in enumerate(datasets, 1):
         logger.info(f">> Registering: {i}. {dataset}...")
-        data_dir = make_test_data_dir / "test_aeo_data" / dataset
+        data_dir = make_test_data_dir_module / "test_aeo_data" / dataset
 
         shutil.copyfile(data_dir / "load_data.csv", data_dir / "load_data_original.csv")
 
-        logger.info("1. normal registration: ")
-        _test_dataset_registration(make_test_project_dir, data_dir, dataset)
-
-        logger.info("2. with unexpected col: ")
-        _modify_data_file(data_dir, export_index=True)
-        with pytest.raises(
-            DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
-        ):
+        try:
+            logger.info("1. normal registration: ")
             _test_dataset_registration(make_test_project_dir, data_dir, dataset)
 
-        logger.info("3. with a duplicated dimension: ")
-        _modify_data_file(data_dir, duplicate_col="subsector")
-        with pytest.raises((ValueError, DSGInvalidDimension)):
-            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
-
-        logger.info("4. with a duplicated pivot col: ")
-        _modify_data_file(data_dir, duplicate_col="elec_heating")
-        with pytest.raises(
-            DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
-        ):
-            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
-
-        logger.info("5. End Uses dataset only - missing time ")
-        if "End_Uses" in dataset:
-            _modify_data_file(data_dir, drop_first_row=True)
+            logger.info("2. with unexpected col: ")
+            _modify_data_file(data_dir, export_index=True)
             with pytest.raises(
-                DSGInvalidDataset,
-                match=r"All time arrays must be repeated the same number of times: unique timestamp repeats =.*",
+                DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
             ):
                 _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+            logger.info("3. with a duplicated dimension: ")
+            _modify_data_file(data_dir, duplicate_col="subsector")
+            with pytest.raises((ValueError, DSGInvalidDimension)):
+                _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+            logger.info("4. with a duplicated pivot col: ")
+            _modify_data_file(data_dir, duplicate_col="elec_heating")
+            with pytest.raises(
+                DSGInvalidDimension, match=r"column.*is not expected or of a known dimension type"
+            ):
+                _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+
+            logger.info("5. End Uses dataset only - missing time ")
+            if "End_Uses" in dataset:
+                _modify_data_file(data_dir, drop_first_row=True)
+                with pytest.raises(
+                    DSGInvalidDataset,
+                    match=r"All time arrays must be repeated the same number of times: unique timestamp repeats =.*",
+                ):
+                    _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+        finally:
+            shutil.copyfile(data_dir / "load_data_original.csv", data_dir / "load_data.csv")
 
 
 def _test_dataset_registration(make_test_project_dir, data_dir, dataset):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
         logger.info(f"temp_registry created: {base_dir}")
+        return make_registry_for_aeo(
+            base_dir,
+            make_test_project_dir,
+            dataset,
+            dataset_path=data_dir,
+        )
+
+
+def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module):
+    dataset_id = "aeo2021_ref_com_energy_end_use_growth_factors"
+    geography_record = "mountain"
+    filter_config = {
+        "name": "test-registry",
+        "projects": [],
+        "datasets": [
+            {
+                "dataset_id": dataset_id,
+                "dimensions": [{"dimension_type": "geography", "record_ids": [geography_record]}],
+            }
+        ],
+    }
+    simple_model = RegistrySimpleModel(**filter_config)
+    with TemporaryDirectory() as tmpdir:
+        base_dir = Path(tmpdir)
+        dataset = "Commercial_End_Use_Growth_Factors"
+        data_dir = Path(make_test_data_dir_module) / "test_aeo_data" / dataset
         make_registry_for_aeo(
             base_dir,
             make_test_project_dir,
             dataset,
             dataset_path=data_dir,
         )
+        FilterRegistryManager.load(base_dir, offline_mode=True).filter(simple_model)
+        mgr = RegistryManager.load(base_dir, offline_mode=True)
+        config = mgr.dataset_manager.get_by_id(dataset_id)
+        geo = config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
+        assert get_unique_values(geo, "id") == {geography_record}
 
 
 def _modify_data_file(

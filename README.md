@@ -1,5 +1,6 @@
 # dsgrid
 [![Documentation](https://img.shields.io/badge/docs-ready-blue.svg)](https://dsgrid.github.io/dsgrid)
+[![codecov](https://codecov.io/gh/dsgrid/dsgrid/branch/main/graph/badge.svg?token=W0441C9XAL)](https://codecov.io/gh/dsgrid/dsgrid)
 
 Python API for contributing to and accessing demand-side grid model (dsgrid) projects and datasets.
 

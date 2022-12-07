@@ -514,6 +514,15 @@ def submit_dataset(
     callback=_path_callback,
 )
 @click.option(
+    "-r",
+    "--dimension-mapping-references-file",
+    type=click.Path(exists=True),
+    show_default=True,
+    help="dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
+    "Use it when the mappings are already registered.",
+    callback=_path_callback,
+)
+@click.option(
     "-a",
     "--autogen-reverse-supplemental-mappings",
     type=click.Choice([x.value for x in DimensionType]),
@@ -543,6 +552,7 @@ def register_and_submit_dataset(
     dataset_config_file,
     dataset_path,
     dimension_mapping_file,
+    dimension_mapping_references_file,
     autogen_reverse_supplemental_mappings,
     project_id,
     log_message,
@@ -557,6 +567,7 @@ def register_and_submit_dataset(
         submitter,
         log_message,
         dimension_mapping_file=dimension_mapping_file,
+        dimension_mapping_references_file=dimension_mapping_references_file,
         autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
     )
 

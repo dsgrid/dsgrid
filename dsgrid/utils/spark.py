@@ -46,8 +46,8 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     cluster = os.environ.get("SPARK_CLUSTER")
     conf = SparkConf().setAppName(name)
     if spark_conf is not None:
-        for name, val in spark_conf.items():
-            conf.set(name, val)
+        for key, val in spark_conf.items():
+            conf.set(key, val)
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf.setMaster(cluster)
@@ -78,8 +78,8 @@ def restart_spark(*args, force=False, **kwargs):
     needs_restart = force
     if not force:
         conf = kwargs.get("spark_conf", {})
-        for name, val in conf.items():
-            current = spark.conf.get(name, None)
+        for key, val in conf.items():
+            current = spark.conf.get(key, None)
             if current is not None and current != val:
                 needs_restart = True
                 break

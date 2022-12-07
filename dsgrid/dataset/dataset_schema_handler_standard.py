@@ -6,16 +6,14 @@ from typing import List
 import pyspark.sql.functions as F
 
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.config.simple_models import DatasetSimpleModel
+from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
 from dsgrid.query.models import TableFormatType
 from dsgrid.query.query_context import QueryContext
-from dsgrid.utils.dataset import (
-    check_null_value_in_unique_dimension_rows,
-)
+from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
 from dsgrid.utils.spark import (
     # create_dataframe_from_pandas,
     read_dataframe,
@@ -57,38 +55,51 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         check_null_value_in_unique_dimension_rows(dim_table)
         return dim_table
 
-    def get_time_zone_mapping(self):
-        lk_df = self._load_data_lookup.filter("id is not NULL")
-        return self._add_time_zone(lk_df).select("id", "time_zone").distinct()
-
-    def make_project_dataframe(self):
+    def make_project_dataframe(self, project_config):
         # TODO: Can we remove NULLs at registration time?
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._convert_time_dimension(self._load_data, self.get_time_zone_mapping())
+        ld_df = self._load_data
+
+        # TODO: handle fraction application
+        # Currently this requires fraction = 1.0
+        ld_df = ld_df.join(lk_df, on="id").drop("id")
+
+        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
+        if convert_time_before_project_mapping:
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
         lk_df = self._remap_dimension_columns(lk_df)
         ld_df = self._remap_dimension_columns(
             ld_df,
             # Some pivot columns may have been removed.
-            pivoted_columns=set(self._load_data.columns).intersection(
-                self.get_pivoted_dimension_columns()
-            ),
+            pivoted_columns=set(ld_df.columns).intersection(self.get_pivoted_dimension_columns()),
         )
-        # TODO: handle fraction application
-        # Currently this requires fraction = 1.0
-        ld_df = ld_df.join(lk_df, on="id").drop("id")
+        if not convert_time_before_project_mapping:
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
         return ld_df
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
         lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._convert_time_dimension(self._load_data, self.get_time_zone_mapping())
+        ld_df = self._load_data
 
         self._check_aggregations(context)
         lk_df, ld_df = self._prefilter_dataset(context, lk_df, ld_df)
 
-        lk_df = self._remap_dimension_columns(lk_df)
+        # TODO: handle fraction application
+        # Currently this requires fraction = 1.0
+        ld_df = ld_df.join(lk_df, on="id").drop("id")
+
+        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
+        if convert_time_before_project_mapping:
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
         # Some pivoted columns may have been removed in pre-filtering.
         pivoted_columns = set(ld_df.columns).intersection(self.get_pivoted_dimension_columns())
         ld_df = self._remap_dimension_columns(ld_df, pivoted_columns=pivoted_columns)
+
+        if not convert_time_before_project_mapping:
+            ld_df = self._convert_time_dimension(ld_df, project_config)
 
         pivoted_columns = set(ld_df.columns).intersection(
             self.get_pivoted_dimension_columns_mapped_to_project()
@@ -102,16 +113,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
             context.add_dimension_query_name(dim_type, name, dataset_id=self.dataset_id)
 
-        # It should be cheaper to do this before the join with lookup.
         table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
         ld_df = table_handler.process_pivoted_aggregations(
             ld_df, context.model.project.dataset_params.per_dataset_aggregations, context
         )
-
-        # TODO: handle fraction application
-        # Currently this requires fraction = 1.0
-        ld_df = ld_df.join(lk_df, on="id").drop("id")
-
         ld_df = table_handler.convert_columns_to_query_names(ld_df)
         ld_df = table_handler.process_stacked_aggregations(
             ld_df, context.model.project.dataset_params.per_dataset_aggregations, context
@@ -162,13 +167,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 ).drop("dataset_record_id")
 
         return lk_df, ld_df
-
-    @track_timing(timer_stats_collector)
-    def get_dataframe(self, query_context: QueryContext, project_config):
-        return self.make_project_dataframe_from_query(
-            context=query_context,
-            project_config=project_config,
-        )
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):
@@ -293,19 +291,19 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
 
     @track_timing(timer_stats_collector)
-    def filter_data(self, dimensions: List[DatasetSimpleModel]):
+    def filter_data(self, dimensions: List[DimensionSimpleModel]):
         lookup = self._load_data_lookup
         lookup.cache()
         pivoted_dimension_type = self.get_pivoted_dimension_type()
         pivoted_columns = set(self.get_pivoted_dimension_columns())
-        pivoted_columns_to_keep = set()
+        pivoted_columns_to_remove = set()
         lookup_columns = set(lookup.columns)
         for dim in dimensions:
             column = dim.dimension_type.value
             if column in lookup_columns:
                 lookup = lookup.filter(lookup[column].isin(dim.record_ids))
             elif dim.dimension_type == pivoted_dimension_type:
-                pivoted_columns_to_keep.update(set(dim.record_ids))
+                pivoted_columns_to_remove = pivoted_columns.difference(dim.record_ids)
 
         drop_columns = []
         for dim in self._config.model.trivial_dimensions:
@@ -322,7 +320,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ids = next(iter(lookup2.select("id").distinct().select(F.collect_list("id")).first()))
 
         load_df = self._load_data.filter(self._load_data.id.isin(ids))
-        pivoted_columns_to_remove = list(pivoted_columns.difference(pivoted_columns_to_keep))
         load_df = load_df.drop(*pivoted_columns_to_remove)
         path = Path(self._config.load_data_path)
         if path.suffix == ".csv":

@@ -121,7 +121,7 @@ class ConfigRegistrationModel(DSGBaseModel):
 
 def get_version_from_filename(filename):
     """Return the handle and version from a registry file."""
-    regex = re.compile(r"(?P<handle>\w+)-v(?P<version>[\d\.]+).toml")
+    regex = re.compile(r"(?P<handle>\w+)-v(?P<version>[\d\.]+).json5")
     match = regex.search(filename)
     assert match, filename
     return match.groupdict("handle"), make_version(match.groupdict("version"))
@@ -139,7 +139,7 @@ def make_initial_config_registration(submitter, log_message):
 
 def make_filename_from_version(handle, version):
     """Make a filename with the handle and version."""
-    return f"{handle}-v{version}.toml"
+    return f"{handle}-v{version}.json5"
 
 
 def make_dimension_id(name: str):

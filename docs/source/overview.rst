@@ -124,7 +124,7 @@ Dimension Configs and Records
 +++++++++++++++++++++++++++++
 
 Specific instances of a dimension type are defined by a :ref:`Dimensions Config` (metadata
-description provided in a .toml file) and, in most cases, a .csv of ``dimension
+description provided in a .json5 file) and, in most cases, a .csv of ``dimension
 records``. Dimension records csvs have a header row and a row for each record, i.e.,
 for each individual element in a given dimension, to which data points can be
 assigned.

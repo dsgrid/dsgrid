@@ -81,6 +81,7 @@ setup(
         "dash",
         "dash_bootstrap_components",
         "fastapi",
+        "json5",
         "numpy",
         "pandas",
         "prettytable",
@@ -90,7 +91,6 @@ setup(
         "s3path",
         "semver",
         "sqlalchemy",
-        "toml",
         "uvicorn",
         "tzdata",  # time zone stuff
     ],

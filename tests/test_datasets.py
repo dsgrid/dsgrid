@@ -40,7 +40,7 @@ def setup_registry(make_test_project_dir_module, make_test_data_dir_module):
         )
         dataset_config_path = make_test_project_dir_module / "datasets" / "modeled" / "comstock"
         assert dataset_config_path.exists()
-        dataset_config_file = dataset_config_path / "dataset.toml"
+        dataset_config_file = dataset_config_path / "dataset.json5"
         replace_dimension_uuids_from_registry(base_dir, (dataset_config_file,))
         yield manager, base_dir, dataset_config_path, make_test_data_dir_module
 
@@ -50,7 +50,7 @@ def register_dataset(setup_registry):
     manager, base_dir, dataset_config_path, dataset_path = setup_registry
     test_dir = base_dir / "test_data_dir"
     shutil.copytree(dataset_path, test_dir)
-    dataset_config_file = dataset_config_path / "dataset.toml"
+    dataset_config_file = dataset_config_path / "dataset.json5"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
     dataset_path = test_dir / dataset_id
     # This dict must get filled in by each test.
@@ -74,7 +74,7 @@ def register_and_submit_dataset(setup_registry):
     manager, base_dir, dataset_config_path, dataset_path = setup_registry
     test_dir = base_dir / "test_data_dir"
     shutil.copytree(dataset_path, test_dir)
-    dataset_config_file = dataset_config_path / "dataset.toml"
+    dataset_config_file = dataset_config_path / "dataset.json5"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
     dataset_path = test_dir / dataset_id
     # This dict must get filled in by each test.
@@ -93,7 +93,7 @@ def register_and_submit_dataset(setup_registry):
                 dataset_id,
                 getpass.getuser(),
                 "submit invalid dataset",
-                dimension_mapping_file=dataset_config_path / "dimension_mappings.toml",
+                dimension_mapping_file=dataset_config_path / "dimension_mappings.json5",
             )
             expected_errors.clear()
     finally:

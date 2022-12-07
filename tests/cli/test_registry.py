@@ -16,10 +16,10 @@ def test_register_dimensions_and_mappings(make_test_project_dir):
         path = Path(tmpdir) / "registry"
         check_run_command(f"dsgrid-admin create-registry {path}")
         project_dimension_mapping_config = (
-            make_test_project_dir / "dimension_mappings_with_ids.toml"
+            make_test_project_dir / "dimension_mappings_with_ids.json5"
         )
 
-        dim_config_file = make_test_project_dir / "dimensions.toml"
+        dim_config_file = make_test_project_dir / "dimensions.json5"
         cmd = (
             f"dsgrid registry --path={path} --offline dimensions register {dim_config_file} -l log"
         )
@@ -46,10 +46,10 @@ def test_register_project_and_dataset(make_test_project_dir):
                     shutil.rmtree(path)
 
         src_dir = make_test_project_dir
-        project_config = src_dir / "project.toml"
+        project_config = src_dir / "project.json5"
         project_id = load_data(project_config)["project_id"]
-        dataset_config = src_dir / dataset_dir / "dataset.toml"
-        dataset_map_file = src_dir / dataset_dir / "dimension_mappings.toml"
+        dataset_config = src_dir / dataset_dir / "dataset.json5"
+        dataset_map_file = src_dir / dataset_dir / "dimension_mappings.json5"
         dataset_id = load_data(dataset_config)["dataset_id"]
         dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 

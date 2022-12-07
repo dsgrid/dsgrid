@@ -11,11 +11,11 @@ PROJECT_REPO = Path(__file__).resolve().parent.parent / "dsgrid-test-data" / "te
 base_dir = PROJECT_REPO / "dsgrid_project"
 dataset_dir = base_dir / "datasets" / "modeled" / "comstock"
 
-project_config = base_dir / "project.toml"
-dimensions_config = base_dir / "dimensions.toml"
-dimension_mappings_config = base_dir / "dimension_mappings_with_ids.toml"
-dataset_config = dataset_dir / "dataset.toml"
-dimension_mapping_ref_config = dataset_dir / "dimension_mapping_references.toml"
+project_config = base_dir / "project.json5"
+dimensions_config = base_dir / "dimensions.json5"
+dimension_mappings_config = base_dir / "dimension_mappings_with_ids.json5"
+dataset_config = dataset_dir / "dataset.json5"
+dimension_mapping_ref_config = dataset_dir / "dimension_mapping_references.json5"
 
 docs_dir = Path(__file__).resolve().parent / "_build" / "example_configs"
 

@@ -12,7 +12,7 @@ class DimensionBaseConfigWithFiles(ConfigWithDataFilesBase, abc.ABC):
 
     @staticmethod
     def config_filename():
-        return "dimension.toml"
+        return "dimension.json5"
 
     @property
     def config_id(self):
@@ -32,7 +32,7 @@ class DimensionBaseConfigWithoutFiles(ConfigBase, abc.ABC):
 
     @staticmethod
     def config_filename():
-        return "dimension.toml"
+        return "dimension.json5"
 
     @property
     def config_id(self):

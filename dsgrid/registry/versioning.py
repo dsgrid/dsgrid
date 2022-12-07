@@ -1,5 +1,5 @@
 import os
-import toml
+import json5
 
 DATASET_REGISTRY_PATH = "registry/datasets/"
 PROJECT_REGISTRY_PATH = "registry/projects/"
@@ -38,7 +38,7 @@ def versioning(registry_type, id_handle, update):
     # if config.update is False, then assume major=1, minor=0, patch=0
     if not update:
         version = f"{id_handle}-v1.0.0"
-        registry_file = f"{registry_path}/{version}.toml"
+        registry_file = f"{registry_path}/{version}.json5"
         # Raise error if v1.0.0 registry exists for project_id
         if os.path.exists(registry_file):
             raise ValueError(
@@ -69,13 +69,13 @@ def versioning(registry_type, id_handle, update):
         # NOTE: this is currently based on major verison only
         last_vmajor_nbr = sorted(existing_versions)[-1]
         old_project_version = f"{id_handle}-v{last_vmajor_nbr}.0.0"
-        old_registry_file = f"{registry_path}/{old_project_version}.toml"
+        old_registry_file = f"{registry_path}/{old_project_version}.json5"
 
         # depricate old project registry
-        t = toml.load(old_registry_file)
+        t = json5.load(old_registry_file)
         t["status"] = "Deprecated"
         with open(old_registry_file.format(**locals()), "w") as f:
-            toml.dump(t, f)
+            json5.dump(t, f)
 
         # update version
         # TODO NEED REAL LOGIC FOR THIS!

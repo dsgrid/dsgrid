@@ -781,7 +781,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         if new_mappings:
             # We don't currently have a way to register a single dimension mapping. It would be
             # better to register these mappings directly. But, this code was already here.
-            mapping_file = Path(tempfile.gettempdir()) / "dimension_mappings.toml"
+            mapping_file = Path(tempfile.gettempdir()) / "dimension_mappings.json5"
             dump_data({"mappings": new_mappings}, mapping_file)
             to_delete = [mapping_file] + [x["file"] for x in new_mappings]
             try:

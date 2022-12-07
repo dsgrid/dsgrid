@@ -4,14 +4,14 @@
   "projects": [
     {
       "project_id": "test_efs",
-      "config_file": "dsgrid-test-data/test_efs/dsgrid_project/project.toml",
+      "config_file": "dsgrid-test-data/test_efs/dsgrid_project/project.json5",
       "register_project": true,
       "datasets": [
         {
           "dataset_id": "test_efs_comstock",
           "dataset_path": "dsgrid-test-data/datasets/test_efs_comstock",
-          "config_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dataset.toml",
-          "dimension_mapping_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dimension_mappings.toml",
+          "config_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dataset.json5",
+          "dimension_mapping_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
           "fix_dimension_uuids": true,

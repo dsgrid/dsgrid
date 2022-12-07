@@ -169,7 +169,7 @@ def get_row(i, field, fields, field_items, cls, indent_level=1):
         t1 = "".join([t1] * indent_level)
     t2 = "".join([t] * (indent_level + 1))
 
-    # treat dimensions.toml config differently
+    # treat dimensions.json5 config differently
     if field == "SubFields" and cls == "dsgrid.config.project_config.DimensionsModel":
         rows.append(
             f"{t1}{t}:{field}: The config sub-fields depends on the "
@@ -230,13 +230,13 @@ def make_config_rst(output):
     os.makedirs(output, exist_ok=True)
     for cls in (
         # keep only the config models
-        ProjectConfigModel,  # project.toml
-        DatasetConfigModel,  # dataset.toml
-        DimensionsModel,  # dimensions.toml
+        ProjectConfigModel,  # project.json5
+        DatasetConfigModel,  # dataset.json5
+        DimensionsModel,  # dimensions.json5
         DimensionModel,
         DateTimeDimensionModel,
-        DimensionMappingBaseModel,  # dimension mapping toml
-        DimensionMappingReferenceListModel,  # dimension mapping references toml
+        DimensionMappingBaseModel,  # dimension mapping json5
+        DimensionMappingReferenceListModel,  # dimension mapping references json5
         # TODO: @DT please confirm whether these models below are being used directly by the user or not. If not, I do not think we need to create .rst docs explaining the fields. Do you agree?
         # MappingTableModel,
         # DimensionMappingBaseModel,

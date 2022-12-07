@@ -312,8 +312,8 @@ class RegistryManager:
                 delete_local=True,
             )
             cloud_interface.sync_pull(
-                remote_path=self._params.remote_path + f"/data/{dataset_id}/registry.toml",
-                local_path=str(self._params.base_path) + f"/data/{dataset_id}/registry.toml",
+                remote_path=self._params.remote_path + f"/data/{dataset_id}/registry.json5",
+                local_path=str(self._params.base_path) + f"/data/{dataset_id}/registry.json5",
                 delete_local=True,
                 is_file=True,
             )
@@ -557,7 +557,7 @@ class RegistryManager:
 
 
 def _make_data_symlinks(src, dst):
-    # registry/data/dataset_id/registry.toml
+    # registry/data/dataset_id/registry.json5
     # registry/data/dataset_id/version/*.parquet
     for dataset_id in (src / "data").iterdir():
         if dataset_id.is_dir():

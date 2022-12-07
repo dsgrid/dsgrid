@@ -5,7 +5,7 @@ Project Config
 **************
 .. include:: ../../_build/config_rsts/ProjectConfigModel.rst
 
-Example project.toml
+Example project.json5
 ====================
-.. literalinclude:: ../../_build/example_configs/project.toml
-   :language: toml
+.. literalinclude:: ../../_build/example_configs/project.json5
+   :language: json

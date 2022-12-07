@@ -27,7 +27,7 @@ class DatasetRegistry(RegistryBase):
 
     @staticmethod
     def config_filename():
-        return "dataset.toml"
+        return "dataset.json5"
 
     @property
     def config_id(self):

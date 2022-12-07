@@ -43,7 +43,7 @@ def make_standard_scenarios_registry(
         raise Exception("If include_datasets is True then include_projects must also be True.")
 
     path = create_local_test_registry(registry_path)
-    project_config_file = src_dir / "project.toml"
+    project_config_file = src_dir / "project.json5"
     dataset_base = Path("datasets/modeled")
     dataset_ids = (
         "conus_2022_reference_comstock",
@@ -63,7 +63,7 @@ def make_standard_scenarios_registry(
     dim_uuid_replacements = []
     dim_mapping_uuid_replacements = []
     for dataset_dir in dataset_dirs:
-        dataset_config_file = src_dir / dataset_base / dataset_dir / "dataset.toml"
+        dataset_config_file = src_dir / dataset_base / dataset_dir / "dataset.json5"
         dim_uuid_replacements.append(dataset_config_file)
         dim_mapping_uuid_replacements.append(dataset_config_file)
 
@@ -73,11 +73,11 @@ def make_standard_scenarios_registry(
         dataset_path = Path(dataset_path)
         for dataset_id, dataset_dir in zip(dataset_ids, dataset_dirs):
             config_path = src_dir / dataset_base / dataset_dir
-            dataset_config_file = config_path / "dataset.toml"
+            dataset_config_file = config_path / "dataset.json5"
             manager.dataset_manager.register(
                 dataset_config_file, dataset_path / dataset_id, user, log_message
             )
-            dimension_mapping_file = config_path / "dimension_mappings.toml"
+            dimension_mapping_file = config_path / "dimension_mappings.json5"
             if not dimension_mapping_file.exists():
                 dimension_mapping_file = None
             manager.project_manager.submit_dataset(

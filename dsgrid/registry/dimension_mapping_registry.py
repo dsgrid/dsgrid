@@ -24,7 +24,7 @@ class DimensionMappingRegistry(RegistryBase):
 
     @staticmethod
     def config_filename():
-        return "dimension_mapping.toml"
+        return "dimension_mapping.json5"
 
     @property
     def config_id(self):

@@ -42,7 +42,7 @@ def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data
             )
             dataset_dir = make_test_project_dir / "datasets" / "modeled" / "comstock"
             assert dataset_dir.exists()
-            dimension_mapping_refs = dataset_dir / "dimension_mapping_references.toml"
+            dimension_mapping_refs = dataset_dir / "dimension_mapping_references.json5"
             assert dimension_mapping_refs.exists()
 
             # TODO: finish workflow when ready (submit dataset)
@@ -69,10 +69,10 @@ def check_configs_dimensions(s3):
         for file in files:
             assert s3.listdir(f"configs/dimensions/{dim_type.value}/{file}") == [
                 "1.0.0",
-                "registry.toml",
+                "registry.json5",
             ], (
                 s3.listdir(f"configs/dimensions/{dim_type.value}/{file}")
-                == ["1.0.0", "registry.toml"],
+                == ["1.0.0", "registry.json5"],
                 f"configs/dimensions/{dim_type.value}/{file}",
                 file,
             )
@@ -84,14 +84,14 @@ def check_configs_dimension_mappings(s3):
     for folder in folders:
         files = s3.listdir(f"{path}/{folder}")
         for file in files:
-            assert file in ("1.0.0", "registry.toml")
-            if file != "registry.toml":
+            assert file in ("1.0.0", "registry.json5")
+            if file != "registry.json5":
                 files2 = s3.listdir(f"{path}/{folder}/{file}")
                 for file in files2:
                     assert len(files2) == 2
                     extensions = [file.split(".")[-1] for file in files2]
                     for extension in extensions:
-                        assert extension in ("csv", "toml")
+                        assert extension in ("csv", "json5")
 
 
 def check_configs_projects_and_datasets(s3):
@@ -102,39 +102,39 @@ def check_configs_projects_and_datasets(s3):
             files = s3.listdir(f"{path}/{folder}")
             for file in files:
                 if "projects" in path:
-                    assert file in ("1.0.0", "1.1.0", "registry.toml")
+                    assert file in ("1.0.0", "1.1.0", "registry.json5")
                     # project.toml
                     expected_file_count = 1
                 else:
-                    assert file in ("1.0.0", "registry.toml")
-                    expected_file_count = 1  # dataset.toml
-                if file != "registry.toml":
+                    assert file in ("1.0.0", "registry.json5")
+                    expected_file_count = 1  # dataset.json5
+                if file != "registry.json5":
                     files2 = s3.listdir(f"{path}/{folder}/{file}")
                     for file in files2:
                         assert len(files2) == expected_file_count
                         extensions = [file.split(".")[-1] for file in files2]
                         for extension in extensions:
-                            assert extension in ("csv", "toml")
+                            assert extension in ("csv", "json5")
 
 
 def check_dimension_version(s3, config_id, dimension_type, version):
-    assert "dimension.toml" in s3.listdir(
+    assert "dimension.json5" in s3.listdir(
         f"configs/dimensions/{dimension_type.value}/{config_id}/{version}"
     )
 
 
 def check_dimension_mapping_version(s3, config_id, version):
-    assert "dimension_mapping.toml" in s3.listdir(
+    assert "dimension_mapping.json5" in s3.listdir(
         f"configs/dimension_mappings/{config_id}/{version}"
     )
 
 
 def check_dataset_version(s3, config_id, version):
-    assert "dataset.toml" in s3.listdir(f"configs/datasets/{config_id}/{version}")
+    assert "dataset.json5" in s3.listdir(f"configs/datasets/{config_id}/{version}")
 
 
 def check_project_version(s3, config_id, version):
-    assert "project.toml" in s3.listdir(f"configs/projects/{config_id}/{version}")
+    assert "project.json5" in s3.listdir(f"configs/projects/{config_id}/{version}")
 
 
 def check_data(s3):
@@ -143,8 +143,8 @@ def check_data(s3):
     for folder in folders:
         files = s3.listdir(f"{path}/{folder}")
         for file in files:
-            assert file in ("1.0.0", "registry.toml")
-            if file != "registry.toml":
+            assert file in ("1.0.0", "registry.json5")
+            if file != "registry.json5":
                 files2 = s3.listdir(f"{path}/{folder}/{file}")
                 for file in files2:
                     assert len(files2) == 2

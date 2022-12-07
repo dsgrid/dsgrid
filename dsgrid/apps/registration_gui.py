@@ -15,8 +15,8 @@ from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.loggers import setup_logging
 from dsgrid.utils.spark import init_spark
 
-SS_PROJECT = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/project.toml"
-RS_DATASET = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/datasets/modeled/resstock/dataset.toml"
+SS_PROJECT = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/project.json5"
+RS_DATASET = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/datasets/modeled/resstock/dataset.json5"
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class RegistrationGui:
         self._project_file_text = widgets.Text(
             str(self._defaults["project_file"]),
             description="Project File",
-            placeholder="project.toml",
+            placeholder="project.json5",
         )
         self._project_file_ex = widgets.HTML(
             f"<a href={SS_PROJECT} target='_blank'>Example: Standard Scenarios</a>"
@@ -126,7 +126,7 @@ class RegistrationGui:
         self._dataset_file_text = widgets.Text(
             str(self._defaults["dataset_file"]),
             description="Dataset File",
-            placeholder="dataset.toml",
+            placeholder="dataset.json5",
         )
         self._dataset_path_text = widgets.Text(
             self._defaults["dataset_path"],
@@ -135,7 +135,7 @@ class RegistrationGui:
         )
         self._dimension_mapping_label = widgets.HTML("Dimension mapping file")
         self._dimension_mapping_text = widgets.Text(
-            str(self._defaults["dimension_mapping_file"]), placeholder="dimension_mappings.toml"
+            str(self._defaults["dimension_mapping_file"]), placeholder="dimension_mappings.json5"
         )
         self._dataset_project_id_dd = widgets.Dropdown(
             description="Project ID",

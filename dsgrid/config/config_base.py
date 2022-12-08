@@ -5,9 +5,10 @@ import os
 import shutil
 from pathlib import Path
 
+import json5
+
 from dsgrid.data_models import serialize_model
 from dsgrid.exceptions import DSGInvalidOperation
-from dsgrid.utils.files import dump_data
 from dsgrid.utils.spark import models_to_dataframe
 
 
@@ -106,7 +107,7 @@ class ConfigBase(abc.ABC):
         filename = Path(path) / self.config_filename()
         if filename.exists() and not force:
             raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
-        dump_data(serialize_model(self.model), filename)
+        filename.write_text(json5.dumps(serialize_model(self.model), indent=2))
         return filename
 
 
@@ -195,7 +196,7 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
                 new_files.append(Path(orig_file).name)
             model_data[field] = new_files
 
-        dump_data(model_data, dst_config_file)
+        dst_config_file.write_text(json5.dumps(model_data, indent=2))
         return dst_config_file
 
     @property

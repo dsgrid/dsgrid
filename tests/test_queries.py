@@ -5,6 +5,7 @@ import shutil
 import tempfile
 from collections import defaultdict, namedtuple
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import pyspark.sql.functions as F
 import pytest
@@ -51,6 +52,32 @@ Tables = namedtuple("Tables", ["load_data", "lookup", "table"])
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture(scope="module")
+def la_expected_electricity_hour_16():
+    with TemporaryDirectory() as tmpdir:
+        output_dir = Path(tmpdir) / "diurnal_queries"
+        project = get_project()
+        query = QueryTestElectricityValues(False, REGISTRY_PATH, project, output_dir=output_dir)
+        ProjectQuerySubmitter(project, output_dir).submit(
+            query.make_query(),
+            persist_intermediate_table=False,
+            load_cached_table=False,
+        )
+        df = read_parquet(str(output_dir / query.name / "table.parquet"))
+        df = df.withColumn("elec", df.electricity_cooling + df.electricity_heating).drop(
+            "electricity_cooling", "electricity_heating"
+        )
+        expected = (
+            df.groupBy("county", F.hour("time_est").alias("hour"))
+            .agg(F.mean("elec"))
+            .filter(f"hour == 16")
+            .collect()[0]["avg(elec)"]
+        )
+        yield {
+            "la_electricity_hour_16": expected,
+        }
+
+
 def test_electricity_values():
     run_query_test(QueryTestElectricityValues, True)
     run_query_test(QueryTestElectricityValues, False)
@@ -74,12 +101,18 @@ def test_total_electricity_use_by_state_and_pca():
     run_query_test(QueryTestElectricityUseByStateAndPCA)
 
 
-def test_diurnal_electricity_use_by_pca_pre_post_concat():
-    run_query_test(QueryTestDiurnalElectricityUseByCountyPrePostConcat)
+def test_diurnal_electricity_use_by_pca_pre_post_concat(la_expected_electricity_hour_16):
+    run_query_test(
+        QueryTestDiurnalElectricityUseByCountyPrePostConcat,
+        expected_values=la_expected_electricity_hour_16,
+    )
 
 
-def test_diurnal_electricity_use_by_county_chained():
-    run_query_test(QueryTestDiurnalElectricityUseByCountyChained)
+def test_diurnal_electricity_use_by_county_chained(la_expected_electricity_hour_16):
+    run_query_test(
+        QueryTestDiurnalElectricityUseByCountyChained,
+        expected_values=la_expected_electricity_hour_16,
+    )
 
 
 def test_peak_load():
@@ -222,7 +255,7 @@ def shutdown_project():
             shutil.rmtree(path)
 
 
-def run_query_test(test_query_cls, *args):
+def run_query_test(test_query_cls, *args, expected_values=None):
     output_dir = Path(tempfile.gettempdir()) / "queries"
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -237,7 +270,7 @@ def run_query_test(test_query_cls, *args):
                 load_cached_table=load_cached_table,
                 force=True,
             )
-            query.validate()
+            query.validate(expected_values=expected_values)
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -293,8 +326,13 @@ class QueryTestBase(abc.ABC):
         """Return the query model"""
 
     @abc.abstractmethod
-    def validate(self):
+    def validate(self, expected_values=None):
         """Validate the results
+
+        Parameters
+        ----------
+        expected_values : dict | None
+            Optional dictionary containing expected values from a pytest fixture.
 
         Returns
         -------
@@ -373,7 +411,7 @@ class QueryTestElectricityValues(QueryTestBase):
             )
         return self._model
 
-    def validate(self):
+    def validate(self, expected_values=None):
         county = "06037"
         county_name = (
             self._project.config.get_dimension_records("county")
@@ -468,7 +506,7 @@ class QueryTestElectricityUse(QueryTestBase):
         )
         return self._model
 
-    def validate(self):
+    def validate(self, expected_values=None):
         if self._geography == "county":
             validate_electricity_use_by_county(
                 self._op,
@@ -549,7 +587,7 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
         )
         return self._model
 
-    def validate(self):
+    def validate(self, expected_values=None):
         validate_electricity_use_by_county(
             "sum",
             self.output_dir / self.name / "table.parquet",
@@ -614,8 +652,10 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
         )
         return self._model
 
-    def validate(self):
-        validate_county_diurnal_hourly(self.output_dir / self.name / "table.parquet")
+    def validate(self, expected_values=None):
+        validate_county_diurnal_hourly(
+            self.output_dir / self.name / "table.parquet", expected_values
+        )
 
 
 class QueryTestDiurnalElectricityUseByCountyPrePostConcat(QueryTestBase):
@@ -677,8 +717,10 @@ class QueryTestDiurnalElectricityUseByCountyPrePostConcat(QueryTestBase):
         )
         return self._model
 
-    def validate(self):
-        validate_county_diurnal_hourly(self.output_dir / self.name / "table.parquet")
+    def validate(self, expected_values=None):
+        validate_county_diurnal_hourly(
+            self.output_dir / self.name / "table.parquet", expected_values
+        )
 
 
 class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
@@ -720,7 +762,7 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
         )
         return self._model
 
-    def validate(self):
+    def validate(self, expected_values=None):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
         assert not {"all_electricity_sum", "reeds_pca", "state", "census_region"}.difference(
             df.columns
@@ -774,7 +816,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
         )
         return self._model
 
-    def validate(self):
+    def validate(self, expected_values=None):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
         peak_load = read_parquet(self.output_dir / self.name / PeakLoadReport.REPORT_FILENAME)
         model_year = "2018"
@@ -828,7 +870,7 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
         )
         return self._model
 
-    def validate(self):
+    def validate(self, expected_values=None):
         df = read_parquet(
             str(self.output_dir / "composite_datasets" / self._model.dataset_id / "table.parquet")
         )
@@ -884,7 +926,7 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
         )
         return self._model
 
-    def validate(self):
+    def validate(self, expected_values=None):
         if self._geography == "county":
             validate_electricity_use_by_county(
                 "sum",
@@ -941,17 +983,12 @@ def validate_electricity_use_by_state(op, results_path, raw_stats):
     assert math.isclose(actual_ny, exp_ny)
 
 
-def validate_county_diurnal_hourly(filename):
+def validate_county_diurnal_hourly(filename, expected_values):
     df = read_parquet(filename)
     assert not {"all_electricity_sum", "county", "hour"}.difference(df.columns)
-
-    val = df.filter("county == '06037'").filter("hour == 16").collect()[0].all_electricity_sum
-    # Computed this value manually by reading a dataframe from
-    # QueryTestElectricityValues and running these commands.
-    # df = df.withColumn("elec", df.electricity_cooling + df.electricity_heating).drop("electricity_cooling", "electricity_heating")
-    # df.groupBy("county", F.hour("time_est").alias("hour")).agg(F.mean("elec")).sort("county", "hour").show()
-    expected = 385856.4879243111
-    assert math.isclose(val, expected)
+    hour = 16
+    val = df.filter("county == '06037'").filter(f"hour == {hour}").collect()[0].all_electricity_sum
+    assert math.isclose(val, expected_values["la_electricity_hour_16"])
 
 
 def get_expected_ca_max_electricity(raw_stats):

@@ -1,0 +1,21 @@
+{
+  "create_registry": true,
+  "registry_path": "efs-2018-registry",
+  "projects": [
+    {
+      "project_id": "efs_2018",
+      "config_file": "../dsgrid-project-EFS/dsgrid_project/project.json5",
+      "register_project": true,
+      "datasets": [
+        {
+          "dataset_id": "test_efs_comstock",
+          "dataset_path": "../dsgrid-data/efs_comstock",
+          "config_file": "../dsgrid-project-EFS/dsgrid_project/datasets/sector_models/comstock/dataset.json5",
+          "register_dataset": true,
+          "submit_to_project": true,
+          "fix_dimension_uuids": true,
+        }
+      ]
+    }
+  ]
+}

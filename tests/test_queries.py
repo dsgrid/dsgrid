@@ -947,7 +947,7 @@ def validate_county_diurnal_hourly(filename):
 
     val = df.filter("county == '06037'").filter("hour == 16").collect()[0].all_electricity_sum
     # Computed this value manually by reading a dataframe from
-    # QueryTestElectricityValuesStandalone and running these commands.
+    # QueryTestElectricityValues and running these commands.
     # df = df.withColumn("elec", df.electricity_cooling + df.electricity_heating).drop("electricity_cooling", "electricity_heating")
     # df.groupBy("county", F.hour("time_est").alias("hour")).agg(F.mean("elec")).sort("county", "hour").show()
     expected = 385856.4879243111

@@ -84,15 +84,17 @@ def test_get_project():
 
 def test_list_datasets():
     response = ListDatasetsResponse(**check_response("/datasets").json())
-    assert len(response.datasets) == 3
-    assert response.datasets[0].dataset_id == "conus_2022_reference_comstock"
+    assert len(response.datasets) == 5
+    assert (
+        response.datasets[0].dataset_id == "aeo2021_reference_commercial_energy_use_growth_factors"
+    )
 
 
 def test_get_dataset():
     response = GetDatasetResponse(
-        **check_response("/datasets/conus_2022_reference_comstock").json()
+        **check_response("/datasets/comstock_conus_2022_reference").json()
     )
-    assert response.dataset.dataset_id == "conus_2022_reference_comstock"
+    assert response.dataset.dataset_id == "comstock_conus_2022_reference"
 
 
 def test_list_project_dimensions():
@@ -122,6 +124,7 @@ def test_list_project_supplemental_dimension_query_names():
     )
     result = ListProjectSupplementalDimensionQueryNames(**response.json())
     assert result.dimension_query_names == [
+        "all_geographies",
         "census_division",
         "census_region",
         "reeds_pca",

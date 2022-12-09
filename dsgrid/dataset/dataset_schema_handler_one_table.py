@@ -125,7 +125,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         for dim in self._config.model.trivial_dimensions:
             col = dim.value
             count = load_df.select(col).distinct().count()
-            assert count == 1, f"{dim}: count"
+            assert count == 1, f"{dim}: {count}"
             drop_columns.append(col)
         load_df = load_df.drop(*drop_columns)
 

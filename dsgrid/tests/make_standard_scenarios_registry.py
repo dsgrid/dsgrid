@@ -46,8 +46,8 @@ def make_standard_scenarios_registry(
     project_config_file = src_dir / "project.json5"
     dataset_base = Path("datasets/modeled")
     dataset_ids = (
-        "conus_2022_reference_comstock",
-        "conus_2022_reference_resstock",
+        "comstock_conus_2022_reference",
+        "resstockconus_2022_reference",
         "tempo_conus_2022",
     )
     dataset_dirs = ("comstock", "resstock", "tempo")

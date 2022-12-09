@@ -107,8 +107,8 @@ def test_invalid_drop_pivoted_dimension(tmp_path):
             project_id="dsgrid_conus_2022",
             include_dsgrid_dataset_components=False,
             dataset_ids=[
-                "conus_2022_reference_comstock",
-                "conus_2022_reference_resstock",
+                "comstock_conus_2022_reference",
+                "resstock_conus_2022_reference",
             ],
         ),
         result=QueryResultParamsModel(
@@ -237,6 +237,7 @@ def run_query_test(test_query_cls, *args):
                 load_cached_table=load_cached_table,
                 force=True,
             )
+            query.validate()
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -324,8 +325,8 @@ class QueryTestElectricityValues(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset_ids=[
-                    "conus_2022_reference_comstock",
-                    "conus_2022_reference_resstock",
+                    "comstock_conus_2022_reference",
+                    "resstock_conus_2022_reference",
                     # "tempo_conus_2022",
                 ],
                 dataset_params=ProjectQueryDatasetParamsModel(
@@ -423,8 +424,8 @@ class QueryTestElectricityUse(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset_ids=[
-                    "conus_2022_reference_comstock",
-                    "conus_2022_reference_resstock",
+                    "comstock_conus_2022_reference",
+                    "resstock_conus_2022_reference",
                 ],
                 dataset_params=ProjectQueryDatasetParamsModel(
                     per_dataset_aggregations=[
@@ -496,8 +497,8 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset_ids=[
-                    "conus_2022_reference_comstock",
-                    "conus_2022_reference_resstock",
+                    "comstock_conus_2022_reference",
+                    "resstock_conus_2022_reference",
                 ],
                 dataset_params=ProjectQueryDatasetParamsModel(
                     dimension_filters=[
@@ -568,8 +569,8 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset_ids=[
-                    "conus_2022_reference_comstock",
-                    "conus_2022_reference_resstock",
+                    "comstock_conus_2022_reference",
+                    "resstock_conus_2022_reference",
                 ],
             ),
             result=QueryResultParamsModel(
@@ -628,8 +629,8 @@ class QueryTestDiurnalElectricityUseByCountyPrePostConcat(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset_ids=[
-                    "conus_2022_reference_comstock",
-                    "conus_2022_reference_resstock",
+                    "comstock_conus_2022_reference",
+                    "resstock_conus_2022_reference",
                 ],
                 dataset_params=ProjectQueryDatasetParamsModel(
                     per_dataset_aggregations=[
@@ -691,8 +692,8 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset_ids=[
-                    "conus_2022_reference_comstock",
-                    "conus_2022_reference_resstock",
+                    "comstock_conus_2022_reference",
+                    "resstock_conus_2022_reference",
                 ],
                 dataset_params=ProjectQueryDatasetParamsModel(
                     per_dataset_aggregations=[
@@ -737,8 +738,8 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset_ids=[
-                    "conus_2022_reference_comstock",
-                    "conus_2022_reference_resstock",
+                    "comstock_conus_2022_reference",
+                    "resstock_conus_2022_reference",
                 ],
                 dataset_params=ProjectQueryDatasetParamsModel(
                     per_dataset_aggregations=[
@@ -776,7 +777,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
     def validate(self):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
         peak_load = read_parquet(self.output_dir / self.name / PeakLoadReport.REPORT_FILENAME)
-        model_year = "2020"
+        model_year = "2018"
         scenario = "reference"
         state = "CA"
         subsector = "hospital"
@@ -811,8 +812,8 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset_ids=[
-                    "conus_2022_reference_comstock",
-                    "conus_2022_reference_resstock",
+                    "comstock_conus_2022_reference",
+                    "resstock_conus_2022_reference",
                     # "tempo_conus_2022",
                 ],
                 dataset_params=ProjectQueryDatasetParamsModel(
@@ -945,10 +946,11 @@ def validate_county_diurnal_hourly(filename):
     assert not {"all_electricity_sum", "county", "hour"}.difference(df.columns)
 
     val = df.filter("county == '06037'").filter("hour == 16").collect()[0].all_electricity_sum
-    # Computed this value manually by reading a composite dataframe and running this
+    # Computed this value manually by reading a dataframe from
+    # QueryTestElectricityValuesStandalone and running these commands.
     # df = df.withColumn("elec", df.electricity_cooling + df.electricity_heating).drop("electricity_cooling", "electricity_heating")
-    # df.groupBy("county", F.hour("time_est").alias("hour")).agg(F.mean(".elec")).sort("county", "hour").show()
-    expected = 223597.40584404464
+    # df.groupBy("county", F.hour("time_est").alias("hour")).agg(F.mean("elec")).sort("county", "hour").show()
+    expected = 385856.4879243111
     assert math.isclose(val, expected)
 
 
@@ -1073,8 +1075,8 @@ def accumulate_stats(stats):
 
 def read_datasets(path):
     datasets = Datasets(
-        comstock=read_table(path / "data" / "conus_2022_reference_comstock" / "1.0.0"),
-        resstock=read_table(path / "data" / "conus_2022_reference_resstock" / "1.0.0"),
+        comstock=read_table(path / "data" / "comstock_conus_2022_reference" / "1.0.0"),
+        resstock=read_table(path / "data" / "resstock_conus_2022_reference" / "1.0.0"),
         tempo=read_dataset_tempo(),
     )
     return datasets
@@ -1118,8 +1120,8 @@ def perform_op_by_electricity(stats, table, name, operation):
             col_name,
         )
         if op == "sum":
-            # 2 scenarios x 2 model years
-            val *= 4
+            # 2 scenarios
+            val *= 2
         stats[name][op][col] = val
     stats[name]["count"] = table.count()
 

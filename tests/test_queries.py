@@ -5,7 +5,6 @@ import shutil
 import tempfile
 from collections import defaultdict, namedtuple
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import pyspark.sql.functions as F
 import pytest
@@ -53,29 +52,28 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture(scope="module")
-def la_expected_electricity_hour_16():
-    with TemporaryDirectory() as tmpdir:
-        output_dir = Path(tmpdir) / "diurnal_queries"
-        project = get_project()
-        query = QueryTestElectricityValues(False, REGISTRY_PATH, project, output_dir=output_dir)
-        ProjectQuerySubmitter(project, output_dir).submit(
-            query.make_query(),
-            persist_intermediate_table=False,
-            load_cached_table=False,
-        )
-        df = read_parquet(str(output_dir / query.name / "table.parquet"))
-        df = df.withColumn("elec", df.electricity_cooling + df.electricity_heating).drop(
-            "electricity_cooling", "electricity_heating"
-        )
-        expected = (
-            df.groupBy("county", F.hour("time_est").alias("hour"))
-            .agg(F.mean("elec"))
-            .filter("hour == 16")
-            .collect()[0]["avg(elec)"]
-        )
-        yield {
-            "la_electricity_hour_16": expected,
-        }
+def la_expected_electricity_hour_16(tmp_path_factory):
+    output_dir = tmp_path_factory.mktemp("diurnal_queries")
+    project = get_project()
+    query = QueryTestElectricityValues(False, REGISTRY_PATH, project, output_dir=output_dir)
+    ProjectQuerySubmitter(project, output_dir).submit(
+        query.make_query(),
+        persist_intermediate_table=False,
+        load_cached_table=False,
+    )
+    df = read_parquet(str(output_dir / query.name / "table.parquet"))
+    df = df.withColumn("elec", df.electricity_cooling + df.electricity_heating).drop(
+        "electricity_cooling", "electricity_heating"
+    )
+    expected = (
+        df.groupBy("county", F.hour("time_est").alias("hour"))
+        .agg(F.mean("elec"))
+        .filter("hour == 16")
+        .collect()[0]["avg(elec)"]
+    )
+    yield {
+        "la_electricity_hour_16": expected,
+    }
 
 
 def test_electricity_values():

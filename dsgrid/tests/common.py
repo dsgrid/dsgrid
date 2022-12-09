@@ -18,7 +18,7 @@ TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_efs"
 TEST_STANDARD_SCENARIOS_PROJECT_REPO = TEST_PROJECT_PATH / "standard_scenarios_2021"
 TEST_DATASET_DIRECTORY = TEST_PROJECT_PATH / "datasets"
 TEST_REGISTRY = Path("tests/data/registry")
-TEST_EFS_REGISTRATION_FILE = Path("tests/data/test_efs_registration.json")
+TEST_EFS_REGISTRATION_FILE = Path("tests/data/test_efs_registration.json5")
 AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 TEST_REMOTE_REGISTRY = "s3://nrel-dsgrid-registry-test"
 

@@ -66,7 +66,6 @@ def test_convert_to_project_time(registry_mgr):
     comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
     comstock_geo_dim = comstock._handler.config.get_dimension(DimensionType.GEOGRAPHY)
     tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
-    tempo_geo_dim = tempo._handler.config.get_dimension(DimensionType.GEOGRAPHY)
 
     # [1] test build_time_dataframe()
     check_time_dataframe(project_time_dim)

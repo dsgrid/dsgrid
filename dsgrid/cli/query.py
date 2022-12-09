@@ -124,7 +124,7 @@ _COMMON_RUN_OPTIONS = (
 @click.option(
     "-f",
     "--query-file",
-    default="query.json",
+    default="query.json5",
     show_default=True,
     help="Query file to create.",
     callback=lambda _, __, x: Path(x),

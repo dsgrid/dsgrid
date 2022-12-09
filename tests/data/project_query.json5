@@ -4,7 +4,7 @@
   "project": {
     "project_id": "dsgrid_conus_2022",
     "dataset_ids": [
-      "conus_2022_reference_resstock"
+      "resstock_conus_2022_reference"
     ],
     "excluded_dataset_ids": [],
     "include_dsgrid_dataset_components": false,

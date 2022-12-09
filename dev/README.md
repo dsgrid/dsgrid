@@ -253,7 +253,7 @@ app = RegistrationGui(
         "project_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/project.json5",
         "dataset_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dataset.json5",
         "dimension_mapping_file": "/repos/dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dimension_mappings.json5",
-        "dataset_path": "/dsgrid-data/data-StandardScenarios/conus_2022_reference_comstock",
+        "dataset_path": "/dsgrid-data/data-StandardScenarios/comstock_conus_2022_reference",
         "log_message": "log message",
     }
 )

@@ -70,7 +70,7 @@ def la_expected_electricity_hour_16():
         expected = (
             df.groupBy("county", F.hour("time_est").alias("hour"))
             .agg(F.mean("elec"))
-            .filter(f"hour == 16")
+            .filter("hour == 16")
             .collect()[0]["avg(elec)"]
         )
         yield {

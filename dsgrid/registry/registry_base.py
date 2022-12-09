@@ -3,6 +3,7 @@ import logging
 from typing import List, Optional
 
 
+import json5
 from pydantic import Field
 from pydantic import validator
 
@@ -13,7 +14,6 @@ from dsgrid.registry.common import (
     ConfigRegistrationModel,
 )
 from dsgrid.data_models import serialize_model
-from dsgrid.utils.files import dump_data
 from dsgrid.utils.versioning import handle_version_or_str
 
 
@@ -74,7 +74,7 @@ class RegistryBase(ConfigBase, abc.ABC):
     def serialize(self, path, force=False):
         if path.exists() and not force:
             raise DSGInvalidOperation(f"{path} exists. Set force=True to overwrite.")
-        dump_data(serialize_model(self._model), path)
+        path.write_text(json5.dumps(serialize_model(self._model), indent=2))
 
     @property
     def version(self):

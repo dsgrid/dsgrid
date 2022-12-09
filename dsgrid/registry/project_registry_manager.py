@@ -9,6 +9,7 @@ import tempfile
 from pathlib import Path
 from typing import Union, List, Dict
 
+import json5
 from prettytable import PrettyTable
 
 from dsgrid.dimension.base_models import DimensionType
@@ -47,7 +48,7 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
 )
 from dsgrid.utils.timing import track_timing, timer_stats_collector
-from dsgrid.utils.files import dump_data, load_data, run_in_other_dir
+from dsgrid.utils.files import load_data, run_in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.spark import (
     models_to_dataframe,
@@ -782,7 +783,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             # We don't currently have a way to register a single dimension mapping. It would be
             # better to register these mappings directly. But, this code was already here.
             mapping_file = Path(tempfile.gettempdir()) / "dimension_mappings.json5"
-            dump_data({"mappings": new_mappings}, mapping_file)
+            mapping_file.write_text(json5.dumps({"mappings": new_mappings}, indent=2))
             to_delete = [mapping_file] + [x["file"] for x in new_mappings]
             try:
                 references += self._register_mappings_from_file(

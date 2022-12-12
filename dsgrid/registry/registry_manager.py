@@ -562,12 +562,12 @@ def _make_data_symlinks(src, dst):
     for dataset_id in (src / "data").iterdir():
         if dataset_id.is_dir():
             (dst / "data" / dataset_id.name).mkdir(parents=True)
-        for path in (src / "data" / dataset_id).iterdir():
+        for path in (src / "data" / dataset_id.name).iterdir():
             if path.is_dir():
                 (dst / "data" / dataset_id.name / path.name).mkdir()
                 for data_file in path.iterdir():
                     os.symlink(
-                        data_file,
+                        data_file.absolute(),
                         dst / "data" / dataset_id.name / path.name / data_file.name,
                         target_is_directory=data_file.is_dir(),
                     )

@@ -232,8 +232,7 @@ NREL's HPC GitHub repository contains scripts that will create an ephemeral Spar
 on compute nodes that you allocate.
 
 The README in the repository has generic instructions to run Spark in a variety of ways. The rest
-of this section calls out choices that you should make to run Spark with dsgrid.
-a Spark cluster in an interactive session.
+of this section calls out choices that you should make to run Spark jobs with dsgrid.
 
 1. The repository has setup instructions that are not currently correct because the branch
 is still under review. Follow

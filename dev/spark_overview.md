@@ -228,22 +228,17 @@ This section describes how you can run Spark jobs on any number of HPC compute n
 The scripts and examples described here rely on the SLURM scheduling system and have been tested
 on NREL's Eagle cluster.
 
-NREL's HPC GitHub repository contains scripts that will create an ephemeral Spark cluster
-on compute nodes that you allocate.
+NREL's HPC GitHub [repository](https://github.com/NREL/HPC) contains scripts that will create an
+ephemeral Spark cluster on compute nodes that you allocate.
 
-The README in the repository has generic instructions to run Spark in a variety of ways. The rest
-of this section calls out choices that you should make to run Spark jobs with dsgrid.
+The [README](https://github.com/NREL/HPC/blob/master/applications/spark/README.md) in the
+repository has generic instructions to run Spark in a variety of ways. The rest of this section
+calls out choices that you should make to run Spark jobs with dsgrid.
 
-1. The repository has setup instructions that are not currently correct because the branch
-is still under review. Follow
-https://github.com/daniel-thom/HPC/blob/apache-spark-clusters/applications/spark/README.md.
-You can get the code with these git commands:
+1. Clone the repository.
 
 ```
-$ git clone https://github.com/daniel-thom/HPC.git
-$ cd HPC
-$ git fetch origin apache-spark-clusters
-$ git checkout apache-spark-clusters
+$ git clone https://github.com/NREL/HPC.git
 ```
 
 2. Choose compute node(s) with fast local storage. This example will allocate one node.

@@ -3,8 +3,8 @@ This page describes Spark concepts that are important to understand when using d
 
 [Spark Overview](#spark-overview) |
 [Conventions](#conventions) |
-[Installing a Spark Standalone Cluster on Your Laptop](#installing-a-spark-standalone-cluster-on-your-laptop) |
-[Installing a Spark Standalone Cluster on an HPC](#installing-a-spark-standalone-cluster-on-an-hpc) |
+[Installing a Spark Standalone Cluster on Your Laptop](#laptop) |
+[Installing a Spark Standalone Cluster on an HPC](#hpc) |
 [Tuning Spark Configuration Settings](#tuning-spark-configuration-settings) |
 [Creating a SparkSession with dsgrid](#creating-a-sparksession-with-dsgrid) |
 [Spark Configuration Problems](#spark-configuration-problems)
@@ -261,6 +261,7 @@ Python 3.10. The team has validated the container below. It was created with thi
 in dsgrid: `docker/spark/Dockerfile`. The container includes ipython, jupyter, pyspark, pandas,
 and pyarrow, but not dsgrid.
 
+    This command can be run on a login node or a compute node.
 ```
 $ create_config.sh -c /projects/dsgrid/containers/spark_py310.sif
 ```
@@ -268,8 +269,20 @@ $ create_config.sh -c /projects/dsgrid/containers/spark_py310.sif
 4. Configure Spark parameters based on the amount of memory and CPU in each compute node. dsgrid
 jobs on Eagle seem to work better with dynamic allocation enabled.
 
+    This command must be run on a compute node. The script will check for the environment variable
+    `SLURM_JOB_ID`, which is set by `SLURM`. If you ssh'd into the compute node, it won't be set and
+    then you have to pass it as an argument.
+
+    Choose the option that is appropriate for your environment.
+
 ```
 $ configure_spark.sh --dynamic-allocation
+```
+```
+$ configure_spark.sh --dynamic-allocation <SLURM_JOB_ID>
+```
+```
+$ configure_spark.sh --dynamic-allocation <SLURM_JOB_ID1> <SLURM_JOB_ID2>
 ```
 
     Run `configure_spark.sh --help` to see all options.

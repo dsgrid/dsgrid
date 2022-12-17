@@ -1,9 +1,9 @@
 import operator
 
-from py_expression_eval import Parser
 from pyspark.sql import DataFrame
 
 from dsgrid.exceptions import DSGInvalidOperation
+from dsgrid.utils.py_expression_eval import Parser
 
 
 class DatasetExpressionHandler:

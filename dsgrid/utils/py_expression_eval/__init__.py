@@ -332,6 +332,9 @@ class Parser:
         a.append(b)
         return a
 
+    def union(self, a, b):
+        return a | b
+
     def __init__(self, string_literal_quotes = ("'", "\"")):
         self.string_literal_quotes = string_literal_quotes
 
@@ -391,7 +394,8 @@ class Parser:
             "or": self.orOperator,
             "xor": self.xorOperator,
             "in": self.inOperator,
-            "D": self.roll
+            "D": self.roll,
+            "|": self.union,
         }
 
         self.functions = {
@@ -727,6 +731,7 @@ class Parser:
             ('and ', 1, 'and'),
             ('xor ', 0, 'xor'),
             ('or ', 0, 'or'),
+            ('|', 3, '|'),
         )
         for token, priority, index in ops:
             if self.expression.startswith(token, self.pos):

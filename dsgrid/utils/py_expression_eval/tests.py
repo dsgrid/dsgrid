@@ -13,7 +13,7 @@
 
 import unittest
 
-from py_expression_eval import Parser
+from dsgrid.utils.py_expression_eval import Parser
 
 
 class ParserTestCase(unittest.TestCase):
@@ -74,6 +74,7 @@ class ParserTestCase(unittest.TestCase):
         self.assertEqual(parser.parse("(a**2-b**2+1)==((a+b)*(a-b))").evaluate({'a': 4859, 'b': 13150}), False)
         self.assertExactEqual(parser.parse("x/((x+y))").simplify({}).evaluate({'x': 1, 'y': 1}), 0.5)
         self.assertExactEqual(parser.parse('origin+2.0').evaluate({'origin': 1.0}), 3.0)
+        assert parser.parse('a | b').evaluate({'a': set([1, 2]), 'b': set([3, 4])}) == set([1, 2, 3, 4])
 
         # logical expressions
         self.assertExactEqual(parser.parse('a and b').evaluate({'a': True, 'b': False}), False)

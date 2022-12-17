@@ -30,7 +30,7 @@ jobs:
         # Credentials would need to be configured.
         git submodule init
         git submodule update
-        python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests
+        python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:

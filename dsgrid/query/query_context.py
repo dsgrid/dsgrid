@@ -92,8 +92,8 @@ class QueryContext:
         else:
             self._dataset_metadata[dataset_id].table_format_type = val
 
-    def get_dimension_query_names(self, dimension_type: DimensionType):
-        return getattr(self._metadata.dimensions, dimension_type.value)
+    def get_dimension_query_names(self, dimension_type: DimensionType, dataset_id=None):
+        return self._get_dimension_query_name_container(dimension_type, dataset_id=dataset_id)
 
     def get_all_dimension_query_names(self):
         names = set()
@@ -146,6 +146,9 @@ class QueryContext:
         if dataset_id is None:
             return getattr(self._metadata.dimensions, field)
         return getattr(self._dataset_metadata[dataset_id].dimensions, field)
+
+    def get_record_ids(self):
+        return self._record_ids_by_dimension_type
 
     def get_record_ids_by_dimension_type(self, dimension_type):
         return self._record_ids_by_dimension_type[dimension_type]

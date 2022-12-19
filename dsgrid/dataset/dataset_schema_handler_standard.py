@@ -1,4 +1,3 @@
-import itertools
 import logging
 from pathlib import Path
 from typing import List
@@ -10,7 +9,7 @@ from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
+from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import TableFormatType
 from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
@@ -69,11 +68,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         lk_df = self._remap_dimension_columns(lk_df)
+        pivoted_columns = set(ld_df.columns).intersection(self.get_pivoted_dimension_columns())
         ld_df = self._remap_dimension_columns(
             ld_df,
-            # Some pivot columns may have been removed.
-            pivoted_columns=set(ld_df.columns).intersection(self.get_pivoted_dimension_columns()),
+            pivoted_columns=pivoted_columns,
         )
+        pivoted_columns = set(ld_df.columns).intersection(
+            self.get_pivoted_dimension_columns_mapped_to_project()
+        )
+        ld_df = self._apply_fraction(ld_df, pivoted_columns)
         if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
@@ -84,26 +87,31 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._load_data
 
         self._check_aggregations(context)
-        lk_df, ld_df = self._prefilter_dataset(context, lk_df, ld_df)
+        lk_df = self._prefilter_stacked_dimensions(context, lk_df)
+        ld_df = self._prefilter_pivoted_dimensions(context, ld_df)
+        ld_df = self._prefilter_time_dimension(context, ld_df)
 
-        # TODO: handle fraction application
-        # Currently this requires fraction = 1.0
         ld_df = ld_df.join(lk_df, on="id").drop("id")
 
         convert_time_before_project_mapping = self._convert_time_before_project_mapping()
         if convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
-        # Some pivoted columns may have been removed in pre-filtering.
+        # Some pivoted columns may have been removed in pre-filtering. The remap may change them
+        # further.
         pivoted_columns = set(ld_df.columns).intersection(self.get_pivoted_dimension_columns())
-        ld_df = self._remap_dimension_columns(ld_df, pivoted_columns=pivoted_columns)
-
-        if not convert_time_before_project_mapping:
-            ld_df = self._convert_time_dimension(ld_df, project_config)
+        ld_df = self._remap_dimension_columns(
+            ld_df, pivoted_columns=pivoted_columns, filtered_records=context.get_record_ids()
+        )
 
         pivoted_columns = set(ld_df.columns).intersection(
             self.get_pivoted_dimension_columns_mapped_to_project()
         )
+        ld_df = self._apply_fraction(ld_df, pivoted_columns)
+
+        if not convert_time_before_project_mapping:
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
         context.add_dataset_metadata(self.dataset_id)
         context.set_pivoted_columns(pivoted_columns, dataset_id=self.dataset_id)
         context.set_pivoted_dimension_type(
@@ -114,59 +122,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             context.add_dimension_query_name(dim_type, name, dataset_id=self.dataset_id)
 
         table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
-        ld_df = table_handler.process_pivoted_aggregations(
-            ld_df, context.model.project.dataset_params.per_dataset_aggregations, context
-        )
-        ld_df = table_handler.convert_columns_to_query_names(ld_df)
-        ld_df = table_handler.process_stacked_aggregations(
-            ld_df, context.model.project.dataset_params.per_dataset_aggregations, context
-        )
-
-        return ld_df
-
-    def _check_aggregations(self, context):
-        pivoted_type = self.get_pivoted_dimension_type()
-        for agg in itertools.chain(
-            context.model.project.dataset_params.per_dataset_aggregations,
-            context.model.result.aggregations,
-        ):
-            if not getattr(agg.dimensions, pivoted_type.value):
-                raise DSGInvalidQuery(
-                    f"Pivoted dimension type {pivoted_type.value} is not included in an aggregation"
-                )
-
-    def _prefilter_dataset(self, context: QueryContext, lk_df, ld_df):
-        # TODO: prefilter time
-
-        for dim_type, project_record_ids in context.iter_record_ids_by_dimension_type():
-            dataset_mapping = self._get_dataset_to_project_mapping_records(dim_type)
-            if dataset_mapping is None:
-                dataset_record_ids = project_record_ids
-            else:
-                dataset_record_ids = (
-                    dataset_mapping.withColumnRenamed("from_id", "dataset_record_id")
-                    .join(
-                        project_record_ids,
-                        on=dataset_mapping.to_id == project_record_ids.id,
-                    )
-                    .selectExpr("dataset_record_id AS id")
-                    .distinct()
-                )
-            if dim_type == self.get_pivoted_dimension_type():
-                # Drop columns that don't match requested project record IDs.
-                cols_to_keep = {x.id for x in dataset_record_ids.collect()}
-                cols_to_drop = set(self.get_pivoted_dimension_columns()).difference(cols_to_keep)
-                if cols_to_drop:
-                    ld_df = ld_df.drop(*cols_to_drop)
-            else:
-                # Drop rows that don't match requested project record IDs.
-                tmp = dataset_record_ids.withColumnRenamed("id", "dataset_record_id")
-                lk_df = lk_df.join(
-                    tmp,
-                    on=lk_df[dim_type.value] == tmp.dataset_record_id,
-                ).drop("dataset_record_id")
-
-        return lk_df, ld_df
+        return table_handler.convert_columns_to_query_names(ld_df)
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):

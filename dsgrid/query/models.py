@@ -192,14 +192,6 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
         description="Filters to apply to all datasets",
         default=[],
     )
-    per_dataset_aggregations: List[AggregationModel] = Field(
-        description="Defines how to aggregate dimensions",
-        default=[],
-    )
-    # TODO: When do we filter dimensions based on project vs dataset?
-    # filtered_datasets: FilteredDatasetModel = Field(
-    #     description="", default=[]
-    # )
     # TODO: Should this be a result param instead of project? Or both?
     table_format: TableFormatType = Field(
         description="Controls table format",
@@ -213,40 +205,134 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
                 dimension_filters[i] = make_dimension_filter(dimension_filter)
         return dimension_filters
 
-    @validator("per_dataset_aggregations")
-    def check_aggregations(cls, aggregations):
-        for agg in aggregations:
-            for dim_type in DimensionType:
-                field = dim_type.value
-                for item in getattr(agg.dimensions, field):
-                    # TODO: we could add support for this, but it does add some ambiguity.
-                    if item.function is not None:
-                        raise ValueError(
-                            f"function={item.function} cannot be set in ProjectQueryDatasetParamsModel"
-                        )
-                    if item.alias is not None:
-                        # TODO: need to support aliases here. The code that handles columns during
-                        # dataset concatenation doesn't support it.
-                        raise ValueError(
-                            f"alias={item.alias} cannot be set in ProjectQueryDatasetParamsModel"
-                        )
-        return aggregations
+
+class DatasetsModel(DSGBaseModel):
+    """Specifies the datasets to use in a project query."""
+
+    datasets: list[Any] = Field(description="Datasets to include in the query.")
+    expression: str | None = Field(
+        description="Expression to combine datasets. Default is to take a union of all datasets.",
+        default=None,
+    )
+    params: ProjectQueryDatasetParamsModel = Field(
+        description="Parameters affecting datasets. Used for caching intermediate tables.",
+        default=ProjectQueryDatasetParamsModel(),
+    )
+
+    @validator("datasets", each_item=True)
+    def check_component(cls, component):
+        if isinstance(component, DatasetBaseModel):
+            return component
+        if component["dataset_type"] == DatasetType.STANDALONE.value:
+            return StandaloneDatasetModel(**component)
+        elif component["dataset_type"] == DatasetType.EXPONENTIAL_GROWTH.value:
+            return ExponentialGrowthDatasetModel(**component)
+        raise ValueError(f"dataset_type={component['dataset_type']} isn't supported")
+
+    @validator("expression")
+    def handle_expression(cls, expression, values):
+        if expression is None:
+            expression = " | ".join((x.dataset_id for x in values["datasets"]))
+        return expression
+
+
+class DatasetType(enum.Enum):
+
+    EXPONENTIAL_GROWTH = "exponential_growth"
+    STANDALONE = "standalone"
+    DERIVED = "derived"
+
+
+class DatasetBaseModel(DSGBaseModel, abc.ABC):
+    @abc.abstractmethod
+    def get_dataset_id(self) -> str:
+        """Return the primary dataset ID.
+
+        Returns
+        -------
+        str
+        """
+
+    @abc.abstractmethod
+    def iter_dataset_ids(self) -> str:
+        """Return a generator over all dataset IDs.
+
+        Yields
+        ------
+        str
+        """
+
+
+class StandaloneDatasetModel(DatasetBaseModel):
+
+    dataset_id: str = Field(description="Dataset identifier")
+    dataset_type: DatasetType = Field(
+        description="Type of dataset specified in a query",
+        default=DatasetType.STANDALONE,
+    )
+
+    @validator("dataset_type")
+    def check_dataset_type(cls, dataset_type):
+        if dataset_type != DatasetType.STANDALONE:
+            raise ValueError(f"dataset_type must be {DatasetType.STANDALONE}: {dataset_type}")
+        return dataset_type
+
+    def get_dataset_id(self) -> str:
+        return self.dataset_id
+
+    def iter_dataset_ids(self):
+        yield self.dataset_id
+
+
+class ExponentialGrowthDatasetModel(DatasetBaseModel):
+
+    dataset_id: str = Field(description="Identifier for the resulting dataset")
+    initial_value_dataset_id: str = Field(description="Principal dataset identifier")
+    growth_rate_dataset_id: str = Field(
+        description="Growth rate dataset identifier to apply to the principal dataset"
+    )
+    construction_method: str = Field(
+        description="Specifier for the code that applies the growth rate to the principal dataset"
+    )
+    base_year: int = Field(
+        description="Base year of the dataset to use in growth rate application. Must be a year "
+        "defined in the principal dataset's model year dimension. If None, there must be only "
+        "one model year in that dimension and it will be used.",
+        default=None,
+    )
+    dataset_type: DatasetType = Field(
+        description="Type of dataset specified in a query",
+        default=DatasetType.EXPONENTIAL_GROWTH,
+    )
+
+    @validator("dataset_type")
+    def check_dataset_type(cls, dataset_type):
+        if dataset_type != DatasetType.EXPONENTIAL_GROWTH:
+            raise ValueError(
+                f"dataset_type must be {DatasetType.EXPONENTIAL_GROWTH}: {dataset_type}"
+            )
+        return dataset_type
+
+    def get_dataset_id(self) -> str:
+        return self.initial_value_dataset_id
+
+    def iter_dataset_ids(self):
+        for dataset_id in (self.initial_value_dataset_id, self.growth_rate_dataset_id):
+            yield dataset_id
 
 
 class ProjectQueryParamsModel(CacheableQueryBaseModel):
     """Defines how to transform a project into a CompositeDataset"""
 
     project_id: str = Field(description="Project ID for query")
-    dataset_ids: List[str] = Field(description="Dataset IDs from which to read")
+    datasets: DatasetsModel = Field(
+        description="Datasets from which to read. Each must be of type " "DatasetBaseModel"
+    )
     excluded_dataset_ids: List[str] = Field(
         description="Datasets to exclude from query", default=[]
     )
     # TODO: default needs to change
     include_dsgrid_dataset_components: bool = Field(description="", default=False)
-    dataset_params: ProjectQueryDatasetParamsModel = Field(
-        description="Parameters affecting datasets. Will be used for caching intermediate tables.",
-        default=ProjectQueryDatasetParamsModel(),
-    )
     version: Optional[str] = Field(
         description="Version of project or dataset on which the query is based. "
         "Should not be set by the user",
@@ -269,16 +355,17 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
             raise ValueError(f"only table_format={fmt} is currently supported")
         return values
 
-    @validator("excluded_dataset_ids")
-    def check_dataset_ids(cls, excluded_dataset_ids, values):
-        dataset_ids = values.get("dataset_ids")
-        if dataset_ids is None:
-            return excluded_dataset_ids
+    # TODO: currently incorrect and may get deleted
+    # @validator("excluded_dataset_ids")
+    # def check_dataset_ids(cls, excluded_dataset_ids, values):
+    #    datasets = values.get("datasets")
+    #    #if datasets is None:
+    #    #    return excluded_dataset_ids
 
-        if excluded_dataset_ids and dataset_ids:
-            raise ValueError("excluded_dataset_ids and dataset_ids cannot both be set")
+    #    #if excluded_dataset_ids and dataset_ids:
+    #    #    raise ValueError("excluded_dataset_ids and dataset_ids cannot both be set")
 
-        return excluded_dataset_ids
+    #    return excluded_dataset_ids
 
     def get_spark_conf(self, dataset_id) -> dict[str, Any]:
         """Return the Spark settings to apply while processing dataset_id."""

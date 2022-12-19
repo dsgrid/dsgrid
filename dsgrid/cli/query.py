@@ -22,6 +22,9 @@ from dsgrid.query.models import (
     ProjectQueryParamsModel,
     CreateCompositeDatasetQueryModel,
     CompositeDatasetQueryModel,
+    StandaloneDatasetModel,
+    DatasetType,
+    DatasetsModel,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter  # , CompositeDatasetQuerySubmitter
 from dsgrid.registry.registry_manager import RegistryManager
@@ -179,7 +182,12 @@ def create_project(
         name=query_name,
         project=ProjectQueryParamsModel(
             project_id=project_id,
-            dataset_ids=project.config.list_registered_dataset_ids(),
+            datasets=DatasetsModel(
+                datasets=[
+                    StandaloneDatasetModel(dataset_type=DatasetType.STANDALONE, dataset_id=x)
+                    for x in project.config.list_registered_dataset_ids()
+                ],
+            ),
         ),
     )
 
@@ -218,19 +226,12 @@ def create_project(
             )
         else:
             assert False
-        query.project.dataset_params.dimension_filters.append(flt)
+        query.project.datasets.params.dimension_filters.append(flt)
 
-    if default_per_dataset_aggregation or default_result_aggregation:
+    if default_result_aggregation:
         default_aggs = {}
         for dim_type, name in project.config.get_base_dimension_to_query_name_mapping().items():
             default_aggs[dim_type.value] = [name]
-        if default_per_dataset_aggregation:
-            query.project.dataset_params.per_dataset_aggregations = [
-                AggregationModel(
-                    dimensions=DimensionQueryNamesModel(**default_aggs),
-                    aggregation_function=aggregation_function,
-                ),
-            ]
         if default_result_aggregation:
             query.result.aggregations = [
                 AggregationModel(

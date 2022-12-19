@@ -6,7 +6,6 @@ import shutil
 import sys
 from datetime import timedelta
 from pathlib import Path
-from tempfile import TemporaryDirectory
 
 import pandas as pd
 import pytest
@@ -25,24 +24,23 @@ DATASET_ID = "test_efs_comstock"
 
 
 @pytest.fixture(scope="module")
-def setup_registry(make_test_project_dir_module, make_test_data_dir_module):
+def setup_registry(tmp_path_factory, make_test_project_dir_module, make_test_data_dir_module):
     if DATASET_ID not in os.listdir(make_test_data_dir_module):
         logger.error("test_invalid_datasets requires the dsgrid-test-data repository")
         sys.exit(1)
 
-    with TemporaryDirectory() as tmpdir:
-        base_dir = Path(tmpdir)
-        manager = make_test_data_registry(
-            base_dir,
-            make_test_project_dir_module,
-            dataset_path=make_test_data_dir_module,
-            include_datasets=False,
-        )
-        dataset_config_path = make_test_project_dir_module / "datasets" / "modeled" / "comstock"
-        assert dataset_config_path.exists()
-        dataset_config_file = dataset_config_path / "dataset.json5"
-        replace_dimension_uuids_from_registry(base_dir, (dataset_config_file,))
-        yield manager, base_dir, dataset_config_path, make_test_data_dir_module
+    base_dir = tmp_path_factory.mktemp("dsgrid")
+    manager = make_test_data_registry(
+        base_dir,
+        make_test_project_dir_module,
+        dataset_path=make_test_data_dir_module,
+        include_datasets=False,
+    )
+    dataset_config_path = make_test_project_dir_module / "datasets" / "modeled" / "comstock"
+    assert dataset_config_path.exists()
+    dataset_config_file = dataset_config_path / "dataset.json5"
+    replace_dimension_uuids_from_registry(base_dir, (dataset_config_file,))
+    yield manager, base_dir, dataset_config_path, make_test_data_dir_module
 
 
 @pytest.fixture

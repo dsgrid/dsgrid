@@ -17,6 +17,8 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.query.models import TableFormatType
+from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.query.query_context import QueryContext
 
 logger = logging.getLogger(__name__)
@@ -145,13 +147,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         else:
             ld_df = self._load_data
 
-        ld_df = self._remap_dimension_columns(
-            ld_df,
-            # Some pivot columns may have been removed.
-            pivoted_columns=set(self._load_data.columns).intersection(
-                self.get_pivoted_dimension_columns()
-            ),
+        # Some pivot columns may have been removed.
+        pivoted_columns = set(self._load_data.columns).intersection(
+            self.get_pivoted_dimension_columns()
         )
+        ld_df = self._remap_dimension_columns(ld_df, pivoted_columns=pivoted_columns)
+        ld_df = self._apply_fraction(ld_df, pivoted_columns)
 
         if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
@@ -159,4 +160,41 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return ld_df
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
-        assert False, "not implemented yet"
+        ld_df = self._load_data
+
+        self._check_aggregations(context)
+        ld_df = self._prefilter_stacked_dimensions(context, ld_df)
+        ld_df = self._prefilter_pivoted_dimensions(context, ld_df)
+        ld_df = self._prefilter_time_dimension(context, ld_df)
+
+        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
+        if convert_time_before_project_mapping:
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
+        # Some pivoted columns may have been removed in pre-filtering.
+        pivoted_columns = set(ld_df.columns).intersection(self.get_pivoted_dimension_columns())
+        ld_df = self._remap_dimension_columns(
+            ld_df, pivoted_columns=pivoted_columns, filtered_records=context.get_record_ids()
+        )
+
+        pivoted_columns = set(ld_df.columns).intersection(
+            self.get_pivoted_dimension_columns_mapped_to_project()
+        )
+        ld_df = self._apply_fraction(ld_df, pivoted_columns)
+
+        if not convert_time_before_project_mapping:
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
+        context.add_dataset_metadata(self.dataset_id)
+        context.set_pivoted_columns(pivoted_columns, dataset_id=self.dataset_id)
+        context.set_pivoted_dimension_type(
+            self.get_pivoted_dimension_type(), dataset_id=self.dataset_id
+        )
+        context.set_table_format_type(TableFormatType.PIVOTED, dataset_id=self.dataset_id)
+        for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
+            context.add_dimension_query_name(dim_type, name, dataset_id=self.dataset_id)
+
+        table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
+        ld_df = table_handler.convert_columns_to_query_names(ld_df)
+
+        return ld_df

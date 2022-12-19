@@ -16,21 +16,19 @@ logger = logging.getLogger(__name__)
 @track_timing(timer_stats_collector)
 def map_and_reduce_stacked_dimension(df, records, column):
     if "fraction" not in df.columns:
-        df = df.withColumn("fraction", F.lit(1))
+        df = df.withColumn("fraction", F.lit(1.0))
     # map and consolidate from_fraction only
     # TODO: can remove this if we do it at registration time
     records = records.filter("to_id IS NOT NULL")
+
     df = (
         df.join(records, on=df[column] == records.from_id, how="inner")
         .drop("from_id")
         .drop(column)
         .withColumnRenamed("to_id", column)
     ).filter(f"{column} IS NOT NULL")
-    # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for
-    # one_table_handler may not be unique;
-    # imagine 5 subsectors being remapped/consolidated to 2 subsectors.
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
-    df = df.fillna(1, subset=["from_fraction"]).selectExpr(
+    df = df.fillna(1.0, subset=["from_fraction"]).selectExpr(
         *nonfraction_cols, "fraction*from_fraction AS fraction"
     )
     return df

@@ -9,3 +9,4 @@ ignore =
     # line break occurred before binary operator
     W504
     # line break occurred before binary operator
+exclude = dsgrid/utils/py_expression_eval

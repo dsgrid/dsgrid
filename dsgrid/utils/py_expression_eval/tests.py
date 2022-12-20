@@ -75,6 +75,7 @@ class ParserTestCase(unittest.TestCase):
         self.assertExactEqual(parser.parse("x/((x+y))").simplify({}).evaluate({'x': 1, 'y': 1}), 0.5)
         self.assertExactEqual(parser.parse('origin+2.0').evaluate({'origin': 1.0}), 3.0)
         assert parser.parse('a | b').evaluate({'a': set([1, 2]), 'b': set([3, 4])}) == set([1, 2, 3, 4])
+        assert parser.parse('a | b').evaluate({'a': True, 'b': False})
 
         # logical expressions
         self.assertExactEqual(parser.parse('a and b').evaluate({'a': True, 'b': False}), False)

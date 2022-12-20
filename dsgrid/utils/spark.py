@@ -11,11 +11,12 @@ from pathlib import Path
 from typing import AnyStr, List, Union
 
 import pandas as pd
+import pyspark
 from pyspark.sql import Row, SparkSession
 from pyspark.sql.types import StructType, StringType
 from pyspark import SparkConf
 
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter, DSGInvalidFile
 from dsgrid.loggers import disable_console_logging
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
@@ -129,6 +130,37 @@ def create_dataframe_from_pandas(df):
     return get_spark_session().createDataFrame(df)
 
 
+def try_read_dataframe(filename: Path, delete_if_invalid=True, **kwargs):
+    """Try to read the dataframe.
+
+    Parameters
+    ----------
+    filename : Path
+    delete_if_invalid : bool
+        Delete the file if it cannot be read, defaults to true.
+    kwargs
+        Forwarded to read_dataframe.
+
+    Returns
+    -------
+    pyspark.sql.DataFrame | None
+        Returns None if the file does not exist or is invalid.
+
+    """
+    if not filename.exists():
+        return None
+
+    try:
+        return read_dataframe(filename, **kwargs)
+    except DSGInvalidFile:
+        if delete_if_invalid:
+            if filename.is_dir():
+                shutil.rmtree(filename)
+            else:
+                filename.unlink()
+        return None
+
+
 @track_timing(timer_stats_collector)
 def read_dataframe(filename, table_name=None, require_unique=None, read_with_spark=True):
     """Create a spark DataFrame from a file.
@@ -162,6 +194,8 @@ def read_dataframe(filename, table_name=None, require_unique=None, read_with_spa
     ------
     ValueError
         Raised if a require_unique column has duplicate values.
+    DSGInvalidFile
+        Raised if the file cannot be read. This can happen if a Parquet write operation fails.
 
     """
     func = _read_with_spark if read_with_spark else _read_natively
@@ -178,7 +212,13 @@ def _read_with_spark(filename):
     if suffix == ".csv":
         df = spark.read.csv(filename, inferSchema=True, header=True)
     elif suffix == ".parquet":
-        df = spark.read.parquet(filename)
+        try:
+            df = spark.read.parquet(filename)
+        except pyspark.sql.utils.AnalysisException as exc:
+            if "Unable to infer schema for Parquet. It must be specified manually." in str(exc):
+                logger.exception("Failed to read Parquet file=%s. File may be invalid", filename)
+                raise DSGInvalidFile(f"Cannot read {filename=}")
+            raise
     elif suffix == ".json":
         df = spark.read.json(filename, mode="FAILFAST")
     else:

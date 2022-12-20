@@ -19,8 +19,8 @@ class DatasetExpressionHandler:
         orig_other_count = other.df.count()
         if orig_self_count != orig_other_count:
             raise DSGInvalidOperation(
-                "operation {op} requires that the datasets have the same length "
-                f"self={orig_self_count} other={orig_other_count}"
+                f"{op=} requires that the datasets have the same length "
+                f"{orig_self_count=} {orig_other_count=}"
             )
 
         expr = [op(self.df[x], other.df[x]).alias(x) for x in self.pivoted_columns]
@@ -30,8 +30,8 @@ class DatasetExpressionHandler:
         joined_count = df.count()
         if joined_count != orig_self_count:
             raise DSGInvalidOperation(
-                "join for operation {op} has a different row count than the original. "
-                f"original={orig_self_count} joined={orig_other_count}"
+                f"join for operation {op=} has a different row count than the original. "
+                f"{orig_self_count=} {joined_count=}"
             )
 
         return DatasetExpressionHandler(df, self.dimension_columns, self.pivoted_columns)
@@ -49,7 +49,7 @@ class DatasetExpressionHandler:
         if self.df.columns != other.df.columns:
             raise DSGInvalidOperation(
                 "Union is only allowed when datasets have identical columns: "
-                f"{self.df.columns} vs {other.df.columns}"
+                f"{self.df.columns=} vs {other.df.columns=}"
             )
         return DatasetExpressionHandler(
             self.df.union(other.df), self.dimension_columns, self.pivoted_columns

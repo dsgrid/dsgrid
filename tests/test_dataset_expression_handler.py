@@ -1,6 +1,7 @@
 import pytest
 
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
+from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.spark import get_spark_session
 
 STACKED_DIMENSION_COLUMNS = ["county", "model_year"]
@@ -76,3 +77,57 @@ def test_dataset_expression_combo(datasets):
     assert denver.count() == 2
     assert denver.collect()[0].elec_heating == 18
     assert denver.collect()[1].elec_heating == 72
+
+
+def test_invalid_lengths(datasets):
+    datasets["dataset3"] = evaluate_expression("dataset1 | dataset2", datasets)
+    with pytest.raises(DSGInvalidOperation, match="datasets have the same length"):
+        evaluate_expression("dataset1 * dataset3", datasets)
+
+
+def test_invalid_join():
+    spark = get_spark_session()
+    # Make a county mismatch - Adams vs Jefferson - to trigger a join failure.
+    df1 = spark.createDataFrame(
+        [
+            {"county": "Adams", "model_year": "2030", "elec_cooling": 2, "elec_heating": 3},
+            {"county": "Boulder", "model_year": "2030", "elec_cooling": 3, "elec_heating": 4},
+            {"county": "Denver", "model_year": "2030", "elec_cooling": 5, "elec_heating": 6},
+        ]
+    )
+    df2 = spark.createDataFrame(
+        [
+            {"county": "Jefferson", "model_year": "2030", "elec_cooling": 9, "elec_heating": 10},
+            {"county": "Boulder", "model_year": "2030", "elec_cooling": 10, "elec_heating": 11},
+            {"county": "Denver", "model_year": "2030", "elec_cooling": 11, "elec_heating": 12},
+        ]
+    )
+    dataset1 = DatasetExpressionHandler(df1, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
+    dataset2 = DatasetExpressionHandler(df2, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
+    datasets = {"dataset1": dataset1, "dataset2": dataset2}
+    with pytest.raises(DSGInvalidOperation, match="has a different row count"):
+        evaluate_expression("dataset1 + dataset2", datasets)
+
+
+def test_invalid_union():
+    spark = get_spark_session()
+    # Make a column mismatch to trigger an invalid union.
+    df1 = spark.createDataFrame(
+        [
+            {"county": "Adams", "model_year": "2030", "elec_cooling": 2},
+            {"county": "Boulder", "model_year": "2030", "elec_cooling": 3},
+            {"county": "Denver", "model_year": "2030", "elec_cooling": 5},
+        ]
+    )
+    df2 = spark.createDataFrame(
+        [
+            {"county": "Jefferson", "model_year": "2030", "elec_cooling": 9, "elec_heating": 10},
+            {"county": "Boulder", "model_year": "2030", "elec_cooling": 10, "elec_heating": 11},
+            {"county": "Denver", "model_year": "2030", "elec_cooling": 11, "elec_heating": 12},
+        ]
+    )
+    dataset1 = DatasetExpressionHandler(df1, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
+    dataset2 = DatasetExpressionHandler(df2, STACKED_DIMENSION_COLUMNS, PIVOTED_COLUMNS)
+    datasets = {"dataset1": dataset1, "dataset2": dataset2}
+    with pytest.raises(DSGInvalidOperation, match=r"Union.* datasets have identical columns"):
+        evaluate_expression("dataset1 | dataset2", datasets)

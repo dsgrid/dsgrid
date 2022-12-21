@@ -256,15 +256,6 @@ class DatasetBaseModel(DSGBaseModel, abc.ABC):
         str
         """
 
-    @abc.abstractmethod
-    def iter_dataset_ids(self) -> str:
-        """Return a generator over all dataset IDs.
-
-        Yields
-        ------
-        str
-        """
-
 
 class StandaloneDatasetModel(DatasetBaseModel):
 
@@ -282,9 +273,6 @@ class StandaloneDatasetModel(DatasetBaseModel):
 
     def get_dataset_id(self) -> str:
         return self.dataset_id
-
-    def iter_dataset_ids(self):
-        yield self.dataset_id
 
 
 class ExponentialGrowthDatasetModel(DatasetBaseModel):
@@ -319,10 +307,6 @@ class ExponentialGrowthDatasetModel(DatasetBaseModel):
     def get_dataset_id(self) -> str:
         return self.initial_value_dataset_id
 
-    def iter_dataset_ids(self):
-        for dataset_id in (self.initial_value_dataset_id, self.growth_rate_dataset_id):
-            yield dataset_id
-
 
 class ProjectQueryParamsModel(CacheableQueryBaseModel):
     """Defines how to transform a project into a CompositeDataset"""
@@ -355,18 +339,6 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
         if values.get("table_format", fmt) not in (fmt, TableFormatType.PIVOTED):
             raise ValueError(f"only table_format={fmt} is currently supported")
         return values
-
-    # TODO: currently incorrect and may get deleted
-    # @validator("excluded_dataset_ids")
-    # def check_dataset_ids(cls, excluded_dataset_ids, values):
-    #    datasets = values.get("datasets")
-    #    #if datasets is None:
-    #    #    return excluded_dataset_ids
-
-    #    #if excluded_dataset_ids and dataset_ids:
-    #    #    raise ValueError("excluded_dataset_ids and dataset_ids cannot both be set")
-
-    #    return excluded_dataset_ids
 
     def get_spark_conf(self, dataset_id) -> dict[str, Any]:
         """Return the Spark settings to apply while processing dataset_id."""

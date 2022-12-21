@@ -147,7 +147,7 @@ class Project:
                     context, cached_datasets_dir, dataset
                 )
             else:
-                raise Exception(f"Unsupported type: {type(StandaloneDatasetModel)}")
+                raise Exception(f"Unsupported type: {type(dataset)}")
             df_filenames[dataset.dataset_id] = path
 
         if not df_filenames:
@@ -250,10 +250,10 @@ class Project:
                 with Timer(timer_stats_collector, "build_project_mapped_dataset"):
                     df = dataset.make_project_dataframe_from_query(context, self._config)
                     write_dataframe_and_auto_partition(df, cached_dataset_path)
-                    context.serialize_dataset_metadata(dataset.dataset_id, metadata_file)
+                    context.serialize_dataset_metadata_to_file(dataset.dataset_id, metadata_file)
         else:
             assert metadata_file.exists(), metadata_file
-            context.deserialize_and_set_dataset_metadata(dataset_id, metadata_file)
+            context.set_dataset_metadata_from_file(dataset_id, metadata_file)
             logger.info("Use cached project-mapped dataset %s", dataset_id)
 
         logger.info("Finished processing query for dataset_id=%s", dataset_id)
@@ -285,7 +285,7 @@ class Project:
             )
         else:
             assert metadata_file.exists(), metadata_file
-            context.deserialize_and_set_dataset_metadata(dataset.dataset_id, metadata_file)
+            context.set_dataset_metadata_from_file(dataset.dataset_id, metadata_file)
             logger.info("Use cached project-mapped dataset %s", dataset.dataset_id)
 
         return cached_dataset_path
@@ -348,4 +348,4 @@ class Project:
                 TableFormatType.PIVOTED,
                 self._config,
             )
-            context.serialize_dataset_metadata(dataset.dataset_id, metadata_file)
+            context.serialize_dataset_metadata_to_file(dataset.dataset_id, metadata_file)

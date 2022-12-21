@@ -110,7 +110,7 @@ class QueryContext:
         table_format_type,
         project_config,
     ):
-        self.add_dataset_metadata(dataset_id)
+        self.init_dataset_metadata(dataset_id)
         self.set_pivoted_columns(pivoted_columns, dataset_id=dataset_id)
         self.set_pivoted_dimension_type(pivoted_dimension_type, dataset_id=dataset_id)
         self.set_table_format_type(table_format_type, dataset_id=dataset_id)
@@ -120,14 +120,13 @@ class QueryContext:
     def get_dataset_metadata(self, dataset_id):
         return self._dataset_metadata[dataset_id]
 
-    def add_dataset_metadata(self, dataset_id):
+    def init_dataset_metadata(self, dataset_id):
         self._dataset_metadata[dataset_id] = DatasetMetadataModel()
 
-    def serialize_dataset_metadata(self, dataset_id, filename: Path):
+    def serialize_dataset_metadata_to_file(self, dataset_id, filename: Path):
         filename.write_text(self._dataset_metadata[dataset_id].json(indent=2))
 
-    def deserialize_and_set_dataset_metadata(self, dataset_id, filename: Path):
-        # Not 100% sure that this check is good.
+    def set_dataset_metadata_from_file(self, dataset_id, filename: Path):
         assert dataset_id not in self._dataset_metadata, dataset_id
         self._dataset_metadata[dataset_id] = DatasetMetadataModel.from_file(filename)
 

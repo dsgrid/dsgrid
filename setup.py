@@ -83,7 +83,7 @@ setup(
         "fastapi",
         "json5",
         "numpy~=1.23.0",  # pyspark uses numpy.bool, which was removed in numpy 1.24
-                          # Remove this restriction when pyspark is fixed.
+        # Remove this restriction when pyspark is fixed.
         "pandas",
         "prettytable",
         "pydantic",

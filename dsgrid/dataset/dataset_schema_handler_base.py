@@ -258,7 +258,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return
 
     def _iter_dataset_record_ids(self, context: QueryContext):
-        for dim_type, project_record_ids in context.iter_record_ids_by_dimension_type():
+        for dim_type, project_record_ids in context.get_record_ids():
             dataset_mapping = self._get_dataset_to_project_mapping_records(dim_type)
             if dataset_mapping is None:
                 dataset_record_ids = project_record_ids

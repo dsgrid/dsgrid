@@ -112,15 +112,13 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
-        context.add_dataset_metadata(self.dataset_id)
-        context.set_pivoted_columns(pivoted_columns, dataset_id=self.dataset_id)
-        context.set_pivoted_dimension_type(
-            self.get_pivoted_dimension_type(), dataset_id=self.dataset_id
+        context.set_dataset_metadata(
+            self.dataset_id,
+            pivoted_columns,
+            self.get_pivoted_dimension_type(),
+            TableFormatType.PIVOTED,
+            project_config,
         )
-        context.set_table_format_type(TableFormatType.PIVOTED, dataset_id=self.dataset_id)
-        for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
-            context.add_dimension_query_name(dim_type, name, dataset_id=self.dataset_id)
-
         table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
         return table_handler.convert_columns_to_query_names(ld_df)
 

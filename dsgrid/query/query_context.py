@@ -1,7 +1,8 @@
 import logging
+from pathlib import Path
 
 from dsgrid.dimension.base_models import DimensionType
-
+from dsgrid.utils.spark import get_spark_session
 from .models import QueryBaseModel, DatasetMetadataModel, TableFormatType
 
 
@@ -101,8 +102,34 @@ class QueryContext:
             names.update(getattr(self._metadata.dimensions, dimension_type.value))
         return names
 
+    def set_dataset_metadata(
+        self,
+        dataset_id,
+        pivoted_columns,
+        pivoted_dimension_type,
+        table_format_type,
+        project_config,
+    ):
+        self.add_dataset_metadata(dataset_id)
+        self.set_pivoted_columns(pivoted_columns, dataset_id=dataset_id)
+        self.set_pivoted_dimension_type(pivoted_dimension_type, dataset_id=dataset_id)
+        self.set_table_format_type(table_format_type, dataset_id=dataset_id)
+        for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
+            self.add_dimension_query_name(dim_type, name, dataset_id=dataset_id)
+
+    def get_dataset_metadata(self, dataset_id):
+        return self._dataset_metadata[dataset_id]
+
     def add_dataset_metadata(self, dataset_id):
         self._dataset_metadata[dataset_id] = DatasetMetadataModel()
+
+    def serialize_dataset_metadata(self, dataset_id, filename: Path):
+        filename.write_text(self._dataset_metadata[dataset_id].json(indent=2))
+
+    def deserialize_and_set_dataset_metadata(self, dataset_id, filename: Path):
+        # Not 100% sure that this check is good.
+        assert dataset_id not in self._dataset_metadata, dataset_id
+        self._dataset_metadata[dataset_id] = DatasetMetadataModel.from_file(filename)
 
     def add_dimension_query_name(
         self, dimension_type: DimensionType, dimension_query_name, dataset_id=None
@@ -148,13 +175,11 @@ class QueryContext:
         return getattr(self._dataset_metadata[dataset_id].dimensions, field)
 
     def get_record_ids(self):
-        return self._record_ids_by_dimension_type
-
-    def get_record_ids_by_dimension_type(self, dimension_type):
-        return self._record_ids_by_dimension_type[dimension_type]
+        spark = get_spark_session()
+        return {
+            k: spark.createDataFrame(v) for k, v in self._record_ids_by_dimension_type.items()
+        }.items()
 
     def set_record_ids_by_dimension_type(self, dimension_type, record_ids):
-        self._record_ids_by_dimension_type[dimension_type] = record_ids
-
-    def iter_record_ids_by_dimension_type(self):
-        return self._record_ids_by_dimension_type.items()
+        # Can't keep the dataframes in memory because of spark restarts.
+        self._record_ids_by_dimension_type[dimension_type] = record_ids.collect()

@@ -206,10 +206,13 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
         return dimension_filters
 
 
-class DatasetsModel(DSGBaseModel):
+class DatasetModel(DSGBaseModel):
     """Specifies the datasets to use in a project query."""
 
-    datasets: list[Any] = Field(description="Datasets to include in the query.")
+    dataset_id: str = Field(description="Identifier for the resulting dataset")
+    source_datasets: list[Any] = Field(
+        description="Datasets from which to read. Each must be of type DatasetBaseModel."
+    )
     expression: str | None = Field(
         description="Expression to combine datasets. Default is to take a union of all datasets.",
         default=None,
@@ -219,7 +222,7 @@ class DatasetsModel(DSGBaseModel):
         default=ProjectQueryDatasetParamsModel(),
     )
 
-    @validator("datasets", each_item=True)
+    @validator("source_datasets", each_item=True)
     def check_component(cls, component):
         if isinstance(component, DatasetBaseModel):
             return component
@@ -232,7 +235,7 @@ class DatasetsModel(DSGBaseModel):
     @validator("expression")
     def handle_expression(cls, expression, values):
         if expression is None:
-            expression = " | ".join((x.dataset_id for x in values["datasets"]))
+            expression = " | ".join((x.dataset_id for x in values["source_datasets"]))
         return expression
 
 
@@ -325,9 +328,7 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
     """Defines how to transform a project into a CompositeDataset"""
 
     project_id: str = Field(description="Project ID for query")
-    datasets: DatasetsModel = Field(
-        description="Datasets from which to read. Each must be of type " "DatasetBaseModel"
-    )
+    dataset: DatasetModel = Field(description="Definition of the dataset to create.")
     excluded_dataset_ids: List[str] = Field(
         description="Datasets to exclude from query", default=[]
     )

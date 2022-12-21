@@ -24,7 +24,7 @@ from dsgrid.query.models import (
     CompositeDatasetQueryModel,
     StandaloneDatasetModel,
     DatasetType,
-    DatasetsModel,
+    DatasetModel,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter  # , CompositeDatasetQuerySubmitter
 from dsgrid.registry.registry_manager import RegistryManager
@@ -94,6 +94,7 @@ _COMMON_RUN_OPTIONS = (
 @click.command("create")
 @click.argument("query_name")
 @click.argument("project_id")
+@click.argument("dataset_id")
 @click.option(
     "-F",
     "--filters",
@@ -151,6 +152,7 @@ _COMMON_RUN_OPTIONS = (
 def create_project(
     query_name,
     project_id,
+    dataset_id,
     filters,
     aggregation_function,
     default_per_dataset_aggregation,
@@ -182,8 +184,9 @@ def create_project(
         name=query_name,
         project=ProjectQueryParamsModel(
             project_id=project_id,
-            datasets=DatasetsModel(
-                datasets=[
+            dataset=DatasetModel(
+                dataset_id=dataset_id,
+                source_datasets=[
                     StandaloneDatasetModel(dataset_type=DatasetType.STANDALONE, dataset_id=x)
                     for x in project.config.list_registered_dataset_ids()
                 ],
@@ -226,7 +229,7 @@ def create_project(
             )
         else:
             assert False
-        query.project.datasets.params.dimension_filters.append(flt)
+        query.project.dataset.params.dimension_filters.append(flt)
 
     if default_result_aggregation:
         default_aggs = {}

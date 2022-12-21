@@ -25,7 +25,7 @@ from dsgrid.query.models import (
     ColumnModel,
     CompositeDatasetQueryModel,
     CreateCompositeDatasetQueryModel,
-    DatasetsModel,
+    DatasetModel,
     DimensionQueryNamesModel,
     ProjectQueryDatasetParamsModel,
     ProjectQueryParamsModel,
@@ -141,8 +141,9 @@ def test_invalid_drop_pivoted_dimension(tmp_path):
         project=ProjectQueryParamsModel(
             project_id="dsgrid_conus_2022",
             include_dsgrid_dataset_components=False,
-            datasets=DatasetsModel(
-                datasets=[
+            dataset=DatasetModel(
+                dataset_id="projected_dg_conus_2022",
+                source_datasets=[
                     StandaloneDatasetModel(
                         dataset_id="comstock_conus_2022_reference",
                     ),
@@ -191,7 +192,8 @@ def test_query_cli_create_validate(tmp_path):
     cmd = (
         f"dsgrid query project create --offline --registry-path={REGISTRY_PATH} "
         f"-d -r -f {filename} -F expression -F column_operator "
-        "-F supplemental_column_operator -F raw --force my_query dsgrid_conus_2022"
+        "-F supplemental_column_operator -F raw --force my_query dsgrid_conus_2022 "
+        "projected_dg_conus_2022"
     )
     shutdown_project()
     check_run_command(cmd)
@@ -366,8 +368,9 @@ class QueryTestElectricityValues(QueryTestBase):
             project=ProjectQueryParamsModel(
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
-                datasets=DatasetsModel(
-                    datasets=[
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
                         ExponentialGrowthDatasetModel(
                             dataset_id="comstock_projected_conus_2022",
                             initial_value_dataset_id="comstock_conus_2022_reference",
@@ -412,14 +415,14 @@ class QueryTestElectricityValues(QueryTestBase):
             ),
         )
         if self._use_supplemental_dimension:
-            self._model.project.datasets.params.dimension_filters.append(
+            self._model.project.dataset.params.dimension_filters.append(
                 SupplementalDimensionFilterColumnOperatorModel(
                     dimension_type=DimensionType.METRIC,
                     dimension_query_name="electricity",
                 )
             )
         else:
-            self._model.project.datasets.params.dimension_filters.append(
+            self._model.project.dataset.params.dimension_filters.append(
                 DimensionFilterExpressionModel(
                     dimension_type=DimensionType.METRIC,
                     dimension_query_name="end_use",
@@ -479,8 +482,9 @@ class QueryTestElectricityUse(QueryTestBase):
             project=ProjectQueryParamsModel(
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
-                datasets=DatasetsModel(
-                    datasets=[
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
                         ExponentialGrowthDatasetModel(
                             dataset_id="comstock_projected_conus_2022",
                             initial_value_dataset_id="comstock_conus_2022_reference",
@@ -546,8 +550,9 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
             project=ProjectQueryParamsModel(
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
-                datasets=DatasetsModel(
-                    datasets=[
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
                         ExponentialGrowthDatasetModel(
                             dataset_id="comstock_projected_conus_2022",
                             initial_value_dataset_id="comstock_conus_2022_reference",
@@ -614,8 +619,9 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
             project=ProjectQueryParamsModel(
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
-                datasets=DatasetsModel(
-                    datasets=[
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
                         ExponentialGrowthDatasetModel(
                             dataset_id="comstock_projected_conus_2022",
                             initial_value_dataset_id="comstock_conus_2022_reference",
@@ -696,8 +702,9 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
             project=ProjectQueryParamsModel(
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
-                datasets=DatasetsModel(
-                    datasets=[
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
                         ExponentialGrowthDatasetModel(
                             dataset_id="comstock_projected_conus_2022",
                             initial_value_dataset_id="comstock_conus_2022_reference",
@@ -752,13 +759,20 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
             project=ProjectQueryParamsModel(
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
-                datasets=DatasetsModel(
-                    datasets=[
-                        StandaloneDatasetModel(
-                            dataset_id="comstock_conus_2022_reference",
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
+                        ExponentialGrowthDatasetModel(
+                            dataset_id="comstock_projected_conus_2022",
+                            initial_value_dataset_id="comstock_conus_2022_reference",
+                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
+                            construction_method="formula123",
                         ),
-                        StandaloneDatasetModel(
-                            dataset_id="resstock_conus_2022_reference",
+                        ExponentialGrowthDatasetModel(
+                            dataset_id="resstock_projected_conus_2022",
+                            initial_value_dataset_id="resstock_conus_2022_reference",
+                            growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
+                            construction_method="formula123",
                         ),
                     ],
                 ),
@@ -830,13 +844,20 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
             project=ProjectQueryParamsModel(
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
-                datasets=DatasetsModel(
-                    datasets=[
-                        StandaloneDatasetModel(
-                            dataset_id="comstock_conus_2022_reference",
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
+                        ExponentialGrowthDatasetModel(
+                            dataset_id="comstock_projected_conus_2022",
+                            initial_value_dataset_id="comstock_conus_2022_reference",
+                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
+                            construction_method="formula123",
                         ),
-                        StandaloneDatasetModel(
-                            dataset_id="resstock_conus_2022_reference",
+                        ExponentialGrowthDatasetModel(
+                            dataset_id="resstock_projected_conus_2022",
+                            initial_value_dataset_id="resstock_conus_2022_reference",
+                            growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
+                            construction_method="formula123",
                         ),
                     ],
                     params=ProjectQueryDatasetParamsModel(

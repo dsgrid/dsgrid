@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "project": {
     "project_id": "dsgrid_conus_2022",
-    "datasets": {
-      "datasets": [
+    "dataset": {
+      "dataset_id": "conus_2022",
+      "source_datasets": [
       {
         "dataset_id": "resstock_projected_conus_2022",
         "initial_value_dataset_id": "resstock_conus_2022_reference",

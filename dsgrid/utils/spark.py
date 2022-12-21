@@ -68,7 +68,7 @@ def restart_spark(*args, force=False, **kwargs):
     ----------
     force : bool
         If True, restart the session even if the config parameters haven't changed.
-        You might want to do this in order to clear cached tables.
+        You might want to do this in order to clear cached tables or start Spark fresh.
 
     Returns
     -------
@@ -82,6 +82,7 @@ def restart_spark(*args, force=False, **kwargs):
         for key, val in conf.items():
             current = spark.conf.get(key, None)
             if current is not None and current != val:
+                logger.info("SparkSession needs restart because of %s = %s", key, val)
                 needs_restart = True
                 break
 
@@ -385,6 +386,7 @@ def check_for_nulls(df, exclude_columns=None):
         sql("DROP VIEW tmp_table")
 
 
+@track_timing(timer_stats_collector)
 def overwrite_dataframe_file(filename, df):
     """Perform an in-place overwrite of a Spark DataFrame, accounting for different file types
     and symlinks.
@@ -424,6 +426,7 @@ def overwrite_dataframe_file(filename, df):
     return read_method(str(filename), **kwargs)
 
 
+@track_timing(timer_stats_collector)
 def write_dataframe_and_auto_partition(
     df, filename, partition_size_mb=128, columns=None, rtol_pct=50
 ):
@@ -480,6 +483,7 @@ def write_dataframe_and_auto_partition(
         df = overwrite_dataframe_file(filename, df)
         logger.info("Repartitioned %s to partition count", filename, desired)
 
+    logger.info("Wrote dataframe to %s", filename)
     return df
 
 
@@ -594,13 +598,16 @@ def custom_spark_conf(conf):
 
 
 @contextmanager
-def restart_spark_with_custom_conf(conf: dict):
+def restart_spark_with_custom_conf(conf: dict, force=False):
     """Restart the SparkSession with a custom configuration for the duration of a code block.
 
     Parameters
     ----------
     conf : dict
         Key-value pairs to set on the spark configuration.
+    force : bool
+        If True, restart the session even if the config parameters haven't changed.
+        You might want to do this in order to clear cached tables or start Spark fresh.
 
     """
     spark = get_spark_session()
@@ -612,10 +619,10 @@ def restart_spark_with_custom_conf(conf: dict):
             current = spark.conf.get(name, None)
             if current is not None:
                 orig_settings[name] = current
-        restart_spark(name=app_name, spark_conf=conf)
+        restart_spark(name=app_name, spark_conf=conf, force=force)
         yield
     finally:
-        restart_spark(name=app_name, spark_conf=orig_settings)
+        restart_spark(name=app_name, spark_conf=orig_settings, force=force)
 
 
 def load_stored_table(table_name):

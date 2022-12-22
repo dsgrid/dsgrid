@@ -94,9 +94,11 @@ def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, re
         elif operation == "min":
             val = ",".join(expr)
             expr = f"least({val}) AS {column}"
-        elif operation in ("avg", "mean"):
-            val = "(" + "+".join(expr) + f") / {len(expr)}"
-            expr = f"{val} AS {column}"
+        # TODO: Need to decide how to handle NULL values. If they should not be included in the
+        # mean, the logic below is incorred.t
+        # elif operation in ("avg", "mean"):
+        #    val = "(" + "+".join(expr) + f") / {len(expr)}"
+        #    expr = f"{val} AS {column}"
         else:
             raise Exception(f"Unsupported operation: {operation}")
         exprs.append(expr)

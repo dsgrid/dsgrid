@@ -1,11 +1,11 @@
 import logging
 from pathlib import Path
-from typing import List
 
 import pyspark.sql.functions as F
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.utils.dataset import ordered_subset_columns
 from dsgrid.utils.spark import read_dataframe
 from .models import TableFormatType
 from .query_context import QueryContext
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 class PeakLoadInputModel(DSGBaseModel):
 
-    group_by_columns: List[str]
+    group_by_columns: list[str]
 
 
 class PeakLoadReport(ReportsBase):
@@ -47,7 +47,8 @@ class PeakLoadReport(ReportsBase):
         diff = time_columns.difference(df.columns)
         if diff:
             raise Exception(f"BUG: expected time column(s) {diff} are not present in table")
-        with_time = peak_load.join(df.select(*time_columns, *join_cols), on=join_cols).sort(
+        columns = ordered_subset_columns(df, time_columns) + join_cols
+        with_time = peak_load.join(df.select(*columns), on=join_cols).sort(
             *inputs.group_by_columns
         )
         output_file = output_dir / PeakLoadReport.REPORT_FILENAME

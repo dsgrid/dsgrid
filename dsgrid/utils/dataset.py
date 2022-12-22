@@ -156,3 +156,8 @@ def check_null_value_in_unique_dimension_rows(dim_table):
             "Combination of remapped dataset dimensions contain NULL value(s) for "
             f"dimension(s): \n{str(exc)}"
         )
+
+
+def ordered_subset_columns(df, subset: set[str]) -> list[str]:
+    """Return a list of columns in the dataframe that are present in subset."""
+    return [x for x in df.columns if x in subset]

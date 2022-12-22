@@ -180,12 +180,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 group_by_cols.append(expr)
                 group_by_query_names.append(column.dimension_query_name)
             op = agg.aggregation_function
-            ordered_pivoted_columns = [
-                x
-                for x in context.get_pivoted_columns(dataset_id=self.dataset_id)
-                if x in pivoted_columns
-            ]
-            agg_expr = [op(x).alias(x) for x in ordered_pivoted_columns]
+            agg_expr = [op(x).alias(x) for x in df.columns if x in pivoted_columns]
             df = df.groupBy(*group_by_cols).agg(*agg_expr)
             logger.info(
                 "Aggregated dimensions with groupBy %s and agg %s", group_by_cols, agg_expr

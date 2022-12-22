@@ -15,6 +15,7 @@ from dsgrid.utils.dataset import (
     map_and_reduce_stacked_dimension,
     map_and_reduce_pivoted_dimension,
     add_time_zone,
+    ordered_subset_columns,
 )
 from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -360,7 +361,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # Maintain column order.
         agg_ops = [agg_func(x).alias(x) for x in [y for y in df.columns if y in pivoted_columns]]
         gcols = set(df.columns) - pivoted_columns - {"fraction"}
-        df = df.groupBy(*gcols).agg(*agg_ops)
+        df = df.groupBy(*ordered_subset_columns(df, gcols)).agg(*agg_ops)
         return df.drop("fraction")
 
     def _convert_time_before_project_mapping(self):

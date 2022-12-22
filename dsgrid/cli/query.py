@@ -261,8 +261,7 @@ def validate_project(query_file):
 @click.command("run")
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @click.option(
-    "-p",
-    "--persist-intermediate-table",
+    "--persist-intermediate-table/--no-persist-intermediate-table",
     is_flag=True,
     default=True,
     show_default=True,
@@ -270,7 +269,7 @@ def validate_project(query_file):
 )
 @click.option(
     "-z",
-    "--zip",
+    "--zip-file",
     is_flag=True,
     default=False,
     show_default=True,
@@ -281,7 +280,7 @@ def validate_project(query_file):
 def run_project(
     query_definition_file,
     persist_intermediate_table,
-    zip,
+    zip_file,
     registry_path,
     remote_path,
     offline,
@@ -301,7 +300,7 @@ def run_project(
         query,
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
-        zip=zip,
+        zip_file=zip_file,
         force=force,
     )
 

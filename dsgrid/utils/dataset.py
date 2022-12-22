@@ -77,6 +77,10 @@ def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, re
 
     extra_pivoted_columns_to_keep = set(pivoted_columns).difference(processed)
 
+    if operation == "sum":
+        # This is identical to running F.coalesce(col, F.lit(0.0)) on each column.
+        df = df.fillna(0.0, subset=list(pivoted_columns))
+
     to_ids = sorted(records_dict)
     exprs = []
     final_columns = []

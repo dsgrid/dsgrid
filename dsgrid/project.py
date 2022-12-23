@@ -174,13 +174,13 @@ class Project:
         datasets = {}
         for dataset_id, path in df_filenames.items():
             df = read_dataframe(path)
-            remaining = sorted(set(df.columns).difference(expected_columns))
-            final_columns = expected_columns + remaining
-            missing = pivoted_columns.difference(df.columns)
-            for column in missing:
+            unexpected = sorted(set(df.columns).difference(expected_columns))
+            if unexpected:
+                raise Exception(f"Unexpected columns are present in {dataset_id=} {unexpected=}")
+            for column in pivoted_columns.difference(df.columns):
                 df = df.withColumn(column, F.lit(None).cast(DoubleType()))
             datasets[dataset_id] = DatasetExpressionHandler(
-                df.select(*final_columns), time_columns + dim_columns, pivoted_columns_sorted
+                df.select(*expected_columns), time_columns + dim_columns, pivoted_columns_sorted
             )
 
         return evaluate_expression(context.model.project.dataset.expression, datasets).df

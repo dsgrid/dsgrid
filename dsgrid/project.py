@@ -227,7 +227,7 @@ class Project:
             model_file = hash_dir / "model.json"
             model_file.write_text(text)
         cached_dataset_path = hash_dir / (dataset_id + ".parquet")
-        metadata_file = Path(str(cached_dataset_path).replace(".parquet", ".json5"))
+        metadata_file = cached_dataset_path.with_suffix(".json5")
         if try_read_dataframe(cached_dataset_path) is None:
             # An alternative solution is to call custom_spark_conf instead.
             # That changes some settings without restarting the SparkSession.
@@ -274,7 +274,7 @@ class Project:
             model_file = hash_dir / "model.json"
             model_file.write_text(text)
         cached_dataset_path = hash_dir / (dataset.dataset_id + ".parquet")
-        metadata_file = Path(str(cached_dataset_path).replace(".parquet", ".json5"))
+        metadata_file = cached_dataset_path.with_suffix(".json5")
         if try_read_dataframe(cached_dataset_path) is None:
             self._build_exponential_growth_dataset(
                 context,

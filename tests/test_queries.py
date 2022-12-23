@@ -1219,12 +1219,8 @@ def map_aeo_com_subsectors(aeo_com):
     new_count = mapped.select("subsector").distinct().count()
     assert orig_count == new_count, f"{orig_count} {new_count}"
     mapped = mapped.drop("from_id", "subsector").withColumnRenamed("to_id", "subsector")
-    for column in ("electricity_cooling", "electricity_heating"):
-        mapped = (
-            mapped.withColumn("tmp", F.col(column) * F.col("from_fraction"))
-            .drop(column)
-            .withColumnRenamed("tmp", column)
-        )
+    for col in ("electricity_cooling", "electricity_heating"):
+        mapped = mapped.withColumn(col, mapped[col] * mapped["from_fraction"])
     return (
         mapped.drop("from_fraction")
         .groupBy("subsector", "geography")
@@ -1263,16 +1259,10 @@ def make_projection_df(aeo, ld_df, join_columns):
 
     df = ld_df.join(gr_df, on=join_columns)
     for column in pivoted_columns:
-        tmp_col = column + "_tmp"
         gr_col = column + "__gr"
-        df = (
-            df.withColumn(tmp_col, F.col(column) * F.col(gr_col))
-            .drop(column, gr_col)
-            .withColumnRenamed(tmp_col, column)
-        )
+        df = df.withColumn(column, df[column] * df[gr_col]).drop(gr_col)
 
-    df.cache()
-    return df
+    return df.cache()
 
 
 def read_dataset_tempo():

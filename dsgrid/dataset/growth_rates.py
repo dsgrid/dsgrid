@@ -6,7 +6,6 @@ from pyspark.sql.types import IntegerType
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.query.models import ExponentialGrowthDatasetModel
-from dsgrid.utils.dataset import ordered_subset_columns
 from dsgrid.utils.spark import get_unique_values
 
 
@@ -36,12 +35,17 @@ def apply_growth_rate_123(
     pyspark.sql.DataFrame
 
     """
+    orig_columns = initial_value_df.columns
     initial_value_df, base_year = _check_model_years(
         dataset, initial_value_df, growth_rate_df, model_year_column
     )
+
+    def renamed(col):
+        return col + "_gr"
+
     gr_df = growth_rate_df
     for column in pivoted_columns:
-        gr_col = column + "__gr"
+        gr_col = renamed(column)
         gr_df = gr_df.withColumn(
             gr_col,
             F.pow((1 + F.col(column)), F.col(model_year_column).cast(IntegerType()) - base_year),
@@ -57,16 +61,12 @@ def apply_growth_rate_123(
         gr_df = gr_df.drop(DimensionType.DATA_SOURCE.value)
 
     df = initial_value_df.join(gr_df, on=list(dim_columns))
-    for column in ordered_subset_columns(df, pivoted_columns):
-        tmp_col = column + "_tmp"
-        gr_col = column + "__gr"
-        df = (
-            df.withColumn(tmp_col, F.col(column) * F.col(gr_col))
-            .drop(column, gr_col)
-            .withColumnRenamed(tmp_col, column)
-        )
+    for column in df.columns:
+        if column in pivoted_columns:
+            gr_column = renamed(column)
+            df = df.withColumn(column, df[column] * df[gr_column])
 
-    return df
+    return df.select(*orig_columns)
 
 
 def _check_model_years(dataset, initial_value_df, growth_rate_df, model_year_column):

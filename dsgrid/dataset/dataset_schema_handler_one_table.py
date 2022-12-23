@@ -147,12 +147,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         else:
             ld_df = self._load_data
 
-        # Some pivot columns may have been removed.
-        pivoted_columns = set(self._load_data.columns).intersection(
-            self.get_pivoted_dimension_columns()
-        )
-        ld_df = self._remap_dimension_columns(ld_df, pivoted_columns=pivoted_columns)
-        ld_df = self._apply_fraction(ld_df, pivoted_columns)
+        ld_df = self._remap_dimension_columns(ld_df)
+        ld_df = self._apply_fraction(ld_df)
 
         if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
@@ -171,20 +167,15 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
-        # Some pivoted columns may have been removed in pre-filtering.
-        pivoted_columns = set(ld_df.columns).intersection(self.get_pivoted_dimension_columns())
-        ld_df = self._remap_dimension_columns(
-            ld_df, pivoted_columns=pivoted_columns, filtered_records=context.get_record_ids()
-        )
-
-        pivoted_columns = set(ld_df.columns).intersection(
-            self.get_pivoted_dimension_columns_mapped_to_project()
-        )
-        ld_df = self._apply_fraction(ld_df, pivoted_columns)
+        ld_df = self._remap_dimension_columns(ld_df, filtered_records=context.get_record_ids())
+        ld_df = self._apply_fraction(ld_df)
 
         if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
+        pivoted_columns = set(ld_df.columns).intersection(
+            self.get_pivoted_dimension_columns_mapped_to_project()
+        )
         context.set_dataset_metadata(
             self.dataset_id,
             pivoted_columns,

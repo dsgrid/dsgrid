@@ -302,9 +302,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # TODO:
         return df
 
-    def _remap_dimension_columns(self, df, pivoted_columns=None, filtered_records=None):
-        if pivoted_columns is None:
-            pivoted_columns = set(self.get_pivoted_dimension_columns())
+    def _remap_dimension_columns(self, df, filtered_records=None):
+        pivoted_columns = set(df.columns).intersection(self.get_pivoted_dimension_columns())
         for ref in self._mapping_references:
             dim_type = ref.from_dimension_type
             column = dim_type.value
@@ -349,17 +348,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return df
 
-    def _apply_fraction(self, df, pivoted_columns, agg_func=None):
+    def _apply_fraction(self, df, agg_func=None):
+        pivoted_columns = set(df.columns).intersection(
+            self.get_pivoted_dimension_columns_mapped_to_project()
+        )
         agg_func = agg_func or F.sum
         assert "fraction" in df.columns
-        for col in pivoted_columns:
-            df = (
-                df.withColumn("tmp", F.col(col) * F.col("fraction"))
-                .drop(col)
-                .withColumnRenamed("tmp", col)
-            )
         # Maintain column order.
-        agg_ops = [agg_func(x).alias(x) for x in [y for y in df.columns if y in pivoted_columns]]
+        agg_ops = [
+            agg_func(F.col(x) * F.col("fraction")).alias(x)
+            for x in [y for y in df.columns if y in pivoted_columns]
+        ]
         gcols = set(df.columns) - pivoted_columns - {"fraction"}
         df = df.groupBy(*ordered_subset_columns(df, gcols)).agg(*agg_ops)
         return df.drop("fraction")

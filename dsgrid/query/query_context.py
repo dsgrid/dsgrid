@@ -175,9 +175,7 @@ class QueryContext:
 
     def get_record_ids(self):
         spark = get_spark_session()
-        return {
-            k: spark.createDataFrame(v) for k, v in self._record_ids_by_dimension_type.items()
-        }.items()
+        return {k: spark.createDataFrame(v) for k, v in self._record_ids_by_dimension_type.items()}
 
     def set_record_ids_by_dimension_type(self, dimension_type, record_ids):
         # Can't keep the dataframes in memory because of spark restarts.

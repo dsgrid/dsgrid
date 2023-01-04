@@ -259,7 +259,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return
 
     def _iter_dataset_record_ids(self, context: QueryContext):
-        for dim_type, project_record_ids in context.get_record_ids():
+        for dim_type, project_record_ids in context.get_record_ids().items():
             dataset_mapping = self._get_dataset_to_project_mapping_records(dim_type)
             if dataset_mapping is None:
                 dataset_record_ids = project_record_ids
@@ -291,10 +291,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if dim_type != self.get_pivoted_dimension_type():
                 # Drop rows that don't match requested project record IDs.
                 tmp = dataset_record_ids.withColumnRenamed("id", "dataset_record_id")
-                df = df.join(
-                    tmp,
-                    on=df[dim_type.value] == tmp.dataset_record_id,
-                ).drop("dataset_record_id")
+                df = df.join(tmp, on=df[dim_type.value] == tmp.dataset_record_id).drop(
+                    "dataset_record_id"
+                )
 
         return df
 

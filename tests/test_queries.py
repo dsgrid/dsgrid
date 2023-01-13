@@ -102,6 +102,10 @@ def test_electricity_use_by_state():
     run_query_test(QueryTestElectricityUse, "state", "max")
 
 
+def test_electricity_use_with_results_filter():
+    run_query_test(QueryTestElectricityUseFilterResults, "county", "sum")
+
+
 def test_total_electricity_use_with_filter():
     run_query_test(QueryTestTotalElectricityUseWithFilter)
 
@@ -529,6 +533,89 @@ class QueryTestElectricityUse(QueryTestBase):
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
                 4,
+            )
+        elif self._geography == "state":
+            validate_electricity_use_by_state(
+                self._op,
+                self.output_dir / self.name / "table.parquet",
+                self.get_raw_stats(),
+            )
+        else:
+            assert False, self._geography
+
+
+class QueryTestElectricityUseFilterResults(QueryTestBase):
+
+    NAME = "total_electricity_use"
+
+    def __init__(self, geography, op, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert geography in ("county", "state"), geography
+        self._geography = geography
+        self._op = op
+
+    def make_query(self):
+        self._model = ProjectQueryModel(
+            name=self.NAME,
+            project=ProjectQueryParamsModel(
+                project_id="dsgrid_conus_2022",
+                include_dsgrid_dataset_components=False,
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
+                        ExponentialGrowthDatasetModel(
+                            dataset_id="comstock_projected_conus_2022",
+                            initial_value_dataset_id="comstock_conus_2022_reference",
+                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
+                            construction_method="formula123",
+                        ),
+                        ExponentialGrowthDatasetModel(
+                            dataset_id="resstock_projected_conus_2022",
+                            initial_value_dataset_id="resstock_conus_2022_reference",
+                            growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
+                            construction_method="formula123",
+                        ),
+                    ],
+                ),
+            ),
+            result=QueryResultParamsModel(
+                aggregations=[
+                    AggregationModel(
+                        dimensions=DimensionQueryNamesModel(
+                            data_source=[],
+                            geography=[self._geography],
+                            metric=["electricity"],
+                            model_year=[],
+                            scenario=[],
+                            sector=[],
+                            subsector=[],
+                            time=[],
+                            weather_year=[],
+                        ),
+                        aggregation_function=self._op,
+                    ),
+                ],
+                dimension_filters=[
+                    DimensionFilterColumnOperatorModel(
+                        dimension_type=DimensionType.GEOGRAPHY,
+                        dimension_query_name=self._geography,
+                        column=self._geography,
+                        operator="isin",
+                        value=["06037", "36047"] if self._geography == "county" else ["CA", "NY"],
+                    )
+                ],
+                output_format="parquet",
+            ),
+        )
+        return self._model
+
+    def validate(self, expected_values=None):
+        if self._geography == "county":
+            validate_electricity_use_by_county(
+                self._op,
+                self.output_dir / self.name / "table.parquet",
+                self.get_raw_stats(),
+                2,
             )
         elif self._geography == "state":
             validate_electricity_use_by_state(

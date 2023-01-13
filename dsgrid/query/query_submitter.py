@@ -36,10 +36,11 @@ class QuerySubmitterBase:
         self._cached_tables_dir().mkdir(exist_ok=True, parents=True)
         self._composite_datasets_dir().mkdir(exist_ok=True, parents=True)
 
-        # TODO: This location will need more consideration.
+        # TODO #186: This location will need more consideration.
         # We might want to store cached datasets in the spark-warehouse and let Spark manage it
         # for us. However, would we share them on Eagle? What happens on Eagle walltime timeouts
         # where the tables are left in intermediate states?
+        # This is even more of a problem on AWS.
         self._cached_project_mapped_datasets_dir().mkdir(exist_ok=True, parents=True)
 
     @abc.abstractmethod
@@ -173,9 +174,14 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     def _apply_filters(self, df, context: QueryContext):
         for dim_filter in context.model.result.dimension_filters:
-            raise Exception("Filtering result data is not supported yet")
-            # TODO: check column names, resolution, etc. Filter.
-            # Could be problems with aliases.
+            query_name = dim_filter.dimension_query_name
+            if query_name not in df.columns:
+                # Consider catching this exception and still write to a file.
+                # It could mean writing a lot of data the user doesn't want.
+                raise DSGInvalidParameter(
+                    f"filter column {query_name} is not in the dataframe: {df.columns}"
+                )
+            df = dim_filter.apply_filter(df)
         return df
 
     @track_timing(timer_stats_collector)
@@ -200,7 +206,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
-            # TODO minor: Some users may want us to use pandas because Spark makes a csv directory.
+            # TODO #207: Some users may want us to use pandas because Spark makes a csv directory.
             df.write.mode("overwrite").csv(str(filename), header=True)
         elif suffix == ".parquet":
             if repartition:

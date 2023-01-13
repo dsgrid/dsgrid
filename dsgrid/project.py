@@ -156,7 +156,7 @@ class Project:
 
         # All dataset columns need to be in the same order.
         context.consolidate_dataset_metadata()
-        # TODO: Change this when we support long format.
+        # TODO #202: Change this when we support long format.
         pivoted_columns = context.get_pivoted_columns()
         pivoted_columns_sorted = sorted(pivoted_columns)
         dim_columns = context.get_all_dimension_query_names()

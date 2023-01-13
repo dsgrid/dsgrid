@@ -298,7 +298,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df
 
     def _prefilter_time_dimension(self, context: QueryContext, df):
-        # TODO:
+        # TODO #196:
         return df
 
     def _remap_dimension_columns(self, df, filtered_records=None):
@@ -326,7 +326,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 if columns_to_remove:
                     df = df.drop(*columns_to_remove)
                     pivoted_columns.difference_update(columns_to_remove)
-                # TODO: Do we want operation to be configurable?
+                # TODO #197: Do we want operation to be configurable?
                 operation = "sum"
                 df, _, _ = map_and_reduce_pivoted_dimension(
                     df,

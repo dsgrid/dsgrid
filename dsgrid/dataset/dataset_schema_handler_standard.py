@@ -59,8 +59,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         lk_df = self._load_data_lookup.filter("id is not NULL")
         ld_df = self._load_data
 
-        # TODO: handle fraction application
-        # Currently this requires fraction = 1.0
         ld_df = ld_df.join(lk_df, on="id").drop("id")
 
         convert_time_before_project_mapping = self._convert_time_before_project_mapping()

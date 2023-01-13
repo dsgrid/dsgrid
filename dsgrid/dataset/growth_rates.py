@@ -52,7 +52,7 @@ def apply_growth_rate_123(
         ).drop(column)
 
     dim_columns = set(initial_value_df.columns) - pivoted_columns - time_columns
-    # TODO: data_source needs some thought. They are different in these two dfs.
+    # TODO #185: data_source needs some thought. They are different in these two dfs.
     # And this should be dimension_query_name instead of dimension type
     # What is the data_source of the resulting df?
     if DimensionType.DATA_SOURCE.value in dim_columns:
@@ -83,7 +83,7 @@ def _check_model_years(dataset, initial_value_df, growth_rate_df, model_year_col
         )
 
     if len(iv_years) > 1:
-        # TODO: needs test case
+        # TODO #198: needs test case
         initial_value_df = initial_value_df.filter(f"{model_year_column} == '{base_year}'")
 
     initial_value_df = initial_value_df.drop(model_year_column).crossJoin(

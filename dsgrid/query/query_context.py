@@ -47,7 +47,7 @@ class QueryContext:
                     self.set_pivoted_dimension_type(dataset_metadata.pivoted.dimension_type)
                     self.set_table_format_type(TableFormatType.PIVOTED)
                 elif dataset_metadata.pivoted.dimension_type != self.get_pivoted_dimension_type():
-                    # TODO: Remove this check when we support transforming to long format.
+                    # TODO #202: Remove this check when we support transforming to long format.
                     raise Exception(
                         "Datasets have different pivoted dimension types: "
                         f"{dataset_metadata.pivoted.dimension_type} {self.get_pivoted_dimension_type()}"

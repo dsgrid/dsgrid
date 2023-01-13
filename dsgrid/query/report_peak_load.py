@@ -35,7 +35,7 @@ class PeakLoadReport(ReportsBase):
         if context.get_table_format_type() == TableFormatType.PIVOTED:
             value_columns = list(context.get_pivoted_columns())
         else:
-            # TODO: this is TBD
+            # TODO #202: this is TBD
             # value_columns = ["value"]
             raise Exception(f"Unsupported table format {context.get_table_format_type()}")
 

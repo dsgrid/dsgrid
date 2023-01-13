@@ -17,7 +17,6 @@ class DatasetBase(abc.ABC):
         self._id = schema_handler.config.model.dataset_id
         # Can't use dashes in view names. This will need to be handled when we implement
         # queries based on dataset ID.
-        # TODO: do we need a DimensionStore here?
 
     @property
     def dataset_id(self):

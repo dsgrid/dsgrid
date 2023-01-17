@@ -775,10 +775,6 @@ class ProjectConfig(ConfigBase):
         for dataset in self.model.datasets:
             yield dataset
 
-    def iter_dataset_ids(self):
-        for dataset in self.model.datasets:
-            yield dataset.dataset_id
-
     def iter_dimensions(self):
         """Return an iterator over all dimensions of the project.
 

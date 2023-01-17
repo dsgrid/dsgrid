@@ -1,7 +1,8 @@
 import logging
+from pathlib import Path
 
 from dsgrid.dimension.base_models import DimensionType
-
+from dsgrid.utils.spark import get_spark_session
 from .models import QueryBaseModel, DatasetMetadataModel, TableFormatType
 
 
@@ -46,7 +47,7 @@ class QueryContext:
                     self.set_pivoted_dimension_type(dataset_metadata.pivoted.dimension_type)
                     self.set_table_format_type(TableFormatType.PIVOTED)
                 elif dataset_metadata.pivoted.dimension_type != self.get_pivoted_dimension_type():
-                    # TODO: Remove this check when we support transforming to long format.
+                    # TODO #202: Remove this check when we support transforming to long format.
                     raise Exception(
                         "Datasets have different pivoted dimension types: "
                         f"{dataset_metadata.pivoted.dimension_type} {self.get_pivoted_dimension_type()}"
@@ -92,8 +93,8 @@ class QueryContext:
         else:
             self._dataset_metadata[dataset_id].table_format_type = val
 
-    def get_dimension_query_names(self, dimension_type: DimensionType):
-        return getattr(self._metadata.dimensions, dimension_type.value)
+    def get_dimension_query_names(self, dimension_type: DimensionType, dataset_id=None):
+        return self._get_dimension_query_name_container(dimension_type, dataset_id=dataset_id)
 
     def get_all_dimension_query_names(self):
         names = set()
@@ -101,8 +102,33 @@ class QueryContext:
             names.update(getattr(self._metadata.dimensions, dimension_type.value))
         return names
 
-    def add_dataset_metadata(self, dataset_id):
+    def set_dataset_metadata(
+        self,
+        dataset_id,
+        pivoted_columns,
+        pivoted_dimension_type,
+        table_format_type,
+        project_config,
+    ):
+        self.init_dataset_metadata(dataset_id)
+        self.set_pivoted_columns(pivoted_columns, dataset_id=dataset_id)
+        self.set_pivoted_dimension_type(pivoted_dimension_type, dataset_id=dataset_id)
+        self.set_table_format_type(table_format_type, dataset_id=dataset_id)
+        for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
+            self.add_dimension_query_name(dim_type, name, dataset_id=dataset_id)
+
+    def get_dataset_metadata(self, dataset_id):
+        return self._dataset_metadata[dataset_id]
+
+    def init_dataset_metadata(self, dataset_id):
         self._dataset_metadata[dataset_id] = DatasetMetadataModel()
+
+    def serialize_dataset_metadata_to_file(self, dataset_id, filename: Path):
+        filename.write_text(self._dataset_metadata[dataset_id].json(indent=2))
+
+    def set_dataset_metadata_from_file(self, dataset_id, filename: Path):
+        assert dataset_id not in self._dataset_metadata, dataset_id
+        self._dataset_metadata[dataset_id] = DatasetMetadataModel.from_file(filename)
 
     def add_dimension_query_name(
         self, dimension_type: DimensionType, dimension_query_name, dataset_id=None
@@ -147,11 +173,10 @@ class QueryContext:
             return getattr(self._metadata.dimensions, field)
         return getattr(self._dataset_metadata[dataset_id].dimensions, field)
 
-    def get_record_ids_by_dimension_type(self, dimension_type):
-        return self._record_ids_by_dimension_type[dimension_type]
+    def get_record_ids(self):
+        spark = get_spark_session()
+        return {k: spark.createDataFrame(v) for k, v in self._record_ids_by_dimension_type.items()}
 
     def set_record_ids_by_dimension_type(self, dimension_type, record_ids):
-        self._record_ids_by_dimension_type[dimension_type] = record_ids
-
-    def iter_record_ids_by_dimension_type(self):
-        return self._record_ids_by_dimension_type.items()
+        # Can't keep the dataframes in memory because of spark restarts.
+        self._record_ids_by_dimension_type[dimension_type] = record_ids.collect()

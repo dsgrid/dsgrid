@@ -491,7 +491,7 @@ class RegistryManager:
         for project in self.project_manager.iter_configs():
             updated = False
             for dataset in project.model.datasets:
-                # TODO: does dataset status matter? update unregistered?
+                # TODO #191: does dataset status matter? update unregistered?
                 if dataset.dataset_id in updated_datasets:
                     dataset.version = str(updated_datasets[dataset.dataset_id])
                     updated = True

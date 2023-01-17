@@ -17,6 +17,8 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.query.models import TableFormatType
+from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.query.query_context import QueryContext
 
 logger = logging.getLogger(__name__)
@@ -145,13 +147,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         else:
             ld_df = self._load_data
 
-        ld_df = self._remap_dimension_columns(
-            ld_df,
-            # Some pivot columns may have been removed.
-            pivoted_columns=set(self._load_data.columns).intersection(
-                self.get_pivoted_dimension_columns()
-            ),
-        )
+        ld_df = self._remap_dimension_columns(ld_df)
+        ld_df = self._apply_fraction(ld_df)
 
         if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
@@ -159,4 +156,34 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return ld_df
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
-        assert False, "not implemented yet"
+        ld_df = self._load_data
+
+        self._check_aggregations(context)
+        ld_df = self._prefilter_stacked_dimensions(context, ld_df)
+        ld_df = self._prefilter_pivoted_dimensions(context, ld_df)
+        ld_df = self._prefilter_time_dimension(context, ld_df)
+
+        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
+        if convert_time_before_project_mapping:
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
+        ld_df = self._remap_dimension_columns(ld_df, filtered_records=context.get_record_ids())
+        ld_df = self._apply_fraction(ld_df)
+
+        if not convert_time_before_project_mapping:
+            ld_df = self._convert_time_dimension(ld_df, project_config)
+
+        pivoted_columns = set(ld_df.columns).intersection(
+            self.get_pivoted_dimension_columns_mapped_to_project()
+        )
+        context.set_dataset_metadata(
+            self.dataset_id,
+            pivoted_columns,
+            self.get_pivoted_dimension_type(),
+            TableFormatType.PIVOTED,
+            project_config,
+        )
+        table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
+        ld_df = table_handler.convert_columns_to_query_names(ld_df)
+
+        return ld_df

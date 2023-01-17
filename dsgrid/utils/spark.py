@@ -11,11 +11,12 @@ from pathlib import Path
 from typing import AnyStr, List, Union
 
 import pandas as pd
+import pyspark
 from pyspark.sql import Row, SparkSession
 from pyspark.sql.types import StructType, StringType
 from pyspark import SparkConf
 
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter, DSGInvalidFile
 from dsgrid.loggers import disable_console_logging
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
@@ -67,7 +68,7 @@ def restart_spark(*args, force=False, **kwargs):
     ----------
     force : bool
         If True, restart the session even if the config parameters haven't changed.
-        You might want to do this in order to clear cached tables.
+        You might want to do this in order to clear cached tables or start Spark fresh.
 
     Returns
     -------
@@ -81,6 +82,7 @@ def restart_spark(*args, force=False, **kwargs):
         for key, val in conf.items():
             current = spark.conf.get(key, None)
             if current is not None and current != val:
+                logger.info("SparkSession needs restart because of %s = %s", key, val)
                 needs_restart = True
                 break
 
@@ -129,6 +131,37 @@ def create_dataframe_from_pandas(df):
     return get_spark_session().createDataFrame(df)
 
 
+def try_read_dataframe(filename: Path, delete_if_invalid=True, **kwargs):
+    """Try to read the dataframe.
+
+    Parameters
+    ----------
+    filename : Path
+    delete_if_invalid : bool
+        Delete the file if it cannot be read, defaults to true.
+    kwargs
+        Forwarded to read_dataframe.
+
+    Returns
+    -------
+    pyspark.sql.DataFrame | None
+        Returns None if the file does not exist or is invalid.
+
+    """
+    if not filename.exists():
+        return None
+
+    try:
+        return read_dataframe(filename, **kwargs)
+    except DSGInvalidFile:
+        if delete_if_invalid:
+            if filename.is_dir():
+                shutil.rmtree(filename)
+            else:
+                filename.unlink()
+        return None
+
+
 @track_timing(timer_stats_collector)
 def read_dataframe(filename, table_name=None, require_unique=None, read_with_spark=True):
     """Create a spark DataFrame from a file.
@@ -162,6 +195,8 @@ def read_dataframe(filename, table_name=None, require_unique=None, read_with_spa
     ------
     ValueError
         Raised if a require_unique column has duplicate values.
+    DSGInvalidFile
+        Raised if the file cannot be read. This can happen if a Parquet write operation fails.
 
     """
     func = _read_with_spark if read_with_spark else _read_natively
@@ -178,7 +213,13 @@ def _read_with_spark(filename):
     if suffix == ".csv":
         df = spark.read.csv(filename, inferSchema=True, header=True)
     elif suffix == ".parquet":
-        df = spark.read.parquet(filename)
+        try:
+            df = spark.read.parquet(filename)
+        except pyspark.sql.utils.AnalysisException as exc:
+            if "Unable to infer schema for Parquet. It must be specified manually." in str(exc):
+                logger.exception("Failed to read Parquet file=%s. File may be invalid", filename)
+                raise DSGInvalidFile(f"Cannot read {filename=}")
+            raise
     elif suffix == ".json":
         df = spark.read.json(filename, mode="FAILFAST")
     else:
@@ -345,6 +386,7 @@ def check_for_nulls(df, exclude_columns=None):
         sql("DROP VIEW tmp_table")
 
 
+@track_timing(timer_stats_collector)
 def overwrite_dataframe_file(filename, df):
     """Perform an in-place overwrite of a Spark DataFrame, accounting for different file types
     and symlinks.
@@ -384,6 +426,7 @@ def overwrite_dataframe_file(filename, df):
     return read_method(str(filename), **kwargs)
 
 
+@track_timing(timer_stats_collector)
 def write_dataframe_and_auto_partition(
     df, filename, partition_size_mb=128, columns=None, rtol_pct=50
 ):
@@ -440,6 +483,7 @@ def write_dataframe_and_auto_partition(
         df = overwrite_dataframe_file(filename, df)
         logger.info("Repartitioned %s to partition count", filename, desired)
 
+    logger.info("Wrote dataframe to %s", filename)
     return df
 
 
@@ -554,13 +598,16 @@ def custom_spark_conf(conf):
 
 
 @contextmanager
-def restart_spark_with_custom_conf(conf: dict):
+def restart_spark_with_custom_conf(conf: dict, force=False):
     """Restart the SparkSession with a custom configuration for the duration of a code block.
 
     Parameters
     ----------
     conf : dict
         Key-value pairs to set on the spark configuration.
+    force : bool
+        If True, restart the session even if the config parameters haven't changed.
+        You might want to do this in order to clear cached tables or start Spark fresh.
 
     """
     spark = get_spark_session()
@@ -572,10 +619,10 @@ def restart_spark_with_custom_conf(conf: dict):
             current = spark.conf.get(name, None)
             if current is not None:
                 orig_settings[name] = current
-        restart_spark(name=app_name, spark_conf=conf)
+        restart_spark(name=app_name, spark_conf=conf, force=force)
         yield
     finally:
-        restart_spark(name=app_name, spark_conf=orig_settings)
+        restart_spark(name=app_name, spark_conf=orig_settings, force=force)
 
 
 def load_stored_table(table_name):

@@ -16,21 +16,19 @@ logger = logging.getLogger(__name__)
 @track_timing(timer_stats_collector)
 def map_and_reduce_stacked_dimension(df, records, column):
     if "fraction" not in df.columns:
-        df = df.withColumn("fraction", F.lit(1))
+        df = df.withColumn("fraction", F.lit(1.0))
     # map and consolidate from_fraction only
     # TODO: can remove this if we do it at registration time
     records = records.filter("to_id IS NOT NULL")
+
     df = (
         df.join(records, on=df[column] == records.from_id, how="inner")
         .drop("from_id")
         .drop(column)
         .withColumnRenamed("to_id", column)
     ).filter(f"{column} IS NOT NULL")
-    # After remapping, rows in load_data_lookup for standard_handler and rows in load_data for
-    # one_table_handler may not be unique;
-    # imagine 5 subsectors being remapped/consolidated to 2 subsectors.
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
-    df = df.fillna(1, subset=["from_fraction"]).selectExpr(
+    df = df.fillna(1.0, subset=["from_fraction"]).selectExpr(
         *nonfraction_cols, "fraction*from_fraction AS fraction"
     )
     return df
@@ -79,6 +77,10 @@ def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, re
 
     extra_pivoted_columns_to_keep = set(pivoted_columns).difference(processed)
 
+    if operation == "sum":
+        # This is identical to running F.coalesce(col, F.lit(0.0)) on each column.
+        df = df.fillna(0.0, subset=list(pivoted_columns))
+
     to_ids = sorted(records_dict)
     exprs = []
     final_columns = []
@@ -96,9 +98,11 @@ def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, re
         elif operation == "min":
             val = ",".join(expr)
             expr = f"least({val}) AS {column}"
-        elif operation in ("avg", "mean"):
-            val = "(" + "+".join(expr) + f") / {len(expr)}"
-            expr = f"{val} AS {column}"
+        # TODO #208: Need to decide how to handle NULL values. If they should not be included in
+        # the mean, the logic below is incorrect
+        # elif operation in ("avg", "mean"):
+        #    val = "(" + "+".join(expr) + f") / {len(expr)}"
+        #    expr = f"{val} AS {column}"
         else:
             raise Exception(f"Unsupported operation: {operation}")
         exprs.append(expr)
@@ -152,3 +156,8 @@ def check_null_value_in_unique_dimension_rows(dim_table):
             "Combination of remapped dataset dimensions contain NULL value(s) for "
             f"dimension(s): \n{str(exc)}"
         )
+
+
+def ordered_subset_columns(df, subset: set[str]) -> list[str]:
+    """Return a list of columns in the dataframe that are present in subset."""
+    return [x for x in df.columns if x in subset]

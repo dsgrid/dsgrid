@@ -357,7 +357,7 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
         base_cmd = (
             f"query project run --offline "
             f"--registry-path={REGISTRY_PATH} {fp.name} "
-            f"--output={output_dir} --zip --force"
+            f"--output={output_dir} --zip-file --force"
         )
         if spark_query.use_spark_submit:
             # Need to find the full path to pass to spark-submit.

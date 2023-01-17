@@ -21,6 +21,10 @@ class DSGInvalidParameter(DSGBaseException):
     """Raised if a parameter is invalid."""
 
 
+class DSGInvalidFile(DSGBaseException):
+    """Raised if a file cannot be read. Possible reason is that the write operation failed."""
+
+
 class DSGInvalidDimension(DSGBaseException):
     """Raised if a type is not stored or is invalid."""
 

@@ -45,7 +45,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
                     )
             from_fractions = get_unique_values(records, "from_fraction")
             if len(from_fractions) != 1 and float(next(iter(from_fractions))) != 1.0:
-                # TODO: This needs to apply from_fraction to each load value column.
+                # TODO #199: This needs to apply from_fraction to each load value column.
                 # Also needs to handle all possible from_id/to_id combinations
                 # If aggregation is not allowed then it should raise an error.
                 raise DSGInvalidParameter(
@@ -54,7 +54,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
             else:
                 records = records.drop("from_fraction")
                 if column.function is not None:
-                    # TODO: Do we want to allow this?
+                    # TODO #200: Do we want to allow this?
                     raise Exception(
                         f"Applying a SQL function to added column={query_name} is not supported yet"
                     )
@@ -180,12 +180,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 group_by_cols.append(expr)
                 group_by_query_names.append(column.dimension_query_name)
             op = agg.aggregation_function
-            ordered_pivoted_columns = [
-                x
-                for x in context.get_pivoted_columns(dataset_id=self.dataset_id)
-                if x in pivoted_columns
-            ]
-            agg_expr = [op(x).alias(x) for x in ordered_pivoted_columns]
+            agg_expr = [op(x).alias(x) for x in df.columns if x in pivoted_columns]
             df = df.groupBy(*group_by_cols).agg(*agg_expr)
             logger.info(
                 "Aggregated dimensions with groupBy %s and agg %s", group_by_cols, agg_expr

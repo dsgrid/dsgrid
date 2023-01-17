@@ -99,7 +99,7 @@ class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
     Uses the passed string with no modification.
 
     Example:
-        DimensionFilterExpressionModel(
+        DimensionFilterExpressionRawModel(
             dimension_type=DimensionType.GEOGRAPHY,
             dimension_query_name="county",
             value="== '06037'",

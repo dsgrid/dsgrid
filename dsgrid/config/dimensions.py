@@ -251,7 +251,7 @@ class DimensionModel(DimensionBaseModel):
     @validator("file_hash")
     def compute_file_hash(cls, file_hash, values):
         if "filename" not in values:
-            # TODO
+            # TODO #194
             # We are getting here for Time. That shouldn't be happening.
             # This seems to work, but something is broken.
             return None

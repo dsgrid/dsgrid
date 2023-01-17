@@ -33,7 +33,7 @@ class ProjectUpdateChecker(ConfigUpdateCheckerBase):
             )
 
     def handle_postconditions(self):
-        # TODO: detect changes to required dimensions for each dataset.
+        # TODO #191: detect changes to required dimensions for each dataset.
         changes = set(self._REQUIRES_DATASET_UNREGISTRATION).intersection(self._changed_fields)
         if changes:
             for dataset in self._new_model.datasets:

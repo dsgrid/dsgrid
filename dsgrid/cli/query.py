@@ -22,6 +22,9 @@ from dsgrid.query.models import (
     ProjectQueryParamsModel,
     CreateCompositeDatasetQueryModel,
     CompositeDatasetQueryModel,
+    StandaloneDatasetModel,
+    DatasetType,
+    DatasetModel,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter  # , CompositeDatasetQuerySubmitter
 from dsgrid.registry.registry_manager import RegistryManager
@@ -91,6 +94,7 @@ _COMMON_RUN_OPTIONS = (
 @click.command("create")
 @click.argument("query_name")
 @click.argument("project_id")
+@click.argument("dataset_id")
 @click.option(
     "-F",
     "--filters",
@@ -148,6 +152,7 @@ _COMMON_RUN_OPTIONS = (
 def create_project(
     query_name,
     project_id,
+    dataset_id,
     filters,
     aggregation_function,
     default_per_dataset_aggregation,
@@ -179,7 +184,13 @@ def create_project(
         name=query_name,
         project=ProjectQueryParamsModel(
             project_id=project_id,
-            dataset_ids=project.config.list_registered_dataset_ids(),
+            dataset=DatasetModel(
+                dataset_id=dataset_id,
+                source_datasets=[
+                    StandaloneDatasetModel(dataset_type=DatasetType.STANDALONE, dataset_id=x)
+                    for x in project.config.list_registered_dataset_ids()
+                ],
+            ),
         ),
     )
 
@@ -218,19 +229,12 @@ def create_project(
             )
         else:
             assert False
-        query.project.dataset_params.dimension_filters.append(flt)
+        query.project.dataset.params.dimension_filters.append(flt)
 
-    if default_per_dataset_aggregation or default_result_aggregation:
+    if default_result_aggregation:
         default_aggs = {}
         for dim_type, name in project.config.get_base_dimension_to_query_name_mapping().items():
             default_aggs[dim_type.value] = [name]
-        if default_per_dataset_aggregation:
-            query.project.dataset_params.per_dataset_aggregations = [
-                AggregationModel(
-                    dimensions=DimensionQueryNamesModel(**default_aggs),
-                    aggregation_function=aggregation_function,
-                ),
-            ]
         if default_result_aggregation:
             query.result.aggregations = [
                 AggregationModel(
@@ -257,8 +261,7 @@ def validate_project(query_file):
 @click.command("run")
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @click.option(
-    "-p",
-    "--persist-intermediate-table",
+    "--persist-intermediate-table/--no-persist-intermediate-table",
     is_flag=True,
     default=True,
     show_default=True,
@@ -266,7 +269,7 @@ def validate_project(query_file):
 )
 @click.option(
     "-z",
-    "--zip",
+    "--zip-file",
     is_flag=True,
     default=False,
     show_default=True,
@@ -277,7 +280,7 @@ def validate_project(query_file):
 def run_project(
     query_definition_file,
     persist_intermediate_table,
-    zip,
+    zip_file,
     registry_path,
     remote_path,
     offline,
@@ -297,7 +300,7 @@ def run_project(
         query,
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
-        zip=zip,
+        zip_file=zip_file,
         force=force,
     )
 

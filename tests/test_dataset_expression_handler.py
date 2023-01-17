@@ -36,6 +36,7 @@ def test_dataset_expression_add(datasets):
     assert df.filter("county == 'Jefferson'").collect()[0].elec_cooling == 11
     assert df.filter("county == 'Boulder'").collect()[0].elec_cooling == 13
     assert df.filter("county == 'Denver'").collect()[0].elec_heating == 18
+    assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_dataset_expression_mul(datasets):
@@ -44,6 +45,7 @@ def test_dataset_expression_mul(datasets):
     assert df.filter("county == 'Jefferson'").collect()[0].elec_cooling == 18
     assert df.filter("county == 'Boulder'").collect()[0].elec_cooling == 30
     assert df.filter("county == 'Denver'").collect()[0].elec_heating == 72
+    assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_dataset_expression_sub(datasets):
@@ -52,6 +54,7 @@ def test_dataset_expression_sub(datasets):
     assert df.filter("county == 'Jefferson'").collect()[0].elec_cooling == 7
     assert df.filter("county == 'Boulder'").collect()[0].elec_cooling == 7
     assert df.filter("county == 'Denver'").collect()[0].elec_heating == 6
+    assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_dataset_expression_union(datasets):
@@ -60,6 +63,7 @@ def test_dataset_expression_union(datasets):
     assert df.filter("county == 'Jefferson'").count() == 2
     assert df.filter("county == 'Boulder'").count() == 2
     assert df.filter("county == 'Denver'").count() == 2
+    assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_dataset_expression_combo(datasets):
@@ -77,6 +81,7 @@ def test_dataset_expression_combo(datasets):
     assert denver.count() == 2
     assert denver.collect()[0].elec_heating == 18
     assert denver.collect()[1].elec_heating == 72
+    assert df.columns == datasets["dataset1"].df.columns
 
 
 def test_invalid_lengths(datasets):

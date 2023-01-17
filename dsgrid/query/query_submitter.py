@@ -6,7 +6,11 @@ from zipfile import ZipFile
 
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.exceptions import DSGInvalidParameter
-from dsgrid.utils.spark import read_dataframe, write_dataframe_and_auto_partition
+from dsgrid.utils.spark import (
+    read_dataframe,
+    try_read_dataframe,
+    write_dataframe_and_auto_partition,
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.files import load_data
 from .models import (
@@ -32,10 +36,11 @@ class QuerySubmitterBase:
         self._cached_tables_dir().mkdir(exist_ok=True, parents=True)
         self._composite_datasets_dir().mkdir(exist_ok=True, parents=True)
 
-        # TODO: This location will need more consideration.
+        # TODO #186: This location will need more consideration.
         # We might want to store cached datasets in the spark-warehouse and let Spark manage it
         # for us. However, would we share them on Eagle? What happens on Eagle walltime timeouts
         # where the tables are left in intermediate states?
+        # This is even more of a problem on AWS.
         self._cached_project_mapped_datasets_dir().mkdir(exist_ok=True, parents=True)
 
     @abc.abstractmethod
@@ -81,11 +86,12 @@ class QuerySubmitterBase:
     def _try_read_cache(self, context: QueryContext):
         hash, _ = context.model.serialize_cached_content()
         cached_dir = self._cached_tables_dir() / hash
-        if cached_dir.exists():
-            filename = self._cached_table_filename(cached_dir)
+        filename = self._cached_table_filename(cached_dir)
+        df = try_read_dataframe(filename)
+        if df is not None:
             logger.info("Load intermediate table from cache: %s", filename)
             metadata_file = self._metadata_filename(cached_dir)
-            return read_dataframe(filename), DatasetMetadataModel(**load_data(metadata_file))
+            return df, DatasetMetadataModel.from_file(metadata_file)
         return None, None
 
 
@@ -110,7 +116,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         model,
         load_cached_table,
         persist_intermediate_table,
-        zip=False,
+        zip_file=False,
         force=False,
     ):
         context = QueryContext(model)
@@ -156,7 +162,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             df = df.sort(*context.model.result.sort_columns)
 
         repartition = not persist_intermediate_table
-        table_filename = self._save_query_results(context, df, repartition, zip=zip)
+        table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
 
         for report in context.model.result.reports:
             output_dir = self._output_dir / context.model.name
@@ -168,14 +174,19 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     def _apply_filters(self, df, context: QueryContext):
         for dim_filter in context.model.result.dimension_filters:
-            raise Exception("Filtering result data is not supported yet")
-            # TODO: check column names, resolution, etc. Filter.
-            # Could be problems with aliases.
+            query_name = dim_filter.dimension_query_name
+            if query_name not in df.columns:
+                # Consider catching this exception and still write to a file.
+                # It could mean writing a lot of data the user doesn't want.
+                raise DSGInvalidParameter(
+                    f"filter column {query_name} is not in the dataframe: {df.columns}"
+                )
+            df = dim_filter.apply_filter(df)
         return df
 
     @track_timing(timer_stats_collector)
     def _save_query_results(
-        self, context: QueryContext, df, repartition, aggregation_name=None, zip=False
+        self, context: QueryContext, df, repartition, aggregation_name=None, zip_file=False
     ):
         output_dir = self._output_dir / context.model.name
         output_dir.mkdir(exist_ok=True)
@@ -184,7 +195,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             output_dir.mkdir(exist_ok=True)
         filename = output_dir / f"table.{context.model.result.output_format}"
         self._save_result(context, df, filename, repartition)
-        if zip:
+        if zip_file:
             zip_name = Path(str(output_dir) + ".zip")
             with ZipFile(zip_name, "w") as zipf:
                 for path in output_dir.rglob("*"):
@@ -195,7 +206,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
-            # TODO minor: Some users may want us to use pandas because Spark makes a csv directory.
+            # TODO #207: Some users may want us to use pandas because Spark makes a csv directory.
             df.write.mode("overwrite").csv(str(filename), header=True)
         elif suffix == ".parquet":
             if repartition:
@@ -218,7 +229,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         model: ProjectQueryModel,
         persist_intermediate_table=True,
         load_cached_table=True,
-        zip=False,
+        zip_file=False,
         force=False,
     ):
         """Submits a project query to consolidate datasets and produce result tables.
@@ -230,7 +241,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
             Persist the intermediate consolidated table.
         load_cached_table : bool, optional
             Load a cached consolidated table if the query matches an existing query.
-        zip : bool, optional
+        zip_file : bool, optional
             Create a zip file with all output files.
         force : bool
             If True, overwrite any existing output directory.
@@ -248,7 +259,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
 
         """
         return self._run_query(
-            model, load_cached_table, persist_intermediate_table, zip=zip, force=force
+            model, load_cached_table, persist_intermediate_table, zip_file=zip_file, force=force
         )[0]
 
 

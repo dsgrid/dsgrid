@@ -23,10 +23,19 @@ class DatasetExpressionHandler:
                 f"{orig_self_count=} {orig_other_count=}"
             )
 
-        expr = [op(self.df[x], other.df[x]).alias(x) for x in self.pivoted_columns]
-        df = self.df.join(other.df, on=self.dimension_columns).select(
-            *self.dimension_columns, *expr
-        )
+        def renamed(col):
+            return col + "_other"
+
+        other_df = other.df
+        for column in self.pivoted_columns:
+            other_df = other_df.withColumnRenamed(column, renamed(column))
+        df = self.df.join(other_df, on=self.dimension_columns)
+
+        for column in self.pivoted_columns:
+            other_column = renamed(column)
+            df = df.withColumn(column, op(df[column], df[other_column]))
+
+        df = df.select(*self.df.columns)
         joined_count = df.count()
         if joined_count != orig_self_count:
             raise DSGInvalidOperation(

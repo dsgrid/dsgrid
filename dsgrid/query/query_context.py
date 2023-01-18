@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, get_project_dimension_types
 from dsgrid.utils.spark import get_spark_session
 from .models import QueryBaseModel, DatasetMetadataModel, TableFormatType
 
@@ -31,7 +31,7 @@ class QueryContext:
         return self._model
 
     def consolidate_dataset_metadata(self):
-        for dim_type in DimensionType:
+        for dim_type in get_project_dimension_types():
             field = dim_type.value
             getattr(self._metadata.dimensions, field).clear()
             for dataset_metadata in self._dataset_metadata.values():
@@ -98,7 +98,7 @@ class QueryContext:
 
     def get_all_dimension_query_names(self):
         names = set()
-        for dimension_type in DimensionType:
+        for dimension_type in get_project_dimension_types():
             names.update(getattr(self._metadata.dimensions, dimension_type.value))
         return names
 

@@ -8,7 +8,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, get_project_dimension_types
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import TableFormatType
 from dsgrid.query.query_context import QueryContext
@@ -37,7 +37,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def load(cls, config: DatasetConfig, *args, **kwargs):
         load_data_df = read_dataframe(config.load_data_path)
         load_data_lookup = read_dataframe(config.load_data_lookup_path)
-        load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
+        load_data_lookup = config.add_trivial_dimensions(load_data_lookup).drop(
+            DimensionType.DATA_SOURCE.value
+        )
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
@@ -125,11 +127,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if not found_id:
             raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
 
-        load_data_dimensions = (
+        load_data_dimensions = {
             DimensionType.TIME,
             self._config.model.data_schema.load_data_column_dimension,
-        )
-        expected_dimensions = {d for d in DimensionType if d not in load_data_dimensions}
+        }
+        expected_dimensions = get_project_dimension_types() - load_data_dimensions
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
             raise DSGInvalidDataset(
@@ -245,7 +247,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 pivoted_columns_to_remove = pivoted_columns.difference(dim.record_ids)
 
         drop_columns = []
-        for dim in self._config.model.trivial_dimensions:
+        for dim in get_project_dimension_types().intersection(
+            self._config.model.trivial_dimensions
+        ):
             col = dim.value
             count = lookup.select(col).distinct().count()
             assert count == 1, f"{dim}: count"

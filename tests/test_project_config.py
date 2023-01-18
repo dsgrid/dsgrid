@@ -1,6 +1,6 @@
 import pytest
 
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import get_project_dimension_types
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
 from dsgrid.config.project_config import ProjectConfigModel, ProjectDimensionQueryNamesModel
@@ -64,6 +64,6 @@ def test_project_duplicate_type(config_as_dict, dimension_manager):
 
 
 def test_project_dimension_query_names_model():
-    assert not {x.value for x in DimensionType}.difference(
+    assert not {x.value for x in get_project_dimension_types()}.difference(
         ProjectDimensionQueryNamesModel.__fields__
     )

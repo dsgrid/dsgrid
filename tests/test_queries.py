@@ -11,7 +11,7 @@ from pyspark.sql.types import DoubleType, IntegerType, StringType, StructField, 
 import pytest
 from pyspark.sql import SparkSession
 
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, get_project_dimension_types
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
     DimensionFilterColumnOperatorModel,
@@ -128,7 +128,6 @@ def test_peak_load():
 def test_invalid_drop_pivoted_dimension(tmp_path):
     invalid_agg = AggregationModel(
         dimensions=DimensionQueryNamesModel(
-            data_source=["data_source"],
             geography=["county"],
             metric=[],
             model_year=["model_year"],
@@ -224,7 +223,7 @@ def test_query_cli_run(tmp_path):
 
 def test_dimension_query_names_model():
     # Test that this model is defined with all dimension types.
-    diff = {x.value for x in DimensionType}.symmetric_difference(
+    diff = {x.value for x in get_project_dimension_types()}.symmetric_difference(
         set(DimensionQueryNamesModel.__fields__)
     )
     assert not diff
@@ -508,7 +507,6 @@ class QueryTestElectricityUse(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=[self._geography],
                             metric=["electricity"],
                             model_year=[],
@@ -582,7 +580,6 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=[self._geography],
                             metric=["electricity"],
                             model_year=[],
@@ -669,7 +666,6 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=["county"],
                             metric=["electricity"],
                             model_year=[],
@@ -728,7 +724,6 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
                             geography=["county"],
                             metric=["electricity"],
                             model_year=["model_year"],
@@ -742,7 +737,6 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                     ),
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=["county"],
                             metric=["electricity"],
                             model_year=[],
@@ -811,7 +805,6 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
                             geography=["state", "reeds_pca", "census_region"],
                             metric=["electricity"],
                             model_year=["model_year"],
@@ -868,7 +861,6 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
                             geography=["state"],
                             metric=["electricity"],
                             model_year=["model_year"],
@@ -998,7 +990,6 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=[self._geography],
                             metric=["electricity"],
                             model_year=[],

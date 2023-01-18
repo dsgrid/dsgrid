@@ -12,7 +12,7 @@ from typing import Union, List, Dict
 import json5
 from prettytable import PrettyTable
 
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, get_project_dimension_types
 from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidDimensionMapping,
@@ -888,13 +888,13 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_time_dim=project_config.get_base_dimension(DimensionType.TIME),
         )
         pivoted_dimension = handler.get_pivoted_dimension_type()
-        exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivoted_dimension])
+        exclude_dims = set([DimensionType.TIME, pivoted_dimension])
 
         dim_table = (
             handler.get_unique_dimension_rows().drop("id").drop(DimensionType.DATA_SOURCE.value)
         )
 
-        cols = [x.value for x in DimensionType if x not in exclude_dims]
+        cols = [x.value for x in (get_project_dimension_types() - exclude_dims)]
         dataset_id = dataset_config.config_id
         assoc_table = project_config.load_dimension_associations(
             dataset_id, pivoted_dimension=pivoted_dimension, try_load_cache=False
@@ -939,7 +939,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id)
 
     @staticmethod
-    def _check_pivoted_dimension_columns(handler, project_pivoted_ids, data_source):
+    def _check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id):
         """pivoted dimension record is the same as project's unless a relevant association is provided."""
         logger.info("Check pivoted dimension columns.")
         d_dim_ids = handler.get_pivoted_dimension_columns_mapped_to_project()
@@ -947,10 +947,10 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         if d_dim_ids.symmetric_difference(project_pivoted_ids):
             raise DSGInvalidDataset(
-                f"Mismatch between project and {data_source} dataset pivoted {pivoted_dim.value} dimension, "
+                f"Mismatch between project and {dataset_id} dataset pivoted {pivoted_dim.value} dimension, "
                 "please double-check data, and any relevant association_table and dimension_mapping. "
-                f"\n - Invalid column(s) in {data_source} load data according to project: {d_dim_ids.difference(project_pivoted_ids)}"
-                f"\n - Missing column(s) in {data_source} load data according to project: {project_pivoted_ids.difference(d_dim_ids)}"
+                f"\n - Invalid column(s) in {dataset_id} load data according to project: {d_dim_ids.difference(project_pivoted_ids)}"
+                f"\n - Missing column(s) in {dataset_id} load data according to project: {project_pivoted_ids.difference(d_dim_ids)}"
             )
 
     def update_from_file(

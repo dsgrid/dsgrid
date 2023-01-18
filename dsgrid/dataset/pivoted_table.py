@@ -4,7 +4,7 @@ from typing import List
 
 import pyspark.sql.functions as F
 
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import get_project_dimension_types
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.query.models import AggregationModel
 from dsgrid.query.query_context import QueryContext
@@ -186,7 +186,9 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 "Aggregated dimensions with groupBy %s and agg %s", group_by_cols, agg_expr
             )
 
-        final_query_names = {x: set() for x in DimensionType if x != pivoted_dimension_type}
+        final_query_names = {
+            x: set() for x in get_project_dimension_types() if x != pivoted_dimension_type
+        }
         for column in group_by_query_names:
             dim = self.project_config.get_dimension(column)
             final_query_names[dim.model.dimension_type].add(column)

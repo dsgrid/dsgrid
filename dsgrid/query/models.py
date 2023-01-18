@@ -8,7 +8,7 @@ from semver import VersionInfo
 
 from dsgrid.data_models import DSGBaseModel
 
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, get_project_dimension_types
 from dsgrid.dimension.dimension_filters import make_dimension_filter, DimensionFilterBaseModel
 from dsgrid.utils.files import compute_hash
 
@@ -73,7 +73,6 @@ class DimensionQueryNamesModel(DSGBaseModel):
     If a value is empty, that dimension will be aggregated and dropped from the table.
     """
 
-    data_source: List[Union[str, ColumnModel]]
     geography: List[Union[str, ColumnModel]]
     metric: List[Union[str, ColumnModel]]
     model_year: List[Union[str, ColumnModel]]
@@ -85,7 +84,7 @@ class DimensionQueryNamesModel(DSGBaseModel):
 
     @root_validator
     def fix_columns(cls, values):
-        for dim_type in DimensionType:
+        for dim_type in get_project_dimension_types():
             field = dim_type.value
             container = values[field]
             for i, item in enumerate(container):
@@ -146,7 +145,6 @@ class TableFormatType(enum.Enum):
 class DatasetDimensionsMetadataModel(DSGBaseModel):
     """Defines the dimensions of a dataset serialized to file."""
 
-    data_source: Set[str] = set()
     geography: Set[str] = set()
     metric: Set[str] = set()
     model_year: Set[str] = set()

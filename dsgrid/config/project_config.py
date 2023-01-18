@@ -12,7 +12,12 @@ from dsgrid.config.dimension_association_manager import (
     save_dimension_associations,
 )
 from dsgrid.data_models import DSGBaseModel, serialize_model_data
-from dsgrid.dimension.base_models import check_required_dimensions, check_timezone_in_geography
+from dsgrid.dimension.base_models import (
+    check_required_dimensions,
+    check_timezone_in_geography,
+    get_project_dimension_types,
+    DimensionType,
+)
 from dsgrid.exceptions import (
     DSGInvalidField,
     DSGInvalidDimension,
@@ -41,7 +46,6 @@ from .dimension_mapping_base import DimensionMappingReferenceModel
 from .mapping_tables import MappingTableByNameModel
 from .dimensions import (
     DimensionReferenceModel,
-    DimensionType,
     handle_dimension_union,
     DimensionModel,
 )
@@ -411,7 +415,6 @@ class _DimensionQueryNamesModel(DSGBaseModel):
 class ProjectDimensionQueryNamesModel(DSGBaseModel):
     """Defines the query names for all base and supplemental dimensions in the project."""
 
-    data_source: _DimensionQueryNamesModel
     geography: _DimensionQueryNamesModel
     metric: _DimensionQueryNamesModel
     model_year: _DimensionQueryNamesModel
@@ -633,7 +636,7 @@ class ProjectConfig(ConfigBase):
 
         """
         query_names = {}
-        for dimension_type in DimensionType:
+        for dimension_type in get_project_dimension_types():
             dim = self.get_base_dimension(dimension_type)
             query_names[dimension_type] = dim.model.dimension_query_name
         return query_names
@@ -661,7 +664,7 @@ class ProjectConfig(ConfigBase):
         base_query_names_by_type = self.get_base_dimension_to_query_name_mapping()
         supp_query_names_by_type = self.get_supplemental_dimension_to_query_name_mapping()
         model = {}
-        for dimension_type in DimensionType:
+        for dimension_type in get_project_dimension_types():
             model[dimension_type.value] = {
                 "base": base_query_names_by_type[dimension_type],
                 "supplemental": supp_query_names_by_type[dimension_type],

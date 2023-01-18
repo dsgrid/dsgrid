@@ -15,7 +15,7 @@ from dsgrid.utils.spark import (
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, get_project_dimension_types
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import TableFormatType
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
@@ -33,7 +33,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @classmethod
     def load(cls, config: DatasetConfig, *args, **kwargs):
-        load_data_df = config.add_trivial_dimensions(read_dataframe(config.load_data_path))
+        load_data_df = config.add_trivial_dimensions(read_dataframe(config.load_data_path)).drop(
+            DimensionType.DATA_SOURCE.value
+        )
         return cls(load_data_df, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
@@ -68,7 +70,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if pivoted_dim_found:
             dimension_types.add(pivoted_dim)
 
-        expected_dimensions = {d for d in DimensionType if d != DimensionType.TIME}
+        expected_dimensions = get_project_dimension_types() - {DimensionType.TIME}
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
             raise DSGInvalidDataset(
@@ -124,7 +126,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 pivoted_columns_to_remove = pivoted_columns.difference(dim.record_ids)
 
         drop_columns = []
-        for dim in self._config.model.trivial_dimensions:
+        for dim in get_project_dimension_types().intersection(
+            self._config.model.trivial_dimensions
+        ):
             col = dim.value
             count = load_df.select(col).distinct().count()
             assert count == 1, f"{dim}: {count}"

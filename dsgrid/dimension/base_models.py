@@ -34,6 +34,11 @@ class DimensionType(DSGEnum):
             )
 
 
+def get_project_dimension_types() -> set[DimensionType]:
+    """Return the types that must be present in a dataset for operation with a project."""
+    return {x for x in DimensionType if x != DimensionType.DATA_SOURCE}
+
+
 class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 

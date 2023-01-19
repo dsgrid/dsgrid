@@ -552,23 +552,6 @@ class DatasetConfig(ConfigBase):
                 return dim_config
         assert False, dimension_type
 
-    # def get_dimension_by_query_name(self, dimension_query_name: str):
-    #    """Return the dimension matching dimension_query_name.
-
-    #    Parameters
-    #    ----------
-    #    dimension_query_name : str
-
-    #    Returns
-    #    -------
-    #    DimensionConfig
-
-    #    """
-    #    for dim_config in self.dimensions.values():
-    #        if dim_config.model.dimension_query_name == dimension_query_name:
-    #            return dim_config
-    #    assert False, dimension_query_name
-
     def add_trivial_dimensions(self, df):
         """Add trivial 1-element dimensions to load_data_lookup."""
         for dim in self._dimensions.values():

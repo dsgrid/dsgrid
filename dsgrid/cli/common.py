@@ -13,7 +13,7 @@ def check_output_directory(path: Path, fs_interface, force: bool):
         If False and the directory exists and has content, exit.
     """
     if path.exists():
-        if not list(path.iterdir()):
+        if not bool(path.iterdir()):
             return
         if force:
             fs_interface.rm_tree(path)

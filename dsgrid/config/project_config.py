@@ -542,9 +542,7 @@ class ProjectConfig(ConfigBase):
         ):
             if ref.dimension_id == dimension_id:
                 return ref
-        # for key, dim in itertools.chain(self._base_dimensions.items(), self._supplemental_dimensions.items()):
-        #    if key.id == dimension_id:
-        #        return dim
+
         raise DSGInvalidDimension(f"{dimension_id} is not stored")
 
     def list_supplemental_dimensions(self, dimension_type: DimensionType, sort_by=None):

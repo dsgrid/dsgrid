@@ -32,6 +32,9 @@ class LocalFilesystem(FilesystemInterface):
             return [x for x in contents if os.path.isdir(os.path.join(directory, x))]
         return contents
 
+    def path(self, path) -> Path:
+        return Path(path)
+
     def rglob(
         self,
         directory,

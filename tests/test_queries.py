@@ -453,7 +453,7 @@ class QueryTestElectricityValues(QueryTestBase):
         non_value_columns.update(supp_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         expected = ["electricity_cooling", "electricity_heating"]
-        # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating", "fraction"]
+        # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating"]
         success = value_columns == expected
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)

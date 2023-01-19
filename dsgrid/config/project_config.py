@@ -525,6 +525,28 @@ class ProjectConfig(ConfigBase):
         """
         return self.get_dimension(dimension_query_name).get_records_dataframe()
 
+    def get_dimension_reference(self, dimension_id: str):
+        """Return the reference of the dimension matching dimension_id.
+
+        Parameters
+        ----------
+        dimension_id : str
+
+        Returns
+        -------
+        DimensionReferenceModel
+        """
+        for ref in itertools.chain(
+            self.model.dimensions.base_dimension_references,
+            self.model.dimensions.supplemental_dimension_references,
+        ):
+            if ref.dimension_id == dimension_id:
+                return ref
+        # for key, dim in itertools.chain(self._base_dimensions.items(), self._supplemental_dimensions.items()):
+        #    if key.id == dimension_id:
+        #        return dim
+        raise DSGInvalidDimension(f"{dimension_id} is not stored")
+
     def list_supplemental_dimensions(self, dimension_type: DimensionType, sort_by=None):
         """Return the supplemental dimensions matching dimension (if any).
 

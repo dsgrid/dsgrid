@@ -26,15 +26,16 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return DateTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df):
+    def check_dataset_time_consistency(self, load_data_df, time_columns):
         logger.info("Check DateTimeDimensionConfig dataset time consistency.")
-        time_col = self.get_timestamp_load_data_columns()
-        if len(time_col) > 1:
+        if len(time_columns) > 1:
             raise ValueError(
                 "DateTimeDimensionConfig expects only one column from "
-                f"get_timestamp_load_data_columns, but has {time_col}"
+                f"get_timestamp_load_data_columns, but has {time_columns}"
             )
-        time_col = time_col[0]
+        time_col = time_columns[0]
+        if time_col not in load_data_df.columns:
+            time_col = self.model.dimension_query_name  # TODO: hack
         tz = self.get_tzinfo()
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)

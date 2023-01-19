@@ -2,9 +2,7 @@ import logging
 from pathlib import Path
 from typing import List
 
-from dsgrid.config.dataset_config import (
-    DatasetConfig,
-)
+from dsgrid.config.dataset_config import DatasetConfig, ColumnType
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
 from dsgrid.utils.spark import (
@@ -16,7 +14,7 @@ from dsgrid.utils.spark import (
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.query.models import TableFormatType
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.query.query_context import QueryContext
@@ -50,9 +48,24 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         logger.info("Check one table dataset consistency.")
         dimension_types = set()
         pivoted_cols = set()
+        dimension_type_to_column = {}
+        column_to_dimension_type = {}
 
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_columns = time_dim.get_timestamp_load_data_columns()
+        if self._config.model.data_schema.column_type == ColumnType.DIMENSION_TYPES:
+            time_columns = time_dim.get_timestamp_load_data_columns()
+            for dimension_type in DimensionType:
+                dimension_type_to_column[dimension_type] = dimension_type.value
+                column_to_dimension_type[dimension_type.value] = dimension_type
+        elif self._config.model.data_schema.column_type == ColumnType.DIMENSION_QUERY_NAMES:
+            time_columns = [time_dim.model.dimension_query_name]
+            for dimension_type in DimensionType:
+                name = self._config.get_dimension(dimension_type).model.dimension_query_name
+                dimension_type_to_column[dimension_type] = name
+                column_to_dimension_type[name] = dimension_type
+        else:
+            raise Exception(f"BUG: not handled: {self._config.model.data_schema.column_type}")
+
         pivoted_dim = self._config.model.data_schema.load_data_column_dimension
         expected_pivoted_columns = self.get_pivoted_dimension_columns()
         pivoted_dim_found = False
@@ -62,8 +75,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             elif col in expected_pivoted_columns:
                 pivoted_dim_found = True
                 pivoted_cols.add(col)
+            elif col not in column_to_dimension_type:
+                raise DSGInvalidDimension(f"column={col} is not expected.")
             else:
-                dimension_types.add(DimensionType.from_column(col))
+                dimension_types.add(column_to_dimension_type[col])
 
         if pivoted_dim_found:
             dimension_types.add(pivoted_dim)
@@ -77,21 +92,25 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
 
         for dimension_type in dimension_types:
-            name = dimension_type.value
+            if dimension_type == DimensionType.DATA_SOURCE:
+                # TODO
+                continue
+            column = dimension_type_to_column[dimension_type]
             dimension = self._config.get_dimension(dimension_type)
             dim_records = dimension.get_unique_ids()
             if dimension_type == pivoted_dim:
                 data_records = set(pivoted_cols)
             else:
-                data_records = get_unique_values(self._load_data, name)
+                data_records = get_unique_values(self._load_data, column)
             if dim_records != data_records:
                 logger.error(
                     "Mismatch in load_data records. dimension=%s mismatched=%s",
-                    name,
+                    column,
                     data_records.symmetric_difference(dim_records),
                 )
+                breakpoint()
                 raise DSGInvalidDataset(
-                    f"load_data records do not match dimension records for {name}"
+                    f"load_data records do not match dimension records for {column}"
                 )
 
     def get_unique_dimension_rows(self):

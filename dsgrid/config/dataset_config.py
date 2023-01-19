@@ -22,7 +22,7 @@ from .dimensions import (
 
 
 # Note that there is special handling for S3 at use sites.
-ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv")
+ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv", "table.parquet")
 ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.parquet",
     # The next two are only used for test data.
@@ -167,11 +167,17 @@ class DataClassificationType(DSGEnum):
     )
 
 
+class ColumnType(DSGEnum):
+    DIMENSION_TYPES = "dimension_types"
+    DIMENSION_QUERY_NAMES = "dimension_query_names"
+
+
 class StandardDataSchemaModel(DSGBaseModel):
     load_data_column_dimension: DimensionType = Field(
         title="load_data_column_dimension",
         description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
     )
+    column_type: ColumnType = ColumnType.DIMENSION_TYPES
 
 
 class OneTableDataSchemaModel(DSGBaseModel):
@@ -179,6 +185,7 @@ class OneTableDataSchemaModel(DSGBaseModel):
         title="load_data_column_dimension",
         description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
     )
+    column_type: ColumnType = ColumnType.DIMENSION_TYPES
 
 
 class DatasetQualifierType(DSGEnum):
@@ -544,6 +551,23 @@ class DatasetConfig(ConfigBase):
             if key.type == dimension_type:
                 return dim_config
         assert False, dimension_type
+
+    # def get_dimension_by_query_name(self, dimension_query_name: str):
+    #    """Return the dimension matching dimension_query_name.
+
+    #    Parameters
+    #    ----------
+    #    dimension_query_name : str
+
+    #    Returns
+    #    -------
+    #    DimensionConfig
+
+    #    """
+    #    for dim_config in self.dimensions.values():
+    #        if dim_config.model.dimension_query_name == dimension_query_name:
+    #            return dim_config
+    #    assert False, dimension_query_name
 
     def add_trivial_dimensions(self, df):
         """Add trivial 1-element dimensions to load_data_lookup."""

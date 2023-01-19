@@ -57,12 +57,16 @@ class QuerySubmitterBase:
         return self._output_dir / "cached_project_mapped_datasets"
 
     @staticmethod
-    def _metadata_filename(path: Path):
+    def metadata_filename(path: Path):
         return path / "metadata.json"
 
     @staticmethod
-    def _query_filename(path: Path):
+    def query_filename(path: Path):
         return path / "query.json"
+
+    @staticmethod
+    def table_filename(path: Path):
+        return path / "table.parquet"
 
     @staticmethod
     def _cached_table_filename(path: Path):
@@ -78,8 +82,8 @@ class QuerySubmitterBase:
         filename = self._cached_table_filename(cached_dir)
         df = write_dataframe_and_auto_partition(df, filename)
 
-        self._metadata_filename(cached_dir).write_text(context.metadata.json(indent=2))
-        self._query_filename(cached_dir).write_text(text)
+        self.metadata_filename(cached_dir).write_text(context.metadata.json(indent=2))
+        self.query_filename(cached_dir).write_text(text)
         logger.info("Persisted intermediate table to %s", filename)
         return df
 
@@ -90,7 +94,7 @@ class QuerySubmitterBase:
         df = try_read_dataframe(filename)
         if df is not None:
             logger.info("Load intermediate table from cache: %s", filename)
-            metadata_file = self._metadata_filename(cached_dir)
+            metadata_file = self.metadata_filename(cached_dir)
             return df, DatasetMetadataModel.from_file(metadata_file)
         return None, None
 
@@ -215,8 +219,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 df.write.mode("overwrite").parquet(str(filename))
         else:
             raise Exception(f"Unsupported output_format={suffix}")
-        self._query_filename(output_dir).write_text(context.model.serialize()[1])
-        self._metadata_filename(output_dir).write_text(context.metadata.json(indent=2))
+        self.query_filename(output_dir).write_text(context.model.serialize()[1])
+        self.metadata_filename(output_dir).write_text(context.metadata.json(indent=2))
         logger.info("Wrote query=%s output table to %s", context.model.name, filename)
 
 
@@ -329,7 +333,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             raise DSGInvalidParameter(
                 f"There is no composite dataset with dataset_id={dataset_id}"
             )
-        metadata_file = self._metadata_filename(self._composite_datasets_dir() / dataset_id)
+        metadata_file = self.metadata_filename(self._composite_datasets_dir() / dataset_id)
         return (read_dataframe(filename), DatasetMetadataModel(**load_data(metadata_file)))
 
     @track_timing(timer_stats_collector)
@@ -338,4 +342,4 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         output_dir.mkdir(exist_ok=True)
         filename = output_dir / "table.parquet"
         self._save_result(context, df, filename, repartition)
-        self._metadata_filename(output_dir).write_text(context.metadata.json(indent=2))
+        self.metadata_filename(output_dir).write_text(context.metadata.json(indent=2))

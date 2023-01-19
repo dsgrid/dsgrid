@@ -1,6 +1,7 @@
 """Defines interface to access all filesystems"""
 
 import abc
+from pathlib import Path
 
 
 class FilesystemInterface(abc.ABC):
@@ -75,6 +76,19 @@ class FilesystemInterface(abc.ABC):
         ----------
         directory : str
 
+        """
+
+    @abc.abstractmethod
+    def path(self, path) -> Path:
+        """Return an object that meets the interface of pathlib.Path.
+
+        Parameters
+        ----------
+        path : str
+
+        Returns
+        -------
+        Path
         """
 
     @abc.abstractmethod

@@ -5,7 +5,7 @@ from typing import List
 
 import pyspark.sql.functions as F
 
-from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dataset_config import DatasetConfig, ColumnType
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
@@ -158,9 +158,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         List: List of column names.
 
         """
-        time_col = time_dim.get_timestamp_load_data_columns()
+        time_cols = self._get_time_dimension_columns()
         pivoted_cols = self.get_pivoted_dimension_columns()
-        groupby_cols = list(set(load_data_df.columns).difference(set(pivoted_cols + time_col)))
+        groupby_cols = list(set(load_data_df.columns).difference(set(pivoted_cols + time_cols)))
 
         return groupby_cols
 
@@ -215,16 +215,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         logger.info("Check dataset time consistency.")
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_dim.check_dataset_time_consistency(load_data_df)
+        time_cols = self._get_time_dimension_columns()
+        time_dim.check_dataset_time_consistency(load_data_df, time_cols)
         if time_dim.model.time_type != TimeDimensionType.NOOP:
-            self._check_dataset_time_consistency_by_time_array(time_dim, load_data_df)
+            self._check_dataset_time_consistency_by_time_array(time_dim, time_cols, load_data_df)
 
     @track_timing(timer_stats_collector)
-    def _check_dataset_time_consistency_by_time_array(self, time_dim, load_data_df):
+    def _check_dataset_time_consistency_by_time_array(self, time_dim, time_cols, load_data_df):
         """Check that each unique time array has the same timestamps."""
         logger.info("Check dataset time consistency by time array.")
         unique_array_cols = self.get_columns_for_unique_arrays(time_dim, load_data_df)
-        time_cols = time_dim.get_timestamp_load_data_columns()
         counts = load_data_df.groupBy(*time_cols).count().select("count")
         distinct_counts = counts.select("count").distinct().collect()
         if len(distinct_counts) != 1:
@@ -257,6 +257,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if ref.from_dimension_type == dimension_type:
                 return ref
         return
+
+    def _get_time_dimension_columns(self):
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        if self._config.model.data_schema.column_type == ColumnType.DIMENSION_TYPES:
+            time_cols = time_dim.get_timestamp_load_data_columns()
+        elif self._config.model.data_schema.column_type == ColumnType.DIMENSION_QUERY_NAMES:
+            time_cols = [time_dim.model.dimension_query_name]
+        else:
+            raise Exception(f"BUG: unhandled: {self._config.model.data_schema.column_type}")
+
+        return time_cols
 
     def _iter_dataset_record_ids(self, context: QueryContext):
         for dim_type, project_record_ids in context.get_record_ids().items():

@@ -21,7 +21,7 @@ from dsgrid.exceptions import (
 )
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dataset_config import DatasetConfig, ColumnType
 from dsgrid.config.dimension_association_manager import remove_project_dimension_associations
 from dsgrid.config.dimensions import DimensionModel, DimensionReferenceByNameModel
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
@@ -888,17 +888,31 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_time_dim=project_config.get_base_dimension(DimensionType.TIME),
         )
         pivoted_dimension = handler.get_pivoted_dimension_type()
-        exclude_dims = set([DimensionType.TIME, DimensionType.DATA_SOURCE, pivoted_dimension])
+        exclude_dims = {DimensionType.TIME, DimensionType.DATA_SOURCE, pivoted_dimension}
 
         dim_table = (
             handler.get_unique_dimension_rows().drop("id").drop(DimensionType.DATA_SOURCE.value)
         )
-
-        cols = [x.value for x in DimensionType if x not in exclude_dims]
         dataset_id = dataset_config.config_id
         assoc_table = project_config.load_dimension_associations(
             dataset_id, pivoted_dimension=pivoted_dimension, try_load_cache=False
         )
+
+        dimension_types = set(DimensionType).difference(exclude_dims)
+        if dataset_config.model.data_schema.column_type == ColumnType.DIMENSION_TYPES:
+            cols = [x.value for x in dimension_types]
+        elif dataset_config.model.data_schema.column_type == ColumnType.DIMENSION_QUERY_NAMES:
+            cols = []
+            dimension_type_to_query_name = {}
+            for dim_type in dimension_types:
+                query_name = project_config.get_base_dimension(dim_type).model.dimension_query_name
+                cols.append(query_name)
+                dimension_type_to_query_name[dim_type] = query_name
+            for dim_type, query_name in dimension_type_to_query_name.items():
+                assoc_table = assoc_table.withColumnRenamed(dim_type.value, query_name)
+        else:
+            raise Exception(f"BUG: unhandled: {dataset_config.model.data_schema.column_type}")
+
         project_table = assoc_table.select(*cols).distinct()
         diff = project_table.exceptAll(dim_table.select(*cols).distinct())
         if not diff.rdd.isEmpty():

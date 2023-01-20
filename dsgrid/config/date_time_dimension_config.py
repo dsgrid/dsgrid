@@ -34,8 +34,6 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"get_timestamp_load_data_columns, but has {time_columns}"
             )
         time_col = time_columns[0]
-        if time_col not in load_data_df.columns:
-            time_col = self.model.dimension_query_name  # TODO: hack
         tz = self.get_tzinfo()
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)

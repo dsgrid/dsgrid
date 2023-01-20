@@ -1,0 +1,33 @@
+{
+  "name": "comstock_projected_conus_2022",
+  "version": "0.1.0",
+  "project": {
+    "project_id": "dsgrid_conus_2022",
+    "dataset": {
+      "dataset_id": "comstock_projected_conus_2022",
+      "source_datasets": [
+      {
+        "dataset_id": "comstock_projected_conus_2022",
+        "initial_value_dataset_id": "comstock_conus_2022_reference",
+        "growth_rate_dataset_id": "aeo2021_reference_commercial_energy_use_growth_factors",
+        "construction_method": "formula123",
+        "dataset_type": "exponential_growth",
+      },
+      ],
+    "params": {},
+    },
+    "excluded_dataset_ids": [],
+    "include_dsgrid_dataset_components": false,
+    "version": "1.3.0"
+  },
+  "result": {
+    "supplemental_columns": [],
+    "replace_ids_with_names": false,
+    "aggregations": [],
+    "reports": [],
+    "output_format": "parquet",
+    "sort_columns": [],
+    "dimension_filters": [],
+    "time_zone": null
+  }
+}

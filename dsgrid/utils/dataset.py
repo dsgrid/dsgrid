@@ -141,7 +141,7 @@ def add_column_from_records(df, dimension_records, dimension_name, column_to_add
 
 
 @track_timing(timer_stats_collector)
-def check_null_value_in_unique_dimension_rows(dim_table):
+def check_null_value_in_unique_dimension_rows(dim_table, exclude_columns=None):
     if os.environ.get("__DSGRID_SKIP_CHECK_NULL_UNIQUE_DIMENSION__"):
         # This has intermittently caused GC-related timeouts for TEMPO.
         # Leave a backdoor to skip these checks, which may eventually be removed.
@@ -149,7 +149,10 @@ def check_null_value_in_unique_dimension_rows(dim_table):
         return
 
     try:
-        check_for_nulls(dim_table, exclude_columns={"id"})
+        exclude = {"id"}
+        if exclude_columns is not None:
+            exclude.update(exclude_columns)
+        check_for_nulls(dim_table, exclude_columns=exclude)
     except DSGInvalidField as exc:
         raise DSGInvalidDimensionMapping(
             "Invalid dimension mapping application. "

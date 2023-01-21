@@ -56,6 +56,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def make_project_dataframe(self, project_config):
         # TODO: Can we remove NULLs at registration time?
+        null_lk_df = self._load_data_lookup.filter("id is NULL")
         lk_df = self._load_data_lookup.filter("id is not NULL")
         ld_df = self._load_data
 
@@ -66,19 +67,22 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         lk_df = self._remap_dimension_columns(lk_df)
+        null_lk_df = self._remap_dimension_columns(null_lk_df)
         ld_df = self._remap_dimension_columns(ld_df)
         ld_df = self._apply_fraction(ld_df)
         if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
-        return ld_df
+        return self._add_null_values(ld_df, null_lk_df)
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
-        lk_df = self._load_data_lookup.filter("id is not NULL")
+        lk_df = self._load_data_lookup
         ld_df = self._load_data
 
         self._check_aggregations(context)
         lk_df = self._prefilter_stacked_dimensions(context, lk_df)
+        null_lk_df = lk_df.filter("id is NULL")
+        lk_df = lk_df.filter("id is not NULL")
         ld_df = self._prefilter_pivoted_dimensions(context, ld_df)
         ld_df = self._prefilter_time_dimension(context, ld_df)
 
@@ -90,6 +94,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         ld_df = self._remap_dimension_columns(ld_df, filtered_records=context.get_record_ids())
         ld_df = self._apply_fraction(ld_df)
+        null_lk_df = self._remap_dimension_columns(
+            null_lk_df, filtered_records=context.get_record_ids()
+        )
 
         if not convert_time_before_project_mapping:
             ld_df = self._convert_time_dimension(ld_df, project_config)
@@ -97,6 +104,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         pivoted_columns = set(ld_df.columns).intersection(
             self.get_pivoted_dimension_columns_mapped_to_project()
         )
+        ld_df = self._add_null_values(ld_df, null_lk_df)
+
         context.set_dataset_metadata(
             self.dataset_id,
             pivoted_columns,
@@ -106,6 +115,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         )
         table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
         return table_handler.convert_columns_to_query_names(ld_df)
+
+    @staticmethod
+    def _add_null_values(ld_df, null_lk_df):
+        if not null_lk_df.rdd.isEmpty():
+            for col in set(ld_df.columns).difference(null_lk_df.columns):
+                null_lk_df = null_lk_df.withColumn(col, F.lit(None))
+            ld_df = ld_df.union(null_lk_df.select(*ld_df.columns))
+
+        return ld_df
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):

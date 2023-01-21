@@ -225,6 +225,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """Check that each unique time array has the same timestamps."""
         logger.info("Check dataset time consistency by time array.")
         unique_array_cols = self.get_columns_for_unique_arrays(time_dim, load_data_df)
+        for col in time_cols:
+            # TODO DT: add a check in representative time that either nulls aren't allowed
+            # or if one time column is null, all of them must be null.
+            load_data_df = load_data_df.filter(f"{col} is not null")
         counts = load_data_df.groupBy(*time_cols).count().select("count")
         distinct_counts = counts.select("count").distinct().collect()
         if len(distinct_counts) != 1:
@@ -359,11 +363,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df
 
     def _apply_fraction(self, df, agg_func=None):
+        if "fraction" not in df.columns:
+            return df
         pivoted_columns = set(df.columns).intersection(
             self.get_pivoted_dimension_columns_mapped_to_project()
         )
         agg_func = agg_func or F.sum
-        assert "fraction" in df.columns
         # Maintain column order.
         agg_ops = [
             agg_func(F.col(x) * F.col("fraction")).alias(x)

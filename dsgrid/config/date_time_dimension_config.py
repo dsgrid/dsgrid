@@ -43,7 +43,11 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         expected_timestamps = time_range.list_time_range()
         actual_timestamps = [
             x[time_col].astimezone().astimezone(tz)
-            for x in load_data_df.select(time_col).distinct().sort(time_col).collect()
+            for x in load_data_df.select(time_col)
+            .distinct()
+            .filter(f"{time_col} is not null")
+            .sort(time_col)
+            .collect()
         ]
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(

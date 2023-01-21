@@ -9,7 +9,10 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
 )
-from dsgrid.query.derived_dataset import does_query_support_a_derived_dataset
+from dsgrid.query.derived_dataset import (
+    create_derived_dataset_confg_from_query,
+    does_query_support_a_derived_dataset,
+)
 from dsgrid.query.models import (
     DatasetModel,
     ProjectQueryDatasetParamsModel,
@@ -20,7 +23,9 @@ from dsgrid.query.models import (
 )
 from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.dataset_registry import DatasetRegistry
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.run_command import check_run_command
+from dsgrid.utils.spark import read_dataframe
 
 
 REGISTRY_PATH = (
@@ -118,6 +123,13 @@ def test_create_derived_dataset_config(tmp_path):
     table_file = QuerySubmitterBase.table_filename(query_output)
     assert table_file.exists()
 
+    # Ensure that this derived dataset matches the one in the registry.
+    orig_df = read_dataframe(REGISTRY_PATH / "data" / dataset_id / "1.0.0" / "table.parquet")
+    new_df = read_dataframe(query_output / "table.parquet")
+    assert sorted(new_df.columns) == sorted(orig_df.columns)
+    assert new_df.sort(*orig_df.columns).collect() == orig_df.sort(*orig_df.columns).collect()
+
+    # Create the config twice to get test coverage in both places.
     dataset_dir = tmp_path / dataset_id
     check_run_command(
         f"dsgrid query project create-derived-dataset-config --offline "
@@ -125,12 +137,9 @@ def test_create_derived_dataset_config(tmp_path):
     )
     dataset_config_file = dataset_dir / DatasetRegistry.config_filename()
     assert dataset_config_file.exists()
+    shutil.rmtree(dataset_dir)
 
-    tmp_registry = tmp_path / "registry"
-    shutil.copytree(REGISTRY_PATH, tmp_registry)
-    check_run_command(
-        f"dsgrid registry --offline --path {tmp_registry} projects register-and-submit-dataset "
-        f"-c {dataset_config_file} -p dsgrid_conus_2022 -l 'Submit resstock projection' "
-        f"-d {query_output}"
-    )
-    # TODO: load dataset and check values
+    registry_manager = RegistryManager.load(REGISTRY_PATH, offline_mode=True)
+    dataset_dir.mkdir()
+    assert create_derived_dataset_confg_from_query(query_output, dataset_dir, registry_manager)
+    assert dataset_config_file.exists()

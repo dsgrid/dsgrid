@@ -154,10 +154,10 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 context,
                 False,
             )
-        df = handler.process_aggregations(df, context.model.result.aggregations, context)
-
         if context.model.result.dimension_filters:
             df = self._apply_filters(df, context)
+
+        df = handler.process_aggregations(df, context.model.result.aggregations, context)
 
         if context.model.result.replace_ids_with_names:
             df = handler.replace_ids_with_names(df)

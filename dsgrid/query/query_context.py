@@ -136,7 +136,7 @@ class QueryContext:
         container = self._get_dimension_query_name_container(dimension_type, dataset_id=dataset_id)
         if dimension_query_name not in container:
             container.add(dimension_query_name)
-            logger.info(
+            logger.debug(
                 "Added dimension query name for %s: %s dataset_id=%s",
                 dimension_type,
                 dimension_query_name,

@@ -70,34 +70,6 @@ def test_resstock_projection_valid_query(valid_query):
     assert does_query_support_a_derived_dataset(valid_query)
 
 
-def test_resstock_projection_invalid_query_filtered_dataset(valid_query):
-    query = valid_query
-    query.project.dataset.params = ProjectQueryDatasetParamsModel(
-        dimension_filters=[
-            DimensionFilterExpressionModel(
-                dimension_type=DimensionType.GEOGRAPHY,
-                dimension_query_name="county",
-                operator="==",
-                value="06037",
-            ),
-        ],
-    )
-    assert not does_query_support_a_derived_dataset(query)
-
-
-def test_resstock_projection_invalid_query_filtered_result(valid_query):
-    query = valid_query
-    query.result.dimension_filters = [
-        DimensionFilterExpressionModel(
-            dimension_type=DimensionType.GEOGRAPHY,
-            dimension_query_name="county",
-            operator="==",
-            value="06037",
-        ),
-    ]
-    assert not does_query_support_a_derived_dataset(query)
-
-
 def test_resstock_projection_invalid_query_supplemental_columns(valid_query):
     query = valid_query
     query.result.supplemental_columns = ["state"]

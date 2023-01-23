@@ -69,6 +69,7 @@ def create_derived_dataset_confg_from_query(
             is_valid = True  # TODO: how can time be different? This was already mapped to project
             table_records = None
         else:
+            if dim_type == DimensionType.SECTOR:breakpoint()
             is_valid = is_dimension_valid_for_dataset(dim, df)
             table_records = get_unique_values(df, dim.model.dimension_query_name)
         if is_valid:
@@ -138,22 +139,12 @@ def does_query_support_a_derived_dataset(query: ProjectQueryModel):
     bool
     """
     is_valid = True
-    if query.project.dataset.params.dimension_filters:
-        is_valid = False
-        logger.error(
-            "Cannot create a derived dataset from a query with filtered dataset dimensions"
-        )
     if query.result.supplemental_columns:
         is_valid = False
         logger.error("Cannot create a derived dataset from a query with supplemental_columns")
     if query.result.replace_ids_with_names:
         is_valid = False
         logger.error("Cannot create a derived dataset from a query with replace_ids_with_names")
-    if query.result.dimension_filters:
-        is_valid = False
-        logger.error(
-            "Cannot create a derived dataset from a query with filtered result dimensions"
-        )
 
     return is_valid
 

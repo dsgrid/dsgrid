@@ -5,10 +5,6 @@ from pathlib import Path
 
 import pytest
 
-from dsgrid.dimension.base_models import DimensionType
-from dsgrid.dimension.dimension_filters import (
-    DimensionFilterExpressionModel,
-)
 from dsgrid.query.derived_dataset import (
     create_derived_dataset_confg_from_query,
     does_query_support_a_derived_dataset,

@@ -66,10 +66,9 @@ def create_derived_dataset_confg_from_query(
             is_valid = bool(metadata.pivoted.columns.difference(df.columns))
             table_records = metadata.pivoted.columns
         elif dim_type == DimensionType.TIME:
-            is_valid = True  # TODO: how can time be different? This was already mapped to project
+            is_valid = True  # time should be identical to the project
             table_records = None
         else:
-            if dim_type == DimensionType.SECTOR:breakpoint()
             is_valid = is_dimension_valid_for_dataset(dim, df)
             table_records = get_unique_values(df, dim.model.dimension_query_name)
         if is_valid:

@@ -226,8 +226,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         logger.info("Check dataset time consistency by time array.")
         unique_array_cols = self.get_columns_for_unique_arrays(time_dim, load_data_df)
         for col in time_cols:
-            # TODO DT: add a check in representative time that either nulls aren't allowed
-            # or if one time column is null, all of them must be null.
             load_data_df = load_data_df.filter(f"{col} is not null")
         counts = load_data_df.groupBy(*time_cols).count().select("count")
         distinct_counts = counts.select("count").distinct().collect()

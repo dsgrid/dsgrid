@@ -224,10 +224,21 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
 
     def check_dataset_time_consistency(self, expected_timestamps, load_data_df, time_columns):
         logger.info("Check OneWeekPerMonthByHourHandler dataset time consistency.")
-        actual_timestamps = [
-            OneWeekPerMonthByHourType(*x.asDict().values())
-            for x in load_data_df.select(*time_columns).distinct().sort(*time_columns).collect()
-        ]
+        actual_timestamps = []
+        for row in load_data_df.select(*time_columns).distinct().sort(*time_columns).collect():
+            data = row.asDict()
+            num_none = 0
+            for val in data.values():
+                if val is None:
+                    num_none += 1
+            if num_none > 0:
+                if num_none != len(data):
+                    raise DSGInvalidDataset(
+                        f"If any time column is null then all columns must be null: {data}"
+                    )
+            else:
+                actual_timestamps.append(OneWeekPerMonthByHourType(**data))
+
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(
                 set(expected_timestamps).symmetric_difference(set(actual_timestamps))

@@ -170,7 +170,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         Parameters
         ----------
         project_id : str
-        version : VersionInfo
+        version : str
 
         Returns
         -------
@@ -458,7 +458,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         )
         registry_config = ProjectRegistry(registry_model)
         registry_dir = self.get_registry_directory(config.model.project_id)
-        data_dir = registry_dir / str(registration.version)
+        data_dir = registry_dir / registration.version
 
         # Serialize the registry file as well as the updated ProjectConfig to the registry.
         self.fs_interface.mkdir(data_dir)

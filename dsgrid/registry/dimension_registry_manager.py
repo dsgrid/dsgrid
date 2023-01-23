@@ -143,7 +143,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         if dimension is not None:
             return dimension
 
-        src_dir = self._path / key.type.value / key.id / str(key.version)
+        src_dir = self._path / key.type.value / key.id / key.version
         filename = src_dir / self.registry_class().config_filename()
         config = load_dimension_config(filename)
         self._dimensions[key] = config
@@ -159,7 +159,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         if version is None:
             return config_id in self._registry_configs
         dimension_type = self._id_to_type[config_id]
-        path = self._path / str(dimension_type) / config_id / str(version)
+        path = self._path / str(dimension_type) / config_id / version
         return self.fs_interface.exists(path)
 
     def list_types(self):
@@ -255,7 +255,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                     self._path
                     / dimension.dimension_type.value
                     / dimension.dimension_id
-                    / str(registration.version)
+                    / registration.version
                 )
                 self.fs_interface.mkdir(dst_dir)
 
@@ -313,7 +313,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 DimensionReferenceModel(
                     dimension_id=dim_id,
                     dimension_type=dim.model.dimension_type,
-                    version=str(self.get_current_version(dim_id)),
+                    version=self.get_current_version(dim_id),
                 )
             )
         return refs

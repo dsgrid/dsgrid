@@ -5,7 +5,6 @@ from pathlib import Path
 
 import pyspark
 import pytest
-from semver import VersionInfo
 
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
@@ -49,13 +48,13 @@ def test_register_project_and_dataset(make_test_project_dir, tmp_path):
     log_message = "initial registration"
     dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
-    project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.1.0"))
+    project_config = project_mgr.get_by_id(project_id, "1.1.0")
     assert project_config.model.status == ProjectRegistryStatus.COMPLETE
     dataset = project_config.get_dataset(dataset_id)
     assert dataset.status == DatasetRegistryStatus.REGISTERED
 
     # The project version from before dataset submission should still be there.
-    project_config = project_mgr.get_by_id(project_id, VersionInfo.parse("1.0.0"))
+    project_config = project_mgr.get_by_id(project_id, "1.0.0")
     dataset = project_config.get_dataset(dataset_id)
     assert dataset.status == DatasetRegistryStatus.UNREGISTERED
 
@@ -248,12 +247,12 @@ def test_auto_updates(make_test_project_dir, tmp_path):
             break
     assert mapping is not None
     orig_version = dimension_mapping_mgr.get_current_version(mapping.config_id)
-    assert orig_version == VersionInfo.parse("1.0.0")
+    assert orig_version == "1.0.0"
 
     mgr.update_dependent_configs(dimension, update_type, log_message)
 
     new_version = dimension_mapping_mgr.get_current_version(mapping.config_id)
-    assert new_version == VersionInfo.parse("1.1.0")
+    assert new_version == "1.1.0"
 
     project = project_mgr.get_by_id(project_id)
     found = False
@@ -267,28 +266,26 @@ def test_auto_updates(make_test_project_dir, tmp_path):
     found = False
     for dimension_ref in dataset.model.dimension_references:
         if dimension_ref.dimension_id == dimension.config_id:
-            assert dimension_ref.version == VersionInfo.parse("1.1.0")
+            assert dimension_ref.version == "1.1.0"
             found = True
     assert found
 
-    assert project.model.datasets[0].version == VersionInfo.parse("1.1.0")
-    assert project_mgr.get_current_version(project_id) == VersionInfo.parse("1.2.0")
-    assert dataset_mgr.get_current_version(dataset_id) == VersionInfo.parse("1.1.0")
+    assert project.model.datasets[0].version == "1.1.0"
+    assert project_mgr.get_current_version(project_id) == "1.2.0"
+    assert dataset_mgr.get_current_version(dataset_id) == "1.1.0"
 
     # The project should get updated again if we update the dimension mapping.
     mapping.model.description += "test update"
     dimension_mapping_mgr.update(mapping, VersionUpdateType.PATCH, "test update")
-    assert dimension_mapping_mgr.get_current_version(mapping.config_id) == VersionInfo.parse(
-        "1.1.1"
-    )
+    assert dimension_mapping_mgr.get_current_version(mapping.config_id) == "1.1.1"
     mgr.update_dependent_configs(mapping, VersionUpdateType.PATCH, "test update")
-    assert project_mgr.get_current_version(project_id) == VersionInfo.parse("1.2.1")
+    assert project_mgr.get_current_version(project_id) == "1.2.1"
 
     # And again if we update the dataset.
     dataset.model.description += "test update"
     dataset_mgr.update(dataset, VersionUpdateType.PATCH, "test update")
     mgr.update_dependent_configs(dataset, VersionUpdateType.PATCH, "test update")
-    assert project_mgr.get_current_version(project_id) == VersionInfo.parse("1.2.2")
+    assert project_mgr.get_current_version(project_id) == "1.2.2"
 
 
 def test_invalid_dimension_mapping(make_test_project_dir, tmp_path):

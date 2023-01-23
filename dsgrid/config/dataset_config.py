@@ -6,7 +6,6 @@ from pydantic import Field
 from pydantic import validator
 import pyspark.sql.functions as F
 
-from dsgrid.data_models import serialize_model_data
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
@@ -433,10 +432,6 @@ class DatasetConfigModel(DSGBaseModel):
                     )
 
         return dimensions
-
-    def dict(self, *args, **kwargs):
-        data = super().dict(*args, **kwargs)
-        return serialize_model_data(data)
 
 
 class DatasetConfig(ConfigBase):

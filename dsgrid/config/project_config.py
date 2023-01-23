@@ -11,7 +11,7 @@ from dsgrid.config.dimension_association_manager import (
     try_load_dimension_associations,
     save_dimension_associations,
 )
-from dsgrid.data_models import DSGBaseModel, serialize_model_data
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import check_required_dimensions, check_timezone_in_geography
 from dsgrid.exceptions import (
     DSGInvalidField,
@@ -34,7 +34,6 @@ from dsgrid.utils.spark import (
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
-from dsgrid.utils.versioning import handle_version_or_str
 from .config_base import ConfigBase
 from .dataset_config import InputDatasetType
 from .dimension_mapping_base import DimensionMappingReferenceModel
@@ -281,10 +280,6 @@ class InputDatasetModel(DSGBaseModel):
         updateable=False,
     )
 
-    @validator("version")
-    def check_version(cls, version):
-        return handle_version_or_str(version)
-
 
 class DimensionMappingsModel(DSGBaseModel):
     """Defines all dimension mappings associated with a dsgrid project,
@@ -397,10 +392,6 @@ class ProjectConfigModel(DSGBaseModel):
 
         check_config_id_strict(project_id, "Project")
         return project_id
-
-    def dict(self, *args, **kwargs):
-        data = super().dict(*args, **kwargs)
-        return serialize_model_data(data)
 
 
 class _DimensionQueryNamesModel(DSGBaseModel):

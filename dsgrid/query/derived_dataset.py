@@ -42,7 +42,7 @@ def create_derived_dataset_confg_from_query(
     metadata_file = QuerySubmitterBase.metadata_filename(query_path)
     query_file = QuerySubmitterBase.query_filename(query_path)
     table_file = QuerySubmitterBase.table_filename(query_path)
-    if not metadata_file.exists() or not query_file.exists():
+    if not metadata_file.exists() or not query_file.exists() or not table_file.exists():
         logger.error("%s is not a valid query result directory", query_path)
         return False
 
@@ -54,6 +54,7 @@ def create_derived_dataset_confg_from_query(
     project = registry_manager.project_manager.load_project(
         query.project.project_id, version=query.project.version
     )
+    df = read_dataframe(table_file)
     # TODO: should there be a warning if the current project version is later?
     dimensions = []
     dimension_references = []
@@ -61,9 +62,8 @@ def create_derived_dataset_confg_from_query(
         dims = getattr(metadata.dimensions, dim_type.value)
         assert len(dims) == 1, dims
         dim = project.config.get_dimension(next(iter(dims)))
-        df = read_dataframe(table_file)
         if metadata.pivoted.dimension_type == dim_type:
-            is_valid = bool(metadata.pivoted.columns.difference(df.columns))
+            is_valid = not bool(metadata.pivoted.columns.difference(df.columns))
             table_records = metadata.pivoted.columns
         elif dim_type == DimensionType.TIME:
             is_valid = True  # time should be identical to the project

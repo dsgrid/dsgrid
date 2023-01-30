@@ -86,7 +86,7 @@ def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, re
     final_columns = []
     dropped = set()
     for tid in to_ids:
-        column = f"{tid}_{operation}" if rename else tid
+        column = f"{tid}" if rename else tid
         final_columns.append(column)
         expr = [f"{from_id}*{fraction}" for from_id, fraction in records_dict[tid].items()]
         if operation == "sum":

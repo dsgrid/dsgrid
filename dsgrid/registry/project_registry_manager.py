@@ -21,7 +21,7 @@ from dsgrid.exceptions import (
 )
 from dsgrid.common import REGISTRY_FILENAME
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-from dsgrid.config.dataset_config import DatasetConfig, ColumnType
+from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_association_manager import remove_project_dimension_associations
 from dsgrid.config.dimensions import DimensionModel, DimensionReferenceByNameModel
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
@@ -888,31 +888,16 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_time_dim=project_config.get_base_dimension(DimensionType.TIME),
         )
         pivoted_dimension = handler.get_pivoted_dimension_type()
-        exclude_dims = {DimensionType.TIME, DimensionType.DATA_SOURCE, pivoted_dimension}
+        exclude_dims = {DimensionType.TIME, pivoted_dimension}
 
-        dim_table = (
-            handler.get_unique_dimension_rows().drop("id").drop(DimensionType.DATA_SOURCE.value)
-        )
+        dim_table = handler.get_unique_dimension_rows().drop("id")
         dataset_id = dataset_config.config_id
         assoc_table = project_config.load_dimension_associations(
             dataset_id, pivoted_dimension=pivoted_dimension, try_load_cache=False
         )
 
         dimension_types = set(DimensionType).difference(exclude_dims)
-        if dataset_config.model.data_schema.column_type == ColumnType.DIMENSION_TYPES:
-            cols = [x.value for x in dimension_types]
-        elif dataset_config.model.data_schema.column_type == ColumnType.DIMENSION_QUERY_NAMES:
-            cols = []
-            dimension_type_to_query_name = {}
-            for dim_type in dimension_types:
-                query_name = project_config.get_base_dimension(dim_type).model.dimension_query_name
-                cols.append(query_name)
-                dimension_type_to_query_name[dim_type] = query_name
-            for dim_type, query_name in dimension_type_to_query_name.items():
-                assoc_table = assoc_table.withColumnRenamed(dim_type.value, query_name)
-        else:
-            raise Exception(f"BUG: unhandled: {dataset_config.model.data_schema.column_type}")
-
+        cols = [x.value for x in dimension_types]
         project_table = assoc_table.select(*cols).distinct()
         diff = project_table.exceptAll(dim_table.select(*cols).distinct())
         if not diff.rdd.isEmpty():
@@ -953,7 +938,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id)
 
     @staticmethod
-    def _check_pivoted_dimension_columns(handler, project_pivoted_ids, data_source):
+    def _check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id):
         """pivoted dimension record is the same as project's unless a relevant association is provided."""
         logger.info("Check pivoted dimension columns.")
         d_dim_ids = handler.get_pivoted_dimension_columns_mapped_to_project()
@@ -961,10 +946,10 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         if d_dim_ids.symmetric_difference(project_pivoted_ids):
             raise DSGInvalidDataset(
-                f"Mismatch between project and {data_source} dataset pivoted {pivoted_dim.value} dimension, "
+                f"Mismatch between project and {dataset_id} dataset pivoted {pivoted_dim.value} dimension, "
                 "please double-check data, and any relevant association_table and dimension_mapping. "
-                f"\n - Invalid column(s) in {data_source} load data according to project: {d_dim_ids.difference(project_pivoted_ids)}"
-                f"\n - Missing column(s) in {data_source} load data according to project: {project_pivoted_ids.difference(d_dim_ids)}"
+                f"\n - Invalid column(s) in {dataset_id} load data according to project: {d_dim_ids.difference(project_pivoted_ids)}"
+                f"\n - Missing column(s) in {dataset_id} load data according to project: {project_pivoted_ids.difference(d_dim_ids)}"
             )
 
     def update_from_file(

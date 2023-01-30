@@ -5,7 +5,7 @@ from typing import List
 
 import pyspark.sql.functions as F
 
-from dsgrid.config.dataset_config import DatasetConfig, ColumnType
+from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
@@ -262,13 +262,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _get_time_dimension_columns(self):
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        if self._config.model.data_schema.column_type == ColumnType.DIMENSION_TYPES:
-            time_cols = time_dim.get_timestamp_load_data_columns()
-        elif self._config.model.data_schema.column_type == ColumnType.DIMENSION_QUERY_NAMES:
-            time_cols = [time_dim.model.dimension_query_name]
-        else:
-            raise Exception(f"BUG: unhandled: {self._config.model.data_schema.column_type}")
-
+        time_cols = time_dim.get_timestamp_load_data_columns()
         return time_cols
 
     def _iter_dataset_record_ids(self, context: QueryContext):

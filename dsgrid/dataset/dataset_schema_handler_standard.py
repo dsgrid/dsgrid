@@ -10,7 +10,7 @@ from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.query.models import TableFormatType
+from dsgrid.query.models import TableFormatType, ColumnType
 from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
 from dsgrid.utils.spark import (
@@ -114,7 +114,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             project_config,
         )
         table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
-        return table_handler.convert_columns_to_query_names(ld_df)
+        if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
+            ld_df = table_handler.convert_columns_to_query_names(ld_df)
+        return ld_df
 
     @staticmethod
     def _add_null_values(ld_df, null_lk_df):

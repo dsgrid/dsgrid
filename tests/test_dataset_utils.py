@@ -59,12 +59,12 @@ def test_map_and_reduce_pivoted_dimension_sum_rename(dataframes):
     res, new_pivoted, dropped = map_and_reduce_pivoted_dimension(
         df, records, pivoted_columns, operation, rename=True
     )
-    assert new_pivoted == ["all_electricity_sum"]
+    assert new_pivoted == ["all_electricity"]
     assert sorted(dropped) == sorted(pivoted_columns)
     expected = 2.1 + 7.8 + 3.5 + 6.8 + 4.2 + 5.8 + 1.3 + 4.8
     assert math.isclose(
-        res.select("all_electricity_sum")
-        .agg(F.sum("all_electricity_sum").alias("sum_elec"))
+        res.select("all_electricity")
+        .agg(F.sum("all_electricity").alias("sum_elec"))
         .collect()[0]
         .sum_elec,
         expected,

@@ -10,6 +10,7 @@ from dsgrid.query.derived_dataset import (
     does_query_support_a_derived_dataset,
 )
 from dsgrid.query.models import (
+    ColumnType,
     DatasetModel,
     ProjectQueryDatasetParamsModel,
     ProjectQueryParamsModel,
@@ -58,12 +59,18 @@ def valid_query():
                 params=ProjectQueryDatasetParamsModel(),
             ),
         ),
-        result=QueryResultParamsModel(),
+        result=QueryResultParamsModel(column_type=ColumnType.DIMENSION_TYPES),
     )
 
 
 def test_resstock_projection_valid_query(valid_query):
     assert does_query_support_a_derived_dataset(valid_query)
+
+
+def test_resstock_projection_invalid_query_column_type(valid_query):
+    query = valid_query
+    query.result.column_type = ColumnType.DIMENSION_QUERY_NAMES
+    assert not does_query_support_a_derived_dataset(query)
 
 
 def test_resstock_projection_invalid_query_supplemental_columns(valid_query):
@@ -97,7 +104,7 @@ def test_create_derived_dataset_config(tmp_path):
     assert sorted(new_df.columns) == sorted(orig_df.columns)
     assert new_df.sort(*orig_df.columns).collect() == orig_df.sort(*orig_df.columns).collect()
 
-    # Create the config twice to get test coverage in both places.
+    # Create the config in the CLI and Python API to get pytest coverage stats in both places.
     dataset_dir = tmp_path / dataset_id
     check_run_command(
         f"dsgrid query project create-derived-dataset-config --offline "

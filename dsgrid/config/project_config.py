@@ -173,7 +173,7 @@ class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
 
 class RequiredDimensionRecordsModel(DSGBaseModel):
 
-    # data_source and time are excluded
+    # time is excluded
     geography: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
     metric: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
     model_year: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
@@ -411,7 +411,6 @@ class _DimensionQueryNamesModel(DSGBaseModel):
 class ProjectDimensionQueryNamesModel(DSGBaseModel):
     """Defines the query names for all base and supplemental dimensions in the project."""
 
-    data_source: _DimensionQueryNamesModel
     geography: _DimensionQueryNamesModel
     metric: _DimensionQueryNamesModel
     model_year: _DimensionQueryNamesModel
@@ -583,6 +582,34 @@ class ProjectConfig(ConfigBase):
             if x.model.from_dimension.dimension_type == dimension_type
         ]
 
+    def get_base_to_supplemental_config(self, dimension_query_name: str):
+        """Return the project's base-to-supplemental dimension mapping config.
+
+        Parameters
+        ----------
+        dimension_query_name : str
+
+        Returns
+        -------
+        ConfigKey, DimensionMappingConfig
+
+        """
+        dim = self.get_dimension(dimension_query_name)
+        dimension_type = dim.model.dimension_type
+        base_dim = self.get_base_dimension(dimension_type)
+        if dim.model.dimension_id == base_dim.model.dimension_id:
+            raise DSGInvalidParameter(
+                f"Cannot pass base dimension: {dimension_type}/{dimension_query_name}"
+            )
+
+        for key, mapping in self._base_to_supplemental_mappings.items():
+            if mapping.model.to_dimension.dimension_id == dim.model.dimension_id:
+                return key, mapping
+
+        raise DSGInvalidParameter(
+            f"No mapping is stored for {dimension_type}/{dimension_query_name}"
+        )
+
     def get_base_to_supplemental_mapping_records(self, dimension_query_name: str):
         """Return the project's base-to-supplemental dimension mapping records.
 
@@ -595,21 +622,8 @@ class ProjectConfig(ConfigBase):
         pyspark.sql.DataFrame
 
         """
-        dim = self.get_dimension(dimension_query_name)
-        dimension_type = dim.model.dimension_type
-        base_dim = self.get_base_dimension(dimension_type)
-        if dim.model.dimension_id == base_dim.model.dimension_id:
-            raise DSGInvalidParameter(
-                f"Cannot pass base dimension: {dimension_type}/{dimension_query_name}"
-            )
-
-        for mapping in self._base_to_supplemental_mappings.values():
-            if mapping.model.to_dimension.dimension_id == dim.model.dimension_id:
-                return mapping.get_records_dataframe().filter("to_id is not NULL")
-
-        raise DSGInvalidParameter(
-            f"No mapping is stored for {dimension_type}/{dimension_query_name}"
-        )
+        _, config = self.get_base_to_supplemental_config(dimension_query_name)
+        return config.get_records_dataframe().filter("to_id is not NULL")
 
     def has_base_to_supplemental_dimension_mapping_types(self, dimension_type):
         """Return True if the config has these base-to-supplemental mappings."""

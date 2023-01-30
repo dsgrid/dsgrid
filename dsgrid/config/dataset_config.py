@@ -167,17 +167,11 @@ class DataClassificationType(DSGEnum):
     )
 
 
-class ColumnType(DSGEnum):
-    DIMENSION_TYPES = "dimension_types"
-    DIMENSION_QUERY_NAMES = "dimension_query_names"
-
-
 class StandardDataSchemaModel(DSGBaseModel):
     load_data_column_dimension: DimensionType = Field(
         title="load_data_column_dimension",
         description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
     )
-    column_type: ColumnType = ColumnType.DIMENSION_TYPES
 
 
 class OneTableDataSchemaModel(DSGBaseModel):
@@ -185,7 +179,6 @@ class OneTableDataSchemaModel(DSGBaseModel):
         title="load_data_column_dimension",
         description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
     )
-    column_type: ColumnType = ColumnType.DIMENSION_TYPES
 
 
 class DatasetQualifierType(DSGEnum):

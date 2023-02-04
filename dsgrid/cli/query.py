@@ -18,7 +18,7 @@ from dsgrid.dimension.dimension_filters import (
     SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.filesystem.factory import make_filesystem_interface
-from dsgrid.query.derived_dataset import create_derived_dataset_confg_from_query
+from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
     AggregationModel,
     DimensionQueryNamesModel,
@@ -393,7 +393,7 @@ def create_derived_dataset_config(src, dst, registry_path, remote_path, offline,
         remote_path=remote_path,
         offline_mode=offline,
     )
-    result = create_derived_dataset_confg_from_query(src_path, dst_path, registry_manager)
+    result = create_derived_dataset_config_from_query(src_path, dst_path, registry_manager)
     if not result:
         logger.error("The query defined in %s does not support a derived dataset.", src)
         sys.exit(1)

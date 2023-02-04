@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 from dsgrid.query.derived_dataset import (
-    create_derived_dataset_confg_from_query,
+    create_derived_dataset_config_from_query,
     does_query_support_a_derived_dataset,
 )
 from dsgrid.query.models import (
@@ -116,5 +116,5 @@ def test_create_derived_dataset_config(tmp_path):
 
     registry_manager = RegistryManager.load(REGISTRY_PATH, offline_mode=True)
     dataset_dir.mkdir()
-    assert create_derived_dataset_confg_from_query(query_output, dataset_dir, registry_manager)
+    assert create_derived_dataset_config_from_query(query_output, dataset_dir, registry_manager)
     assert dataset_config_file.exists()

@@ -11,6 +11,7 @@ from dsgrid.config.dataset_config import (
 )
 from dsgrid.data_models import serialize_model
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
 from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.dataset_registry import DatasetRegistry
@@ -23,7 +24,7 @@ from dsgrid.utils.spark import read_dataframe, get_unique_values
 logger = logging.getLogger(__name__)
 
 
-def create_derived_dataset_confg_from_query(
+def create_derived_dataset_config_from_query(
     query_path: Path, dst_path: Path, registry_manager: RegistryManager
 ):
     """Create a DatasetConfigModel and dimensions from a query result.
@@ -69,7 +70,14 @@ def create_derived_dataset_confg_from_query(
         dim_query_name = next(iter(dimension_query_names))
         dim = project.config.get_dimension(dim_query_name)
         if dim_type == DimensionType.TIME:
-            is_valid = True  # time should be identical to the project
+            is_valid = _does_time_dimension_match(dim, df)
+            if not is_valid:
+                logger.warning(
+                    "The dataset does not match the project's time dimension. "
+                    "If this is expected, add a new time dimension to the dataset config file "
+                    "and create an appropriate dimension mapping."
+                )
+                continue
             unique_data_records = None
         else:
             if metadata.pivoted.dimension_type == dim_type:
@@ -138,6 +146,14 @@ def does_query_support_a_derived_dataset(query: ProjectQueryModel):
     return is_valid
 
 
+def _does_time_dimension_match(dim_config, df):
+    try:
+        dim_config.check_dataset_time_consistency(df, dim_config.get_timestamp_load_data_columns())
+    except DSGInvalidDataset:
+        return False
+    return True
+
+
 def _is_dimension_valid_for_dataset(dim_config, unique_data_records):
     records = dim_config.get_records_dataframe()
     dim_values = get_unique_values(records, "id")
@@ -161,6 +177,7 @@ def _make_dataset_config(
     path: Path,
     data_classification=DataClassificationType.MODERATE.value,
 ):
+    # Use dictionaries to avoid validation.
     config = {
         "dataset_id": dataset_id,
         "dataset_type": InputDatasetType.MODELED.value,
@@ -257,6 +274,7 @@ def _get_dimension_reference(dim_model: DimensionModel, project_config):
 
 def _get_dimension_mapping_reference(dim_model: DimensionModel, project_config):
     key, _ = project_config.get_base_to_supplemental_config(dim_model.dimension_query_name)
+    # Use dictionaries to avoid validation and be consistent with dimension definition.
     return {
         "mapping_id": key.id,
         "from_dimension_type": dim_model.dimension_type.value,

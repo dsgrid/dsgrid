@@ -160,13 +160,20 @@ class Project:
         # TODO #202: Change this when we support long format.
         pivoted_columns = context.get_pivoted_columns()
         pivoted_columns_sorted = sorted(pivoted_columns)
+
         match context.model.result.column_type:
             case ColumnType.DIMENSION_QUERY_NAMES:
                 dim_columns = context.get_all_dimension_query_names()
                 time_columns = context.get_dimension_query_names(DimensionType.TIME)
             case ColumnType.DIMENSION_TYPES:
                 dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
-                time_columns = {"timestamp"}
+                tcols = context.get_dimension_query_names(DimensionType.TIME)
+                if len(tcols) != 1:
+                    raise Exception(f"Project queries can only have one time column: {tcols}")
+                time_column = next(iter(tcols))
+                time_columns = set(
+                    self.config.get_dimension(time_column).get_timestamp_load_data_columns()
+                )
             case _:
                 raise Exception(f"BUG: unhandled column type {context.model.result.column_type}")
         dim_columns -= time_columns
@@ -353,7 +360,9 @@ class Project:
                     DimensionType.TIME, dataset_id=dataset.initial_value_dataset_id
                 )
             case ColumnType.DIMENSION_TYPES:
-                time_columns = {"timestamp"}  # TODO: is this really hard-coded?
+                dset = self.get_dataset(dataset.initial_value_dataset_id)
+                time_dim = dset.config.get_dimension(DimensionType.TIME)
+                time_columns = set(time_dim.get_timestamp_load_data_columns())
             case _:
                 raise Exception(f"BUG: unhandled column type {context.model.result.column_type}")
         with restart_spark_with_custom_conf(

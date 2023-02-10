@@ -1,0 +1,44 @@
+{
+  "name": "conus_2022",
+  "version": "0.1.0",
+  "project": {
+    "project_id": "dsgrid_conus_2022",
+    "dataset": {
+      "dataset_id": "conus_2022",
+      "source_datasets": [
+      {
+        "dataset_id": "resstock_projected_conus_2022",
+        "dataset_type": "standalone",
+      },
+      ],
+    "params": {
+      "table_format": "pivoted"
+    },
+    },
+    "excluded_dataset_ids": [],
+    "include_dsgrid_dataset_components": false,
+    "version": "1.3.0"
+  },
+  "result": {
+    "supplemental_columns": [],
+    "replace_ids_with_names": false,
+    "aggregations": [],
+    "reports": [],
+    "output_format": "parquet",
+    "sort_columns": [],
+    "dimension_filters": [
+        {
+          "dimension_type": "geography",
+          "dimension_query_name": "county",
+          "column": "county",
+          "operator": "isin",
+          "value": [
+            "06037"
+          ],
+          "negate": false,
+          "filter_type": "DimensionFilterColumnOperatorModel"
+        },
+    ],
+    "time_zone": null
+  }
+}

@@ -240,7 +240,7 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         dataset_registry_dir = self.get_registry_data_directory(dataset_id)
         dataset_registry_filename = dataset_registry_dir / REGISTRY_FILENAME
-        dataset_path = dataset_registry_dir / str(registry_config.version)
+        dataset_path = dataset_registry_dir / registry_config.version
         dataset_path.mkdir(exist_ok=True, parents=True)
         self.fs_interface.mkdir(dataset_registry_dir)
         registry_config.serialize(dataset_registry_filename)

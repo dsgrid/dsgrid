@@ -186,7 +186,7 @@ def test_list_table_format_types():
 def test_submit_project_query(setup_api_server):
     query = SparkSubmitProjectQueryRequest(
         use_spark_submit=False,
-        query=load_data(Path(__file__).parent / "data" / "project_query.json5"),
+        query=load_data(Path(__file__).parent / "data" / "simple_query.json5"),
     )
     async_task_id = SparkSubmitProjectQueryResponse(
         **check_response("/queries/projects", data=json.loads(query.json())).json()

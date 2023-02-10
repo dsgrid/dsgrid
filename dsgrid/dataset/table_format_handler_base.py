@@ -74,7 +74,7 @@ class TableFormatHandlerBase(abc.ABC):
             new_col = base_to_query_name_mapping[dim_type]
             if existing_col != new_col:
                 df = df.withColumnRenamed(existing_col, new_col)
-                logger.info("Converted column from %s to %s", existing_col, new_col)
+                logger.debug("Converted column from %s to %s", existing_col, new_col)
         return df
 
     def replace_ids_with_names(self, df):

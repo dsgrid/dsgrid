@@ -3,9 +3,7 @@ import logging
 from typing import List, Optional
 
 
-import json5
 from pydantic import Field
-from pydantic import validator
 
 from dsgrid.config.config_base import ConfigBase
 from dsgrid.data_models import DSGBaseModel
@@ -13,8 +11,6 @@ from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.registry.common import (
     ConfigRegistrationModel,
 )
-from dsgrid.data_models import serialize_model
-from dsgrid.utils.versioning import handle_version_or_str
 
 
 logger = logging.getLogger(__name__)
@@ -36,10 +32,6 @@ class RegistryBaseModel(DSGBaseModel):
         description="History of all registration updates",
         default=[],
     )
-
-    @validator("version")
-    def check_version(cls, version):
-        return handle_version_or_str(version)
 
 
 class RegistryBase(ConfigBase, abc.ABC):
@@ -74,7 +66,7 @@ class RegistryBase(ConfigBase, abc.ABC):
     def serialize(self, path, force=False):
         if path.exists() and not force:
             raise DSGInvalidOperation(f"{path} exists. Set force=True to overwrite.")
-        path.write_text(json5.dumps(serialize_model(self._model), indent=2))
+        path.write_text(self._model.json(indent=2))
 
     @property
     def version(self):

@@ -1,6 +1,5 @@
 import abc
 import csv
-import enum
 import importlib
 import logging
 import os
@@ -23,7 +22,6 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME, REGEX_VALID_REGISTRY_DISPLAY_NAME
 from dsgrid.utils.files import compute_file_hash
-from dsgrid.utils.versioning import handle_version_or_str
 
 
 logger = logging.getLogger(__name__)
@@ -288,17 +286,20 @@ class DimensionModel(DimensionBaseModel):
 
         return records
 
-    def dict(self, by_alias=True, **kwargs):
+    def dict(self, *args, **kwargs):
+        return super().dict(*args, **self._handle_kwargs(**kwargs))
+
+    def json(self, *args, **kwargs):
+        return super().json(*args, **self._handle_kwargs(**kwargs))
+
+    @staticmethod
+    def _handle_kwargs(**kwargs):
         exclude = {"cls", "records"}
         if "exclude" in kwargs and kwargs["exclude"] is not None:
             kwargs["exclude"].union(exclude)
         else:
             kwargs["exclude"] = exclude
-        data = super().dict(by_alias=by_alias, **kwargs)
-        data["module"] = str(data["module"])
-        data["dimension_class"] = None
-        _convert_for_serialization(data)
-        return data
+        return kwargs
 
 
 class TimeRangeModel(DSGBaseModel):
@@ -346,17 +347,20 @@ class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
         options=TimeDimensionType.format_for_docs(),
     )
 
-    def dict(self, by_alias=True, **kwargs):
+    def dict(self, *args, **kwargs):
+        return super().dict(*args, **self._handle_kwargs(**kwargs))
+
+    def json(self, *args, **kwargs):
+        return super().json(*args, **self._handle_kwargs(**kwargs))
+
+    @staticmethod
+    def _handle_kwargs(**kwargs):
         exclude = {"cls"}
         if "exclude" in kwargs and kwargs["exclude"] is not None:
             kwargs["exclude"].union(exclude)
         else:
             kwargs["exclude"] = exclude
-        data = super().dict(by_alias=by_alias, **kwargs)
-        data["module"] = str(data["module"])
-        data["dimension_class"] = None
-        _convert_for_serialization(data)
-        return data
+        return kwargs
 
     @abc.abstractmethod
     def is_time_zone_required_in_geography(self):
@@ -567,10 +571,6 @@ class DimensionReferenceModel(DSGBaseModel):
         # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
 
-    @validator("version")
-    def check_version(cls, version):
-        return handle_version_or_str(version)
-
 
 class DimensionReferenceByNameModel(DSGBaseModel):
     """Reference to a dimension that has yet to be registered."""
@@ -607,12 +607,6 @@ def handle_dimension_union(value):
     else:
         val = DimensionModel(**value)
     return val
-
-
-def _convert_for_serialization(data):
-    for key, val in data.items():
-        if isinstance(val, enum.Enum):
-            data[key] = val.value
 
 
 def _check_time_ranges(ranges: list, str_format: str, frequency: timedelta):

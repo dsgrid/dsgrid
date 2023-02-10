@@ -1,4 +1,4 @@
 [submodule "dsgrid-test-data"]
 	path = dsgrid-test-data
 	url = https://github.com/dsgrid/dsgrid-test-data
-	branch = dt/buildings-projection-datasets
+	branch = main

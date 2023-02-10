@@ -9,7 +9,6 @@ from dsgrid.config.dataset_config import (
     DataSchemaType,
     InputDatasetType,
 )
-from dsgrid.utils.spark import read_dataframe, get_unique_values
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
@@ -291,7 +290,7 @@ def _get_unique_data_records(df, dim_model: DimensionModel, column_type: ColumnT
 
 def _get_dimension_reference(dim_model: DimensionModel, project_config):
     dim_ref = project_config.get_dimension_reference(dim_model.dimension_id)
-    return dim_ref.dict()
+    return dim_ref.serialize()
 
 
 def _get_supplemental_dimension_mapping_reference(dim_model: DimensionModel, project_config):

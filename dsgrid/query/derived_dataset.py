@@ -60,10 +60,17 @@ def create_derived_dataset_config_from_query(
     new_supplemental_dims_path = dst_path / "new_supplemental_dimensions"
     df = read_dataframe(table_file)
     # TODO: should there be a warning if the current project version is later?
-    dimensions = []
+
+    # This code blocks compares the dimension records in the dataframe against the project's base
+    # and supplemental dimensions.
+    # If the records match an existing dimension, add a reference to that dimension in the
+    # dataset config.
+    # If the records don't match an existing dimension, create a new supplemental dimension and
+    # base-to-supplemental mapping that the user will need to register.
     dimension_references = []
     dimension_mapping_references = []
     base_dim_query_names = project.config.get_base_dimension_query_names()
+    num_new_supplemental_dimensions = 0
     for dim_type in DimensionType:
         dimension_query_names = getattr(metadata.dimensions, dim_type.value)
         assert len(dimension_query_names) == 1, dimension_query_names
@@ -89,9 +96,9 @@ def create_derived_dataset_config_from_query(
             is_valid = _is_dimension_valid_for_dataset(dim, unique_data_records)
         if is_valid:
             dimension_references.append(_get_dimension_reference(dim.model, project.config))
-            if dim.model.dimension_query_name not in base_dim_query_names:
+            if dim_query_name not in base_dim_query_names:
                 dimension_mapping_references.append(
-                    _get_dimension_mapping_reference(dim.model, project.config)
+                    _get_supplemental_dimension_mapping_reference(dim.model, project.config)
                 )
         else:
             supp_dim = _get_matching_supplemental_dimension(
@@ -102,10 +109,11 @@ def create_derived_dataset_config_from_query(
                 _make_new_supplemental_dimension(
                     dim, unique_data_records, new_supplemental_dims_path
                 )
+                num_new_supplemental_dimensions += 1
             else:
                 dimension_references.append(_get_dimension_reference(supp_dim, project.config))
                 dimension_mapping_references.append(
-                    _get_dimension_mapping_reference(supp_dim, project.config)
+                    _get_supplemental_dimension_mapping_reference(supp_dim, project.config)
                 )
 
     if dimension_mapping_references:
@@ -114,9 +122,9 @@ def create_derived_dataset_config_from_query(
     _make_dataset_config(
         query.project.dataset.dataset_id,
         metadata.pivoted.dimension_type.value,
-        dimensions,
         dimension_references,
         dst_path,
+        num_new_supplemental_dimensions,
     )
     return True
 
@@ -172,12 +180,13 @@ def _get_matching_supplemental_dimension(project_config, dimension_type, unique_
 def _make_dataset_config(
     dataset_id,
     pivoted_dim_type,
-    dimensions,
     dimension_references,
     path: Path,
+    num_new_supplemental_dimensions,
     data_classification=DataClassificationType.MODERATE.value,
 ):
-    # Use dictionaries to avoid validation.
+    # Use dictionaries instead of DatasetConfigModel to avoid validation, which isn't possible
+    # here.
     config = {
         "dataset_id": dataset_id,
         "dataset_type": InputDatasetType.MODELED.value,
@@ -196,19 +205,24 @@ def _make_dataset_config(
         "source": "",
         "data_classification": data_classification,
         "use_project_geography_time_zone": True,
-        "dimensions": dimensions,
+        "dimensions": [],
         "dimension_references": dimension_references,
     }
     config_file = path / DatasetRegistry.config_filename()
     config_file.write_text(json5.dumps(config, indent=2))
+    if num_new_supplemental_dimensions > 0:
+        logger.info(
+            "Generated %s new supplemental dimensions. Review the records and fill out "
+            "the remaining fields, and then register them.",
+            num_new_supplemental_dimensions,
+        )
     logger.info(
-        "Created %s with default information. "
-        "Re-used %s project dimensions and generated %s new dimensions. "
-        "Examine %s, fill out the remaining fields, and review the generated dimension values "
+        "Created %s with default information. Re-used %s project dimensions. "
+        "Examine %s, fill out the remaining fields, and register any new dimensions "
         "before registering and submitting the dataset to the project.",
         path,
         len(dimension_references),
-        len(dimensions),
+        num_new_supplemental_dimensions,
         config_file,
     )
 
@@ -223,7 +237,8 @@ def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path:
     filename = new_dim_path / "records.csv"
     # Use pandas because spark creates a directory.
     records.toPandas().to_csv(filename, index=False)
-    # Use dictionaries to avoid validation.
+    # Use dictionaries instead of DimensionModel to avoid running the Pydantic validators.
+    # Some won't work, like loading the records. Others, like file_hash, shouldn't get set yet.
     new_dim = {
         "type": orig_dim_config.model.dimension_type.value,
         "name": "",
@@ -272,7 +287,7 @@ def _get_dimension_reference(dim_model: DimensionModel, project_config):
     return serialize_model(dim_ref)
 
 
-def _get_dimension_mapping_reference(dim_model: DimensionModel, project_config):
+def _get_supplemental_dimension_mapping_reference(dim_model: DimensionModel, project_config):
     key, _ = project_config.get_base_to_supplemental_config(dim_model.dimension_query_name)
     # Use dictionaries to avoid validation and be consistent with dimension definition.
     return {

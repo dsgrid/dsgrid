@@ -228,7 +228,14 @@ def _make_dataset_config(
 
 
 def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path: Path):
-    # This assumes that the new supplemental dimension is a subset of project's base dimension.
+    project_record_ids = orig_dim_config.get_unique_ids()
+    if not unique_data_records.issubset(project_record_ids):
+        raise DSGInvalidDataset(
+            f"The derived dataset records is not a subset of the project base dimension records. "
+            f"Dimension type = {orig_dim_config.model.dimension_type} "
+            f"diff = {project_record_ids.diff(unique_data_records)}"
+        )
+
     new_dim_path = path / orig_dim_config.model.dimension_type.value
     new_dim_path.mkdir(parents=True)
     orig_records = orig_dim_config.get_records_dataframe()

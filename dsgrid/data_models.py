@@ -77,12 +77,14 @@ class DSGBaseModel(BaseModel):
         return fields
 
     def dict(self, *args, by_alias=True, **kwargs):
-        kw = {k: v for k, v in kwargs.items() if k not in ("by_alias",)}
-        return super().dict(*args, by_alias=by_alias, **kw)
+        return super().dict(*args, by_alias=by_alias, **self._handle_kwargs(**kwargs))
 
     def json(self, *args, by_alias=True, **kwargs):
-        kw = {k: v for k, v in kwargs.items() if k not in ("by_alias",)}
-        return super().json(*args, by_alias=by_alias, **kw)
+        return super().json(*args, by_alias=by_alias, **self._handle_kwargs(**kwargs))
+
+    @staticmethod
+    def _handle_kwargs(**kwargs):
+        return {k: v for k, v in kwargs.items() if k not in ("by_alias",)}
 
     def serialize(self, *args, **kwargs):
         return json.loads(self.json(*args, **kwargs))

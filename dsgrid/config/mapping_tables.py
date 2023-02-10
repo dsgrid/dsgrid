@@ -131,20 +131,19 @@ class MappingTableModel(DimensionMappingBaseModel):
         return records
 
     def dict(self, *args, **kwargs):
-        exclude = {"records"}
-        if "exclude" in kwargs and kwargs["exclude"] is not None:
-            kwargs["exclude"].union(exclude)
-        else:
-            kwargs["exclude"] = exclude
-        return super().dict(*args, **kwargs)
+        return super().dict(*args, **self._handle_kwargs(**kwargs))
 
     def json(self, *args, **kwargs):
+        return super().json(*args, **self._handle_kwargs(**kwargs))
+
+    @staticmethod
+    def _handle_kwargs(**kwargs):
         exclude = {"records"}
         if "exclude" in kwargs and kwargs["exclude"] is not None:
             kwargs["exclude"].union(exclude)
         else:
             kwargs["exclude"] = exclude
-        return super().json(*args, **kwargs)
+        return kwargs
 
     @classmethod
     def from_pre_registered_model(

@@ -17,6 +17,7 @@ from dsgrid.query.models import (
     StandaloneDatasetModel,
     ExponentialGrowthDatasetModel,
     TableFormatType,
+    ColumnType,
 )
 
 from dsgrid.utils.spark import (
@@ -159,11 +160,33 @@ class Project:
         # TODO #202: Change this when we support long format.
         pivoted_columns = context.get_pivoted_columns()
         pivoted_columns_sorted = sorted(pivoted_columns)
-        dim_columns = context.get_all_dimension_query_names()
-        time_columns = context.get_dimension_query_names(DimensionType.TIME)
+
+        match context.model.result.column_type:
+            case ColumnType.DIMENSION_QUERY_NAMES:
+                dim_columns = context.get_all_dimension_query_names()
+                time_columns = context.get_dimension_query_names(DimensionType.TIME)
+            case ColumnType.DIMENSION_TYPES:
+                dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
+                tcols = context.get_dimension_query_names(DimensionType.TIME)
+                if len(tcols) != 1:
+                    raise Exception(f"Project queries can only have one time column: {tcols}")
+                time_column = next(iter(tcols))
+                time_columns = set(
+                    self.config.get_dimension(time_column).get_timestamp_load_data_columns()
+                )
+            case _:
+                raise Exception(f"BUG: unhandled column type {context.model.result.column_type}")
         dim_columns -= time_columns
         for col in dim_columns:
-            dimension_type = self._config.get_dimension(col).model.dimension_type
+            match context.model.result.column_type:
+                case ColumnType.DIMENSION_QUERY_NAMES:
+                    dimension_type = self._config.get_dimension(col).model.dimension_type
+                case ColumnType.DIMENSION_TYPES:
+                    dimension_type = DimensionType.from_column(col)
+                case _:
+                    raise Exception(
+                        f"BUG: unhandled column type {context.model.result.column_type}"
+                    )
             if dimension_type == context.get_pivoted_dimension_type():
                 dim_columns.remove(col)
                 break
@@ -295,6 +318,15 @@ class Project:
         self, context, cached_datasets_dir, dataset, dataset_path, metadata_file
     ):
         def get_myear_column(dataset_id):
+            match context.model.result.column_type:
+                case ColumnType.DIMENSION_TYPES:
+                    return DimensionType.MODEL_YEAR.value
+                case ColumnType.DIMENSION_QUERY_NAMES:
+                    pass
+                case _:
+                    raise Exception(
+                        f"BUG: unhandled column type {context.model.result.column_type}"
+                    )
             names = list(
                 context.get_dimension_query_names(DimensionType.MODEL_YEAR, dataset_id=dataset_id)
             )
@@ -322,9 +354,17 @@ class Project:
                 "BUG: initial_value and growth rate datasets have different model_year columns: "
                 f"{model_year_column=} {model_year_column_gr=}"
             )
-        time_columns = context.get_dimension_query_names(
-            DimensionType.TIME, dataset_id=dataset.initial_value_dataset_id
-        )
+        match context.model.result.column_type:
+            case ColumnType.DIMENSION_QUERY_NAMES:
+                time_columns = context.get_dimension_query_names(
+                    DimensionType.TIME, dataset_id=dataset.initial_value_dataset_id
+                )
+            case ColumnType.DIMENSION_TYPES:
+                dset = self.get_dataset(dataset.initial_value_dataset_id)
+                time_dim = dset.config.get_dimension(DimensionType.TIME)
+                time_columns = set(time_dim.get_timestamp_load_data_columns())
+            case _:
+                raise Exception(f"BUG: unhandled column type {context.model.result.column_type}")
         with restart_spark_with_custom_conf(
             conf=context.model.project.get_spark_conf(dataset.dataset_id),
             force=True,

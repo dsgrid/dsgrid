@@ -5,7 +5,6 @@ from pydantic import Field, validator
 
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.utils.versioning import handle_version_or_str
 from dsgrid.exceptions import DSGInvalidDimensionMapping
 from .dimensions import DimensionReferenceModel, DimensionReferenceByNameModel
 
@@ -320,10 +319,6 @@ class DimensionMappingReferenceModel(DSGBaseModel):
         default=True,
         # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
-
-    @validator("version")
-    def check_version(cls, version):
-        return handle_version_or_str(version)
 
     # @validator("required_for_validation")
     # def check_required_for_validation_field(cls, value):

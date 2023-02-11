@@ -43,9 +43,11 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         return RepresentativePeriodTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df):
+    def check_dataset_time_consistency(self, load_data_df, time_columns):
         self._format_handler.check_dataset_time_consistency(
-            self._format_handler.list_expected_dataset_timestamps(self.model.ranges), load_data_df
+            self._format_handler.list_expected_dataset_timestamps(self.model.ranges),
+            load_data_df,
+            time_columns,
         )
 
     def build_time_dataframe(self):
@@ -158,13 +160,14 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
     """Provides implementations for different representative time formats."""
 
     @abc.abstractmethod
-    def check_dataset_time_consistency(self, expected_timestamps, load_data_df):
+    def check_dataset_time_consistency(self, expected_timestamps, load_data_df, time_columns):
         """Check consistency between time ranges from the time dimension and load data.
 
         Parameters
         ----------
         expected_timestamps : list
         load_data_df : pyspark.sql.DataFrame
+        time_columns : list[str]
 
         Raises
         ------
@@ -219,13 +222,23 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
 class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     """Handler for format with hourly data that includes one week per month."""
 
-    def check_dataset_time_consistency(self, expected_timestamps, load_data_df):
+    def check_dataset_time_consistency(self, expected_timestamps, load_data_df, time_columns):
         logger.info("Check OneWeekPerMonthByHourHandler dataset time consistency.")
-        time_cols = self.get_timestamp_load_data_columns()
-        actual_timestamps = [
-            OneWeekPerMonthByHourType(*x.asDict().values())
-            for x in load_data_df.select(*time_cols).distinct().sort(*time_cols).collect()
-        ]
+        actual_timestamps = []
+        for row in load_data_df.select(*time_columns).distinct().sort(*time_columns).collect():
+            data = row.asDict()
+            num_none = 0
+            for val in data.values():
+                if val is None:
+                    num_none += 1
+            if num_none > 0:
+                if num_none != len(data):
+                    raise DSGInvalidDataset(
+                        f"If any time column is null then all columns must be null: {data}"
+                    )
+            else:
+                actual_timestamps.append(OneWeekPerMonthByHourType(**data))
+
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(
                 set(expected_timestamps).symmetric_difference(set(actual_timestamps))

@@ -26,15 +26,14 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return DateTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df):
+    def check_dataset_time_consistency(self, load_data_df, time_columns):
         logger.info("Check DateTimeDimensionConfig dataset time consistency.")
-        time_col = self.get_timestamp_load_data_columns()
-        if len(time_col) > 1:
+        if len(time_columns) > 1:
             raise ValueError(
                 "DateTimeDimensionConfig expects only one column from "
-                f"get_timestamp_load_data_columns, but has {time_col}"
+                f"get_timestamp_load_data_columns, but has {time_columns}"
             )
-        time_col = time_col[0]
+        time_col = time_columns[0]
         tz = self.get_tzinfo()
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
@@ -44,7 +43,11 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         expected_timestamps = time_range.list_time_range()
         actual_timestamps = [
             x[time_col].astimezone().astimezone(tz)
-            for x in load_data_df.select(time_col).distinct().sort(time_col).collect()
+            for x in load_data_df.select(time_col)
+            .distinct()
+            .filter(f"{time_col} is not null")
+            .sort(time_col)
+            .collect()
         ]
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(

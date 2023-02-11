@@ -24,15 +24,14 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         return AnnualTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df):
+    def check_dataset_time_consistency(self, load_data_df, time_columns):
         logger.info("Check AnnualTimeDimensionConfig dataset time consistency.")
-        time_col = self.get_timestamp_load_data_columns()
-        if len(time_col) > 1:
+        if len(time_columns) > 1:
             raise ValueError(
                 "AnnualTimeDimensionConfig expects only one column from "
-                f"get_timestamp_load_data_columns, but has {time_col}"
+                f"get_timestamp_load_data_columns, but has {time_columns}"
             )
-        time_col = time_col[0]
+        time_col = time_columns[0]
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
         time_range = time_ranges[0]

@@ -7,12 +7,13 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     """Base class for all time dimension configs"""
 
     @abc.abstractmethod
-    def check_dataset_time_consistency(self, load_data_df):
+    def check_dataset_time_consistency(self, load_data_df, time_columns):
         """Check consistency of the load data with the time dimension.
 
         Parameters
         ----------
         load_data_df : pyspark.sql.DataFrame
+        time_columns : list[str]
 
         Raises
         ------

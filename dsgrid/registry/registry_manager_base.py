@@ -88,7 +88,7 @@ class RegistryManagerBase(abc.ABC):
         Parameters
         ----------
         config_id : str
-        version : VersionInfo
+        version : str
             If None, return the latest version.
 
         Returns
@@ -182,7 +182,7 @@ class RegistryManagerBase(abc.ABC):
         submitter : str
         update_type : VersionUpdateType
         log_message : str
-        version : VersionInfo
+        version : str
             Version to update. Must be the current version.
 
         Raises
@@ -228,14 +228,18 @@ class RegistryManagerBase(abc.ABC):
             raise DSGInvalidParameter(f"version={version} is not current. Current={cur_version}")
 
     @staticmethod
-    def get_next_version(version: VersionInfo, update_type: VersionUpdateType):
+    def get_next_version(version: str, update_type: VersionUpdateType):
+        ver = VersionInfo.parse(version)
         if update_type == VersionUpdateType.MAJOR:
-            return version.bump_major()
+            next_version = ver.bump_major()
         elif update_type == VersionUpdateType.MINOR:
-            return version.bump_minor()
+            next_version = ver.bump_minor()
         elif update_type == VersionUpdateType.PATCH:
-            return version.bump_patch()
-        raise Exception(f"invalid version update type {update_type}")
+            next_version = ver.bump_patch()
+        else:
+            raise Exception(f"invalid version update type {update_type}")
+
+        return str(next_version)
 
     def _update_config(self, config, submitter, update_type, log_message):
         config_id = config.config_id
@@ -243,7 +247,7 @@ class RegistryManagerBase(abc.ABC):
         registry_config.version = self.get_next_version(registry_config.version, update_type)
 
         registration = ConfigRegistrationModel(
-            version=str(registry_config.version),
+            version=registry_config.version,
             submitter=submitter,
             date=datetime.now(ZoneInfo("UTC")),
             log_message=log_message,
@@ -345,7 +349,7 @@ class RegistryManagerBase(abc.ABC):
         Parameters
         ----------
         config_id : str
-        version : VersionInfo
+        version : str
 
         Returns
         -------
@@ -354,7 +358,7 @@ class RegistryManagerBase(abc.ABC):
         """
         if version is None:
             version = self.get_current_version(config_id)
-        return self.get_registry_directory(config_id) / str(version)
+        return self.get_registry_directory(config_id) / version
 
     def get_config_file(self, config_id, version):
         """Return the path to the config file.
@@ -362,7 +366,7 @@ class RegistryManagerBase(abc.ABC):
         Parameters
         ----------
         config_id : str
-        version : VersionInfo
+        version : str
 
         Returns
         -------
@@ -476,7 +480,7 @@ class RegistryManagerBase(abc.ABC):
         Parameters
         ----------
         config_id : str
-        version : VersionInfo
+        version : str
             If None, use latest.
 
         Returns

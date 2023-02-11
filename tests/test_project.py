@@ -113,7 +113,7 @@ def test_dimension_map_and_reduce_in_dataset():
     assert "fraction" in mapped_load_data_lookup.columns
 
     # * this check is specific to the actual from_fraction values specified in the mapping *
-    data_filters = "data_source=='comstock' and subsector=='Warehouse' and model_year=='2050'"
+    data_filters = "subsector=='Warehouse' and model_year=='2050'"
     fraction = [
         row.fraction
         for row in mapped_load_data_lookup.filter(data_filters)

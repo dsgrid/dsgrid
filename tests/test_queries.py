@@ -66,13 +66,26 @@ logger = logging.getLogger(__name__)
 def la_expected_electricity_hour_16(tmp_path_factory):
     output_dir = tmp_path_factory.mktemp("diurnal_queries")
     project = get_project()
-    query = QueryTestElectricityValues(False, REGISTRY_PATH, project, output_dir=output_dir)
+    query = ProjectQueryModel(
+        name="projected_dg_conus_2022",
+        project=ProjectQueryParamsModel(
+            project_id="dsgrid_conus_2022",
+            include_dsgrid_dataset_components=False,
+            dataset=DatasetModel(
+                dataset_id="projected_dg_conus_2022",
+                source_datasets=[
+                    StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
+                    StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
+                ],
+            ),
+        ),
+    )
     ProjectQuerySubmitter(project, output_dir).submit(
-        query.make_query(),
+        query,
         persist_intermediate_table=False,
         load_cached_table=False,
     )
-    df = read_parquet(str(output_dir / query.name / "table.parquet"))
+    df = read_parquet(str(output_dir / query.name / "table.parquet")).filter("county == '06037'")
     df = df.withColumn("elec", df.electricity_cooling + df.electricity_heating).drop(
         "electricity_cooling", "electricity_heating"
     )
@@ -128,7 +141,6 @@ def test_peak_load():
 def test_invalid_drop_pivoted_dimension(tmp_path):
     invalid_agg = AggregationModel(
         dimensions=DimensionQueryNamesModel(
-            data_source=["data_source"],
             geography=["county"],
             metric=[],
             model_year=["model_year"],
@@ -176,6 +188,7 @@ def test_create_composite_dataset_query(tmp_path):
         REGISTRY_PATH, project, output_dir=output_dir
     )
     CompositeDatasetQuerySubmitter(project, output_dir).create_dataset(query.make_query())
+    query.validate()
 
     query2 = QueryTestElectricityValuesCompositeDatasetAgg(
         REGISTRY_PATH, project, output_dir=output_dir, geography="county"
@@ -453,7 +466,7 @@ class QueryTestElectricityValues(QueryTestBase):
         non_value_columns.update(supp_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         expected = ["electricity_cooling", "electricity_heating"]
-        # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating", "fraction"]
+        # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating"]
         success = value_columns == expected
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
@@ -489,18 +502,8 @@ class QueryTestElectricityUse(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="comstock_projected_conus_2022",
-                            initial_value_dataset_id="comstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="resstock_projected_conus_2022",
-                            initial_value_dataset_id="resstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
+                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
                     ],
                 ),
             ),
@@ -508,9 +511,8 @@ class QueryTestElectricityUse(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=[self._geography],
-                            metric=["electricity"],
+                            metric=["electricity_collapsed"],
                             model_year=[],
                             scenario=[],
                             sector=[],
@@ -563,18 +565,8 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="comstock_projected_conus_2022",
-                            initial_value_dataset_id="comstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="resstock_projected_conus_2022",
-                            initial_value_dataset_id="resstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
+                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
                     ],
                 ),
             ),
@@ -582,9 +574,8 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=[self._geography],
-                            metric=["electricity"],
+                            metric=["electricity_collapsed"],
                             model_year=[],
                             scenario=[],
                             sector=[],
@@ -640,38 +631,26 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="comstock_projected_conus_2022",
-                            initial_value_dataset_id="comstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="resstock_projected_conus_2022",
-                            initial_value_dataset_id="resstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
+                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
                     ],
-                    params=ProjectQueryDatasetParamsModel(
-                        dimension_filters=[
-                            DimensionFilterExpressionModel(
-                                dimension_type=DimensionType.GEOGRAPHY,
-                                dimension_query_name="county",
-                                operator="==",
-                                value="06037",
-                            ),
-                        ],
-                    ),
                 ),
             ),
             result=QueryResultParamsModel(
+                dimension_filters=[
+                    DimensionFilterExpressionModel(
+                        dimension_type=DimensionType.GEOGRAPHY,
+                        dimension_query_name="county",
+                        operator="==",
+                        value="06037",
+                        column="county",
+                    ),
+                ],
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=["county"],
-                            metric=["electricity"],
+                            metric=["electricity_collapsed"],
                             model_year=[],
                             scenario=[],
                             sector=[],
@@ -709,18 +688,8 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="comstock_projected_conus_2022",
-                            initial_value_dataset_id="comstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="resstock_projected_conus_2022",
-                            initial_value_dataset_id="resstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
+                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
                     ],
                 ),
             ),
@@ -728,9 +697,8 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
                             geography=["county"],
-                            metric=["electricity"],
+                            metric=["electricity_collapsed"],
                             model_year=["model_year"],
                             scenario=["scenario"],
                             sector=["sector"],
@@ -742,9 +710,8 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                     ),
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=["county"],
-                            metric=["electricity"],
+                            metric=["electricity_collapsed"],
                             model_year=[],
                             scenario=[],
                             sector=[],
@@ -768,14 +735,9 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
     def validate(self, expected_values):
         filename = self.output_dir / self.name / "table.parquet"
         df = read_parquet(str(filename))
-        assert not {"all_electricity_sum", "county", "hour"}.difference(df.columns)
+        assert not {"all_electricity", "county", "hour"}.difference(df.columns)
         hour = 16
-        val = (
-            df.filter("county == '06037'")
-            .filter(f"hour == {hour}")
-            .collect()[0]
-            .all_electricity_sum
-        )
+        val = df.filter("county == '06037'").filter(f"hour == {hour}").collect()[0].all_electricity
         assert math.isclose(val, expected_values["la_electricity_hour_16"])
 
 
@@ -792,18 +754,8 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="comstock_projected_conus_2022",
-                            initial_value_dataset_id="comstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="resstock_projected_conus_2022",
-                            initial_value_dataset_id="resstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
+                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
                     ],
                 ),
             ),
@@ -811,9 +763,8 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
                             geography=["state", "reeds_pca", "census_region"],
-                            metric=["electricity"],
+                            metric=["electricity_collapsed"],
                             model_year=["model_year"],
                             scenario=["scenario"],
                             sector=["sector"],
@@ -831,7 +782,7 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
 
     def validate(self, expected_values=None):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
-        assert not {"all_electricity_sum", "reeds_pca", "state", "census_region"}.difference(
+        assert not {"all_electricity", "reeds_pca", "state", "census_region"}.difference(
             df.columns
         )
 
@@ -849,18 +800,8 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="comstock_projected_conus_2022",
-                            initial_value_dataset_id="comstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="resstock_projected_conus_2022",
-                            initial_value_dataset_id="resstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
+                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
                     ],
                 ),
             ),
@@ -868,9 +809,8 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=["data_source"],
                             geography=["state"],
-                            metric=["electricity"],
+                            metric=["electricity_collapsed"],
                             model_year=["model_year"],
                             scenario=["scenario"],
                             sector=["sector"],
@@ -897,7 +837,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
     def validate(self, expected_values=None):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
         peak_load = read_parquet(self.output_dir / self.name / PeakLoadReport.REPORT_FILENAME)
-        model_year = "2018"
+        model_year = "2020"
         scenario = "reference"
         state = "CA"
         subsector = "hospital"
@@ -912,11 +852,11 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
 
         expected = (
             df.filter(make_expr(df))
-            .agg(F.max("all_electricity_sum").alias("max_val"))
+            .agg(F.max("all_electricity").alias("max_val"))
             .collect()[0]
             .max_val
         )
-        actual = peak_load.filter(make_expr(peak_load)).collect()[0].all_electricity_sum
+        actual = peak_load.filter(make_expr(peak_load)).collect()[0].all_electricity
         assert math.isclose(actual, expected)
 
 
@@ -932,14 +872,8 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
-                    dataset_id="projected_dg_conus_2022",
+                    dataset_id="resstock_projected_conus_2022",
                     source_datasets=[
-                        ExponentialGrowthDatasetModel(
-                            dataset_id="comstock_projected_conus_2022",
-                            initial_value_dataset_id="comstock_conus_2022_reference",
-                            growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
-                            construction_method="formula123",
-                        ),
                         ExponentialGrowthDatasetModel(
                             dataset_id="resstock_projected_conus_2022",
                             initial_value_dataset_id="resstock_conus_2022_reference",
@@ -969,15 +903,14 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
         non_value_columns.update({"id", "timestamp"})
         non_value_columns.update(self._model.result.supplemental_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
-        # TODO: fraction will be removed eventually
-        expected = ["electricity_cooling", "electricity_heating", "fraction"]
+        expected = ["electricity_cooling", "electricity_heating"]
         # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating", "fraction"]
         assert value_columns == expected
         assert not set(self._model.result.supplemental_columns).difference(df.columns)
 
         total_cooling = df.agg(F.sum("electricity_cooling").alias("sum")).collect()[0].sum
         total_heating = df.agg(F.sum("electricity_heating").alias("sum")).collect()[0].sum
-        expected = self.get_raw_stats()["overall"]["comstock_resstock"]["sum"]
+        expected = self.get_raw_stats()["overall"]["resstock"]["sum"]
         assert math.isclose(total_cooling, expected["electricity_cooling"])
         assert math.isclose(total_heating, expected["electricity_heating"])
 
@@ -998,9 +931,8 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            data_source=[],
                             geography=[self._geography],
-                            metric=["electricity"],
+                            metric=["electricity_collapsed"],
                             model_year=[],
                             scenario=[],
                             sector=[],
@@ -1043,14 +975,12 @@ def perform_op(df, column, operation):
 
 def validate_electricity_use_by_county(op, results_path, raw_stats, expected_county_count):
     spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    results = spark.read.parquet(
-        str(results_path),
-    )
+    results = spark.read.parquet(str(results_path))
     counties = [str(x.county) for x in results.select("county").distinct().collect()]
     assert len(counties) == expected_county_count, counties
     stats = raw_stats["by_county"]
     for county in counties:
-        col = f"all_electricity_{op}"
+        col = "all_electricity"
         actual = results.filter(f"county == '{county}'").collect()[0][col]
         expected = stats[county]["comstock_resstock"][op]["electricity"]
         assert math.isclose(actual, expected)
@@ -1066,7 +996,7 @@ def validate_electricity_use_by_state(op, results_path, raw_stats):
         assert op == "max", op
         exp_ca = get_expected_ca_max_electricity(raw_stats)
         exp_ny = get_expected_ny_max_electricity(raw_stats)
-    col = f"all_electricity_{op}"
+    col = "all_electricity"
     actual_ca = results.filter("state == 'CA'").collect()[0][col]
     actual_ny = results.filter("state == 'NY'").collect()[0][col]
     assert math.isclose(actual_ca, exp_ca)
@@ -1329,9 +1259,9 @@ def apply_load_mapping_aeo_res(aeo_res):
 
 def make_projection_df(aeo, ld_df, join_columns):
     # comstock and resstock have a single year of data for model_year 2018
-    # Apply the growth rate for 2018 and 2040, the years in the filtered registry.
+    # Apply the growth rate for 2020 and 2040, the years in the filtered registry.
     spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    years_df = spark.createDataFrame([{"model_year": "2018"}, {"model_year": "2040"}])
+    years_df = spark.createDataFrame([{"model_year": "2020"}, {"model_year": "2040"}])
     aeo = aeo.crossJoin(years_df)
     ld_df = ld_df.crossJoin(years_df)
     base_year = 2018

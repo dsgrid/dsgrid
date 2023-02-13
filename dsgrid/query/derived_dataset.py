@@ -221,7 +221,6 @@ def _make_dataset_config(
         "before registering and submitting the dataset to the project.",
         path,
         len(dimension_references),
-        num_new_supplemental_dimensions,
         config_file,
     )
 

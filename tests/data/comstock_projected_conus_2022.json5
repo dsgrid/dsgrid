@@ -1,13 +1,13 @@
 {
-  "name": "comstock_projected_conus_2022",
+  "name": "comstock_conus_2022_projected",
   "version": "0.1.0",
   "project": {
     "project_id": "dsgrid_conus_2022",
     "dataset": {
-      "dataset_id": "comstock_projected_conus_2022",
+      "dataset_id": "comstock_conus_2022_projected",
       "source_datasets": [
       {
-        "dataset_id": "comstock_projected_conus_2022",
+        "dataset_id": "comstock_conus_2022_projected",
         "initial_value_dataset_id": "comstock_conus_2022_reference",
         "growth_rate_dataset_id": "aeo2021_reference_commercial_energy_use_growth_factors",
         "construction_method": "formula123",

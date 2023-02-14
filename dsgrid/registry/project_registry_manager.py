@@ -13,6 +13,8 @@ import json5
 from prettytable import PrettyTable
 
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.time import TimeIntervalType
+from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidDimensionMapping,
@@ -611,6 +613,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                 f"dataset={dataset_id} has already been submitted to project={project_config.config_id}"
             )
 
+        self._check_dataset_time_interval_type(project_config, dataset_config)
+
         references = []
         if dimension_mapping_file is not None:
             references += self._register_mappings_from_file(
@@ -639,6 +643,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 log_message,
                 context,
             )
+
         self._submit_dataset(project_config, dataset_config, submitter, log_message, references)
 
     def _register_mappings_from_file(
@@ -848,6 +853,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 )
 
         dataset_model = project_config.get_dataset(dataset_config.model.dataset_id)
+
         dataset_model.mapping_references = mapping_references
         dataset_model.status = DatasetRegistryStatus.REGISTERED
         if project_config.are_all_datasets_submitted():
@@ -870,6 +876,42 @@ class ProjectRegistryManager(RegistryManagerBase):
             version,
             project_config.model.project_id,
         )
+
+    def _check_dataset_time_interval_type(
+        self, project_config: ProjectConfig, dataset_config: DatasetConfig
+    ):
+        dtime = dataset_config.get_dimension(DimensionType.TIME)
+        dtime_interval = dtime.model.time_interval_type
+        ptime = project_config.get_base_dimension(DimensionType.TIME)
+        ptime_interval = ptime.model.time_interval_type
+
+        if dtime_interval != ptime_interval:
+            # convert time ranges to matching time_interval_type and see if they match
+            if (
+                dtime_interval == TimeIntervalType.PERIOD_BEGINNING
+                and ptime_interval == TimeIntervalType.PERIOD_ENDING
+            ):
+                dtime_timestamps = [
+                    DatetimeTimestampType(x.timestamp + dtime.get_frequency())
+                    for x in dtime.list_expected_dataset_timestamps()
+                ]
+            elif (
+                dtime_interval == TimeIntervalType.PERIOD_ENDING
+                and ptime_interval == TimeIntervalType.PERIOD_BEGINNING
+            ):
+                dtime_timestamps = [
+                    DatetimeTimestampType(x.timestamp - dtime.get_frequency())
+                    for x in dtime.list_expected_dataset_timestamps()
+                ]
+            else:
+                dtime_timestamps = dtime.list_expected_dataset_timestamps()
+
+            if dtime_timestamps != ptime.list_expected_dataset_timestamps():
+                raise DSGInvalidDataset(
+                    "Mistmatch time between project and dataset due to TimeIntervalType: "
+                    f"project time dimension is {ptime_interval.value} with {ptime.get_time_ranges()} but "
+                    f"dataset time dimension is {dtime_interval.value} with {dtime.get_time_ranges()}"
+                )
 
     @track_timing(timer_stats_collector)
     def _check_dataset_base_to_project_base_mappings(

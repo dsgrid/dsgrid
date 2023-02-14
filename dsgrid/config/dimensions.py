@@ -14,7 +14,7 @@ from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
-    TimeInvervalType,
+    TimeIntervalType,
     MeasurementType,
     TimeZone,
     TimeDimensionType,
@@ -411,10 +411,10 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             "Adjustments are made to leap years only.",
         ),
     )
-    time_interval_type: TimeInvervalType = Field(
+    time_interval_type: TimeIntervalType = Field(
         title="time_interval",
         description="The range of time that the value associated with a timestamp represents, e.g., period-beginning",
-        options=TimeInvervalType.format_descriptions_for_docs(),
+        options=TimeIntervalType.format_descriptions_for_docs(),
     )
     timezone: TimeZone = Field(
         title="timezone",
@@ -520,10 +520,10 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         title="ranges",
         description="Defines the continuous ranges of time in the data, inclusive of start and end time.",
     )
-    time_interval_type: TimeInvervalType = Field(
+    time_interval_type: TimeIntervalType = Field(
         title="time_interval",
         description="The range of time that the value associated with a timestamp represents",
-        options=TimeInvervalType.format_descriptions_for_docs(),
+        options=TimeIntervalType.format_descriptions_for_docs(),
     )
 
     def is_time_zone_required_in_geography(self):

@@ -49,7 +49,7 @@ class LeapDayAdjustmentType(DSGEnum):
     NONE = EnumValue(value="none", description="No leap day adjustment made.")
 
 
-class TimeInvervalType(DSGEnum):
+class TimeIntervalType(DSGEnum):
     """Time interval enum types"""
 
     # TODO: R2PD uses a different set; do we want to align?

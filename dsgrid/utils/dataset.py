@@ -4,6 +4,7 @@ from collections import defaultdict
 
 # from typing import List
 
+import pyspark
 import pyspark.sql.functions as F
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
@@ -159,6 +160,13 @@ def check_null_value_in_unique_dimension_rows(dim_table, exclude_columns=None):
             "Combination of remapped dataset dimensions contain NULL value(s) for "
             f"dimension(s): \n{str(exc)}"
         )
+
+
+def is_noop_mapping(records: pyspark.sql.DataFrame) -> bool:
+    """Return True if the mapping is a no-op."""
+    return records.filter(
+        (records.from_id != records.to_id) | (records.from_fraction != 1.0)
+    ).rdd.isEmpty()
 
 
 def ordered_subset_columns(df, subset: set[str]) -> list[str]:

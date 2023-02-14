@@ -12,6 +12,7 @@ from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import (
+    is_noop_mapping,
     map_and_reduce_stacked_dimension,
     map_and_reduce_pivoted_dimension,
     add_time_zone,
@@ -322,6 +323,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     filtered_records[dim_type], on=records.to_id == filtered_records[dim_type].id
                 ).drop("id")
 
+            if is_noop_mapping(records):
+                logger.info("Skip no-op mapping %s.", ref.mapping_id)
+                continue
             if column in df.columns:
                 df = map_and_reduce_stacked_dimension(df, records, column)
             elif (

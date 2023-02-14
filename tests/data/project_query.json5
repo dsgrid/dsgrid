@@ -7,7 +7,7 @@
       "dataset_id": "conus_2022",
       "source_datasets": [
       {
-        "dataset_id": "resstock_projected_conus_2022",
+        "dataset_id": "resstock_conus_2022_projected",
         "initial_value_dataset_id": "resstock_conus_2022_reference",
         "growth_rate_dataset_id": "aeo2021_reference_residential_energy_use_growth_factors",
         "construction_method": "formula123",

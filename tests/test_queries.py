@@ -74,8 +74,8 @@ def la_expected_electricity_hour_16(tmp_path_factory):
             dataset=DatasetModel(
                 dataset_id="projected_dg_conus_2022",
                 source_datasets=[
-                    StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
-                    StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
+                    StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
+                    StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
                 ],
             ),
         ),
@@ -389,21 +389,21 @@ class QueryTestElectricityValues(QueryTestBase):
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
                         ExponentialGrowthDatasetModel(
-                            dataset_id="comstock_projected_conus_2022",
+                            dataset_id="comstock_conus_2022_projected",
                             initial_value_dataset_id="comstock_conus_2022_reference",
                             growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
                             construction_method="formula123",
                         ),
                         ExponentialGrowthDatasetModel(
-                            dataset_id="resstock_projected_conus_2022",
+                            dataset_id="resstock_conus_2022_projected",
                             initial_value_dataset_id="resstock_conus_2022_reference",
                             growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
                             construction_method="formula123",
                         ),
                         # StandaloneDatasetModel(dataset_id="tempo_conus_2022"),
                     ],
-                    expression="comstock_projected_conus_2022 | resstock_projected_conus_2022",
-                    # expression="comstock_projected_conus_2022 | resstock_projected_conus_2022 | tempo_conus_2022",
+                    expression="comstock_conus_2022_projected | resstock_conus_2022_projected",
+                    # expression="comstock_conus_2022_projected | resstock_conus_2022_projected | tempo_conus_2022",
                     params=ProjectQueryDatasetParamsModel(
                         dimension_filters=[
                             # This is a nonsensical way to filter down to county 06037, but
@@ -502,8 +502,8 @@ class QueryTestElectricityUse(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
-                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
+                        StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
                     ],
                 ),
             ),
@@ -565,8 +565,8 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
-                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
+                        StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
                     ],
                 ),
             ),
@@ -631,8 +631,8 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
-                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
+                        StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
                     ],
                 ),
             ),
@@ -688,8 +688,8 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
-                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
+                        StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
                     ],
                 ),
             ),
@@ -754,8 +754,8 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
-                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
+                        StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
                     ],
                 ),
             ),
@@ -800,8 +800,8 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        StandaloneDatasetModel(dataset_id="comstock_projected_conus_2022"),
-                        StandaloneDatasetModel(dataset_id="resstock_projected_conus_2022"),
+                        StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
+                        StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
                     ],
                 ),
             ),
@@ -872,10 +872,10 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                 project_id="dsgrid_conus_2022",
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
-                    dataset_id="resstock_projected_conus_2022",
+                    dataset_id="resstock_conus_2022_projected",
                     source_datasets=[
                         ExponentialGrowthDatasetModel(
-                            dataset_id="resstock_projected_conus_2022",
+                            dataset_id="resstock_conus_2022_projected",
                             initial_value_dataset_id="resstock_conus_2022_reference",
                             growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
                             construction_method="formula123",

@@ -32,7 +32,7 @@ REGISTRY_PATH = (
     / "simple_standard_scenarios"
 )
 
-RESSTOCK_PROJECTION_QUERY = Path("tests") / "data" / "resstock_projected_conus_2022.json5"
+RESSTOCK_PROJECTION_QUERY = Path("tests") / "data" / "resstock_conus_2022_projected.json5"
 
 Datasets = namedtuple("Datasets", ["comstock", "resstock", "tempo"])
 
@@ -42,15 +42,15 @@ logger = logging.getLogger(__name__)
 @pytest.fixture
 def valid_query():
     yield ProjectQueryModel(
-        name="resstock_projected_conus_2022",
+        name="resstock_conus_2022_projected",
         project=ProjectQueryParamsModel(
             project_id="dsgrid_conus_2022",
             include_dsgrid_dataset_components=False,
             dataset=DatasetModel(
-                dataset_id="resstock_projected_conus_2022",
+                dataset_id="resstock_conus_2022_projected",
                 source_datasets=[
                     ExponentialGrowthDatasetModel(
-                        dataset_id="resstock_projected_conus_2022",
+                        dataset_id="resstock_conus_2022_projected",
                         initial_value_dataset_id="resstock_conus_2022_reference",
                         growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
                         construction_method="formula123",
@@ -86,7 +86,7 @@ def test_resstock_projection_invalid_query_replace_ids_with_names(valid_query):
 
 
 def test_create_derived_dataset_config(tmp_path):
-    dataset_id = "resstock_projected_conus_2022"
+    dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"
     check_run_command(
         "dsgrid query project run --offline "

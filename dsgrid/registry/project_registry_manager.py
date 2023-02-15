@@ -881,30 +881,25 @@ class ProjectRegistryManager(RegistryManagerBase):
         self, project_config: ProjectConfig, dataset_config: DatasetConfig
     ):
         dtime = dataset_config.get_dimension(DimensionType.TIME)
-        dtime_interval = dtime.model.time_interval_type
+        dtime_interval = dtime.get_time_interval_type()
         ptime = project_config.get_base_dimension(DimensionType.TIME)
-        ptime_interval = ptime.model.time_interval_type
+        ptime_interval = ptime.get_time_interval_type()
 
         if dtime_interval != ptime_interval:
+            dtime_timestamps = dtime.list_expected_dataset_timestamps()
+
             # convert time ranges to matching time_interval_type and see if they match
-            if (
-                dtime_interval == TimeIntervalType.PERIOD_BEGINNING
-                and ptime_interval == TimeIntervalType.PERIOD_ENDING
-            ):
-                dtime_timestamps = [
-                    DatetimeTimestampType(x.timestamp + dtime.get_frequency())
-                    for x in dtime.list_expected_dataset_timestamps()
-                ]
-            elif (
-                dtime_interval == TimeIntervalType.PERIOD_ENDING
-                and ptime_interval == TimeIntervalType.PERIOD_BEGINNING
-            ):
-                dtime_timestamps = [
-                    DatetimeTimestampType(x.timestamp - dtime.get_frequency())
-                    for x in dtime.list_expected_dataset_timestamps()
-                ]
-            else:
-                dtime_timestamps = dtime.list_expected_dataset_timestamps()
+            match (dtime_interval, ptime_interval):
+                case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
+                    dtime_timestamps = [
+                        DatetimeTimestampType(x.timestamp + dtime.get_frequency())
+                        for x in dtime.list_expected_dataset_timestamps()
+                    ]
+                case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
+                    dtime_timestamps = [
+                        DatetimeTimestampType(x.timestamp - dtime.get_frequency())
+                        for x in dtime.list_expected_dataset_timestamps()
+                    ]
 
             if dtime_timestamps != ptime.list_expected_dataset_timestamps():
                 raise DSGInvalidDataset(

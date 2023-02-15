@@ -152,6 +152,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         # TBD
         return None
 
+    def get_time_interval_type(self):
+        return self.model.time_interval_type
+
     def list_expected_dataset_timestamps(self):
         return self._format_handler.list_expected_dataset_timestamps(self.model.ranges)
 

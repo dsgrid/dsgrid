@@ -404,34 +404,27 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _convert_dataset_time_to_project_time_interval(self, load_data_df, project_config):
         """Shift dataset time to match project time based on TimeIntervalType"""
         dtime = self._config.get_dimension(DimensionType.TIME)
-        dtime_interval = dtime.model.time_interval_type
+        dtime_interval = dtime.get_time_interval_type()
         ptime = project_config.get_base_dimension(DimensionType.TIME)
-        ptime_interval = ptime.model.time_interval_type
+        ptime_interval = ptime.get_time_interval_type()
         time_col = ptime.get_timestamp_load_data_columns()
 
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
 
         if dtime_interval != ptime_interval:
+            match (dtime_interval, ptime_interval):
+                case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
+                    load_data_df = load_data_df.withColumn(
+                        time_col,
+                        F.col(time_col)
+                        + F.expr(f"INTERVAL {dtime.get_frequency().seconds} SECONDS"),
+                    )
+                case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
+                    load_data_df = load_data_df.withColumn(
+                        time_col,
+                        F.col(time_col)
+                        - F.expr(f"INTERVAL {dtime.get_frequency().seconds} SECONDS"),
+                    )
 
-            if (
-                dtime_interval == TimeIntervalType.PERIOD_BEGINNING
-                and ptime_interval == TimeIntervalType.PERIOD_ENDING
-            ):
-                load_data_df = load_data_df.withColumn(
-                    time_col,
-                    F.col("timestamp")
-                    + F.expr(f"INTERVAL {dtime.get_frequency().seconds} SECONDS"),
-                )
-            elif (
-                dtime_interval == TimeIntervalType.PERIOD_ENDING
-                and ptime_interval == TimeIntervalType.PERIOD_BEGINNING
-            ):
-                load_data_df = load_data_df.withColumn(
-                    time_col,
-                    F.col("timestamp")
-                    - F.expr(f"INTERVAL {dtime.get_frequency().seconds} SECONDS"),
-                )
-
-        # Shifiting time here does not override dataset time interval type, would it be confusing?
         return load_data_df

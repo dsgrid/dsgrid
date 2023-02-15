@@ -127,6 +127,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_tzinfo(self):
         return self.model.timezone.tz
 
+    def get_time_interval_type(self):
+        return self.model.time_interval_type
+
     def list_expected_dataset_timestamps(self):
         # TODO: need to support validation of multiple time ranges: DSGRID-173
         time_ranges = self.get_time_ranges()

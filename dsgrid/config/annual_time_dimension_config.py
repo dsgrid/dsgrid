@@ -94,6 +94,9 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_tzinfo(self):
         return None
 
+    def get_time_interval_type(self):
+        return None
+
     def list_expected_dataset_timestamps(self):
         # TODO: need to support validation of multiple time ranges: DSGRID-173
         assert len(self.model.ranges) == 1, self.model.ranges

@@ -101,6 +101,16 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
+    def get_time_interval_type(self):
+        """Return the time interval type for this dimension.
+
+        Returns
+        -------
+        TimeIntervalType | None
+
+        """
+
+    @abc.abstractmethod
     def list_expected_dataset_timestamps(self):
         """Return a list of the timestamps expected in the load_data table.
 

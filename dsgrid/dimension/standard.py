@@ -108,6 +108,12 @@ class Stock(MetricDimensionBaseModel):
     unit: str
 
 
+class Capacity(MetricDimensionBaseModel):
+    """Capacity attributes - includes distributed generation and other equipment capacities"""
+
+    unit: str
+
+
 class EnergyEfficiency(MetricDimensionBaseModel):
     """Energy Efficiency of building stock or equipment"""
 

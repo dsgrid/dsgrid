@@ -7,7 +7,6 @@ from pathlib import Path
 
 import json5
 
-from dsgrid.data_models import serialize_model
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.spark import models_to_dataframe
 
@@ -107,7 +106,7 @@ class ConfigBase(abc.ABC):
         filename = Path(path) / self.config_filename()
         if filename.exists() and not force:
             raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
-        filename.write_text(json5.dumps(serialize_model(self.model), indent=2))
+        filename.write_text(self.model.json(indent=2))
         return filename
 
 
@@ -159,7 +158,7 @@ class ConfigWithDataFilesBase(ConfigBase, abc.ABC):
     def serialize(self, path, force=False):
         # Serialize the data alongside the config file at path and point the
         # config to that file to ensure that the config will be Pydantic-valid when loaded.
-        model_data = serialize_model(self.model)
+        model_data = self.model.serialize()
         dst_config_file = path / self.config_filename()
         if dst_config_file.exists() and not force:
             raise DSGInvalidOperation(f"{dst_config_file} exists. Set force=True to overwrite.")

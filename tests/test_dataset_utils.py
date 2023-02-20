@@ -3,7 +3,7 @@ import math
 import pyspark.sql.functions as F
 import pytest
 
-from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension
+from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension, is_noop_mapping
 from dsgrid.utils.spark import get_spark_session
 
 
@@ -115,6 +115,81 @@ def test_map_and_reduce_pivoted_dimension_min(dataframes):
     assert res.filter("county == 'Boulder'").collect()[0].all_electricity == 3.5
     assert res.filter("county == 'Denver'").collect()[0].all_electricity == 4.2
     assert res.filter("county == 'Adams'").collect()[0].all_electricity == 1.3
+
+
+def test_is_noop_mapping_true():
+    spark = get_spark_session()
+    df = spark.createDataFrame(
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elec_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": "elec_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 1.0,
+            },
+        ]
+    )
+    assert is_noop_mapping(df)
+
+
+def test_is_noop_mapping_false():
+    spark = get_spark_session()
+    for records in (
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elec_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": "electricity_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 1.0,
+            },
+        ],
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "electricity_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": "elec_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 1.0,
+            },
+        ],
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elect_cooling",
+                "from_fraction": 2.0,
+            },
+            {
+                "from_id": "elec_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 1.0,
+            },
+        ],
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elect_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": "elec_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 2.0,
+            },
+        ],
+    ):
+        df = spark.createDataFrame(records)
+        assert not is_noop_mapping(df)
 
 
 # TODO: enable this when we decide if and how to handle NULL values in mean operations.

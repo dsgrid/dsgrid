@@ -3,7 +3,6 @@ import logging
 import pyspark.sql.functions as F
 from pyspark.sql.types import IntegerType
 
-from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.query.models import ExponentialGrowthDatasetModel
 from dsgrid.utils.spark import get_unique_values
@@ -52,14 +51,6 @@ def apply_growth_rate_123(
         ).drop(column)
 
     dim_columns = set(initial_value_df.columns) - pivoted_columns - time_columns
-    # TODO #185: data_source needs some thought. They are different in these two dfs.
-    # And this should be dimension_query_name instead of dimension type
-    # What is the data_source of the resulting df?
-    if DimensionType.DATA_SOURCE.value in dim_columns:
-        dim_columns.remove(DimensionType.DATA_SOURCE.value)
-    if DimensionType.DATA_SOURCE.value in gr_df.columns:
-        gr_df = gr_df.drop(DimensionType.DATA_SOURCE.value)
-
     df = initial_value_df.join(gr_df, on=list(dim_columns))
     for column in df.columns:
         if column in pivoted_columns:

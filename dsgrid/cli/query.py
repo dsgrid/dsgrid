@@ -1,5 +1,6 @@
 """Runs dsgrid queries."""
 
+import logging
 import sys
 from pathlib import Path
 
@@ -7,6 +8,7 @@ import click
 from pydantic import ValidationError
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
+from dsgrid.cli.common import check_output_directory
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
@@ -15,6 +17,8 @@ from dsgrid.dimension.dimension_filters import (
     DimensionFilterColumnOperatorModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
+from dsgrid.filesystem.factory import make_filesystem_interface
+from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
     AggregationModel,
     DimensionQueryNamesModel,
@@ -26,8 +30,13 @@ from dsgrid.query.models import (
     DatasetType,
     DatasetModel,
 )
-from dsgrid.query.query_submitter import ProjectQuerySubmitter  # , CompositeDatasetQuerySubmitter
+from dsgrid.query.query_submitter import (
+    ProjectQuerySubmitter,
+)  # , CompositeDatasetQuerySubmitter
 from dsgrid.registry.registry_manager import RegistryManager
+
+
+logger = logging.getLogger(__name__)
 
 
 def add_options(options):
@@ -70,8 +79,8 @@ _COMMON_RUN_OPTIONS = (
         "--output",
         default="query_output",
         show_default=True,
+        type=str,
         help="Output directory for query results",
-        callback=lambda _, __, x: Path(x),
     ),
     click.option(
         "-i",
@@ -296,7 +305,8 @@ def run_project(
         offline_mode=offline,
     )
     project = registry_manager.project_manager.load_project(query.project.project_id)
-    ProjectQuerySubmitter(project, output).submit(
+    fs_interface = make_filesystem_interface(output)
+    ProjectQuerySubmitter(project, fs_interface.path(output)).submit(
         query,
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
@@ -357,6 +367,38 @@ def query_composite_dataset(
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
 
 
+@click.command()
+@click.argument("src")
+@click.argument("dst")
+@add_options(_COMMON_REGISTRY_OPTIONS)
+@click.option(
+    "--force",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite results directory if it exists.",
+)
+def create_derived_dataset_config(src, dst, registry_path, remote_path, offline, force):
+    """Create a derived dataset configuration and dimensions from a query result."""
+    fs_interface = make_filesystem_interface(src)
+    src_path = fs_interface.path(src)
+    if not src_path.exists():
+        print(f"{src} does not exist", file=sys.stderr)
+        sys.exit(1)
+    dst_path = fs_interface.path(dst)
+    check_output_directory(dst_path, fs_interface, force)
+
+    registry_manager = RegistryManager.load(
+        registry_path,
+        remote_path=remote_path,
+        offline_mode=offline,
+    )
+    result = create_derived_dataset_config_from_query(src_path, dst_path, registry_manager)
+    if not result:
+        logger.error("The query defined in %s does not support a derived dataset.", src)
+        sys.exit(1)
+
+
 @click.group()
 def query():
     """Query group commands"""
@@ -377,5 +419,6 @@ query.add_command(project)
 project.add_command(create_project)
 project.add_command(validate_project)
 project.add_command(run_project)
+project.add_command(create_derived_dataset_config)
 composite_dataset.add_command(create_composite_dataset)
 composite_dataset.add_command(query_composite_dataset)

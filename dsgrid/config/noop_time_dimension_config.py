@@ -12,7 +12,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def model_class():
         return NoOpTimeDimensionModel
 
-    def check_dataset_time_consistency(self, load_data_df):
+    def check_dataset_time_consistency(self, load_data_df, time_columns):
         pass
 
     def build_time_dataframe(self):

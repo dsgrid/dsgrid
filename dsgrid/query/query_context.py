@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.spark import get_spark_session
-from .models import QueryBaseModel, DatasetMetadataModel, TableFormatType
+from .models import ProjectQueryModel, DatasetMetadataModel, TableFormatType
 
 
 logger = logging.getLogger(__name__)
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 class QueryContext:
     """Maintains context of the query as it is processed through the stack."""
 
-    def __init__(self, model: QueryBaseModel):
+    def __init__(self, model: ProjectQueryModel):
         self._model = model
         self._record_ids_by_dimension_type = {}  # DimensionType to DataFrame
         self._metadata = DatasetMetadataModel()
@@ -136,7 +136,7 @@ class QueryContext:
         container = self._get_dimension_query_name_container(dimension_type, dataset_id=dataset_id)
         if dimension_query_name not in container:
             container.add(dimension_query_name)
-            logger.info(
+            logger.debug(
                 "Added dimension query name for %s: %s dataset_id=%s",
                 dimension_type,
                 dimension_query_name,

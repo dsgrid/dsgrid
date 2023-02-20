@@ -2,9 +2,7 @@ import logging
 from pathlib import Path
 from typing import List
 
-from dsgrid.config.dataset_config import (
-    DatasetConfig,
-)
+from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
 from dsgrid.utils.spark import (
@@ -17,7 +15,7 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.query.models import TableFormatType
+from dsgrid.query.models import TableFormatType, ColumnType
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.query.query_context import QueryContext
 
@@ -97,15 +95,14 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def get_unique_dimension_rows(self):
         """Get distinct combinations of remapped dimensions.
         Check each col in combination for null value."""
-        time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_cols = set(time_dim.get_timestamp_load_data_columns())
+        time_cols = set(self._get_time_dimension_columns())
         pivoted_cols = set(self.get_pivoted_dimension_columns())
         exclude = time_cols.union(pivoted_cols)
         dim_cols = [x for x in self._load_data.columns if x not in exclude]
         df = self._load_data.select(*dim_cols).distinct()
 
         dim_table = self._remap_dimension_columns(df).distinct()
-        check_null_value_in_unique_dimension_rows(dim_table)
+        check_null_value_in_unique_dimension_rows(dim_table, exclude_columns=time_cols)
 
         return dim_table
 
@@ -142,10 +139,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def make_project_dataframe(self, project_config):
         convert_time_before_project_mapping = self._convert_time_before_project_mapping()
+        ld_df = self._load_data
         if convert_time_before_project_mapping:
-            ld_df = self._convert_time_dimension(self._load_data, project_config)
-        else:
-            ld_df = self._load_data
+            ld_df = self._convert_time_dimension(ld_df, project_config)
 
         ld_df = self._remap_dimension_columns(ld_df)
         ld_df = self._apply_fraction(ld_df)
@@ -184,6 +180,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             project_config,
         )
         table_handler = PivotedTableHandler(project_config, dataset_id=self.dataset_id)
-        ld_df = table_handler.convert_columns_to_query_names(ld_df)
+        if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
+            ld_df = table_handler.convert_columns_to_query_names(ld_df)
 
         return ld_df

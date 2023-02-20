@@ -19,7 +19,6 @@ class DimensionType(DSGEnum):
     WEATHER_YEAR = "weather_year"
     MODEL_YEAR = "model_year"
     SCENARIO = "scenario"
-    DATA_SOURCE = "data_source"
 
     def __lt__(self, other):
         return self.value < other.value
@@ -99,7 +98,6 @@ _DIMENSION_TO_MODEL = {
     DimensionType.WEATHER_YEAR: WeatherYearDimensionBaseModel,
     DimensionType.MODEL_YEAR: ModelYearDimensionBaseModel,
     DimensionType.SCENARIO: ScenarioDimensionBaseModel,
-    DimensionType.DATA_SOURCE: DataSourceDimensionBaseModel,
 }
 
 

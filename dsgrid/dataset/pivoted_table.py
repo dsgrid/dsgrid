@@ -126,7 +126,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 mapping_records,
                 pivoted_columns,
                 agg.aggregation_function.__name__,
-                rename=True,
+                rename=False,
             )
             context.replace_dimension_query_names(
                 dim_config.model.dimension_type, {dimension_query_name}, dataset_id=self.dataset_id

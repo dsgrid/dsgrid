@@ -4,6 +4,7 @@ from collections import defaultdict
 
 # from typing import List
 
+import pyspark
 import pyspark.sql.functions as F
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
@@ -141,7 +142,7 @@ def add_column_from_records(df, dimension_records, dimension_name, column_to_add
 
 
 @track_timing(timer_stats_collector)
-def check_null_value_in_unique_dimension_rows(dim_table):
+def check_null_value_in_unique_dimension_rows(dim_table, exclude_columns=None):
     if os.environ.get("__DSGRID_SKIP_CHECK_NULL_UNIQUE_DIMENSION__"):
         # This has intermittently caused GC-related timeouts for TEMPO.
         # Leave a backdoor to skip these checks, which may eventually be removed.
@@ -149,13 +150,23 @@ def check_null_value_in_unique_dimension_rows(dim_table):
         return
 
     try:
-        check_for_nulls(dim_table, exclude_columns={"id"})
+        exclude = {"id"}
+        if exclude_columns is not None:
+            exclude.update(exclude_columns)
+        check_for_nulls(dim_table, exclude_columns=exclude)
     except DSGInvalidField as exc:
         raise DSGInvalidDimensionMapping(
             "Invalid dimension mapping application. "
             "Combination of remapped dataset dimensions contain NULL value(s) for "
             f"dimension(s): \n{str(exc)}"
         )
+
+
+def is_noop_mapping(records: pyspark.sql.DataFrame) -> bool:
+    """Return True if the mapping is a no-op."""
+    return records.filter(
+        (records.from_id != records.to_id) | (records.from_fraction != 1.0)
+    ).rdd.isEmpty()
 
 
 def ordered_subset_columns(df, subset: set[str]) -> list[str]:

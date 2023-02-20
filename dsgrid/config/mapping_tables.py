@@ -12,7 +12,7 @@ from dsgrid.config.dimension_mapping_base import (
     DimensionMappingDatasetToProjectBaseModel,
     DimensionMappingPreRegisteredBaseModel,
 )
-from dsgrid.data_models import serialize_model_data, DSGBaseModel
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.files import compute_file_hash
 from .config_base import ConfigWithDataFilesBase
 
@@ -130,12 +130,20 @@ class MappingTableModel(DimensionMappingBaseModel):
 
         return records
 
-    def dict(self, by_alias=True, exclude=None):
-        if exclude is None:
-            exclude = set()
-        exclude.add("records")
-        data = super().dict(by_alias=by_alias, exclude=exclude)
-        return serialize_model_data(data)
+    def dict(self, *args, **kwargs):
+        return super().dict(*args, **self._handle_kwargs(**kwargs))
+
+    def json(self, *args, **kwargs):
+        return super().json(*args, **self._handle_kwargs(**kwargs))
+
+    @staticmethod
+    def _handle_kwargs(**kwargs):
+        exclude = {"records"}
+        if "exclude" in kwargs and kwargs["exclude"] is not None:
+            kwargs["exclude"].union(exclude)
+        else:
+            kwargs["exclude"] = exclude
+        return kwargs
 
     @classmethod
     def from_pre_registered_model(

@@ -6,8 +6,7 @@ import pyspark.sql.functions as F
 from pydantic import Field, root_validator, validator
 from semver import VersionInfo
 
-from dsgrid.data_models import DSGBaseModel
-
+from dsgrid.data_models import DSGBaseModel, DSGEnum
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import make_dimension_filter, DimensionFilterBaseModel
 from dsgrid.utils.files import compute_hash
@@ -68,12 +67,16 @@ class ColumnModel(DSGBaseModel):
         return f"{self.function.__name__}__{self.dimension_query_name})"
 
 
+class ColumnType(DSGEnum):
+    DIMENSION_TYPES = "dimension_types"
+    DIMENSION_QUERY_NAMES = "dimension_query_names"
+
+
 class DimensionQueryNamesModel(DSGBaseModel):
     """Defines the list of dimensions to which the value columns should be aggregated.
     If a value is empty, that dimension will be aggregated and dropped from the table.
     """
 
-    data_source: List[Union[str, ColumnModel]]
     geography: List[Union[str, ColumnModel]]
     metric: List[Union[str, ColumnModel]]
     model_year: List[Union[str, ColumnModel]]
@@ -146,7 +149,6 @@ class TableFormatType(enum.Enum):
 class DatasetDimensionsMetadataModel(DSGBaseModel):
     """Defines the dimensions of a dataset serialized to file."""
 
-    data_source: Set[str] = set()
     geography: Set[str] = set()
     metric: Set[str] = set()
     model_year: Set[str] = set()
@@ -394,6 +396,12 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     reports: List[ReportInputModel] = Field(
         description="Run these pre-defined reports on the result.", default=[]
     )
+    column_type: ColumnType = Field(
+        description="Whether to make the result table columns dimension types. Default behavior "
+        "is to use dimension query names. In order to register a result table as a derived "
+        f"dataset, this must be set to {ColumnType.DIMENSION_TYPES.value}.",
+        default=ColumnType.DIMENSION_QUERY_NAMES,
+    )
     output_format: str = Field(description="Output file format: csv or parquet", default="parquet")
     sort_columns: List[str] = Field(
         description="Sort the results by these dimension query names.",
@@ -430,6 +438,15 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
             if not isinstance(dimension_filter, DimensionFilterBaseModel):
                 dimension_filters[i] = make_dimension_filter(dimension_filter)
         return dimension_filters
+
+    @validator("column_type")
+    def check_column_type(cls, column_type, values):
+        if column_type == ColumnType.DIMENSION_TYPES and values["supplemental_columns"]:
+            # This would cause duplicate column names.
+            raise ValueError(
+                f"column_type={ColumnType.DIMENSION_TYPES} is incompatible with supplemental_columns"
+            )
+        return column_type
 
 
 class ProjectQueryModel(QueryBaseModel):

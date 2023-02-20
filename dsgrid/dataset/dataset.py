@@ -13,10 +13,15 @@ class DatasetBase(abc.ABC):
     """Base class for datasets"""
 
     def __init__(self, schema_handler):
+        self._config = schema_handler.config
         self._handler = schema_handler
         self._id = schema_handler.config.model.dataset_id
         # Can't use dashes in view names. This will need to be handled when we implement
         # queries based on dataset ID.
+
+    @property
+    def config(self):
+        return self._config
 
     @property
     def dataset_id(self):

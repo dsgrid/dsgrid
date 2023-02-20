@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 import pytest
+from semver import VersionInfo
 
 from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidOperation
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
@@ -170,7 +171,7 @@ def check_config_update(base_dir, mgr, config_id, user, version):
     mgr : RegistryManagerBase
     config_id : str
     user : str
-    version : VersionInfo
+    version : str
 
     """
     config_file = Path(base_dir) / mgr.registry_class().config_filename()
@@ -200,7 +201,7 @@ def check_config_update(base_dir, mgr, config_id, user, version):
                 user,
                 VersionUpdateType.PATCH,
                 "update to description",
-                version.bump_patch(),
+                str(VersionInfo.parse(version).bump_patch()),
             )
 
         mgr.update_from_file(
@@ -211,7 +212,7 @@ def check_config_update(base_dir, mgr, config_id, user, version):
             "update to description",
             version,
         )
-        assert mgr.get_current_version(config_id) == version.bump_patch()
+        assert mgr.get_current_version(config_id) == str(VersionInfo.parse(version).bump_patch())
     finally:
         if config_file.exists():
             os.remove(config_file)

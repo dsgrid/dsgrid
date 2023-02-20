@@ -191,7 +191,6 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_references : list
             iterable of DimensionReferenceModel instances
 
-
         Returns
         -------
         dict

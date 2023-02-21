@@ -172,3 +172,21 @@ def is_noop_mapping(records: pyspark.sql.DataFrame) -> bool:
 def ordered_subset_columns(df, subset: set[str]) -> list[str]:
     """Return a list of columns in the dataframe that are present in subset."""
     return [x for x in df.columns if x in subset]
+
+
+def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
+    """Remove rows from the dataframe where the time column is NULL and other rows with the
+    same dimensions contain valid data.
+    """
+    assert len(time_columns) == 1, time_columns
+    time_column = next(iter(time_columns))
+    orig_columns = df.columns
+    stacked = list(stacked_columns)
+    return (
+        df.join(
+            df.groupBy(*stacked).agg(F.count_distinct(time_column).alias("count_time")),
+            on=stacked,
+        )
+        .filter(f"{time_column} IS NOT NULL or count_time == 0")
+        .select(orig_columns)
+    )

@@ -8,7 +8,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.query.models import AggregationModel
 from dsgrid.query.query_context import QueryContext
-from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension
+from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension, remove_invalid_null_timestamps
 from dsgrid.utils.spark import get_unique_values
 from .table_format_handler_base import TableFormatHandlerBase
 
@@ -73,7 +73,20 @@ class PivotedTableHandler(TableFormatHandlerBase):
         self, df, aggregations: List[AggregationModel], context: QueryContext
     ):
         df = self.process_pivoted_aggregations(df, aggregations, context)
-        return self.process_stacked_aggregations(df, aggregations, context)
+        orig_id = id(df)
+        df = self.process_stacked_aggregations(df, aggregations, context)
+
+        if id(df) != orig_id:
+            # The table could have NULL timestamps that designate expected-missing data.
+            # Those rows could be obsolete after aggregating stacked dimensions.
+            # This is an expensive operation, so only do it if the dataframe changed.
+            pivoted_columns = context.get_pivoted_columns()
+            time_columns = context.get_dimension_query_names(DimensionType.TIME)
+            if time_columns:
+                stacked_columns = set(df.columns) - pivoted_columns.union(time_columns)
+                df = remove_invalid_null_timestamps(df, time_columns, stacked_columns)
+
+        return df
 
     def process_pivoted_aggregations(
         self, df, aggregations: List[AggregationModel], context: QueryContext
@@ -97,8 +110,8 @@ class PivotedTableHandler(TableFormatHandlerBase):
         pivoted_columns = copy.deepcopy(context.get_pivoted_columns(dataset_id=self.dataset_id))
         new_pivoted_columns = []  # Will be the pivoted columns after the last aggregation.
         pivoted_dim_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
+        base_query_names = self.project_config.get_base_dimension_query_names()
         for agg in aggregations:
-            base_query_names = self.project_config.get_base_dimension_query_names()
             dimension_query_name = None
             for _, column in agg.iter_dimensions_to_keep():
                 query_name = column.dimension_query_name

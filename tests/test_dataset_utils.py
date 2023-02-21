@@ -3,7 +3,11 @@ import math
 import pyspark.sql.functions as F
 import pytest
 
-from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension, is_noop_mapping
+from dsgrid.utils.dataset import (
+    map_and_reduce_pivoted_dimension,
+    is_noop_mapping,
+    remove_invalid_null_timestamps,
+)
 from dsgrid.utils.spark import get_spark_session
 
 
@@ -190,6 +194,37 @@ def test_is_noop_mapping_false():
     ):
         df = spark.createDataFrame(records)
         assert not is_noop_mapping(df)
+
+
+def test_remove_invalid_null_timestamps():
+    spark = get_spark_session()
+    df = spark.createDataFrame(
+        [
+            # No nulls
+            {"timestamp": 1, "county": "Jefferson", "subsector": "warehouse", "value": 4},
+            {"timestamp": 2, "county": "Jefferson", "subsector": "warehouse", "value": 5},
+            # Nulls and valid values
+            {"timestamp": None, "county": "Boulder", "subsector": "large_office", "value": 0},
+            {"timestamp": 1, "county": "Boulder", "subsector": "large_office", "value": 4},
+            {"timestamp": 2, "county": "Boulder", "subsector": "large_office", "value": 5},
+            # Only nulls
+            {"timestamp": None, "county": "Adams", "subsector": "retail_stripmall", "value": 0},
+            {"timestamp": None, "county": "Denver", "subsector": "hospital", "value": 0},
+        ]
+    )
+    stacked = ["county", "subsector"]
+    time_col = "timestamp"
+    result = remove_invalid_null_timestamps(df, {time_col}, stacked)
+    result = (
+        df.join(
+            df.groupBy(*stacked).agg(F.count_distinct(time_col).alias("count_time")), on=stacked
+        )
+        .filter(f"{time_col} IS NOT NULL or count_time == 0")
+        .drop("count_time")
+    )
+    assert result.count() == 6
+    assert result.filter("county == 'Boulder'").count() == 2
+    assert result.filter(f"county == 'Boulder' and {time_col} is NULL").rdd.isEmpty()
 
 
 # TODO: enable this when we decide if and how to handle NULL values in mean operations.

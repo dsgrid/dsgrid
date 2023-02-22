@@ -126,6 +126,14 @@ class AggregationModel(DSGBaseModel):
             for val in getattr(self.dimensions, field):
                 yield DimensionType(field), val
 
+    def list_dropped_dimensions(self):
+        """Return a list of dimension types that will be dropped by the aggregation."""
+        return [
+            DimensionType(x)
+            for x in DimensionQueryNamesModel.__fields__
+            if not getattr(self.dimensions, x)
+        ]
+
 
 class ReportType(enum.Enum):
     """Pre-defined reports"""

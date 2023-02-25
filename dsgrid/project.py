@@ -164,7 +164,7 @@ class Project:
         match context.model.result.column_type:
             case ColumnType.DIMENSION_QUERY_NAMES:
                 dim_columns = context.get_all_dimension_query_names()
-                time_columns = context.get_dimension_query_names(DimensionType.TIME)
+                time_columns = context.get_dimension_column_names(DimensionType.TIME)
             case ColumnType.DIMENSION_TYPES:
                 dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
                 tcols = context.get_dimension_query_names(DimensionType.TIME)
@@ -328,7 +328,7 @@ class Project:
                         f"BUG: unhandled column type {context.model.result.column_type}"
                     )
             names = list(
-                context.get_dimension_query_names(DimensionType.MODEL_YEAR, dataset_id=dataset_id)
+                context.get_dimension_column_names(DimensionType.MODEL_YEAR, dataset_id=dataset_id)
             )
             assert len(names) == 1, f"{dataset_id=} {names=}"
             return names[0]
@@ -356,7 +356,7 @@ class Project:
             )
         match context.model.result.column_type:
             case ColumnType.DIMENSION_QUERY_NAMES:
-                time_columns = context.get_dimension_query_names(
+                time_columns = context.get_dimension_column_names(
                     DimensionType.TIME, dataset_id=dataset.initial_value_dataset_id
                 )
             case ColumnType.DIMENSION_TYPES:

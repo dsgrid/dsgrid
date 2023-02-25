@@ -154,17 +154,61 @@ class TableFormatType(enum.Enum):
     LONG = "long"
 
 
+class DimensionMetadataModel(DSGBaseModel):
+    """Defines the columns in a table for a dimension."""
+
+    dimension_query_name: str
+    column_name: str | None = None
+
+    @validator("column_name")
+    def handle_default_column_name(cls, column_name, values):
+        return column_name or values["dimension_query_name"]
+
+    def make_key(self):
+        return f"{self.dimension_query_name}__{self.column_name}"
+
+
 class DatasetDimensionsMetadataModel(DSGBaseModel):
     """Defines the dimensions of a dataset serialized to file."""
 
-    geography: Set[str] = set()
-    metric: Set[str] = set()
-    model_year: Set[str] = set()
-    scenario: Set[str] = set()
-    sector: Set[str] = set()
-    subsector: Set[str] = set()
-    time: Set[str] = set()
-    weather_year: Set[str] = set()
+    geography: list[DimensionMetadataModel] = []
+    metric: list[DimensionMetadataModel] = []
+    model_year: list[DimensionMetadataModel] = []
+    scenario: list[DimensionMetadataModel] = []
+    sector: list[DimensionMetadataModel] = []
+    subsector: list[DimensionMetadataModel] = []
+    time: list[DimensionMetadataModel] = []
+    weather_year: list[DimensionMetadataModel] = []
+
+    def add_metadata(self, dimension_type: DimensionType, metadata: DimensionMetadataModel):
+        """Add dimension metadata. Skip duplicates."""
+        container = getattr(self, dimension_type.value)
+        if metadata.make_key() not in {x.make_key() for x in container}:
+            container.append(metadata)
+
+    def get_metadata(self, dimension_type: DimensionType):
+        """Return the dimension metadata."""
+        return getattr(self, dimension_type.value)
+
+    def replace_metadata(self, dimension_type: DimensionType, metadata: DimensionMetadataModel):
+        """Replace the dimension metadata."""
+        setattr(self, dimension_type.value, metadata)
+
+    def get_column_names(self, dimension_type: DimensionType):
+        """Return the column names for the given dimension type."""
+        return {x.column_name for x in getattr(self, dimension_type.value)}
+
+    def get_dimension_query_names(self, dimension_type: DimensionType):
+        """Return the dimension query names for the given dimension type."""
+        return {x.dimension_query_name for x in getattr(self, dimension_type.value)}
+
+    def remove_metadata(self, dimension_type: DimensionType, dimension_query_name):
+        """Remove the dimension metadata for the given dimension query name."""
+        container = getattr(self, dimension_type.value)
+        for i, metadata in enumerate(container):
+            if metadata.dimension_query_name == dimension_query_name:
+                container.pop(i)
+                break
 
 
 class PivotedDatasetMetadataModel(DSGBaseModel):

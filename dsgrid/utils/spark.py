@@ -211,7 +211,12 @@ def _read_with_spark(filename):
     spark = get_spark_session()
     suffix = Path(filename).suffix
     if suffix == ".csv":
-        df = spark.read.csv(filename, inferSchema=True, header=True)
+        # ETH@20230228 - Changed inferSchema to False, because this enabled import of county 
+        # FIPS as strings instead of numbers. It seems like it might be better to be able to 
+        # explicitly state columns that we are expecting to be strings, as you can with the 
+        # dtype option of pd.read_csv, but it's not clear to me that spark allows that on an 
+        # unordered column-by-column basis.
+        df = spark.read.csv(filename, inferSchema=False, header=True)
     elif suffix == ".parquet":
         try:
             df = spark.read.parquet(filename)
@@ -235,6 +240,9 @@ def _read_natively(filename):
         # Keep the code in case we ever want to revert.
         # with open(filename, encoding="utf-8-sig") as f_in:
         #     rows = [Row(**x) for x in csv.DictReader(f_in)]
+        #
+        # ETH@20230238 - This path would also have difficulty reading in county FIPS,
+        # but it is not currently the path we end up on.
         obj = pd.read_csv(filename)
     elif suffix == ".json":
         obj = load_data(filename)

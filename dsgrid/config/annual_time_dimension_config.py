@@ -67,11 +67,12 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         return df
 
     def get_frequency(self):
-        return timedelta(days=365)
+        # TODO: Verify that multiplying 365 times a number of years is okay 
+        # even with leap years
+        return timedelta(days=365*self.model.frequency)
 
     def get_time_ranges(self):
         ranges = []
-        frequency = self.get_frequency()
         for time_range in self.model.ranges:
             start = datetime.strptime(time_range.start, self.model.str_format)
             start = pd.Timestamp(start)
@@ -81,7 +82,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 make_time_range(
                     start=start,
                     end=end,
-                    frequency=frequency,
+                    frequency=self.model.frequency,
                     leap_day_adjustment=None,
                 )
             )
@@ -98,4 +99,4 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         # TODO: need to support validation of multiple time ranges: DSGRID-173
         assert len(self.model.ranges) == 1, self.model.ranges
         start, end = (int(self.model.ranges[0].start), int(self.model.ranges[0].end))
-        return [AnnualTimestampType(x) for x in range(start, end + 1)]
+        return [AnnualTimestampType(x) for x in range(start, end + self.model.frequency, self.model.frequency)]

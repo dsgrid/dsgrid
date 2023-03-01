@@ -330,7 +330,7 @@ class AnnualTimeRange(DatetimeRange):
         start = self.start.to_pydatetime()
         end = self.end.to_pydatetime()
         tz = self.tzinfo
-        for year in range(start.year, end.year + 1):
+        for year in range(start.year, end.year + self.frequency, self.frequency):
             yield datetime.datetime(year=year, month=1, day=1, tzinfo=tz)
 
 
@@ -343,7 +343,7 @@ def make_time_range(start, end, frequency, leap_day_adjustment):
     """
     factory function that decides which TimeRange func to use based on frequency
     """
-    if frequency == datetime.timedelta(days=365):
+    if isinstance(frequency, int):
         return AnnualTimeRange(start, end, frequency, leap_day_adjustment)
     elif frequency == datetime.timedelta(days=0):
         return NoOpTimeRange(start, end, frequency, leap_day_adjustment)

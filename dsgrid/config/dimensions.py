@@ -476,6 +476,14 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
             "Cheatsheet reference: `<https://strftime.org/>`_.",
         ),
     )
+    frequency: int = Field(
+        title="frequency",
+        default=1,
+        description="Resolution of the timestamps",
+        notes=(
+            "Frequency of data reporting, in years",
+        ),
+    ) # HERE -- list_time_ranges (generally mash up what's done for DateTimeDimensionModel into annual_time)
     ranges: List[TimeRangeModel] = Field(
         title="time_ranges",
         description="Defines the contiguous ranges of time in the data, inclusive of start and end time.",

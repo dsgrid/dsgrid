@@ -190,7 +190,9 @@ class DatasetDimensionsMetadataModel(DSGBaseModel):
         """Return the dimension metadata."""
         return getattr(self, dimension_type.value)
 
-    def replace_metadata(self, dimension_type: DimensionType, metadata: DimensionMetadataModel):
+    def replace_metadata(
+        self, dimension_type: DimensionType, metadata: list[DimensionMetadataModel]
+    ):
         """Replace the dimension metadata."""
         setattr(self, dimension_type.value, metadata)
 

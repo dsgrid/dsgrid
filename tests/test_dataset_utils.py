@@ -215,13 +215,6 @@ def test_remove_invalid_null_timestamps():
     stacked = ["county", "subsector"]
     time_col = "timestamp"
     result = remove_invalid_null_timestamps(df, {time_col}, stacked)
-    result = (
-        df.join(
-            df.groupBy(*stacked).agg(F.count_distinct(time_col).alias("count_time")), on=stacked
-        )
-        .filter(f"{time_col} IS NOT NULL or count_time == 0")
-        .drop("count_time")
-    )
     assert result.count() == 6
     assert result.filter("county == 'Boulder'").count() == 2
     assert result.filter(f"county == 'Boulder' and {time_col} is NULL").rdd.isEmpty()

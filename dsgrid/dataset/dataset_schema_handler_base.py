@@ -5,7 +5,6 @@ from typing import List
 
 import pyspark.sql.functions as F
 
-from dsgrid.dimension.time import TimeIntervalType
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dimension.base_models import DimensionType
@@ -395,36 +394,5 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")
-
-        load_data_df = self._convert_dataset_time_to_project_time_interval(
-            load_data_df, project_config
-        )
-        return load_data_df
-
-    def _convert_dataset_time_to_project_time_interval(self, load_data_df, project_config):
-        """Shift dataset time to match project time based on TimeIntervalType"""
-        dtime = self._config.get_dimension(DimensionType.TIME)
-        dtime_interval = dtime.get_time_interval_type()
-        ptime = project_config.get_base_dimension(DimensionType.TIME)
-        ptime_interval = ptime.get_time_interval_type()
-        time_col = ptime.get_timestamp_load_data_columns()
-
-        assert len(time_col) == 1, time_col
-        time_col = time_col[0]
-
-        if dtime_interval != ptime_interval:
-            match (dtime_interval, ptime_interval):
-                case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
-                    load_data_df = load_data_df.withColumn(
-                        time_col,
-                        F.col(time_col)
-                        + F.expr(f"INTERVAL {dtime.get_frequency().seconds} SECONDS"),
-                    )
-                case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
-                    load_data_df = load_data_df.withColumn(
-                        time_col,
-                        F.col(time_col)
-                        - F.expr(f"INTERVAL {dtime.get_frequency().seconds} SECONDS"),
-                    )
 
         return load_data_df

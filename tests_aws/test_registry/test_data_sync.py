@@ -31,7 +31,8 @@ def local_registry(make_test_project_dir):
         shutil.copytree(
             base_dir / "data" / "test_efs_comstock", base_dir / "data" / "test_efs_resstock"
         )
-        registry_json5 = json5.load(base_dir / "data" / "test_efs_resstock" / "registry.json5")
+        with open(base_dir / "data" / "test_efs_resstock" / "registry.json5") as f:
+            registry_json5 = json5.load(f)
         registry_json5["dataset_id"] = "test_efs_resstock"
         with open(base_dir / "data" / "test_efs_resstock" / "registry.json5", "w") as f:
             json5.dump(registry_json5, f)
@@ -41,9 +42,8 @@ def local_registry(make_test_project_dir):
             base_dir / "configs" / "datasets" / "test_efs_comstock",
             base_dir / "configs" / "datasets" / "test_efs_resstock",
         )
-        registry_json5 = json5.load(
-            base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.json5"
-        )
+        with open(base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.json5") as f:
+            registry_json5 = json5.load(f)
         registry_json5["dataset_id"] = "test_efs_resstock"
         with open(
             base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.json5", "w"
@@ -51,9 +51,8 @@ def local_registry(make_test_project_dir):
             json5.dump(registry_json5, f)
 
         # add ressotck dataset to the project config
-        registry_json5 = json5.load(
-            base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.json5"
-        )
+        with open(base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.json5") as f:
+            registry_json5 = json5.load(f)
         x = registry_json5["datasets"][0].copy()
         x["dataset_id"] = "test_efs_resstock"
         registry_json5["datasets"] = [registry_json5["datasets"][0], x]

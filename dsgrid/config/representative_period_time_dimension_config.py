@@ -137,6 +137,8 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         ]
         df = df.select(*select).join(time_df, on=join_keys).drop(*time_cols)
 
+        df = self._convert_time_to_project_time_interval(df=df, project_time_dim=project_time_dim)
+
         return df
 
     def get_frequency(self):

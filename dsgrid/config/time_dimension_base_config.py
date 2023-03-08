@@ -1,6 +1,8 @@
 import abc
+import pyspark.sql.functions as F
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
+from dsgrid.dimension.time import TimeIntervalType
 
 
 class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
@@ -120,3 +122,37 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             List of tuples of columns representing time in the load_data table.
 
         """
+
+    def _convert_time_to_project_time_interval(self, df=None, project_time_dim=None):
+        """Shift time to match project time based on TimeIntervalType"""
+        if project_time_dim is None:
+            return df
+
+        dtime_interval = self.get_time_interval_type()
+        ptime_interval = project_time_dim.get_time_interval_type()
+        time_col = project_time_dim.get_timestamp_load_data_columns()
+
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+
+        print()
+        print("=============================")
+        print(dtime_interval, ptime_interval)
+        print("=============================")
+        print()
+        if dtime_interval != ptime_interval:
+            match (dtime_interval, ptime_interval):
+                case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
+                    df = df.withColumn(
+                        time_col,
+                        F.col(time_col)
+                        + F.expr(f"INTERVAL {self.get_frequency().seconds} SECONDS"),
+                    )
+                case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
+                    df = df.withColumn(
+                        time_col,
+                        F.col(time_col)
+                        - F.expr(f"INTERVAL {self.get_frequency().seconds} SECONDS"),
+                    )
+
+        return df

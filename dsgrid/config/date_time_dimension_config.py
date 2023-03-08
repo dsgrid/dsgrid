@@ -97,6 +97,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def convert_dataframe(self, df=None, project_time_dim=None):
         # TODO #193: we may have to do something special with local timezone
+        df = self._convert_time_to_project_time_interval(df=df, project_time_dim=project_time_dim)
         return df
 
     def get_frequency(self):

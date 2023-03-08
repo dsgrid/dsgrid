@@ -71,7 +71,7 @@ def create_derived_dataset_config_from_query(
     base_dim_query_names = project.config.get_base_dimension_query_names()
     num_new_supplemental_dimensions = 0
     for dim_type in DimensionType:
-        dimension_query_names = getattr(metadata.dimensions, dim_type.value)
+        dimension_query_names = metadata.dimensions.get_dimension_query_names(dim_type)
         assert len(dimension_query_names) == 1, dimension_query_names
         dim_query_name = next(iter(dimension_query_names))
         dim = project.config.get_dimension(dim_query_name)

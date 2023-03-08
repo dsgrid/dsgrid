@@ -104,17 +104,18 @@ def test_create_derived_dataset_config(tmp_path):
     assert sorted(new_df.columns) == sorted(orig_df.columns)
     assert new_df.sort(*orig_df.columns).collect() == orig_df.sort(*orig_df.columns).collect()
 
-    # Create the config in the CLI and Python API to get pytest coverage stats in both places.
+    # Create the config in the CLI and Python API to get test coverage in both places.
     dataset_dir = tmp_path / dataset_id
-    check_run_command(
-        f"dsgrid query project create-derived-dataset-config --offline "
-        f"--registry-path={REGISTRY_PATH} {query_output} {dataset_dir} --force"
-    )
     dataset_config_file = dataset_dir / DatasetRegistry.config_filename()
-    assert dataset_config_file.exists()
-    shutil.rmtree(dataset_dir)
 
     registry_manager = RegistryManager.load(REGISTRY_PATH, offline_mode=True)
     dataset_dir.mkdir()
     assert create_derived_dataset_config_from_query(query_output, dataset_dir, registry_manager)
     assert dataset_config_file.exists()
+
+    check_run_command(
+        f"dsgrid query project create-derived-dataset-config --offline "
+        f"--registry-path={REGISTRY_PATH} {query_output} {dataset_dir} --force"
+    )
+    assert dataset_config_file.exists()
+    shutil.rmtree(dataset_dir)

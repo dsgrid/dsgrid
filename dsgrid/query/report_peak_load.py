@@ -43,7 +43,7 @@ class PeakLoadReport(ReportsBase):
         expr = [F.max(x).alias(x) for x in value_columns]
         peak_load = df.groupBy(*inputs.group_by_columns).agg(*expr)
         join_cols = inputs.group_by_columns + value_columns
-        time_columns = context.get_dimension_query_names(DimensionType.TIME)
+        time_columns = context.get_dimension_column_names(DimensionType.TIME)
         diff = time_columns.difference(df.columns)
         if diff:
             raise Exception(f"BUG: expected time column(s) {diff} are not present in table")

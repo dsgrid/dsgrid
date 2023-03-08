@@ -6,9 +6,13 @@ import pyspark.sql.functions as F
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
-from dsgrid.query.models import AggregationModel
+from dsgrid.query.models import (
+    AggregationModel,
+    DatasetDimensionsMetadataModel,
+    DimensionMetadataModel,
+)
 from dsgrid.query.query_context import QueryContext
-from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension
+from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension, remove_invalid_null_timestamps
 from dsgrid.utils.spark import get_unique_values
 from .table_format_handler_base import TableFormatHandlerBase
 
@@ -63,8 +67,10 @@ class PivotedTableHandler(TableFormatHandlerBase):
                     .drop("from_id")
                     .withColumnRenamed("to_id", query_name)
                 )
-                context.add_dimension_query_name(
-                    supp_dim.model.dimension_type, query_name, dataset_id=self.dataset_id
+                context.add_dimension_metadata(
+                    supp_dim.model.dimension_type,
+                    DimensionMetadataModel(dimension_query_name=query_name),
+                    dataset_id=self.dataset_id,
                 )
 
         return df
@@ -73,7 +79,20 @@ class PivotedTableHandler(TableFormatHandlerBase):
         self, df, aggregations: List[AggregationModel], context: QueryContext
     ):
         df = self.process_pivoted_aggregations(df, aggregations, context)
-        return self.process_stacked_aggregations(df, aggregations, context)
+        orig_id = id(df)
+        df = self.process_stacked_aggregations(df, aggregations, context)
+
+        if id(df) != orig_id:
+            # The table could have NULL timestamps that designate expected-missing data.
+            # Those rows could be obsolete after aggregating stacked dimensions.
+            # This is an expensive operation, so only do it if the dataframe changed.
+            pivoted_columns = context.get_pivoted_columns()
+            time_columns = context.get_dimension_column_names(DimensionType.TIME)
+            if time_columns:
+                stacked_columns = set(df.columns) - pivoted_columns.union(time_columns)
+                df = remove_invalid_null_timestamps(df, time_columns, stacked_columns)
+
+        return df
 
     def process_pivoted_aggregations(
         self, df, aggregations: List[AggregationModel], context: QueryContext
@@ -97,8 +116,8 @@ class PivotedTableHandler(TableFormatHandlerBase):
         pivoted_columns = copy.deepcopy(context.get_pivoted_columns(dataset_id=self.dataset_id))
         new_pivoted_columns = []  # Will be the pivoted columns after the last aggregation.
         pivoted_dim_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
+        base_query_names = self.project_config.get_base_dimension_query_names()
         for agg in aggregations:
-            base_query_names = self.project_config.get_base_dimension_query_names()
             dimension_query_name = None
             for _, column in agg.iter_dimensions_to_keep():
                 query_name = column.dimension_query_name
@@ -106,7 +125,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 # dimension or if this pivoted column has already been handled.
                 if (
                     query_name not in base_query_names
-                    and query_name not in context.get_dimension_query_names(pivoted_dim_type)
+                    and query_name not in context.get_dimension_column_names(pivoted_dim_type)
                 ):
                     if column.function is not None:
                         # TODO: Do we need to support this?
@@ -128,8 +147,10 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 agg.aggregation_function.__name__,
                 rename=False,
             )
-            context.replace_dimension_query_names(
-                dim_config.model.dimension_type, {dimension_query_name}, dataset_id=self.dataset_id
+            context.replace_dimension_metadata(
+                dim_config.model.dimension_type,
+                [DimensionMetadataModel(dimension_query_name=dimension_query_name)],
+                dataset_id=self.dataset_id,
             )
             pivoted_columns -= dropped_columns
             logger.info("Replaced dimensions with supplemental records %s", new_pivoted_columns)
@@ -158,27 +179,40 @@ class PivotedTableHandler(TableFormatHandlerBase):
         if not aggregations:
             return df
 
-        group_by_query_names = []
         pivoted_dimension_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
         pivoted_columns = set(context.get_pivoted_columns(dataset_id=self.dataset_id))
+        final_query_names = DatasetDimensionsMetadataModel()
+        column_to_dim_type = {}
+        dropped_dimensions = set()
         for agg in aggregations:
             columns = []
             for dim_type, column in agg.iter_dimensions_to_keep():
+                assert dim_type not in dropped_dimensions, dim_type
                 if dim_type != pivoted_dimension_type:
                     columns.append(column)
+                    self._add_column_to_dim_type(column, dim_type, column_to_dim_type)
+            dropped_dimensions.update(set(agg.list_dropped_dimensions()))
             if not columns:
                 continue
+
             df = self.add_columns(df, columns, context, True)
             group_by_cols = []
             for column in columns:
-                if column.function is None:
-                    expr = column.dimension_query_name
-                else:
-                    expr = column.function(column.dimension_query_name)
-                    if column.alias is not None:
-                        expr = expr.alias(column.alias)
+                name = column.get_column_name()
+                dim_type = column_to_dim_type[name]
+                expr = self._make_group_by_column_expr(column)
+                if not isinstance(expr, str) or expr != column.dimension_query_name:
+                    # In this case we are replacing any existing query name with an expression
+                    # or alias, and so the old name must be removed.
+                    final_query_names.remove_metadata(dim_type, column.dimension_query_name)
+                final_query_names.add_metadata(
+                    dim_type,
+                    DimensionMetadataModel(
+                        dimension_query_name=column.dimension_query_name, column_name=name
+                    ),
+                )
                 group_by_cols.append(expr)
-                group_by_query_names.append(column.dimension_query_name)
+
             op = agg.aggregation_function
             agg_expr = [op(x).alias(x) for x in df.columns if x in pivoted_columns]
             df = df.groupBy(*group_by_cols).agg(*agg_expr)
@@ -186,11 +220,26 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 "Aggregated dimensions with groupBy %s and agg %s", group_by_cols, agg_expr
             )
 
-        final_query_names = {x: set() for x in DimensionType if x != pivoted_dimension_type}
-        for column in group_by_query_names:
-            dim = self.project_config.get_dimension(column)
-            final_query_names[dim.model.dimension_type].add(column)
-
-        for dim_type, columns in final_query_names.items():
-            context.replace_dimension_query_names(dim_type, columns, dataset_id=self.dataset_id)
+        for dim_type in DimensionType:
+            metadata = final_query_names.get_metadata(dim_type)
+            if dim_type in dropped_dimensions and metadata:
+                metadata = []
+            context.replace_dimension_metadata(dim_type, metadata, dataset_id=self.dataset_id)
         return df
+
+    @staticmethod
+    def _add_column_to_dim_type(column, dim_type, column_to_dim_type):
+        name = column.get_column_name()
+        if name in column_to_dim_type:
+            assert dim_type == column_to_dim_type[name], f"{name=} {column_to_dim_type}"
+        column_to_dim_type[name] = dim_type
+
+    @staticmethod
+    def _make_group_by_column_expr(column):
+        if column.function is None:
+            expr = column.dimension_query_name
+        else:
+            expr = column.function(column.dimension_query_name)
+            if column.alias is not None:
+                expr = expr.alias(column.alias)
+        return expr

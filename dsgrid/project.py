@@ -87,7 +87,7 @@ class Project:
         return dataset
 
     def load_dataset(self, dataset_id):
-        """Loads a dataset.
+        """Loads a dataset.  Creates a view for each of its tables.
 
         Parameters
         ----------
@@ -115,7 +115,7 @@ class Project:
         return dataset
 
     def unload_dataset(self, dataset_id):
-        """Loads a dataset. Creates a view for each of its tables.
+        """Unloads a dataset by deleting the views into its tables.
 
         Parameters
         ----------

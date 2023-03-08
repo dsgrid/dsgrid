@@ -135,11 +135,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
 
-        print()
-        print("=============================")
-        print(dtime_interval, ptime_interval)
-        print("=============================")
-        print()
         if dtime_interval != ptime_interval:
             match (dtime_interval, ptime_interval):
                 case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):

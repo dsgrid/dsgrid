@@ -35,6 +35,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
                 end=None,
                 frequency=frequency,
                 leap_day_adjustment=None,
+                time_interval_type=None,
             )
         ]
 

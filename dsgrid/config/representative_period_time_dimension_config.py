@@ -145,7 +145,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         return self._format_handler.get_frequency()
 
     def get_time_ranges(self):
-        return self._format_handler.get_time_ranges(self.model.ranges, self.get_tzinfo())
+        return self._format_handler.get_time_ranges(
+            self.model.ranges, self.model.time_interval_type, self.get_tzinfo()
+        )
 
     def get_timestamp_load_data_columns(self):
         return self._format_handler.get_timestamp_load_data_columns()
@@ -264,7 +266,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     def get_frequency(self):
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, _):
+    def get_time_ranges(self, ranges, time_interval_type, _):
         # TODO: This method may have some problems but is currently unused.
         # How to handle year? Leap year?
         time_ranges = []
@@ -278,6 +280,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
                     end=pd.Timestamp(datetime(year=1970, month=model.end, day=last_day, hour=23)),
                     frequency=timedelta(hours=1),
                     leap_day_adjustment=LeapDayAdjustmentType.NONE,
+                    time_interval_type=time_interval_type,
                 )
             )
 

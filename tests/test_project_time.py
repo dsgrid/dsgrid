@@ -13,6 +13,7 @@ from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone
 from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.spark import get_spark_session
+from dsgrid.exceptions import DSGDatasetConfigError
 
 
 REGISTRY_PATH = (
@@ -71,7 +72,6 @@ def test_convert_to_project_time(registry_mgr):
     check_time_dataframe(project_time_dim)
     check_time_dataframe(resstock_time_dim)
     check_time_dataframe(comstock_time_dim)
-    tempo_time_dim.build_time_dataframe()
 
     # [2] test convert time
     tempo_data = tempo_load_data.join(tempo_load_data_lookup, on="id").drop("id")
@@ -86,6 +86,11 @@ def test_convert_to_project_time(registry_mgr):
         raw_data=tempo_data_with_tz,
         converted_data=tempo_data_mapped_time,
     )
+    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=True)
+    compare_time_conversion(comstock_time_dim, project_time_dim, expect_error=True)
+    compare_time_conversion(
+        tempo_time_dim, project_time_dim, df=tempo_data_mapped_time, expect_error=True
+    )
 
     # comstock time conversion
     comstock_data = comstock._handler._load_data.join(comstock._handler._load_data_lookup, on="id")
@@ -99,6 +104,34 @@ def test_convert_to_project_time(registry_mgr):
     tempo._handler.make_project_dataframe(project.config)
     comstock._handler.make_project_dataframe(project.config)
     resstock._handler.make_project_dataframe(project.config)
+
+
+def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None):
+    project_time = project_time_dim.build_time_dataframe()
+    if df is None:
+        converted_dataset_time = dataset_time_dim.convert_dataframe(
+            dataset_time_dim.build_time_dataframe(), project_time_dim
+        )
+    else:
+        converted_dataset_time = df
+    ptime_col = project_time_dim.get_timestamp_load_data_columns()
+    dfp = project_time.select(ptime_col).distinct().orderBy(ptime_col).toPandas()
+    dfd = converted_dataset_time.select(ptime_col).distinct().orderBy(ptime_col).toPandas()
+
+    delta = dfp.compare(dfd)
+
+    if len(delta) > 0:
+        raise DSGDatasetConfigError(
+            "dataset time dimension converted to project requirement does not match project time dimension. \n{delta}"
+        )
+
+
+def compare_time_conversion(dataset_time_dim, project_time_dim, df=None, expect_error=False):
+    if expect_error:
+        with pytest.raises(DSGDatasetConfigError):
+            _compare_time_conversion(dataset_time_dim, project_time_dim, df=df)
+    else:
+        _compare_time_conversion(dataset_time_dim, project_time_dim, df=df)
 
 
 def check_time_dataframe(time_dim):

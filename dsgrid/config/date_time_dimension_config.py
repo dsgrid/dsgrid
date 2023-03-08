@@ -117,6 +117,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                     end=end,
                     frequency=self.model.frequency,
                     leap_day_adjustment=self.model.leap_day_adjustment,
+                    time_interval_type=self.model.time_interval_type,
                 )
             )
 

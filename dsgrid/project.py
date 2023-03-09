@@ -68,6 +68,30 @@ class Project:
         """
         return self._version
 
+    def is_registered(self, dataset_id):
+        """Provides the status of dataset_id within this project.
+
+        Parameters
+        ----------
+        dataset_id : str
+
+        Returns
+        -------
+        bool
+            True if dataset_id is in this project's config and the dataset has been
+            registered with (successfully submitted to) this project; False if dataset_id
+            is in this project's config but the dataset is not yet available.
+
+        Throws
+        ------
+        DSGValueNotRegistered
+            If dataset_id is not in this project's config.
+        """
+        if dataset_id not in self.list_datasets():
+            raise DSGValueNotRegistered(f"{dataset_id} is not expected by {self.config.project_id}")
+
+        return (dataset_id in self._dataset_configs)
+
     def get_dataset(self, dataset_id):
         """Returns a Dataset. Calls load_dataset if it hasn't already been loaded.
 

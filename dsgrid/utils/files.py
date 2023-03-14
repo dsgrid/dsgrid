@@ -4,6 +4,7 @@ import hashlib
 import logging
 import os
 import json
+from contextlib import contextmanager
 from pathlib import Path
 
 import json5
@@ -123,21 +124,18 @@ def load_line_delimited_json(filename):
     return objects
 
 
-def run_in_other_dir(path: Path, func, *args, **kwargs):
-    """Run a function while in another directory.
+@contextmanager
+def in_other_dir(path: Path):
+    """Change to another directory while user code runs.
 
     Parameters
     ----------
     path : Path
-        Change to this directory while running func.
-    func
-        Function to call.
-
     """
     orig = os.getcwd()
     os.chdir(path)
     try:
-        return func(*args, **kwargs)
+        yield
     finally:
         os.chdir(orig)
 

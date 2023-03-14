@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 
 from dsgrid.loggers import setup_logging, check_log_file_size
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     create_local_test_registry,
@@ -16,7 +17,11 @@ from dsgrid.tests.common import (
 )
 from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.utils.files import load_data
-from dsgrid.tests.common import replace_dimension_uuids_from_registry, TEST_PROJECT_REPO
+from dsgrid.tests.common import (
+    map_dimension_names_to_ids,
+    replace_dimension_names_with_current_ids,
+    TEST_PROJECT_REPO,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -25,6 +30,7 @@ logger = logging.getLogger(__name__)
 def make_test_data_registry(
     registry_path,
     src_dir,
+    database_name="test-dsgrid",
     dataset_path=None,
     include_projects=True,
     include_datasets=True,
@@ -53,16 +59,17 @@ def make_test_data_registry(
     if dataset_path is None:
         dataset_path = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY)
     dataset_path = Path(dataset_path)
-    path = create_local_test_registry(registry_path)
+    conn = DatabaseConnection(database=database_name)
+    create_local_test_registry(registry_path, conn=conn)
     dataset_dir = Path("datasets/modeled/comstock")
 
     user = getpass.getuser()
     log_message = "Initial registration"
     if offline_mode:
-        manager = RegistryManager.load(path, offline_mode=offline_mode)
+        manager = RegistryManager.load(conn, offline_mode=offline_mode)
     else:
         manager = RegistryManager.load(
-            path, remote_path=TEST_REMOTE_REGISTRY, offline_mode=offline_mode
+            conn, remote_path=TEST_REMOTE_REGISTRY, offline_mode=offline_mode
         )
 
     project_config_file = src_dir / "project.json5"
@@ -82,7 +89,8 @@ def make_test_data_registry(
         )
     if include_datasets:
         print("\n 2. register dataset: \n")
-        replace_dimension_uuids_from_registry(path, (dataset_config_file,))
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(dataset_config_file, mappings)
         manager.dataset_manager.register(
             dataset_config_file,
             dataset_path / dataset_id,

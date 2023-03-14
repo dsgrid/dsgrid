@@ -9,8 +9,11 @@ from dsgrid.loggers import setup_logging, check_log_file_size
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     create_local_test_registry,
-    replace_dimension_mapping_uuids_from_registry,
-    replace_dimension_uuids_from_registry,
+    map_dimension_names_to_ids,
+    map_dimension_ids_to_names,
+    map_dimension_mapping_names_to_ids,
+    replace_dimension_names_with_current_ids,
+    replace_dimension_mapping_names_with_current_ids,
 )
 from dsgrid.tests.registration_models import RegistrationModel, create_registration
 from dsgrid.utils.timing import timer_stats_collector
@@ -32,9 +35,9 @@ def run(input_file, verbose):
     logger = setup_logging("dsgrid", log_file, console_level=level, file_level=level, mode="a")
     registration = create_registration(input_file)
     if registration.create_registry:
-        if registration.registry_path.exists():
-            shutil.rmtree(registration.registry_path)
-        create_local_test_registry(registration.registry_path)
+        if registration.data_path.exists():
+            shutil.rmtree(registration.data_path)
+        create_local_test_registry(registration.data_path, conn=registration.conn)
 
     tmp_files = []
     try:
@@ -54,10 +57,11 @@ def run(input_file, verbose):
 def _run_registration(registration: RegistrationModel, tmp_files):
     user = getpass.getuser()
     log_message = "Initial registration"
-    reg_path = registration.registry_path
-    manager = RegistryManager.load(reg_path, offline_mode=True)
+    manager = RegistryManager.load(registration.conn, offline_mode=True)
     project_mgr = manager.project_manager
     dataset_mgr = manager.dataset_manager
+    dim_mgr = manager.dimension_manager
+    dim_mapping_mgr = manager.dimension_mapping_manager
 
     for project in registration.projects:
         if project.register_project:
@@ -67,31 +71,28 @@ def _run_registration(registration: RegistrationModel, tmp_files):
             refs_file = None
             config_file = None
             if dataset.register_dataset:
-                if dataset.fix_dimension_uuids:
-                    suffix = dataset.config_file.suffix
-                    config_file = Path(str(dataset.config_file).replace(suffix, "__tmp" + suffix))
-                    config_file = shutil.copyfile(dataset.config_file, config_file)
+                if dataset.replace_dimension_names_with_ids:
+                    mappings = map_dimension_names_to_ids(dim_mgr)
+                    orig = dataset.config_file
+                    config_file = orig.with_stem(orig.name + "__tmp")
+                    shutil.copyfile(orig, config_file)
                     tmp_files.append(config_file)
-                    replace_dimension_uuids_from_registry(reg_path, [config_file])
+                    replace_dimension_names_with_current_ids(config_file, mappings)
                 else:
                     config_file = dataset.config_file
 
             if dataset.submit_to_project:
                 if (
-                    dataset.fix_dimension_mapping_uuids
+                    dataset.replace_dimension_mapping_names_with_ids
                     and dataset.dimension_mapping_references_file is not None
                 ):
-                    suffix = dataset.dimension_mapping_references_file.suffix
-                    refs_file = Path(
-                        str(dataset.dimension_mapping_references_file).replace(
-                            suffix, "__tmp" + suffix
-                        )
-                    )
-                    refs_file = shutil.copyfile(
-                        dataset.dimension_mapping_references_file, refs_file
-                    )
+                    dim_id_to_name = map_dimension_ids_to_names(manager.dimension_manager)
+                    mappings = map_dimension_mapping_names_to_ids(dim_mapping_mgr, dim_id_to_name)
+                    orig = dataset.dimension_mapping_references_file
+                    refs_file = orig.with_stem(orig.name + "__tmp")
+                    shutil.copyfile(orig, refs_file)
                     tmp_files.append(refs_file)
-                    replace_dimension_mapping_uuids_from_registry(reg_path, [refs_file])
+                    replace_dimension_mapping_names_with_current_ids(refs_file, mappings)
                 else:
                     refs_file = dataset.dimension_mapping_references_file
 

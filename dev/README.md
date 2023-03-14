@@ -135,7 +135,9 @@ If you update the configs or data for the StandardScenarios registry then you'll
 the test data repository per these instructions.
 
 1. Register and submit all datasets to a clean registry. The initial registry can be created with
-this command after modifiying the paths specified in the JSON5 file.
+this command after modifiying the paths specified in the JSON5 file. Four `bigmem` compute nodes
+on Eagle are recommended in order to complete the job in one hour. Two may be sufficient if you
+run multiple iterations.
 
 ```
 $ spark-submit \
@@ -146,9 +148,13 @@ $ spark-submit \
 ```
 
 2. Filter the registry such that the datasets are small enough to be used in tests. You'll likely
-need to do this on Eagle.
+need to do this on Eagle. One compute node for hour should be sufficient.
 ```
-$ dsgrid-admin make-filtered-registry --src-db-name standard-scenarios --dst-db-name simple-standard-scenarios --url http://localhost:8529 standard-scenarios-registry-data dsgrid-tests-data/filtered-registries/simple_standard_scenarios.json
+$ dsgrid-admin make-filtered-registry \
+    --src-db-name standard-scenarios \
+    --dst-db-name simple-standard-scenarios \
+    --url http://localhost:8529 \
+    standard-scenarios-registry-data dsgrid-tests-data/filtered-registries/simple_standard_scenarios.json
 ```
 
 3. Create derived datasets and submit them.
@@ -160,7 +166,6 @@ These queries create the datasets.
 ```
 $ spark-submit \
     --master=spark://$(hostname):7077 \
-    --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) \
     query project run \
     --db-name=standard-scenarios \
@@ -169,7 +174,6 @@ $ spark-submit \
     -o query-output
 $ spark-submit \
     --master=spark://$(hostname):7077 \
-    --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) \
     query project run \
     --db-name=standard-scenarios \
@@ -178,7 +182,6 @@ $ spark-submit \
     -o query-output
 $ spark-submit \
     --master=spark://$(hostname):7077 \
-    --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) \
     query project run \
     --db-name=standard-scenarios \
@@ -219,7 +222,6 @@ These commands register and submit the datasets.
 ```
 $ spark-submit \
     --master=spark://$(hostname):7077 \
-    --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) \
     registry \
     --offline \
@@ -230,7 +232,6 @@ $ spark-submit \
     -l "Register comstock_projected_conus_2022"
 $ spark-submit \
     --master=spark://$(hostname):7077 \
-    --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) \
     registry \
     --offline \
@@ -243,7 +244,6 @@ $ spark-submit \
 
 $ spark-submit \
     --master=spark://$(hostname):7077 \
-    --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) \
     registry \
     --offline \
@@ -254,7 +254,6 @@ $ spark-submit \
     -l "Register resstock_projected_conus_2022"
 $ spark-submit \
     --master=spark://$(hostname):7077 \
-    --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) \
     registry \
     --offline \
@@ -267,7 +266,6 @@ $ spark-submit \
 
 $ spark-submit \
     --master=spark://$(hostname):7077 \
-    --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) \
     registry \
     --offline \
@@ -278,7 +276,6 @@ $ spark-submit \
     -l "Register tempo_conus_2022_mapped"
 $ spark-submit \
     --master=spark://$(hostname):7077 \
-    --conf spark.sql.shuffle.partitions=2400 \
     $(which dsgrid-cli.py) \
     registry \
     --offline \
@@ -298,13 +295,15 @@ singularity run \
     arangodump \
     --server.database standard-scenarios \
     --server.password openSesame \
-    --output-directory /scratch/$USER/simple-standard-scenarios-dump \
+    --output-directory simple-standard-scenarios-dump \
     --compress-output false \
     --include-system-collections true
 ```
 
-5. Push the output files to a dsgrid-test-data repository branch in the directory
-`dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump` and open a pull request.
+5. Copy (e.g., cp, scp, rsync) or arangodump the output files to a dsgrid-test-data
+repository in the directory
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump`, push to GitHub and open a
+pull request.
 
 ### Run tests
 

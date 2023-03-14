@@ -122,19 +122,16 @@ class DimensionBaseModel(DSGBaseModel):
         alias="_id",
         description="Registry database ID",
         dsgrid_internal=True,
-        updateable=False,
     )
     key: Optional[str] = Field(
         alias="_key",
         description="Registry database key",
         dsgrid_internal=True,
-        updateable=False,
     )
     rev: Optional[str] = Field(
         alias="_rev",
         description="Registry database revision",
         dsgrid_internal=True,
-        updateable=False,
     )
 
     @validator("name")

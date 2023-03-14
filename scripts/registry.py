@@ -6,18 +6,25 @@ import sys
 
 import click
 
-from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
+from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.loggers import setup_logging
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 
 
 @click.command()
 @click.option(
-    "--path",
-    default=LOCAL_REGISTRY,
+    "--url",
+    default="http://localhost:8529",
     show_default=True,
-    envvar="DSGRID_REGISTRY_PATH",
-    help="path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
+    envvar="DSGRID_REGISTRY_DATABASE",
+    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE",
+)
+@click.option(
+    "--db-name",
+    default="dsgrid",
+    show_default=True,
+    help="dsgrid registry database name.",
 )
 @click.option(
     "--remote-path",
@@ -36,10 +43,11 @@ from dsgrid.registry.registry_manager import RegistryManager
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def load(path, remote_path, offline, verbose):
+def load(url, db_name, remote_path, offline, verbose):
     level = logging.DEBUG if verbose else logging.INFO
     setup_logging("dsgrid", "dsgrid.log", console_level=level, file_level=level, mode="a")
-    return RegistryManager.load(path, remote_path, offline_mode=offline)
+    conn = DatabaseConnection.from_url(url, database=db_name)
+    return RegistryManager.load(conn, remote_path, offline_mode=offline)
 
 
 if __name__ == "__main__":

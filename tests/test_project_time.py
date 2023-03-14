@@ -1,5 +1,4 @@
 import logging
-from pathlib import Path
 
 import pyspark.sql.functions as F
 from pyspark.sql.types import FloatType
@@ -9,25 +8,20 @@ import pandas as pd
 import numpy as np
 
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone
 from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.spark import get_spark_session
 
 
-REGISTRY_PATH = (
-    Path(__file__).absolute().parents[1]
-    / "dsgrid-test-data"
-    / "filtered_registries"
-    / "simple_standard_scenarios"
-)
-
 logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
 def registry_mgr():
-    return RegistryManager.load(REGISTRY_PATH, offline_mode=True)
+    conn = DatabaseConnection(database="test-dsgrid")
+    return RegistryManager.load(conn, offline_mode=True)
 
 
 def test_no_unexpected_timezone():

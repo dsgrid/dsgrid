@@ -63,7 +63,7 @@ class Project:
 
         Returns
         -------
-        VersionInfo
+        str
 
         """
         return self._version

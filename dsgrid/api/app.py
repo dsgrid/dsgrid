@@ -18,9 +18,8 @@ from dsgrid.query.models import (
     ReportType,
     TableFormatType,
 )
-
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-
 from dsgrid.utils.run_command import run_command
 from dsgrid.utils.spark import init_spark
 from .api_manager import ApiManager
@@ -52,9 +51,9 @@ from .response_models import (
 
 
 logger = setup_logging(__name__, "dsgrid_api.log")
-REGISTRY_PATH = os.environ.get("DSGRID_LOCAL_REGISTRY")
-if REGISTRY_PATH is None:
-    raise Exception("The environment variable DSGRID_LOCAL_REGISTRY must be set.")
+DSGRID_REGISTRY_DATABASE = os.environ.get("DSGRID_REGISTRY_DATABASE")
+if DSGRID_REGISTRY_DATABASE is None:
+    raise Exception("The environment variable DSGRID_REGISTRY_DATABASE must be set.")
 QUERY_OUTPUT_DIR = os.environ.get("DSGRID_QUERY_OUTPUT_DIR")
 if QUERY_OUTPUT_DIR is None:
     raise Exception("The environment variable DSGRID_QUERY_OUTPUT_DIR must be set.")
@@ -67,15 +66,11 @@ no_prompts = True
 # subprocesses that run queries.
 # If both processes try to use the Hive metastore, a crash will occur.
 spark = init_spark("dsgrid_api", check_env=False)
+conn = DatabaseConnection.from_url(DSGRID_REGISTRY_DATABASE, database="simple-standard-scenarios")
 manager = RegistryManager.load(
-    REGISTRY_PATH, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts
+    conn, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts
 )
-api_mgr = ApiManager(
-    API_SERVER_STORE_DIR,
-    RegistryManager.load(
-        REGISTRY_PATH, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts
-    ),
-)
+api_mgr = ApiManager(API_SERVER_STORE_DIR, manager)
 
 # Current limitations:
 # This can only run in one process. State is tracked in memory. This could be solved by
@@ -356,7 +351,7 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
         dsgrid_exec = "dsgrid-cli.py"
         base_cmd = (
             f"query project run --offline "
-            f"--registry-path={REGISTRY_PATH} {fp.name} "
+            f"--db-name=simple-standard-scenarios {fp.name} "
             f"--output={output_dir} --zip-file --force"
         )
         if spark_query.use_spark_submit:

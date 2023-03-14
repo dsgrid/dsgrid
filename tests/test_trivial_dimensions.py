@@ -3,7 +3,8 @@ import pytest
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.utils.files import load_data, dump_data
 from dsgrid.tests.common import (
-    replace_dimension_uuids_from_registry,
+    map_dimension_names_to_ids,
+    replace_dimension_names_with_current_ids,
 )
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
@@ -22,7 +23,8 @@ def test_trivial_dimension_bad(make_test_project_dir, make_test_data_dir, tmp_pa
     dataset_dir = make_test_project_dir / "datasets" / "modeled" / "comstock"
     assert dataset_dir.exists()
     dataset_config_file = dataset_dir / "dataset.json5"
-    replace_dimension_uuids_from_registry(tmp_path, (dataset_config_file,))
+    mappings = map_dimension_names_to_ids(manager.dimension_manager)
+    replace_dimension_names_with_current_ids(dataset_config_file, mappings)
 
     config = load_data(dataset_config_file)
     config["trivial_dimensions"] = config["trivial_dimensions"] + ["geography"]

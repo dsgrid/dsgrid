@@ -38,16 +38,10 @@ from dsgrid.query.models import (
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.run_command import check_run_command
 
-
-REGISTRY_PATH = (
-    Path(__file__).absolute().parent.parent
-    / "dsgrid-test-data"
-    / "filtered_registries"
-    / "simple_standard_scenarios"
-)
 
 DIMENSION_MAPPING_SCHEMA = StructType(
     [
@@ -56,6 +50,7 @@ DIMENSION_MAPPING_SCHEMA = StructType(
         StructField("from_fraction", DoubleType()),
     ]
 )
+REGISTRY_PATH = Path("dsgrid-test-data/filtered_registries/simple_standard_scenarios")
 
 Datasets = namedtuple("Datasets", ["comstock", "resstock", "tempo"])
 
@@ -253,8 +248,9 @@ def get_project():
     global _project
     if _project is not None:
         return _project
+    conn = DatabaseConnection(database="simple-standard-scenarios")
     mgr = RegistryManager.load(
-        REGISTRY_PATH,
+        conn,
         offline_mode=True,
     )
     return mgr.project_manager.load_project("dsgrid_conus_2022")
@@ -1385,9 +1381,10 @@ def run_composite_dataset(
     setup_logging(
         "dsgrid", "query.log", console_level=logging.INFO, file_level=logging.INFO, mode="w"
     )
+    conn = DatabaseConnection(database="simple_standard_scenarios")
     mgr = RegistryManager.load(
+        conn,
         offline_mode=True,
-        registry_path=registry_path,
     )
     project = mgr.project_manager.load_project("dsgrid_conus_2022")
     query = QueryTestElectricityValuesCompositeDataset(

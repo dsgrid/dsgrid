@@ -16,6 +16,7 @@ from dsgrid.tests.common import (
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
+from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.utils.spark import get_unique_values
@@ -28,10 +29,16 @@ TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_aeo"
 
 
 @pytest.fixture(scope="module")
-def make_test_project_dir():
+def make_test_project_dir(tmp_path_factory):
+    database_name = "tmp-dsgrid"
+    conn = DatabaseConnection(database=database_name)
+    RegistryDatabase.delete(conn)
     tmpdir = _make_project_dir(TEST_PROJECT_REPO)
-    yield tmpdir / "dsgrid_project"
+    src_dir = tmpdir / "dsgrid_project"
+    registry_dir = tmp_path_factory.mktemp("registry")
+    yield src_dir, registry_dir, conn
     shutil.rmtree(tmpdir)
+    RegistryDatabase.delete(conn)
 
     # These can cause failures in later tests.
     for name in ("spark-warehouse", "metastore_db"):
@@ -51,7 +58,7 @@ def _make_project_dir(project):
 
 # set up registry for AEO data
 def make_registry_for_aeo(
-    registry_path, src_dir, dataset_name: str, dataset_path=None
+    src_dir, registry_path, conn, dataset_name: str, dataset_path=None
 ) -> RegistryManager:
     """Creates a local registry to test registration of AEO dimensions and dataset.
 
@@ -67,11 +74,11 @@ def make_registry_for_aeo(
     """
     if dataset_path is None:
         dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
-    path = create_local_test_registry(registry_path)
+    create_local_test_registry(registry_path, conn=conn)
     dataset_dir = Path(f"datasets/benchmark/{dataset_name}")
     user = getpass.getuser()
     log_message = "Initial registration"
-    manager = RegistryManager.load(path, offline_mode=True)
+    manager = RegistryManager.load(conn, offline_mode=True)
 
     dataset_config_file = src_dir / dataset_dir / "dataset.json5"
     manager.dataset_manager.register(dataset_config_file, dataset_path, user, log_message)
@@ -85,6 +92,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
         logger.info("test_invalid_datasets requires the dsgrid-test-data repository")
         sys.exit(1)
 
+    src_dir, registry_dir, conn = make_test_project_dir
     datasets = os.listdir(make_test_data_dir_module / "test_aeo_data")
     for i, dataset in enumerate(datasets, 1):
         logger.info(f">> Registering: {i}. {dataset}...")
@@ -94,22 +102,22 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
 
         try:
             logger.info("1. normal registration: ")
-            _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+            _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("2. with unexpected col: ")
             _modify_data_file(data_dir, export_index=True)
             with pytest.raises(DSGInvalidDimension, match=r"column.*is not expected"):
-                _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+                _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("3. with a duplicated dimension: ")
             _modify_data_file(data_dir, duplicate_col="subsector")
             with pytest.raises((ValueError, DSGInvalidDimension)):
-                _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+                _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("4. with a duplicated pivot col: ")
             _modify_data_file(data_dir, duplicate_col="elec_heating")
             with pytest.raises(DSGInvalidDimension, match=r"column.*is not expected"):
-                _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+                _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("5. End Uses dataset only - missing time ")
             if "End_Uses" in dataset:
@@ -118,28 +126,28 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
                     DSGInvalidDataset,
                     match=r"All time arrays must be repeated the same number of times: unique timestamp repeats =.*",
                 ):
-                    _test_dataset_registration(make_test_project_dir, data_dir, dataset)
+                    _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
         finally:
             shutil.copyfile(data_dir / "load_data_original.csv", data_dir / "load_data.csv")
 
 
-def _test_dataset_registration(make_test_project_dir, data_dir, dataset):
-    with TemporaryDirectory() as tmpdir:
-        base_dir = Path(tmpdir)
-        logger.info(f"temp_registry created: {base_dir}")
-        return make_registry_for_aeo(
-            base_dir,
-            make_test_project_dir,
-            dataset,
-            dataset_path=data_dir,
-        )
+def _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset):
+    logger.info(f"temp_registry created: {registry_dir}")
+    return make_registry_for_aeo(
+        src_dir,
+        registry_dir,
+        conn,
+        dataset,
+        dataset_path=data_dir,
+    )
 
 
 def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module):
+    src_dir, _, conn = make_test_project_dir
     dataset_id = "aeo2021_ref_com_energy_end_use_growth_factors"
     geography_record = "mountain"
     filter_config = {
-        "name": "test-registry",
+        "name": "test-dsgrid",
         "projects": [],
         "datasets": [
             {
@@ -154,13 +162,15 @@ def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module):
         dataset = "Commercial_End_Use_Growth_Factors"
         data_dir = Path(make_test_data_dir_module) / "test_aeo_data" / dataset
         make_registry_for_aeo(
+            src_dir,
             base_dir,
-            make_test_project_dir,
+            conn,
             dataset,
             dataset_path=data_dir,
         )
-        FilterRegistryManager.load(base_dir, offline_mode=True).filter(simple_model)
-        mgr = RegistryManager.load(base_dir, offline_mode=True)
+        FilterRegistryManager.load(conn, offline_mode=True).filter(simple_model)
+        conn = DatabaseConnection(database="test-dsgrid")
+        mgr = RegistryManager.load(conn, offline_mode=True)
         config = mgr.dataset_manager.get_by_id(dataset_id)
         geo = config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
         assert get_unique_values(geo, "id") == {geography_record}

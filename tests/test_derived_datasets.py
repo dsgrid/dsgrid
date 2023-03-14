@@ -19,6 +19,7 @@ from dsgrid.query.models import (
     ExponentialGrowthDatasetModel,
 )
 from dsgrid.query.query_submitter import QuerySubmitterBase
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.dataset_registry import DatasetRegistry
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.run_command import check_run_command
@@ -108,7 +109,8 @@ def test_create_derived_dataset_config(tmp_path):
     dataset_dir = tmp_path / dataset_id
     dataset_config_file = dataset_dir / DatasetRegistry.config_filename()
 
-    registry_manager = RegistryManager.load(REGISTRY_PATH, offline_mode=True)
+    conn = DatabaseConnection(database="simple_standard_scenarios")
+    registry_manager = RegistryManager.load(conn, offline_mode=True)
     dataset_dir.mkdir()
     assert create_derived_dataset_config_from_query(query_output, dataset_dir, registry_manager)
     assert dataset_config_file.exists()

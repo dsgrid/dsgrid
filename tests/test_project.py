@@ -5,8 +5,8 @@ from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimensionMapping
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import TEST_REGISTRY
 
 
 PROJECT_ID = "test_efs"
@@ -14,7 +14,8 @@ DATASET_ID = "test_efs_comstock"
 
 
 def test_project_load():
-    mgr = RegistryManager.load(TEST_REGISTRY, offline_mode=True)
+    conn = DatabaseConnection(database="test-dsgrid")
+    mgr = RegistryManager.load(conn, offline_mode=True)
     project = mgr.project_manager.load_project(PROJECT_ID)
     assert isinstance(project, Project)
 
@@ -42,7 +43,8 @@ def test_project_load():
 
 
 def test_dataset_load():
-    mgr = RegistryManager.load(TEST_REGISTRY, offline_mode=True)
+    conn = DatabaseConnection(database="test-dsgrid")
+    mgr = RegistryManager.load(conn, offline_mode=True)
     project = mgr.project_manager.load_project(PROJECT_ID)
     project.load_dataset(DATASET_ID)
     dataset = project.get_dataset(DATASET_ID)
@@ -69,7 +71,8 @@ def test_dataset_load():
 
 
 def test_dimension_map_and_reduce_in_dataset():
-    mgr = RegistryManager.load(TEST_REGISTRY, offline_mode=True)
+    conn = DatabaseConnection(database="test-dsgrid")
+    mgr = RegistryManager.load(conn, offline_mode=True)
     project = mgr.project_manager.load_project(PROJECT_ID)
     project.load_dataset(DATASET_ID)
     dataset = project.get_dataset(DATASET_ID)

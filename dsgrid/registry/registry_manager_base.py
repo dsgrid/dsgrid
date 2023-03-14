@@ -64,7 +64,7 @@ class RegistryManagerBase(abc.ABC):
     @staticmethod
     @abc.abstractmethod
     def config_class():
-        """Return the filename used for storing the config."""
+        """Return the class used for storing the config."""
 
     @abc.abstractmethod
     def get_by_id(self, config_id, version=None):

@@ -82,7 +82,8 @@ class MappingTableModel(DimensionMappingBaseModel):
     filename: Optional[str] = Field(
         title="filename",
         alias="file",
-        description="Filename containing association table records.",
+        description="Filename containing association table records. Only assigned for user input "
+        "and output purposes. The registry database stores records in the mapping JSON document.",
     )
     file_hash: Optional[str] = Field(
         title="file_hash",

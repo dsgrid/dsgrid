@@ -365,9 +365,24 @@ class ProjectConfigModel(DSGBaseModel):
         default=DimensionMappingsModel(),
         notes=("`[dimension_mappings]` are optional at the project level.",),
     )
-    id: Optional[str] = Field(alias="_id")
-    key: Optional[str] = Field(alias="_key")
-    rev: Optional[str] = Field(alias="_rev")
+    id: Optional[str] = Field(
+        alias="_id",
+        description="Registry database ID",
+        dsgrid_internal=True,
+        updateable=False,
+    )
+    key: Optional[str] = Field(
+        alias="_key",
+        description="Registry database key",
+        dsgrid_internal=True,
+        updateable=False,
+    )
+    rev: Optional[str] = Field(
+        alias="_rev",
+        description="Registry database revision",
+        dsgrid_internal=True,
+        updateable=False,
+    )
 
     @root_validator(pre=False, skip_on_failure=True)
     def check_mappings_with_dimensions(cls, values):

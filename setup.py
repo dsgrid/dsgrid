@@ -88,6 +88,7 @@ setup(
         "prettytable",
         "pydantic",
         "pyspark==3.3.1",  # Keep this synced with the spark version in Dockerfile.
+        "python-arango",
         "requests",
         "s3path",
         "semver",

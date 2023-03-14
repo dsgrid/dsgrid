@@ -75,17 +75,15 @@ class RegistryDatabase:
         for dim_type in DimensionType:
             dimension_types.insert({"_key": dim_type.value})
 
+        # TODO: Figure out to specify exact from/to relationships.
+        # We should be able to be limit what can be created.
         graph.create_edge_definition(
             edge_collection=Edge.CONTAINS.value,
             from_vertex_collections=[
                 Collection.PROJECTS.value,
-                Collection.DATASETS.value,
-                Collection.DIMENSION_MAPPINGS.value,
             ],
             to_vertex_collections=[
                 Collection.DIMENSIONS.value,
-                Collection.DIMENSION_MAPPINGS.value,
-                Collection.DATASETS.value,
             ],
         )
         graph.create_edge_definition(
@@ -97,23 +95,16 @@ class RegistryDatabase:
             edge_collection=Edge.UPDATED_TO.value,
             from_vertex_collections=[
                 Collection.DIMENSION_ROOTS.value,
-                Collection.DIMENSIONS.value,
             ],
-            to_vertex_collections=[Collection.DIMENSION_ROOTS.value],
+            to_vertex_collections=[Collection.DIMENSIONS.value],
         )
         graph.create_edge_definition(
             edge_collection=Edge.LATEST.value,
             from_vertex_collections=[
                 Collection.DIMENSION_ROOTS.value,
-                Collection.DIMENSION_MAPPING_ROOTS.value,
-                Collection.DATASET_ROOTS.value,
-                Collection.PROJECT_ROOTS.value,
             ],
             to_vertex_collections=[
                 Collection.DIMENSIONS.value,
-                Collection.DIMENSION_MAPPINGS.value,
-                Collection.DATASETS.value,
-                Collection.PROJECTS.value,
             ],
         )
         graph.create_edge_definition(
@@ -406,11 +397,11 @@ class RegistryDatabase:
 
 
 if __name__ == "__main__":
-    conn = DatabaseConnection()
+    conn = DatabaseConnection(database="test-dsgrid")
     # RegistryDatabase.delete(conn)
-    # db = RegistryDatabase.create(conn, Path("."))
-    db = RegistryDatabase.connect(conn)
+    # client = RegistryDatabase.create(conn, Path("."))
+    client = RegistryDatabase.connect(conn)
     # src_conn = DatabaseConnection(database="test-dsgrid")
     # dst_conn = DatabaseConnection(database="test-dsgrid2")
     # RegistryDatabase.delete(dst_conn)
-    # db = RegistryDatabase.copy(src_conn, dst_conn, Path("reg2"))
+    # client = RegistryDatabase.copy(src_conn, dst_conn, Path("reg2"))

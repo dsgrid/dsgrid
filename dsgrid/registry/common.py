@@ -60,7 +60,7 @@ class Collection(enum.Enum):
 
 
 class Edge(enum.Enum):
-    """Edges in the database"""
+    """Types of edges in the database"""
 
     CONTAINS = "contains"
     UPDATED_TO = "updated_to"

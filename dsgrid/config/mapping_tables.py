@@ -14,7 +14,8 @@ from dsgrid.config.dimension_mapping_base import (
 )
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.files import compute_file_hash
-from .config_base import ConfigWithDataFilesBase
+from dsgrid.utils.utilities import convert_record_dicts_to_classes
+from .config_base import ConfigWithRecordFileBase
 
 
 logger = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ class DatasetBaseToProjectMappingTableListModel(DSGBaseModel):
 class MappingTableModel(DimensionMappingBaseModel):
     """Attributes for a dimension mapping table"""
 
-    filename: str = Field(
+    filename: Optional[str] = Field(
         title="filename",
         alias="file",
         description="Filename containing association table records.",
@@ -98,7 +99,7 @@ class MappingTableModel(DimensionMappingBaseModel):
     @validator("filename")
     def check_filename(cls, filename):
         """Validate record file"""
-        if not os.path.exists(filename):
+        if filename is not None and not os.path.isfile(filename):
             raise ValueError(f"{filename} does not exist")
         return filename
 
@@ -112,23 +113,20 @@ class MappingTableModel(DimensionMappingBaseModel):
     @validator("records", always=True)
     def add_records(cls, records, values):
         """Add records from the file."""
-        if records:
-            raise ValueError("records should not be defined in the dimension mapping config")
-
-        records = []
         if "filename" not in values:
-            return records  # this means filename validator fail
+            return []  # this means filename validator fail
+
+        if records:
+            if isinstance(records[0], dict):
+                records = convert_record_dicts_to_classes(records, MappingTableRecordModel)
+            return records
+
         filename = Path(values["filename"])
-        if filename.name.endswith(".csv"):
-            with open(filename, encoding="utf8") as f_in:
-                reader = csv.DictReader(f_in)
-                for row in reader:
-                    record = MappingTableRecordModel(**row)
-                    records.append(record)
-        else:
+        if not filename.name.endswith(".csv"):
             raise ValueError(f"only CSV is supported: {filename}")
 
-        return records
+        with open(filename, encoding="utf8") as f_in:
+            return convert_record_dicts_to_classes(csv.DictReader(f_in), MappingTableRecordModel)
 
     def dict(self, *args, **kwargs):
         return super().dict(*args, **self._handle_kwargs(**kwargs))
@@ -138,7 +136,7 @@ class MappingTableModel(DimensionMappingBaseModel):
 
     @staticmethod
     def _handle_kwargs(**kwargs):
-        exclude = {"records"}
+        exclude = {"file", "filename"}
         if "exclude" in kwargs and kwargs["exclude"] is not None:
             kwargs["exclude"].union(exclude)
         else:
@@ -161,7 +159,7 @@ class MappingTableModel(DimensionMappingBaseModel):
         )
 
 
-class MappingTableConfig(ConfigWithDataFilesBase):
+class MappingTableConfig(ConfigWithRecordFileBase):
     """Provides an interface to an MappingTableModel"""
 
     def __init__(self, *args, **kwargs):
@@ -175,14 +173,6 @@ class MappingTableConfig(ConfigWithDataFilesBase):
     @property
     def config_id(self):
         return self.model.mapping_id
-
-    @staticmethod
-    def data_file_fields():
-        return ["filename"]
-
-    @staticmethod
-    def data_files_fields():
-        return []
 
     @staticmethod
     def model_class():

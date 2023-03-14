@@ -34,29 +34,30 @@ class FilterRegistryManager(RegistryManager):
         modified_dims = set()
         modified_dim_records = {}
 
-        # Note: Use pandas to write CSVs because Spark produces directories.
-
         def handle_dimension(simple_dim, dim):
             records = dim.get_records_dataframe()
-            filename = dim.src_dir / dim.model.filename
+            # filename = dim.src_dir / dim.model.filename
             df = records.filter(records.id.isin(simple_dim.record_ids))
-            df.toPandas().to_csv(filename, index=False)
+            filtered_records = [x.asDict() for x in df.collect()]
             modified_dims.add(dim.model.dimension_id)
             modified_dim_records[dim.model.dimension_id] = {
                 x.id for x in df.select("id").distinct().collect()
             }
+            return filtered_records
 
         logger.info("Filter project dimensions")
         for project in simple_model.projects:
             project_config = self._project_mgr.get_by_id(project.project_id)
             for simple_dim in project.dimensions.base_dimensions:
                 dim = project_config.get_base_dimension(simple_dim.dimension_type)
-                handle_dimension(simple_dim, dim)
+                dim.model.records = handle_dimension(simple_dim, dim)
+                self.dimension_manager.db.replace(dim.model, check_rev=False)
 
             for simple_dim in project.dimensions.supplemental_dimensions:
                 for dim in project_config.list_supplemental_dimensions(simple_dim.dimension_type):
                     if dim.model.dimension_query_name == simple_dim.dimension_query_name:
-                        handle_dimension(simple_dim, dim)
+                        dim.model.records = handle_dimension(simple_dim, dim)
+                        self.dimension_manager.db.replace(dim.model, check_rev=False)
 
         logger.info("Filter dataset dimensions")
         for dataset in simple_model.datasets:
@@ -64,7 +65,8 @@ class FilterRegistryManager(RegistryManager):
             dataset_config = self._dataset_mgr.get_by_id(dataset.dataset_id)
             for simple_dim in dataset.dimensions:
                 dim = dataset_config.get_dimension(simple_dim.dimension_type)
-                handle_dimension(simple_dim, dim)
+                dim.model.records = handle_dimension(simple_dim, dim)
+                self.dimension_manager.db.replace(dim.model, check_rev=False)
             handler = make_dataset_schema_handler(
                 dataset_config, self._dimension_mgr, self._dimension_mapping_mgr
             )
@@ -73,23 +75,22 @@ class FilterRegistryManager(RegistryManager):
         logger.info("Filter dimension mapping records")
         for mapping in self._dimension_mapping_mgr.iter_configs():
             records = None
+            changed = False
             from_id = mapping.model.from_dimension.dimension_id
             to_id = mapping.model.to_dimension.dimension_id
             if from_id in modified_dims or to_id in modified_dims:
                 records = mapping.get_records_dataframe()
                 if from_id in modified_dims:
                     records = records.filter(records.from_id.isin(modified_dim_records[from_id]))
+                    changed = True
                 if to_id in modified_dims:
                     records = records.filter(records.to_id.isin(modified_dim_records[to_id]))
-            if records is not None:
-                filename = mapping.src_dir / mapping.model.filename
-                records.toPandas().to_csv(filename, index=False)
-                logger.info("Filtered dimension mapping records from %s", filename)
+                    changed = True
 
-        for project in simple_model.projects:
-            project_config = self._project_mgr.get_by_id(project.project_id)
-            project_config.serialize(project_config.src_dir, force=True)
-
-        for dataset in simple_model.datasets:
-            dataset_config = self._dataset_mgr.get_by_id(dataset.dataset_id)
-            dataset_config.serialize(dataset_config.src_dir, force=True)
+            # TODO: probably need to remove a dimension mapping if it is empty
+            if records is not None and changed and not records.rdd.isEmpty():
+                mapping.model.records = [x.asDict() for x in records.collect()]
+                self.dimension_mapping_manager.db.replace(mapping.model, check_rev=False)
+                logger.info(
+                    "Filtered dimension mapping records from ID %s", mapping.model.mapping_id
+                )

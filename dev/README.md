@@ -48,6 +48,58 @@ You need to have some familiarity with Spark in order to run non-trivial tasks i
 This [page](spark_overview.md) provides an overview and explains various ways to use Spark in
 dsgrid.
 
+## ArangoDB
+dsgrid stores registry information in an ArangoDB database. You must install it locally in
+order to work with a local instance of dsgrid. There are two ways to install ArangoDB
+on your computer.
+
+Once installed, the easiest way to mange the database manually is through Arango's web UI,
+available at http://localhost:8529
+
+### Native installation
+1. Install ``ArangoDB Community Edition`` locally by following instructions at
+https://www.arangodb.com/download-major/
+
+Add the ``bin`` directory to your system path. It will likely be in a location like this::
+
+    $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/bin
+
+Note the configuration files in this directory::
+
+    $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/etc/arangodb3
+
+Customize as desired, particularly regarding authentication.
+
+2. Start the database by running ``arangodb``.
+
+You may need to specify the config file with ``arangodb --conf <your-path>/arangod.conf``
+
+### Docker container
+Run the ArangoDB Docker container by following instructions at
+https://www.arangodb.com/download-major/docker/
+
+If you are running on Eagle then you should use a Singularity container by follwing these steps:
+
+1. Acquire a compute node. It can be the same node that participates in your Spark cluster.
+Don't run ArangoDB on a login node.
+
+2. Change to a directory where you would like to store the database files and create these
+directories.
+```
+$ mkdir arangodb3 arangodb3-apps
+```
+
+3. Load the singularity environment module.
+```
+$ module load singularity-container
+```
+
+4. Start ArangoDB. Note that you can change the password to whatever you'd like.
+```
+$ singularity run --network-args "portmap=8529:8529" --env "ARANGO_ROOT_PASSWORD=openSesame" -B arangodb3:/var/lib/arangodb3 -B arangodb3-apps:/var/lib/arangodb3-apps /projects/dsgrid/containers/arangodb.sif
+```
+
+
 ## Tests
 
 ### Setup
@@ -57,14 +109,202 @@ datasets. You must initialize this submodule and keep it updated.
 
 Initialize the submodule:
 ```
-git submodule init
-git submodule update
+$ git submodule init
+$ git submodule update
 ```
 
 Update the submodule when there are new changes in the test data repository:
 ```
-git submodule update --remote --merge
+$ git submodule update --remote --merge
 ```
+
+### Import/restore simple-standard-scenarios registry
+Some tests require a filtered StandardScenarios registry. The test data repository
+contains a JSON-exported database that you must import into your local ArangoDB instance.
+
+You can use a native ArangoDB installation or the docker container.
+```
+$ arangorestore --create-database --input-directory dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump --server.database simple-standard-scenarios --include-system-collections true
+```
+
+You will have to repeat this process anytime the test data is updated.
+**TODO**: Automate this process.
+
+### Updating the simple-standard-scenarios registry
+If you update the configs or data for the StandardScenarios registry then you'll need to update
+the test data repository per these instructions.
+
+1. Register and submit all datasets to a clean registry. The initial registry can be created with
+this command after modifiying the paths specified in the JSON5 file.
+
+```
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py)
+    dsgrid/tests/register.py tests/data/standard_scenarios_registration.json
+```
+
+2. Filter the registry such that the datasets are small enough to be used in tests. You'll likely
+need to do this on Eagle.
+```
+$ dsgrid-admin make-filtered-registry --src-db-name standard-scenarios --dst-db-name simple-standard-scenarios --url http://localhost:8529 standard-scenarios-registry-data dsgrid-tests-data/filtered-registries/simple_standard_scenarios.json
+```
+
+3. Create derived datasets and submit them.
+- `comstock_conus_2022_projected`
+- `resstock_conus_2022_projected`
+- `tempo_conus_2022_mapped`
+
+These queries create the datasets.
+```
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py) \
+    query project run \
+    --db-name=standard-scenarios \
+    --offline \
+    ~/repos/dsgrid-project-StandardScenarios/dsgrid_project/derived_datasets/comstock_conus_2022_projected.json5 \
+    -o query-output
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py) \
+    query project run \
+    --db-name=standard-scenarios \
+    --offline \
+    ~/repos/dsgrid-project-StandardScenarios/dsgrid_project/derived_datasets/resstock_conus_2022_projected.json5 \
+    -o query-output
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py) \
+    query project run \
+    --db-name=standard-scenarios \
+    --offline \
+    ~/repos/dsgrid-project-StandardScenarios/dsgrid_project/derived_datasets/tempo_conus_2022_mapped.json5 \
+    -o query-output
+```
+
+These commands create derived-dataset configurations.
+```
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    $(which dsgrid-cli.py) \
+    query project create-derived-dataset-config \
+    --db-name=standard-scenarios \
+    --offline \
+    query-output/comstock_projected_conus_2022 \
+    comstock-derived-dataset
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    $(which dsgrid-cli.py) \
+    query project create-derived-dataset-config \
+    --db-name=standard-scenarios \
+    --offline \
+    query-output/resstock_projected_conus_2022 \
+    resstock-derived-dataset
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    $(which dsgrid-cli.py) \
+    query project create-derived-dataset-config \
+    --db-name=standard-scenarios \
+    --offline \
+    query-output/tempo_conus_2022_mapped tempo-derived-dataset \
+    tempo-derived-dataset
+```
+
+These commands register and submit the datasets.
+```
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py) \
+    registry \
+    --offline \
+    datasets \
+    register \
+    comstock-derived-dataset/dataset.json5 \
+    query-output/comstock_projected_conus_2022 \
+    -l "Register comstock_projected_conus_2022"
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py) \
+    registry \
+    --offline \
+    projects \
+    submit-dataset \
+    -p dsgrid_conus_2022 \
+    -d comstock_projected_conus_2022 \
+    -m comstock-derived-dataset/dimension_mapping_references.json5 \
+    -l "Submit comstock_projected_conus_2022"
+
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py) \
+    registry \
+    --offline \
+    datasets \
+    register \
+    resstock-derived-dataset/dataset.json5 \
+    query-output/resstock_projected_conus_2022 \
+    -l "Register resstock_projected_conus_2022"
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py) \
+    registry \
+    --offline \
+    projects \
+    submit-dataset \
+    -p dsgrid_conus_2022 \
+    -d resstock_projected_conus_2022 \
+    -m resstock-derived-dataset/dimension_mapping_references.json5 \
+    -l "Submit resstock_projected_conus_2022"
+
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py) \
+    registry \
+    --offline \
+    datasets \
+    register \
+    tempo-derived-dataset/dataset.json5 \
+    query-output/tempo_conus_2022_mapped \
+    -l "Register tempo_conus_2022_mapped"
+$ spark-submit \
+    --master=spark://$(hostname):7077 \
+    --conf spark.sql.shuffle.partitions=2400 \
+    $(which dsgrid-cli.py) \
+    registry \
+    --offline \
+    projects \
+    submit-dataset \
+    -p dsgrid_conus_2022 \
+    -d tempo_conus_2022_mapped \
+    -m tempo-derived-dataset/dimension_mapping_references.json5 \
+    -l "Submit tempo_conus_2022_mapped"
+```
+
+4. Dump the registry database to text files.
+```
+singularity run \
+    -B /scratch:/scratch \
+    /projects/dsgrid/containers/arangodb.sif \
+    arangodump \
+    --server.database standard-scenarios \
+    --server.password openSesame \
+    --output-directory /scratch/$USER/simple-standard-scenarios-dump \
+    --compress-output false \
+    --include-system-collections true
+```
+
+5. Push the output files to a dsgrid-test-data repository branch in the directory
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump` and open a pull request.
 
 ### Run tests
 
@@ -78,6 +318,7 @@ If you want to exclude AWS tests:
 pytest tests
 ```
 
+**TODO** AWS tests have not been updated to support the registry database.
 If you only want to run AWS tests:
 ```
 pytest tests_aws
@@ -245,9 +486,11 @@ Here is an example notebook (assuming you have already downloaded a registry to 
 from IPython.core.display import display, HTML
 display(HTML("<style>.container { width:100% !important; }</style>"))
 
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 
-mgr = RegistryManager.load("./local-registry", offline_mode=True)
+conn = DatabaseConnection()
+mgr = RegistryManager.load(conn, offline_mode=True)
 mgr.dimension_manager.show()
 ```
 

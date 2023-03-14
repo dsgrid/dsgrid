@@ -9,7 +9,7 @@ from dsgrid.config.config_base import ConfigBase
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.registry.common import (
-    ConfigRegistrationModel,
+    RegistrationModel,
 )
 
 
@@ -27,7 +27,7 @@ class RegistryBaseModel(DSGBaseModel):
         title="description",
         description="Description of what is stored",
     )
-    registration_history: Optional[List[ConfigRegistrationModel]] = Field(
+    registration_history: Optional[List[RegistrationModel]] = Field(
         title="registration_history",
         description="History of all registration updates",
         default=[],
@@ -39,8 +39,8 @@ class RegistryBase(ConfigBase, abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def config_filename():
-        """Return the config filename.
+    def config_class():
+        """Return the class used to represent a single configuration.
 
         Returns
         -------

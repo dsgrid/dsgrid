@@ -64,7 +64,7 @@ class RegistryDatabase:
         registry_file = data_path / "registry.json5"
         registry_file.write_text(conn.json(indent=2))
 
-        graph = client.create_graph("registry")
+        graph = client.create_graph(GRAPH)
         graph.create_vertex_collection(Collection.PROJECT_ROOTS.value)
         graph.create_vertex_collection(Collection.DATASET_ROOTS.value)
         graph.create_vertex_collection(Collection.DATASET_DATA_ROOTS.value)

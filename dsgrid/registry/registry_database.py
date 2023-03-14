@@ -67,10 +67,12 @@ class RegistryDatabase:
         graph = client.create_graph("registry")
         graph.create_vertex_collection(Collection.PROJECT_ROOTS.value)
         graph.create_vertex_collection(Collection.DATASET_ROOTS.value)
+        graph.create_vertex_collection(Collection.DATASET_DATA_ROOTS.value)
         graph.create_vertex_collection(Collection.DIMENSION_ROOTS.value)
         graph.create_vertex_collection(Collection.DIMENSION_MAPPING_ROOTS.value)
         graph.create_vertex_collection(Collection.PROJECTS.value)
         graph.create_vertex_collection(Collection.DATASETS.value)
+        graph.create_vertex_collection(Collection.DATASET_DATA.value)
         graph.create_vertex_collection(Collection.DIMENSIONS.value)
         graph.create_vertex_collection(Collection.DIMENSION_MAPPINGS.value)
         dimension_types = graph.create_vertex_collection(Collection.DIMENSION_TYPES.value)
@@ -165,14 +167,17 @@ class RegistryDatabase:
             sys_db.delete_database(conn.database)
             logger.info("Deleted the database %s", conn.database)
 
-    def add_updated_to_edge(self, from_, to, registration: RegistrationModel):
-        self._graph.edge_collection(Edge.UPDATED_TO.value).insert(
+    def insert_edge(self, from_id, to_id, data, edge: Edge):
+        self._graph.edge_collection(edge.value).insert(
             {
-                "_from": from_.id,
-                "_to": to.id,
-                **registration.serialize(),
+                "_from": from_id,
+                "_to": to_id,
+                **data,
             }
         )
+
+    def insert_updated_to_edge(self, from_, to, registration: RegistrationModel):
+        self.insert_edge(from_.id, to.id, registration.serialize(), Edge.UPDATED_TO)
 
     def collection(self, name):
         return self._client.collection(name)
@@ -260,6 +265,26 @@ class RegistryDatabase:
             f"""
             FOR v, e in 1
                 INBOUND "{db_id}"
+                GRAPH "{GRAPH}"
+                OPTIONS {{edgeCollections: ["{Edge.UPDATED_TO.value}"]}}
+                RETURN {{version: e.version, submitter: e.submitter, date: e.date,
+                        log_message: e.log_message}}
+        """,
+            count=True,
+        )
+        count = cursor.count()
+        assert count <= 1, f"{db_id=} {count=}"
+        if count == 0:
+            raise DSGValueNotRegistered(f"{db_id=} is not registered")
+
+        return RegistrationModel(**cursor.next())
+
+    def get_initial_registration(self, db_id) -> RegistrationModel:
+        """Return the initial registration information for the ID."""
+        cursor = self._client.aql.execute(
+            f"""
+            FOR v, e in 1
+                OUTBOUND "{db_id}"
                 GRAPH "{GRAPH}"
                 OPTIONS {{edgeCollections: ["{Edge.UPDATED_TO.value}"]}}
                 RETURN {{version: e.version, submitter: e.submitter, date: e.date,

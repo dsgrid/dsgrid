@@ -48,8 +48,10 @@ def check_config_id_strict(config_id, tag):
 class Collection(enum.Enum):
     """Collections in the database"""
 
-    DATASETS = "datasets"
+    DATASETS = "datasets"  # dataset config
+    DATASET_DATA = "dataset_data"  # actual data (parquet files). tracks data versions
     DATASET_ROOTS = "dataset_roots"
+    DATASET_DATA_ROOTS = "dataset_data_roots"
     DIMENSION_TYPES = "dimension_types"
     DIMENSIONS = "dimensions"
     DIMENSION_ROOTS = "dimension_roots"

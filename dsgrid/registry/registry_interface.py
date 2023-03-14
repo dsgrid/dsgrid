@@ -177,9 +177,10 @@ class RegistryInterfaceBase(abc.ABC):
         model = self._make_dsgrid_model(data)
 
         self._db.insert_latest_edge(root, model)
-        self._db.add_updated_to_edge(root, model, registration)
+        self._db.insert_updated_to_edge(root, model, registration)
         assert model.version == registration.version
         self._insert_contains_edges(model)
+        self._post_insert_handling(model, root)
         return model
 
     def iter_models(self, all_versions=False, filter_config=None):
@@ -232,7 +233,7 @@ class RegistryInterfaceBase(abc.ABC):
 
         self._db.delete_latest_edge(root)
         self._db.insert_latest_edge(root, new_model)
-        self._db.add_updated_to_edge(cur_model, new_model, registration)
+        self._db.insert_updated_to_edge(cur_model, new_model, registration)
         assert model.version == registration.version
         self._insert_contains_edges(new_model)
         return new_model
@@ -303,6 +304,18 @@ class DatasetRegistryInterface(RegistryInterfaceBase):
     @staticmethod
     def root_collection_name():
         return Collection.DATASET_ROOTS.value
+
+    def _post_insert_handling(self, model: DatasetConfigModel, root):
+        registration = self._db.get_initial_registration(root.id)
+        reg_data = _serialize_new_model(registration)
+
+        root_data = {"_key": model.dataset_id}
+        root_res = self._db.collection(Collection.DATASET_DATA_ROOTS.value).insert(root_data)
+
+        ddata = {"version": registration.version}
+        dd_res = self._db.collection(Collection.DATASET_DATA.value).insert(ddata)
+        ddata.update(dd_res)
+        self._db.insert_edge(root_res["_id"], ddata["_id"], reg_data, Edge.UPDATED_TO)
 
     @staticmethod
     def _uses_model_id_in_db():

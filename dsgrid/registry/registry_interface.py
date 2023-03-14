@@ -12,7 +12,7 @@ from dsgrid.config.project_config import ProjectConfigModel
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from .common import Collection, DatasetRegistryStatus, RegistrationModel, Edge, RegistryType
-from .registry_database import RegistryDatabase
+from .registry_database import RegistryDatabase, MAX_CONFIG_VERSIONS
 
 
 logger = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ class RegistryInterfaceBase(abc.ABC):
             return
 
         root_id = self._get_root_db_id(model_id)
-        ids = self._db.list_connected_ids(root_id, Edge.UPDATED_TO)
+        ids = self._db.list_connected_ids(root_id, Edge.UPDATED_TO, MAX_CONFIG_VERSIONS)
         for _id in ids:
             self._db.delete_document(self._collection_name(), _id)
 

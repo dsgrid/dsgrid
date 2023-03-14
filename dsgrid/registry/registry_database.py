@@ -11,7 +11,9 @@ from dsgrid.registry.common import Collection, RegistrationModel, Edge
 
 
 GRAPH = "registry"
-MAX_REGISTRY_VERSIONS = 1000
+# This number limits graph traversals along, for example, a project_root for a single project
+# config to all of its versions (1.0.0, 1.0.1, 1.1.0, 2.0, etc.).
+MAX_CONFIG_VERSIONS = 1000
 
 logger = logging.getLogger(__name__)
 
@@ -237,7 +239,7 @@ class RegistryDatabase:
     def _get_by_version(self, db_id, version):
         cursor = self._client.aql.execute(
             f"""
-            FOR v, e, p in 0..{MAX_REGISTRY_VERSIONS}
+            FOR v, e, p in 0..{MAX_CONFIG_VERSIONS}
                 OUTBOUND "{db_id}"
                 GRAPH "{GRAPH}"
                 OPTIONS {{edgeCollections: ["{Edge.UPDATED_TO.value}"]}}
@@ -307,7 +309,7 @@ class RegistryDatabase:
 
         cursor = self._client.aql.execute(
             f"""
-            FOR v, e, p in 0..{MAX_REGISTRY_VERSIONS}
+            FOR v, e, p in 0..{MAX_CONFIG_VERSIONS}
                 OUTBOUND "{db_id}"
                 GRAPH "{GRAPH}"
                 OPTIONS {{edgeCollections: ["{Edge.UPDATED_TO.value}"]}}
@@ -343,7 +345,7 @@ class RegistryDatabase:
         """Return a generator of database documents connected by the 'updated_to' edge."""
         cursor = self._client.aql.execute(
             f"""
-            FOR v, e, p in 1..{MAX_REGISTRY_VERSIONS}
+            FOR v, e, p in 1..{MAX_CONFIG_VERSIONS}
                 OUTBOUND "{db_id}"
                 GRAPH "{GRAPH}"
                 OPTIONS {{edgeCollections: ["{Edge.UPDATED_TO.value}"]}}
@@ -358,7 +360,7 @@ class RegistryDatabase:
         for doc in cursor:
             yield doc
 
-    def list_connected_ids(self, db_id, edge: Edge, depth=MAX_REGISTRY_VERSIONS):
+    def list_connected_ids(self, db_id, edge: Edge, depth):
         """Return a list of database objects linked to db_id by edge."""
         cursor = self._client.aql.execute(
             f"""
@@ -367,23 +369,6 @@ class RegistryDatabase:
                 GRAPH "{GRAPH}"
                 OPTIONS {{edgeCollections: ["{edge.value}"]}}
                 RETURN v._id
-        """,
-            count=True,
-        )
-        count = cursor.count()
-        if count == 0:
-            raise DSGValueNotRegistered(f"{db_id=} is not registered")
-        return list(cursor)
-
-    def list_connected_edges(self, db_id, edge: Edge, depth=MAX_REGISTRY_VERSIONS):
-        """Return a list of edge IDs connected to db_id."""
-        cursor = self._client.aql.execute(
-            f"""
-            FOR v, e in 1..{depth}
-                OUTBOUND "{db_id}"
-                GRAPH "{GRAPH}"
-                OPTIONS {{edgeCollections: ["{edge.value}"]}}
-                RETURN e._id
         """,
             count=True,
         )

@@ -140,7 +140,12 @@ contains a JSON-exported database that you must import into your local ArangoDB 
 
 You can use a native ArangoDB installation or the docker container.
 ```
-$ arangorestore --create-database --input-directory dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump --server.database simple-standard-scenarios --include-system-collections true
+$ arangorestore \
+    --create-database \
+    --input-directory \
+    dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \
+    --server.database simple-standard-scenarios \
+    --include-system-collections true
 ```
 
 You will have to repeat this process anytime the test data is updated.
@@ -155,171 +160,31 @@ this command after modifiying the paths specified in the JSON5 file. Four `bigme
 on Eagle are recommended in order to complete the job in one hour. Two may be sufficient if you
 run multiple iterations.
 
+Run this from your scratch directory.
+
 ```
 $ spark-submit \
     --master=spark://$(hostname):7077 \
     --conf spark.sql.shuffle.partitions=2400 \
-    $(which dsgrid-cli.py)
     dsgrid/tests/register.py tests/data/standard_scenarios_registration.json
 ```
 
-2. Filter the registry such that the datasets are small enough to be used in tests. You'll likely
-need to do this on Eagle. One compute node for hour should be sufficient.
-```
-$ dsgrid-admin make-filtered-registry \
-    --src-db-name standard-scenarios \
-    --dst-db-name simple-standard-scenarios \
-    --url http://localhost:8529 \
-    standard-scenarios-registry-data dsgrid-tests-data/filtered-registries/simple_standard_scenarios.json
-```
+2. Acquire a new compute node. It can be any time of node and you only need it for an hour.
+Create a local version of the dsgrid repository script `scripts/create_simple_standard_scenarios.sh`.
+Edit the environment variables at the top of the script as necessary and then run it. It will
+filter the StandardScenarios data and then create, register, and submit-to-project these derived
+datasets:
 
-3. Create derived datasets and submit them.
 - `comstock_conus_2022_projected`
 - `resstock_conus_2022_projected`
 - `tempo_conus_2022_mapped`
 
-These queries create the datasets.
-```
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project run \
-    --db-name=standard-scenarios \
-    --offline \
-    ~/repos/dsgrid-project-StandardScenarios/dsgrid_project/derived_datasets/comstock_conus_2022_projected.json5 \
-    -o query-output
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project run \
-    --db-name=standard-scenarios \
-    --offline \
-    ~/repos/dsgrid-project-StandardScenarios/dsgrid_project/derived_datasets/resstock_conus_2022_projected.json5 \
-    -o query-output
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project run \
-    --db-name=standard-scenarios \
-    --offline \
-    ~/repos/dsgrid-project-StandardScenarios/dsgrid_project/derived_datasets/tempo_conus_2022_mapped.json5 \
-    -o query-output
-```
-
-These commands create derived-dataset configurations.
-```
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project create-derived-dataset-config \
-    --db-name=standard-scenarios \
-    --offline \
-    query-output/comstock_projected_conus_2022 \
-    comstock-derived-dataset
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project create-derived-dataset-config \
-    --db-name=standard-scenarios \
-    --offline \
-    query-output/resstock_projected_conus_2022 \
-    resstock-derived-dataset
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project create-derived-dataset-config \
-    --db-name=standard-scenarios \
-    --offline \
-    query-output/tempo_conus_2022_mapped tempo-derived-dataset \
-    tempo-derived-dataset
-```
-
-These commands register and submit the datasets.
-```
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    datasets \
-    register \
-    comstock-derived-dataset/dataset.json5 \
-    query-output/comstock_projected_conus_2022 \
-    -l "Register comstock_projected_conus_2022"
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    projects \
-    submit-dataset \
-    -p dsgrid_conus_2022 \
-    -d comstock_projected_conus_2022 \
-    -m comstock-derived-dataset/dimension_mapping_references.json5 \
-    -l "Submit comstock_projected_conus_2022"
-
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    datasets \
-    register \
-    resstock-derived-dataset/dataset.json5 \
-    query-output/resstock_projected_conus_2022 \
-    -l "Register resstock_projected_conus_2022"
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    projects \
-    submit-dataset \
-    -p dsgrid_conus_2022 \
-    -d resstock_projected_conus_2022 \
-    -m resstock-derived-dataset/dimension_mapping_references.json5 \
-    -l "Submit resstock_projected_conus_2022"
-
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    datasets \
-    register \
-    tempo-derived-dataset/dataset.json5 \
-    query-output/tempo_conus_2022_mapped \
-    -l "Register tempo_conus_2022_mapped"
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    projects \
-    submit-dataset \
-    -p dsgrid_conus_2022 \
-    -d tempo_conus_2022_mapped \
-    -m tempo-derived-dataset/dimension_mapping_references.json5 \
-    -l "Submit tempo_conus_2022_mapped"
-```
-
-4. Dump the registry database to text files.
-```
-singularity run \
-    -B /scratch:/scratch \
-    /projects/dsgrid/containers/arangodb.sif \
-    arangodump \
-    --server.database standard-scenarios \
-    --server.password openSesame \
-    --output-directory simple-standard-scenarios-dump \
-    --compress-output false \
-    --include-system-collections true
-```
-
-5. Copy (e.g., cp, scp, rsync) or arangodump the output files to a dsgrid-test-data
-repository in the directory
-`dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump`, push to GitHub and open a
-pull request.
+3. Copy (e.g., cp, scp, rsync) or arangodump the output files (registry JSON and Parquet) from the
+previous step to a dsgrid-test-data repository in the directory
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios`. Edit the file
+`dump/data_path_*.data.json` to ensure that the `data_path` value is set to
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios`. Make a branch, commit, push
+it to GitHub, and open a pull request.
 
 ### Run tests
 

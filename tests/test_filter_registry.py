@@ -1,3 +1,5 @@
+import shutil
+
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
@@ -41,12 +43,12 @@ def test_filter_registry(tmp_path):
     dst_data_path = tmp_path / "test-dsgrid-registry"
     src_conn = DatabaseConnection(database="test-dsgrid")
     dst_conn = DatabaseConnection(database="filtered-dsgrid")
-    RegistryManager.copy(src_conn, dst_conn, dst_data_path, force=True)
-    FilterRegistryManager.load(dst_conn, offline_mode=True).filter(simple_model)
-    mgr = RegistryManager.load(dst_conn, offline_mode=True)
-    project = mgr.project_manager.load_project(PROJECT_ID)
 
     try:
+        RegistryManager.copy(src_conn, dst_conn, dst_data_path, force=True)
+        FilterRegistryManager.load(dst_conn, offline_mode=True).filter(simple_model)
+        mgr = RegistryManager.load(dst_conn, offline_mode=True)
+        project = mgr.project_manager.load_project(PROJECT_ID)
         # Verify that the dataset, dimensions, and dimension mappings are all filtered.
         project.load_dataset(DATASET_ID)
         dataset = project.get_dataset(DATASET_ID)
@@ -80,3 +82,5 @@ def test_filter_registry(tmp_path):
         assert found_mapping_records
     finally:
         RegistryDatabase.delete(dst_conn)
+        if dst_data_path.exists():
+            shutil.rmtree(dst_data_path)

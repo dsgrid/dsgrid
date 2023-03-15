@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture
 def registry_mgr():
-    conn = DatabaseConnection(database="test-dsgrid")
+    conn = DatabaseConnection(database="simple-standard-scenarios")
     return RegistryManager.load(conn, offline_mode=True)
 
 

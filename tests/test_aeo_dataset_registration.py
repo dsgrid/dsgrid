@@ -128,6 +128,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
                 ):
                     _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
         finally:
+            RegistryDatabase.delete(conn)
             shutil.copyfile(data_dir / "load_data_original.csv", data_dir / "load_data.csv")
 
 
@@ -168,12 +169,14 @@ def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module):
             dataset,
             dataset_path=data_dir,
         )
-        FilterRegistryManager.load(conn, offline_mode=True).filter(simple_model)
-        conn = DatabaseConnection(database="test-dsgrid")
-        mgr = RegistryManager.load(conn, offline_mode=True)
-        config = mgr.dataset_manager.get_by_id(dataset_id)
-        geo = config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
-        assert get_unique_values(geo, "id") == {geography_record}
+        try:
+            FilterRegistryManager.load(conn, offline_mode=True).filter(simple_model)
+            mgr = RegistryManager.load(conn, offline_mode=True)
+            config = mgr.dataset_manager.get_by_id(dataset_id)
+            geo = config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
+            assert get_unique_values(geo, "id") == {geography_record}
+        finally:
+            RegistryDatabase.delete(conn)
 
 
 def _modify_data_file(

@@ -12,6 +12,7 @@ import pytest
 from pyspark.sql import SparkSession
 
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.config.mapping_tables import MappingTableRecordModel
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
     DimensionFilterColumnOperatorModel,
@@ -38,9 +39,11 @@ from dsgrid.query.models import (
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.run_command import check_run_command
+from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.utils.utilities import convert_record_dicts_to_classes
 
 
 DIMENSION_MAPPING_SCHEMA = StructType(
@@ -202,7 +205,7 @@ def test_create_composite_dataset_query(tmp_path):
 def test_query_cli_create_validate(tmp_path):
     filename = tmp_path / "query.json5"
     cmd = (
-        f"dsgrid query project create --offline --registry-path={REGISTRY_PATH} "
+        f"dsgrid query project create --offline --db-name=simple-standard-scenarios "
         f"-d -r -f {filename} -F expression -F column_operator "
         "-F supplemental_column_operator -F raw --force my_query dsgrid_conus_2022 "
         "projected_dg_conus_2022"
@@ -222,7 +225,7 @@ def test_query_cli_run(tmp_path):
     filename = tmp_path / "query.json"
     filename.write_text(query.make_query().json(indent=2))
     cmd = (
-        f"dsgrid query project run --offline --registry-path={REGISTRY_PATH} "
+        f"dsgrid query project run --offline --db-name=simple-standard-scenarios "
         f"--output={output_dir} {filename}"
     )
     shutdown_project()
@@ -1169,19 +1172,8 @@ def apply_load_mapping_aeo_com(aeo_com):
     )
 
 
-def _load_dimension_mapping_records(path):
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    return spark.read.csv(str(path), header=True, schema=DIMENSION_MAPPING_SCHEMA).cache()
-
-
 def duplicate_aeo_com_census_division_to_county(aeo_com):
-    path = REGISTRY_PATH / "configs" / "dimension_mappings"
-    paths = [x for x in path.iterdir() if x.name.startswith("us_census_divisions__us_counties")]
-    assert len(paths) == 1, paths
-    dm_path = paths[0] / "1.0.0"
-    csv_files = [x for x in dm_path.iterdir() if x.suffix == ".csv"]
-    assert len(csv_files) == 1, csv_files
-    records = _load_dimension_mapping_records(csv_files[0])
+    records = get_dim_mapping_records_from_db("US Census Divisions", "US Counties 2020 L48")
     assert records.select("from_fraction").distinct().collect()[0].from_fraction == 1.0
     records = records.drop("from_fraction")
     mapped = aeo_com.join(records, on=aeo_com.geography == records.from_id)
@@ -1193,17 +1185,9 @@ def duplicate_aeo_com_census_division_to_county(aeo_com):
 
 
 def map_aeo_com_county_to_comstock_county(aeo_com):
-    path = REGISTRY_PATH / "configs" / "dimension_mappings"
-    paths = [
-        x
-        for x in path.iterdir()
-        if x.name.startswith("conus_2022-comstock_us_county_fip__us_counties_2020_l48")
-    ]
-    assert len(paths) == 1, paths
-    dm_path = paths[0] / "1.0.0"
-    csv_files = [x for x in dm_path.iterdir() if x.suffix == ".csv"]
-    assert len(csv_files) == 1, csv_files
-    records = _load_dimension_mapping_records(csv_files[0])
+    records = get_dim_mapping_records_from_db(
+        "conus_2022-comstock_US_county_FIP", "US Counties 2020 L48"
+    )
     assert records.select("from_fraction").distinct().collect()[0].from_fraction == 1.0
     records = records.drop("from_fraction")
     mapped = aeo_com.join(records, on=aeo_com.geography == records.to_id)
@@ -1215,17 +1199,9 @@ def map_aeo_com_county_to_comstock_county(aeo_com):
 
 
 def map_aeo_com_subsectors(aeo_com):
-    path = REGISTRY_PATH / "configs" / "dimension_mappings"
-    paths = [
-        x
-        for x in path.iterdir()
-        if x.name.startswith("aeo2021-commercial-building-types__conus-2022-detailed-subsectors")
-    ]
-    assert len(paths) == 1, paths
-    dm_path = paths[0] / "1.0.0"
-    csv_files = [x for x in dm_path.iterdir() if x.suffix == ".csv"]
-    assert len(csv_files) == 1, csv_files
-    records = _load_dimension_mapping_records(csv_files[0])
+    records = get_dim_mapping_records_from_db(
+        "AEO2021-commercial-building-types", "CONUS-2022-Detailed-Subsectors"
+    )
     mapped = aeo_com.join(records, on=aeo_com.subsector == records.from_id)
     # Make sure no subsector got dropped in the join.
     orig_count = aeo_com.select("subsector").distinct().count()
@@ -1243,6 +1219,22 @@ def map_aeo_com_subsectors(aeo_com):
             F.sum("ng_heating").alias("ng_heating"),
         )
     )
+
+
+def get_dim_mapping_records_from_db(from_dim_name, to_dim_name):
+    conn = DatabaseConnection(database="simple-standard-scenarios")
+    client = RegistryDatabase.connect(conn)
+    records = None
+    for doc in client.collection("dimension_mappings"):
+        from_id = doc["from_dimension"]["dimension_id"]
+        to_id = doc["to_dimension"]["dimension_id"]
+        from_dim = client.collection("dimensions").find({"dimension_id": from_id}).next()
+        to_dim = client.collection("dimensions").find({"dimension_id": to_id}).next()
+        if from_dim["name"] == from_dim_name and to_dim["name"] == to_dim_name:
+            models = convert_record_dicts_to_classes(doc["records"], MappingTableRecordModel)
+            records = models_to_dataframe(models)
+    assert records is not None, f"{from_dim_name=} {to_dim_name=}"
+    return records
 
 
 def apply_load_mapping_aeo_res(aeo_res):

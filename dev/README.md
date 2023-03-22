@@ -75,17 +75,33 @@ Customize as desired, particularly regarding authentication.
 You may need to specify the config file with ``arangodb --conf <your-path>/arangod.conf``
 
 ### Docker container
-Run the ArangoDB Docker container by following instructions at
-https://www.arangodb.com/download-major/docker/
 
+#### Local
+Run the ArangoDB Docker container by following instructions at
+https://www.arangodb.com/download-major/docker/. For example:
+
+```
+docker run --name=arango-container -p 8529:8529 -e ARANGO_ROOT_PASSWORD=openSesame arangodb/arangodb:3.10.4
+```
+
+Once the docker container is running, Arango commands will need to be preceded with `docker exec`. For example, using the container name from above:
+
+```
+docker exec arango-container arangorestore ...
+```
+
+#### Eagle
 If you are running on Eagle then you should use a Singularity container by follwing these steps:
 
-1. Acquire a compute node. It can be the same node that participates in your Spark cluster.
-Don't run ArangoDB on a login node.
+1. Acquire a compute node. It can be the same node that participates in your Spark cluster. *Don't run ArangoDB on a login node.*
 
 2. Change to a directory where you would like to store the database files and create these
 directories.
 ```
+$ cd /scratch/$USER
+$ mkdir arango
+$ cd arango
+# These folders are referenced in the singularity run command below
 $ mkdir arangodb3 arangodb3-apps
 ```
 
@@ -98,7 +114,6 @@ $ module load singularity-container
 ```
 $ singularity run --network-args "portmap=8529:8529" --env "ARANGO_ROOT_PASSWORD=openSesame" -B arangodb3:/var/lib/arangodb3 -B arangodb3-apps:/var/lib/arangodb3-apps /projects/dsgrid/containers/arangodb.sif
 ```
-
 
 ## Tests
 

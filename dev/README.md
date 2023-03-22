@@ -112,8 +112,9 @@ $ module load singularity-container
 
 4. Start ArangoDB. Note that you can change the password to whatever you'd like.
 ```
-$ singularity run --network-args "portmap=8529:8529" --env "ARANGO_ROOT_PASSWORD=openSesame" -B arangodb3:/var/lib/arangodb3 -B arangodb3-apps:/var/lib/arangodb3-apps /projects/dsgrid/containers/arangodb.sif
+$ singularity instance start --network-args "portmap=8529:8529" --env "ARANGO_ROOT_PASSWORD=openSesame" -B arangodb3:/var/lib/arangodb3 -B arangodb3-apps:/var/lib/arangodb3-apps /projects/dsgrid/containers/arangodb.sif arango-container
 ```
+This command starts the instance, after which you can run commands against the instance using `singularity exec instance://arango-container ...`
 
 ## Tests
 

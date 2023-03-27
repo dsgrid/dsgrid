@@ -14,6 +14,7 @@ from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_han
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDataset
+from dsgrid.utils.spark import read_dataframe, write_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import check_uniqueness, display_table
@@ -249,10 +250,9 @@ class DatasetRegistryManager(RegistryManagerBase):
             path = Path(config.dataset_path) / filename
             if path.exists():
                 dst = dataset_path / filename
-                if path.is_file():
-                    self.fs_interface.copy_file(path, dst)
-                else:
-                    self.fs_interface.copy_tree(path, dst)
+                # Writing with Spark is much faster than copying or rsync if there are
+                # multiple nodes in the cluster - much more parallelism.
+                write_dataframe(read_dataframe(path), dst)
 
         # Serialize the registry file as well as the updated DatasetConfig to the registry.
         registry_filename = registry_dir / REGISTRY_FILENAME

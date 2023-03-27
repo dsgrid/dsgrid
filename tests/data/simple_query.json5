@@ -7,7 +7,7 @@
       "dataset_id": "conus_2022",
       "source_datasets": [
       {
-        "dataset_id": "resstock_projected_conus_2022",
+        "dataset_id": "resstock_conus_2022_projected",
         "dataset_type": "standalone",
       },
       ],

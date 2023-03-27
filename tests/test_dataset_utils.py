@@ -3,7 +3,11 @@ import math
 import pyspark.sql.functions as F
 import pytest
 
-from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension
+from dsgrid.utils.dataset import (
+    map_and_reduce_pivoted_dimension,
+    is_noop_mapping,
+    remove_invalid_null_timestamps,
+)
 from dsgrid.utils.spark import get_spark_session
 
 
@@ -115,6 +119,105 @@ def test_map_and_reduce_pivoted_dimension_min(dataframes):
     assert res.filter("county == 'Boulder'").collect()[0].all_electricity == 3.5
     assert res.filter("county == 'Denver'").collect()[0].all_electricity == 4.2
     assert res.filter("county == 'Adams'").collect()[0].all_electricity == 1.3
+
+
+def test_is_noop_mapping_true():
+    spark = get_spark_session()
+    df = spark.createDataFrame(
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elec_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": "elec_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 1.0,
+            },
+        ]
+    )
+    assert is_noop_mapping(df)
+
+
+def test_is_noop_mapping_false():
+    spark = get_spark_session()
+    for records in (
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elec_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": "electricity_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 1.0,
+            },
+        ],
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "electricity_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": "elec_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 1.0,
+            },
+        ],
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elect_cooling",
+                "from_fraction": 2.0,
+            },
+            {
+                "from_id": "elec_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 1.0,
+            },
+        ],
+        [
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elect_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": "elec_heating",
+                "to_id": "elec_heating",
+                "from_fraction": 2.0,
+            },
+        ],
+    ):
+        df = spark.createDataFrame(records)
+        assert not is_noop_mapping(df)
+
+
+def test_remove_invalid_null_timestamps():
+    spark = get_spark_session()
+    df = spark.createDataFrame(
+        [
+            # No nulls
+            {"timestamp": 1, "county": "Jefferson", "subsector": "warehouse", "value": 4},
+            {"timestamp": 2, "county": "Jefferson", "subsector": "warehouse", "value": 5},
+            # Nulls and valid values
+            {"timestamp": None, "county": "Boulder", "subsector": "large_office", "value": 0},
+            {"timestamp": 1, "county": "Boulder", "subsector": "large_office", "value": 4},
+            {"timestamp": 2, "county": "Boulder", "subsector": "large_office", "value": 5},
+            # Only nulls
+            {"timestamp": None, "county": "Adams", "subsector": "retail_stripmall", "value": 0},
+            {"timestamp": None, "county": "Denver", "subsector": "hospital", "value": 0},
+        ]
+    )
+    stacked = ["county", "subsector"]
+    time_col = "timestamp"
+    result = remove_invalid_null_timestamps(df, {time_col}, stacked)
+    assert result.count() == 6
+    assert result.filter("county == 'Boulder'").count() == 2
+    assert result.filter(f"county == 'Boulder' and {time_col} is NULL").rdd.isEmpty()
 
 
 # TODO: enable this when we decide if and how to handle NULL values in mean operations.

@@ -32,7 +32,7 @@ REGISTRY_PATH = (
     / "simple_standard_scenarios"
 )
 
-RESSTOCK_PROJECTION_QUERY = Path("tests") / "data" / "resstock_projected_conus_2022.json5"
+RESSTOCK_PROJECTION_QUERY = Path("tests") / "data" / "resstock_conus_2022_projected.json5"
 
 Datasets = namedtuple("Datasets", ["comstock", "resstock", "tempo"])
 
@@ -42,15 +42,15 @@ logger = logging.getLogger(__name__)
 @pytest.fixture
 def valid_query():
     yield ProjectQueryModel(
-        name="resstock_projected_conus_2022",
+        name="resstock_conus_2022_projected",
         project=ProjectQueryParamsModel(
             project_id="dsgrid_conus_2022",
             include_dsgrid_dataset_components=False,
             dataset=DatasetModel(
-                dataset_id="resstock_projected_conus_2022",
+                dataset_id="resstock_conus_2022_projected",
                 source_datasets=[
                     ExponentialGrowthDatasetModel(
-                        dataset_id="resstock_projected_conus_2022",
+                        dataset_id="resstock_conus_2022_projected",
                         initial_value_dataset_id="resstock_conus_2022_reference",
                         growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
                         construction_method="formula123",
@@ -86,7 +86,7 @@ def test_resstock_projection_invalid_query_replace_ids_with_names(valid_query):
 
 
 def test_create_derived_dataset_config(tmp_path):
-    dataset_id = "resstock_projected_conus_2022"
+    dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"
     check_run_command(
         "dsgrid query project run --offline "
@@ -104,17 +104,18 @@ def test_create_derived_dataset_config(tmp_path):
     assert sorted(new_df.columns) == sorted(orig_df.columns)
     assert new_df.sort(*orig_df.columns).collect() == orig_df.sort(*orig_df.columns).collect()
 
-    # Create the config in the CLI and Python API to get pytest coverage stats in both places.
+    # Create the config in the CLI and Python API to get test coverage in both places.
     dataset_dir = tmp_path / dataset_id
-    check_run_command(
-        f"dsgrid query project create-derived-dataset-config --offline "
-        f"--registry-path={REGISTRY_PATH} {query_output} {dataset_dir} --force"
-    )
     dataset_config_file = dataset_dir / DatasetRegistry.config_filename()
-    assert dataset_config_file.exists()
-    shutil.rmtree(dataset_dir)
 
     registry_manager = RegistryManager.load(REGISTRY_PATH, offline_mode=True)
     dataset_dir.mkdir()
     assert create_derived_dataset_config_from_query(query_output, dataset_dir, registry_manager)
     assert dataset_config_file.exists()
+
+    check_run_command(
+        f"dsgrid query project create-derived-dataset-config --offline "
+        f"--registry-path={REGISTRY_PATH} {query_output} {dataset_dir} --force"
+    )
+    assert dataset_config_file.exists()
+    shutil.rmtree(dataset_dir)

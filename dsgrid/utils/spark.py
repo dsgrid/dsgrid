@@ -487,6 +487,30 @@ def write_dataframe_and_auto_partition(
     return df
 
 
+@track_timing(timer_stats_collector)
+def write_dataframe(df, filename):
+    """Write a Spark DataFrame, accounting for different file types.
+
+    Parameters
+    ----------
+    filename : str
+    df : pyspark.sql.DataFrame
+
+    Returns
+    -------
+    pyspark.sql.DataFrame
+
+    """
+    suffix = Path(filename).suffix
+    name = str(filename)
+    if suffix == ".parquet":
+        df.write.parquet(name)
+    elif suffix == ".csv":
+        df.write.csv(name, header=True)
+    elif suffix == ".json":
+        df.write.json(name)
+
+
 def sql(query):
     """Run a SQL query with Spark.
 

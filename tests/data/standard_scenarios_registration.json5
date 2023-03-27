@@ -7,6 +7,35 @@
       "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/project.json5",
       "register_project": true,
       "datasets": [
+          "dataset_id": "eia_861_annual_energy_use_state_sector",
+          "dataset_path": "../dsgrid-data/eia_861_annual_energy_use_state_sector",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/historical/eia_861_annual_energy_use_state_sector/dataset.json5",
+          "dimension_mapping_file": "/home/dthom/sandboxes/dsgrid-project-StandardScenarios/dsgrid_project/datasets/historical/eia_861_annual_energy_use_state_sector/dimension_mappings.json5",
+          "register_dataset": true,
+          "submit_to_project": true,
+          "fix_dimension_uuids": false,
+          "fix_dimension_mapping_uuids": false
+        },
+        {
+          "dataset_id": "dsgrid_efs_2012_distributed_generation",
+          "dataset_path": "../dsgrid-data/dsgrid_efs_2012_distributed_generation",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/historical/dsgrid_efs_2012_distributed_generation/dataset.json5",
+          "dimension_mapping_file": "/home/dthom/sandboxes/dsgrid-project-StandardScenarios/dsgrid_project/datasets/historical/dsgrid_efs_2012_distributed_generation/dimension_mappings.json5",
+          "register_dataset": true,
+          "submit_to_project": true,
+          "fix_dimension_uuids": false,
+          "fix_dimension_mapping_uuids": false
+        },
+        {
+          "dataset_id": "dsgrid_efs_2012_losses",
+          "dataset_path": "../dsgrid-data/dsgrid_efs_2012_losses",
+          "config_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/historical/dsgrid_efs_2012_losses/dataset.json5",
+          "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/historical/dsgrid_efs_2012_losses/dimension_mappings.json5",
+          "register_dataset": true,
+          "submit_to_project": true,
+          "fix_dimension_uuids": false,
+          "fix_dimension_mapping_uuids": false
+        },
         {
           "dataset_id": "comstock_conus_2022_reference",
           "dataset_path": "../dsgrid-data/comstock_conus_2022_reference",

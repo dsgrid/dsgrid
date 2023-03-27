@@ -1,5 +1,6 @@
 import abc
 import pyspark.sql.functions as F
+import pyspark.sql.types as sparktypes
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import TimeIntervalType
@@ -123,8 +124,13 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         """
 
-    def _convert_time_to_project_time_interval(self, df=None, project_time_dim=None):
-        """Shift time to match project time based on TimeIntervalType"""
+    def _convert_time_to_project_time_interval(
+        self, df=None, project_time_dim=None, wrap_time=True
+    ):
+        """Shift time to match project time based on TimeIntervalType
+        If time range spills over into anothr year after time interval alignment,
+        the time range will be wrapped around so it's bounded within the year
+        """
         if project_time_dim is None:
             return df
 
@@ -150,4 +156,38 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                         - F.expr(f"INTERVAL {self.get_frequency().seconds} SECONDS"),
                     )
 
+        if not wrap_time:
+            return df
+
+        # If dataset_time does not match project_time, try time-wrapping
+        dataset_time = df.agg(F.collect_set(time_col)).collect()[0][0]
+        project_time = (
+            project_time_dim.build_time_dataframe().agg(F.collect_set(time_col)).collect()[0][0]
+        )
+
+        diff = set(dataset_time).difference(set(project_time))
+
+        if diff:
+            # take most common year from time col
+            main_year = int(
+                df.groupBy(F.year(time_col)).count().select(f"year({time_col})").collect()[0][0]
+            )
+            # time-wrap by changing the year
+            df = (
+                df.filter(F.col(time_col).isin(diff))
+                .withColumn(time_col, self.change_year(time_col, F.lit(main_year)))
+                .union(df.filter(~F.col(time_col).isin(diff)))
+            )
+
+        dataset_time = df.agg(F.collect_set(time_col)).collect()[0][0]
+        diff = set(dataset_time).difference(set(project_time))
+        assert (
+            len(diff) == 0
+        ), "Dataset time column after change_year() does not match project_time"
+
         return df
+
+    @staticmethod
+    @F.udf(returnType=sparktypes.TimestampType())
+    def change_year(date, year=2012):
+        return date.replace(year=year)

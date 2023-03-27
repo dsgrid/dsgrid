@@ -86,10 +86,20 @@ def test_convert_to_project_time(registry_mgr):
         raw_data=tempo_data_with_tz,
         converted_data=tempo_data_mapped_time,
     )
-    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=True)
-    compare_time_conversion(comstock_time_dim, project_time_dim, expect_error=True)
     compare_time_conversion(
-        tempo_time_dim, project_time_dim, df=tempo_data_mapped_time, expect_error=True
+        resstock_time_dim, project_time_dim, wrap_time=False, expect_error=True
+    )
+    compare_time_conversion(
+        comstock_time_dim, project_time_dim, wrap_time=False, expect_error=True
+    )
+    compare_time_conversion(
+        resstock_time_dim, project_time_dim, wrap_time=True, expect_error=False
+    )
+    compare_time_conversion(
+        comstock_time_dim, project_time_dim, wrap_time=True, expect_error=False
+    )
+    compare_time_conversion(
+        tempo_time_dim, project_time_dim, df=tempo_data_mapped_time, expect_error=False
     )
 
     # comstock time conversion
@@ -106,11 +116,11 @@ def test_convert_to_project_time(registry_mgr):
     resstock._handler.make_project_dataframe(project.config)
 
 
-def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None):
+def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None, wrap_time=True):
     project_time = project_time_dim.build_time_dataframe()
     if df is None:
-        converted_dataset_time = dataset_time_dim.convert_dataframe(
-            dataset_time_dim.build_time_dataframe(), project_time_dim
+        converted_dataset_time = dataset_time_dim._convert_time_to_project_time_interval(
+            dataset_time_dim.build_time_dataframe(), project_time_dim, wrap_time=wrap_time
         )
     else:
         converted_dataset_time = df
@@ -126,12 +136,16 @@ def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None):
         )
 
 
-def compare_time_conversion(dataset_time_dim, project_time_dim, df=None, expect_error=False):
+def compare_time_conversion(
+    dataset_time_dim, project_time_dim, df=None, wrap_time=True, expect_error=False
+):
     if expect_error:
         with pytest.raises(DSGDatasetConfigError):
-            _compare_time_conversion(dataset_time_dim, project_time_dim, df=df)
+            _compare_time_conversion(
+                dataset_time_dim, project_time_dim, df=df, wrap_time=wrap_time
+            )
     else:
-        _compare_time_conversion(dataset_time_dim, project_time_dim, df=df)
+        _compare_time_conversion(dataset_time_dim, project_time_dim, df=df, wrap_time=wrap_time)
 
 
 def check_time_dataframe(time_dim):

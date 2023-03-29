@@ -9,6 +9,9 @@ from dsgrid.registry.registry_database import RegistryDatabase, DatabaseConnecti
 
 
 def restore_simple_standard_scenarios(conn=None):
+    """Restores the simple standard scenarios database. Using arangorestore with Docker on
+    GitHub currently does not work.
+    """
     dump_path = (
         Path("dsgrid-test-data") / "filtered_registries" / "simple_standard_scenarios" / "dump"
     )

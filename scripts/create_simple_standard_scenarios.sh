@@ -1,10 +1,20 @@
 #!/bin/bash
+
+# Creates a simple-standard-scenarios registry using a dsgrid registry
+# database containing the StandardScenarios project and data as well as
+# files from the dsgrid and dsgrid-project-StandardScenarios repositories.
+#
+# You'll need to adjust these environment variables to match your registry
+# and local repository paths.
+export DSGRID_REGISTRY_DATABASE_URL=http://localhost:8529
+export DSGRID_REGISTRY_DATABASE_NAME=standard-scenarios
+export REPO_BASE=${HOME}/repos
+export DSGRID_REPO=${REPO_BASE}/dsgrid
+export SS_REPO=${REPO_BASE}/dsgrid-project-StandardScenarios
+
 export SPARK_CLUSTER=spark://$(hostname):7077
 export SPARK_CONF_DIR=$(pwd)/conf
-export REPO_BASE=${HOME}/repos
-export DSGRID_REPO=${REPO_BASE}/dsgrid-db
-export SS_REPO=${REPO_BASE}/dsgrid-project-StandardScenarios
-export DSGRID_REGISTRY_DB_NAME=simple-standard-scenarios
+export DSGRID_REGISTRY_SIMPLE_DB_NAME=simple-standard-scenarios
 export SIMPLE_SS_DATA=$(pwd)/simple_standard_scenarios-data
 export QUERY_OUTPUT=$(pwd)/query_output
 export COMSTOCK_DD=$(pwd)/comstock_projected_derived_dataset
@@ -15,9 +25,9 @@ export DUMP_DIR=$(pwd)/simple_standard_scenarios_dump
 rm -rf ${QUERY_OUTPUT} ${SIMPLE_SS_DATA} ${COMSTOCK_DD} ${RESSTOCK_DD} ${TEMPO_DD} ${DUMP_DIR}
 
 dsgrid-admin make-filtered-registry \
-    --src-db-name standard-scenarios \
-    --dst-db-name ${DSGRID_REGISTRY_DB_NAME} \
-    --url http://localhost:8529 \
+    --src-db-name ${DSGRID_REGISTRY_DATABASE_NAME} \
+    --dst-db-name ${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --url ${DSGRID_REGISTRY_DATABASE_URL} \
     ${SIMPLE_SS_DATA} \
     ${DSGRID_REPO}/dsgrid-test-data/filtered_registries/simple_standard_scenarios.json
 if [[ $? -ne 0 ]]; then
@@ -30,7 +40,7 @@ spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
     query project run \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
     ${SS_REPO}/dsgrid_project/derived_datasets/comstock_conus_2022_projected.json5 \
     -o ${QUERY_OUTPUT}
@@ -43,7 +53,7 @@ spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
     query project run \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
     ${SS_REPO}/dsgrid_project/derived_datasets/resstock_conus_2022_projected.json5 \
     -o ${QUERY_OUTPUT}
@@ -56,7 +66,7 @@ spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
     query project run \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
     ${SS_REPO}/dsgrid_project/derived_datasets/tempo_conus_2022_mapped.json5 \
     -o ${QUERY_OUTPUT}
@@ -70,7 +80,7 @@ spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
     query project create-derived-dataset-config \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
     ${QUERY_OUTPUT}/comstock_conus_2022_projected \
     ${COMSTOCK_DD}
@@ -83,7 +93,7 @@ spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
     query project create-derived-dataset-config \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
     ${QUERY_OUTPUT}/resstock_conus_2022_projected \
     ${RESSTOCK_DD}
@@ -96,7 +106,7 @@ spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
     query project create-derived-dataset-config \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
     ${QUERY_OUTPUT}/tempo_conus_2022_mapped \
     ${TEMPO_DD}
@@ -110,7 +120,7 @@ spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
     registry \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
     datasets \
     register \
@@ -126,7 +136,7 @@ spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
     registry \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
     projects \
     submit-dataset \
@@ -144,7 +154,7 @@ spark-submit \
     $(which dsgrid-cli.py) \
     registry \
     --offline \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     datasets \
     register \
     ${RESSTOCK_DD}/dataset.json5 \
@@ -159,7 +169,7 @@ spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
     registry \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
     projects \
     submit-dataset \
@@ -177,7 +187,7 @@ spark-submit \
     $(which dsgrid-cli.py) \
     registry \
     --offline \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     datasets \
     register \
     ${TEMPO_DD}/dataset.json5 \
@@ -193,7 +203,7 @@ spark-submit \
     $(which dsgrid-cli.py) \
     registry \
     --offline \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     projects \
     submit-dataset \
     -p dsgrid_conus_2022 \
@@ -210,14 +220,14 @@ singularity run \
     -B /scratch:/scratch \
     /projects/dsgrid/containers/arangodb.sif \
     arangodump --server.database \
-    --db-name=${DSGRID_REGISTRY_DB_NAME} \
+    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --server.password openSesame \
     --output-directory $(pwd)/$(DUMP_DIR) \
     --compress-output false \
     --include-system-collections true
 
 echo ""
-echo "Created a registry database called ${DSGRID_REGISTRY_DB_NAME} with filtered StandardScenarios data."
+echo "Created a registry database called ${DSGRID_REGISTRY_SIMPLE_DB_NAME} with filtered StandardScenarios data."
 echo "The registry dumped in JSON format is at ${DUMP_DIR}."
 echo "The load data for the registry is at ${SIMPLE_SS_DATA}."
 echo "The changed files need to be committed in git and pushed back to GitHub."

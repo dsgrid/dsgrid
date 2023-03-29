@@ -45,8 +45,8 @@ def cli(log_file, no_prompts, verbose):
     "--url",
     default="http://localhost:8529",
     show_default=True,
-    envvar="DSGRID_REGISTRY_DATABASE",
-    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE",
+    envvar="DSGRID_REGISTRY_DATABASE_URL",
+    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
 )
 @click.option(
     "--db-name",
@@ -125,8 +125,8 @@ Registry Commands
     "--url",
     default="http://localhost:8529",
     show_default=True,
-    envvar="DSGRID_REGISTRY_DATABASE",
-    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE",
+    envvar="DSGRID_REGISTRY_DATABASE_URL",
+    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
 )
 @click.option(
     "-f", "--force", is_flag=True, default=False, help="Delete registry_path if it already exists."
@@ -201,8 +201,8 @@ def remove_dataset(registry_manager, dataset_id):
     "--url",
     default="http://localhost:8529",
     show_default=True,
-    envvar="DSGRID_REGISTRY_DATABASE",
-    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE",
+    envvar="DSGRID_REGISTRY_DATABASE_URL",
+    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
 )
 @click.option(
     "--src-db-name",

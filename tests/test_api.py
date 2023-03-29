@@ -39,7 +39,8 @@ from dsgrid.utils.files import load_data
 
 logger = logging.getLogger(__name__)
 # These env variables need to be set before the app is imported.
-os.environ["DSGRID_REGISTRY_DATABASE"] = "http://localhost:8529"
+os.environ["DSGRID_REGISTRY_DATABASE_URL"] = "http://localhost:8529"
+os.environ["DSGRID_REGISTRY_DATABASE_NAME"] = "simple-standard-scenarios"
 QUERY_OUTPUT_DIR = Path(tempfile.gettempdir()) / "test_dsgrid_query_output"
 os.environ["DSGRID_QUERY_OUTPUT_DIR"] = str(QUERY_OUTPUT_DIR)
 API_SERVER_STORE_DIR = Path(tempfile.gettempdir()) / "test_dsgrid_api_server"

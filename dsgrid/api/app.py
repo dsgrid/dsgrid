@@ -51,22 +51,28 @@ from .response_models import (
 
 
 logger = setup_logging(__name__, "dsgrid_api.log")
-DSGRID_REGISTRY_DATABASE = os.environ.get("DSGRID_REGISTRY_DATABASE")
-if DSGRID_REGISTRY_DATABASE is None:
-    raise Exception("The environment variable DSGRID_REGISTRY_DATABASE must be set.")
+DSGRID_REGISTRY_DATABASE_URL = os.environ.get("DSGRID_REGISTRY_DATABASE_URL")
+if DSGRID_REGISTRY_DATABASE_URL is None:
+    raise Exception("The environment variable DSGRID_REGISTRY_DATABASE_URL must be set.")
+DSGRID_REGISTRY_DATABASE_NAME = os.environ.get("DSGRID_REGISTRY_DATABASE_NAME")
+if DSGRID_REGISTRY_DATABASE_NAME is None:
+    raise Exception("The environment variable DSGRID_REGISTRY_DATABASE_NAME must be set.")
 QUERY_OUTPUT_DIR = os.environ.get("DSGRID_QUERY_OUTPUT_DIR")
 if QUERY_OUTPUT_DIR is None:
     raise Exception("The environment variable DSGRID_QUERY_OUTPUT_DIR must be set.")
 API_SERVER_STORE_DIR = os.environ.get("DSGRID_API_SERVER_STORE_DIR")
 if API_SERVER_STORE_DIR is None:
     raise Exception("The environment variable DSGRID_API_SERVER_STORE_DIR must be set.")
+
 offline_mode = True
 no_prompts = True
 # There could be collisions on the only-allowed SparkSession between the main process and
 # subprocesses that run queries.
 # If both processes try to use the Hive metastore, a crash will occur.
 spark = init_spark("dsgrid_api", check_env=False)
-conn = DatabaseConnection.from_url(DSGRID_REGISTRY_DATABASE, database="simple-standard-scenarios")
+conn = DatabaseConnection.from_url(
+    DSGRID_REGISTRY_DATABASE_URL, database=DSGRID_REGISTRY_DATABASE_NAME
+)
 manager = RegistryManager.load(
     conn, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts
 )
@@ -351,8 +357,9 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
         dsgrid_exec = "dsgrid-cli.py"
         base_cmd = (
             f"query project run --offline "
-            f"--db-name=simple-standard-scenarios {fp.name} "
-            f"--output={output_dir} --zip-file --force"
+            f"--url={DSGRID_REGISTRY_DATABASE_URL} "
+            f"--db-name={DSGRID_REGISTRY_DATABASE_NAME} "
+            f"--output={output_dir} --zip-file --force {fp.name}"
         )
         if spark_query.use_spark_submit:
             # Need to find the full path to pass to spark-submit.

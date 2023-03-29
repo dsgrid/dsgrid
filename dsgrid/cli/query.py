@@ -54,8 +54,8 @@ _COMMON_REGISTRY_OPTIONS = (
         "--url",
         default="http://localhost:8529",
         show_default=True,
-        envvar="DSGRID_REGISTRY_DATABASE",
-        help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE",
+        envvar="DSGRID_REGISTRY_DATABASE_URL",
+        help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
     ),
     click.option(
         "--db-name",

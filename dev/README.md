@@ -57,22 +57,30 @@ Once installed, the easiest way to mange the database manually is through Arango
 available at http://localhost:8529
 
 ### Native installation
-1. Install ``ArangoDB Community Edition`` locally by following instructions at
+1. Install `ArangoDB Community Edition` locally by following instructions at
 https://www.arangodb.com/download-major/
 
-Add the ``bin`` directory to your system path. It will likely be in a location like this::
+Add the `bin` directory to your system path. On a Mac It will be in a location like this:
 
     $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/bin
 
-Note the configuration files in this directory::
+though you may have chosen to install to `/Applications`.
+
+Note the configuration files in this directory:
 
     $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/etc/arangodb3
 
 Customize as desired, particularly regarding authentication.
 
-2. Start the database by running ``arangodb``.
+2. Start the database by running `arangodb`. If it gives the error
+`cannot find configuration file` then make this directory and copy the configuration files.
 
-You may need to specify the config file with ``arangodb --conf <your-path>/arangod.conf``
+```
+$ mkdir ~/.arangodb
+$ cp ~/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/etc/arangodb3/*conf ~/.arangodb
+```
+
+If you don't copy the files, you can specify the config file with `arangodb --conf <your-path>/arangod.conf`
 
 ### Docker container
 
@@ -119,6 +127,11 @@ This command starts the instance, after which you can run commands against the i
 ## Tests
 
 ### Setup
+You must be running a local instance of ArangoDB in order to run the tests. It can be a native
+installation or use Docker. The only requirement is that it be available at http://localhost:8529.
+
+The tests will create their own registries and clean up after themselves.
+
 The tests use the [test data repository](https://github.com/dsgrid/dsgrid-test-data.git)
 as a git submodule in `./dsgrid-test-data`. It is a minimal version of the EFS project and
 datasets. You must initialize this submodule and keep it updated.
@@ -138,12 +151,22 @@ $ git submodule update --remote --merge
 Some tests require a filtered StandardScenarios registry. The test data repository
 contains a JSON-exported database that you must import into your local ArangoDB instance.
 
-You can use a native ArangoDB installation or the docker container.
+You can use a native ArangoDB installation or the docker container. If using Docker you must have
+bind-mounted the `dsgrid-test-data` directory, as in `docker run -v $(pwd)/dsgrid-test-data:/dsgrid-test-data`.
+
 ```
 $ arangorestore \
     --create-database \
     --input-directory \
     dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \
+    --server.database simple-standard-scenarios \
+    --include-system-collections true
+```
+```
+$ docker exec arango-container arangorestore \
+    --create-database \
+    --input-directory \
+    /dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \
     --server.database simple-standard-scenarios \
     --include-system-collections true
 ```

@@ -58,21 +58,31 @@ available at http://localhost:8529
 
 ### Native installation
 1. Install `ArangoDB Community Edition` locally by following instructions at
-https://www.arangodb.com/download-major/
+https://www.arangodb.com/download-major/. If asked and you plan to run dsgrid tests, set the root password to openSesame to match the defaults.
 
-Add the `bin` directory to your system path. On a Mac It will be in a location like this:
+Add the `bin` directory to your system path. On a Mac it will be in a location like this:
 
     $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/bin
 
-though you may have chosen to install to `/Applications`.
+though you may have chosen to install to `/Applications`. On Windows, it will be in a location like this:
 
-Note the configuration files in this directory:
+    C:\Users\$USER\AppData\Local\ArangoDB3 3.10.5\usr\bin
+
+and the executable installer will have already added it to your path (User variables, Path).
+
+Note the configuration files in this directory on Mac:
 
     $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/etc/arangodb3
 
+and this directory on Windows:
+
+    C:\Users\$USER\AppData\Local\ArangoDB3 3.10.5\etc\arangodb3
+
 Customize as desired, particularly regarding authentication.
 
-2. Start the database by running `arangodb`. If it gives the error
+2. Start the database by running `arangodb` on Mac and `arangod` on Windows. Also on Windows, it is preferable to run `arangod` from the path like `C:\Users\$USER\AppData\Local\ArangoDB3 3.10.5`. Alternatively, you can directly use the ArangoDB Server shortcut on your Windows desktop.
+
+On Mac if it gives the error
 `cannot find configuration file` then make this directory and copy the configuration files.
 
 ```

@@ -1,6 +1,5 @@
 import abc
 import pyspark.sql.functions as F
-import pyspark.sql.types as sparktypes
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import TimeIntervalType
@@ -169,13 +168,25 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         if diff:
             # take most common year from time col
-            main_year = int(
+            main_year = (
                 df.groupBy(F.year(time_col)).count().select(f"year({time_col})").collect()[0][0]
             )
+
             # time-wrap by changing the year
             df = (
                 df.filter(F.col(time_col).isin(diff))
-                .withColumn(time_col, self.change_year(time_col, F.lit(main_year)))
+                .withColumn(
+                    time_col,
+                    F.from_unixtime(
+                        F.unix_timestamp(time_col)
+                        + F.datediff(
+                            F.to_date(F.lit(main_year + 1), "yyyy"),
+                            F.to_date(F.year(time_col) + 1, "yyyy"),
+                        )
+                        * 24
+                        * 3600
+                    ).cast("timestamp"),
+                )
                 .union(df.filter(~F.col(time_col).isin(diff)))
             )
 
@@ -186,8 +197,3 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         ), "Dataset time column after change_year() does not match project_time"
 
         return df
-
-    @staticmethod
-    @F.udf(returnType=sparktypes.TimestampType())
-    def change_year(date, year=2012):
-        return date.replace(year=year)

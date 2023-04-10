@@ -128,11 +128,17 @@ $ mkdir arangodb3 arangodb3-apps
 $ module load singularity-container
 ```
 
-4. Start ArangoDB. Note that you can change the password to whatever you'd like.
+4. Create the ArangoDB singularity instance. Note that you can change the password to whatever you'd like.
 ```
-$ singularity instance start --network-args "portmap=8529:8529" --env "ARANGO_ROOT_PASSWORD=openSesame" -B arangodb3:/var/lib/arangodb3 -B arangodb3-apps:/var/lib/arangodb3-apps /projects/dsgrid/containers/arangodb.sif arango-container
+$ singularity instance start --network-args "portmap=8529:8529" --env "ARANGO_ROOT_PASSWORD=openSesame" -B $(pwd)/arangodb3:/var/lib/arangodb3 -B $(pwd)/arangodb3-apps:/var/lib/arangodb3-apps /projects/dsgrid/containers/arangodb.sif arango-container
 ```
 This command starts the instance, after which you can run commands against the instance using `singularity exec instance://arango-container ...`
+
+5. Run ArangoDB.
+```
+singularity exec instance://arango-container arangod
+```
+After running this command, your window will be unusable. Open a new window and ssh to the same compute node to continue.
 
 ## Tests
 
@@ -161,8 +167,7 @@ $ git submodule update --remote --merge
 Some tests require a filtered StandardScenarios registry. The test data repository
 contains a JSON-exported database that you must import into your local ArangoDB instance.
 
-You can use a native ArangoDB installation or the docker container. If using Docker you must have
-bind-mounted the `dsgrid-test-data` directory, as in `docker run -v $(pwd)/dsgrid-test-data:/dsgrid-test-data`.
+You can use a native ArangoDB installation or the docker container. If using Docker you must have bind-mounted the `dsgrid-test-data` directory, as in `docker run -v $(pwd)/dsgrid-test-data:/dsgrid-test-data`. Similarly, for the Eagle Singularity container you would add an additional bind-mount to the original `singularity instance start` call as in `-B /home/$USER/dsgrid/dsgrid-test-data:/dsgrid-test-data`.
 
 ```
 $ arangorestore \
@@ -172,8 +177,18 @@ $ arangorestore \
     --server.database simple-standard-scenarios \
     --include-system-collections true
 ```
+
 ```
 $ docker exec arango-container arangorestore \
+    --create-database \
+    --input-directory \
+    /dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \
+    --server.database simple-standard-scenarios \
+    --include-system-collections true
+```
+
+```
+$ singularity exec instance://arango-container arangorestore \
     --create-database \
     --input-directory \
     /dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \

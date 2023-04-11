@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.query.derived_dataset import (
     create_derived_dataset_config_from_query,
     does_query_support_a_derived_dataset,
@@ -86,6 +87,11 @@ def test_resstock_projection_invalid_query_replace_ids_with_names(valid_query):
 
 
 def test_create_derived_dataset_config(tmp_path):
+
+    registry_manager = RegistryManager.load(REGISTRY_PATH, offline_mode=True)
+    project_id = "dsgrid_conus_2022"
+    project = registry_manager.project_manager.load_project(project_id)
+
     dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"
     check_run_command(
@@ -102,13 +108,15 @@ def test_create_derived_dataset_config(tmp_path):
     orig_df = read_dataframe(REGISTRY_PATH / "data" / dataset_id / "1.0.0" / "table.parquet")
     new_df = read_dataframe(query_output / "table.parquet")
     assert sorted(new_df.columns) == sorted(orig_df.columns)
+
+    # orig_df does not have time-wrapping, so need to load project_time to convert
+    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
+    orig_df = project_time_dim.convert_dataframe(orig_df, project_time_dim)
     assert new_df.sort(*orig_df.columns).collect() == orig_df.sort(*orig_df.columns).collect()
 
     # Create the config in the CLI and Python API to get test coverage in both places.
     dataset_dir = tmp_path / dataset_id
     dataset_config_file = dataset_dir / DatasetRegistry.config_filename()
-
-    registry_manager = RegistryManager.load(REGISTRY_PATH, offline_mode=True)
     dataset_dir.mkdir()
     assert create_derived_dataset_config_from_query(query_output, dataset_dir, registry_manager)
     assert dataset_config_file.exists()

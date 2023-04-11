@@ -127,7 +127,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         self, df=None, project_time_dim=None, wrap_time=True
     ):
         """Shift time to match project time based on TimeIntervalType
-        If time range spills over into anothr year after time interval alignment,
+        If time range spills over into another year after time interval alignment,
         the time range will be wrapped around so it's bounded within the year
         """
         if project_time_dim is None:

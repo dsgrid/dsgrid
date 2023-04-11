@@ -157,12 +157,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                     )
 
         if wrap_time:
-            df = self._wrap_time_around_year(df, project_time_dim)
+            df = self._apply_time_wrap(df, project_time_dim)
 
         return df
 
     @staticmethod
-    def _wrap_time_around_year(df, project_time_dim):
+    def _apply_time_wrap(df, project_time_dim):
         """If dataset_time does not match project_time, apply time-wrapping"""
 
         time_col = project_time_dim.get_timestamp_load_data_columns()

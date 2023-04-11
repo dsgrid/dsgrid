@@ -7,6 +7,7 @@ import pytest
 
 import pandas as pd
 import numpy as np
+from zoneinfo import ZoneInfo
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_manager import RegistryManager
@@ -125,12 +126,10 @@ def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None, wrap_t
     else:
         converted_dataset_time = df
     ptime_col = project_time_dim.get_timestamp_load_data_columns()
-    dfp = project_time.select(ptime_col).distinct().orderBy(ptime_col).toPandas()
-    dfd = converted_dataset_time.select(ptime_col).distinct().orderBy(ptime_col).toPandas()
+    dfp = set(project_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
+    dfd = set(converted_dataset_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
 
-    delta = dfp.compare(dfd)
-
-    if len(delta) > 0:
+    if dfp != dfd:
         raise DSGDatasetConfigError(
             "dataset time dimension converted to project requirement does not match project time dimension. \n{delta}"
         )
@@ -150,21 +149,18 @@ def compare_time_conversion(
 
 def check_time_dataframe(time_dim):
     session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
-    time_df = time_dim.build_time_dataframe().toPandas()  # pyspark df
+    time_df = time_dim.build_time_dataframe().collect()
+    time_df_start = min(time_df)[0].astimezone(ZoneInfo(session_tz))
+    time_df_end = max(time_df)[0].astimezone(ZoneInfo(session_tz))
     time_range = time_dim.get_time_ranges()[0]
-
-    time_df.iloc[:, 0] = time_df.iloc[:, 0].dt.tz_localize(session_tz, ambiguous="infer")
-    time_df_ts = time_df.iloc[0, 0]
-    time_range_ts = time_range.start.tz_convert(session_tz)
+    time_range_start = time_range.start.tz_convert(session_tz)
+    time_range_end = time_range.end.tz_convert(session_tz)
     assert (
-        time_df_ts == time_range_ts
-    ), f"Starting timestamp does not match: {time_df_ts} vs. {time_range_ts}"
-
-    time_df_ts = time_df.iloc[-1, 0]
-    time_range_ts = time_range.end.tz_convert(session_tz)
+        time_df_start == time_range_start
+    ), f"Starting timestamp does not match: {time_df_start} vs. {time_range_start}"
     assert (
-        time_df_ts == time_range_ts
-    ), f"Ending timestamp does not match: {time_df_ts} vs. {time_range_ts}"
+        time_df_end == time_range_end
+    ), f"Ending timestamp does not match: {time_df_end} vs. {time_range_end}"
 
 
 def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
@@ -280,8 +276,11 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     raw_sum_df2 = raw_sum_df2.toPandas().set_index(groupby_cols).sort_index()
 
     # check 1: that mapping df are the same for both spark and pandas
-    time_df2 = time_df.toPandas()
-    time_df2[ptime_col] = time_df2[ptime_col].dt.tz_localize(session_tz, ambiguous="infer")
+    time_df2 = time_df.collect()
+    time_df2 = pd.DataFrame(time_df2, columns=time_df.columns)
+    time_df2[ptime_col] = pd.to_datetime(time_df2[ptime_col]).dt.tz_localize(
+        session_tz, ambiguous="infer"
+    )
 
     cond = model_time_df["month"] != time_df2["month"]
     cond |= model_time_df["day_of_week"] != time_df2["day_of_week"]
@@ -361,21 +360,21 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     # QC 2: model_time == project_time == tempo_time
     session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
     model_time[time_col] = model_time[time_col].dt.tz_convert(session_tz)
-    project_time = project_time.toPandas()
-    project_time[time_col] = project_time[time_col].dt.tz_localize(session_tz, ambiguous="infer")
-    tempo_time = tempo_time.toPandas()
-    tempo_time[time_col] = tempo_time[time_col].dt.tz_localize(session_tz, ambiguous="infer")
+    project_time = [t[0].astimezone(ZoneInfo(session_tz)) for t in project_time.collect()]
+    project_time = pd.DataFrame(project_time, columns=["project_time"])
+    tempo_time = [t[0].astimezone(ZoneInfo(session_tz)) for t in tempo_time.collect()]
+    tempo_time = pd.DataFrame(tempo_time, columns=["tempo_time"])
 
     # Checks
-    n_model = model_time[time_col].nunique()
-    n_project = project_time[time_col].nunique()
-    n_tempo = tempo_time[time_col].nunique()
+    n_model = model_time.iloc[:, 0].nunique()
+    n_project = project_time.iloc[:, 0].nunique()
+    n_tempo = tempo_time.iloc[:, 0].nunique()
 
     time = pd.concat(
         [
             model_time,
-            project_time.rename(columns={time_col: "project_time"}),
-            tempo_time.rename(columns={time_col: "tempo_time"}),
+            project_time,
+            tempo_time,
         ],
         axis=1,
     )

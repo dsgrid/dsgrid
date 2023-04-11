@@ -116,6 +116,18 @@ delete those directories before running the script.
 
 Note that Slurm will log stdout/stderr from `arangod` into `./arango_<job-id>.o/e`.
 
+The repository also includes `scripts/start_spark_and_arango_on_eagle.sh`. It starts Spark as well
+as ArangoDB, but you must have cloned `https://github.com/NREL/HPC.git`. It looks for the repo at
+`~/repos/HPC`, but you can set a custom value on the command line, such as the example below.
+
+You may want to adjust the number and type of nodes in the script based on your Spark requirements.
+```
+$ sbatch scripts/start_spark_and_arango_on_eagle.sh ~/HPC
+```
+
+Note that Slurm will log stdout/stderr from into `./dsgrid_infra<job-id>.o/e`. Look at the .o
+file to see the URL for the Spark cluster and the Spark configuration directory.
+
 It is advised to gracefully shut down the database if you want to ensure that all updates have
 been persisted to files. To do that:
 

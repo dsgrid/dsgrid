@@ -321,6 +321,8 @@ def get_async_task_data(async_task_id: int):
             detail=f"Data can only be read for completed tasks: async_task_id={async_task_id} status={task.status}",
         )
     if task.task_type == AsyncTaskType.PROJECT_QUERY:
+        if not task.result.data_file:
+            raise HTTPException(400, f"{task.result.data_file=} is invalid")
         # TODO: Sending data this way has major limitations. We lose all the benefits of Parquet and
         # compression.
         # We should also check how much data we can read through the Spark driver.

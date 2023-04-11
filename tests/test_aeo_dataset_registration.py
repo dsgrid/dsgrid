@@ -40,12 +40,6 @@ def make_test_project_dir(tmp_path_factory):
     shutil.rmtree(tmpdir)
     RegistryDatabase.delete(conn)
 
-    # These can cause failures in later tests.
-    for name in ("spark-warehouse", "metastore_db"):
-        path = Path(name)
-        if path.exists():
-            shutil.rmtree(path)
-
 
 def _make_project_dir(project):
     tmpdir = Path(gettempdir()) / "test_project"

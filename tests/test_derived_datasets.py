@@ -4,7 +4,9 @@ from collections import namedtuple
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
+from dsgrid.cli.dsgrid import cli
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.query.derived_dataset import (
     create_derived_dataset_config_from_query,
@@ -22,7 +24,6 @@ from dsgrid.query.models import (
 from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.spark import read_dataframe
 
 
@@ -89,11 +90,23 @@ def test_resstock_projection_invalid_query_replace_ids_with_names(valid_query):
 def test_create_derived_dataset_config(tmp_path):
     dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"
-    check_run_command(
-        "dsgrid query project run --offline "
-        f"--db-name=simple-standard-scenarios "
-        f"{RESSTOCK_PROJECTION_QUERY} -o {query_output_base} --force"
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli,
+        [
+            "query",
+            "project",
+            "run",
+            "--offline",
+            "--db-name",
+            "simple-standard-scenarios",
+            str(RESSTOCK_PROJECTION_QUERY),
+            "-o",
+            str(query_output_base),
+            "--force",
+        ],
     )
+    assert result.exit_code == 0
     query_output = query_output_base / dataset_id
     assert query_output.exists()
     table_file = QuerySubmitterBase.table_filename(query_output)
@@ -115,9 +128,20 @@ def test_create_derived_dataset_config(tmp_path):
     assert create_derived_dataset_config_from_query(query_output, dataset_dir, registry_manager)
     assert dataset_config_file.exists()
 
-    check_run_command(
-        f"dsgrid query project create-derived-dataset-config --offline "
-        f"--db-name=simple-standard-scenarios {query_output} {dataset_dir} --force"
+    result = runner.invoke(
+        cli,
+        [
+            "query",
+            "project",
+            "create-derived-dataset-config",
+            "--offline",
+            "--db-name",
+            "simple-standard-scenarios",
+            str(query_output),
+            str(dataset_dir),
+            "--force",
+        ],
     )
+    assert result.exit_code == 0
     assert dataset_config_file.exists()
     shutil.rmtree(dataset_dir)

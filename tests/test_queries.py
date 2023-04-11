@@ -9,8 +9,10 @@ from pathlib import Path
 import pyspark.sql.functions as F
 from pyspark.sql.types import DoubleType, IntegerType, StringType, StructField, StructType
 import pytest
+from click.testing import CliRunner
 from pyspark.sql import SparkSession
 
+from dsgrid.cli.dsgrid import cli
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.mapping_tables import MappingTableRecordModel
 from dsgrid.dimension.dimension_filters import (
@@ -41,7 +43,6 @@ from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDataset
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.spark import models_to_dataframe
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
 
@@ -204,18 +205,39 @@ def test_create_composite_dataset_query(tmp_path):
 
 def test_query_cli_create_validate(tmp_path):
     filename = tmp_path / "query.json5"
-    cmd = (
-        f"dsgrid query project create --offline --db-name=simple-standard-scenarios "
-        f"-d -r -f {filename} -F expression -F column_operator "
-        "-F supplemental_column_operator -F raw --force my_query dsgrid_conus_2022 "
-        "projected_dg_conus_2022"
-    )
+    cmd = [
+        "query",
+        "project",
+        "create",
+        "--offline",
+        "--db-name",
+        "simple-standard-scenarios",
+        "-d",
+        "-r",
+        "-f",
+        str(filename),
+        "-F",
+        "expression",
+        "-F",
+        "column_operator",
+        "-F",
+        "supplemental_column_operator",
+        "-F",
+        "raw",
+        "--force",
+        "my_query",
+        "dsgrid_conus_2022",
+        "projected_dg_conus_2022",
+    ]
     shutdown_project()
-    check_run_command(cmd)
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(cli, cmd)
+    assert result.exit_code == 0
     query = ProjectQueryModel.from_file(filename)
     assert query.name == "my_query"
     assert query.result.aggregations
-    check_run_command(f"dsgrid query project validate {filename}")
+    result = runner.invoke(cli, ["query", "project", "validate", str(filename)])
+    assert result.exit_code == 0
 
 
 def test_query_cli_run(tmp_path):
@@ -224,12 +246,21 @@ def test_query_cli_run(tmp_path):
     query = QueryTestElectricityValues(True, REGISTRY_PATH, project, output_dir=output_dir)
     filename = tmp_path / "query.json"
     filename.write_text(query.make_query().json(indent=2))
-    cmd = (
-        f"dsgrid query project run --offline --db-name=simple-standard-scenarios "
-        f"--output={output_dir} {filename}"
-    )
+    cmd = [
+        "query",
+        "project",
+        "run",
+        "--offline",
+        "--db-name",
+        "simple-standard-scenarios",
+        "--output",
+        str(output_dir),
+        str(filename),
+    ]
     shutdown_project()
-    check_run_command(cmd)
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(cli, cmd)
+    assert result.exit_code == 0
     query.validate()
 
 
@@ -268,11 +299,6 @@ def shutdown_project():
     spark = SparkSession.getActiveSession()
     if spark is not None:
         spark.stop()
-
-    # There could be collisions with the Hive metastore.
-    for path in ("metastore_db", "spark-warehouse"):
-        if Path(path).exists():
-            shutil.rmtree(path)
 
 
 def run_query_test(test_query_cls, *args, expected_values=None):

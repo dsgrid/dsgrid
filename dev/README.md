@@ -109,36 +109,33 @@ docker exec arango-container arangorestore ...
 ```
 
 #### Eagle
-If you are running on Eagle then you should use a Singularity container by follwing these steps:
+The dsgrid repository includes `scripts/start_arangodb_on_eagle.sh`. It will start an ArangoDB
+on a compute node using the debug partition. It stores Arango files in `/scratch/${USER}/arangodb3`
+and `/scratch/${USER}/arangodb3-apps`. If you would like to use a completely new database,
+delete those directories before running the script.
 
-1. Acquire a compute node. It can be the same node that participates in your Spark cluster. *Don't run ArangoDB on a login node.*
+Note that Slurm will log stdout/stderr from `arangod` into `./arango_<job-id>.o/e`.
 
-2. Change to a directory where you would like to store the database files and create these
-directories.
-```
-$ cd /scratch/$USER
-$ mkdir arango
-$ cd arango
-# These folders are referenced in the singularity run command below
-$ mkdir arangodb3 arangodb3-apps
-```
+It is advised to gracefully shut down the database if you want to ensure that all updates have
+been persisted to files. To do that:
 
-3. Load the singularity environment module.
+1. ssh to the compute node running the database.
+2. Identify the process ID of `arangod`. In this example the PID is `195412`.
 ```
-$ module load singularity-container
+$ ps -ef | grep arango
+dthom    195412 195392  0 09:31 ?        00:00:06 arangod --server.authentication=true --config /tmp/arangod.conf
 ```
+3. Send `SIGTERM` to the process.
+```
+$ kill -s TERM 195412
+```
+4. `arangod` will detect the signal and gracefully shutdown.
 
-4. Create the ArangoDB singularity instance. Note that you can change the password to whatever you'd like.
-```
-$ singularity instance start --network-args "portmap=8529:8529" --env "ARANGO_ROOT_PASSWORD=openSesame" -B $(pwd)/arangodb3:/var/lib/arangodb3 -B $(pwd)/arangodb3-apps:/var/lib/arangodb3-apps /projects/dsgrid/containers/arangodb.sif arango-container
-```
-This command starts the instance, after which you can run commands against the instance using `singularity exec instance://arango-container ...`
+Modify the HPC parameters as needed. Or run the commands manually. *Note that you should never run
+ArangoDB on a login node.*
 
-5. Run ArangoDB.
-```
-singularity exec instance://arango-container arangod
-```
-After running this command, your window will be unusable. Open a new window and ssh to the same compute node to continue.
+If you need to start a Spark cluster, you can do that on the same compute node running the database.
+
 
 ## Tests
 
@@ -167,7 +164,7 @@ $ git submodule update --remote --merge
 Some tests require a filtered StandardScenarios registry. The test data repository
 contains a JSON-exported database that you must import into your local ArangoDB instance.
 
-You can use a native ArangoDB installation or the docker container. If using Docker you must have bind-mounted the `dsgrid-test-data` directory, as in `docker run -v $(pwd)/dsgrid-test-data:/dsgrid-test-data`. Similarly, for the Eagle Singularity container you would add an additional bind-mount to the original `singularity instance start` call as in `-B /home/$USER/dsgrid/dsgrid-test-data:/dsgrid-test-data`.
+You can use a native ArangoDB installation or the docker container. If using Docker you must have bind-mounted the `dsgrid-test-data` directory, as in `docker run -v $(pwd)/dsgrid-test-data:/dsgrid-test-data`.
 
 ```
 $ arangorestore \
@@ -187,13 +184,10 @@ $ docker exec arango-container arangorestore \
     --include-system-collections true
 ```
 
+If you are running on Eagle, run this script from the dsgrid repository. Note that you can run this
+command on a login node. `DB_HOSTNAME` is the node name of the compute node running Arango.
 ```
-$ singularity exec instance://arango-container arangorestore \
-    --create-database \
-    --input-directory \
-    /dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \
-    --server.database simple-standard-scenarios \
-    --include-system-collections true
+$ bash scripts/restore_simple_standard_scenarios.sh <path-to-your-local-dsgrid-test-data> <DB_HOSTNAME>
 ```
 
 You will have to repeat this process anytime the test data is updated.

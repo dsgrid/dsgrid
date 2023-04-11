@@ -8,6 +8,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pandas as pd
+import pytest
 from fastapi.testclient import TestClient
 
 from dsgrid.dimension.base_models import DimensionType
@@ -178,6 +179,9 @@ def test_list_table_format_types():
     assert response.types == sorted(list(TableFormatType), key=lambda x: x.value)
 
 
+# This doesn't work in all environments, especially Eagle. There are conflicts with the
+# metastore_db directory.
+@pytest.mark.skip
 def test_submit_project_query(setup_api_server):
     query = SparkSubmitProjectQueryRequest(
         use_spark_submit=False,

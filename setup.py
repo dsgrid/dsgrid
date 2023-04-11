@@ -84,7 +84,7 @@ setup(
         "json5",
         "numpy~=1.23.0",  # pyspark uses numpy.bool, which was removed in numpy 1.24
         # Remove this restriction when pyspark is fixed.
-        "pandas",
+        "pandas~=1.5",
         "prettytable",
         "pydantic",
         "pyspark==3.3.1",  # Keep this synced with the spark version in Dockerfile.

@@ -3,6 +3,7 @@ import pyspark.sql.functions as F
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import TimeIntervalType
+from dsgrid.exceptions import DSGInvalidOperation
 
 
 class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
@@ -155,45 +156,57 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                         - F.expr(f"INTERVAL {self.get_frequency().seconds} SECONDS"),
                     )
 
-        if not wrap_time:
-            return df
+        if wrap_time:
+            df = self._wrap_time_around_year(df, project_time_dim)
 
-        # If dataset_time does not match project_time, try time-wrapping
-        dataset_time = df.agg(F.collect_set(time_col)).collect()[0][0]
-        project_time = (
+        return df
+
+    @staticmethod
+    def _wrap_time_around_year(df, project_time_dim):
+        """If dataset_time does not match project_time, apply time-wrapping"""
+
+        time_col = project_time_dim.get_timestamp_load_data_columns()
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+
+        project_time = set(
             project_time_dim.build_time_dataframe().agg(F.collect_set(time_col)).collect()[0][0]
         )
+        dataset_time = set(df.agg(F.collect_set(time_col)).collect()[0][0])
+        diff = dataset_time.difference(project_time)
 
-        diff = set(dataset_time).difference(set(project_time))
+        if not diff:
+            return df
 
-        if diff:
-            # take most common year from time col
-            main_year = (
-                df.groupBy(F.year(time_col)).count().select(f"year({time_col})").collect()[0][0]
+        # extract main_year based on if diff is to the left or right of project_time
+        main_year = df.groupBy(F.year(time_col).alias("year")).count()
+        if max(diff) < min(project_time):
+            main_year = main_year.sort(F.col("count").desc()).select("year").collect()[0][0]
+        else:
+            main_year = main_year.sort(F.col("count").asc()).select("year").collect()[0][0]
+
+        # time-wrap by "changing" the year with time delta
+        df = (
+            df.filter(F.col(time_col).isin(diff))
+            .withColumn(
+                time_col,
+                F.from_unixtime(
+                    F.unix_timestamp(time_col)
+                    + F.datediff(
+                        F.to_date(F.lit(main_year + 1), "yyyy"),
+                        F.to_date(F.year(time_col) + 1, "yyyy"),
+                    )
+                    * 24
+                    * 3600
+                ).cast("timestamp"),
             )
+            .union(df.filter(~F.col(time_col).isin(diff)))
+        )
 
-            # time-wrap by changing the year
-            df = (
-                df.filter(F.col(time_col).isin(diff))
-                .withColumn(
-                    time_col,
-                    F.from_unixtime(
-                        F.unix_timestamp(time_col)
-                        + F.datediff(
-                            F.to_date(F.lit(main_year + 1), "yyyy"),
-                            F.to_date(F.year(time_col) + 1, "yyyy"),
-                        )
-                        * 24
-                        * 3600
-                    ).cast("timestamp"),
-                )
-                .union(df.filter(~F.col(time_col).isin(diff)))
+        dataset_time = set(df.agg(F.collect_set(time_col)).collect()[0][0])
+        if not dataset_time.issubset(project_time):
+            raise DSGInvalidOperation(
+                "Dataset time column after self._wrap_time_around_year() does not match project_time"
             )
-
-        dataset_time = df.agg(F.collect_set(time_col)).collect()[0][0]
-        diff = set(dataset_time).difference(set(project_time))
-        assert (
-            len(diff) == 0
-        ), "Dataset time column after change_year() does not match project_time"
 
         return df

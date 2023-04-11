@@ -178,27 +178,19 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         if not diff:
             return df
 
-        # extract main_year based on if diff is to the left or right of project_time
-        main_year = df.groupBy(F.year(time_col).alias("year")).count()
-        if max(diff) < min(project_time):
-            main_year = main_year.sort(F.col("count").desc()).select("year").collect()[0][0]
-        else:
-            main_year = main_year.sort(F.col("count").asc()).select("year").collect()[0][0]
+        # extract time_delta based on if diff is to the left or right of project_time
+        time_delta = (
+            max(project_time) - min(project_time) + project_time_dim.get_frequency()
+        ).total_seconds()
+        if min(diff) > max(project_time):
+            time_delta *= -1
 
-        # time-wrap by "changing" the year with time delta
+        # time-wrap by "changing" the year with time_delta
         df = (
             df.filter(F.col(time_col).isin(diff))
             .withColumn(
                 time_col,
-                F.from_unixtime(
-                    F.unix_timestamp(time_col)
-                    + F.datediff(
-                        F.to_date(F.lit(main_year + 1), "yyyy"),
-                        F.to_date(F.year(time_col) + 1, "yyyy"),
-                    )
-                    * 24
-                    * 3600
-                ).cast("timestamp"),
+                F.from_unixtime(F.unix_timestamp(time_col) + time_delta).cast("timestamp"),
             )
             .union(df.filter(~F.col(time_col).isin(diff)))
         )

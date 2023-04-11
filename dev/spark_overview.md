@@ -52,7 +52,8 @@ enables full performance on your system. It also allows you to debug your
 jobs in the Spark UI before or after they complete.
 
 - HPC compute node in local mode: Use this only for quick checks. Same points above for local
-computer in local mode apply. Create a standalone cluster for real work.
+computer in local mode apply. Create a standalone cluster for real work. If you use this, set
+the environment variable `SPARK_LOCAL_DIRS=/tmp/scratch` so that you have enough space.
 
 - HPC compute node(s) with a standalone cluster: Create a cluster on any number of compute nodes
 and then use all CPUs for your jobs. Refer to the [installation
@@ -398,6 +399,17 @@ Spark UI Stages tab in the Shuffle Write column. Your `target_partition_size` sh
 
 The minimum partitions value should be the total number of cores in the cluster unless you want to
 leave some cores available for other jobs that may be running simultaneously.
+
+### Running out of space in local mode on the HPC
+The `/tmp` directory on HPC filesystems is very small. If you run Spark local mode with default
+settings, it will to use that directory for scratch space and then quickly fill it up and fail.
+Set the environment variable `SPARK_LOCAL_DIRS` to an appropriate directory.
+
+```
+$ export SPARK_LOCAL_DIRS=/tmp/scratch
+```
+
+The scripts discussed above set this environment variable for standalone clusters on an HPC.
 
 ### Dynamic allocation
 This feature is disabled by default on standalone clusters. It is described

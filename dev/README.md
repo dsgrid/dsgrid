@@ -258,6 +258,17 @@ If you only want to run AWS tests:
 pytest tests_aws
 ```
 
+If you're running tests on Eagle and used the `scripts/start_spark_and_arango_on_eagle.sh` or set up a custom configuration you will want to:
+
+- ssh to the node where Arango is running
+- `export SPARK_LOCAL_DIRS=/tmp/scratch`
+- change to the directory from which you ran the `start_spark_and_arango_on_eagle.sh` script or otherwise identify the full path to the Spark config directory
+- `export SPARK_CONF_DIR=$(pwd)/conf` (You can also get the correct command from `grep SPARK dsgrid_infra*.o`.)
+- `cd ~/dsgrid`
+- `module load conda`
+- activate your conda environment
+- `pytest tests`
+
 ### Workflow for developing a feature that changes code and data
 
 If you are developing a feature that requires changing code and data then you will need to keep

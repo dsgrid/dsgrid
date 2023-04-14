@@ -3,11 +3,11 @@ import pytest
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.exceptions import DSGInvalidParameter
-from dsgrid.tests.common import TEST_REGISTRY
+from dsgrid.registry.registry_database import DatabaseConnection
 
 
 registry_manager = RegistryManager.load(
-    path=TEST_REGISTRY,
+    DatabaseConnection(database="test-dsgrid"),
     remote_path=REMOTE_REGISTRY,
     offline_mode=True,
     no_prompts=True,
@@ -23,7 +23,6 @@ def test_registry_list_all():
     """
 
     assert registry_manager
-    print(f"Local registry: {registry_manager.path}")
     registry_manager.show()
     registry_manager.project_manager.show()
     registry_manager.dataset_manager.show()

@@ -10,6 +10,7 @@ import click
 from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.loggers import setup_logging, check_log_file_size
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.utils.files import load_data
@@ -41,11 +42,17 @@ def cli(log_file, no_prompts, verbose):
 
 @click.group()
 @click.option(
-    "--path",
-    default=LOCAL_REGISTRY,
+    "--url",
+    default="http://localhost:8529",
     show_default=True,
-    envvar="DSGRID_REGISTRY_PATH",
-    help="path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
+    envvar="DSGRID_REGISTRY_DATABASE_URL",
+    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
+)
+@click.option(
+    "--db-name",
+    default="dsgrid",
+    show_default=True,
+    help="dsgrid registry database name.",
 )
 @click.option(
     "--remote-path",
@@ -63,14 +70,15 @@ def cli(log_file, no_prompts, verbose):
     "commands will not be officially synced with the remote registry",
 )
 @click.pass_context
-def registry(ctx, path, remote_path, offline):
+def registry(ctx, url, db_name, remote_path, offline):
     """Manage a registry."""
     no_prompts = ctx.parent.params["no_prompts"]
     if "--help" in sys.argv:
         ctx.obj = None
     else:
+        conn = DatabaseConnection.from_url(url, database=db_name)
         ctx.obj = RegistryManager.load(
-            path, remote_path, offline_mode=offline, no_prompts=no_prompts
+            conn, remote_path, offline_mode=offline, no_prompts=no_prompts
         )
 
 
@@ -104,20 +112,36 @@ Registry Commands
 
 
 @click.command()
-@click.argument("registry_path")
+@click.argument("db_name")
+@click.option(
+    "-p",
+    "--data-path",
+    default=LOCAL_REGISTRY,
+    show_default=True,
+    callback=lambda *x: Path(x[2]),
+    help="local dsgrid registry data path.",
+)
+@click.option(
+    "--url",
+    default="http://localhost:8529",
+    show_default=True,
+    envvar="DSGRID_REGISTRY_DATABASE_URL",
+    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
+)
 @click.option(
     "-f", "--force", is_flag=True, default=False, help="Delete registry_path if it already exists."
 )
-def create_registry(registry_path, force):
+def create_registry(db_name, url, data_path, force):
     """Create a new registry."""
-    path = Path(registry_path)
-    if path.exists():
+    if data_path.exists():
         if force:
-            shutil.rmtree(path)
+            shutil.rmtree(data_path)
         else:
-            print(f"{registry_path} already exists. Set --force to overwrite.", file=sys.stderr)
+            print(f"{data_path} already exists. Set --force to overwrite.", file=sys.stderr)
             sys.exit(1)
-    RegistryManager.create(path)
+
+    conn = DatabaseConnection.from_url(url, database=db_name)
+    RegistryManager.create(conn, data_path)
 
 
 """
@@ -172,14 +196,27 @@ def remove_dataset(registry_manager, dataset_id):
     registry_manager.dataset_manager.remove(dataset_id)
 
 
-def _path_cb(_, __, val):
-    return Path(val)
-
-
 @click.command()
-@click.argument("src_registry_path", type=click.Path(exists=True), callback=_path_cb)
-@click.argument("dst_registry_path", type=click.Path(exists=False), callback=_path_cb)
-@click.argument("config_file", type=click.Path(exists=True), callback=_path_cb)
+@click.option(
+    "--url",
+    default="http://localhost:8529",
+    show_default=True,
+    envvar="DSGRID_REGISTRY_DATABASE_URL",
+    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
+)
+@click.option(
+    "--src-db-name",
+    required=True,
+    help="Source dsgrid registry database name.",
+)
+@click.option(
+    "--dst-db-name",
+    default="dsgrid",
+    required=True,
+    help="Destination dsgrid registry database name.",
+)
+@click.argument("dst_data_path", type=click.Path(exists=False), callback=lambda *x: Path(x[2]))
+@click.argument("config_file", type=click.Path(exists=True), callback=lambda *x: Path(x[2]))
 @click.option(
     "-m",
     "--mode",
@@ -198,21 +235,26 @@ def _path_cb(_, __, val):
     help="Overwrite dst_registry_path if it already exists. Does not apply if using rsync.",
 )
 def make_filtered_registry(
-    src_registry_path: Path,
-    dst_registry_path: Path,
+    url: str,
+    src_db_name,
+    dst_db_name,
+    dst_data_path: Path,
     config_file: Path,
     mode,
     force,
 ):
     """Make a filtered registry for testing purposes."""
     simple_model = RegistrySimpleModel(**load_data(config_file))
+    src_conn = DatabaseConnection.from_url(url, database=src_db_name)
+    dst_conn = DatabaseConnection.from_url(url, database=dst_db_name)
     RegistryManager.copy(
-        src_registry_path,
-        dst_registry_path,
+        src_conn,
+        dst_conn,
+        dst_data_path,
         mode=mode,
         force=force,
     )
-    mgr = FilterRegistryManager.load(dst_registry_path, offline_mode=True, use_remote_data=False)
+    mgr = FilterRegistryManager.load(dst_conn, offline_mode=True, use_remote_data=False)
     mgr.filter(simple_model=simple_model)
 
 

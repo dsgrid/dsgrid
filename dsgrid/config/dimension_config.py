@@ -1,13 +1,14 @@
 import abc
 import logging
 
-from .config_base import ConfigBase, ConfigWithDataFilesBase
+
+from .config_base import ConfigBase, ConfigWithRecordFileBase
 from .dimensions import DimensionModel
 
 logger = logging.getLogger(__name__)
 
 
-class DimensionBaseConfigWithFiles(ConfigWithDataFilesBase, abc.ABC):
+class DimensionBaseConfigWithFiles(ConfigWithRecordFileBase, abc.ABC):
     """Base class for dimension configs"""
 
     @staticmethod
@@ -17,14 +18,6 @@ class DimensionBaseConfigWithFiles(ConfigWithDataFilesBase, abc.ABC):
     @property
     def config_id(self):
         return self.model.dimension_id
-
-    @staticmethod
-    def data_file_fields():
-        return ["filename"]
-
-    @staticmethod
-    def data_files_fields():
-        return []
 
 
 class DimensionBaseConfigWithoutFiles(ConfigBase, abc.ABC):

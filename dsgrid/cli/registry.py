@@ -8,10 +8,11 @@ from pathlib import Path
 import click
 from semver import VersionInfo
 
-from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
+from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import VersionUpdateType
+from dsgrid.registry.registry_database import DatabaseConnection
 
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.filters import ACCEPTED_OPS
@@ -47,11 +48,17 @@ Click Group Definitions
 
 @click.group()
 @click.option(
-    "--path",
-    default=LOCAL_REGISTRY,
+    "--url",
+    default="http://localhost:8529",
     show_default=True,
-    envvar="DSGRID_REGISTRY_PATH",
-    help="path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
+    envvar="DSGRID_REGISTRY_DATABASE_URL",
+    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
+)
+@click.option(
+    "--db-name",
+    default="dsgrid",
+    show_default=True,
+    help="dsgrid registry database name.",
 )
 @click.option(
     "--remote-path",
@@ -68,14 +75,15 @@ Click Group Definitions
     "commands will not be officially synced with the remote registry",
 )
 @click.pass_context
-def registry(ctx, path, remote_path, offline):
+def registry(ctx, url, db_name, remote_path, offline):
     """Manage a registry."""
+    conn = DatabaseConnection.from_url(url, database=db_name)
     no_prompts = ctx.parent.params["no_prompts"]
     if "--help" in sys.argv:
         ctx.obj = None
     else:
         ctx.obj = RegistryManager.load(
-            path, remote_path, offline_mode=offline, no_prompts=no_prompts
+            conn, remote_path, offline_mode=offline, no_prompts=no_prompts
         )
 
 
@@ -259,27 +267,17 @@ def list_dimension_mappings(registry_manager, filter):
     "dimension-mapping-config-file", type=click.Path(exists=True), callback=_path_callback
 )
 @click.option(
-    # TODO: Why do we want this?
-    "--force",
-    default=False,
-    is_flag=True,
-    show_default=True,
-    help="Register the dimension mappings even if there are duplicates",
-)
-@click.option(
     "-l",
     "--log-message",
     required=True,
     help="reason for submission",
 )
 @click.pass_obj
-def register_dimension_mappings(
-    registry_manager, dimension_mapping_config_file, log_message, force
-):
+def register_dimension_mappings(registry_manager, dimension_mapping_config_file, log_message):
     """Register new dimension mappings with the dsgrid repository."""
     submitter = getpass.getuser()
     manager = registry_manager.dimension_mapping_manager
-    manager.register(dimension_mapping_config_file, submitter, log_message, force=force)
+    manager.register(dimension_mapping_config_file, submitter, log_message)
 
 
 @click.command(name="dump")

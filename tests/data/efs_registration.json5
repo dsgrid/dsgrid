@@ -13,7 +13,7 @@
           "config_file": "../dsgrid-project-EFS/dsgrid_project/datasets/sector_models/comstock/dataset.json5",
           "register_dataset": true,
           "submit_to_project": true,
-          "fix_dimension_uuids": true,
+          "replace_dimension_names_with_ids": true,
         }
       ]
     }

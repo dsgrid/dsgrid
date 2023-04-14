@@ -2,7 +2,6 @@
 
 import abc
 import logging
-import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -10,15 +9,14 @@ from typing import List
 
 from semver import VersionInfo
 
-from dsgrid import timer_stats_collector
 from dsgrid.common import REGISTRY_FILENAME, SYNC_EXCLUDE_LIST
 from dsgrid.exceptions import (
     DSGInvalidParameter,
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
 )
-from dsgrid.utils.timing import track_timing
-from .common import RegistryManagerParams, ConfigRegistrationModel, VersionUpdateType
+from .common import RegistryManagerParams, RegistrationModel, VersionUpdateType
+from .registry_interface import RegistryInterfaceBase
 
 
 logger = logging.getLogger(__name__)
@@ -30,18 +28,20 @@ class RegistryManagerBase(abc.ABC):
     def __init__(self, path, params: RegistryManagerParams):
         self._path = path
         self._params = params
-        self._registry_configs = {}  # ID to registry config
+        self._db = None
 
-    @track_timing(timer_stats_collector)
-    def inventory(self):
-        for config_id in self.fs_interface.listdir(
-            self._path, directories_only=True, exclude_hidden=True
-        ):
-            registry = self.registry_class().load(self.get_registry_file(config_id))
-            self._registry_configs[config_id] = registry
+    @property
+    @abc.abstractmethod
+    def db(self) -> RegistryInterfaceBase:
+        """Return the database interface."""
+
+    @db.setter
+    @abc.abstractmethod
+    def db(self, db: RegistryInterfaceBase):
+        """Return the database interface."""
 
     @classmethod
-    def load(cls, path, params, *args, **kwargs):
+    def load(cls, path, params, db, *args, **kwargs):
         """Load the registry manager.
 
         path : str
@@ -53,33 +53,18 @@ class RegistryManagerBase(abc.ABC):
 
         """
         mgr = cls(path, params)
-        mgr.inventory()
+        mgr.db = db
         return mgr
 
     @classmethod
     def _load(cls, path, fs_interface):
         mgr = cls(path, fs_interface)
-        mgr.inventory()
         return mgr
 
+    @staticmethod
     @abc.abstractmethod
-    def get_by_key(self, key):
-        """Get the item matching key. Returns from cache if already loaded.
-
-        Parameters
-        ----------
-        key : ConfigKey Key
-
-        Returns
-        -------
-        DSGBaseModel
-
-        Raises
-        ------
-        DSGValueNotRegistered
-            Raised if the ID is not stored.
-
-        """
+    def config_class():
+        """Return the class used for storing the config."""
 
     @abc.abstractmethod
     def get_by_id(self, config_id, version=None):
@@ -163,11 +148,6 @@ class RegistryManagerBase(abc.ABC):
 
         """
 
-    @staticmethod
-    @abc.abstractmethod
-    def registry_class():
-        """Return the class used for the registry item."""
-
     @abc.abstractmethod
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
@@ -223,7 +203,7 @@ class RegistryManagerBase(abc.ABC):
                 f"ID={config_id} does not match ID in file: {config.config_id}"
             )
 
-        cur_version = self.get_current_version(config_id)
+        cur_version = self.get_latest_version(config_id)
         if version != cur_version:
             raise DSGInvalidParameter(f"version={version} is not current. Current={cur_version}")
 
@@ -243,44 +223,35 @@ class RegistryManagerBase(abc.ABC):
 
     def _update_config(self, config, submitter, update_type, log_message):
         config_id = config.config_id
-        registry_config = self.get_registry_config(config_id)
-        registry_config.version = self.get_next_version(registry_config.version, update_type)
+        cur_version = config.model.version
+        version = self.get_next_version(cur_version, update_type)
 
-        registration = ConfigRegistrationModel(
-            version=registry_config.version,
+        registration = RegistrationModel(
+            version=version,
             submitter=submitter,
             date=datetime.now(ZoneInfo("UTC")),
             log_message=log_message,
         )
-        registry_config.registration_history.insert(0, registration)
-        registry_config.serialize(self.get_registry_file(config_id), force=True)
 
-        new_config_dir = self.get_config_directory(config_id, registry_config.version)
-        self.fs_interface.mkdir(new_config_dir)
-        config.serialize(new_config_dir)
-
-        self._update_registry_cache(config_id, registry_config)
+        model = self.db.update(config.model, registration)
         logger.info(
             "Updated registry and config information for %s ID=%s version=%s",
             self.name(),
             config_id,
-            registry_config.version,
+            version,
         )
-        return registry_config.version
+        return model
 
     def _check_if_already_registered(self, config_id):
-        if config_id in self._registry_configs:
+        if self.db.has(config_id):
             raise DSGDuplicateValueRegistered(f"{self.name()}={config_id}")
 
     def _check_if_not_registered(self, config_id):
-        if config_id not in self._registry_configs:
+        if not self.db.has(config_id):
             raise DSGValueNotRegistered(f"{self.name()}={config_id}")
 
     def _log_offline_mode_prefix(self):
         return "* OFFLINE MODE * |" if self.offline_mode else ""
-
-    def _update_registry_cache(self, config_id, registry_config):
-        self._registry_configs[config_id] = registry_config
 
     @property
     def cloud_interface(self):
@@ -306,16 +277,14 @@ class RegistryManagerBase(abc.ABC):
 
         """
         path = Path(directory)
-        os.makedirs(path, exist_ok=True)
+        path.mkdir(exist_ok=True, parents=True)
         config = self.get_by_id(config_id, version)
         filename = config.serialize(path, force=force)
-        if version is None:
-            version = self._registry_configs[config_id].version
         logger.info(
             "Dumped config for type=%s ID=%s version=%s to %s",
             self.name(),
             config_id,
-            version,
+            config.model.version,
             filename,
         )
 
@@ -343,108 +312,45 @@ class RegistryManagerBase(abc.ABC):
         """Return True if there is to be no syncing with the remote registry."""
         return self._params.offline
 
-    def get_config_directory(self, config_id, version):
-        """Return the path to the config file.
-
-        Parameters
-        ----------
-        config_id : str
-        version : str
-
-        Returns
-        -------
-        str
-
-        """
-        if version is None:
-            version = self.get_current_version(config_id)
-        return self.get_registry_directory(config_id) / version
-
-    def get_config_file(self, config_id, version):
-        """Return the path to the config file.
-
-        Parameters
-        ----------
-        config_id : str
-        version : str
-
-        Returns
-        -------
-        str
-
-        """
-        return (
-            self.get_config_directory(config_id, version) / self.registry_class().config_filename()
-        )
-
-    def get_current_version(self, config_id):
+    def get_latest_version(self, config_id):
         """Return the current version in the registry.
 
         Returns
         -------
-        VersionInfo
-
-        """
-        return self._registry_configs[config_id].model.version
-
-    def get_registry_config(self, config_id):
-        """Return the registry config.
-
-        Parameters
-        ----------
-        config_id : str
-
-        Returns
-        -------
-        RegistryBase
-
-        """
-        self._check_if_not_registered(config_id)
-        return self._registry_configs[config_id]
-
-    @abc.abstractmethod
-    def acquire_registry_locks(self, config_ids: List[str]):
-        """Acquire lock(s) on the registry for all config_ids.
-
-        Parameters
-        ----------
-        config_ids : List[str]
-
-        Raises
-        ------
-        DSGRegistryLockError
-            Raised if a lock cannot be acquired.
-
-        """
-
-    @abc.abstractmethod
-    def get_registry_lock_file(self, config_id):
-        """Return registry lock file path.
-
-        Parameters
-        ----------
-        config_id : str
-            Config ID
-
-        Returns
-        -------
-        str
-            Lock file path
-        """
-
-    def get_registry_directory(self, config_id):
-        """Return the directory containing config info for config_id (registry.json5 and versions).
-
-        Parameters
-        ----------
-        config_id : str
-
-        Returns
-        -------
         str
 
         """
-        return self._path / config_id
+        return self.db.get_latest_version(config_id)
+
+    # @abc.abstractmethod
+    # def acquire_registry_locks(self, config_ids: List[str]):
+    #    """Acquire lock(s) on the registry for all config_ids.
+
+    #    Parameters
+    #    ----------
+    #    config_ids : List[str]
+
+    #    Raises
+    #    ------
+    #    DSGRegistryLockError
+    #        Raised if a lock cannot be acquired.
+
+    #    """
+
+    # @abc.abstractmethod
+    # def get_registry_lock_file(self, config_id):
+    #    """Return registry lock file path.
+
+    #    Parameters
+    #    ----------
+    #    config_id : str
+    #        Config ID
+
+    #    Returns
+    #    -------
+    #    str
+    #        Lock file path
+    #    """
 
     def get_registry_data_directory(self, config_id):
         """Return the directory containing data for config_id (parquet files).
@@ -488,9 +394,7 @@ class RegistryManagerBase(abc.ABC):
         bool
 
         """
-        if version is None:
-            return config_id in self._registry_configs
-        return self.fs_interface.exists(self.get_config_directory(config_id, version))
+        return self.db.has(config_id, version=version)
 
     def iter_configs(self):
         """Return an iterator over the registered configs."""
@@ -498,8 +402,9 @@ class RegistryManagerBase(abc.ABC):
             yield self.get_by_id(config_id)
 
     def iter_ids(self):
-        """Return an iterator over the registered IDs."""
-        return self._registry_configs.keys()
+        """Return an iterator over the registered dsgrid IDs."""
+        for root in self.db.collection(self.db.root_collection_name()):
+            yield root["_key"]
 
     def list_ids(self, **kwargs):
         """Return the IDs.
@@ -532,12 +437,6 @@ class RegistryManagerBase(abc.ABC):
 
         """
         # TODO: Do we want to handle specific versions? This removes all configs.
-
-    def _remove(self, config_id):
-        self._check_if_not_registered(config_id)
-        self.fs_interface.rm_tree(self.get_registry_directory(config_id))
-        self._registry_configs.pop(config_id, None)
-        logger.info("Removed %s from the registry.", config_id)
 
     def sync_pull(self, path):
         """Synchronizes files from the remote registry to local.

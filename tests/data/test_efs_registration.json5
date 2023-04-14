@@ -1,6 +1,13 @@
 {
   "create_registry": true,
-  "registry_path": "tests/data/registry",
+  "data_path": "tests/data/registry",
+  "conn": {
+    hostname: "localhost",
+    port: 8529,
+    username: "root",
+    password: "openSesame",
+    database: "test-dsgrid",
+  },
   "projects": [
     {
       "project_id": "test_efs",
@@ -14,8 +21,8 @@
           "dimension_mapping_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
-          "fix_dimension_uuids": true,
-          "fix_dimension_mapping_uuids": true
+          "replace_dimension_names_with_ids": true,
+          "replace_dimension_mapping_names_with_ids": true
         }
       ]
     }

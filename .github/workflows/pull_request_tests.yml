@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - name: Setup ArangoDB
+      uses: rhizomenetwork/arangodb-action@v1
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:
@@ -30,6 +32,8 @@ jobs:
         # Credentials would need to be configured.
         git submodule init
         git submodule update
+        # Haven't figured out how to run arangorestore here. Use this instead.
+        python dsgrid/tests/restore_simple_standard_scenarios_db.py
         python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

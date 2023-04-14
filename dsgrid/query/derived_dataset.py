@@ -9,12 +9,12 @@ from dsgrid.config.dataset_config import (
     DataSchemaType,
     InputDatasetType,
 )
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
 from dsgrid.query.query_submitter import QuerySubmitterBase
-from dsgrid.registry.dataset_registry import DatasetRegistry
-from dsgrid.registry.dimension_registry import DimensionRegistry
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.spark import read_dataframe, get_unique_values
@@ -207,7 +207,7 @@ def _make_dataset_config(
         "dimensions": [],
         "dimension_references": dimension_references,
     }
-    config_file = path / DatasetRegistry.config_filename()
+    config_file = path / DatasetConfig.config_filename()
     config_file.write_text(json5.dumps(config, indent=2))
     if num_new_supplemental_dimensions > 0:
         logger.info(
@@ -253,7 +253,7 @@ def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path:
         "description": "",
         "filename": filename.name,
     }
-    dump_data(new_dim, new_dim_path / DimensionRegistry.config_filename(), indent=2)
+    dump_data(new_dim, new_dim_path / DimensionConfig.config_filename(), indent=2)
     logger.warning(
         "The derived dataset does not match any project dimension for dimension "
         "type %s. Consider creating a new supplemental dimension out of the files in %s",

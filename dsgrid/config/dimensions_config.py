@@ -6,7 +6,6 @@ from pydantic import Field
 from pydantic import validator
 
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.registry.common import make_dimension_id, check_config_id_loose
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import DimensionModel, handle_dimension_union
@@ -79,31 +78,10 @@ class DimensionsConfig(ConfigBase):
     def model_class():
         return DimensionsConfigModel
 
-    def assign_ids(self):
-        """Assign unique IDs to each mapping in the config"""
-        logger.info("Dimension record ID assignment:")
-        for dim in self.model.dimensions:
-            # assign id, made from dimension.name and a UUID
-            dimension_id = make_dimension_id(dim.name)
-            check_config_id_loose(dimension_id, "Dimension")
-            dim.dimension_id = dimension_id
-
-    @property
-    def src_dir(self):
-        return self._src_dir
-
-    @src_dir.setter
-    def src_dir(self, src_dir):
-        self._src_dir = src_dir
-
     @classmethod
     def load(cls, config_filename: Path, *args, **kwargs):
-        obj = super().load(config_filename, *args, **kwargs)
-        obj.src_dir = config_filename.parent
-        return obj
+        return super().load(config_filename, *args, **kwargs)
 
     @classmethod
-    def load_from_model(cls, model, src_dir):
-        obj = cls(model)
-        obj.src_dir = src_dir
-        return obj
+    def load_from_model(cls, model):
+        return cls(model)

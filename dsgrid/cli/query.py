@@ -7,7 +7,7 @@ from pathlib import Path
 import click
 from pydantic import ValidationError
 
-from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
+from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.cli.common import check_output_directory
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
@@ -33,6 +33,7 @@ from dsgrid.query.models import (
 from dsgrid.query.query_submitter import (
     ProjectQuerySubmitter,
 )  # , CompositeDatasetQuerySubmitter
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -50,11 +51,17 @@ def add_options(options):
 
 _COMMON_REGISTRY_OPTIONS = (
     click.option(
-        "--registry-path",
-        default=LOCAL_REGISTRY,
+        "--url",
+        default="http://localhost:8529",
         show_default=True,
-        envvar="DSGRID_REGISTRY_PATH",
-        help="Path to dsgrid registry. Override with the environment variable DSGRID_REGISTRY_PATH",
+        envvar="DSGRID_REGISTRY_DATABASE_URL",
+        help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
+    ),
+    click.option(
+        "--db-name",
+        default="dsgrid",
+        show_default=True,
+        help="dsgrid registry database name.",
     ),
     click.option(
         "--remote-path",
@@ -168,7 +175,8 @@ def create_project(
     query_file,
     default_result_aggregation,
     force,
-    registry_path,
+    url,
+    db_name,
     remote_path,
     offline,
 ):
@@ -183,8 +191,9 @@ def create_project(
             )
             sys.exit(1)
 
+    conn = DatabaseConnection.from_url(url, database=db_name)
     registry_manager = RegistryManager.load(
-        registry_path,
+        conn,
         remote_path=remote_path,
         offline_mode=offline,
     )
@@ -290,7 +299,8 @@ def run_project(
     query_definition_file,
     persist_intermediate_table,
     zip_file,
-    registry_path,
+    url,
+    db_name,
     remote_path,
     offline,
     output,
@@ -299,8 +309,9 @@ def run_project(
 ):
     """Run a query on a dsgrid project."""
     query = ProjectQueryModel.from_file(query_definition_file)
+    conn = DatabaseConnection.from_url(url, database=db_name)
     registry_manager = RegistryManager.load(
-        registry_path,
+        conn,
         remote_path=remote_path,
         offline_mode=offline,
     )
@@ -320,7 +331,8 @@ def run_project(
 @add_options(_COMMON_RUN_OPTIONS)
 def create_composite_dataset(
     query_definition_file,
-    registry_path,
+    url,
+    db_name,
     remote_path,
     offline,
     output,
@@ -329,11 +341,12 @@ def create_composite_dataset(
 ):
     """Run a query to create a composite dataset."""
     CreateCompositeDatasetQueryModel.from_file(query_definition_file)
+    # conn = DatabaseConnection.from_url(url, database=db_name)
     # TODO
     print("not implemented yet")
     sys.exit(1)
     # registry_manager = RegistryManager.load(
-    #     registry_path,
+    #     conn,
     #     remote_path=remote_path,
     #     offline_mode=offline,
     # )
@@ -346,7 +359,8 @@ def create_composite_dataset(
 @add_options(_COMMON_RUN_OPTIONS)
 def query_composite_dataset(
     query_definition_file,
-    registry_path,
+    url,
+    db_name,
     remote_path,
     offline,
     output,
@@ -355,6 +369,7 @@ def query_composite_dataset(
 ):
     """Run a query on a composite dataset."""
     CompositeDatasetQueryModel.from_file(query_definition_file)
+    # conn = DatabaseConnection.from_url(url, database=db_name)
     # TODO
     print("not implemented yet")
     sys.exit(1)
@@ -378,7 +393,7 @@ def query_composite_dataset(
     show_default=True,
     help="Overwrite results directory if it exists.",
 )
-def create_derived_dataset_config(src, dst, registry_path, remote_path, offline, force):
+def create_derived_dataset_config(src, dst, url, db_name, remote_path, offline, force):
     """Create a derived dataset configuration and dimensions from a query result."""
     fs_interface = make_filesystem_interface(src)
     src_path = fs_interface.path(src)
@@ -388,8 +403,9 @@ def create_derived_dataset_config(src, dst, registry_path, remote_path, offline,
     dst_path = fs_interface.path(dst)
     check_output_directory(dst_path, fs_interface, force)
 
+    conn = DatabaseConnection.from_url(url, database=db_name)
     registry_manager = RegistryManager.load(
-        registry_path,
+        conn,
         remote_path=remote_path,
         offline_mode=offline,
     )

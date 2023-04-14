@@ -3,7 +3,6 @@
 from enum import Enum
 import json
 import logging
-import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -12,7 +11,7 @@ from pydantic.json import isoformat, timedelta_isoformat
 from semver import VersionInfo
 
 from dsgrid.exceptions import DSGInvalidParameter
-from dsgrid.utils.files import load_data
+from dsgrid.utils.files import in_other_dir, load_data
 
 
 logger = logging.getLogger(__name__)
@@ -52,16 +51,12 @@ class DSGBaseModel(BaseModel):
         if not filename.is_file():
             raise DSGInvalidParameter(f"{filename} is not a file")
 
-        base_dir = filename.parent.absolute()
-        orig = os.getcwd()
-        os.chdir(base_dir)
-        try:
-            return cls(**load_data(filename.name))
-        except ValidationError:
-            logger.exception("Failed to validate %s", filename)
-            raise
-        finally:
-            os.chdir(orig)
+        with in_other_dir(filename.parent):
+            try:
+                return cls(**load_data(filename.name))
+            except ValidationError:
+                logger.exception("Failed to validate %s", filename)
+                raise
 
     @classmethod
     def schema_json(cls, by_alias=True, indent=None) -> str:

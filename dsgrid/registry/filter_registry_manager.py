@@ -27,8 +27,8 @@ class FilterRegistryManager(RegistryManager):
             self._project_mgr.remove(project_id)
 
         dataset_ids_to_keep = {x.dataset_id for x in simple_model.datasets}
-        to_remove = [x for x in self._dataset_mgr.list_ids() if x not in dataset_ids_to_keep]
-        for dataset_id in to_remove:
+        dataset_ids_to_remove = set(self._dataset_mgr.list_ids()) - dataset_ids_to_keep
+        for dataset_id in dataset_ids_to_remove:
             self._dataset_mgr.remove(dataset_id)
 
         modified_dims = set()
@@ -36,7 +36,6 @@ class FilterRegistryManager(RegistryManager):
 
         def handle_dimension(simple_dim, dim):
             records = dim.get_records_dataframe()
-            # filename = dim.src_dir / dim.model.filename
             df = records.filter(records.id.isin(simple_dim.record_ids))
             filtered_records = [x.asDict() for x in df.collect()]
             modified_dims.add(dim.model.dimension_id)
@@ -47,7 +46,15 @@ class FilterRegistryManager(RegistryManager):
 
         logger.info("Filter project dimensions")
         for project in simple_model.projects:
+            changed_project = False
             project_config = self._project_mgr.get_by_id(project.project_id)
+            indices_to_remove = []
+            for i, dataset in enumerate(project_config.model.datasets):
+                if dataset.dataset_id in dataset_ids_to_remove:
+                    indices_to_remove.append(i)
+            for index in reversed(indices_to_remove):
+                project_config.model.datasets.pop(index)
+                changed_project = True
             for simple_dim in project.dimensions.base_dimensions:
                 dim = project_config.get_base_dimension(simple_dim.dimension_type)
                 dim.model.records = handle_dimension(simple_dim, dim)
@@ -58,6 +65,8 @@ class FilterRegistryManager(RegistryManager):
                     if dim.model.dimension_query_name == simple_dim.dimension_query_name:
                         dim.model.records = handle_dimension(simple_dim, dim)
                         self.dimension_manager.db.replace(dim.model, check_rev=False)
+            if changed_project:
+                self.project_manager.db.replace(project_config.model)
 
         logger.info("Filter dataset dimensions")
         for dataset in simple_model.datasets:

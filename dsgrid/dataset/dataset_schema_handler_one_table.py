@@ -110,14 +110,21 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def filter_data(self, dimensions: List[DimensionSimpleModel]):
         load_df = self._load_data
         pivoted_dimension_type = self.get_pivoted_dimension_type()
-        pivoted_columns = set(self.get_pivoted_dimension_columns())
-        pivoted_columns_to_remove = set()
+        time_columns = set(
+            self._config.get_dimension(DimensionType.TIME).get_timestamp_load_data_columns()
+        )
         df_columns = set(load_df.columns)
+        stacked_columns = set()
         for dim in dimensions:
             column = dim.dimension_type.value
             if column in df_columns:
                 load_df = load_df.filter(load_df[column].isin(dim.record_ids))
-            elif dim.dimension_type == pivoted_dimension_type:
+                stacked_columns.add(column)
+
+        pivoted_columns = set(load_df.columns) - time_columns - stacked_columns
+        pivoted_columns_to_remove = set()
+        for dim in dimensions:
+            if dim.dimension_type == pivoted_dimension_type:
                 pivoted_columns_to_remove = pivoted_columns.difference(dim.record_ids)
 
         drop_columns = []

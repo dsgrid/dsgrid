@@ -30,6 +30,11 @@ def pytest_sessionstart(session):
         print("git submodule update")
         sys.exit(1)
 
+    # Previous versions of this database can cause problems in error conditions.
+    path = Path("metastore_db")
+    if path.exists():
+        shutil.rmtree(path)
+
     # Saving these tables during tests doesn't add any value and adds complications whenever
     # multiple processes try to access the Hive metastore, particularly when we inject errors.
     # We only need this when we submit datasets to projects and users want to inspect the

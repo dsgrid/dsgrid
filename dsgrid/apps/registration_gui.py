@@ -11,6 +11,7 @@ from pyspark.sql import SparkSession
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.exceptions import DSGBaseException
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.loggers import setup_logging
 from dsgrid.utils.spark import init_spark
@@ -295,17 +296,18 @@ class RegistrationGui:
 
         sync = self._sync_cbox.value
         online = self._online_mode_cbox.value
+        conn = DatabaseConnection()
         try:
             if sync and not online:
                 # This exists only to sync data locally.
                 RegistryManager.load(
-                    path=self._local_path_text.value,
+                    conn,
                     remote_path=self._remote_path_text.value,
                     offline_mode=False,
                     user=getpass.getuser(),
                 )
             self._manager = RegistryManager.load(
-                path=self._local_path_text.value,
+                conn,
                 remote_path=self._remote_path_text.value,
                 offline_mode=not online,
                 user=getpass.getuser(),

@@ -196,7 +196,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         return Project(
             config,
-            version,
+            config.model.version,
             dataset_configs,
             self._dimension_mgr,
             self._dimension_mapping_mgr,

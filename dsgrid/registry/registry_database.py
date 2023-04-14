@@ -133,7 +133,7 @@ class RegistryDatabase:
         src = cls.connect(src_conn)
         cls.delete(dst_conn)
         dst = cls.create(dst_conn, dst_data_path)
-        edge_names = []
+        edge_names = set()
         for collection in src.client.collections():
             name = collection["name"]
             # If we keep anything besides data_path here, we need to import it.
@@ -141,7 +141,7 @@ class RegistryDatabase:
                 continue
             if not name.startswith("_"):
                 if collection["type"] == "edge":
-                    edge_names.append(name)
+                    edge_names.add(name)
                     continue
                 for item in src.client.collection(name):
                     dst.client.collection(name).insert(item)

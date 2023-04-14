@@ -57,22 +57,40 @@ Once installed, the easiest way to mange the database manually is through Arango
 available at http://localhost:8529
 
 ### Native installation
-1. Install ``ArangoDB Community Edition`` locally by following instructions at
-https://www.arangodb.com/download-major/
+1. Install `ArangoDB Community Edition` locally by following instructions at
+https://www.arangodb.com/download-major/. If asked and you plan to run dsgrid tests, set the root password to openSesame to match the defaults.
 
-Add the ``bin`` directory to your system path. It will likely be in a location like this::
+Add the `bin` directory to your system path. On a Mac it will be in a location like this:
 
     $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/bin
 
-Note the configuration files in this directory::
+though you may have chosen to install to `/Applications`. On Windows, it will be in a location like this:
+
+    C:\Users\$USER\AppData\Local\ArangoDB3 3.10.5\usr\bin
+
+and the executable installer will have already added it to your path (User variables, Path).
+
+Note the configuration files in this directory on Mac:
 
     $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/etc/arangodb3
 
+and this directory on Windows:
+
+    C:\Users\$USER\AppData\Local\ArangoDB3 3.10.5\etc\arangodb3
+
 Customize as desired, particularly regarding authentication.
 
-2. Start the database by running ``arangodb``.
+2. Start the database by running `arangodb` on Mac and `arangod` on Windows. Also on Windows, it is preferable to run `arangod` from the path like `C:\Users\$USER\AppData\Local\ArangoDB3 3.10.5`. Alternatively, you can directly use the ArangoDB Server shortcut on your Windows desktop.
 
-You may need to specify the config file with ``arangodb --conf <your-path>/arangod.conf``
+On Mac if it gives the error
+`cannot find configuration file` then make this directory and copy the configuration files.
+
+```
+$ mkdir ~/.arangodb
+$ cp ~/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/etc/arangodb3/*conf ~/.arangodb
+```
+
+If you don't copy the files, you can specify the config file with `arangodb --conf <your-path>/arangod.conf`
 
 ### Docker container
 
@@ -91,34 +109,54 @@ docker exec arango-container arangorestore ...
 ```
 
 #### Eagle
-If you are running on Eagle then you should use a Singularity container by follwing these steps:
+The dsgrid repository includes `scripts/start_arangodb_on_eagle.sh`. It will start an ArangoDB
+on a compute node using the debug partition. It stores Arango files in `/scratch/${USER}/arangodb3`
+and `/scratch/${USER}/arangodb3-apps`. If you would like to use a completely new database,
+delete those directories before running the script.
 
-1. Acquire a compute node. It can be the same node that participates in your Spark cluster. *Don't run ArangoDB on a login node.*
+Note that Slurm will log stdout/stderr from `arangod` into `./arango_<job-id>.o/e`.
 
-2. Change to a directory where you would like to store the database files and create these
-directories.
-```
-$ cd /scratch/$USER
-$ mkdir arango
-$ cd arango
-# These folders are referenced in the singularity run command below
-$ mkdir arangodb3 arangodb3-apps
-```
+The repository also includes `scripts/start_spark_and_arango_on_eagle.sh`. It starts Spark as well
+as ArangoDB, but you must have cloned `https://github.com/NREL/HPC.git`. It looks for the repo at
+`~/repos/HPC`, but you can set a custom value on the command line, such as the example below.
 
-3. Load the singularity environment module.
+You may want to adjust the number and type of nodes in the script based on your Spark requirements.
 ```
-$ module load singularity-container
+$ sbatch scripts/start_spark_and_arango_on_eagle.sh ~/HPC
 ```
 
-4. Start ArangoDB. Note that you can change the password to whatever you'd like.
+Note that Slurm will log stdout/stderr from into `./dsgrid_infra<job-id>.o/e`. Look at the .o
+file to see the URL for the Spark cluster and the Spark configuration directory.
+
+It is advised to gracefully shut down the database if you want to ensure that all updates have
+been persisted to files. To do that:
+
+1. ssh to the compute node running the database.
+2. Identify the process ID of `arangod`. In this example the PID is `195412`.
 ```
-$ singularity instance start --network-args "portmap=8529:8529" --env "ARANGO_ROOT_PASSWORD=openSesame" -B arangodb3:/var/lib/arangodb3 -B arangodb3-apps:/var/lib/arangodb3-apps /projects/dsgrid/containers/arangodb.sif arango-container
+$ ps -ef | grep arango
+dthom    195412 195392  0 09:31 ?        00:00:06 arangod --server.authentication=true --config /tmp/arangod.conf
 ```
-This command starts the instance, after which you can run commands against the instance using `singularity exec instance://arango-container ...`
+3. Send `SIGTERM` to the process.
+```
+$ kill -s TERM 195412
+```
+4. `arangod` will detect the signal and gracefully shutdown.
+
+Modify the HPC parameters as needed. Or run the commands manually. *Note that you should never run
+ArangoDB on a login node.*
+
+If you need to start a Spark cluster, you can do that on the same compute node running the database.
+
 
 ## Tests
 
 ### Setup
+You must be running a local instance of ArangoDB in order to run the tests. It can be a native
+installation or use Docker. The only requirement is that it be available at http://localhost:8529.
+
+The tests will create their own registries and clean up after themselves.
+
 The tests use the [test data repository](https://github.com/dsgrid/dsgrid-test-data.git)
 as a git submodule in `./dsgrid-test-data`. It is a minimal version of the EFS project and
 datasets. You must initialize this submodule and keep it updated.
@@ -138,9 +176,30 @@ $ git submodule update --remote --merge
 Some tests require a filtered StandardScenarios registry. The test data repository
 contains a JSON-exported database that you must import into your local ArangoDB instance.
 
-You can use a native ArangoDB installation or the docker container.
+You can use a native ArangoDB installation or the docker container. If using Docker you must have bind-mounted the `dsgrid-test-data` directory, as in `docker run -v $(pwd)/dsgrid-test-data:/dsgrid-test-data`.
+
 ```
-$ arangorestore --create-database --input-directory dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump --server.database simple-standard-scenarios --include-system-collections true
+$ arangorestore \
+    --create-database \
+    --input-directory \
+    dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \
+    --server.database simple-standard-scenarios \
+    --include-system-collections true
+```
+
+```
+$ docker exec arango-container arangorestore \
+    --create-database \
+    --input-directory \
+    /dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \
+    --server.database simple-standard-scenarios \
+    --include-system-collections true
+```
+
+If you are running on Eagle, run this script from the dsgrid repository. Note that you can run this
+command on a login node. `DB_HOSTNAME` is the node name of the compute node running Arango.
+```
+$ bash scripts/restore_simple_standard_scenarios.sh <path-to-your-local-dsgrid-test-data> <DB_HOSTNAME>
 ```
 
 You will have to repeat this process anytime the test data is updated.
@@ -155,171 +214,31 @@ this command after modifiying the paths specified in the JSON5 file. Four `bigme
 on Eagle are recommended in order to complete the job in one hour. Two may be sufficient if you
 run multiple iterations.
 
+Run this from your scratch directory.
+
 ```
 $ spark-submit \
     --master=spark://$(hostname):7077 \
     --conf spark.sql.shuffle.partitions=2400 \
-    $(which dsgrid-cli.py)
     dsgrid/tests/register.py tests/data/standard_scenarios_registration.json
 ```
 
-2. Filter the registry such that the datasets are small enough to be used in tests. You'll likely
-need to do this on Eagle. One compute node for hour should be sufficient.
-```
-$ dsgrid-admin make-filtered-registry \
-    --src-db-name standard-scenarios \
-    --dst-db-name simple-standard-scenarios \
-    --url http://localhost:8529 \
-    standard-scenarios-registry-data dsgrid-tests-data/filtered-registries/simple_standard_scenarios.json
-```
+2. Acquire a new compute node. It can be any time of node and you only need it for an hour.
+Create a local version of the dsgrid repository script `scripts/create_simple_standard_scenarios.sh`.
+Edit the environment variables at the top of the script as necessary and then run it. It will
+filter the StandardScenarios data and then create, register, and submit-to-project these derived
+datasets:
 
-3. Create derived datasets and submit them.
 - `comstock_conus_2022_projected`
 - `resstock_conus_2022_projected`
 - `tempo_conus_2022_mapped`
 
-These queries create the datasets.
-```
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project run \
-    --db-name=standard-scenarios \
-    --offline \
-    ~/repos/dsgrid-project-StandardScenarios/dsgrid_project/derived_datasets/comstock_conus_2022_projected.json5 \
-    -o query-output
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project run \
-    --db-name=standard-scenarios \
-    --offline \
-    ~/repos/dsgrid-project-StandardScenarios/dsgrid_project/derived_datasets/resstock_conus_2022_projected.json5 \
-    -o query-output
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project run \
-    --db-name=standard-scenarios \
-    --offline \
-    ~/repos/dsgrid-project-StandardScenarios/dsgrid_project/derived_datasets/tempo_conus_2022_mapped.json5 \
-    -o query-output
-```
-
-These commands create derived-dataset configurations.
-```
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project create-derived-dataset-config \
-    --db-name=standard-scenarios \
-    --offline \
-    query-output/comstock_projected_conus_2022 \
-    comstock-derived-dataset
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project create-derived-dataset-config \
-    --db-name=standard-scenarios \
-    --offline \
-    query-output/resstock_projected_conus_2022 \
-    resstock-derived-dataset
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    query project create-derived-dataset-config \
-    --db-name=standard-scenarios \
-    --offline \
-    query-output/tempo_conus_2022_mapped tempo-derived-dataset \
-    tempo-derived-dataset
-```
-
-These commands register and submit the datasets.
-```
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    datasets \
-    register \
-    comstock-derived-dataset/dataset.json5 \
-    query-output/comstock_projected_conus_2022 \
-    -l "Register comstock_projected_conus_2022"
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    projects \
-    submit-dataset \
-    -p dsgrid_conus_2022 \
-    -d comstock_projected_conus_2022 \
-    -m comstock-derived-dataset/dimension_mapping_references.json5 \
-    -l "Submit comstock_projected_conus_2022"
-
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    datasets \
-    register \
-    resstock-derived-dataset/dataset.json5 \
-    query-output/resstock_projected_conus_2022 \
-    -l "Register resstock_projected_conus_2022"
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    projects \
-    submit-dataset \
-    -p dsgrid_conus_2022 \
-    -d resstock_projected_conus_2022 \
-    -m resstock-derived-dataset/dimension_mapping_references.json5 \
-    -l "Submit resstock_projected_conus_2022"
-
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    datasets \
-    register \
-    tempo-derived-dataset/dataset.json5 \
-    query-output/tempo_conus_2022_mapped \
-    -l "Register tempo_conus_2022_mapped"
-$ spark-submit \
-    --master=spark://$(hostname):7077 \
-    $(which dsgrid-cli.py) \
-    registry \
-    --offline \
-    projects \
-    submit-dataset \
-    -p dsgrid_conus_2022 \
-    -d tempo_conus_2022_mapped \
-    -m tempo-derived-dataset/dimension_mapping_references.json5 \
-    -l "Submit tempo_conus_2022_mapped"
-```
-
-4. Dump the registry database to text files.
-```
-singularity run \
-    -B /scratch:/scratch \
-    /projects/dsgrid/containers/arangodb.sif \
-    arangodump \
-    --server.database standard-scenarios \
-    --server.password openSesame \
-    --output-directory simple-standard-scenarios-dump \
-    --compress-output false \
-    --include-system-collections true
-```
-
-5. Copy (e.g., cp, scp, rsync) or arangodump the output files to a dsgrid-test-data
-repository in the directory
-`dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump`, push to GitHub and open a
-pull request.
+3. Copy (e.g., cp, scp, rsync) or arangodump the output files (registry JSON and Parquet) from the
+previous step to a dsgrid-test-data repository in the directory
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios`. Edit the file
+`dump/data_path_*.data.json` to ensure that the `data_path` value is set to
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios`. Make a branch, commit, push
+it to GitHub, and open a pull request.
 
 ### Run tests
 
@@ -338,6 +257,18 @@ If you only want to run AWS tests:
 ```
 pytest tests_aws
 ```
+
+If you're running tests on Eagle and used the `scripts/start_spark_and_arango_on_eagle.sh` or set up a custom configuration you will want to:
+
+- ssh to the node where Arango is running
+- change to the directory from which you ran the `start_spark_and_arango_on_eagle.sh` script or otherwise identify the full path to the Spark config directory
+- `export SPARK_CONF_DIR=$(pwd)/conf` (You can also get the correct command from `grep SPARK dsgrid_infra*.o`.)
+- `cd ~/dsgrid`
+- `module load conda`
+- activate your conda environment
+- `pytest tests`
+
+If you did not set up a Spark cluster and are instead running Spark in local mode you can skip the above command to `export SPARK_CONF_DIR=$(pwd)/conf` and will want to instead `export SPARK_LOCAL_DIRS=/tmp/scratch`.
 
 ### Workflow for developing a feature that changes code and data
 

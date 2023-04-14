@@ -519,23 +519,23 @@ class RegistryManager:
         if not {x.name for x in src_data_path.iterdir()}.issuperset({"data"}):
             raise DSGInvalidParameter(f"{src_data_path} is not a valid registry")
 
+        if mode in ("copy", "data-symlinks"):
+            if dst_data_path.exists():
+                if force:
+                    shutil.rmtree(dst_data_path)
+                else:
+                    raise DSGInvalidParameter(f"{dst_data_path} already exists.")
         RegistryDatabase.copy(src, dst, dst_data_path)
         if mode == "rsync":
             cmd = f"rsync -a {src_data_path}/ {dst_data_path}"
             logger.info("rsync data with [%s]", cmd)
             check_run_command(cmd)
         elif mode in ("copy", "data-symlinks"):
-            if dst_data_path.exists():
-                if force:
-                    shutil.rmtree(dst_data_path)
-                else:
-                    raise DSGInvalidParameter(f"{dst_data_path} already exists.")
             logger.info("Copy data from source registry %s", src_data_path)
             if mode == "data-symlinks":
-                (dst_data_path).mkdir()
                 _make_data_symlinks(src_data_path, dst_data_path)
             else:
-                shutil.copytree(src_data_path, dst_data_path, symlinks=True)
+                shutil.copytree(src_data_path / "data", dst_data_path / "data", symlinks=True)
         else:
             raise DSGInvalidParameter(f"mode={mode} is not supported")
 

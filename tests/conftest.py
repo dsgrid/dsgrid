@@ -7,6 +7,7 @@ from tempfile import gettempdir
 
 import pytest
 
+from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.utils.run_command import run_command, check_run_command
 from dsgrid.utils.spark import init_spark
 from dsgrid.tests.common import (
@@ -28,6 +29,11 @@ def pytest_sessionstart(session):
         print("git submodule init")
         print("git submodule update")
         sys.exit(1)
+
+    # Previous versions of this database can cause problems in error conditions.
+    path = Path("metastore_db")
+    if path.exists():
+        shutil.rmtree(path)
 
     # Saving these tables during tests doesn't add any value and adds complications whenever
     # multiple processes try to access the Hive metastore, particularly when we inject errors.
@@ -133,3 +139,12 @@ def _make_project_dir(project):
     os.mkdir(tmpdir)
     shutil.copytree(project / "dsgrid_project", tmpdir / "dsgrid_project")
     return tmpdir
+
+
+@pytest.fixture
+def tmp_registry_db(make_test_project_dir, tmp_path):
+    database_name = "tmp-dsgrid"
+    conn = DatabaseConnection(database=database_name)
+    RegistryDatabase.delete(conn)
+    yield make_test_project_dir, tmp_path, database_name
+    RegistryDatabase.delete(conn)

@@ -1,6 +1,13 @@
 {
   "create_registry": true,
-  "registry_path": "standard-scenarios-registry",
+  "data_path": "standard-scenarios-registry-data",
+  "conn": {
+    hostname: "localhost",
+    port: 8529,
+    username: "root",
+    password: "openSesame",
+    database: "standard-scenarios",
+  },
   "projects": [
     {
       "project_id": "dsgrid_conus_2022",
@@ -13,8 +20,8 @@
           "dimension_mapping_file": "/home/dthom/sandboxes/dsgrid-project-StandardScenarios/dsgrid_project/datasets/historical/eia_861_annual_energy_use_state_sector/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
-          "fix_dimension_uuids": false,
-          "fix_dimension_mapping_uuids": false
+          "replace_dimension_names_with_ids": false,
+          "replace_dimension_mapping_names_with_ids": false
         },
         {
           "dataset_id": "dsgrid_efs_2012_distributed_generation",
@@ -23,8 +30,8 @@
           "dimension_mapping_file": "/home/dthom/sandboxes/dsgrid-project-StandardScenarios/dsgrid_project/datasets/historical/dsgrid_efs_2012_distributed_generation/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
-          "fix_dimension_uuids": false,
-          "fix_dimension_mapping_uuids": false
+          "replace_dimension_names_with_ids": false,
+          "replace_dimension_mapping_names_with_ids": false
         },
         {
           "dataset_id": "dsgrid_efs_2012_losses",
@@ -33,8 +40,8 @@
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/historical/dsgrid_efs_2012_losses/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
-          "fix_dimension_uuids": false,
-          "fix_dimension_mapping_uuids": false
+          "replace_dimension_names_with_ids": false,
+          "replace_dimension_mapping_names_with_ids": false
         },
         {
           "dataset_id": "comstock_conus_2022_reference",
@@ -43,8 +50,8 @@
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/comstock/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
-          "fix_dimension_uuids": false,
-          "fix_dimension_mapping_uuids": false
+          "replace_dimension_names_with_ids": false,
+          "replace_dimension_mapping_names_with_ids": false
         },
         {
           "dataset_id": "resstock_conus_2022_reference",
@@ -53,8 +60,8 @@
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/resstock/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
-          "fix_dimension_uuids": false,
-          "fix_dimension_mapping_uuids": false
+          "replace_dimension_names_with_ids": false,
+          "replace_dimension_mapping_names_with_ids": false
         },
         {
           "dataset_id": "tempo_conus_2022",
@@ -63,8 +70,8 @@
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/tempo/dimension_mappings.json5",
           "register_dataset": false,
           "submit_to_project": false,
-          "fix_dimension_uuids": false,
-          "fix_dimension_mapping_uuids": false
+          "replace_dimension_names_with_ids": false,
+          "replace_dimension_mapping_names_with_ids": false
         },
         {
           "dataset_id": "aeo2021_reference_residential_energy_use_growth_factors",
@@ -73,8 +80,8 @@
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/residential/End_Use_Growth_Factors/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
-          "fix_dimension_uuids": true,
-          "fix_dimension_mapping_uuids": false,
+          "replace_dimension_names_with_ids": true,
+          "replace_dimension_mapping_names_with_ids": false,
           "autogen_reverse_supplemental_mappings": ["geography"]
         },
         {
@@ -84,8 +91,8 @@
           "dimension_mapping_file": "../dsgrid-project-StandardScenarios/dsgrid_project/datasets/modeled/aeo2021_reference/commercial/End_Use_Growth_Factors/dimension_mappings.json5",
           "register_dataset": true,
           "submit_to_project": true,
-          "fix_dimension_uuids": false,
-          "fix_dimension_mapping_uuids": false,
+          "replace_dimension_names_with_ids": false,
+          "replace_dimension_mapping_names_with_ids": false,
           "autogen_reverse_supplemental_mappings": ["geography"]
         }
       ]

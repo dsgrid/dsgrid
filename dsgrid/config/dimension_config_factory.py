@@ -15,7 +15,7 @@ from .dimensions import (
 )
 
 
-def get_dimension_config(model, src_dir):
+def get_dimension_config(model):
     if isinstance(model, DateTimeDimensionModel):
         return DateTimeDimensionConfig(model)
     if isinstance(model, AnnualTimeDimensionModel):
@@ -24,7 +24,6 @@ def get_dimension_config(model, src_dir):
         return RepresentativePeriodTimeDimensionConfig(model)
     if isinstance(model, DimensionModel):
         config = DimensionConfig(model)
-        config.src_dir = src_dir
         return config
     if isinstance(model, NoOpTimeDimensionModel):
         return NoOpTimeDimensionConfig(model)

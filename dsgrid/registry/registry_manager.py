@@ -22,23 +22,24 @@ from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
-from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidParameter
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.utils.spark import init_spark
 from .common import (
-    RegistryType,
     RegistryManagerParams,
 )
-from .dimension_mapping_registry import DimensionMappingRegistry
 from .dimension_mapping_registry_manager import DimensionMappingRegistryManager
-from .dataset_registry import DatasetRegistry
 from .dataset_registry_manager import DatasetRegistryManager
-from .dimension_registry import DimensionRegistry
 from .dimension_registry_manager import DimensionRegistryManager
-from .project_registry import ProjectRegistry
 from .project_registry_manager import ProjectRegistryManager
+from .registry_database import DatabaseConnection, RegistryDatabase
+from .registry_interface import (
+    DatasetRegistryInterface,
+    DimensionMappingRegistryInterface,
+    DimensionRegistryInterface,
+    ProjectRegistryInterface,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -53,40 +54,48 @@ class RegistryManager:
 
     """
 
-    def __init__(self, params: RegistryManagerParams):
+    def __init__(self, params: RegistryManagerParams, db: RegistryDatabase):
         self._check_environment_variables(params)
         if SparkSession.getActiveSession() is None:
             init_spark("dsgrid")
         self._params = params
         self._dimension_mgr = DimensionRegistryManager.load(
-            params.base_path / DimensionRegistry.registry_path(), params
+            params.base_path,
+            params,
+            DimensionRegistryInterface(db),
         )
         self._dimension_mapping_mgr = DimensionMappingRegistryManager.load(
-            params.base_path / DimensionMappingRegistry.registry_path(),
+            params.base_path,
             params,
             self._dimension_mgr,
+            DimensionMappingRegistryInterface(db),
         )
         self._dataset_mgr = DatasetRegistryManager.load(
-            params.base_path / DatasetRegistry.registry_path(),
+            params.base_path,
             params,
             self._dimension_mgr,
             self._dimension_mapping_mgr,
+            DatasetRegistryInterface(db),
         )
         self._project_mgr = ProjectRegistryManager.load(
-            params.base_path / ProjectRegistry.registry_path(),
+            params.base_path,
             params,
             self._dataset_mgr,
             self._dimension_mgr,
             self._dimension_mapping_mgr,
+            ProjectRegistryInterface(db),
         )
 
     @classmethod
-    def create(cls, path, remote_path=REMOTE_REGISTRY, user=None):
+    def create(
+        cls, conn: DatabaseConnection, data_path: Path, remote_path=REMOTE_REGISTRY, user=None
+    ):
         """Creates a new RegistryManager at the given path.
 
         Parameters
         ----------
-        path : str
+        db_url : str
+        data_path : Path
         remote_path : str
             Path to remote registry.
         use_remote_data_path : None, str
@@ -101,23 +110,20 @@ class RegistryManager:
             user = getpass.getuser()
         uid = str(uuid.uuid4())
 
-        if str(path).startswith("s3"):
-            raise Exception(f"s3 is not currently supported: {path}")
+        if str(data_path).startswith("s3"):
+            raise Exception(f"s3 is not currently supported: {data_path}")
 
-        fs_interface = make_filesystem_interface(path)
-        fs_interface.mkdir(path)
-        fs_interface.mkdir(path / "configs")
-        fs_interface.mkdir(path / "data")
-        fs_interface.mkdir(path / DatasetRegistry.registry_path())
-        fs_interface.mkdir(path / ProjectRegistry.registry_path())
-        fs_interface.mkdir(path / DimensionRegistry.registry_path())
-        fs_interface.mkdir(path / DimensionMappingRegistry.registry_path())
-        logger.info("Created registry at %s", path)
-        cloud_interface = make_cloud_storage_interface(path, "", offline=True, uuid=uid, user=user)
-        params = RegistryManagerParams(
-            Path(path), remote_path, False, fs_interface, cloud_interface, offline=True
+        fs_interface = make_filesystem_interface(data_path)
+        logger.info("Created registry at %s", data_path)
+        cloud_interface = make_cloud_storage_interface(
+            data_path, "", offline=True, uuid=uid, user=user
         )
-        return cls(params)
+        params = RegistryManagerParams(
+            Path(data_path), remote_path, False, fs_interface, cloud_interface, offline=True
+        )
+        RegistryDatabase.delete(conn)
+        db = RegistryDatabase.create(conn, data_path)
+        return cls(params, db)
 
     @property
     def dataset_manager(self):
@@ -138,7 +144,7 @@ class RegistryManager:
     @classmethod
     def load(
         cls,
-        path,
+        conn: DatabaseConnection,
         remote_path=REMOTE_REGISTRY,
         use_remote_data=None,
         offline_mode=False,
@@ -149,8 +155,7 @@ class RegistryManager:
 
         Parameters
         ----------
-        path : str
-            base path of the local or base registry
+        conn : DatabaseConnection
         remote_path: str, optional
             path of the remote registry; default is REMOTE_REGISTRY
         use_remote_data: bool, None
@@ -168,19 +173,18 @@ class RegistryManager:
         RegistryManager
 
         """
+        db = RegistryDatabase.connect(conn)
+        data_path = db.get_data_path()
         if not user:
             user = getpass.getuser()
         uid = str(uuid.uuid4())
-        # TODO S3
-        if str(path).startswith("s3"):
-            raise Exception(f"S3 is not yet supported as the base path: {path}")
-        fs_interface = make_filesystem_interface(path)
+        fs_interface = make_filesystem_interface(data_path)
 
         if use_remote_data is None:
             use_remote_data = _should_use_remote_data(remote_path)
 
         cloud_interface = make_cloud_storage_interface(
-            path, remote_path, offline=offline_mode, uuid=uid, user=user
+            data_path, remote_path, offline=offline_mode, uuid=uid, user=user
         )
 
         if not offline_mode:
@@ -208,36 +212,22 @@ class RegistryManager:
                 # NOTE: When creating a registry, only the /configs are pulled. To sync_pull /data, use the dsgrid registry data-sync CLI command.
                 cloud_interface.sync_pull(
                     remote_path + "/configs",
-                    str(path) + "/configs",
+                    str(data_path) + "/configs",
                     exclude=SYNC_EXCLUDE_LIST,
                     delete_local=True,
                 )
 
         params = RegistryManagerParams(
-            Path(path), remote_path, use_remote_data, fs_interface, cloud_interface, offline_mode
+            data_path, remote_path, use_remote_data, fs_interface, cloud_interface, offline_mode
         )
-        path = Path(path)
-        for dir_name in (
-            path,
-            path / DatasetRegistry.registry_path(),
-            path / ProjectRegistry.registry_path(),
-            path / DimensionRegistry.registry_path(),
-            path / DimensionMappingRegistry.registry_path(),
-        ):
-            if not fs_interface.exists(str(dir_name)):
-                fs_interface.mkdir(dir_name)
-
-        for dim_type in DimensionType:
-            dir_name = path / DimensionRegistry.registry_path() / dim_type.value
-            if not fs_interface.exists(str(dir_name)):
-                fs_interface.mkdir(dir_name)
 
         logger.info(
-            "Loaded local registry at %s offline_mode=%s",
-            path,
+            "Loaded local registry at %s:%s offline_mode=%s",
+            conn.hostname,
+            conn.port,
             offline_mode,
         )
-        return cls(params)
+        return cls(params, db)
 
     def data_sync(self, project_id, dataset_id, no_prompts=True):
         """Sync data from the remote dsgrid registry.
@@ -270,7 +260,7 @@ class RegistryManager:
         if dataset_id and not project_id:
             if not self.dataset_manager.has_id(dataset_id):
                 raise DSGValueNotRegistered(f"No registered dataset ID = '{dataset_id}'")
-            version = self.dataset_manager.get_current_version(dataset_id)
+            version = self.dataset_manager.get_latest_version(dataset_id)
             datasets = [(dataset_id, version)]
 
         for dataset, version in datasets:
@@ -353,13 +343,13 @@ class RegistryManager:
 
         """
         if isinstance(config, DimensionConfig):
-            version = self.dimension_manager.get_current_version(config.config_id)
+            version = self.dimension_manager.get_latest_version(config.config_id)
             self._update_dimension_users(config, version, update_type, log_message)
         elif isinstance(config, MappingTableConfig):
-            version = self.dimension_mapping_manager.get_current_version(config.config_id)
+            version = self.dimension_mapping_manager.get_latest_version(config.config_id)
             self._update_dimension_mapping_users(config, version, update_type, log_message)
         elif isinstance(config, DatasetConfig):
-            version = self.dataset_manager.get_current_version(config.config_id)
+            version = self.dataset_manager.get_latest_version(config.config_id)
             self._update_dataset_users(config, version, update_type, log_message)
         else:
             assert False, type(config)
@@ -383,7 +373,7 @@ class RegistryManager:
             self.dimension_mapping_manager.update(mapping, update_type, log_message)
             updated_mapping_versions[
                 mapping.config_id
-            ] = self.dimension_mapping_manager.get_current_version(mapping.config_id)
+            ] = self.dimension_mapping_manager.get_latest_version(mapping.config_id)
             logger.info(
                 "Updated dimension mapping %s as a result of dimension update", mapping.config_id
             )
@@ -391,7 +381,7 @@ class RegistryManager:
         self._update_datasets_with_dimensions(updated_dimension_versions, updated_datasets)
         for dataset in updated_datasets.values():
             self.dataset_manager.update(dataset, update_type, log_message)
-            updated_dataset_versions[dataset.config_id] = self.dataset_manager.get_current_version(
+            updated_dataset_versions[dataset.config_id] = self.dataset_manager.get_latest_version(
                 dataset.config_id
             )
             logger.info("Updated dataset %s as a result of dimension update", dataset.config_id)
@@ -499,49 +489,53 @@ class RegistryManager:
                 updated_projects[project.config_id] = project
 
     @staticmethod
-    def copy(src: Path, dst: Path, mode="copy", force=False):
+    def copy(
+        src: DatabaseConnection, dst: DatabaseConnection, dst_data_path, mode="copy", force=False
+    ):
         """Copy a registry to a new path.
 
         Parameters
         ----------
-        src : Path
-        dst : Path
+        src : DatabaseConnection
+        dst : DatabaseConnection
+        dst_data_path : Path
         simple_model : RegistrySimpleModel
             Filter all configs and data according to this model.
         mode : str
             Controls whether to copy all data, make symlinks to data files, or sync data with the
             rsync utility (not available on Windows). Options: 'copy', 'data-symlinks', 'rsync'
         force : bool
-            Overwrite dst if it already exists. Does not apply if using rsync.
+            Overwrite dst_data_path if it already exists. Does not apply if using rsync.
 
         Raises
         ------
         DSGInvalidParameter
             Raised if src is not a valid registry.
-            Raised if dst exists, use_rsync is False, and force is False.
+            Raised if dst_data_path exists, use_rsync is False, and force is False.
 
         """
-        if not {x.name for x in src.iterdir()}.issuperset({"configs", "data"}):
-            raise DSGInvalidParameter(f"{src} is not a valid registry")
+        src_db = RegistryDatabase.connect(src)
+        src_data_path = src_db.get_data_path()
+        if not {x.name for x in src_data_path.iterdir()}.issuperset({"data"}):
+            raise DSGInvalidParameter(f"{src_data_path} is not a valid registry")
 
+        if mode in ("copy", "data-symlinks"):
+            if dst_data_path.exists():
+                if force:
+                    shutil.rmtree(dst_data_path)
+                else:
+                    raise DSGInvalidParameter(f"{dst_data_path} already exists.")
+        RegistryDatabase.copy(src, dst, dst_data_path)
         if mode == "rsync":
-            dst.mkdir(exist_ok=True)
-            cmd = f"rsync -a {src}/ {dst}"
+            cmd = f"rsync -a {src_data_path}/ {dst_data_path}"
             logger.info("rsync data with [%s]", cmd)
             check_run_command(cmd)
         elif mode in ("copy", "data-symlinks"):
-            if dst.exists():
-                if force:
-                    shutil.rmtree(dst)
-                else:
-                    raise DSGInvalidParameter(f"{dst} already exists.")
-            logger.info("Copy data from source registry %s", src)
+            logger.info("Copy data from source registry %s", src_data_path)
             if mode == "data-symlinks":
-                (dst).mkdir()
-                shutil.copytree(src / "configs", dst / "configs")
-                _make_data_symlinks(src, dst)
+                _make_data_symlinks(src_data_path, dst_data_path)
             else:
-                shutil.copytree(src, dst, symlinks=True)
+                shutil.copytree(src_data_path / "data", dst_data_path / "data", symlinks=True)
         else:
             raise DSGInvalidParameter(f"mode={mode} is not supported")
 
@@ -595,19 +589,6 @@ def get_registry_path(registry_path=None):
             "Then register dimensions, dimension mappings, projects, and datasets."
         )
     return registry_path
-
-
-_REGISTRY_TYPE_TO_CLASS = {
-    RegistryType.DATASET: DatasetRegistry,
-    RegistryType.DIMENSION: DimensionRegistry,
-    RegistryType.DIMENSION_MAPPING: DimensionMappingRegistry,
-    RegistryType.PROJECT: ProjectRegistry,
-}
-
-
-def get_registry_class(registry_type):
-    """Return the subtype of RegistryBase correlated with registry_type."""
-    return _REGISTRY_TYPE_TO_CLASS[registry_type]
 
 
 def _should_use_remote_data(remote_path):

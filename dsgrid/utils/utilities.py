@@ -99,6 +99,37 @@ def check_uniqueness(iterable, tag):
         values.add(item)
 
 
+def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list[str] = None):
+    """Convert an iterable of dicts to instances of a data class.
+
+    Parameters
+    ----------
+    iterable
+        Any iterable of dicts that must have an 'id' field.
+    cls : class
+        Instantiate a class from each dict by splatting the dict to the constructor.
+    check_duplicates : None | list[str]
+        If it is a list of column names, ensure that there are no duplicates among the rows.
+
+    Returns
+    -------
+    list
+    """
+    records = []
+    check_duplicates = check_duplicates or []
+    values = {x: set() for x in check_duplicates}
+    for row in iterable:
+        record = cls(**row)
+        for name in check_duplicates:
+            val = getattr(record, name)
+            if val in values[name]:
+                raise ValueError(f"{val} is listed multiple times")
+            values[name].add(val)
+        records.append(record)
+
+    return records
+
+
 def list_enum_values(enum: Enum):
     """Returns list enum values."""
     return [e.value for e in enum]

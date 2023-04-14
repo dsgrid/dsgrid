@@ -1,9 +1,8 @@
 """Common definitions for registry components"""
 
-import itertools
+import enum
 import logging
 import re
-import uuid
 from collections import namedtuple
 from datetime import datetime
 from typing import Optional
@@ -21,7 +20,7 @@ REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
 # Allows letters, numbers, underscores, dashes, spaces
 REGEX_VALID_REGISTRY_DISPLAY_NAME = re.compile(r"^[\w -]+$")
 # Allows letters, numbers, underscores, dashes
-REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE = re.compile(r"^[\w-]+$")
+REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE = re.compile(r"^[\w/-]+$")
 # Allows letters, numbers, underscores
 REGEX_VALID_REGISTRY_CONFIG_ID_STRICT = re.compile(r"^[\w]+$")
 
@@ -44,6 +43,32 @@ def check_config_id_strict(config_id, tag):
         raise ValueError(
             f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, and underscores."
         )
+
+
+class Collection(enum.Enum):
+    """Collections in the database"""
+
+    DATASETS = "datasets"  # dataset config
+    DATASET_DATA = "dataset_data"  # actual data (parquet files). tracks data versions
+    DATASET_ROOTS = "dataset_roots"
+    DATASET_DATA_ROOTS = "dataset_data_roots"
+    DIMENSION_TYPES = "dimension_types"
+    DIMENSIONS = "dimensions"
+    DIMENSION_ROOTS = "dimension_roots"
+    DIMENSION_MAPPINGS = "dimension_mappings"
+    DIMENSION_MAPPING_ROOTS = "dimension_mapping_roots"
+    PROJECTS = "projects"
+    PROJECT_ROOTS = "project_roots"
+
+
+class Edge(enum.Enum):
+    """Types of edges in the database"""
+
+    CONTAINS = "contains"
+    UPDATED_TO = "updated_to"
+    DERIVES = "derives"
+    LATEST = "latest"
+    OF_TYPE = "of_type"
 
 
 class RegistryType(DSGEnum):
@@ -85,10 +110,7 @@ class VersionUpdateType(DSGEnum):
 
 # These keys are used to store references to project/dataset configs and dimensions
 # in dictionaries.
-# The DimensionKey is useful for comparing whether a project and
-# dataset have the same dimension.
 ConfigKey = namedtuple("ConfigKey", ["id", "version"])
-DimensionKey = namedtuple("DimensionKey", ["type", "id", "version"])
 
 # Convenience container to be shared among the registry managers.
 # Obviates the need to pass parameters to many constructors.
@@ -98,7 +120,7 @@ RegistryManagerParams = namedtuple(
 )
 
 
-class ConfigRegistrationModel(DSGBaseModel):
+class RegistrationModel(DSGBaseModel):
     """Registration fields required by the ProjectConfig and DatasetConfig"""
 
     version: str = Field(
@@ -129,7 +151,7 @@ def get_version_from_filename(filename):
 
 def make_initial_config_registration(submitter, log_message):
     version = VersionInfo(major=1)
-    return ConfigRegistrationModel(
+    return RegistrationModel(
         version=str(version),
         submitter=submitter,
         date=datetime.now(),
@@ -142,38 +164,6 @@ def make_filename_from_version(handle, version):
     return f"{handle}-v{version}.json5"
 
 
-def make_dimension_id(name: str):
-    """Return a dimension ID created from a dimension name.
-
-    Parameters
-    ----------
-    name : str
-
-    Returns
-    -------
-    str
-
-    """
-    return make_registry_id([name.lower().replace(" ", "_")])
-
-
-def make_registry_id(fields, delimiter=REGISTRY_ID_DELIMITER):
-    """Make a unique ID by concatenating a list of fields with a UUID.
-
-    Parameters
-    ----------
-    fields : list
-    delimiter : str
-        Delimiter used for concatenation
-
-    Returns
-    -------
-    str
-
-    """
-    return delimiter.join(itertools.chain((str(x) for x in fields), [str(uuid.uuid4())]))
-
-
 # def update_version(id_handle, update, registry_path):
 #    """Determine registration or project version for registration.
 #
@@ -182,7 +172,7 @@ def make_registry_id(fields, delimiter=REGISTRY_ID_DELIMITER):
 #        - Set to work with some central version (like S3)
 #        - Currently only updating major version
 #        - NOTE: not currently utilitzing the update_type in
-#                ConfigRegistrationModel. Could use this to set
+#                RegistrationModel. Could use this to set
 #                major/minor/patch update decisiosns
 #
 #    Args:

@@ -253,10 +253,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def filter_data(self, dimensions: List[DimensionSimpleModel]):
         lookup = self._load_data_lookup
         lookup.cache()
-        pivoted_dimension_type = self.get_pivoted_dimension_type()
-        pivoted_columns = set(self.get_pivoted_dimension_columns())
-        pivoted_columns_to_remove = set()
+        load_df = self._load_data
         lookup_columns = set(lookup.columns)
+        time_columns = set(
+            self._config.get_dimension(DimensionType.TIME).get_timestamp_load_data_columns()
+        )
+        pivoted_columns = set(load_df.columns) - lookup_columns - time_columns
+
+        pivoted_dimension_type = self.get_pivoted_dimension_type()
+        pivoted_columns_to_remove = set()
         for dim in dimensions:
             column = dim.dimension_type.value
             if column in lookup_columns:

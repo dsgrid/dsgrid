@@ -4,7 +4,10 @@ from collections import namedtuple
 from pathlib import Path
 
 import pytest
+from click.testing import CliRunner
 
+from dsgrid.cli.dsgrid import cli
+from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.query.derived_dataset import (
     create_derived_dataset_config_from_query,
     does_query_support_a_derived_dataset,
@@ -19,9 +22,8 @@ from dsgrid.query.models import (
     ExponentialGrowthDatasetModel,
 )
 from dsgrid.query.query_submitter import QuerySubmitterBase
-from dsgrid.registry.dataset_registry import DatasetRegistry
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.spark import read_dataframe
 
 
@@ -88,11 +90,23 @@ def test_resstock_projection_invalid_query_replace_ids_with_names(valid_query):
 def test_create_derived_dataset_config(tmp_path):
     dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"
-    check_run_command(
-        "dsgrid query project run --offline "
-        f"--registry-path={REGISTRY_PATH} "
-        f"{RESSTOCK_PROJECTION_QUERY} -o {query_output_base} --force"
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli,
+        [
+            "query",
+            "project",
+            "run",
+            "--offline",
+            "--db-name",
+            "simple-standard-scenarios",
+            str(RESSTOCK_PROJECTION_QUERY),
+            "-o",
+            str(query_output_base),
+            "--force",
+        ],
     )
+    assert result.exit_code == 0
     query_output = query_output_base / dataset_id
     assert query_output.exists()
     table_file = QuerySubmitterBase.table_filename(query_output)
@@ -106,16 +120,28 @@ def test_create_derived_dataset_config(tmp_path):
 
     # Create the config in the CLI and Python API to get test coverage in both places.
     dataset_dir = tmp_path / dataset_id
-    dataset_config_file = dataset_dir / DatasetRegistry.config_filename()
+    dataset_config_file = dataset_dir / DatasetConfig.config_filename()
 
-    registry_manager = RegistryManager.load(REGISTRY_PATH, offline_mode=True)
+    conn = DatabaseConnection(database="simple-standard-scenarios")
+    registry_manager = RegistryManager.load(conn, offline_mode=True)
     dataset_dir.mkdir()
     assert create_derived_dataset_config_from_query(query_output, dataset_dir, registry_manager)
     assert dataset_config_file.exists()
 
-    check_run_command(
-        f"dsgrid query project create-derived-dataset-config --offline "
-        f"--registry-path={REGISTRY_PATH} {query_output} {dataset_dir} --force"
+    result = runner.invoke(
+        cli,
+        [
+            "query",
+            "project",
+            "create-derived-dataset-config",
+            "--offline",
+            "--db-name",
+            "simple-standard-scenarios",
+            str(query_output),
+            str(dataset_dir),
+            "--force",
+        ],
     )
+    assert result.exit_code == 0
     assert dataset_config_file.exists()
     shutil.rmtree(dataset_dir)

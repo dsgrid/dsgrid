@@ -1,17 +1,15 @@
-import fileinput
 import getpass
 import os
-import re
 from pathlib import Path
 
 import pytest
 from semver import VersionInfo
 
 from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidOperation
-from dsgrid.filesystem.local_filesystem import LocalFilesystem
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.common import VersionUpdateType
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.utils.files import dump_data, load_data
 
 TEST_PROJECT_PATH = Path(__file__).absolute().parent.parent.parent / "dsgrid-test-data"
@@ -24,103 +22,12 @@ AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 TEST_REMOTE_REGISTRY = "s3://nrel-dsgrid-registry-test"
 
 
-def create_local_test_registry(tmpdir):
-    path = Path(tmpdir)
-    RegistryManager.create(path)
-    assert path.exists()
-    assert (path / "configs/projects").exists()
-    assert (path / "configs/datasets").exists()
-    assert (path / "configs/dimensions").exists()
-    assert (path / "configs/dimension_mappings").exists()
-    return path
-
-
-def replace_dimension_mapping_uuids_from_registry(registry_dir, filenames):
-    uuids = read_dimension_mapping_uuid_mapping(registry_dir)
-    for filename in filenames:
-        replace_dimension_mapping_uuids(filename, uuids)
-
-
-def read_dimension_mapping_uuid_mapping(registry_dir):
-    fs_intf = LocalFilesystem()
-    dir_name = Path(registry_dir) / "configs"
-    mappings = {}
-    regex = re.compile(
-        r"(?P<from_dimension>[-\w]+)__(?P<to_dimension>[-\w]+)__(?P<uuid>[-0-9a-f]+)"
-    )
-    path = dir_name / "dimension_mappings"
-    for item in fs_intf.listdir(path, directories_only=True, exclude_hidden=True):
-        assert (path / item).is_dir(), str(path / item)
-        match = regex.search(item)
-        assert match, item
-        data = match.groupdict()
-        from_dimension = data["from_dimension"]
-        to_dimension = data["to_dimension"]
-        item_uuid = data["uuid"]
-        key = (from_dimension, to_dimension)
-        assert key not in mappings, item
-        mappings[key] = item_uuid
-
-    return mappings
-
-
-def replace_dimension_mapping_uuids(filename, uuids):
-    regex = re.compile(
-        r"mapping_id: \"(?P<from_dimension>[-\w]+)__(?P<to_dimension>[-\w]+)__(?P<uuid>[-0-9a-f]+)\""
-    )
-    with fileinput.input(files=[filename], inplace=True) as f:
-        for line in f:
-            if line.strip().startswith("/"):
-                continue
-            match = regex.search(line)
-            if match is None:
-                print(line, end="")
-            else:
-                from_dimension = match.groupdict()["from_dimension"]
-                to_dimension = match.groupdict()["to_dimension"]
-                new_uuid = uuids[(from_dimension, to_dimension)]
-                print(f'      mapping_id: "{from_dimension}__{to_dimension}__{new_uuid}",')
-
-
-def replace_dimension_uuids_from_registry(registry_dir, filenames):
-    uuids = read_dimension_uuid_mapping(registry_dir)
-    for filename in filenames:
-        replace_dimension_uuids(filename, uuids)
-
-
-def read_dimension_uuid_mapping(registry_dir):
-    fs_intf = LocalFilesystem()
-    dir_name = Path(registry_dir) / "configs"
-    mappings = {}
-    regex = re.compile(r"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)")
-    dim_base_path = dir_name / "dimensions"
-    for dim_type in fs_intf.listdir(dim_base_path, directories_only=True, exclude_hidden=True):
-        dim_path = dim_base_path / dim_type
-        for dim in fs_intf.listdir(dim_path, directories_only=True, exclude_hidden=True):
-            match = regex.search(dim)
-            assert match, dim
-            data = match.groupdict()
-            dim_type = data["dimension_type"]
-            dim_uuid = data["uuid"]
-            assert dim_type not in mappings, dim_type
-            mappings[dim_type] = dim_uuid
-
-    return mappings
-
-
-def replace_dimension_uuids(filename, uuids):
-    regex = re.compile(r"dimension_id: \"(?P<dimension_type>[-\w]+)__(?P<uuid>[-0-9a-f]+)\"")
-    with fileinput.input(files=[filename], inplace=True) as f:
-        for line in f:
-            if line.strip().startswith("/"):
-                continue
-            match = regex.search(line)
-            if match is None:
-                print(line, end="")
-            else:
-                dimension_type = match.groupdict()["dimension_type"]
-                new_uuid = uuids[dimension_type]
-                print(f'      dimension_id: "{dimension_type}__{new_uuid}",')
+def create_local_test_registry(tmpdir, conn=None):
+    if conn is None:
+        conn = DatabaseConnection(database="test-dsgrid")
+    data_path = Path(tmpdir)
+    RegistryManager.create(conn, data_path)
+    return data_path
 
 
 def check_configs_update(base_dir, manager):
@@ -150,9 +57,9 @@ def check_configs_update(base_dir, manager):
         manager.project_manager,
     ):
         config_id = mgr.list_ids()[0]
-        version = mgr.get_current_version(config_id)
+        version = mgr.get_latest_version(config_id)
         check_config_update(update_dir, mgr, config_id, user, version)
-        new_version = mgr.get_current_version(config_id)
+        new_version = mgr.get_latest_version(config_id)
         if isinstance(mgr, DimensionRegistryManager):
             config = mgr.get_by_id(config_id)
             updated_ids.append((config_id, config.model.dimension_type, new_version))
@@ -174,10 +81,10 @@ def check_config_update(base_dir, mgr, config_id, user, version):
     version : str
 
     """
-    config_file = Path(base_dir) / mgr.registry_class().config_filename()
+    config_file = Path(base_dir) / mgr.config_class().config_filename()
     assert not config_file.exists()
     try:
-        mgr.dump(config_id, base_dir)
+        mgr.dump(config_id, base_dir, force=True)
         with pytest.raises(DSGInvalidOperation):
             mgr.dump(config_id, base_dir)
         mgr.dump(config_id, base_dir, force=True)
@@ -212,7 +119,104 @@ def check_config_update(base_dir, mgr, config_id, user, version):
             "update to description",
             version,
         )
-        assert mgr.get_current_version(config_id) == str(VersionInfo.parse(version).bump_patch())
+        assert (
+            VersionInfo.parse(mgr.get_latest_version(config_id))
+            == VersionInfo.parse(version).bump_patch()
+        )
     finally:
         if config_file.exists():
             os.remove(config_file)
+
+
+def map_dimension_names_to_ids(dimension_mgr):
+    mapping = {}
+    for dim in dimension_mgr.db.dimensions:
+        if dim["name"] in mapping:
+            assert mapping[dim["name"]] == dim["dimension_id"], dim
+        mapping[dim["name"]] = dim["dimension_id"]
+    return mapping
+
+
+def map_dimension_ids_to_names(dimension_mgr):
+    mapping = {}
+    for dim in dimension_mgr.db.dimensions:
+        assert dim["dimension_id"] not in mapping, dim
+        mapping[dim["dimension_id"]] = dim["name"]
+    return mapping
+
+
+def map_dimension_mapping_names_to_ids(dimension_mapping_mgr, dim_id_to_name):
+    mapping = {}
+    for dmap in dimension_mapping_mgr.db.dimension_mappings:
+        key = (
+            dim_id_to_name[dmap["from_dimension"]["dimension_id"]],
+            dim_id_to_name[dmap["to_dimension"]["dimension_id"]],
+        )
+        if key in mapping:
+            assert mapping[key] == dmap["mapping_id"], dmap
+        mapping[key] = dmap["mapping_id"]
+    return mapping
+
+
+def replace_dimension_names_with_current_ids(filename, mappings):
+    data = load_data(filename)
+
+    def perform_replacements(mappings, dimensions):
+        changed = False
+        for ref in dimensions:
+            if "name" in ref:
+                ref["dimension_id"] = mappings[ref.pop("name")]
+                changed = True
+        return changed
+
+    changed = False
+    if "dimension_references" in data:
+        # This is True for a dataset config file.
+        if perform_replacements(mappings, data["dimension_references"]):
+            changed = True
+
+    if "dimensions" in data and "base_dimension_references" in data["dimensions"]:
+        # This is True for a project config file.
+        if perform_replacements(mappings, data["dimensions"]["base_dimension_references"]):
+            changed = True
+        if perform_replacements(mappings, data["dimensions"]["supplemental_dimension_references"]):
+            changed = True
+
+    if "mappings" in data:
+        # This is True for a dimension mappings file.
+        for mapping in data["mappings"]:
+            if perform_replacements(
+                mappings, [mapping["from_dimension"], mapping["to_dimension"]]
+            ):
+                changed = True
+
+    if changed:
+        dump_data(data, filename, indent=2)
+
+
+def replace_dimension_mapping_names_with_current_ids(filename, mappings):
+    data = load_data(filename)
+
+    def perform_replacements(mappings, references):
+        changed = False
+        for ref in references:
+            if "mapping_names" in ref:
+                item = ref.pop("mapping_names")
+                ref["mapping_id"] = mappings[(item["from"], item["to"])]
+                changed = True
+        return changed
+
+    changed = False
+    if "dimension_mappings" in data:
+        # This is True for a project config file.
+        refs = data["dimension_mappings"]["base_to_supplemental_references"]
+        if perform_replacements(mappings, refs):
+            changed = True
+
+    if "references" in data:
+        # This is True for a dataset-to-project dimension mapping reference file.
+        if perform_replacements(mappings, data["references"]):
+            changed = True
+
+    if changed:
+        dump_data(data, filename, indent=2)

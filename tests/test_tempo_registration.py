@@ -11,8 +11,10 @@ from dsgrid.tests.common import (
     # TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import load_data
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.tests.common import (
-    replace_dimension_uuids_from_registry,
+    map_dimension_names_to_ids,
+    replace_dimension_names_with_current_ids,
 )
 
 
@@ -49,11 +51,12 @@ def make_registry_for_tempo(registry_path, src_dir, dataset_path=None) -> Regist
     """
     if dataset_path is None:
         dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
-    path = create_local_test_registry(registry_path)
+    conn = DatabaseConnection(database="test-dsgrid")
+    create_local_test_registry(registry_path, conn=conn)
     dataset_dir = Path("datasets/modeled/tempo_standard_scenarios_2021")
     user = getpass.getuser()
     log_message = "Initial registration"
-    manager = RegistryManager.load(path, offline_mode=True)
+    manager = RegistryManager.load(conn, offline_mode=True)
     dim_mgr = manager.dimension_manager
     dim_mgr.register_from_config(src_dir / src_dir / "dimensions.json5", user, log_message)
     dim_mgr.register_from_config(src_dir / dataset_dir / "dimensions.json5", user, log_message)
@@ -62,10 +65,11 @@ def make_registry_for_tempo(registry_path, src_dir, dataset_path=None) -> Regist
     project_id = load_data(project_config_file)["project_id"]
     dataset_config_file = src_dir / dataset_dir / "dataset.json5"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
-    replace_dimension_uuids_from_registry(path, (project_config_file, dataset_config_file))
-    replace_dimension_uuids_from_registry(path, (dataset_config_file,))
+    mappings = map_dimension_names_to_ids(manager.dimension_manager)
+    for filename in (project_config_file, dataset_config_file):
+        replace_dimension_names_with_current_ids(filename, mappings)
 
-    manager.dataset_manager.register(dataset_config_file, user, log_message)
+    manager.dataset_manager.register(dataset_config_file, dataset_path, user, log_message)
     manager.project_manager.register(project_config_file, user, log_message)
     manager.project_manager.submit_dataset(
         project_id,

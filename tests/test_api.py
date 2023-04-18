@@ -8,6 +8,7 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pandas as pd
+import pytest
 from fastapi.testclient import TestClient
 
 from dsgrid.dimension.base_models import DimensionType
@@ -38,14 +39,9 @@ from dsgrid.query.models import (
 from dsgrid.utils.files import load_data
 
 logger = logging.getLogger(__name__)
-REGISTRY_PATH = (
-    Path(__file__).absolute().parent.parent
-    / "dsgrid-test-data"
-    / "filtered_registries"
-    / "simple_standard_scenarios"
-)
 # These env variables need to be set before the app is imported.
-os.environ["DSGRID_LOCAL_REGISTRY"] = str(REGISTRY_PATH)
+os.environ["DSGRID_REGISTRY_DATABASE_URL"] = "http://localhost:8529"
+os.environ["DSGRID_REGISTRY_DATABASE_NAME"] = "simple-standard-scenarios"
 QUERY_OUTPUT_DIR = Path(tempfile.gettempdir()) / "test_dsgrid_query_output"
 os.environ["DSGRID_QUERY_OUTPUT_DIR"] = str(QUERY_OUTPUT_DIR)
 API_SERVER_STORE_DIR = Path(tempfile.gettempdir()) / "test_dsgrid_api_server"
@@ -84,7 +80,7 @@ def test_get_project():
 
 def test_list_datasets():
     response = ListDatasetsResponse(**check_response("/datasets").json())
-    assert len(response.datasets) == 7
+    assert len(response.datasets) == 8
     assert (
         response.datasets[0].dataset_id == "aeo2021_reference_commercial_energy_use_growth_factors"
     )
@@ -183,6 +179,9 @@ def test_list_table_format_types():
     assert response.types == sorted(list(TableFormatType), key=lambda x: x.value)
 
 
+# This doesn't work in all environments, especially Eagle. There are conflicts with the
+# metastore_db directory.
+@pytest.mark.skip
 def test_submit_project_query(setup_api_server):
     query = SparkSubmitProjectQueryRequest(
         use_spark_submit=False,

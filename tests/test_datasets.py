@@ -12,7 +12,8 @@ import pytest
 
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.tests.common import (
-    replace_dimension_uuids_from_registry,
+    map_dimension_names_to_ids,
+    replace_dimension_names_with_current_ids,
 )
 from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json, load_data
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
@@ -35,11 +36,13 @@ def setup_registry(tmp_path_factory, make_test_project_dir_module, make_test_dat
         make_test_project_dir_module,
         dataset_path=make_test_data_dir_module,
         include_datasets=False,
+        database_name="tmp-dsgrid",
     )
     dataset_config_path = make_test_project_dir_module / "datasets" / "modeled" / "comstock"
     assert dataset_config_path.exists()
     dataset_config_file = dataset_config_path / "dataset.json5"
-    replace_dimension_uuids_from_registry(base_dir, (dataset_config_file,))
+    mappings = map_dimension_names_to_ids(manager.dimension_manager)
+    replace_dimension_names_with_current_ids(dataset_config_file, mappings)
     yield manager, base_dir, dataset_config_path, make_test_data_dir_module
 
 

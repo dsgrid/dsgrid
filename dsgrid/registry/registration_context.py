@@ -76,8 +76,8 @@ class RegistrationContext:
         if manager_context is None:
             manager_context = RegistryManagerContext(manager)
             self._managers[registry_type] = manager_context
-            manager.acquire_registry_locks(config_ids)
-            manager_context.set_locked()
+            # manager.acquire_registry_locks(config_ids)
+            # manager_context.set_locked()
 
         diff = set(config_ids).intersection(manager_context.ids)
         if diff:

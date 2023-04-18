@@ -6,6 +6,7 @@ from pydantic import validator
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.utils.files import load_data
 
 
@@ -16,8 +17,8 @@ class DatasetRegistrationModel(DSGBaseModel):
     config_file: str | Path
     dimension_mapping_file: str | Path | None
     dimension_mapping_references_file: str | Path | None
-    fix_dimension_uuids: bool = False
-    fix_dimension_mapping_uuids: bool = False
+    replace_dimension_names_with_ids: bool = False
+    replace_dimension_mapping_names_with_ids: bool = False
     register_dataset: bool = True
     submit_to_project: bool = True
     autogen_reverse_supplemental_mappings: set[str | DimensionType] = set()
@@ -51,10 +52,11 @@ class ProjectRegistrationModel(DSGBaseModel):
 class RegistrationModel(DSGBaseModel):
 
     create_registry: bool
-    registry_path: str | Path
+    conn: DatabaseConnection
+    data_path: str | Path
     projects: list[ProjectRegistrationModel]
 
-    @validator("registry_path")
+    @validator("data_path")
     def fix_path(cls, val):
         return Path(val) if isinstance(val, str) else val
 

@@ -1,4 +1,4 @@
 [submodule "dsgrid-test-data"]
 	path = dsgrid-test-data
 	url = https://github.com/dsgrid/dsgrid-test-data
-	branch = period_converted_projection
+	branch = ll/period_beginning

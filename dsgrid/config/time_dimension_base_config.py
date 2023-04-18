@@ -170,10 +170,26 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         time_col = time_col[0]
 
         project_time = set(
-            project_time_dim.build_time_dataframe().agg(F.collect_set(time_col)).collect()[0][0]
+            [
+                row[0]
+                for row in project_time_dim.build_time_dataframe()
+                .select(time_col)
+                .filter(f"{time_col} IS NOT NULL")
+                .distinct()
+                .collect()
+            ]
         )
-        dataset_time = set(df.agg(F.collect_set(time_col)).collect()[0][0])
+        dataset_time = set(
+            [
+                row[0]
+                for row in df.select(time_col)
+                .filter(f"{time_col} IS NOT NULL")
+                .distinct()
+                .collect()
+            ]
+        )
         diff = dataset_time.difference(project_time)
+        print(diff)
 
         if not diff:
             return df
@@ -195,10 +211,23 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             .union(df.filter(~F.col(time_col).isin(diff)))
         )
 
-        dataset_time = set(df.agg(F.collect_set(time_col)).collect()[0][0])
-        if not dataset_time.issubset(project_time):
+        dataset_time = set(
+            [
+                row[0]
+                for row in df.select(time_col)
+                .filter(f"{time_col} IS NOT NULL")
+                .distinct()
+                .collect()
+            ]
+        )
+        if dataset_time.symmetric_difference(project_time):
+            left_msg, right_msg = "", ""
+            if left_diff := dataset_time.difference(project_time):
+                left_msg = f"\nProcessed dataset time contains {len(left_diff)} extra timestamp(s): {left_diff}"
+            if right_diff := project_time.difference(dataset_time):
+                right_msg = f"\nProcessed dataset time is missing {len(right_diff)} timestamp(s): {right_diff}"
             raise DSGInvalidOperation(
-                "Dataset time column after self._wrap_time_around_year() does not match project_time"
+                f"Dataset time cannot be processed to match project time. {left_msg}{right_msg}"
             )
 
         return df

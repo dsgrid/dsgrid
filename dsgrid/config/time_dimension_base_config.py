@@ -141,24 +141,40 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
 
-        if dtime_interval != ptime_interval:
-            match (dtime_interval, ptime_interval):
-                case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
-                    df = df.withColumn(
-                        time_col,
-                        F.col(time_col)
-                        + F.expr(f"INTERVAL {self.get_frequency().seconds} SECONDS"),
-                    )
-                case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
-                    df = df.withColumn(
-                        time_col,
-                        F.col(time_col)
-                        - F.expr(f"INTERVAL {self.get_frequency().seconds} SECONDS"),
-                    )
+        df = self._align_time_interval_type(
+            df, time_col, dtime_interval, ptime_interval, self.get_frequency()
+        )
 
         if wrap_time:
             df = self._apply_time_wrap(df, project_time_dim)
 
+        return df
+
+    @staticmethod
+    def _align_time_interval_type(
+        df, time_column, from_time_interval, to_time_interval, time_step, new_time_column=None
+    ):
+        """
+        Shift time_column by time_step in df as needed by comparing from_time_interval to to_time_interval.
+        If new_time_column is None, time_column is shifted in place, else shifted time is added as new_time_column in df
+        """
+        if from_time_interval == to_time_interval:
+            return df
+
+        if new_time_column is None:
+            new_time_column = time_column
+
+        match (from_time_interval, to_time_interval):
+            case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
+                df = df.withColumn(
+                    new_time_column,
+                    F.col(time_column) + F.expr(f"INTERVAL {time_step.seconds} SECONDS"),
+                )
+            case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
+                df = df.withColumn(
+                    new_time_column,
+                    F.col(time_column) - F.expr(f"INTERVAL {time_step.seconds} SECONDS"),
+                )
         return df
 
     @staticmethod

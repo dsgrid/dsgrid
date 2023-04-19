@@ -102,15 +102,23 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         time_df = None
         try:
             project_time_df = project_time_dim.build_time_dataframe()
+            map_time = "timestamp_to_map"
+            project_time_df = self._align_time_interval_type(
+                project_time_df,
+                ptime_col,
+                project_time_dim.get_time_interval_type(),
+                self.get_time_interval_type(),
+                project_time_dim.get_frequency(),
+                new_time_column=map_time,
+            )
+
             idx = 0
             for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
                 local_time_df = project_time_df.withColumn(
                     "time_zone", F.lit(tz_value)
                 ).withColumn(
                     "local_time",
-                    F.from_utc_timestamp(
-                        F.to_utc_timestamp(F.col(ptime_col), session_tz), tz_name
-                    ),
+                    F.from_utc_timestamp(F.to_utc_timestamp(F.col(map_time), session_tz), tz_name),
                 )
                 select = [ptime_col, "time_zone"]
                 for col in time_cols:
@@ -136,8 +144,6 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             col if col not in time_cols else F.col(col).cast(IntegerType()) for col in df.columns
         ]
         df = df.select(*select).join(time_df, on=join_keys).drop(*time_cols)
-
-        df = self._convert_time_to_project_time_interval(df=df, project_time_dim=project_time_dim)
 
         return df
 

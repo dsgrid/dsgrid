@@ -185,27 +185,19 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
 
-        project_time = set(
-            [
-                row[0]
-                for row in project_time_dim.build_time_dataframe()
-                .select(time_col)
-                .filter(f"{time_col} IS NOT NULL")
-                .distinct()
-                .collect()
-            ]
-        )
-        dataset_time = set(
-            [
-                row[0]
-                for row in df.select(time_col)
-                .filter(f"{time_col} IS NOT NULL")
-                .distinct()
-                .collect()
-            ]
-        )
+        project_time = {
+            row[0]
+            for row in project_time_dim.build_time_dataframe()
+            .select(time_col)
+            .filter(f"{time_col} IS NOT NULL")
+            .distinct()
+            .collect()
+        }
+        dataset_time = {
+            row[0]
+            for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
+        }
         diff = dataset_time.difference(project_time)
-        print(diff)
 
         if not diff:
             return df
@@ -227,15 +219,10 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             .union(df.filter(~F.col(time_col).isin(diff)))
         )
 
-        dataset_time = set(
-            [
-                row[0]
-                for row in df.select(time_col)
-                .filter(f"{time_col} IS NOT NULL")
-                .distinct()
-                .collect()
-            ]
-        )
+        dataset_time = {
+            row[0]
+            for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
+        }
         if dataset_time.symmetric_difference(project_time):
             left_msg, right_msg = "", ""
             if left_diff := dataset_time.difference(project_time):

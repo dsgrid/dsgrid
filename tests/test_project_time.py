@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.dimension.time import TimeZone
+from dsgrid.dimension.time import TimeZone, TimeIntervalType
 from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.spark import get_spark_session
 from dsgrid.exceptions import DSGDatasetConfigError
@@ -168,9 +168,8 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     assert len(ptime_col) == 1, ptime_col
     ptime_col = ptime_col[0]
 
-    time_cols = tempo._handler.config.get_dimension(
-        DimensionType.TIME
-    ).get_timestamp_load_data_columns()
+    tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
+    time_cols = tempo_time_dim.get_timestamp_load_data_columns()
     enduse_cols = tempo._handler.get_pivoted_dimension_columns()
 
     # get sum from converted_data
@@ -189,6 +188,20 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     )
     model_time[ptime_col] = model_time[ptime_col].dt.tz_convert(session_tz)
 
+    # convert to match time interval type
+    dtime_int = tempo_time_dim.get_time_interval_type()
+    ptime_int = project_time_dim.get_time_interval_type()
+    match (ptime_int, dtime_int):
+        case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
+            model_time["map_time"] = model_time[ptime_col] + pd.Timedelta(
+                project_time_dim.get_frequency()
+            )
+
+        case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
+            model_time["map_time"] = model_time[ptime_col] - pd.Timedelta(
+                project_time_dim.get_frequency()
+            )
+
     geo_tz_values = [row.time_zone for row in raw_data.select("time_zone").distinct().collect()]
     geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
 
@@ -197,7 +210,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
         model_time_tz = model_time.copy()
         model_time_tz["time_zone"] = tzv
         # for pd.dt.tz_convert(), always convert to UTC before converting to another tz
-        model_time_tz["UTC"] = model_time_tz[ptime_col].dt.tz_convert("UTC")
+        model_time_tz["UTC"] = model_time_tz["map_time"].dt.tz_convert("UTC")
         model_time_tz["local_time"] = model_time_tz["UTC"].dt.tz_convert(tz)
         for col in time_cols:
             if col == "hour":
@@ -231,14 +244,22 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
     try:
         project_time_df = project_time_dim.build_time_dataframe()
+        project_time_df = project_time_dim._align_time_interval_type(
+            project_time_df,
+            ptime_col,
+            ptime_int,
+            dtime_int,
+            project_time_dim.get_frequency(),
+            new_time_column="map_time",
+        )
         idx = 0
         for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
             local_time_df = (
                 project_time_df.withColumn("time_zone", F.lit(tz_value))
-                .withColumn("UTC", F.to_utc_timestamp(F.col(ptime_col), session_tz))
+                .withColumn("UTC", F.to_utc_timestamp(F.col("map_time"), session_tz))
                 .withColumn("local_time", F.from_utc_timestamp(F.col("UTC"), tz_name))
             )
-            select = [ptime_col, "time_zone", "UTC", "local_time"]
+            select = [ptime_col, "map_time", "time_zone", "UTC", "local_time"]
             for col in time_cols:
                 func = col.replace("_", "")
                 expr = f"{func}(local_time) AS {col}"

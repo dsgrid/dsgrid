@@ -1,6 +1,9 @@
 import abc
+import pyspark.sql.functions as F
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
+from dsgrid.dimension.time import TimeIntervalType
+from dsgrid.exceptions import DSGInvalidOperation
 
 
 class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
@@ -101,6 +104,16 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
+    def get_time_interval_type(self):
+        """Return the time interval type for this dimension.
+
+        Returns
+        -------
+        TimeIntervalType | None
+
+        """
+
+    @abc.abstractmethod
     def list_expected_dataset_timestamps(self):
         """Return a list of the timestamps expected in the load_data table.
 
@@ -110,3 +123,118 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             List of tuples of columns representing time in the load_data table.
 
         """
+
+    def _convert_time_to_project_time_interval(
+        self, df=None, project_time_dim=None, wrap_time=True
+    ):
+        """Shift time to match project time based on TimeIntervalType
+        If time range spills over into another year after time interval alignment,
+        the time range will be wrapped around so it's bounded within the year
+        """
+        if project_time_dim is None:
+            return df
+
+        dtime_interval = self.get_time_interval_type()
+        ptime_interval = project_time_dim.get_time_interval_type()
+        time_col = project_time_dim.get_timestamp_load_data_columns()
+
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+
+        df = self._align_time_interval_type(
+            df, time_col, dtime_interval, ptime_interval, self.get_frequency()
+        )
+
+        if wrap_time:
+            df = self._apply_time_wrap(df, project_time_dim)
+
+        return df
+
+    @staticmethod
+    def _align_time_interval_type(
+        df, time_column, from_time_interval, to_time_interval, time_step, new_time_column=None
+    ):
+        """
+        Shift time_column by time_step in df as needed by comparing from_time_interval to to_time_interval.
+        If new_time_column is None, time_column is shifted in place, else shifted time is added as new_time_column in df
+        """
+        if from_time_interval == to_time_interval:
+            return df
+
+        if new_time_column is None:
+            new_time_column = time_column
+
+        if TimeIntervalType.INSTANTANEOUS in (from_time_interval, to_time_interval):
+            raise Exception("aligning time intervals with instantaneous is not yet supported")
+
+        match (from_time_interval, to_time_interval):
+            case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
+                df = df.withColumn(
+                    new_time_column,
+                    F.col(time_column) + F.expr(f"INTERVAL {time_step.seconds} SECONDS"),
+                )
+            case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
+                df = df.withColumn(
+                    new_time_column,
+                    F.col(time_column) - F.expr(f"INTERVAL {time_step.seconds} SECONDS"),
+                )
+
+        return df
+
+    @staticmethod
+    def _apply_time_wrap(df, project_time_dim):
+        """If dataset_time does not match project_time, apply time-wrapping"""
+
+        time_col = project_time_dim.get_timestamp_load_data_columns()
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+
+        project_time = {
+            row[0]
+            for row in project_time_dim.build_time_dataframe()
+            .select(time_col)
+            .filter(f"{time_col} IS NOT NULL")
+            .distinct()
+            .collect()
+        }
+        dataset_time = {
+            row[0]
+            for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
+        }
+        diff = dataset_time.difference(project_time)
+
+        if not diff:
+            return df
+
+        # extract time_delta based on if diff is to the left or right of project_time
+        time_delta = (
+            max(project_time) - min(project_time) + project_time_dim.get_frequency()
+        ).total_seconds()
+        if min(diff) > max(project_time):
+            time_delta *= -1
+
+        # time-wrap by "changing" the year with time_delta
+        df = (
+            df.filter(F.col(time_col).isin(diff))
+            .withColumn(
+                time_col,
+                F.from_unixtime(F.unix_timestamp(time_col) + time_delta).cast("timestamp"),
+            )
+            .union(df.filter(~F.col(time_col).isin(diff)))
+        )
+
+        dataset_time = {
+            row[0]
+            for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
+        }
+        if dataset_time.symmetric_difference(project_time):
+            left_msg, right_msg = "", ""
+            if left_diff := dataset_time.difference(project_time):
+                left_msg = f"\nProcessed dataset time contains {len(left_diff)} extra timestamp(s): {left_diff}"
+            if right_diff := project_time.difference(dataset_time):
+                right_msg = f"\nProcessed dataset time is missing {len(right_diff)} timestamp(s): {right_diff}"
+            raise DSGInvalidOperation(
+                f"Dataset time cannot be processed to match project time. {left_msg}{right_msg}"
+            )
+
+        return df

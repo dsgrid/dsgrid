@@ -102,15 +102,23 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         time_df = None
         try:
             project_time_df = project_time_dim.build_time_dataframe()
+            map_time = "timestamp_to_map"
+            project_time_df = self._align_time_interval_type(
+                project_time_df,
+                ptime_col,
+                project_time_dim.get_time_interval_type(),
+                self.get_time_interval_type(),
+                project_time_dim.get_frequency(),
+                new_time_column=map_time,
+            )
+
             idx = 0
             for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
                 local_time_df = project_time_df.withColumn(
                     "time_zone", F.lit(tz_value)
                 ).withColumn(
                     "local_time",
-                    F.from_utc_timestamp(
-                        F.to_utc_timestamp(F.col(ptime_col), session_tz), tz_name
-                    ),
+                    F.from_utc_timestamp(F.to_utc_timestamp(F.col(map_time), session_tz), tz_name),
                 )
                 select = [ptime_col, "time_zone"]
                 for col in time_cols:
@@ -143,7 +151,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         return self._format_handler.get_frequency()
 
     def get_time_ranges(self):
-        return self._format_handler.get_time_ranges(self.model.ranges, self.get_tzinfo())
+        return self._format_handler.get_time_ranges(
+            self.model.ranges, self.model.time_interval_type, self.get_tzinfo()
+        )
 
     def get_timestamp_load_data_columns(self):
         return self._format_handler.get_timestamp_load_data_columns()
@@ -151,6 +161,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_tzinfo(self):
         # TBD
         return None
+
+    def get_time_interval_type(self):
+        return self.model.time_interval_type
 
     def list_expected_dataset_timestamps(self):
         return self._format_handler.list_expected_dataset_timestamps(self.model.ranges)
@@ -259,7 +272,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     def get_frequency(self):
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, _):
+    def get_time_ranges(self, ranges, time_interval_type, _):
         # TODO: This method may have some problems but is currently unused.
         # How to handle year? Leap year?
         time_ranges = []
@@ -273,6 +286,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
                     end=pd.Timestamp(datetime(year=1970, month=model.end, day=last_day, hour=23)),
                     frequency=timedelta(hours=1),
                     leap_day_adjustment=LeapDayAdjustmentType.NONE,
+                    time_interval_type=time_interval_type,
                 )
             )
 

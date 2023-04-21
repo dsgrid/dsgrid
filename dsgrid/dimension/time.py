@@ -49,7 +49,7 @@ class LeapDayAdjustmentType(DSGEnum):
     NONE = EnumValue(value="none", description="No leap day adjustment made.")
 
 
-class TimeInvervalType(DSGEnum):
+class TimeIntervalType(DSGEnum):
     """Time interval enum types"""
 
     # TODO: R2PD uses a different set; do we want to align?
@@ -250,18 +250,27 @@ class TimeZone(DSGEnum):
 
 
 class DatetimeRange:
-    def __init__(self, start, end, frequency, leap_day_adjustment: LeapDayAdjustmentType):
+    def __init__(
+        self,
+        start,
+        end,
+        frequency,
+        leap_day_adjustment: LeapDayAdjustmentType,
+        time_interval_type: TimeIntervalType,
+    ):
         self.start = start
         self.end = end
         self.tzinfo = start.tzinfo
         self.frequency = frequency
         self.leap_day_adjustment = leap_day_adjustment
+        self.time_interval_type = time_interval_type
 
     def __repr__(self):
         return (
             self.__class__.__qualname__
             + f"(start={self.start}, end={self.end}, frequency={self.frequency}, "
-            + f"leap_day_adjustment={self.leap_day_adjustment})"
+            + f"leap_day_adjustment={self.leap_day_adjustment}, "
+            + f"time_interval_type={self.time_interval_type})"
         )
 
     def __str__(self):
@@ -339,12 +348,12 @@ class NoOpTimeRange(DatetimeRange):
         yield None
 
 
-def make_time_range(start, end, frequency, leap_day_adjustment):
+def make_time_range(start, end, frequency, leap_day_adjustment, time_interval_type):
     """
     factory function that decides which TimeRange func to use based on frequency
     """
     if frequency == datetime.timedelta(days=365):
-        return AnnualTimeRange(start, end, frequency, leap_day_adjustment)
+        return AnnualTimeRange(start, end, frequency, leap_day_adjustment, time_interval_type)
     elif frequency == datetime.timedelta(days=0):
-        return NoOpTimeRange(start, end, frequency, leap_day_adjustment)
-    return DatetimeRange(start, end, frequency, leap_day_adjustment)
+        return NoOpTimeRange(start, end, frequency, leap_day_adjustment, time_interval_type)
+    return DatetimeRange(start, end, frequency, leap_day_adjustment, time_interval_type)

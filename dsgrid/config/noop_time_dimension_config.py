@@ -35,6 +35,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
                 end=None,
                 frequency=frequency,
                 leap_day_adjustment=None,
+                time_interval_type=None,
             )
         ]
 
@@ -44,6 +45,9 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
         return []
 
     def get_tzinfo(self):
+        return None
+
+    def get_time_interval_type(self):
         return None
 
     def list_expected_dataset_timestamps(self):

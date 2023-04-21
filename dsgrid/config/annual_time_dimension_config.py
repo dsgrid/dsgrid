@@ -83,6 +83,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                     end=end,
                     frequency=frequency,
                     leap_day_adjustment=None,
+                    time_interval_type=None,
                 )
             )
 
@@ -92,6 +93,9 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         return list(AnnualTimestampType._fields)
 
     def get_tzinfo(self):
+        return None
+
+    def get_time_interval_type(self):
         return None
 
     def list_expected_dataset_timestamps(self):

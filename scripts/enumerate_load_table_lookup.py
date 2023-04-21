@@ -4,8 +4,6 @@ import os
 import shutil
 import logging
 
-import pyspark.sql.functions as F
-
 from dsgrid.loggers import setup_logging
 from dsgrid.utils.timing import timed_info
 from dsgrid.utils.spark import init_spark
@@ -82,8 +80,8 @@ class EnumerateTable:
     def assertion_checks(self, df_lookup_full, df_lookup, keys):
 
         # 1) set of (data) id is the same before and after enumeration
-        df_lookup_ids = df_lookup.agg(F.collect_set("id")).collect()[0][0]
-        df_lookup_full_ids = df_lookup_full.agg(F.collect_set("id")).collect()[0][0]
+        df_lookup_ids = df_lookup.select("id").distinct().collect()[0]
+        df_lookup_full_ids = df_lookup_full.select("id").distinct().collect()[0]
 
         assert set(df_lookup_ids) == set(df_lookup_full_ids) - set([None])
 

@@ -398,4 +398,5 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")
+
         return load_data_df

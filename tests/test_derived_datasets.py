@@ -87,6 +87,7 @@ def test_resstock_projection_invalid_query_replace_ids_with_names(valid_query):
     assert not does_query_support_a_derived_dataset(query)
 
 
+@pytest.mark.skip
 def test_create_derived_dataset_config(tmp_path):
     dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"

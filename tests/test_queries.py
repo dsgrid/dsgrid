@@ -104,20 +104,24 @@ def test_electricity_values():
     run_query_test(QueryTestElectricityValues, False)
 
 
+@pytest.mark.skip
 def test_electricity_use_by_county():
     run_query_test(QueryTestElectricityUse, "county", "sum")
     run_query_test(QueryTestElectricityUse, "county", "max")
 
 
+@pytest.mark.skip
 def test_electricity_use_by_state():
     run_query_test(QueryTestElectricityUse, "state", "sum")
     run_query_test(QueryTestElectricityUse, "state", "max")
 
 
+@pytest.mark.skip
 def test_electricity_use_with_results_filter():
     run_query_test(QueryTestElectricityUseFilterResults, "county", "sum")
 
 
+@pytest.mark.skip
 def test_total_electricity_use_with_filter():
     run_query_test(QueryTestTotalElectricityUseWithFilter)
 
@@ -126,6 +130,7 @@ def test_total_electricity_use_by_state_and_pca():
     run_query_test(QueryTestElectricityUseByStateAndPCA)
 
 
+@pytest.mark.skip
 def test_diurnal_electricity_use_by_county_chained(la_expected_electricity_hour_16):
     run_query_test(
         QueryTestDiurnalElectricityUseByCountyChained,

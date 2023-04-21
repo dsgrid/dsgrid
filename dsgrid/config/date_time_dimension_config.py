@@ -97,6 +97,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def convert_dataframe(self, df=None, project_time_dim=None):
         # TODO #193: we may have to do something special with local timezone
+        df = self._convert_time_to_project_time_interval(df=df, project_time_dim=project_time_dim)
         return df
 
     def get_frequency(self):
@@ -116,6 +117,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                     end=end,
                     frequency=self.model.frequency,
                     leap_day_adjustment=self.model.leap_day_adjustment,
+                    time_interval_type=self.model.time_interval_type,
                 )
             )
 
@@ -126,6 +128,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_tzinfo(self):
         return self.model.timezone.tz
+
+    def get_time_interval_type(self):
+        return self.model.time_interval_type
 
     def list_expected_dataset_timestamps(self):
         # TODO: need to support validation of multiple time ranges: DSGRID-173

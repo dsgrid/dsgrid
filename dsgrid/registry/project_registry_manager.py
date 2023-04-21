@@ -576,6 +576,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                 f"dataset={dataset_id} has already been submitted to project={project_config.config_id}"
             )
 
+        self._check_dataset_time_interval_type(project_config, dataset_config)
+
         references = []
         if dimension_mapping_file is not None:
             references += self._register_mappings_from_file(
@@ -604,6 +606,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 log_message,
                 context,
             )
+
         self._submit_dataset(project_config, dataset_config, submitter, log_message, references)
 
     def _register_mappings_from_file(
@@ -812,6 +815,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 )
 
         dataset_model = project_config.get_dataset(dataset_config.model.dataset_id)
+
         dataset_model.mapping_references = mapping_references
         dataset_model.status = DatasetRegistryStatus.REGISTERED
         if project_config.are_all_datasets_submitted():
@@ -834,6 +838,15 @@ class ProjectRegistryManager(RegistryManagerBase):
             model.version,
             model.project_id,
         )
+
+    def _check_dataset_time_interval_type(
+        self, project_config: ProjectConfig, dataset_config: DatasetConfig
+    ):
+        dtime = dataset_config.get_dimension(DimensionType.TIME)
+        ptime = project_config.get_base_dimension(DimensionType.TIME)
+
+        df = dtime.build_time_dataframe()
+        dtime._convert_time_to_project_time_interval(df=df, project_time_dim=ptime, wrap_time=True)
 
     @track_timing(timer_stats_collector)
     def _check_dataset_base_to_project_base_mappings(

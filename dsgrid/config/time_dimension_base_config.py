@@ -164,6 +164,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         if new_time_column is None:
             new_time_column = time_column
 
+        if TimeIntervalType.INSTANTANEOUS in (from_time_interval, to_time_interval):
+            raise Exception("aligning time intervals with instantaneous is not yet supported")
+
         match (from_time_interval, to_time_interval):
             case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
                 df = df.withColumn(
@@ -175,6 +178,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                     new_time_column,
                     F.col(time_column) - F.expr(f"INTERVAL {time_step.seconds} SECONDS"),
                 )
+
         return df
 
     @staticmethod

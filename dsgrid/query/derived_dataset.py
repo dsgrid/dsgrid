@@ -1,4 +1,3 @@
-from dsgrid.config.dimensions import DimensionModel
 import logging
 from pathlib import Path
 
@@ -11,6 +10,7 @@ from dsgrid.config.dataset_config import (
 )
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimensions import DimensionModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
@@ -228,10 +228,17 @@ def _make_dataset_config(
 def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path: Path):
     project_record_ids = orig_dim_config.get_unique_ids()
     if not unique_data_records.issubset(project_record_ids):
+        diff = project_record_ids.difference(unique_data_records)
+        if diff:
+            raise DSGInvalidDataset(
+                f"The derived dataset records do not include some project base dimension "
+                f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff=}"
+            )
+        assert unique_data_records.issuperset(project_record_ids)
+        diff = unique_data_records.difference(project_record_ids)
         raise DSGInvalidDataset(
-            f"The derived dataset records is not a subset of the project base dimension records. "
-            f"Dimension type = {orig_dim_config.model.dimension_type} "
-            f"diff = {project_record_ids.diff(unique_data_records)}"
+            f"The derived dataset records is a superset of the project base dimension "
+            f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff=}"
         )
 
     new_dim_path = path / orig_dim_config.model.dimension_type.value

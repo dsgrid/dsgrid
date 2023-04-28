@@ -165,7 +165,10 @@ def check_null_value_in_unique_dimension_rows(dim_table, exclude_columns=None):
 def is_noop_mapping(records: pyspark.sql.DataFrame) -> bool:
     """Return True if the mapping is a no-op."""
     return records.filter(
-        (records.from_id != records.to_id) | (records.from_fraction != 1.0)
+        (records.to_id.isNull() & ~records.from_id.isNull())
+        | (~records.to_id.isNull() & records.from_id.isNull())
+        | (records.from_id != records.to_id)
+        | (records.from_fraction != 1.0)
     ).rdd.isEmpty()
 
 

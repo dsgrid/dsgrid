@@ -170,7 +170,7 @@ def test_is_noop_mapping_false():
         [
             {
                 "from_id": "elec_cooling",
-                "to_id": "elect_cooling",
+                "to_id": "elec_cooling",
                 "from_fraction": 2.0,
             },
             {
@@ -182,13 +182,39 @@ def test_is_noop_mapping_false():
         [
             {
                 "from_id": "elec_cooling",
-                "to_id": "elect_cooling",
+                "to_id": "elec_cooling",
                 "from_fraction": 1.0,
             },
             {
                 "from_id": "elec_heating",
                 "to_id": "elec_heating",
                 "from_fraction": 2.0,
+            },
+        ],
+        [
+            # NULLs are ignored
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elec_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": "elec_cooling",
+                "to_id": None,
+                "from_fraction": 1.0,
+            },
+        ],
+        [
+            # NULLs are ignored
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elec_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": None,
+                "to_id": "elec_cooling",
+                "from_fraction": 1.0,
             },
         ],
     ):

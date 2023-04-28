@@ -204,6 +204,19 @@ def test_is_noop_mapping_false():
                 "from_fraction": 1.0,
             },
         ],
+        [
+            # NULLs are ignored
+            {
+                "from_id": "elec_cooling",
+                "to_id": "elec_cooling",
+                "from_fraction": 1.0,
+            },
+            {
+                "from_id": None,
+                "to_id": "elec_cooling",
+                "from_fraction": 1.0,
+            },
+        ],
     ):
         df = spark.createDataFrame(records)
         assert not is_noop_mapping(df)

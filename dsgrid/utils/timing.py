@@ -3,7 +3,9 @@
 import functools
 import logging
 import time
+from pathlib import Path
 
+from dsgrid.utils.files import dump_line_delimited_json
 
 logger = logging.getLogger(__name__)
 
@@ -110,10 +112,12 @@ class Timer:
         self._timer_stat = timer_stats.get_stat(name)
 
     def __enter__(self):
-        self._start = time.perf_counter()
+        if self._timer_stat is not None:
+            self._start = time.perf_counter()
 
     def __exit__(self, exc, value, tb):
-        self._timer_stat.update(time.perf_counter() - self._start)
+        if self._timer_stat is not None:
+            self._timer_stat.update(time.perf_counter() - self._start)
 
 
 def track_timing(collector):
@@ -142,15 +146,24 @@ def _timed_func(timer_stats, func, *args, **kwargs):
 class TimerStatsCollector:
     """Collects statistics for timed code segments."""
 
-    def __init__(self):
+    def __init__(self, is_enabled=False):
         self._stats = {}
+        self._is_enabled = is_enabled
 
     def clear(self):
         """Clear all stats."""
         self._stats.clear()
 
+    def disable(self):
+        """Disable timing."""
+        self._is_enabled = False
+
+    def enable(self):
+        """Enable timing."""
+        self._is_enabled = True
+
     def get_stat(self, name):
-        """Return a TimerStats.
+        """Return a TimerStats. Return None if timing is disabled.
 
         Parameters
         ----------
@@ -158,12 +171,38 @@ class TimerStatsCollector:
 
         Returns
         -------
-        TimerStats
+        TimerStats | None
 
         """
+        if not self._is_enabled:
+            return None
         if name not in self._stats:
             self.register_stat(name)
         return self._stats[name]
+
+    @property
+    def is_enabled(self) -> bool:
+        """Return True if timing is enabled."""
+        return self._is_enabled
+
+    def log_json_stats(self, filename: Path, clear=False):
+        """Log line-delimited JSON stats to filename.
+
+        Parameters
+        ----------
+        filename: Path
+        clear : bool
+            If True, clear all stats.
+        """
+        if self._is_enabled:
+            rows = []
+            for name, stat in self._stats.items():
+                row = {"name": name}
+                row.update(stat.get_stats())
+                rows.append(row)
+            dump_line_delimited_json(rows, filename, mode="a")
+            if clear:
+                self._stats.clear()
 
     def log_stats(self, clear=False):
         """Log statistics for all tracked stats.
@@ -172,12 +211,12 @@ class TimerStatsCollector:
         ----------
         clear : bool
             If True, clear all stats.
-
         """
-        for stat in self._stats.values():
-            stat.log_stats()
-        if clear:
-            self._stats.clear()
+        if self._is_enabled:
+            for stat in self._stats.values():
+                stat.log_stats()
+            if clear:
+                self._stats.clear()
 
     def register_stat(self, name):
         """Register tracking of a new stat.
@@ -191,10 +230,10 @@ class TimerStatsCollector:
         TimerStats
 
         """
-        assert name not in self._stats
-        stat = TimerStats(name)
-        self._stats[name] = stat
-        return stat
+        if self._is_enabled:
+            assert name not in self._stats
+            stat = TimerStats(name)
+            self._stats[name] = stat
 
 
 timer_stats_collector = TimerStatsCollector()

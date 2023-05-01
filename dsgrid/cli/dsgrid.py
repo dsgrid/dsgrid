@@ -69,7 +69,7 @@ _config = DsgridRuntimeConfig.load()
     type=str,
     default=_config.database_url,
     envvar="DSGRID_REGISTRY_DATABASE_URL",
-    help="Database URL. Ex: http://localhost:8529/_db/workflows/torc-service",
+    help="Database URL. Ex: http://localhost:8529",
 )
 @click.pass_context
 def cli(

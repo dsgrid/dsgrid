@@ -35,8 +35,7 @@ def config():
     "--database-url",
     type=str,
     default=None,
-    help="Database URL. Note the database name in this example: "
-    "http://localhost:8529/_db/database_name/dsgrid-service",
+    help="Database URL. Ex: http://localhost:8529",
 )
 @click.option(
     "-o",

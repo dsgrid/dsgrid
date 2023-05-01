@@ -1,4 +1,4 @@
-"""Manages the torc runtime configuration file"""
+"""Manages the dsgrid runtime configuration file"""
 
 import logging
 import sys
@@ -28,7 +28,7 @@ class DsgridRuntimeConfig(DSGBaseModel):
 
     @classmethod
     def load(cls):
-        """Load the torc runtime config if it exists or one with default values."""
+        """Load the dsgrid runtime config if it exists or one with default values."""
         rc_file = cls.path()
         if rc_file.exists():
             data = json5.loads(rc_file.read_text(encoding="utf-8"))

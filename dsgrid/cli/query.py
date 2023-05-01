@@ -148,7 +148,7 @@ _COMMON_RUN_OPTIONS = (
 )
 @add_options(_COMMON_REGISTRY_OPTIONS)
 @click.pass_context
-def create_project(
+def create_project_query(
     ctx,
     query_name,
     project_id,
@@ -254,7 +254,7 @@ def create_project(
 
 @click.command("validate")
 @click.argument("query_file", type=click.Path(exists=True), callback=lambda _, __, x: Path(x))
-def validate_project(query_file):
+def validate_project_query(query_file):
     try:
         ProjectQueryModel.from_file(query_file)
         print(f"Validated {query_file}", file=sys.stderr)
@@ -283,7 +283,7 @@ def validate_project(query_file):
 @add_options(_COMMON_REGISTRY_OPTIONS)
 @add_options(_COMMON_RUN_OPTIONS)
 @click.pass_context
-def run_project(
+def run_project_query(
     ctx,
     query_definition_file,
     persist_intermediate_table,
@@ -435,9 +435,9 @@ def composite_dataset():
 
 query.add_command(composite_dataset)
 query.add_command(project)
-project.add_command(create_project)
-project.add_command(validate_project)
-project.add_command(run_project)
+project.add_command(create_project_query)
+project.add_command(validate_project_query)
+project.add_command(run_project_query)
 project.add_command(create_derived_dataset_config)
 composite_dataset.add_command(create_composite_dataset)
 composite_dataset.add_command(query_composite_dataset)

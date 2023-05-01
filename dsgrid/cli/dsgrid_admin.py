@@ -7,8 +7,10 @@ from pathlib import Path
 
 import click
 
+from dsgrid.cli.common import get_value_from_context
 from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY
 from dsgrid.config.simple_models import RegistrySimpleModel
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.loggers import setup_logging, check_log_file_size
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
@@ -17,6 +19,7 @@ from dsgrid.utils.files import load_data
 
 
 logger = logging.getLogger(__name__)
+_config = DsgridRuntimeConfig.load()
 
 
 """
@@ -25,14 +28,39 @@ Click Group Definitions
 
 
 @click.group()
+@click.option(
+    "--database-name",
+    default=_config.database_name,
+    envvar="DSGRID_REGISTRY_DATABASE_NAME",
+    show_default=True,
+    help="dsgrid registry database name. Override with the environment variable "
+    "DSGRID_REGISTRY_DATABASE_NAME",
+)
+@click.option(
+    "--database-url",
+    default=_config.database_url,
+    show_default=True,
+    envvar="DSGRID_REGISTRY_DATABASE_URL",
+    help="dsgrid registry database URL. Override with the environment variable "
+    "DSGRID_REGISTRY_DATABASE_URL",
+)
 @click.option("-l", "--log-file", default="dsgrid_admin.log", type=str, help="Log to this file.")
 @click.option(
     "-n", "--no-prompts", default=False, is_flag=True, show_default=True, help="Do not prompt."
 )
 @click.option(
+    "--offline/--online",
+    is_flag=True,
+    default=_config.offline,
+    show_default=True,
+    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
+    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
+    "commands will not be officially synced with the remote registry",
+)
+@click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def cli(log_file, no_prompts, verbose):
+def cli(database_name, database_url, log_file, no_prompts, offline, verbose):
     """dsgrid-admin commands"""
     path = Path(log_file)
     level = logging.DEBUG if verbose else logging.INFO
@@ -42,43 +70,27 @@ def cli(log_file, no_prompts, verbose):
 
 @click.group()
 @click.option(
-    "--url",
-    default="http://localhost:8529",
-    show_default=True,
-    envvar="DSGRID_REGISTRY_DATABASE_URL",
-    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
-)
-@click.option(
-    "--db-name",
-    default="dsgrid",
-    show_default=True,
-    help="dsgrid registry database name.",
-)
-@click.option(
     "--remote-path",
     default=REMOTE_REGISTRY,
     show_default=True,
     help="path to dsgrid remote registry",
 )
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    default=False,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
 @click.pass_context
-def registry(ctx, url, db_name, remote_path, offline):
+def registry(ctx, remote_path):
     """Manage a registry."""
     no_prompts = ctx.parent.params["no_prompts"]
     if "--help" in sys.argv:
         ctx.obj = None
     else:
-        conn = DatabaseConnection.from_url(url, database=db_name)
+        conn = DatabaseConnection.from_url(
+            get_value_from_context(ctx, "database_url"),
+            database=get_value_from_context(ctx, "database_name"),
+        )
         ctx.obj = RegistryManager.load(
-            conn, remote_path, offline_mode=offline, no_prompts=no_prompts
+            conn,
+            remote_path,
+            offline_mode=get_value_from_context(ctx, "offline"),
+            no_prompts=no_prompts,
         )
 
 
@@ -122,16 +134,10 @@ Registry Commands
     help="local dsgrid registry data path.",
 )
 @click.option(
-    "--url",
-    default="http://localhost:8529",
-    show_default=True,
-    envvar="DSGRID_REGISTRY_DATABASE_URL",
-    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
-)
-@click.option(
     "-f", "--force", is_flag=True, default=False, help="Delete registry_path if it already exists."
 )
-def create_registry(db_name, url, data_path, force):
+@click.pass_context
+def create_registry(ctx, db_name, data_path, force):
     """Create a new registry."""
     if data_path.exists():
         if force:
@@ -140,7 +146,13 @@ def create_registry(db_name, url, data_path, force):
             print(f"{data_path} already exists. Set --force to overwrite.", file=sys.stderr)
             sys.exit(1)
 
-    conn = DatabaseConnection.from_url(url, database=db_name)
+    config = DsgridRuntimeConfig.load()
+    conn = DatabaseConnection.from_url(
+        get_value_from_context(ctx, "database_url"),
+        database=db_name,
+        username=config.database_user,
+        password=config.database_password,
+    )
     RegistryManager.create(conn, data_path)
 
 
@@ -198,19 +210,12 @@ def remove_dataset(registry_manager, dataset_id):
 
 @click.command()
 @click.option(
-    "--url",
-    default="http://localhost:8529",
-    show_default=True,
-    envvar="DSGRID_REGISTRY_DATABASE_URL",
-    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
-)
-@click.option(
-    "--src-db-name",
+    "--src-database-name",
     required=True,
     help="Source dsgrid registry database name.",
 )
 @click.option(
-    "--dst-db-name",
+    "--dst-database-name",
     default="dsgrid",
     required=True,
     help="Destination dsgrid registry database name.",
@@ -234,10 +239,11 @@ def remove_dataset(registry_manager, dataset_id):
     show_default=True,
     help="Overwrite dst_registry_path if it already exists. Does not apply if using rsync.",
 )
+@click.pass_context
 def make_filtered_registry(
-    url: str,
-    src_db_name,
-    dst_db_name,
+    ctx,
+    src_database_name,
+    dst_database_name,
     dst_data_path: Path,
     config_file: Path,
     mode,
@@ -245,8 +251,20 @@ def make_filtered_registry(
 ):
     """Make a filtered registry for testing purposes."""
     simple_model = RegistrySimpleModel(**load_data(config_file))
-    src_conn = DatabaseConnection.from_url(url, database=src_db_name)
-    dst_conn = DatabaseConnection.from_url(url, database=dst_db_name)
+    database_url = get_value_from_context(ctx, "database_url")
+    config = DsgridRuntimeConfig.load()
+    src_conn = DatabaseConnection.from_url(
+        database_url,
+        database=src_database_name,
+        username=config.database_user,
+        password=config.database_password,
+    )
+    dst_conn = DatabaseConnection.from_url(
+        database_url,
+        database=dst_database_name,
+        username=config.database_user,
+        password=config.database_password,
+    )
     RegistryManager.copy(
         src_conn,
         dst_conn,

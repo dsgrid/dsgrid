@@ -7,7 +7,6 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
 from dsgrid.config.project_config import ProjectConfigModel, ProjectDimensionQueryNamesModel
-from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     map_dimension_ids_to_names,
@@ -19,10 +18,10 @@ from dsgrid.tests.common import (
 from tests.data.dimension_models.minimal.models import PROJECT_CONFIG_FILE
 
 
-@pytest.fixture(scope="module")
-def config_as_dict(tmp_path_factory):
+@pytest.fixture(scope="session")
+def config_as_dict(cached_registry, tmp_path_factory):
     tmp_path = tmp_path_factory.mktemp("dsgrid")
-    conn = DatabaseConnection(database="test-dsgrid")
+    conn = cached_registry
     mgr = RegistryManager.load(conn, offline_mode=True)
     dim_map = map_dimension_names_to_ids(mgr.dimension_manager)
     dim_id_to_name = map_dimension_ids_to_names(mgr.dimension_manager)

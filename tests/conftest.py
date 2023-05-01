@@ -8,13 +8,15 @@ from tempfile import gettempdir
 import pytest
 
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
+from dsgrid.utils.files import load_data
 from dsgrid.utils.run_command import run_command, check_run_command
 from dsgrid.utils.spark import init_spark
 from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
     TEST_PROJECT_PATH,
     TEST_PROJECT_REPO,
-    TEST_REGISTRY,
+    TEST_REGISTRY_DATABASE,
+    TEST_REGISTRY_PATH,
     TEST_STANDARD_SCENARIOS_PROJECT_REPO,
     TEST_EFS_REGISTRATION_FILE,
 )
@@ -41,26 +43,38 @@ def pytest_sessionstart(session):
     # outcomes. This feature may become opt-in if we encounter similar problems.
     os.environ["__DSGRID_SKIP_SAVING_DIMENSION_ASSOCIATIONS__"] = "1"
 
-    commit_file = TEST_REGISTRY / "commit.txt"
+
+@pytest.fixture(scope="session")
+def cached_registry():
+    """Creates a shared registry that is is only rebuilt after a new commit."""
+    data = load_data(TEST_EFS_REGISTRATION_FILE)
+    assert data["data_path"] == str(TEST_REGISTRY_PATH)
+    conn = DatabaseConnection(**data["conn"])
+    assert conn.database == TEST_REGISTRY_DATABASE
+    commit_file = TEST_REGISTRY_PATH / "commit.txt"
     latest_commit = _get_latest_commit()
+
     if (
-        TEST_REGISTRY.exists()
+        TEST_REGISTRY_PATH.exists()
         and commit_file.exists()
         and commit_file.read_text().strip() == latest_commit
     ):
-        print(f"Use existing test registry at {TEST_REGISTRY}.")
+        print(f"Use existing test registry at {TEST_REGISTRY_PATH}.")
     else:
-        if TEST_REGISTRY.exists():
-            shutil.rmtree(TEST_REGISTRY)
+        if TEST_REGISTRY_PATH.exists():
+            shutil.rmtree(TEST_REGISTRY_PATH)
         ret = run_command(f"python dsgrid/tests/register.py {TEST_EFS_REGISTRATION_FILE}")
         if ret == 0:
             print("make script returned 0")
             commit_file.write_text(latest_commit + "\n")
-        elif TEST_REGISTRY.exists():
+        elif TEST_REGISTRY_PATH.exists():
             print("make script returned non-zero:", ret)
             # Delete it because it is invalid.
-            shutil.rmtree(TEST_REGISTRY)
+            shutil.rmtree(TEST_REGISTRY_PATH)
+            RegistryDatabase.delete(conn)
             sys.exit(1)
+
+    yield conn
 
 
 def _get_latest_commit():

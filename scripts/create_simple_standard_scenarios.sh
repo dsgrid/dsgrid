@@ -25,8 +25,8 @@ export DUMP_DIR=$(pwd)/simple_standard_scenarios_dump
 rm -rf ${QUERY_OUTPUT} ${SIMPLE_SS_DATA} ${COMSTOCK_DD} ${RESSTOCK_DD} ${TEMPO_DD} ${DUMP_DIR}
 
 dsgrid-admin make-filtered-registry \
-    --src-db-name ${DSGRID_REGISTRY_DATABASE_NAME} \
-    --dst-db-name ${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --src-database-name ${DSGRID_REGISTRY_DATABASE_NAME} \
+    --dst-database-name ${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --url ${DSGRID_REGISTRY_DATABASE_URL} \
     ${SIMPLE_SS_DATA} \
     ${DSGRID_REPO}/dsgrid-test-data/filtered_registries/simple_standard_scenarios.json
@@ -39,9 +39,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    query project run \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
+    query project run \
     ${SS_REPO}/dsgrid_project/derived_datasets/comstock_conus_2022_projected.json5 \
     -o ${QUERY_OUTPUT}
 if [[ $? -ne 0 ]]; then
@@ -52,9 +52,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    query project run \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
+    query project run \
     ${SS_REPO}/dsgrid_project/derived_datasets/resstock_conus_2022_projected.json5 \
     -o ${QUERY_OUTPUT}
 if [[ $? -ne 0 ]]; then
@@ -65,9 +65,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    query project run \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
+    query project run \
     ${SS_REPO}/dsgrid_project/derived_datasets/tempo_conus_2022_mapped.json5 \
     -o ${QUERY_OUTPUT}
 if [[ $? -ne 0 ]]; then
@@ -79,9 +79,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    query project create-derived-dataset-config \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
+    query project create-derived-dataset-config \
     ${QUERY_OUTPUT}/comstock_conus_2022_projected \
     ${COMSTOCK_DD}
 if [[ $? -ne 0 ]]; then
@@ -92,9 +92,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    query project create-derived-dataset-config \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
+    query project create-derived-dataset-config \
     ${QUERY_OUTPUT}/resstock_conus_2022_projected \
     ${RESSTOCK_DD}
 if [[ $? -ne 0 ]]; then
@@ -105,9 +105,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    query project create-derived-dataset-config \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
+    query project create-derived-dataset-config \
     ${QUERY_OUTPUT}/tempo_conus_2022_mapped \
     ${TEMPO_DD}
 if [[ $? -ne 0 ]]; then
@@ -119,9 +119,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    registry \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
+    registry \
     datasets \
     register \
     ${COMSTOCK_DD}/dataset.json5 \
@@ -135,9 +135,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    registry \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
+    registry \
     projects \
     submit-dataset \
     -p dsgrid_conus_2022 \
@@ -152,9 +152,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    registry \
     --offline \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    registry \
     datasets \
     register \
     ${RESSTOCK_DD}/dataset.json5 \
@@ -168,9 +168,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    registry \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --offline \
+    registry \
     projects \
     submit-dataset \
     -p dsgrid_conus_2022 \
@@ -185,9 +185,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    registry \
     --offline \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    registry \
     datasets \
     register \
     ${TEMPO_DD}/dataset.json5 \
@@ -201,9 +201,9 @@ fi
 spark-submit \
     --master=${SPARK_CLUSTER} \
     $(which dsgrid-cli.py) \
-    registry \
     --offline \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    registry \
     projects \
     submit-dataset \
     -p dsgrid_conus_2022 \
@@ -220,7 +220,7 @@ singularity run \
     -B /scratch:/scratch \
     /projects/dsgrid/containers/arangodb.sif \
     arangodump --server.database \
-    --db-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
+    --database-name=${DSGRID_REGISTRY_SIMPLE_DB_NAME} \
     --server.password openSesame \
     --output-directory $(pwd)/$(DUMP_DIR) \
     --compress-output false \

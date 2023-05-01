@@ -3,26 +3,28 @@ import pytest
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.exceptions import DSGInvalidParameter
-from dsgrid.registry.registry_database import DatabaseConnection
 
 
-registry_manager = RegistryManager.load(
-    DatabaseConnection(database="test-dsgrid"),
-    remote_path=REMOTE_REGISTRY,
-    offline_mode=True,
-    no_prompts=True,
-)
+@pytest.fixture(scope="session")
+def load_registry_manager(cached_registry):
+    conn = cached_registry
+    manager = RegistryManager.load(
+        conn,
+        remote_path=REMOTE_REGISTRY,
+        offline_mode=True,
+        no_prompts=True,
+    )
+    yield conn, manager
 
 
-def test_registry_list_all():
+def test_registry_list_all(load_registry_manager):
     """
     test:
     dsgrid registry sync (not included, add?)
     dsgrid registry --offline list
     dsgrid registry --offline projects|datasets|dimension|dimension-mappings list
     """
-
-    assert registry_manager
+    registry_manager = load_registry_manager[1]
     registry_manager.show()
     registry_manager.project_manager.show()
     registry_manager.dataset_manager.show()
@@ -30,12 +32,12 @@ def test_registry_list_all():
     registry_manager.dimension_mapping_manager.show()
 
 
-def test_registry_list_filters():
+def test_registry_list_filters(load_registry_manager):
     """
     test different variation of:
     dsgrid registry --offline projects|datasets|dimensions|dimension-mappings list -f cond1 -f cond2
     """
-
+    registry_manager = load_registry_manager[1]
     filters1 = ("submitter!=mn",)  # works for all
     filters2 = ("id contains geography", "registration date not contains -06-01")  # works for all
 

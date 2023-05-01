@@ -14,14 +14,14 @@ from dsgrid.registry.registry_manager import RegistryManager
 
 @click.command()
 @click.option(
-    "--url",
+    "--database-url",
     default="http://localhost:8529",
     show_default=True,
     envvar="DSGRID_REGISTRY_DATABASE_URL",
     help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
 )
 @click.option(
-    "--db-name",
+    "--database-name",
     default="dsgrid",
     show_default=True,
     help="dsgrid registry database name.",
@@ -43,10 +43,10 @@ from dsgrid.registry.registry_manager import RegistryManager
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def load(url, db_name, remote_path, offline, verbose):
+def load(database_url, database_name, remote_path, offline, verbose):
     level = logging.DEBUG if verbose else logging.INFO
     setup_logging("dsgrid", "dsgrid.log", console_level=level, file_level=level, mode="a")
-    conn = DatabaseConnection.from_url(url, database=db_name)
+    conn = DatabaseConnection.from_url(database_url, database=database_name)
     return RegistryManager.load(conn, remote_path, offline_mode=offline)
 
 

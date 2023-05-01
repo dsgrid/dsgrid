@@ -104,24 +104,20 @@ def test_electricity_values():
     run_query_test(QueryTestElectricityValues, False)
 
 
-@pytest.mark.skip
 def test_electricity_use_by_county():
     run_query_test(QueryTestElectricityUse, "county", "sum")
     run_query_test(QueryTestElectricityUse, "county", "max")
 
 
-@pytest.mark.skip
 def test_electricity_use_by_state():
     run_query_test(QueryTestElectricityUse, "state", "sum")
     run_query_test(QueryTestElectricityUse, "state", "max")
 
 
-@pytest.mark.skip
 def test_electricity_use_with_results_filter():
     run_query_test(QueryTestElectricityUseFilterResults, "county", "sum")
 
 
-@pytest.mark.skip
 def test_total_electricity_use_with_filter():
     run_query_test(QueryTestTotalElectricityUseWithFilter)
 
@@ -130,7 +126,6 @@ def test_total_electricity_use_by_state_and_pca():
     run_query_test(QueryTestElectricityUseByStateAndPCA)
 
 
-@pytest.mark.skip
 def test_diurnal_electricity_use_by_county_chained(la_expected_electricity_hour_16):
     run_query_test(
         QueryTestDiurnalElectricityUseByCountyChained,
@@ -211,12 +206,12 @@ def test_create_composite_dataset_query(tmp_path):
 def test_query_cli_create_validate(tmp_path):
     filename = tmp_path / "query.json5"
     cmd = [
+        "--offline",
+        "--database-name",
+        "simple-standard-scenarios",
         "query",
         "project",
         "create",
-        "--offline",
-        "--db-name",
-        "simple-standard-scenarios",
         "-d",
         "-r",
         "-f",
@@ -252,12 +247,12 @@ def test_query_cli_run(tmp_path):
     filename = tmp_path / "query.json"
     filename.write_text(query.make_query().json(indent=2))
     cmd = [
+        "--offline",
+        "--database-name",
+        "simple-standard-scenarios",
         "query",
         "project",
         "run",
-        "--offline",
-        "--db-name",
-        "simple-standard-scenarios",
         "--output",
         str(output_dir),
         str(filename),
@@ -786,6 +781,7 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                     source_datasets=[
                         StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
                         StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
+                        StandaloneDatasetModel(dataset_id="tempo_conus_2022_mapped"),
                     ],
                 ),
             ),

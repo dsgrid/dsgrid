@@ -6,7 +6,7 @@
     port: 8529,
     username: "root",
     password: "openSesame",
-    database: "test-dsgrid",
+    database: "cached-test-dsgrid",
   },
   "projects": [
     {

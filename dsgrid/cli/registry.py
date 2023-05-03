@@ -8,12 +8,13 @@ from pathlib import Path
 import click
 from semver import VersionInfo
 
+from dsgrid.cli.common import get_value_from_context
 from dsgrid.common import REMOTE_REGISTRY
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import VersionUpdateType
 from dsgrid.registry.registry_database import DatabaseConnection
-
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.filters import ACCEPTED_OPS
 
@@ -48,37 +49,23 @@ Click Group Definitions
 
 @click.group()
 @click.option(
-    "--url",
-    default="http://localhost:8529",
-    show_default=True,
-    envvar="DSGRID_REGISTRY_DATABASE_URL",
-    help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
-)
-@click.option(
-    "--db-name",
-    default="dsgrid",
-    show_default=True,
-    help="dsgrid registry database name.",
-)
-@click.option(
     "--remote-path",
     default=REMOTE_REGISTRY,
     show_default=True,
     help="path to dsgrid remote registry",
 )
-@click.option(
-    "--offline",
-    "-o",
-    is_flag=True,
-    help="run in registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
 @click.pass_context
-def registry(ctx, url, db_name, remote_path, offline):
+def registry(ctx, remote_path):
     """Manage a registry."""
-    conn = DatabaseConnection.from_url(url, database=db_name)
+    config = DsgridRuntimeConfig.load()
+    conn = DatabaseConnection.from_url(
+        get_value_from_context(ctx, "database_url"),
+        database=get_value_from_context(ctx, "database_name"),
+        username=config.database_user,
+        password=config.database_password,
+    )
     no_prompts = ctx.parent.params["no_prompts"]
+    offline = get_value_from_context(ctx, "offline")
     if "--help" in sys.argv:
         ctx.obj = None
     else:

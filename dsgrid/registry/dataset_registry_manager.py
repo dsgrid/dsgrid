@@ -110,7 +110,6 @@ class DatasetRegistryManager(RegistryManagerBase):
             lock_file = self.get_registry_lock_file(dataset_id)
             self.cloud_interface.check_lock_file(lock_file)
             if not error_occurred:
-                self.sync_push(self.get_registry_directory(dataset_id))
                 self.sync_push(self.get_registry_data_directory(dataset_id))
             self.cloud_interface.remove_lock_file(lock_file)
 

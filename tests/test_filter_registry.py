@@ -38,10 +38,10 @@ FILTER_CONFIG = {
 }
 
 
-def test_filter_registry(tmp_path):
+def test_filter_registry(cached_registry, tmp_path):
     simple_model = RegistrySimpleModel(**FILTER_CONFIG)
     dst_data_path = tmp_path / "test-dsgrid-registry"
-    src_conn = DatabaseConnection(database="test-dsgrid")
+    src_conn = cached_registry
     dst_conn = DatabaseConnection(database="filtered-dsgrid")
 
     try:

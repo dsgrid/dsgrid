@@ -87,7 +87,6 @@ def test_resstock_projection_invalid_query_replace_ids_with_names(valid_query):
     assert not does_query_support_a_derived_dataset(query)
 
 
-@pytest.mark.skip
 def test_create_derived_dataset_config(tmp_path):
     dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"
@@ -95,12 +94,12 @@ def test_create_derived_dataset_config(tmp_path):
     result = runner.invoke(
         cli,
         [
+            "--offline",
+            "--database-name",
+            "simple-standard-scenarios",
             "query",
             "project",
             "run",
-            "--offline",
-            "--db-name",
-            "simple-standard-scenarios",
             str(RESSTOCK_PROJECTION_QUERY),
             "-o",
             str(query_output_base),
@@ -132,12 +131,12 @@ def test_create_derived_dataset_config(tmp_path):
     result = runner.invoke(
         cli,
         [
+            "--offline",
+            "--database-name",
+            "simple-standard-scenarios",
             "query",
             "project",
             "create-derived-dataset-config",
-            "--offline",
-            "--db-name",
-            "simple-standard-scenarios",
             str(query_output),
             str(dataset_dir),
             "--force",

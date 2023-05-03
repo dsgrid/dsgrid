@@ -137,12 +137,13 @@ def _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset):
     )
 
 
-def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module):
+def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module, cached_registry):
     src_dir, _, conn = make_test_project_dir
+    cached_registry_conn = cached_registry
     dataset_id = "aeo2021_ref_com_energy_end_use_growth_factors"
     geography_record = "mountain"
     filter_config = {
-        "name": "test-dsgrid",
+        "name": cached_registry_conn.database,
         "projects": [],
         "datasets": [
             {

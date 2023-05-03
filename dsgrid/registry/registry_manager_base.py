@@ -9,7 +9,7 @@ from typing import List
 
 from semver import VersionInfo
 
-from dsgrid.common import REGISTRY_FILENAME, SYNC_EXCLUDE_LIST
+from dsgrid.common import SYNC_EXCLUDE_LIST
 from dsgrid.exceptions import (
     DSGInvalidParameter,
     DSGValueNotRegistered,
@@ -365,20 +365,6 @@ class RegistryManagerBase(abc.ABC):
 
         """
         return Path(self._params.base_path) / "data" / config_id
-
-    def get_registry_file(self, config_id):
-        """Return the path to the registry file.
-
-        Parameters
-        ----------
-        config_id : str
-
-        Returns
-        -------
-        str
-
-        """
-        return self.get_registry_directory(config_id) / REGISTRY_FILENAME
 
     def has_id(self, config_id, version=None):
         """Return True if an item matching the parameters is stored.

@@ -11,7 +11,6 @@ from dsgrid.tests.common import (
     # TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import load_data
-from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.tests.common import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
@@ -23,11 +22,14 @@ logger = logging.getLogger()
 
 # This is disabled because the test data is not finalized.
 @pytest.mark.skip
-def test_register_project_and_dataset(make_standard_scenarios_project_dir, tmp_path):
+def test_register_project_and_dataset(
+    make_standard_scenarios_project_dir, cached_registry, tmp_path
+):
     pass
+    # conn = cached_registry
     # base_dir = Path(tmpdir)
     # manager = make_registry_for_tempo(
-    #     base_dir, make_standard_scenarios_project_dir, TEST_DATASET_DIRECTORY
+    #     base_dir, make_standard_scenarios_project_dir, conn, TEST_DATASET_DIRECTORY
     # )
     # TODO: not working yet
     # dataset_mgr = manager.dataset_manager
@@ -36,7 +38,7 @@ def test_register_project_and_dataset(make_standard_scenarios_project_dir, tmp_p
     # assert config_ids[0] == "tempo_standard_scenarios_2021"
 
 
-def make_registry_for_tempo(registry_path, src_dir, dataset_path=None) -> RegistryManager:
+def make_registry_for_tempo(registry_path, src_dir, conn, dataset_path=None) -> RegistryManager:
     """Creates a local registry to test registration of TEMPO dimensions and dataset.
 
     Parameters
@@ -51,7 +53,6 @@ def make_registry_for_tempo(registry_path, src_dir, dataset_path=None) -> Regist
     """
     if dataset_path is None:
         dataset_path = os.environ["DSGRID_LOCAL_DATA_DIRECTORY"]
-    conn = DatabaseConnection(database="test-dsgrid")
     create_local_test_registry(registry_path, conn=conn)
     dataset_dir = Path("datasets/modeled/tempo_standard_scenarios_2021")
     user = getpass.getuser()

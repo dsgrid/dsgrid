@@ -576,7 +576,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                 f"dataset={dataset_id} has already been submitted to project={project_config.config_id}"
             )
 
-        self._check_dataset_time_interval_type(project_config, dataset_config)
+        # Issue #241
+        # self._check_dataset_time_interval_type(project_config, dataset_config)
 
         references = []
         if dimension_mapping_file is not None:

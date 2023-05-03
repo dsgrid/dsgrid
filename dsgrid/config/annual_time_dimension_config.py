@@ -57,7 +57,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         schema = StructType([StructField(time_col, IntegerType(), False)])
 
         model_time = self.list_expected_dataset_timestamps()
-        df_time = get_spark_session.createDataFrame(model_time, schema=schema)
+        df_time = get_spark_session().createDataFrame(model_time, schema=schema)
         return df_time
 
     # def build_time_dataframe_with_time_zone(self):

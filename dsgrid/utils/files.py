@@ -79,16 +79,18 @@ def load_data(filename, **kwargs):
     return data
 
 
-def dump_line_delimited_json(data, filename):
+def dump_line_delimited_json(data, filename, mode="w"):
     """Dump a list of objects to the file as line-delimited JSON.
 
     Parameters
     ----------
     data : list
     filename : str
+    mode : str
+        Mode to use for opening the file, defaults to "w"
 
     """
-    with open(filename, "w") as f_out:
+    with open(filename, mode, encoding="utf-8") as f_out:
         for obj in data:
             f_out.write(json.dumps(obj))
             f_out.write("\n")

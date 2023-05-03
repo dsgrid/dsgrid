@@ -8,7 +8,10 @@ import click
 from pydantic import ValidationError
 
 from dsgrid.common import REMOTE_REGISTRY
-from dsgrid.cli.common import check_output_directory
+from dsgrid.cli.common import (
+    check_output_directory,
+    get_value_from_context,
+)
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
@@ -17,6 +20,7 @@ from dsgrid.dimension.dimension_filters import (
     DimensionFilterColumnOperatorModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
@@ -51,31 +55,10 @@ def add_options(options):
 
 _COMMON_REGISTRY_OPTIONS = (
     click.option(
-        "--url",
-        default="http://localhost:8529",
-        show_default=True,
-        envvar="DSGRID_REGISTRY_DATABASE_URL",
-        help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
-    ),
-    click.option(
-        "--db-name",
-        default="dsgrid",
-        show_default=True,
-        help="dsgrid registry database name.",
-    ),
-    click.option(
         "--remote-path",
         default=REMOTE_REGISTRY,
         show_default=True,
         help="Path to dsgrid remote registry",
-    ),
-    click.option(
-        "--offline",
-        "-o",
-        is_flag=True,
-        default=False,
-        show_default=True,
-        help="If offline is true, sync with the remote registry before running the query.",
     ),
 )
 
@@ -90,8 +73,7 @@ _COMMON_RUN_OPTIONS = (
         help="Output directory for query results",
     ),
     click.option(
-        "-i",
-        "--load-cached-table",
+        "--load-cached-table/--no-load-cached-table",
         is_flag=True,
         default=True,
         show_default=True,
@@ -165,7 +147,9 @@ _COMMON_RUN_OPTIONS = (
     help="Overwrite query file if it exists.",
 )
 @add_options(_COMMON_REGISTRY_OPTIONS)
-def create_project(
+@click.pass_context
+def create_project_query(
+    ctx,
     query_name,
     project_id,
     dataset_id,
@@ -175,10 +159,7 @@ def create_project(
     query_file,
     default_result_aggregation,
     force,
-    url,
-    db_name,
     remote_path,
-    offline,
 ):
     """Create a default query file for a dsgrid project."""
     if query_file.exists():
@@ -191,11 +172,17 @@ def create_project(
             )
             sys.exit(1)
 
-    conn = DatabaseConnection.from_url(url, database=db_name)
+    config = DsgridRuntimeConfig.load()
+    conn = DatabaseConnection.from_url(
+        get_value_from_context(ctx, "database_url"),
+        database=get_value_from_context(ctx, "database_name"),
+        username=config.database_user,
+        password=config.database_password,
+    )
     registry_manager = RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=offline,
+        offline_mode=get_value_from_context(ctx, "offline"),
     )
     project = registry_manager.project_manager.load_project(project_id)
     query = ProjectQueryModel(
@@ -267,7 +254,7 @@ def create_project(
 
 @click.command("validate")
 @click.argument("query_file", type=click.Path(exists=True), callback=lambda _, __, x: Path(x))
-def validate_project(query_file):
+def validate_project_query(query_file):
     try:
         ProjectQueryModel.from_file(query_file)
         print(f"Validated {query_file}", file=sys.stderr)
@@ -295,25 +282,30 @@ def validate_project(query_file):
 )
 @add_options(_COMMON_REGISTRY_OPTIONS)
 @add_options(_COMMON_RUN_OPTIONS)
-def run_project(
+@click.pass_context
+def run_project_query(
+    ctx,
     query_definition_file,
     persist_intermediate_table,
     zip_file,
-    url,
-    db_name,
     remote_path,
-    offline,
     output,
     load_cached_table,
     force,
 ):
     """Run a query on a dsgrid project."""
     query = ProjectQueryModel.from_file(query_definition_file)
-    conn = DatabaseConnection.from_url(url, database=db_name)
+    config = DsgridRuntimeConfig.load()
+    conn = DatabaseConnection.from_url(
+        get_value_from_context(ctx, "database_url"),
+        database=get_value_from_context(ctx, "database_name"),
+        username=config.database_user,
+        password=config.database_password,
+    )
     registry_manager = RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=offline,
+        offline_mode=get_value_from_context(ctx, "offline"),
     )
     project = registry_manager.project_manager.load_project(query.project.project_id)
     fs_interface = make_filesystem_interface(output)
@@ -329,26 +321,28 @@ def run_project(
 @click.command("create_dataset")
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @add_options(_COMMON_RUN_OPTIONS)
+@click.pass_context
 def create_composite_dataset(
+    ctx,
     query_definition_file,
-    url,
-    db_name,
     remote_path,
-    offline,
     output,
     load_cached_table,
     force,
 ):
     """Run a query to create a composite dataset."""
     CreateCompositeDatasetQueryModel.from_file(query_definition_file)
-    # conn = DatabaseConnection.from_url(url, database=db_name)
+    # conn = DatabaseConnection.from_url(
+    #     get_value_from_context(ctx, "database_url"),
+    #     database=get_value_from_context(ctx, "database_name"),
+    # )
     # TODO
     print("not implemented yet")
     sys.exit(1)
     # registry_manager = RegistryManager.load(
     #     conn,
     #     remote_path=remote_path,
-    #     offline_mode=offline,
+    #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
@@ -357,26 +351,28 @@ def create_composite_dataset(
 @click.command("run")
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @add_options(_COMMON_RUN_OPTIONS)
+@click.pass_context
 def query_composite_dataset(
+    ctx,
     query_definition_file,
-    url,
-    db_name,
     remote_path,
-    offline,
     output,
     load_cached_table,
     force,
 ):
     """Run a query on a composite dataset."""
     CompositeDatasetQueryModel.from_file(query_definition_file)
-    # conn = DatabaseConnection.from_url(url, database=db_name)
+    # conn = DatabaseConnection.from_url(
+    #     get_value_from_context(ctx, "database_url"),
+    #     database=get_value_from_context(ctx, "database_name"),
+    # )
     # TODO
     print("not implemented yet")
     sys.exit(1)
     # registry_manager = RegistryManager.load(
     #     registry_path,
     #     remote_path=remote_path,
-    #     offline_mode=offline,
+    #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
@@ -393,7 +389,8 @@ def query_composite_dataset(
     show_default=True,
     help="Overwrite results directory if it exists.",
 )
-def create_derived_dataset_config(src, dst, url, db_name, remote_path, offline, force):
+@click.pass_context
+def create_derived_dataset_config(ctx, src, dst, remote_path, force):
     """Create a derived dataset configuration and dimensions from a query result."""
     fs_interface = make_filesystem_interface(src)
     src_path = fs_interface.path(src)
@@ -403,11 +400,17 @@ def create_derived_dataset_config(src, dst, url, db_name, remote_path, offline, 
     dst_path = fs_interface.path(dst)
     check_output_directory(dst_path, fs_interface, force)
 
-    conn = DatabaseConnection.from_url(url, database=db_name)
+    config = DsgridRuntimeConfig.load()
+    conn = DatabaseConnection.from_url(
+        get_value_from_context(ctx, "database_url"),
+        database=get_value_from_context(ctx, "database_name"),
+        username=config.database_user,
+        password=config.database_password,
+    )
     registry_manager = RegistryManager.load(
         conn,
         remote_path=remote_path,
-        offline_mode=offline,
+        offline_mode=get_value_from_context(ctx, "offline"),
     )
     result = create_derived_dataset_config_from_query(src_path, dst_path, registry_manager)
     if not result:
@@ -432,9 +435,9 @@ def composite_dataset():
 
 query.add_command(composite_dataset)
 query.add_command(project)
-project.add_command(create_project)
-project.add_command(validate_project)
-project.add_command(run_project)
+project.add_command(create_project_query)
+project.add_command(validate_project_query)
+project.add_command(run_project_query)
 project.add_command(create_derived_dataset_config)
 composite_dataset.add_command(create_composite_dataset)
 composite_dataset.add_command(query_composite_dataset)

@@ -226,12 +226,8 @@ $ spark-submit \
 2. Acquire a new compute node. It can be any time of node and you only need it for an hour.
 Create a local version of the dsgrid repository script `scripts/create_simple_standard_scenarios.sh`.
 Edit the environment variables at the top of the script as necessary and then run it. It will
-filter the StandardScenarios data and then create, register, and submit-to-project these derived
-datasets:
-
-- `comstock_conus_2022_projected`
-- `resstock_conus_2022_projected`
-- `tempo_conus_2022_mapped`
+make a new registry database, and filter the StandardScenarios data, and create a backup of the
+database with arangodump in JSON format.
 
 3. Copy (e.g., cp, scp, rsync) or arangodump the output files (registry JSON and Parquet) from the
 previous step to a dsgrid-test-data repository in the directory

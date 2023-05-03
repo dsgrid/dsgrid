@@ -24,10 +24,10 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
 
     dim_config_file = src_dir / "dimensions.json5"
     cmd = [
-        "registry",
-        "--offline",
-        "--db-name",
+        "--database-name",
         db_name,
+        "--offline",
+        "registry",
         "dimensions",
         "register",
         str(dim_config_file),
@@ -45,10 +45,10 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     result = runner.invoke(cli, cmd)
 
     cmd = [
-        "registry",
-        "--db-name",
+        "--database-name",
         db_name,
         "--offline",
+        "registry",
         "dimension-mappings",
         "register",
         str(project_dimension_mapping_config),
@@ -78,10 +78,10 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
-            "registry",
-            "--db-name",
+            "--database-name",
             db_name,
             "--offline",
+            "registry",
             "projects",
             "register",
             str(project_config),
@@ -94,10 +94,10 @@ def test_register_project_and_dataset(tmp_registry_db):
     mappings = map_dimension_names_to_ids(manager.dimension_manager)
     replace_dimension_names_with_current_ids(dataset_config, mappings)
     cmd = [
-        "registry",
-        "--db-name",
+        "--database-name",
         db_name,
         "--offline",
+        "registry",
         "projects",
         "register-and-submit-dataset",
         "--dataset-config-file",
@@ -115,7 +115,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
 
-    result = runner.invoke(cli, ["registry", "--db-name", db_name, "--offline", "list"])
+    result = runner.invoke(cli, ["--database-name", db_name, "--offline", "registry", "list"])
     assert result.exit_code == 0
     regex_project = re.compile(rf"{project_id}.*1\.1\.0")
     regex_dataset = re.compile(rf"{dataset_id}.*1\.0\.0")
@@ -126,21 +126,21 @@ def test_register_project_and_dataset(tmp_registry_db):
 
     result = runner.invoke(
         admin_cli,
-        ["registry", "--db-name", db_name, "--offline", "projects", "remove", project_id],
+        ["--database-name", db_name, "--offline", "registry", "projects", "remove", project_id],
     )
     assert result.exit_code == 0
     result = runner.invoke(
         admin_cli,
-        ["registry", "--db-name", db_name, "--offline", "datasets", "remove", dataset_id],
+        ["--database-name", db_name, "--offline", "registry", "datasets", "remove", dataset_id],
     )
     assert result.exit_code == 0
     result = runner.invoke(
         admin_cli,
         [
-            "registry",
-            "--db-name",
+            "--database-name",
             db_name,
             "--offline",
+            "registry",
             "dimension-mappings",
             "remove",
             dim_map_id,
@@ -148,6 +148,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     )
     assert result.exit_code == 0
     result = runner.invoke(
-        admin_cli, ["registry", "--db-name", db_name, "--offline", "dimensions", "remove", dim_id]
+        admin_cli,
+        ["--database-name", db_name, "--offline", "registry", "dimensions", "remove", dim_id],
     )
     assert result.exit_code == 0

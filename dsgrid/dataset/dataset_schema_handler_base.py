@@ -350,7 +350,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 column == self.get_pivoted_dimension_type().value
                 and pivoted_columns.intersection(df.columns)
             ):
-                raise Exception(
+                raise NotImplementedError(
                     f"Unhandled case: column={column} pivoted_columns={pivoted_columns} "
                     f"df.columns={df.columns}"
                 )

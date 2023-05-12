@@ -54,8 +54,8 @@ class QueryContext:
                     # TODO #202: Remove this check when we support transforming to long format.
                     raise Exception(
                         "Datasets have different pivoted dimension types: "
-                        f"{dataset_metadata.pivoted.dimension_type} "
-                        f"{self.get_pivoted_dimension_type()}"
+                        f"{dataset_metadata.pivoted.dimension_type=} "
+                        f"{self.get_pivoted_dimension_type()=}"
                     )
 
     def get_pivoted_columns(self, dataset_id=None):

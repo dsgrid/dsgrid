@@ -197,7 +197,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             new_time_column = time_column
 
         if TimeIntervalType.INSTANTANEOUS in (from_time_interval, to_time_interval):
-            raise Exception("aligning time intervals with instantaneous is not yet supported")
+            raise NotImplementedError(
+                "aligning time intervals with instantaneous is not yet supported"
+            )
 
         match (from_time_interval, to_time_interval):
             case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):

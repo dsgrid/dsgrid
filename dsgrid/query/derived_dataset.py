@@ -289,7 +289,7 @@ def _get_unique_data_records(df, dim_model: DimensionModel, column_type: ColumnT
         case ColumnType.DIMENSION_TYPES:
             column = dim_model.dimension_type.value
         case _:
-            raise Exception(f"BUG: unhandled column type: {column_type}")
+            raise NotImplementedError(f"BUG: unhandled: {column_type=}")
 
     return get_unique_values(df, column)
 

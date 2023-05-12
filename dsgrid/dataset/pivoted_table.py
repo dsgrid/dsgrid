@@ -67,7 +67,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
             records = records.drop("from_fraction")
             if column.function is not None:
                 # TODO #200: Do we want to allow this?
-                raise Exception(
+                raise NotImplementedError(
                     f"Applying a SQL function to added column={query_name} is not supported yet"
                 )
             if len(expected_base_dim_cols) > 1:
@@ -150,7 +150,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 ):
                     if column.function is not None:
                         # TODO: Do we need to support this?
-                        raise Exception(f"column function cannot be set on {column}")
+                        raise NotImplementedError(f"column function cannot be set on {column}")
                     dim = self.project_config.get_dimension(query_name)
                     if dim.model.dimension_type == pivoted_dim_type:
                         dimension_query_name = query_name
@@ -276,7 +276,9 @@ class PivotedTableHandler(TableFormatHandlerBase):
                         # or alias, and so the old name must be removed.
                         final_metadata.remove_metadata(dim_type, column.dimension_query_name)
                 case _:
-                    raise Exception(f"Bug: unhandled: {context.model.result.column_type}")
+                    raise NotImplementedError(
+                        f"Bug: unhandled: {context.model.result.column_type}"
+                    )
             final_metadata.add_metadata(
                 dim_type,
                 DimensionMetadataModel(

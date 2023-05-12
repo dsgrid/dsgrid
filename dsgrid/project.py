@@ -148,7 +148,7 @@ class Project:
                     context, cached_datasets_dir, dataset
                 )
             else:
-                raise Exception(f"Unsupported type: {type(dataset)}")
+                raise NotImplementedError(f"Unsupported type: {type(dataset)}")
             df_filenames[dataset.dataset_id] = path
 
         if not df_filenames:
@@ -169,7 +169,7 @@ class Project:
                 dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
                 time_columns = context.get_dimension_column_names(DimensionType.TIME)
             case _:
-                raise Exception(f"BUG: unhandled column type {context.model.result.column_type}")
+                raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
         dim_columns -= time_columns
         for col in dim_columns:
             match context.model.result.column_type:
@@ -178,8 +178,8 @@ class Project:
                 case ColumnType.DIMENSION_TYPES:
                     dimension_type = DimensionType.from_column(col)
                 case _:
-                    raise Exception(
-                        f"BUG: unhandled column type {context.model.result.column_type}"
+                    raise NotImplementedError(
+                        f"BUG: unhandled {context.model.result.column_type=}"
                     )
             if dimension_type == context.get_pivoted_dimension_type():
                 dim_columns.remove(col)
@@ -318,8 +318,8 @@ class Project:
                 case ColumnType.DIMENSION_QUERY_NAMES:
                     pass
                 case _:
-                    raise Exception(
-                        f"BUG: unhandled column type {context.model.result.column_type}"
+                    raise NotImplementedError(
+                        f"BUG: unhandled {context.model.result.column_type=}"
                     )
             names = list(
                 context.get_dimension_column_names(DimensionType.MODEL_YEAR, dataset_id=dataset_id)
@@ -358,7 +358,7 @@ class Project:
                 time_dim = dset.config.get_dimension(DimensionType.TIME)
                 time_columns = set(time_dim.get_timestamp_load_data_columns())
             case _:
-                raise Exception(f"BUG: unhandled column type {context.model.result.column_type}")
+                raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
         with restart_spark_with_custom_conf(
             conf=context.model.project.get_spark_conf(dataset.dataset_id),
             force=True,
@@ -371,9 +371,7 @@ class Project:
                     dataset, iv_df, gr_df, time_columns, model_year_column, pivoted_columns
                 )
             else:
-                raise Exception(
-                    f"BUG: Unsupported construction_method: {dataset.construction_method}"
-                )
+                raise NotImplementedError(f"BUG: Unsupported {dataset.construction_method=}")
             df = write_dataframe_and_auto_partition(df, dataset_path)
             context.set_dataset_metadata(
                 dataset.dataset_id,

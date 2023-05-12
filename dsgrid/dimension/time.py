@@ -205,7 +205,7 @@ class TimeZone(DSGEnum):
             return TimeZone.EST
         if self == TimeZone.NONE:
             return TimeZone.NONE
-        raise Exception(f"BUG: case not covered: {self}")
+        raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def get_prevailing_time(self):
         """get equivalent prevailing time"""
@@ -226,7 +226,7 @@ class TimeZone(DSGEnum):
         if self == TimeZone.NONE:
             logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
             return TimeZone.NONE
-        raise Exception(f"BUG: case not covered: {self}")
+        raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def is_standard(self):
         lst = [

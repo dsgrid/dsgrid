@@ -37,7 +37,7 @@ class PeakLoadReport(ReportsBase):
         else:
             # TODO #202: this is TBD
             # value_columns = ["value"]
-            raise Exception(f"Unsupported table format {context.get_table_format_type()}")
+            raise NotImplementedError(f"Unsupported {context.get_table_format_type()=}")
 
         df = read_dataframe(filename)
         expr = [F.max(x).alias(x) for x in value_columns]

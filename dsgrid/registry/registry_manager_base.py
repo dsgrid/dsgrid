@@ -217,7 +217,7 @@ class RegistryManagerBase(abc.ABC):
         elif update_type == VersionUpdateType.PATCH:
             next_version = ver.bump_patch()
         else:
-            raise Exception(f"invalid version update type {update_type}")
+            raise NotImplementedError(f"invalid version {update_type=}")
 
         return str(next_version)
 

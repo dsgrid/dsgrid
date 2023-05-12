@@ -332,7 +332,7 @@ def get_async_task_data(async_task_id: int):
             .to_json(orient="split", index=False)
         )
     else:
-        raise Exception(f"task type {task.task_type} is not implemented")
+        raise NotImplementedError(f"task type {task.task_type} is not implemented")
 
     return Response(content=text, media_type="application/json")
 

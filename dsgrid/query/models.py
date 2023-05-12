@@ -158,18 +158,14 @@ class DimensionMetadataModel(DSGBaseModel):
     """Defines the columns in a table for a dimension."""
 
     dimension_query_name: str
-    column_name: str | None = None
-
-    @validator("column_name")
-    def handle_default_column_name(cls, column_name, values):
-        return column_name or values["dimension_query_name"]
+    column_names: list[str]
 
     def make_key(self):
-        return f"{self.dimension_query_name}__{self.column_name}"
+        return "__".join([self.dimension_query_name] + self.column_names)
 
 
 class DatasetDimensionsMetadataModel(DSGBaseModel):
-    """Defines the dimensions of a dataset serialized to file."""
+    """Records the dimensions and columns of a dataset as it is transformed by a query."""
 
     geography: list[DimensionMetadataModel] = []
     metric: list[DimensionMetadataModel] = []
@@ -198,7 +194,10 @@ class DatasetDimensionsMetadataModel(DSGBaseModel):
 
     def get_column_names(self, dimension_type: DimensionType):
         """Return the column names for the given dimension type."""
-        return {x.column_name for x in getattr(self, dimension_type.value)}
+        column_names = set()
+        for item in getattr(self, dimension_type.value):
+            column_names.update(item.column_names)
+        return column_names
 
     def get_dimension_query_names(self, dimension_type: DimensionType):
         """Return the dimension query names for the given dimension type."""
@@ -495,11 +494,19 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
 
     @validator("column_type")
     def check_column_type(cls, column_type, values):
-        if column_type == ColumnType.DIMENSION_TYPES and values["supplemental_columns"]:
-            # This would cause duplicate column names.
-            raise ValueError(
-                f"column_type={ColumnType.DIMENSION_TYPES} is incompatible with supplemental_columns"
-            )
+        if column_type == ColumnType.DIMENSION_TYPES:
+            # Cannot allow duplicate column names.
+            if values["supplemental_columns"]:
+                raise ValueError(
+                    f"column_type={ColumnType.DIMENSION_TYPES} is incompatible with supplemental_columns"
+                )
+            for agg in values["aggregations"]:
+                for dim_type in DimensionType:
+                    columns = getattr(agg.dimensions, dim_type.value)
+                    if len(columns) > 1:
+                        raise ValueError(
+                            f"Multiple columns are incompatible with {column_type=}. {columns=}"
+                        )
         return column_type
 
 

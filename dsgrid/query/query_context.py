@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.query.models import DimensionMetadataModel
+from dsgrid.query.models import ColumnType, DimensionMetadataModel
 from dsgrid.utils.spark import get_spark_session
 from .models import ProjectQueryModel, DatasetMetadataModel, TableFormatType
 
@@ -96,6 +96,7 @@ class QueryContext:
         self,
         dataset_id,
         pivoted_columns,
+        column_type,
         pivoted_dimension_type,
         table_format_type,
         project_config,
@@ -105,8 +106,21 @@ class QueryContext:
         self.set_pivoted_dimension_type(pivoted_dimension_type, dataset_id=dataset_id)
         self.set_table_format_type(table_format_type, dataset_id=dataset_id)
         for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
+            match (column_type, dim_type):
+                case (ColumnType.DIMENSION_QUERY_NAMES, _):
+                    column_names = [name]
+                case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
+                    # This uses the project dimension because the dataset is being mapped.
+                    time_columns = project_config.get_load_data_time_columns(name)
+                    column_names = time_columns
+                case (ColumnType.DIMENSION_TYPES, _):
+                    column_names = [dim_type.value]
+                case _:
+                    raise NotImplementedError(f"Bug: need to support {column_type=}")
             self.add_dimension_metadata(
-                dim_type, DimensionMetadataModel(dimension_query_name=name), dataset_id=dataset_id
+                dim_type,
+                DimensionMetadataModel(dimension_query_name=name, column_names=column_names),
+                dataset_id=dataset_id,
             )
 
     def init_dataset_metadata(self, dataset_id):
@@ -132,6 +146,25 @@ class QueryContext:
             dimension_metadata,
             dataset_id,
         )
+
+    def get_dimension_column_names_by_query_name(
+        self,
+        dimension_type: DimensionType,
+        query_name: str,
+        dataset_id=None,
+    ) -> str:
+        """Return the load data column name for the dimension."""
+        for metadata in self.get_dimension_metadata(dimension_type, dataset_id=dataset_id):
+            if metadata.dimension_query_name == query_name:
+                return metadata.column_names
+        raise Exception(f"No base dimension match: {dimension_type=} {query_name=}")
+
+    def get_dimension_metadata(
+        self,
+        dimension_type: DimensionType,
+        dataset_id=None,
+    ):
+        return self._get_metadata(dataset_id).dimensions.get_metadata(dimension_type)
 
     def replace_dimension_metadata(
         self, dimension_type: DimensionType, dimension_metadata, dataset_id=None

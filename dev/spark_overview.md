@@ -2,7 +2,7 @@
 This page describes Spark concepts that are important to understand when using dsgrid.
 
 [Spark Overview](#spark-overview) |
-[Windows Users](#windows-users) | 
+[Windows Users](#windows-users) |
 [Conventions](#conventions) |
 [Installing a Spark Standalone Cluster on Your Laptop](#laptop) |
 [Installing a Spark Standalone Cluster on an HPC](#hpc) |
@@ -16,7 +16,7 @@ Spark does not offer a great user experience in Windows. While `pyspark` and
 `spark-submit` work in local mode, running a cluster requires manual configuration. The developers
 provide cluster management scripts in bash, and so they do not work in Windows. When running a
 cluster on your laptop we recommend that you use dsgrid in a Windows Subsystem for Linux (WSL2)
-environment instead of a native Windows environment. 
+environment instead of a native Windows environment.
 
 If you are running in local mode, you will need Hadoop's `winutils.exe` because windows doesn't support HDFS. If you don’t have winutils.exe installed, you will need to download the wintils.exe and hadoop.dll files from https://github.com/steveloughran/winutils (select the Hadoop version you are using as winutils are specific to Hadoop versions). Then copy them into a folder like `C:\hadoop\bin`, set the environment variable `HADOOP_HOME` to, e.g., `C:\hadoop`, and add `%HADOOP_HOME%\bin` to your `PATH`.
 

@@ -167,13 +167,7 @@ class Project:
                 time_columns = context.get_dimension_column_names(DimensionType.TIME)
             case ColumnType.DIMENSION_TYPES:
                 dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
-                tcols = context.get_dimension_query_names(DimensionType.TIME)
-                if len(tcols) != 1:
-                    raise Exception(f"Project queries can only have one time column: {tcols}")
-                time_column = next(iter(tcols))
-                time_columns = set(
-                    self.config.get_dimension(time_column).get_timestamp_load_data_columns()
-                )
+                time_columns = context.get_dimension_column_names(DimensionType.TIME)
             case _:
                 raise Exception(f"BUG: unhandled column type {context.model.result.column_type}")
         dim_columns -= time_columns
@@ -384,6 +378,7 @@ class Project:
             context.set_dataset_metadata(
                 dataset.dataset_id,
                 pivoted_columns,
+                context.model.result.column_type,
                 context.get_pivoted_dimension_type(dataset_id=dataset.initial_value_dataset_id),
                 TableFormatType.PIVOTED,
                 self._config,

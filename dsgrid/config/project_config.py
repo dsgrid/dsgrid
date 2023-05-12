@@ -774,6 +774,21 @@ class ProjectConfig(ConfigBase):
         # TODO: what about benchmark and historical?
         return False
 
+    def get_load_data_time_columns(self, dimension_query_name):
+        """Return the time dimension columns expected in the load data table for this query name.
+
+        Parameters
+        ----------
+        dimension_query_name : str
+
+        Returns
+        -------
+        list
+        """
+        dim = self.get_dimension(dimension_query_name)
+        time_columns = dim.get_timestamp_load_data_columns()
+        return time_columns
+
     def iter_datasets(self):
         for dataset in self.model.datasets:
             yield dataset

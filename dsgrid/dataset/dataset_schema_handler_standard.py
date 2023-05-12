@@ -109,6 +109,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         context.set_dataset_metadata(
             self.dataset_id,
             pivoted_columns,
+            context.model.result.column_type,
             self.get_pivoted_dimension_type(),
             TableFormatType.PIVOTED,
             project_config,

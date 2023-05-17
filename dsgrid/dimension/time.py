@@ -180,12 +180,6 @@ class TimeZone(DSGEnum):
         tz=ZoneInfo("US/Eastern"),
         tz_name="US/Eastern",
     )
-    NONE = EnumValue(
-        value="none",
-        description="No timezone, suitable for temporally aggregated data",
-        tz=None,
-        tz_name="none",
-    )
 
     def get_standard_time(self):
         """get equivalent standard time"""
@@ -203,8 +197,6 @@ class TimeZone(DSGEnum):
             return TimeZone.CST
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EST
-        if self == TimeZone.NONE:
-            return TimeZone.NONE
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def get_prevailing_time(self):
@@ -223,9 +215,6 @@ class TimeZone(DSGEnum):
             return TimeZone.CPT
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EPT
-        if self == TimeZone.NONE:
-            logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
-            return TimeZone.NONE
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def is_standard(self):

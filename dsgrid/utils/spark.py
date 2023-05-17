@@ -321,6 +321,8 @@ def models_to_dataframe(models, table_name=None):
             if i == 0:
                 if val is None:
                     python_type = cls.__fields__[f].type_
+                    if issubclass(python_type, enum.Enum):
+                        python_type = type(next(iter(python_type)).value)
                 else:
                     python_type = type(val)
                 spark_type = PYTHON_TO_SPARK_TYPES[python_type]()

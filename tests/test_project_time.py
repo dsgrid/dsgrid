@@ -28,12 +28,9 @@ def registry_mgr():
 
 def test_no_unexpected_timezone():
     for tzo in TimeZone:
-        if tzo == TimeZone.NONE:
-            assert tzo.is_standard() + tzo.is_prevailing() == 0
-        else:
-            assert (
-                tzo.is_standard() + tzo.is_prevailing() == 1
-            ), f"{tzo} can either be prevailing or standard"
+        assert (
+            tzo.is_standard() + tzo.is_prevailing() == 1
+        ), f"{tzo} can either be prevailing or standard"
 
 
 def test_convert_to_project_time(registry_mgr):

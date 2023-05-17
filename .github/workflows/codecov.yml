@@ -10,6 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
+    - name: Setup ArangoDB
+      uses: rhizomenetwork/arangodb-action@v1
     - name: Setup Python
       uses: actions/setup-python@v2
       with:
@@ -24,6 +26,8 @@ jobs:
         # Credentials would need to be configured.
         git submodule init
         git submodule update
+        # Haven't figured out how to run arangorestore here. Use this instead.
+        python dsgrid/tests/restore_simple_standard_scenarios_db.py
         python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3

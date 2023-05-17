@@ -29,7 +29,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def build_time_dataframe(self):
+    def build_time_dataframe(self, model_years=None):
         """Build time dimension as specified in config in a spark dataframe.
 
         Parameters
@@ -286,16 +286,18 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
     def _build_time_ranges(self, time_ranges, str_format, model_years=None, tz=None):
         ranges = []
-        processed_years = set()
+        allowed_year = None
         for time_range in time_ranges:
             start = datetime.strptime(time_range.start, str_format)
             end = datetime.strptime(time_range.end, str_format)
             if model_years is not None:
-                if start.year != end.year or start.year in processed_years:
+                if start.year != end.year or (
+                    allowed_year is not None and start.year != allowed_year
+                ):
                     raise DSGInvalidDimension(
                         f"All time ranges must be in the same year if model_years is set: {model_years=}"
                     )
-                processed_years.add(start.year)
+                allowed_year = start.year
             for year in model_years or [start.year]:
                 start_adj = datetime(
                     year=year,

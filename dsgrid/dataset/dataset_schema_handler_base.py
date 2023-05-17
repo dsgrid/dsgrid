@@ -375,14 +375,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df.drop("fraction")
 
     def _convert_time_before_project_mapping(self):
+        # The only expected case for this returning True is representative time with a custom
+        # geography.
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        return (
+        val = (
             time_dim.model.is_time_zone_required_in_geography()
             and not self._config.model.use_project_geography_time_zone
         )
+        return val
 
     @track_timing(timer_stats_collector)
-    def _convert_time_dimension(self, load_data_df, project_config):
+    def _convert_time_dimension(
+        self, load_data_df, project_config, model_years=None, value_columns=None
+    ):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if time_dim.model.is_time_zone_required_in_geography():
             if self._config.model.use_project_geography_time_zone:
@@ -391,9 +396,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
             load_data_df = add_time_zone(load_data_df, geography_dim)
 
+        if model_years is not None:
+            model_years = sorted(int(x) for x in model_years)
         load_data_df = time_dim.convert_dataframe(
-            df=load_data_df,
-            project_time_dim=self._project_time_dim,
+            load_data_df,
+            self._project_time_dim,
+            model_years=model_years,
+            value_columns=value_columns,
         )
 
         if time_dim.model.is_time_zone_required_in_geography():

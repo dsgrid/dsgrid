@@ -100,10 +100,7 @@ def test_convert_to_project_time(registry_mgr):
     # comstock time conversion
     comstock_data = comstock._handler._load_data.join(comstock._handler._load_data_lookup, on="id")
     comstock_data_with_tz = add_time_zone(comstock_data, comstock_geo_dim)
-    comstock_time_dim.convert_dataframe(
-        df=comstock_data_with_tz,
-        project_time_dim=project_time_dim,
-    )
+    comstock_time_dim.convert_dataframe(comstock_data_with_tz, project_time_dim)
 
     # [3] test make_project_dataframe()
     tempo._handler.make_project_dataframe(project.config)

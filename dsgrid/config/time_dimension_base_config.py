@@ -1,9 +1,12 @@
 import abc
+from datetime import datetime
+
+import pandas as pd
 import pyspark.sql.functions as F
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import TimeIntervalType
-from dsgrid.exceptions import DSGInvalidOperation
+from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidDimension
 
 
 class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
@@ -29,32 +32,30 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     def build_time_dataframe(self):
         """Build time dimension as specified in config in a spark dataframe.
 
+        Parameters
+        ----------
+        model_years : None | list[int]
+            If specified, repeat the timestamps for each model year.
+
         Returns
         -------
         pyspark.sql.DataFrame
 
         """
 
-    # @abc.abstractmethod
-    # def build_time_dataframe_with_time_zone(self):
-    #     """Build time dataframe so that relative to spark.sql.session.timeZone, it
-    #     appears as expected in config time zone.
-    #     Notes: the converted time will need to be converted back to session.timeZone
-    #        so spark can intepret it correctly when saving to file in UTC.
-    #     Returns
-    #     -------
-    #     pyspark.sql.DataFrame
-
-    #     """
-
     @abc.abstractmethod
-    def convert_dataframe(self, df, project_time_dim):
+    def convert_dataframe(self, df, project_time_dim, model_years=None, value_columns=None):
         """Convert input df to use project's time format and time zone.
 
         Parameters
         ----------
         df : pyspark.sql.DataFrame
         project_time_dim : TimeDimensionBaseConfig
+        model_years : None | list[int]
+            Model years required by the project. Not required for all time dimension types.
+        value_columns : None | set[str]
+            Columns in the dataframe that represent load values. Not required for all time
+            dimension types.
 
         Returns
         -------
@@ -115,8 +116,14 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df.withColumnRenamed(time_cols[0], self.model.dimension_query_name)
 
     @abc.abstractmethod
-    def get_time_ranges(self):
+    def get_time_ranges(self, model_years=None):
         """Return time ranges with timezone applied.
+
+        Parameters
+        ----------
+        model_years : None | list[int]
+            If set, replace the base year in the time ranges with these model years. In this case
+            each range must be in the same year.
 
         Returns
         -------
@@ -146,8 +153,14 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(self, model_years=None):
         """Return a list of the timestamps expected in the load_data table.
+
+        Parameters
+        ----------
+        model_years : None | list[int]
+            If set, replace the base year in the time ranges with these model years. In this case
+            each range must be in the same year.
 
         Returns
         -------
@@ -156,9 +169,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         """
 
-    def _convert_time_to_project_time_interval(
-        self, df=None, project_time_dim=None, wrap_time=True
-    ):
+    def _convert_time_to_project_time_interval(self, df, project_time_dim=None, wrap_time=True):
         """Shift time to match project time based on TimeIntervalType
         If time range spills over into another year after time interval alignment,
         the time range will be wrapped around so it's bounded within the year
@@ -272,3 +283,39 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             )
 
         return df
+
+    def _build_time_ranges(self, time_ranges, str_format, model_years=None, tz=None):
+        ranges = []
+        processed_years = set()
+        for time_range in time_ranges:
+            start = datetime.strptime(time_range.start, str_format)
+            end = datetime.strptime(time_range.end, str_format)
+            if model_years is not None:
+                if start.year != end.year or start.year in processed_years:
+                    raise DSGInvalidDimension(
+                        f"All time ranges must be in the same year if model_years is set: {model_years=}"
+                    )
+                processed_years.add(start.year)
+            for year in model_years or [start.year]:
+                start_adj = datetime(
+                    year=year,
+                    month=start.month,
+                    day=start.day,
+                    hour=start.hour,
+                    minute=start.minute,
+                    second=start.second,
+                    microsecond=start.microsecond,
+                )
+                end_adj = datetime(
+                    year=end.year + year - start.year,
+                    month=end.month,
+                    day=end.day,
+                    hour=end.hour,
+                    minute=end.minute,
+                    second=end.second,
+                    microsecond=end.microsecond,
+                )
+                ranges.append((pd.Timestamp(start_adj, tz=tz), pd.Timestamp(end_adj, tz=tz)))
+
+        ranges.sort(key=lambda x: x[0])
+        return ranges

@@ -152,6 +152,10 @@ def test_peak_load():
     run_query_test(QueryTestPeakLoadByStateSubsector)
 
 
+def test_map_annual_time():
+    run_query_test(QueryTestMapAnnualTime)
+
+
 def test_invalid_drop_pivoted_dimension(tmp_path):
     invalid_agg = AggregationModel(
         dimensions=DimensionQueryNamesModel(
@@ -916,6 +920,61 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
         assert math.isclose(actual, expected)
 
 
+class QueryTestMapAnnualTime(QueryTestBase):
+
+    NAME = "map-annual-time"
+
+    def make_query(self):
+        self._model = ProjectQueryModel(
+            name=self.NAME,
+            project=ProjectQueryParamsModel(
+                project_id="dsgrid_conus_2022",
+                include_dsgrid_dataset_components=False,
+                dataset=DatasetModel(
+                    dataset_id="eia_861_annual_energy_use_state_sector_mapped",
+                    source_datasets=[
+                        StandaloneDatasetModel(
+                            dataset_id="eia_861_annual_energy_use_state_sector"
+                        ),
+                    ],
+                ),
+            ),
+            result=QueryResultParamsModel(
+                aggregations=[
+                    AggregationModel(
+                        dimensions=DimensionQueryNamesModel(
+                            geography=["state"],
+                            metric=["end_use"],
+                            model_year=["model_year"],
+                            scenario=[],
+                            sector=["sector"],
+                            subsector=[],
+                            time=["time_est"],
+                            weather_year=["weather_2012"],
+                        ),
+                        aggregation_function="sum",
+                    ),
+                ],
+                output_format="parquet",
+            ),
+        )
+        return self._model
+
+    def validate(self, expected_values=None):
+        df = read_parquet(self.output_dir / self.name / "table.parquet")
+        distinct_model_years = df.select(DimensionType.MODEL_YEAR.value).distinct().collect()
+        assert len(distinct_model_years) == 1
+        assert distinct_model_years[0][DimensionType.MODEL_YEAR.value] == "2020"
+        expected_ca_res = calc_expected_eia_861_ca_res_load_value()
+        actual_ca_res = (
+            df.filter("state == 'CA' and sector == 'res'")
+            .agg(F.sum("electricity_unspecified").alias("total_electricity"))
+            .collect()[0]
+            .total_electricity
+        )
+        assert math.isclose(actual_ca_res, expected_ca_res)
+
+
 class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
 
     NAME = "electricity-values"
@@ -1327,6 +1386,34 @@ def make_projection_df(aeo, ld_df, join_columns):
     return df.cache()
 
 
+def calc_expected_eia_861_ca_res_load_value():
+    project = get_project()
+    dataset_id = dataset_id = "eia_861_annual_energy_use_state_sector"
+    project.load_dataset(dataset_id)
+    mapping_id = None
+    for dataset in project.config.model.datasets:
+        if dataset.dataset_id == "eia_861_annual_energy_use_state_sector":
+            for ref in dataset.mapping_references:
+                if ref.from_dimension_type == DimensionType.GEOGRAPHY:
+                    mapping_id = ref.mapping_id
+                    break
+        if mapping_id is not None:
+            break
+    assert mapping_id is not None
+    records = project.dimension_mapping_manager.get_by_id(mapping_id).get_records_dataframe()
+
+    # geo_records = dataset_config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
+    fraction_06037 = records.filter("to_id == '06037'").collect()[0].from_fraction
+    fraction_06073 = records.filter("to_id == '06073'").collect()[0].from_fraction
+    dataset = project.get_dataset(dataset_id)
+    raw = dataset._handler._load_data.filter("geography == 'CA' and sector == 'res'").collect()
+    assert len(raw) == 1
+    num_scenarios = 2
+    elec_kwh_state = raw[0].electricity_sales * 1000 * num_scenarios
+    elec_kwh_selected_counties = elec_kwh_state * fraction_06037 + elec_kwh_state * fraction_06073
+    return elec_kwh_selected_counties
+
+
 def read_dataset_tempo():
     project = get_project()
     dataset_id = dataset_id = "tempo_conus_2022"
@@ -1335,7 +1422,7 @@ def read_dataset_tempo():
     lookup = tempo._handler._load_data_lookup
     load_data = tempo._handler._load_data
     tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-        load_data.join(lookup, on="id").drop("id"), project.config
+        load_data.join(lookup, on="id").drop("id"), project.config, [], ["L1andL2"]
     )
     return tempo_data_mapped_time.cache()
 

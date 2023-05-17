@@ -16,18 +16,18 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
         pass
 
     def build_time_dataframe(self):
-        pass
+        raise NotImplementedError(f"Cannot build a time dataframe for a {type(self)}")
 
     # def build_time_dataframe_with_time_zone(self):
     #     pass
 
-    def convert_dataframe(self, df=None, project_time_dim=None):
+    def convert_dataframe(self, df, project_time_dim, model_years=None, value_columns=None):
         return df
 
     def get_frequency(self):
         return timedelta(days=0)
 
-    def get_time_ranges(self):
+    def get_time_ranges(self, model_years=None):
         frequency = self.get_frequency()
         ranges = [
             make_time_range(
@@ -50,5 +50,5 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return None
 
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(self, model_years=None):
         return []

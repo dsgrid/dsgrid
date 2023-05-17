@@ -1,10 +1,5 @@
 import logging
-from datetime import datetime
 from pyspark.sql.types import StructType, StructField, TimestampType
-
-# import pyspark.sql.functions as F
-
-import pandas as pd
 
 from dsgrid.dimension.time import make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
@@ -57,7 +52,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def build_time_dataframe(self):
+    def build_time_dataframe(self, model_years=None):
         # Note: DF.show() displays time in session time, which may be confusing.
         # But timestamps are stored correctly here
 
@@ -65,7 +60,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         schema = StructType([StructField(time_col, TimestampType(), False)])
-        model_time = self.list_expected_dataset_timestamps()
+        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
 
         return df_time
@@ -95,7 +90,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     #     )
     #     return df2
 
-    def convert_dataframe(self, df=None, project_time_dim=None):
+    def convert_dataframe(self, df, project_time_dim, model_years=None, value_columns=None):
         # TODO #193: we may have to do something special with local timezone
         df = self._convert_time_to_project_time_interval(df=df, project_time_dim=project_time_dim)
         return df
@@ -103,14 +98,11 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return self.model.frequency
 
-    def get_time_ranges(self):
+    def get_time_ranges(self, model_years=None):
         ranges = []
-        tz = self.get_tzinfo()
-        for time_range in self.model.ranges:
-            start = datetime.strptime(time_range.start, self.model.str_format)
-            start = pd.Timestamp(start, tz=tz)
-            end = datetime.strptime(time_range.end, self.model.str_format)
-            end = pd.Timestamp(end, tz=tz)
+        for start, end in self._build_time_ranges(
+            self.model.ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
+        ):
             ranges.append(
                 make_time_range(
                     start=start,
@@ -132,9 +124,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self):
-        # TODO: need to support validation of multiple time ranges: DSGRID-173
-        time_ranges = self.get_time_ranges()
-        assert len(time_ranges) == 1, len(time_ranges)
-        time_range = time_ranges[0]
-        return [DatetimeTimestampType(x) for x in time_range.list_time_range()]
+    def list_expected_dataset_timestamps(self, model_years=None):
+        timestamps = []
+        for time_range in self.get_time_ranges(model_years=model_years):
+            timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
+        return timestamps

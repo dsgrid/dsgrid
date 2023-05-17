@@ -112,7 +112,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if context.get_table_format_type() == TableFormatType.PIVOTED:
             handler = PivotedTableHandler(self._project.config)
         else:
-            raise Exception(f"Unsupported table format {context.get_table_format_type()}")
+            raise NotImplementedError(f"Unsupported {context.get_table_format_type()=}")
         return handler
 
     def _run_query(
@@ -218,7 +218,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             else:
                 df.write.mode("overwrite").parquet(str(filename))
         else:
-            raise Exception(f"Unsupported output_format={suffix}")
+            raise NotImplementedError(f"Unsupported output_format={suffix}")
         self.query_filename(output_dir).write_text(context.model.serialize()[1])
         self.metadata_filename(output_dir).write_text(context.metadata.json(indent=2))
         logger.info("Wrote query=%s output table to %s", context.model.name, filename)

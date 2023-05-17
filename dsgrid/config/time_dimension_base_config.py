@@ -73,7 +73,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_timestamp_load_data_columns(self):
+    def get_timestamp_load_data_columns(self) -> list[str]:
         """Return the required timestamp columns in the load data table.
 
         Returns
@@ -81,6 +81,38 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         list
 
         """
+
+    def list_load_data_columns_for_query_name(self) -> list[str]:
+        """Return the time columns expected in the load data table for this dimension's query name.
+
+        Returns
+        -------
+        list[str]
+
+        """
+        # This may need to be re-implemented by child classes.
+        return [self.model.dimension_query_name]
+
+    def map_timestamp_load_data_columns_for_query_name(self, df):
+        """Map the timestamp columns in the load data table to those specified by the query name.
+
+        Parameters
+        ----------
+        df : pyspark.sql.DataFrame
+
+        Returns
+        -------
+        pyspark.sql.DataFrame
+
+        """
+        time_cols = self.get_timestamp_load_data_columns()
+        if len(time_cols) > 1:
+            raise NotImplementedError(
+                "Handling of multiple time columns needs to be implemented in the child class: "
+                f"{type(self)}: {time_cols=}"
+            )
+
+        return df.withColumnRenamed(time_cols[0], self.model.dimension_query_name)
 
     @abc.abstractmethod
     def get_time_ranges(self):
@@ -165,7 +197,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             new_time_column = time_column
 
         if TimeIntervalType.INSTANTANEOUS in (from_time_interval, to_time_interval):
-            raise Exception("aligning time intervals with instantaneous is not yet supported")
+            raise NotImplementedError(
+                "aligning time intervals with instantaneous is not yet supported"
+            )
 
         match (from_time_interval, to_time_interval):
             case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):

@@ -56,25 +56,20 @@ class TableFormatHandlerBase(abc.ABC):
         """
 
     def convert_columns_to_query_names(self, df):
-        # All columns start off as base dimension names but need to be query names.
+        # All columns start off as base dimension names but may need to be query names.
         base_to_query_name_mapping = self.project_config.get_base_dimension_to_query_name_mapping()
         columns = set(df.columns)
         for dim_type in DimensionType:
             if dim_type == DimensionType.TIME:
                 time_dim = self._project_config.get_base_dimension(dim_type)
-                time_cols = time_dim.get_timestamp_load_data_columns()
-                # TODO: Should we enforce that projects can only have one time column?
-                assert len(time_cols) == 1, time_cols
-                existing_col = time_cols[0]
+                df = time_dim.map_timestamp_load_data_columns_for_query_name(df)
             elif dim_type.value in columns:
                 existing_col = dim_type.value
-            else:
-                continue
+                new_col = base_to_query_name_mapping[dim_type]
+                if existing_col != new_col:
+                    df = df.withColumnRenamed(existing_col, new_col)
+                    logger.debug("Converted column from %s to %s", existing_col, new_col)
 
-            new_col = base_to_query_name_mapping[dim_type]
-            if existing_col != new_col:
-                df = df.withColumnRenamed(existing_col, new_col)
-                logger.debug("Converted column from %s to %s", existing_col, new_col)
         return df
 
     def replace_ids_with_names(self, df):

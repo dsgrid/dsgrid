@@ -19,8 +19,6 @@ the dimensions in the dataset.json5 file.
 For any dimension that uses the same defintion as project dimension, you can find the dimension ID in the project.json5.
 Here is how to find the project's dimensions.
 
-.. TODO: we should add a CLI command to list a project's dimensions.
-
 .. code-block:: bash
 
     mkdir project_output_dir

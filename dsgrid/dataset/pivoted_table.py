@@ -8,6 +8,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.query.models import (
     AggregationModel,
+    ColumnType,
     DatasetDimensionsMetadataModel,
     DimensionMetadataModel,
 )
@@ -28,17 +29,25 @@ class PivotedTableHandler(TableFormatHandlerBase):
 
     def add_columns(self, df, query_columns, context: QueryContext, aggregation_allowed):
         columns = set(df.columns)
-        base_query_names = self.project_config.get_base_dimension_query_names()
+        dim_type_to_query_name = self.project_config.get_base_dimension_to_query_name_mapping()
+        base_query_names = set(dim_type_to_query_name.values())
         for column in query_columns:
             query_name = column.dimension_query_name
+            dim = self._project_config.get_dimension(query_name)
+            expected_base_dim_cols = context.get_dimension_column_names_by_query_name(
+                dim.model.dimension_type, dim_type_to_query_name[dim.model.dimension_type]
+            )
             if query_name in base_query_names:
-                assert query_name in columns, f"{query_name} {columns}"
+                assert columns.issuperset(
+                    expected_base_dim_cols
+                ), f"{columns=} {expected_base_dim_cols=}"
                 continue
             elif query_name in columns:
                 continue
-            supp_dim = self._project_config.get_dimension(query_name)
-            base_dim = self._project_config.get_base_dimension(supp_dim.model.dimension_type)
-            base_query_name = base_dim.model.dimension_query_name
+            if dim.model.dimension_type == DimensionType.TIME:
+                raise NotImplementedError(
+                    "Adding time columns through supplemental mappings is not supported yet."
+                )
             records = self._project_config.get_base_to_supplemental_mapping_records(query_name)
             if not aggregation_allowed:
                 to_ids = records.groupBy("from_id").agg(F.count("to_id").alias("count_to_id"))
@@ -55,23 +64,34 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 raise DSGInvalidParameter(
                     f"Mapping dimension query name {query_name} produced from_fractions other than 1.0: {from_fractions}"
                 )
+            records = records.drop("from_fraction")
+            if column.function is not None:
+                # TODO #200: Do we want to allow this?
+                raise NotImplementedError(
+                    f"Applying a SQL function to added column={query_name} is not supported yet"
+                )
+            if len(expected_base_dim_cols) > 1:
+                raise Exception(
+                    "Bug: Non-time dimensions cannot have more than one base dimension column"
+                )
+            expected_base_dim_col = expected_base_dim_cols[0]
+            df = (
+                df.join(records, on=df[expected_base_dim_col] == records.from_id)
+                .drop("from_id")
+                .withColumnRenamed("to_id", query_name)
+            )
+            if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
+                if dim.model.dimension_type == DimensionType.TIME:
+                    column_names = dim.list_load_data_columns_for_query_name()
+                else:
+                    column_names = [query_name]
             else:
-                records = records.drop("from_fraction")
-                if column.function is not None:
-                    # TODO #200: Do we want to allow this?
-                    raise Exception(
-                        f"Applying a SQL function to added column={query_name} is not supported yet"
-                    )
-                df = (
-                    df.join(records, on=df[base_query_name] == records.from_id)
-                    .drop("from_id")
-                    .withColumnRenamed("to_id", query_name)
-                )
-                context.add_dimension_metadata(
-                    supp_dim.model.dimension_type,
-                    DimensionMetadataModel(dimension_query_name=query_name),
-                    dataset_id=self.dataset_id,
-                )
+                column_names = [expected_base_dim_col]
+            context.add_dimension_metadata(
+                dim.model.dimension_type,
+                DimensionMetadataModel(dimension_query_name=query_name, column_names=column_names),
+                dataset_id=self.dataset_id,
+            )
 
         return df
 
@@ -116,7 +136,8 @@ class PivotedTableHandler(TableFormatHandlerBase):
         pivoted_columns = copy.deepcopy(context.get_pivoted_columns(dataset_id=self.dataset_id))
         new_pivoted_columns = []  # Will be the pivoted columns after the last aggregation.
         pivoted_dim_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
-        base_query_names = self.project_config.get_base_dimension_query_names()
+        dim_type_to_query_name = self.project_config.get_base_dimension_to_query_name_mapping()
+        base_query_names = set(dim_type_to_query_name.values())
         for agg in aggregations:
             dimension_query_name = None
             for _, column in agg.iter_dimensions_to_keep():
@@ -129,7 +150,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 ):
                     if column.function is not None:
                         # TODO: Do we need to support this?
-                        raise Exception(f"column function cannot be set on {column}")
+                        raise NotImplementedError(f"column function cannot be set on {column}")
                     dim = self.project_config.get_dimension(query_name)
                     if dim.model.dimension_type == pivoted_dim_type:
                         dimension_query_name = query_name
@@ -147,9 +168,19 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 agg.aggregation_function.__name__,
                 rename=False,
             )
+            column_names = [dimension_query_name]
+            dim_type = dim_config.model.dimension_type
+            if context.model.result.column_type == ColumnType.DIMENSION_TYPES:
+                column_names = context.get_dimension_column_names_by_query_name(
+                    dim_type, dim_type_to_query_name[dim_type]
+                )
             context.replace_dimension_metadata(
-                dim_config.model.dimension_type,
-                [DimensionMetadataModel(dimension_query_name=dimension_query_name)],
+                dim_type,
+                [
+                    DimensionMetadataModel(
+                        dimension_query_name=dimension_query_name, column_names=column_names
+                    )
+                ],
                 dataset_id=self.dataset_id,
             )
             pivoted_columns -= dropped_columns
@@ -181,7 +212,8 @@ class PivotedTableHandler(TableFormatHandlerBase):
 
         pivoted_dimension_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
         pivoted_columns = set(context.get_pivoted_columns(dataset_id=self.dataset_id))
-        final_query_names = DatasetDimensionsMetadataModel()
+        final_metadata = DatasetDimensionsMetadataModel()
+        dim_type_to_query_name = self.project_config.get_base_dimension_to_query_name_mapping()
         column_to_dim_type = {}
         dropped_dimensions = set()
         for agg in aggregations:
@@ -196,23 +228,9 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 continue
 
             df = self.add_columns(df, columns, context, True)
-            group_by_cols = []
-            for column in columns:
-                name = column.get_column_name()
-                dim_type = column_to_dim_type[name]
-                expr = self._make_group_by_column_expr(column)
-                if not isinstance(expr, str) or expr != column.dimension_query_name:
-                    # In this case we are replacing any existing query name with an expression
-                    # or alias, and so the old name must be removed.
-                    final_query_names.remove_metadata(dim_type, column.dimension_query_name)
-                final_query_names.add_metadata(
-                    dim_type,
-                    DimensionMetadataModel(
-                        dimension_query_name=column.dimension_query_name, column_name=name
-                    ),
-                )
-                group_by_cols.append(expr)
-
+            group_by_cols = self._build_group_by_columns(
+                columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata
+            )
             op = agg.aggregation_function
             agg_expr = [op(x).alias(x) for x in df.columns if x in pivoted_columns]
             df = df.groupBy(*group_by_cols).agg(*agg_expr)
@@ -221,9 +239,9 @@ class PivotedTableHandler(TableFormatHandlerBase):
             )
 
         for dim_type in DimensionType:
-            metadata = final_query_names.get_metadata(dim_type)
+            metadata = final_metadata.get_metadata(dim_type)
             if dim_type in dropped_dimensions and metadata:
-                metadata = []
+                metadata.clear()
             context.replace_dimension_metadata(dim_type, metadata, dataset_id=self.dataset_id)
         return df
 
@@ -233,6 +251,41 @@ class PivotedTableHandler(TableFormatHandlerBase):
         if name in column_to_dim_type:
             assert dim_type == column_to_dim_type[name], f"{name=} {column_to_dim_type}"
         column_to_dim_type[name] = dim_type
+
+    def _build_group_by_columns(
+        self, columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata
+    ):
+        group_by_cols = []
+        for column in columns:
+            dim_type = column_to_dim_type[column.get_column_name()]
+            match context.model.result.column_type:
+                case ColumnType.DIMENSION_TYPES:
+                    column_names = context.get_dimension_column_names_by_query_name(
+                        dim_type, dim_type_to_query_name[dim_type]
+                    )
+                    if dim_type == DimensionType.TIME:
+                        group_by_cols += column_names
+                    else:
+                        group_by_cols.append(dim_type.value)
+                case ColumnType.DIMENSION_QUERY_NAMES:
+                    column_names = [column.get_column_name()]
+                    expr = self._make_group_by_column_expr(column)
+                    group_by_cols.append(expr)
+                    if not isinstance(expr, str) or expr != column.dimension_query_name:
+                        # In this case we are replacing any existing query name with an expression
+                        # or alias, and so the old name must be removed.
+                        final_metadata.remove_metadata(dim_type, column.dimension_query_name)
+                case _:
+                    raise NotImplementedError(
+                        f"Bug: unhandled: {context.model.result.column_type}"
+                    )
+            final_metadata.add_metadata(
+                dim_type,
+                DimensionMetadataModel(
+                    dimension_query_name=column.dimension_query_name, column_names=column_names
+                ),
+            )
+        return group_by_cols
 
     @staticmethod
     def _make_group_by_column_expr(column):

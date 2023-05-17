@@ -26,6 +26,7 @@ from dsgrid.project import Project
 from dsgrid.query.models import (
     AggregationModel,
     ColumnModel,
+    ColumnType,
     CompositeDatasetQueryModel,
     CreateCompositeDatasetQueryModel,
     DatasetModel,
@@ -122,8 +123,22 @@ def test_total_electricity_use_with_filter():
     run_query_test(QueryTestTotalElectricityUseWithFilter)
 
 
-def test_total_electricity_use_by_state_and_pca():
-    run_query_test(QueryTestElectricityUseByStateAndPCA)
+@pytest.mark.parametrize(
+    "column_inputs",
+    [
+        (ColumnType.DIMENSION_QUERY_NAMES, ["state", "reeds_pca", "census_region"], True),
+        (ColumnType.DIMENSION_TYPES, ["reeds_pca"], True),
+        (ColumnType.DIMENSION_TYPES, ["state"], True),
+        (ColumnType.DIMENSION_TYPES, ["state", "reeds_pca", "census_region"], False),
+    ],
+)
+def test_total_electricity_use_by_state_and_pca(column_inputs):
+    column_type, columns, is_valid = column_inputs
+    if is_valid:
+        run_query_test(QueryTestElectricityUseByStateAndPCA, column_type, columns)
+    else:
+        with pytest.raises(ValueError):
+            run_query_test(QueryTestElectricityUseByStateAndPCA, column_type, columns)
 
 
 def test_diurnal_electricity_use_by_county_chained(la_expected_electricity_hour_16):
@@ -770,6 +785,11 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
 
     NAME = "total_electricity_use_by_state_and_pca"
 
+    def __init__(self, column_type: ColumnType, geography_columns, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._column_type = column_type
+        self._geography_columns = geography_columns
+
     def make_query(self):
         self._model = ProjectQueryModel(
             name=self.NAME,
@@ -786,10 +806,11 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                 ),
             ),
             result=QueryResultParamsModel(
+                column_type=self._column_type,
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
-                            geography=["state", "reeds_pca", "census_region"],
+                            geography=self._geography_columns,
                             metric=["electricity_collapsed"],
                             model_year=["model_year"],
                             scenario=["scenario"],
@@ -808,9 +829,18 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
 
     def validate(self, expected_values=None):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
-        assert not {"all_electricity", "reeds_pca", "state", "census_region"}.difference(
-            df.columns
-        )
+        match self._column_type:
+            case ColumnType.DIMENSION_QUERY_NAMES:
+                assert "time_est" in df.columns
+                for column in self._geography_columns:
+                    assert column in df.columns
+            case ColumnType.DIMENSION_TYPES:
+                assert "timestamp" in df.columns
+                assert "geography" in df.columns
+                for column in self._geography_columns:
+                    assert column not in df.columns
+            case _:
+                assert False, f"Bug: add support for {self._column_type}"
 
 
 class QueryTestPeakLoadByStateSubsector(QueryTestBase):

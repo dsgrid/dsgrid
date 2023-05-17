@@ -105,7 +105,7 @@ def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, re
         #    val = "(" + "+".join(expr) + f") / {len(expr)}"
         #    expr = f"{val} AS {column}"
         else:
-            raise Exception(f"Unsupported operation: {operation}")
+            raise NotImplementedError(f"Unsupported {operation=}")
         exprs.append(expr)
         dropped.update({x for x in records_dict[tid]})
 

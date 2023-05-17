@@ -151,6 +151,6 @@ def _get_module_from_extension(filename, **kwargs):
     elif "mod" in kwargs:
         mod = kwargs["mod"]
     else:
-        raise Exception(f"Unsupported extension {filename}")
+        raise NotImplementedError(f"Unsupported extension {filename}")
 
     return mod

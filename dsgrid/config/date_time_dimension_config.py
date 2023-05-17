@@ -26,7 +26,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         if len(time_columns) > 1:
             raise ValueError(
                 "DateTimeDimensionConfig expects only one column from "
-                f"get_timestamp_load_data_columns, but has {time_columns}"
+                f"get_load_data_time_columns, but has {time_columns}"
             )
         time_col = time_columns[0]
         tz = self.get_tzinfo()
@@ -56,7 +56,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         # Note: DF.show() displays time in session time, which may be confusing.
         # But timestamps are stored correctly here
 
-        time_col = self.get_timestamp_load_data_columns()
+        time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         schema = StructType([StructField(time_col, TimestampType(), False)])
@@ -66,7 +66,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return df_time
 
     # def build_time_dataframe_with_time_zone(self):
-    #     time_col = self.get_timestamp_load_data_columns()
+    #     time_col = self.get_load_data_time_columns()
     #     assert len(time_col) == 1, time_col
     #     time_col = time_col[0]
 
@@ -115,7 +115,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return ranges
 
-    def get_timestamp_load_data_columns(self):
+    def get_load_data_time_columns(self):
         return list(DatetimeTimestampType._fields)
 
     def get_tzinfo(self):

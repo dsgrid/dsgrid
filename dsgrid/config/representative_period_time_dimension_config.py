@@ -51,7 +51,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         )
 
     def build_time_dataframe(self, model_years=None):
-        time_cols = self.get_timestamp_load_data_columns()
+        time_cols = self.get_load_data_time_columns()
         schema = StructType(
             [StructField(time_col, IntegerType(), False) for time_col in time_cols]
         )
@@ -77,8 +77,8 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         ):
             return df
 
-        time_cols = self.get_timestamp_load_data_columns()
-        ptime_col = project_time_dim.get_timestamp_load_data_columns()
+        time_cols = self.get_load_data_time_columns()
+        ptime_col = project_time_dim.get_load_data_time_columns()
         assert len(ptime_col) == 1, ptime_col
         ptime_col = ptime_col[0]
 
@@ -159,8 +159,8 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             self.model.ranges, self.model.time_interval_type, self.get_tzinfo()
         )
 
-    def get_timestamp_load_data_columns(self):
-        return self._format_handler.get_timestamp_load_data_columns()
+    def get_load_data_time_columns(self):
+        return self._format_handler.get_load_data_time_columns()
 
     def get_tzinfo(self):
         # TBD
@@ -207,7 +207,7 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def get_timestamp_load_data_columns():
+    def get_load_data_time_columns():
         """Return the required timestamp columns in the load data table.
 
         Returns
@@ -300,7 +300,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
         return time_ranges
 
     @staticmethod
-    def get_timestamp_load_data_columns():
+    def get_load_data_time_columns():
         return list(OneWeekPerMonthByHourType._fields)
 
     def list_expected_dataset_timestamps(self, ranges):

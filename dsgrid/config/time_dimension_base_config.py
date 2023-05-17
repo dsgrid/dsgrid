@@ -74,7 +74,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_timestamp_load_data_columns(self) -> list[str]:
+    def get_load_data_time_columns(self) -> list[str]:
         """Return the required timestamp columns in the load data table.
 
         Returns
@@ -106,7 +106,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         pyspark.sql.DataFrame
 
         """
-        time_cols = self.get_timestamp_load_data_columns()
+        time_cols = self.get_load_data_time_columns()
         if len(time_cols) > 1:
             raise NotImplementedError(
                 "Handling of multiple time columns needs to be implemented in the child class: "
@@ -179,7 +179,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         dtime_interval = self.get_time_interval_type()
         ptime_interval = project_time_dim.get_time_interval_type()
-        time_col = project_time_dim.get_timestamp_load_data_columns()
+        time_col = project_time_dim.get_load_data_time_columns()
 
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
@@ -230,7 +230,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     def _apply_time_wrap(df, project_time_dim):
         """If dataset_time does not match project_time, apply time-wrapping"""
 
-        time_col = project_time_dim.get_timestamp_load_data_columns()
+        time_col = project_time_dim.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
 

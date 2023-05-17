@@ -41,7 +41,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return ranges
 
-    def get_timestamp_load_data_columns(self):
+    def get_load_data_time_columns(self):
         return []
 
     def get_tzinfo(self):

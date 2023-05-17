@@ -113,7 +113,7 @@ def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None, wrap_t
         )
     else:
         converted_dataset_time = df
-    ptime_col = project_time_dim.get_timestamp_load_data_columns()
+    ptime_col = project_time_dim.get_load_data_time_columns()
     dfp = set(project_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
     dfd = set(converted_dataset_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
 
@@ -158,12 +158,12 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     spark = get_spark_session()
     session_tz_orig = session_tz = spark.conf.get("spark.sql.session.timeZone")
 
-    ptime_col = project_time_dim.get_timestamp_load_data_columns()
+    ptime_col = project_time_dim.get_load_data_time_columns()
     assert len(ptime_col) == 1, ptime_col
     ptime_col = ptime_col[0]
 
     tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
-    time_cols = tempo_time_dim.get_timestamp_load_data_columns()
+    time_cols = tempo_time_dim.get_load_data_time_columns()
     enduse_cols = tempo._handler.get_pivoted_dimension_columns()
 
     # get sum from converted_data
@@ -350,7 +350,7 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     """
 
     # extract data for comparison
-    time_col = project_time_dim.get_timestamp_load_data_columns()
+    time_col = project_time_dim.get_load_data_time_columns()
     assert len(time_col) == 1, time_col
     time_col = time_col[0]
 

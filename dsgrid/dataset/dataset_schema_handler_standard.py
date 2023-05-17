@@ -244,7 +244,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         dim_type = self._config.model.data_schema.load_data_column_dimension
         dimension_records = set(self.get_pivoted_dimension_columns())
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_columns = set(time_dim.get_timestamp_load_data_columns())
+        time_columns = set(time_dim.get_load_data_time_columns())
 
         found_id = False
         pivoted_cols = set()
@@ -275,7 +275,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         load_df = self._load_data
         lookup_columns = set(lookup.columns)
         time_columns = set(
-            self._config.get_dimension(DimensionType.TIME).get_timestamp_load_data_columns()
+            self._config.get_dimension(DimensionType.TIME).get_load_data_time_columns()
         )
         pivoted_columns = set(load_df.columns) - lookup_columns - time_columns
 

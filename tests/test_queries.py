@@ -1402,7 +1402,6 @@ def calc_expected_eia_861_ca_res_load_value():
     assert mapping_id is not None
     records = project.dimension_mapping_manager.get_by_id(mapping_id).get_records_dataframe()
 
-    # geo_records = dataset_config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
     fraction_06037 = records.filter("to_id == '06037'").collect()[0].from_fraction
     fraction_06073 = records.filter("to_id == '06073'").collect()[0].from_fraction
     dataset = project.get_dataset(dataset_id)

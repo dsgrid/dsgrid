@@ -50,7 +50,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         pivoted_cols = set()
 
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_columns = time_dim.get_timestamp_load_data_columns()
+        time_columns = time_dim.get_load_data_time_columns()
         pivoted_dim = self._config.model.data_schema.load_data_column_dimension
         expected_pivoted_columns = self.get_pivoted_dimension_columns()
         pivoted_dim_found = False
@@ -111,7 +111,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         load_df = self._load_data
         pivoted_dimension_type = self.get_pivoted_dimension_type()
         time_columns = set(
-            self._config.get_dimension(DimensionType.TIME).get_timestamp_load_data_columns()
+            self._config.get_dimension(DimensionType.TIME).get_load_data_time_columns()
         )
         df_columns = set(load_df.columns)
         stacked_columns = set()

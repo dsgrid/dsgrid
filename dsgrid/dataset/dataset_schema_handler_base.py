@@ -263,7 +263,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _get_time_dimension_columns(self):
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_cols = time_dim.get_timestamp_load_data_columns()
+        time_cols = time_dim.get_load_data_time_columns()
         return time_cols
 
     def _iter_dataset_record_ids(self, context: QueryContext):

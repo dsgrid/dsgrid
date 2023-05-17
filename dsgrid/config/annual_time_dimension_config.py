@@ -30,7 +30,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         if len(time_columns) > 1:
             raise ValueError(
                 "AnnualTimeDimensionConfig expects only one column from "
-                f"get_timestamp_load_data_columns, but has {time_columns}"
+                f"get_load_data_time_columns, but has {time_columns}"
             )
         time_col = time_columns[0]
         time_ranges = self.get_time_ranges()
@@ -52,7 +52,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
             )
 
     def build_time_dataframe(self, model_years=None):
-        time_col = self.get_timestamp_load_data_columns()
+        time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         schema = StructType([StructField(time_col, IntegerType(), False)])
@@ -81,15 +81,15 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def map_annual_time_measured_to_datetime(self, annual_df, dt_dim, model_years):
         """Map a dataframe with MeasuredType.MEASURED to DateTime."""
-        time_col = self.get_timestamp_load_data_columns()[0]
+        time_col = self.get_load_data_time_columns()[0]
         df = dt_dim.build_time_dataframe(model_years=model_years)
-        dt_time_col = dt_dim.get_timestamp_load_data_columns()[0]
+        dt_time_col = dt_dim.get_load_data_time_columns()[0]
         return df.join(annual_df, on=F.year(dt_time_col) == annual_df[time_col]).drop(time_col)
 
     def map_annual_total_to_datetime(self, annual_df, dt_dim, model_years, value_columns):
         """Map a dataframe with MeasuredType.TOTAL to DateTime."""
         frequency = dt_dim.model.frequency
-        time_col = self.get_timestamp_load_data_columns()[0]
+        time_col = self.get_load_data_time_columns()[0]
         dfs = []
         for model_year in model_years:
             if self.model.include_leap_day and model_year % 4 == 0:
@@ -97,7 +97,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
             else:
                 measured_duration = timedelta(days=365)
             df = dt_dim.build_time_dataframe(model_years=[model_year])
-            dt_time_col = dt_dim.get_timestamp_load_data_columns()[0]
+            dt_time_col = dt_dim.get_load_data_time_columns()[0]
             with custom_spark_conf({"spark.sql.session.timeZone": "UTC"}):
                 tmp_col = f"{dt_time_col}_utc"
                 df = df.withColumn(
@@ -136,7 +136,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return ranges
 
-    def get_timestamp_load_data_columns(self):
+    def get_load_data_time_columns(self):
         return list(AnnualTimestampType._fields)
 
     def get_tzinfo(self):

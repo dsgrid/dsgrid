@@ -148,7 +148,9 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def list_expected_dataset_timestamps(self, model_years=None):
         if model_years is not None:
             # We do not expect to need this.
-            raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
+            raise NotImplementedError(
+                f"No support for {model_years=} in {type(self)}.list_expected_dataset_timestamps"
+            )
 
         timestamps = []
         for time_range in self.model.ranges:

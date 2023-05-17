@@ -91,7 +91,6 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     #     return df2
 
     def convert_dataframe(self, df, project_time_dim, model_years=None, value_columns=None):
-        # TODO #193: we may have to do something special with local timezone
         df = self._convert_time_to_project_time_interval(df=df, project_time_dim=project_time_dim)
         return df
 

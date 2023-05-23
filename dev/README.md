@@ -562,7 +562,8 @@ It may be easier to develop and run queries in Python. Follow examples in `~/rep
 ## API server
 Set these environment variables with your desired values.
 ```
-$ export DSGRID_LOCAL_REGISTRY=~/.dsgrid-registry
+$ export DSGRID_REGISTRY_DATABASE_URL=http://localhost:8529
+$ export DSGRID_REGISTRY_DATABASE_NAME=simple-standard-scenarios
 $ export DSGRID_QUERY_OUTPUT_DIR=api_query_output
 $ export DSGRID_API_SERVER_STORE_DIR=.
 ```
@@ -605,6 +606,12 @@ FastAPI generates API documentation at these links:
 - http://127.0.0.1:8000/docs (with Swagger)
 - http://127.0.0.1:8000/redoc (with Redocly)
 
+## Project Viewer
+dsgrid provides a Dash application that allows you to browse the registry. Once you have started
+the API server as described above, run
+```
+$ python dsgrid/apps/project_viewer/app.py
+```
 
 ## Publish Documentation
 

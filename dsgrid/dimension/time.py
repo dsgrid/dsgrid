@@ -180,12 +180,6 @@ class TimeZone(DSGEnum):
         tz=ZoneInfo("US/Eastern"),
         tz_name="US/Eastern",
     )
-    NONE = EnumValue(
-        value="none",
-        description="No timezone, suitable for temporally aggregated data",
-        tz=None,
-        tz_name="none",
-    )
 
     def get_standard_time(self):
         """get equivalent standard time"""
@@ -203,8 +197,6 @@ class TimeZone(DSGEnum):
             return TimeZone.CST
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EST
-        if self == TimeZone.NONE:
-            return TimeZone.NONE
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def get_prevailing_time(self):
@@ -223,9 +215,6 @@ class TimeZone(DSGEnum):
             return TimeZone.CPT
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EPT
-        if self == TimeZone.NONE:
-            logger.info(f"TimeZone={self.value} does not have meaningful standard time.")
-            return TimeZone.NONE
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def is_standard(self):
@@ -283,8 +272,10 @@ class DatetimeRange:
         n_tail = ", ".join([str(x) for x in output[-n_show:]])
         return n_head + ",\n ... , \n" + n_tail
 
-    def iter_timestamps(self):
+    def _iter_timestamps(self):
         """Return a generator of datetimes for a time range ('start' and 'end' times are inclusive).
+        There could be duplicates.
+
         TODO: for future-selves, test functionality of LeapDayAdjustmentType in relation to TimeIntervalType to make sure drop behavior is expected.
 
         Yields
@@ -319,18 +310,17 @@ class DatetimeRange:
             cur += self.frequency
 
     def list_time_range(self):
-        """Return a list of timestamps (datetime obj) for a time range.
+        """Return a list of timestamps for a time range.
+
         Returns
         -------
-        list
-            list of datetime
-
+        list[datetime]
         """
-        return list(self.iter_timestamps())
+        return sorted(set(self._iter_timestamps()))
 
 
 class AnnualTimeRange(DatetimeRange):
-    def iter_timestamps(self):
+    def _iter_timestamps(self):
         """
         Return a list of years (datetime obj) on Jan 1st
         Might be okay to not convert to UTC for iteration, since it's annual
@@ -344,7 +334,7 @@ class AnnualTimeRange(DatetimeRange):
 
 
 class NoOpTimeRange(DatetimeRange):
-    def iter_timestamps(self):
+    def _iter_timestamps(self):
         yield None
 
 

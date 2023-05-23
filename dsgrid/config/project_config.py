@@ -786,7 +786,7 @@ class ProjectConfig(ConfigBase):
         list
         """
         dim = self.get_dimension(dimension_query_name)
-        time_columns = dim.get_timestamp_load_data_columns()
+        time_columns = dim.get_load_data_time_columns()
         return time_columns
 
     def iter_datasets(self):

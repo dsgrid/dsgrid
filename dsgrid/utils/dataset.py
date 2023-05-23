@@ -2,8 +2,6 @@ import logging
 import os
 from collections import defaultdict
 
-# from typing import List
-
 import pyspark
 import pyspark.sql.functions as F
 

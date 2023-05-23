@@ -356,7 +356,7 @@ class Project:
             case ColumnType.DIMENSION_TYPES:
                 dset = self.get_dataset(dataset.initial_value_dataset_id)
                 time_dim = dset.config.get_dimension(DimensionType.TIME)
-                time_columns = set(time_dim.get_timestamp_load_data_columns())
+                time_columns = set(time_dim.get_load_data_time_columns())
             case _:
                 raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
         with restart_spark_with_custom_conf(

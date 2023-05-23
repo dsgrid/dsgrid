@@ -64,6 +64,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         convert_time_before_project_mapping = self._convert_time_before_project_mapping()
         if convert_time_before_project_mapping:
+            # There is currently no case that needs model years or value columns.
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         lk_df = self._remap_dimension_columns(lk_df)
@@ -71,7 +72,14 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._remap_dimension_columns(ld_df)
         ld_df = self._apply_fraction(ld_df)
         if not convert_time_before_project_mapping:
-            ld_df = self._convert_time_dimension(ld_df, project_config)
+            model_year_dim = project_config.get_base_dimension(DimensionType.MODEL_YEAR)
+            model_years = get_unique_values(model_year_dim.get_records_dataframe(), "id")
+            pivoted_columns = set(ld_df.columns).intersection(
+                self.get_pivoted_dimension_columns_mapped_to_project()
+            )
+            ld_df = self._convert_time_dimension(
+                ld_df, project_config, model_years=model_years, value_columns=pivoted_columns
+            )
 
         return self._add_null_values(ld_df, null_lk_df)
 
@@ -90,6 +98,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         convert_time_before_project_mapping = self._convert_time_before_project_mapping()
         if convert_time_before_project_mapping:
+            # There is currently no case that needs model years or value columns.
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         ld_df = self._remap_dimension_columns(ld_df, filtered_records=context.get_record_ids())
@@ -98,12 +107,21 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             null_lk_df, filtered_records=context.get_record_ids()
         )
 
-        if not convert_time_before_project_mapping:
-            ld_df = self._convert_time_dimension(ld_df, project_config)
-
         pivoted_columns = set(ld_df.columns).intersection(
             self.get_pivoted_dimension_columns_mapped_to_project()
         )
+        if not convert_time_before_project_mapping:
+            m_year_df = context.try_get_record_ids_by_dimension_type(DimensionType.MODEL_YEAR)
+            if m_year_df is None:
+                model_years = project_config.get_base_dimension(
+                    DimensionType.MODEL_YEAR
+                ).get_unique_ids()
+            else:
+                model_years = get_unique_values(m_year_df, "id")
+            ld_df = self._convert_time_dimension(
+                ld_df, project_config, model_years=model_years, value_columns=pivoted_columns
+            )
+
         ld_df = self._add_null_values(ld_df, null_lk_df)
 
         context.set_dataset_metadata(
@@ -226,7 +244,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         dim_type = self._config.model.data_schema.load_data_column_dimension
         dimension_records = set(self.get_pivoted_dimension_columns())
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_columns = set(time_dim.get_timestamp_load_data_columns())
+        time_columns = set(time_dim.get_load_data_time_columns())
 
         found_id = False
         pivoted_cols = set()
@@ -257,7 +275,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         load_df = self._load_data
         lookup_columns = set(lookup.columns)
         time_columns = set(
-            self._config.get_dimension(DimensionType.TIME).get_timestamp_load_data_columns()
+            self._config.get_dimension(DimensionType.TIME).get_load_data_time_columns()
         )
         pivoted_columns = set(load_df.columns) - lookup_columns - time_columns
 

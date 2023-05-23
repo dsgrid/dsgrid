@@ -13,7 +13,7 @@ from typing import AnyStr, List, Union
 import pandas as pd
 import pyspark
 from pyspark.sql import Row, SparkSession
-from pyspark.sql.types import StructType, StringType
+from pyspark.sql.types import StructType, StringType, DoubleType, IntegerType, BooleanType
 from pyspark import SparkConf
 
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter, DSGInvalidFile
@@ -28,6 +28,13 @@ logger = logging.getLogger(__name__)
 # spark.sql(f"CREATE DATABASE IF NOT EXISTS {database}")
 # Doing so has caused conflicts in tests with the Derby db.
 DSGRID_DB_NAME = "default"
+
+PYTHON_TO_SPARK_TYPES = {
+    int: IntegerType,
+    float: DoubleType,
+    str: StringType,
+    bool: BooleanType,
+}
 
 
 def init_spark(name="dsgrid", check_env=True, spark_conf=None):
@@ -304,16 +311,26 @@ def models_to_dataframe(models, table_name=None):
     assert models
     cls = type(models[0])
     rows = []
-    for model in models:
+    schema = StructType()
+    for i, model in enumerate(models):
         dct = {}
         for f in cls.__fields__:
             val = getattr(model, f)
             if isinstance(val, enum.Enum):
                 val = val.value
+            if i == 0:
+                if val is None:
+                    python_type = cls.__fields__[f].type_
+                    if issubclass(python_type, enum.Enum):
+                        python_type = type(next(iter(python_type)).value)
+                else:
+                    python_type = type(val)
+                spark_type = PYTHON_TO_SPARK_TYPES[python_type]()
+                schema.add(f, spark_type, nullable=True)
             dct[f] = val
         rows.append(Row(**dct))
 
-    df = spark.createDataFrame(rows)
+    df = spark.createDataFrame(rows, schema=schema)
 
     if table_name is not None:
         df.createOrReplaceTempView(table_name)
@@ -682,6 +699,17 @@ def try_load_stored_table(table_name, database=DSGRID_DB_NAME):
     if spark.catalog.tableExists(table_name, dbName=database):
         return spark.table(table_name)
     return None
+
+
+def union(dfs) -> pyspark.sql.DataFrame:
+    """Return a union of the dataframes, ensuring that the columns match."""
+    df = dfs[0]
+    if len(dfs) > 1:
+        for dft in dfs[1:]:
+            if df.columns != dft.columns:
+                raise Exception(f"columns don't match: {df.columns=} {dft.columns=}")
+            df = df.union(dft)
+    return df
 
 
 def is_table_stored(table_name, database=DSGRID_DB_NAME):

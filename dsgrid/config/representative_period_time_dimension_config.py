@@ -50,13 +50,13 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             time_columns,
         )
 
-    def build_time_dataframe(self):
-        time_cols = self.get_timestamp_load_data_columns()
+    def build_time_dataframe(self, model_years=None):
+        time_cols = self.get_load_data_time_columns()
         schema = StructType(
             [StructField(time_col, IntegerType(), False) for time_col in time_cols]
         )
 
-        model_time = self.list_expected_dataset_timestamps()
+        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
 
         return df_time
@@ -64,7 +64,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     return self.build_time_dataframe()
 
-    def convert_dataframe(self, df=None, project_time_dim=None):
+    def convert_dataframe(self, df, project_time_dim, model_years=None, value_columns=None):
         # in spark.dayofweek: 1=Sunday, 7=Saturday
         # dsgrid uses python standard library (same for pandas), which has day_of_week: 0=Monday, 6=Sunday
         # the mapping is: python.dt.day_of_week = [(i+7-2)%7 for i in spark.dayofweek]
@@ -77,8 +77,8 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         ):
             return df
 
-        time_cols = self.get_timestamp_load_data_columns()
-        ptime_col = project_time_dim.get_timestamp_load_data_columns()
+        time_cols = self.get_load_data_time_columns()
+        ptime_col = project_time_dim.get_load_data_time_columns()
         assert len(ptime_col) == 1, ptime_col
         ptime_col = ptime_col[0]
 
@@ -150,13 +150,17 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return self._format_handler.get_frequency()
 
-    def get_time_ranges(self):
+    def get_time_ranges(self, model_years=None):
+        if model_years is not None:
+            # We do not expect to need this.
+            raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
+
         return self._format_handler.get_time_ranges(
             self.model.ranges, self.model.time_interval_type, self.get_tzinfo()
         )
 
-    def get_timestamp_load_data_columns(self):
-        return self._format_handler.get_timestamp_load_data_columns()
+    def get_load_data_time_columns(self):
+        return self._format_handler.get_load_data_time_columns()
 
     def get_tzinfo(self):
         # TBD
@@ -165,7 +169,10 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(self, model_years=None):
+        if model_years is not None:
+            # We do not expect to need this.
+            raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
         return self._format_handler.list_expected_dataset_timestamps(self.model.ranges)
 
 
@@ -200,7 +207,7 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def get_timestamp_load_data_columns():
+    def get_load_data_time_columns():
         """Return the required timestamp columns in the load data table.
 
         Returns
@@ -293,7 +300,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
         return time_ranges
 
     @staticmethod
-    def get_timestamp_load_data_columns():
+    def get_load_data_time_columns():
         return list(OneWeekPerMonthByHourType._fields)
 
     def list_expected_dataset_timestamps(self, ranges):

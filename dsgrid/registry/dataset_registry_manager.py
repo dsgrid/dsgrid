@@ -8,6 +8,7 @@ from typing import Union, List, Dict
 
 from prettytable import PrettyTable
 
+from dsgrid.common import SYNC_EXCLUDE_LIST
 from dsgrid.config.dataset_config import DatasetConfig, ALLOWED_DATA_FILES
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
@@ -381,3 +382,36 @@ class DatasetRegistryManager(RegistryManagerBase):
         if return_table:
             return table
         display_table(table)
+
+    def sync_pull(self, path):
+        """Synchronizes files from the remote registry to local.
+        Deletes any files locally that do not exist on remote.
+
+        path : Path
+            Local path
+
+        """
+        remote_path = self.relative_remote_path(path)
+        self.cloud_interface.sync_pull(
+            remote_path, path, exclude=SYNC_EXCLUDE_LIST, delete_local=True
+        )
+
+    def sync_push(self, path):
+        """Synchronizes files from the local path to the remote registry.
+
+        path : Path
+            Local path
+
+        """
+        remote_path = self.relative_remote_path(path)
+        lock_file_path = self.get_registry_lock_file(path.name)
+        self.cloud_interface.check_lock_file(lock_file_path)
+        try:
+            self.cloud_interface.sync_push(
+                remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
+            )
+        except Exception:
+            logger.exception(
+                "Please report this error to the dsgrid team. The registry may need recovery."
+            )
+            raise

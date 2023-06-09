@@ -390,10 +390,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         new_key = ConfigKey(config.model.mapping_id, model.version)
         self._mappings.pop(old_key, None)
         self._mappings[new_key] = MappingTableConfig(model)
-
-        if not self.offline_mode:
-            self.sync_push(self._path)
-
         return model
 
     def remove(self, mapping_id):

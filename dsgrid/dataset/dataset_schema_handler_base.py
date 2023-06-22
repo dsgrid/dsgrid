@@ -11,6 +11,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.query.query_context import QueryContext
+from dsgrid.units.energy import convert_units
 from dsgrid.utils.dataset import (
     is_noop_mapping,
     map_and_reduce_stacked_dimension,
@@ -243,6 +244,29 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 f"unique time array lengths = {len(distinct_ta_counts)}"
             )
 
+    def _convert_units(self, df, project_metric_records, pivoted_columns):
+        if not self._config.model.enable_metric_unit_conversion:
+            return df
+
+        mapping_records = None
+        for ref in self._mapping_references:
+            dim_type = ref.from_dimension_type
+            if dim_type == DimensionType.METRIC:
+                mapping_records = self._dimension_mapping_mgr.get_by_id(
+                    ref.mapping_id, version=ref.version
+                ).get_records_dataframe()
+                break
+
+        if mapping_records is None:
+            # The dataset has the same metric dimension as the project.
+            return df
+
+        dataset_records = self._config.get_dimension(DimensionType.METRIC).get_records_dataframe()
+        df = convert_units(
+            df, pivoted_columns, dataset_records, mapping_records, project_metric_records
+        )
+        return df
+
     def _get_dataset_to_project_mapping_records(self, dimension_type: DimensionType):
         config = self._get_dataset_to_project_mapping_config(dimension_type)
         if config is None:
@@ -358,12 +382,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return df
 
-    def _apply_fraction(self, df, agg_func=None):
+    def _apply_fraction(self, df, pivoted_columns, agg_func=None):
         if "fraction" not in df.columns:
             return df
-        pivoted_columns = set(df.columns).intersection(
-            self.get_pivoted_dimension_columns_mapped_to_project()
-        )
         agg_func = agg_func or F.sum
         # Maintain column order.
         agg_ops = [

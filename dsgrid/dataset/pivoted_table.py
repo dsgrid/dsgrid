@@ -13,7 +13,11 @@ from dsgrid.query.models import (
     DimensionMetadataModel,
 )
 from dsgrid.query.query_context import QueryContext
-from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension, remove_invalid_null_timestamps
+from dsgrid.units.energy import convert_units
+from dsgrid.utils.dataset import (
+    map_and_reduce_pivoted_dimension,
+    remove_invalid_null_timestamps,
+)
 from dsgrid.utils.spark import get_unique_values
 from .table_format_handler_base import TableFormatHandlerBase
 
@@ -168,8 +172,17 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 agg.aggregation_function.__name__,
                 rename=False,
             )
-            column_names = [dimension_query_name]
             dim_type = dim_config.model.dimension_type
+            if dim_type == DimensionType.METRIC:
+                df = convert_units(
+                    df,
+                    new_pivoted_columns,
+                    self._project_config.get_base_dimension(dim_type).get_records_dataframe(),
+                    mapping_records,
+                    dim_config.get_records_dataframe(),
+                )
+
+            column_names = [dimension_query_name]
             if context.model.result.column_type == ColumnType.DIMENSION_TYPES:
                 column_names = context.get_dimension_column_names_by_query_name(
                     dim_type, dim_type_to_query_name[dim_type]
@@ -227,6 +240,8 @@ class PivotedTableHandler(TableFormatHandlerBase):
             if not columns:
                 continue
 
+            # TODO: This does not handle the scenario where the metric dimension is stacked and
+            # needs unit conversion.
             df = self.add_columns(df, columns, context, True)
             group_by_cols = self._build_group_by_columns(
                 columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata

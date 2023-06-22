@@ -152,14 +152,18 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         ld_df = self._remap_dimension_columns(ld_df)
-        ld_df = self._apply_fraction(ld_df)
+        pivoted_columns = set(ld_df.columns).intersection(
+            self.get_pivoted_dimension_columns_mapped_to_project()
+        )
+        ld_df = self._apply_fraction(ld_df, pivoted_columns)
+        project_metric_records = project_config.get_base_dimension(
+            DimensionType.METRIC
+        ).get_records_dataframe()
+        ld_df = self._convert_units(ld_df, project_metric_records, pivoted_columns)
 
         if not convert_time_before_project_mapping:
             model_year_dim = project_config.get_base_dimension(DimensionType.MODEL_YEAR)
             model_years = get_unique_values(model_year_dim.get_records_dataframe(), "id")
-            pivoted_columns = set(ld_df.columns).intersection(
-                self.get_pivoted_dimension_columns_mapped_to_project()
-            )
             ld_df = self._convert_time_dimension(
                 ld_df, project_config, model_years=model_years, value_columns=pivoted_columns
             )
@@ -180,11 +184,14 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         ld_df = self._remap_dimension_columns(ld_df, filtered_records=context.get_record_ids())
-        ld_df = self._apply_fraction(ld_df)
-
         pivoted_columns = set(ld_df.columns).intersection(
             self.get_pivoted_dimension_columns_mapped_to_project()
         )
+        ld_df = self._apply_fraction(ld_df, pivoted_columns)
+        project_metric_records = project_config.get_base_dimension(
+            DimensionType.METRIC
+        ).get_records_dataframe()
+        ld_df = self._convert_units(ld_df, project_metric_records, pivoted_columns)
         if not convert_time_before_project_mapping:
             m_year_df = context.try_get_record_ids_by_dimension_type(DimensionType.MODEL_YEAR)
             if m_year_df is None:

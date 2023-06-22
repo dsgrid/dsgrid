@@ -65,7 +65,7 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(scope="module")
 def la_expected_electricity_hour_16(tmp_path_factory):
     output_dir = tmp_path_factory.mktemp("diurnal_queries")
-    project = get_project()
+    project = get_project("simple-standard-scenarios", "dsgrid_conus_2022")
     query = ProjectQueryModel(
         name="projected_dg_conus_2022",
         project=ProjectQueryParamsModel(
@@ -191,7 +191,7 @@ def test_invalid_drop_pivoted_dimension(tmp_path):
             output_format="parquet",
         ),
     )
-    project = get_project()
+    project = get_project("simple-standard-scenarios", "dsgrid_conus_2022")
     output_dir = tmp_path / "queries"
 
     query.result.aggregations = [invalid_agg]
@@ -201,7 +201,7 @@ def test_invalid_drop_pivoted_dimension(tmp_path):
 
 def test_create_composite_dataset_query(tmp_path):
     output_dir = tmp_path / "queries"
-    project = get_project()
+    project = get_project("simple-standard-scenarios", "dsgrid_conus_2022")
     query = QueryTestElectricityValuesCompositeDataset(
         REGISTRY_PATH, project, output_dir=output_dir
     )
@@ -261,7 +261,9 @@ def test_query_cli_create_validate(tmp_path):
 
 def test_query_cli_run(tmp_path):
     output_dir = tmp_path / "queries"
-    project = get_project()
+    project = get_project(
+        QueryTestElectricityValues.get_database_name(), QueryTestElectricityValues.get_project_id()
+    )
     query = QueryTestElectricityValues(True, REGISTRY_PATH, project, output_dir=output_dir)
     filename = tmp_path / "query.json"
     filename.write_text(query.make_query().json(indent=2))
@@ -291,30 +293,32 @@ def test_dimension_query_names_model():
     assert not diff
 
 
-_project = None
+def test_unit_mapping(cached_registry):
+    run_query_test(QueryTestUnitMapping)
 
 
-def get_project():
+_projects = {}
+
+
+def get_project(database, project_id):
     """Load a Project and cache it for future calls.
     Loading is slow and the Project isn't being changed by these tests.
     """
-    global _project
-    if _project is not None:
-        return _project
-    conn = DatabaseConnection(database="simple-standard-scenarios")
+    key = (database, project_id)
+    if key in _projects:
+        return _projects[key]
+    conn = DatabaseConnection(database=database)
     mgr = RegistryManager.load(
         conn,
         offline_mode=True,
     )
-    return mgr.project_manager.load_project("dsgrid_conus_2022")
+    _projects[key] = mgr.project_manager.load_project(project_id)
+    return _projects[key]
 
 
 def shutdown_project():
     """Shutdown a project and stop the SparkSession so that another process can create one."""
-    global _project
-    if _project is not None:
-        _project = None
-
+    _projects.clear()
     spark = SparkSession.getActiveSession()
     if spark is not None:
         spark.stop()
@@ -325,7 +329,7 @@ def run_query_test(test_query_cls, *args, expected_values=None):
     if output_dir.exists():
         shutil.rmtree(output_dir)
 
-    project = get_project()
+    project = get_project(test_query_cls.get_database_name(), test_query_cls.get_project_id())
     try:
         query = test_query_cls(*args, REGISTRY_PATH, project, output_dir=output_dir)
         for load_cached_table in (False, True):
@@ -351,6 +355,14 @@ class QueryTestBase(abc.ABC):
         self._project = project
         self._output_dir = Path(output_dir)
         self._model = None
+
+    @staticmethod
+    def get_database_name():
+        return "simple-standard-scenarios"
+
+    @staticmethod
+    def get_project_id():
+        return "dsgrid_conus_2022"
 
     @property
     def name(self):
@@ -427,7 +439,7 @@ class QueryTestElectricityValues(QueryTestBase):
         self._model = ProjectQueryModel(
             name=self.NAME,
             project=ProjectQueryParamsModel(
-                project_id="dsgrid_conus_2022",
+                project_id=self.get_project_id(),
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
@@ -541,7 +553,7 @@ class QueryTestElectricityUse(QueryTestBase):
         self._model = ProjectQueryModel(
             name=self.NAME,
             project=ProjectQueryParamsModel(
-                project_id="dsgrid_conus_2022",
+                project_id=self.get_project_id(),
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
@@ -604,7 +616,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
         self._model = ProjectQueryModel(
             name=self.NAME,
             project=ProjectQueryParamsModel(
-                project_id="dsgrid_conus_2022",
+                project_id=self.get_project_id(),
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
@@ -670,7 +682,7 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
         self._model = ProjectQueryModel(
             name=self.NAME,
             project=ProjectQueryParamsModel(
-                project_id="dsgrid_conus_2022",
+                project_id=self.get_project_id(),
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
@@ -727,7 +739,7 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
         self._model = ProjectQueryModel(
             name=self.NAME,
             project=ProjectQueryParamsModel(
-                project_id="dsgrid_conus_2022",
+                project_id=self.get_project_id(),
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
@@ -798,7 +810,7 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
         self._model = ProjectQueryModel(
             name=self.NAME,
             project=ProjectQueryParamsModel(
-                project_id="dsgrid_conus_2022",
+                project_id=self.get_project_id(),
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
@@ -855,7 +867,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
         self._model = ProjectQueryModel(
             name=self.NAME,
             project=ProjectQueryParamsModel(
-                project_id="dsgrid_conus_2022",
+                project_id=self.get_project_id(),
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
@@ -928,7 +940,7 @@ class QueryTestMapAnnualTime(QueryTestBase):
         self._model = ProjectQueryModel(
             name=self.NAME,
             project=ProjectQueryParamsModel(
-                project_id="dsgrid_conus_2022",
+                project_id=self.get_project_id(),
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
                     dataset_id="eia_861_annual_energy_use_state_sector_mapped",
@@ -984,7 +996,7 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
             name=self.NAME,
             dataset_id="com_res",
             project=ProjectQueryParamsModel(
-                project_id="dsgrid_conus_2022",
+                project_id=self.get_project_id(),
                 include_dsgrid_dataset_components=False,
                 dataset=DatasetModel(
                     dataset_id="resstock_conus_2022_projected",
@@ -1082,6 +1094,64 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
             self._geography,
         )
         assert False
+
+
+class QueryTestUnitMapping(QueryTestBase):
+
+    NAME = "test_efs_comstock_query"
+
+    @staticmethod
+    def get_database_name():
+        return "cached-test-dsgrid"
+
+    @staticmethod
+    def get_project_id():
+        return "test_efs"
+
+    def make_query(self):
+        self._model = ProjectQueryModel(
+            name=self.NAME,
+            project=ProjectQueryParamsModel(
+                project_id=self.get_project_id(),
+                include_dsgrid_dataset_components=False,
+                dataset=DatasetModel(
+                    dataset_id="efs_comstock",
+                    source_datasets=[
+                        StandaloneDatasetModel(dataset_id="test_efs_comstock"),
+                    ],
+                ),
+            ),
+            result=QueryResultParamsModel(
+                output_format="parquet",
+            ),
+        )
+        return self._model
+
+    def validate(self, expected_values=None):
+        filename = self.output_dir / self.name / "table.parquet"
+        df = read_parquet(filename)
+        project = get_project(self.get_database_name(), self.get_project_id())
+        project.load_dataset("test_efs_comstock")
+        dataset = project.get_dataset("test_efs_comstock")
+        ld = dataset._handler._load_data
+        lk = dataset._handler._load_data_lookup
+        raw_ld = ld.join(lk, on="id").drop("id")
+        # This test dataset has some fractional mapping values included.
+        # subsector = hospital and model_year = 2020 are 1.0, fans are 1.0
+        expected = (
+            raw_ld.sort("timestamp").filter("subsector == 'com__Hospital'").limit(1).collect()[0]
+        )
+        subsector = expected.subsector.replace("com__", "")
+        actual = (
+            df.filter(
+                f"comstock_building_type == '{subsector}' and county == '{expected.geography}' and model_year == '2020'"
+            )
+            .sort("2012_hourly_est")
+            .limit(1)
+            .collect()[0]
+        )
+        assert actual.fans == expected.com_fans * 0.9
+        assert actual.cooling == expected.com_cooling * 1000
 
 
 def perform_op(df, column, operation):
@@ -1387,7 +1457,7 @@ def make_projection_df(aeo, ld_df, join_columns):
 
 
 def calc_expected_eia_861_ca_res_load_value():
-    project = get_project()
+    project = get_project("simple-standard-scenarios", "dsgrid_conus_2022")
     dataset_id = dataset_id = "eia_861_annual_energy_use_state_sector"
     project.load_dataset(dataset_id)
     mapping_id = None
@@ -1414,7 +1484,7 @@ def calc_expected_eia_861_ca_res_load_value():
 
 
 def read_dataset_tempo():
-    project = get_project()
+    project = get_project("simple-standard-scenarios", "dsgrid_conus_2022")
     dataset_id = dataset_id = "tempo_conus_2022"
     project.load_dataset(dataset_id)
     tempo = project.get_dataset(dataset_id)

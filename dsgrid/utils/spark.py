@@ -487,18 +487,18 @@ def write_dataframe_and_auto_partition(
     desired = math.ceil(total_size / partition_size_bytes)
     actual = df.rdd.getNumPartitions()
     if abs(actual - desired) / desired * 100 < rtol_pct:
-        logger.info("No change in number of partitions is needed for %s.", filename)
+        logger.debug("No change in number of partitions is needed for %s.", filename)
     elif actual > desired:
         df = df.coalesce(desired)
         df = overwrite_dataframe_file(filename, df)
-        logger.info("Coalesced %s to partition count %s", filename, desired)
+        logger.debug("Coalesced %s to partition count %s", filename, desired)
     else:
         if columns is None:
             df = df.repartition(desired)
         else:
             df = df.repartition(desired, *columns)
         df = overwrite_dataframe_file(filename, df)
-        logger.info("Repartitioned %s to partition count", filename, desired)
+        logger.debug("Repartitioned %s to partition count", filename, desired)
 
     logger.info("Wrote dataframe to %s", filename)
     return df

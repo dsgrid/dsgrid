@@ -63,7 +63,7 @@ class QueryContext:
 
     def set_pivoted_columns(self, columns, dataset_id=None):
         self._get_metadata(dataset_id).pivoted.columns = columns
-        logger.info("Set pivoted columns dataset_id=%s: %s", dataset_id, columns)
+        logger.debug("Set pivoted columns dataset_id=%s: %s", dataset_id, columns)
 
     def add_pivoted_columns(self, columns, dataset_id=None):
         self._get_metadata(dataset_id).pivoted.columns.update(columns)

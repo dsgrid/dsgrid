@@ -305,11 +305,10 @@ class DatasetConfigModel(DSGBaseModel):
         description="List of data tags",
         default=[],
     )
-    enable_metric_unit_conversion: bool = Field(
+    enable_unit_conversion: bool = Field(
         default=True,
-        description="If true, dsgrid will convert metric values to project units based on the "
-        "contents of the 'unit' column of the metric dimension records. If the dataset "
-        "defines a dimension mapping for unit conversion then this value should be false.",
+        description="If the dataset uses its dimension mapping for the metric dimension to also "
+        "perform unit conversion, then this value should be false.",
     )
     # This field must be listed before dimensions.
     use_project_geography_time_zone: bool = Field(

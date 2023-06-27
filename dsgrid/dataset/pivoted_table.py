@@ -4,6 +4,7 @@ from typing import List
 
 import pyspark.sql.functions as F
 
+import dsgrid.units.energy as energy
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.query.models import (
@@ -13,7 +14,6 @@ from dsgrid.query.models import (
     DimensionMetadataModel,
 )
 from dsgrid.query.query_context import QueryContext
-from dsgrid.units.energy import convert_units
 from dsgrid.utils.dataset import (
     map_and_reduce_pivoted_dimension,
     remove_invalid_null_timestamps,
@@ -174,7 +174,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
             )
             dim_type = dim_config.model.dimension_type
             if dim_type == DimensionType.METRIC:
-                df = convert_units(
+                df = energy.convert_units(
                     df,
                     new_pivoted_columns,
                     self._project_config.get_base_dimension(dim_type).get_records_dataframe(),

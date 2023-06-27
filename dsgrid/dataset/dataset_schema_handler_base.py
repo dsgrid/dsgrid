@@ -5,13 +5,13 @@ from typing import List
 
 import pyspark.sql.functions as F
 
+import dsgrid.units.energy as energy
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.query.query_context import QueryContext
-from dsgrid.units.energy import convert_units
 from dsgrid.utils.dataset import (
     is_noop_mapping,
     map_and_reduce_stacked_dimension,
@@ -245,7 +245,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             )
 
     def _convert_units(self, df, project_metric_records, pivoted_columns):
-        if not self._config.model.enable_metric_unit_conversion:
+        if not self._config.model.enable_unit_conversion:
             return df
 
         mapping_records = None
@@ -262,7 +262,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             return df
 
         dataset_records = self._config.get_dimension(DimensionType.METRIC).get_records_dataframe()
-        df = convert_units(
+        df = energy.convert_units(
             df, pivoted_columns, dataset_records, mapping_records, project_metric_records
         )
         return df

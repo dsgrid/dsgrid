@@ -224,6 +224,12 @@ class PivotedTableHandler(TableFormatHandlerBase):
             return df
 
         pivoted_dimension_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
+        # TODO: This does not handle the scenario where the metric dimension is stacked and
+        # needs unit conversion. Raise an exception until we have a dataset that can be used
+        # for testing.
+        if pivoted_dimension_type != DimensionType.METRIC:
+            raise NotImplementedError(f"{pivoted_dimension_type=} is not supported yet")
+
         pivoted_columns = set(context.get_pivoted_columns(dataset_id=self.dataset_id))
         final_metadata = DatasetDimensionsMetadataModel()
         dim_type_to_query_name = self.project_config.get_base_dimension_to_query_name_mapping()
@@ -240,8 +246,6 @@ class PivotedTableHandler(TableFormatHandlerBase):
             if not columns:
                 continue
 
-            # TODO: This does not handle the scenario where the metric dimension is stacked and
-            # needs unit conversion.
             df = self.add_columns(df, columns, context, True)
             group_by_cols = self._build_group_by_columns(
                 columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata

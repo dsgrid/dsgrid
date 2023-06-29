@@ -8,7 +8,7 @@ import os
 import shutil
 from contextlib import contextmanager
 from pathlib import Path
-from typing import AnyStr, List, Union
+from typing import AnyStr, Union
 
 import pandas as pd
 import pyspark
@@ -263,7 +263,7 @@ def _post_process_dataframe(df, table_name=None, require_unique=None):
                     raise DSGInvalidField(f"DataFrame has duplicate entries for {column}")
 
 
-def get_unique_values(df, columns: Union[AnyStr, List]):
+def get_unique_values(df, columns: Union[AnyStr, list]):
     """Return the unique values of a dataframe in one column or a list of columns.
 
     Parameters

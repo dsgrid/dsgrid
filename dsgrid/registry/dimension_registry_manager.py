@@ -2,7 +2,7 @@
 
 import getpass
 import logging
-from typing import Union, List, Dict, Set
+from typing import Union
 
 from prettytable import PrettyTable
 
@@ -234,14 +234,14 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimension_ids.extend(existing_ids)
         return dimension_ids
 
-    def make_dimension_references(self, dimension_ids: List[str]):
+    def make_dimension_references(self, dimension_ids: list[str]):
         """Return a list of dimension references from a list of registered dimension IDs.
         This assumes that the latest version of the dimensions will be used because they were
         just created.
 
         Parameters
         ----------
-        dimension_ids : List[str]
+        dimension_ids : list[str]
 
         """
         refs = []
@@ -258,10 +258,10 @@ class DimensionRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        filters: List[str] = None,
-        max_width: Union[int, Dict] = None,
-        drop_fields: List[str] = None,
-        dimension_ids: Set[str] = None,
+        filters: list[str] = None,
+        max_width: Union[int, dict] = None,
+        drop_fields: list[str] = None,
+        dimension_ids: set[str] = None,
         return_table: bool = False,
         **kwargs,
     ):

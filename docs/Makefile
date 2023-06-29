@@ -17,11 +17,8 @@ help:
 # Catch-all target: route all unknown targets to Sphinx using the new
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile
-	python ../dev/md_to_rst.py $(SOURCEDIR)/md_files.txt
 	rm -rf $(SOURCEDIR)/api
-	sphinx-apidoc -o $(SOURCEDIR)/api ../dsgrid
-	python make_config_model_rst.py -o $(BUILDDIR)/config_rsts
-	python make_example_configs.py
+	#sphinx-apidoc -o $(SOURCEDIR)/reference/api ../dsgrid
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 clean:

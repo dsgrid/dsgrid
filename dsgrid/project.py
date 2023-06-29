@@ -87,7 +87,7 @@ class Project:
         return dataset
 
     def load_dataset(self, dataset_id):
-        """Loads a dataset.  Creates a view for each of its tables.
+        """Loads a dataset.
 
         Parameters
         ----------
@@ -115,15 +115,14 @@ class Project:
         return dataset
 
     def unload_dataset(self, dataset_id):
-        """Unloads a dataset by deleting the views into its tables.
+        """Unloads a dataset.
 
         Parameters
         ----------
         dataset_id : str
 
         """
-        dataset = self.get_dataset(dataset_id)
-        dataset.delete_views()
+        self._datasets.pop(dataset_id, None)
 
     def _iter_datasets(self):
         for dataset in self.config.model.datasets:

@@ -46,13 +46,7 @@ logger = logging.getLogger(__name__)
 
 
 class RegistryManager:
-    """Manages registration of all projects and datasets.
-
-    Whichever module loads this class will sync the official registry to the local
-    system and run from there. This uses a FilesystemInterface object to allow
-    remote operations as well.
-
-    """
+    """Manages registration of all projects and datasets."""
 
     def __init__(self, params: RegistryManagerParams, db: RegistryDatabase):
         self._check_environment_variables(params)
@@ -126,19 +120,23 @@ class RegistryManager:
         return cls(params, db)
 
     @property
-    def dataset_manager(self):
+    def dataset_manager(self) -> DatasetRegistryManager:
+        """Return the dataset manager."""
         return self._dataset_mgr
 
     @property
-    def dimension_mapping_manager(self):
+    def dimension_mapping_manager(self) -> DimensionMappingRegistryManager:
+        """Return the dimension mapping manager."""
         return self._dimension_mapping_mgr
 
     @property
-    def dimension_manager(self):
+    def dimension_manager(self) -> DimensionRegistryManager:
+        """Return the dimension manager."""
         return self._dimension_mgr
 
     @property
-    def project_manager(self):
+    def project_manager(self) -> ProjectRegistryManager:
+        """Return the project manager."""
         return self._project_mgr
 
     @classmethod
@@ -172,6 +170,16 @@ class RegistryManager:
         -------
         RegistryManager
 
+        Examples
+        --------
+        >>> from dsgrid.registry.registry_manager import RegistryManager
+        >>> from dsgrid.registry.registry_database import DatabaseConnection
+        >>> manager = RegistryManager.load(
+            DatabaseConnection(
+                hostname="dsgrid-registry.hpc.nrel.gov",
+                database="standard-scenarios",
+            )
+        )
         """
         db = RegistryDatabase.connect(conn)
         data_path = db.get_data_path()

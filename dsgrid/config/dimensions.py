@@ -253,7 +253,7 @@ class DimensionModel(DimensionBaseModel):
         description="Hash of the contents of the file",
         dsg_internal=True,
     )
-    records: Optional[List] = Field(
+    records: List = Field(
         title="records",
         description="Dimension records in filename that get loaded at runtime",
         dsg_internal=True,

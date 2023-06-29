@@ -13,8 +13,6 @@
 # import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
-import sphinx_rtd_theme
-
 
 # -- Project information -----------------------------------------------------
 import dsgrid
@@ -39,12 +37,16 @@ extensions = [
     "sphinx.ext.doctest",
     "sphinx.ext.coverage",
     "sphinx.ext.viewcode",
+    "sphinx.ext.graphviz",
     "sphinx.ext.githubpages",
     "sphinx.ext.napoleon",
     "sphinx.ext.autosectionlabel",
     "sphinxarg.ext",
     "sphinx.ext.todo",
     "sphinxcontrib.programoutput",
+    "sphinx_copybutton",
+    "sphinx_click",
+    "sphinxcontrib.autodoc_pydantic",
 ]
 
 # Add any paths that contain templates here, relative to this directory.
@@ -61,8 +63,7 @@ exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
 #
-html_theme = "sphinx_rtd_theme"
-html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
+html_theme = "furo"
 
 # The name of the Pygments (syntax highlighting) style to use.
 # pygments_style = "sphinx"
@@ -72,9 +73,7 @@ html_theme_path = [sphinx_rtd_theme.get_html_theme_path()]
 # documentation.
 #
 html_theme_options = {
-    "collapse_navigation": False,
-    "sticky_navigation": True,
-    "titles_only": False,
+    "navigation_with_keys": True,
 }
 
 # Add any paths that contain custom static files (such as style sheets) here,
@@ -102,3 +101,14 @@ html_css_files = ["style.css"]
 
 autosectionlabel_prefix_document = True
 autosectionlabel_maxdepth = 100
+copybutton_only_copy_prompt_lines = True
+copybutton_exclude = ".linenos, .gp, .go"
+copybutton_line_continuation_character = "\\"
+copybutton_here_doc_delimiter = "EOT"
+copybutton_prompt_text = "$"
+copybutton_copy_empty_lines = False
+autodoc_pydantic_model_show_json = False
+autodoc_pydantic_model_show_config_member = False
+autodoc_pydantic_model_show_config_summary = False
+autodoc_pydantic_model_erdantic_figure = True
+autodoc_pydantic_model_erdantic_figure_collapsed = False

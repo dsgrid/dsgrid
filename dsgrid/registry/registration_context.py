@@ -1,5 +1,4 @@
 import logging
-from typing import List
 
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -56,14 +55,14 @@ class RegistrationContext:
         self.add_ids(registry_type, [config_id], manager)
 
     def add_ids(
-        self, registry_type: RegistryType, config_ids: List[str], manager: RegistryManagerBase
+        self, registry_type: RegistryType, config_ids: list[str], manager: RegistryManagerBase
     ):
         """Add multiple config IDs that have been registered.
 
         Parameters
         ----------
         registry_type : RegistryType
-        config_ids : List[str]
+        config_ids : list[str]
         manager : RegistryManagerBase
 
         Raises
@@ -97,7 +96,7 @@ class RegistrationContext:
 
         Returns
         -------
-        List[str]
+        list[str]
 
         """
         manager_context = self._managers[registry_type]

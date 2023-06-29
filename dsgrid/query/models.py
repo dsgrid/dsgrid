@@ -1,6 +1,6 @@
 import abc
 import enum
-from typing import Any, List, Optional, Set, Union
+from typing import Any, Optional, Union
 
 import pyspark.sql.functions as F
 from pydantic import Field, root_validator, validator
@@ -13,9 +13,10 @@ from dsgrid.utils.files import compute_hash
 
 
 class FilteredDatasetModel(DSGBaseModel):
+    """Filters to apply to a dataset"""
 
     dataset_id: str = Field(description="Dataset ID")
-    filters: List[Any] = Field(
+    filters: list[Any] = Field(
         description="Dimension filters to apply to the dataset'",
     )
 
@@ -68,6 +69,8 @@ class ColumnModel(DSGBaseModel):
 
 
 class ColumnType(DSGEnum):
+    """Defines what the columns of a dataset table represent."""
+
     DIMENSION_TYPES = "dimension_types"
     DIMENSION_QUERY_NAMES = "dimension_query_names"
 
@@ -77,14 +80,14 @@ class DimensionQueryNamesModel(DSGBaseModel):
     If a value is empty, that dimension will be aggregated and dropped from the table.
     """
 
-    geography: List[Union[str, ColumnModel]]
-    metric: List[Union[str, ColumnModel]]
-    model_year: List[Union[str, ColumnModel]]
-    scenario: List[Union[str, ColumnModel]]
-    sector: List[Union[str, ColumnModel]]
-    subsector: List[Union[str, ColumnModel]]
-    time: List[Union[str, ColumnModel]]
-    weather_year: List[Union[str, ColumnModel]]
+    geography: list[Union[str, ColumnModel]]
+    metric: list[Union[str, ColumnModel]]
+    model_year: list[Union[str, ColumnModel]]
+    scenario: list[Union[str, ColumnModel]]
+    sector: list[Union[str, ColumnModel]]
+    subsector: list[Union[str, ColumnModel]]
+    time: list[Union[str, ColumnModel]]
+    weather_year: list[Union[str, ColumnModel]]
 
     @root_validator
     def fix_columns(cls, values):
@@ -214,7 +217,7 @@ class DatasetDimensionsMetadataModel(DSGBaseModel):
 
 class PivotedDatasetMetadataModel(DSGBaseModel):
 
-    columns: Set[str] = set()
+    columns: set[str] = set()
     dimension_type: Optional[DimensionType]
 
 
@@ -234,6 +237,7 @@ class CacheableQueryBaseModel(DSGBaseModel):
 
 
 class SparkConfByDataset(DSGBaseModel):
+    """Defines a custom Spark configuration to use while running a query on a dataset."""
 
     dataset_id: str
     conf: dict[str, Any]
@@ -242,7 +246,7 @@ class SparkConfByDataset(DSGBaseModel):
 class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
     """Parameters in a project query that only apply to datasets"""
 
-    dimension_filters: List[Any] = Field(
+    dimension_filters: list[Any] = Field(
         # Use Any here because we don't want Pydantic to try to discern the types.
         description="Filters to apply to all datasets",
         default=[],
@@ -295,6 +299,7 @@ class DatasetModel(DSGBaseModel):
 
 
 class DatasetType(enum.Enum):
+    """Defines the type of a dataset in a query."""
 
     EXPONENTIAL_GROWTH = "exponential_growth"
     STANDALONE = "standalone"
@@ -313,6 +318,7 @@ class DatasetBaseModel(DSGBaseModel, abc.ABC):
 
 
 class StandaloneDatasetModel(DatasetBaseModel):
+    """A dataset with energy use data."""
 
     dataset_id: str = Field(description="Dataset identifier")
     dataset_type: DatasetType = Field(
@@ -331,6 +337,7 @@ class StandaloneDatasetModel(DatasetBaseModel):
 
 
 class ExponentialGrowthDatasetModel(DatasetBaseModel):
+    """A dataset with growth rates that can be applied to a standalone dataset."""
 
     dataset_id: str = Field(description="Identifier for the resulting dataset")
     initial_value_dataset_id: str = Field(description="Principal dataset identifier")
@@ -368,7 +375,7 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
 
     project_id: str = Field(description="Project ID for query")
     dataset: DatasetModel = Field(description="Definition of the dataset to create.")
-    excluded_dataset_ids: List[str] = Field(
+    excluded_dataset_ids: list[str] = Field(
         description="Datasets to exclude from query", default=[]
     )
     # TODO #203: default needs to change
@@ -433,7 +440,7 @@ class QueryBaseModel(CacheableQueryBaseModel, abc.ABC):
 class QueryResultParamsModel(CacheableQueryBaseModel):
     """Controls post-processing and storage of CompositeDatasets"""
 
-    supplemental_columns: List[Union[str, ColumnModel]] = Field(
+    supplemental_columns: list[Union[str, ColumnModel]] = Field(
         description="Add these supplemental dimension query names as columns in result tables. "
         "Applies to all dimensions_to_aggregate.",
         default=[],
@@ -442,11 +449,11 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         description="Replace dimension record IDs with their names in result tables.",
         default=False,
     )
-    aggregations: List[AggregationModel] = Field(
+    aggregations: list[AggregationModel] = Field(
         description="Defines how to aggregate dimensions",
         default=[],
     )
-    reports: List[ReportInputModel] = Field(
+    reports: list[ReportInputModel] = Field(
         description="Run these pre-defined reports on the result.", default=[]
     )
     column_type: ColumnType = Field(
@@ -456,11 +463,11 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         default=ColumnType.DIMENSION_QUERY_NAMES,
     )
     output_format: str = Field(description="Output file format: csv or parquet", default="parquet")
-    sort_columns: List[str] = Field(
+    sort_columns: list[str] = Field(
         description="Sort the results by these dimension query names.",
         default=[],
     )
-    dimension_filters: List[Any] = Field(
+    dimension_filters: list[Any] = Field(
         # Use Any here because we don't want Pydantic to try to discern the types.
         description="Filters to apply to the result. Must contain columns in the result.",
         default=[],

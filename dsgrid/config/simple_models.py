@@ -1,6 +1,6 @@
 """Defines simplified data models for testing and filtering."""
 
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import root_validator, validator, Field
 
@@ -12,13 +12,13 @@ class DimensionSimpleModel(DSGBaseModel):
 
     dimension_type: DimensionType
     dimension_query_name: Optional[str]
-    record_ids: List[str]
+    record_ids: list[str]
 
 
 class DimensionsSimpleModel(DSGBaseModel):
 
-    base_dimensions: List[DimensionSimpleModel]
-    supplemental_dimensions: List[DimensionSimpleModel] = Field(default=[])
+    base_dimensions: list[DimensionSimpleModel]
+    supplemental_dimensions: list[DimensionSimpleModel] = Field(default=[])
 
     @validator("base_dimensions")
     def check_base_dimensions(cls, base_dimensions):
@@ -44,7 +44,7 @@ class DimensionsSimpleModel(DSGBaseModel):
 class DatasetSimpleModel(DSGBaseModel):
 
     dataset_id: str
-    dimensions: List[DimensionSimpleModel]
+    dimensions: list[DimensionSimpleModel]
 
 
 class ProjectSimpleModel(DSGBaseModel):
@@ -56,5 +56,5 @@ class ProjectSimpleModel(DSGBaseModel):
 class RegistrySimpleModel(DSGBaseModel):
 
     name: str
-    projects: List[ProjectSimpleModel]
-    datasets: List[DatasetSimpleModel]
+    projects: list[ProjectSimpleModel]
+    datasets: list[DatasetSimpleModel]

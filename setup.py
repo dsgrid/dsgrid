@@ -25,11 +25,12 @@ test_requires = [
 ]
 
 doc_requires = [
+    "furo",
     "ghp-import",
     "numpydoc",
-    "pandoc",
     "sphinx",
-    "sphinx_rtd_theme",
+    "sphinx-click",
+    "sphinx-copybutton",
     "sphinx_argparse",
     "sphinxcontrib.programoutput",
 ]

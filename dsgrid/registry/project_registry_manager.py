@@ -7,7 +7,7 @@ import os
 import shutil
 import tempfile
 from pathlib import Path
-from typing import Union, List, Dict
+from typing import Union
 
 import json5
 from prettytable import PrettyTable
@@ -339,7 +339,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     def _register_dimensions_from_models(
         self,
-        dimensions: List,
+        dimensions: list,
         dimension_references,
         context,
         submitter,
@@ -661,7 +661,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self,
         project_config: ProjectConfig,
         dataset_config: DatasetConfig,
-        mapping_references: List[DimensionMappingReferenceModel],
+        mapping_references: list[DimensionMappingReferenceModel],
         autogen_reverse_supplemental_mappings: set[str],
         submitter,
         log_message,
@@ -792,7 +792,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         dataset_config: DatasetConfig,
         submitter: str,
         log_message: str,
-        mapping_references: List[DimensionMappingReferenceModel],
+        mapping_references: list[DimensionMappingReferenceModel],
     ):
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
         if os.environ.get("__DSGRID_SKIP_CHECK_DATASET_TO_PROJECT_MAPPING__") is not None:
@@ -854,7 +854,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self,
         project_config: ProjectConfig,
         dataset_config: DatasetConfig,
-        mapping_references: List[DimensionMappingReferenceModel],
+        mapping_references: list[DimensionMappingReferenceModel],
     ):
         """Check that a dataset has all project-required dimension records."""
         logger.info("Check dataset-base-to-project-base dimension mappings.")
@@ -978,9 +978,9 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        filters: List[str] = None,
-        max_width: Union[int, Dict] = None,
-        drop_fields: List[str] = None,
+        filters: list[str] = None,
+        max_width: Union[int, dict] = None,
+        drop_fields: list[str] = None,
         return_table: bool = False,
         **kwargs,
     ):

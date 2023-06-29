@@ -1,6 +1,5 @@
 import copy
 import logging
-from typing import List
 
 import pyspark.sql.functions as F
 
@@ -100,7 +99,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
         return df
 
     def process_aggregations(
-        self, df, aggregations: List[AggregationModel], context: QueryContext
+        self, df, aggregations: list[AggregationModel], context: QueryContext
     ):
         df = self.process_pivoted_aggregations(df, aggregations, context)
         orig_id = id(df)
@@ -119,7 +118,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
         return df
 
     def process_pivoted_aggregations(
-        self, df, aggregations: List[AggregationModel], context: QueryContext
+        self, df, aggregations: list[AggregationModel], context: QueryContext
     ):
         """Aggregate the pivoted dimensional data as specified by aggregations.
 
@@ -205,7 +204,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
         return df
 
     def process_stacked_aggregations(
-        self, df, aggregations: List[AggregationModel], context: QueryContext
+        self, df, aggregations: list[AggregationModel], context: QueryContext
     ):
         """Aggregate the stacked dimensional data as specified by aggregations.
 

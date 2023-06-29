@@ -5,7 +5,6 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from typing import List
 
 from semver import VersionInfo
 
@@ -289,12 +288,12 @@ class RegistryManagerBase(abc.ABC):
         )
 
     @abc.abstractmethod
-    def finalize_registration(self, config_ids: List[str], error_occurred: bool):
+    def finalize_registration(self, config_ids: list[str], error_occurred: bool):
         """Peform final actions after a registration process.
 
         Parameters
         ----------
-        config_ids : List[str]
+        config_ids : list[str]
             Config IDs that were registered
         error_occurred : bool
             Set to True if an error occurred and all intermediately-registered IDs should be
@@ -323,12 +322,12 @@ class RegistryManagerBase(abc.ABC):
         return self.db.get_latest_version(config_id)
 
     # @abc.abstractmethod
-    # def acquire_registry_locks(self, config_ids: List[str]):
+    # def acquire_registry_locks(self, config_ids: list[str]):
     #    """Acquire lock(s) on the registry for all config_ids.
 
     #    Parameters
     #    ----------
-    #    config_ids : List[str]
+    #    config_ids : list[str]
 
     #    Raises
     #    ------

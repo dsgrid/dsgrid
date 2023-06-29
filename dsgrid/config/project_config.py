@@ -412,7 +412,9 @@ class ProjectConfigModel(DSGBaseModel):
         return project_id
 
 
-class _DimensionQueryNamesModel(DSGBaseModel):
+class DimensionsByCategoryModel(DSGBaseModel):
+    """Defines the query names by base and supplemental category."""
+
     base: str
     supplemental: List[str]
 
@@ -420,14 +422,14 @@ class _DimensionQueryNamesModel(DSGBaseModel):
 class ProjectDimensionQueryNamesModel(DSGBaseModel):
     """Defines the query names for all base and supplemental dimensions in the project."""
 
-    geography: _DimensionQueryNamesModel
-    metric: _DimensionQueryNamesModel
-    model_year: _DimensionQueryNamesModel
-    scenario: _DimensionQueryNamesModel
-    sector: _DimensionQueryNamesModel
-    subsector: _DimensionQueryNamesModel
-    time: _DimensionQueryNamesModel
-    weather_year: _DimensionQueryNamesModel
+    geography: DimensionsByCategoryModel
+    metric: DimensionsByCategoryModel
+    model_year: DimensionsByCategoryModel
+    scenario: DimensionsByCategoryModel
+    sector: DimensionsByCategoryModel
+    subsector: DimensionsByCategoryModel
+    time: DimensionsByCategoryModel
+    weather_year: DimensionsByCategoryModel
 
 
 class ProjectConfig(ConfigBase):
@@ -826,7 +828,7 @@ class ProjectConfig(ConfigBase):
         return [x.dataset_id for x in self._iter_datasets_by_status(status)]
 
     def list_unregistered_dataset_ids(self):
-        """Get unregistered datasets associated with project registry.
+        """List unregistered datasets associated with project registry.
 
         Returns
         -------

@@ -18,7 +18,6 @@ help:
 # "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
 %: Makefile
 	rm -rf $(SOURCEDIR)/api
-	#sphinx-apidoc -o $(SOURCEDIR)/reference/api ../dsgrid
 	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
 
 clean:

@@ -1,6 +1,6 @@
 # dsgrid Developer README
 
-[Dependencies](#developer-dependencies) | [Tests](#tests) | [Spark](#spark) | [EFS Project Repository](#testingexploring-with-the-efs-project-repository) | [Interactive Exploration](#interactive-exploration) | [Publish Documentation](#publish-documentation)
+[Dependencies](#developer-dependencies) | [Tests](#tests) | [Spark](#spark) | [EFS Project Repository](#testingexploring-with-the-efs-project-repository) | [Interactive Exploration](#interactive-exploration) 
 
 ## Developer Dependencies
 
@@ -617,83 +617,6 @@ dsgrid provides a Dash application that allows you to browse the registry. Once 
 the API server as described above, run
 ```
 $ python dsgrid/apps/project_viewer/app.py
-```
-
-## Publish Documentation
-
-The documentation is built with [Sphinx](http://sphinx-doc.org/index.html). There are several steps to creating and publishing the documentation:
-
-1. Convert .md input files to .rst
-2. Refresh API documentation
-3. Build the HTML docs
-4. Push to GitHub
-
-### Sphinx Style Guide
-
-1. Follow the heading hierarchy convention defined by
-[Sphinx](https://www.sphinx-doc.org/en/master/usage/restructuredtext/basics.html#sections).
-
-2. Line length limit: 99 characters
-
-3. Indentation: 4 spaces unless the text follows a bullet or continues a Sphinx directive.
-
-```
-# 4 spaces
-::
-
-    some raw text
-
-# 4 spaces
-.. code-block:: python
-
-    import dsgrid
-
-# 3 spaces
-.. note:: some note
-   continued
-
-# 2 spaces
-- a bullet description
-  continued
-
-```
-
-### Markdown to reStructuredText
-
-Markdown files are registered in `doc/md_files.txt`. Paths in that file should be relative to the docs folder and should exclude the file extension. For every file listed there, the `dev/md_to_rst.py` utility will expect to find a markdown (`.md`) file, and will look for an optional `.postfix` file, which is expected to contain `.rst` code to be appended to the `.rst` file created by converting the input `.md` file. Thus, running `dev/md_to_rst.py` on the `doc/md_files.txt` file will create revised `.rst` files, one for each entry listed in the registry. In summary:
-
-```
-cd doc
-python ../dev/md_to_rst.py md_files.txt
-```
-
-### Refresh API Documentation
-
-- Make sure dsgrid is installed or is in your PYTHONPATH
-- Delete the contents of `source/api`.
-- Run `sphinx-apidoc -o source/api ../dsgrid` from the `docs` folder.
-- 'git push' changes to the documentation source code as needed.
-- Make the documentation per below
-
-### Building HTML Docs
-
-From the `docs/` folder, run `make html` for Mac and Linux; `make.bat html` for Windows.
-
-### Pushing to GitHub Pages
-
-**TODO:** Structure our GitHub Pages to preserve documentation for different
-versions. Dheepak probably has suggestions.
-
-#### Mac/Linux
-
-```
-make github
-```
-
-#### Windows
-
-```
-make.bat html
 ```
 
 ## Release on pypi

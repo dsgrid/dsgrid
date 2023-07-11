@@ -86,7 +86,7 @@ setup(
         # Remove this restriction when pyspark is fixed.
         "pandas~=1.5",
         "prettytable",
-        "pydantic",
+        "pydantic~=1.10.11",
         "pyspark==3.3.1",  # Keep this synced with the spark version in Dockerfile.
         "python-arango",
         "requests",

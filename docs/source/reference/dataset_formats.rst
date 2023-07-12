@@ -10,7 +10,7 @@ you need a new format, please contact the dsgrid team to discuss it.
 Requirements
 =============
 1. Metric data must be stored in Parquet files. If you need or want another optimized columnar file
-   format, please contact the dsgrid team.
+   format, please contact the dsgrid team. TODO: Describe our (limited) support for CSV?
 2. If the data tables contain time-series data, each unique time array must contain an identical
    range of timestamps.
 3. Tables must be pivoted with the records of one dimension. This is usually much more efficient
@@ -63,6 +63,8 @@ Formats
 =======
 Input datasets can use the formats below. dsgrid uses the one table format for derived datasets.
 
+.. _one-table-format:
+
 One Table Format
 ----------------
 All metric data and dimension records are stored in one Parquet file.
@@ -94,6 +96,7 @@ All metric data and dimension records are stored in one Parquet file.
     |2011-12-31 22:00:00|    01001|         reference|   retail_standalone|
     +-------------------+---------+------------------+--------------------+
 
+.. _two-table-format:
 
 Two Table Format (Standard)
 ----------------------------

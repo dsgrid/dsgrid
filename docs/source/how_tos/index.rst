@@ -1,6 +1,8 @@
-************
-How-To Guide
-************
+.. _how-to-guides:
+
+*************
+How-To Guides
+*************
 This guide lists the steps to perform common dsgrid operations.
 
 .. toctree::

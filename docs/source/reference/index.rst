@@ -6,8 +6,7 @@ Reference
 This section includes reference materials for running dsgrid operations through CLI tools or APIs
 
 .. toctree::
-   :maxdepth: 4
-   :hidden:
+   :maxdepth: 1
 
    cli_fundamentals
    cli

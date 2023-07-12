@@ -25,7 +25,7 @@ test_requires = [
 ]
 
 doc_requires = [
-    "erdantic", # preferable to install with conda, i.e. `conda install erdantic -c conda-forge`
+    "erdantic",  # preferable to install with conda, i.e. `conda install erdantic -c conda-forge`
     "furo",
     "ghp-import",
     "numpydoc",

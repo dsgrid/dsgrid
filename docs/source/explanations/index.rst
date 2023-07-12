@@ -1,6 +1,8 @@
-***********
-Explanation
-***********
+.. _explanations:
+
+************
+Explanations
+************
 This section explains dsgrid concepts and defines data models.
 
 

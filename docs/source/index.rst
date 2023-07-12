@@ -2,26 +2,128 @@
 dsgrid documentation
 ####################
 
-dsgrid is a Python API for contributing to and accessing demand-side
-grid model (dsgrid) datasets.
-
-⚠️ **dsgrid is under active development and does not yet have a formal
-package release.** ⚠️
-
-Details listed here are subject to change. Please reach out to the
-dsgrid coordination team with any questions or other feedback.
-
 What is dsgrid?
 ===============
-dsgrid is a software package and modeling effort for gathering individual datasets
-that describe different aspects of energy demand
-at different levels of resolution and then assembling them into coherent, highly
-resolved descriptions of demand suitable for energy system modeling. See
-`https://www.nrel.gov/analysis/dsgrid.html <https://www.nrel.gov/analysis/dsgrid.html>`_
-for more descriptive information, including past projects.
+
+The dsgrid Python package is the central tool for creating, managing, contributing to, and 
+accessing demand-side grid (dsgrid) toolkit projects. The dsgrid toolkit enables the compilation 
+of high-resolution load datasets suitable for forward-looking power system and other analyses. 
+For more information and completed work products, please see 
+`https://www.nrel.gov/analysis/dsgrid.html <https://www.nrel.gov/analysis/dsgrid.html>`_.
+
+Documentation Overview
+======================
+
+If you are new to dsgrid, you'll likely want to start by reading the rest of this page, reading 
+the how-to guide on installation, and then choosing a tutorial that corresponds to how you expect 
+to be using dsgrid in the near future. 
+
+For general use, the documentation is organized into:
+
+- :ref:`tutorials`, which provide step-by-step instructions (via examples) for common high-level 
+  tasks;
+- :ref:`how-to-guides`, which provide quick reminder recipes for key workflows;
+- :ref:`explanations`, which describe concepts and answer "why" questions to facilitate deeper 
+  understanding; and
+- :ref:`reference`, which provides complete information on various interfaces (e.g., command line, 
+  data formats, data models, public Python API).
+
+Please note that for now:
+
+⚠️ **dsgrid is under active development and does not yet have a formal package release.** ⚠️
+
+and **details listed here are subject to change**. Please reach out to the dsgrid coordination 
+team with any questions or other feedback.
+
+dsgrid Overview
+===============
+
+dsgrid is a tool for collecting and aligning datasets containing timeseries information describing 
+future energy use, especially electricity load, to be used in planning studies. `Datasets`_ are 
+defined over specific scenario, model year, weather year, geography, time, sector, subsector, and 
+metric `Dimensions`_ and can range in size from less than 1 megabyte to over 1 terabyte. Typically, 
+datasets are organized into `Projects`_ with specific base dimensions with the help of 
+`Dimension Mappings`_. Projects use `Queries`_ to consolidate information into 
+`Derived Datasets`_ that, together with the standalone datasets, eventually enable a comprehensive 
+description of the electricity load or other energy use being modeled. Projects can also be 
+queried to produce output data for ingestion into another model or for direct analysis.
+
+The people who interact with dsgrid are typically:
+
+- `Project Coordinators`_, who construct, analyze and publish projects;
+- `Dataset Contributors`_, who register datasets with dsgrid and and submit them to projects; or
+- `Data Users`_, who access already-queried data or write and run their own custom queries.
+
+Because the dsgrid data can be quite large (on the order of terabytes), and are compiled from a 
+variety of data sources, dsgrid uses two key technologies to facilitate its workflows:
+
+- A graph database (currently ArangoDB) to hold dsgrid registries (metadata on and relationships 
+  between dsgrid components, e.g., dimensions, datasets, dimension mappings, projects, derived 
+  datasets, queries)
+- A big-data engine (currently Apache Spark) to perform database operations across a cluster of 
+  computational nodes
+
+Both of these technologies mean that some care must be taken when choosing and setting up a 
+computational environment for a particular task. The dsgrid coordination team currently supports 
+two computational environments:
+
+- `Standalone`_, single-node environments e.g., personal laptops or a single server or virtual 
+  machine, which is suitable for:
+    
+    - Small-scale development and testing
+    - Submitting a single dataset to a project in offline mode
+    - Very small dsgrid projects (no large datasets and little to no downscaling)
+
+  Note that use on standalone Windows machines is especially limited.
+- `NREL High Performance Computing`_, where users can:
+
+    - Directly work on projects through the shared registry
+    - Develop code and test data and workflows using their own registry
+
+   In either case, users will need to launch Apache Spark clusters with sufficient computational, 
+   memory, and disk resources.
+
+Components
+----------
+
+Dimensions
+^^^^^^^^^^
+dsgrid datasets and projects are multi-dimensional, and some dimensions are defined over thousands 
+of elements (e.g., counties in the United States, hours in a year). It is also typical for 
+different datasets that nominally describe the same thing to use different labels (e.g., 
+`ResStock building types 
+<https://github.com/NREL/resstock/blob/euss.2022.1/project_national/housing_characteristics/Geometry%20Building%20Type%20RECS.tsv>`_ 
+and `EIA Residential Energy Consumption Survey (RECS) building types 
+<https://www.eia.gov/consumption/residential/data/2020/hc/pdf/HC%201.1.pdf>`_). 
+
+To manage this complexity while allowing different analysts and modeling teams to use their own 
+labels (to facilitate transparency, easy maintenance and debugging), dsgrid requires its users to 
+explicitly define each data dimension by specifying its :ref:`dimension type <dimension-types>`, 
+metadata, and a table listing each dimension record's id and name. dsgrid uses this information 
+to ensure that submitted data is as-expected.
+
+.. _dataset_overview:
+
+Datasets
+^^^^^^^^
+A dsgrid dataset describes energy use or another metric (e.g., population, stock of certain 
+assets, delivered energy service, growth rates) resolved over a number of different dimensions, 
+e.g., scenario, geography, time, etc. When registering a dataset, the data submitter must define 
+a dimension for each dsgrid :ref:`dimension type <dimension-types>`, but that does not mean that 
+datasets are required to be resolved (i.e., have multiple entries) for each dimension type--any
+dimension can be "trivial", in which case it is defined by a single record (e.g., 'unspecified' 
+subsector, or a single '2012' weather year) and is not included in the data files.
+
+Registering a dataset requires a dataset config file, which lists dataset and dimension metadata, 
+the actual data file(s), and dimension record files (csvs) for any dimensions not already in the 
+dsgrid registry. The data files must conform to one of the dsgrid :ref:`dataset-formats`, 
+currently either the :ref:`one-table-format` or the :ref:`two-table-format`. Upon registration, 
+dsgrid checks the data files, which contain dimension records and numerical values, for 
+consistency with the specified dimensions. Inconsistent data fails registration to prevent 
+compounding downstream errors.
 
 Projects
-========
+^^^^^^^^
 A dsgrid project is a collection of datasets and queries of those datasets
 that describe energy demand for a specific region over a specific timeframe.
 dsgrid projects are assembled at specific points in time by specific modeling
@@ -34,40 +136,10 @@ flexible/schedulable end-uses.
 
 Simply put, the dsgrid project defines the requirements of expected datasets.
 
-Registration
-------------
-TODO: describe the project coordinator workflow
-
-TODO: describe the dataset registration workflow
-
-.. _dataset_overview:
-
-Datasets
-========
-A dsgrid dataset describes energy use or related quantities (e.g., population,
-stock of certain assets, delivered energy service, growth rates) broken down
-over a number of different dimensions, (e.g., scenario, geography, time, etc.).
-See :ref:`dimension-types` for a full list of required dataset dimensions.
-
-A dataset can have different dimensions than the project. If they are different from the project's
-base dimensions then a :ref:`dimension_mapping_overview` is required.
-
-Once a dataset is submitted to a project dsgrid can run a mapping operation to transform
-the dataset into the project's dimensions. Multiple datasets can thus be concatentated together to
-form derived datasets.
-
-Dimensions
-==========
-dsgrid data (and projects) are multi-dimensional. Because of their multi-dimensionality, it is
-important to clearly specify what dimensions data and projects are defined over, make sure data
-for all expected dimension elements are present, and define how dimensions of the same type, but
-with different elements, map to each other.
-
-
 .. _dimension_mapping_overview:
 
 Dimension Mappings
-==================
+^^^^^^^^^^^^^^^^^^
 While many data sources provide information by, e.g., scenario, geographic place,
 sector, and/or subsector, different data sources often define such dimensions
 differently and/or simply report out at a different level of resolution. Because
@@ -97,34 +169,73 @@ dsgrid supports two different types of mappings:
    supplemental dimensions used for queries. These get defined when registering a project.
 
 Queries
-=======
+^^^^^^^
 TODO
 
-Current development status
-==========================
+Derived Datasets
+^^^^^^^^^^^^^^^^
+TODO
 
--  Registering (standalone) datasets - *Functional,*
--  Submitting datasets to projects - *Functional*
--  Basic queries - *Functional*
--  dsgrid project-specific key derived and cached datasets -
-   *In progress*
--  dsgrid publishing process - *Forthcoming*
+Published Projects
+^^^^^^^^^^^^^^^^^^
+TODO
 
+Tasks
+-----
+TODO
 
-.. toctree::
-   :maxdepth: 4
-   :caption: Contents:
+Project Coordinators
+^^^^^^^^^^^^^^^^^^^^
+TODO
 
-   how_tos/index
-   tutorials/index
-   explanation/index
-   reference/index
-   spark_overview
+Dataset Contributors
+^^^^^^^^^^^^^^^^^^^^
+TODO
 
+Data Users
+^^^^^^^^^^
+TODO
 
-Indices and tables
-==================
+Computational Environment
+-------------------------
+
+dsgrid is cross-platform software that can be used with any datasets that conform to the metadata 
+and data formatting requirements. However, the typical dsgrid project involves large, simulated 
+datasets that are "exploded" to align across multiple dimension types and to produce the variety 
+of different views needed by different data users and analysts. Thus while some development, 
+testing, and work with single datasets or very small projects can be performed on `Standalone`_ 
+machines, currently a lot of dsgrid work requires `NREL High Performance Computing`_.
+
+Standalone
+^^^^^^^^^^
+
+TODO: List the key set-up tasks (spin up and connect to ArangoDB, spin up and connect to 
+Apache Spark cluster, and generally configure dsgrid to be pointing to all the right places) 
+and link to the appropriate how-tos
+
+NREL High Performance Computing
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+TODO: List the key set-up tasks (spin up and connect to ArangoDB, spin up and connect to 
+Apache Spark cluster, and generally configure dsgrid to be pointing to all the right places) 
+and link to the appropriate how-tos
+
+Indices, Tables, and Contents
+=============================
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
+
+.. TODO: Search page seems to be where search results land, but if you just click on it 
+   it's blank. Can the default page have a search bar on it or some sort of instruction?
+
+.. toctree::
+   :maxdepth: 2
+   :caption: Contents:
+
+   tutorials/index
+   how_tos/index
+   explanations/index
+   reference/index
+   spark_overview

@@ -88,6 +88,8 @@ def register_and_submit_dataset(setup_registry):
             getpass.getuser(),
             "register bad dataset",
         )
+        project = manager.project_manager.load_project(PROJECT_ID)
+        assert not project.is_registered(dataset_id)
         with pytest.raises(expected_errors["exception"], match=expected_errors["match_msg"]):
             manager.project_manager.submit_dataset(
                 PROJECT_ID,
@@ -97,6 +99,7 @@ def register_and_submit_dataset(setup_registry):
                 dimension_mapping_file=dataset_config_path / "dimension_mappings.json5",
             )
             expected_errors.clear()
+        assert project.is_registered(dataset_id) == (expected_errors["exception"] is None)
     finally:
         shutil.rmtree(test_dir)
         missing_record_file = Path(

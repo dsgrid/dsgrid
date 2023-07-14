@@ -170,9 +170,14 @@ def _get_metric_unit(records: DataFrame, dimension_id: str, unit_col: str) -> st
     return vals[0][unit_col]
 
 
-def _map_metric_units(metric_records: DataFrame, mapping_records: DataFrame) -> dict[str, str]:
-    mappings = mapping_records.filter("to_id IS NOT NULL").select("from_id", "to_id")
-    df = metric_records.join(mappings, on=metric_records.id == mappings.from_id).select(
-        F.col("to_id").alias("id"), "unit"
-    )
+def _map_metric_units(
+    metric_records: DataFrame, mapping_records: DataFrame | None
+) -> dict[str, str]:
+    if mapping_records is None:
+        df = metric_records
+    else:
+        mappings = mapping_records.filter("to_id IS NOT NULL").select("from_id", "to_id")
+        df = metric_records.join(mappings, on=metric_records.id == mappings.from_id).select(
+            F.col("to_id").alias("id"), "unit"
+        )
     return {x["id"]: x["unit"] for x in df.collect()}

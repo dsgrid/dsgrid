@@ -248,6 +248,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if not self._config.model.enable_unit_conversion:
             return df
 
+        # Note that a dataset could have the same dimension record IDs as the project,
+        # no mappings, but then still have different units.
         mapping_records = None
         for ref in self._mapping_references:
             dim_type = ref.from_dimension_type
@@ -256,10 +258,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     ref.mapping_id, version=ref.version
                 ).get_records_dataframe()
                 break
-
-        if mapping_records is None:
-            # The dataset has the same metric dimension as the project.
-            return df
 
         dataset_records = self._config.get_dimension(DimensionType.METRIC).get_records_dataframe()
         df = energy.convert_units(

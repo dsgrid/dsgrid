@@ -15,7 +15,7 @@ TWH = "TWh"
 THERM = "therm"
 MBTU = "MBtu"
 
-# TODO: Verify that this is the right definition of Therm to support and/or 
+# TODO: Verify that this is the right definition of Therm to support and/or
 # support multiple Therm definitions.
 
 # Conversion factors for US Therms

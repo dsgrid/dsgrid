@@ -1,3 +1,6 @@
+
+.. _tutorial_create_a_derived_dataset:
+
 ************************
 Create a derived dataset
 ************************

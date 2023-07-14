@@ -1,11 +1,12 @@
 .. _spark-overview:
 
-*********************
-Apache Spark Overview
-*********************
+************
+Apache Spark
+************
 
 This page describes Spark concepts that are important to understand when using dsgrid.
 
+.. todo:: Split this content up into tutorials, how-tos, explanations, and reference material
 
 Windows Users
 =============

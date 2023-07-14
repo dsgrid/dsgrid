@@ -124,27 +124,42 @@ compounding downstream errors.
 
 Projects
 ^^^^^^^^
-A dsgrid project is a collection of datasets and queries of those datasets
-that describe energy demand for a specific region over a specific timeframe.
-dsgrid projects are assembled at specific points in time by specific modeling
-groups, to satisfy needs of specific data off-takers. For example, hourly
-electricity demand for the contiguous United States, 2010-2050, developed using
-EIA and other data from 2021, with derived datasets developed for capacity
-expansion and production cost grid modelers using 2012 weather patterns (to
-match the models' wind and solar data), and detail available on particularly
-flexible/schedulable end-uses.
+A dsgrid project is a collection of datasets that describe energy demand for a specific region 
+over a specific timeframe. Because datasets describing different sectors' energy use are defined 
+in different ways, the key task of a dsgrid project is to enable and perform mappings from 
+datasets' dimensions into the **project base dimensions**. Project base dimensions are defined
+in the same way as dataset dimensions (i.e., there is a project base dimension for each dimension 
+type), however, they are used differently. Whereas dataset dimensions are *descriptive*--they 
+describe what you will find if you look in a dataset's data files, project base dimensions are 
+*prescriptive*--they define what dataset submitters must map their dimensions into. dsgrid projects
+are also highly prescriptive about what datasets they expect to be submitted, and what data 
+dimensions they are expecting each dataset to provide (post-mapping, see 
+:ref:`dimension_mapping_overview`). dsgrid uses all of the prescribed information to check that 
+submitted datasets are as expected, and throws errors if they are not.
 
-Simply put, the dsgrid project defines the requirements of expected datasets.
+dsgrid projects are also the starting point for `Queries`_. Queries are the process whereby 
+datasets are actually mapped into the project base dimensions, concatenated, and further 
+transformed. The two straightforward applications of queries are:
+
+1. Output data suitable for use in another model, and 
+2. Analyze project data.
+
+Either way, users generally do not want full detail along all dimensions. dsgrid supports this 
+by letting users specify what *supplemental dimensions* they want their query results in, as well 
+as if they want any dimension records filtered out and what mathematical operations they want to
+use for aggregations. For example, a query can be written to filter out non-electricity energy 
+use; sum electricity use over all sectors, subsectors, and end-uses; and map to a specific 
+power system model's geography to create load data for capacity expansion or production cost 
+modeling.
 
 .. _dimension_mapping_overview:
 
 Dimension Mappings
 ^^^^^^^^^^^^^^^^^^
-While many data sources provide information by, e.g., scenario, geographic place,
-sector, and/or subsector, different data sources often define such dimensions
-differently and/or simply report out at a different level of resolution. Because
-dsgrid joins many datasets together to create a coherent description of energy
-for a specific place over a spectific timeframe, we need a mechanism for
+While many data sources provide information by, e.g., scenario, geographic place, and sector, 
+different data sources often define such dimensions differently and/or simply report out at a 
+different level of resolution. Because dsgrid joins many datasets together to create a coherent 
+description of energy for a specific place over a spectific timeframe, we need a mechanism for
 reconciling these differences. For example:
 
 - How should census division data be downscaled to counties?
@@ -153,20 +168,20 @@ reconciling these differences. For example:
 - `Residential`, `res`, and `Res.` should all be interpreted the same way, as referring to
   residential energy use or housing stock, etc.
 
-The mappings that answer these questions are explicitly registered with dsgrid
-as dimension mappings. This way they are clearly documented and usable in automated
-queries. Explicit, programmatically checked and used dimensions and dimension
-mappings are key features that help dsgrid efficiently and reliably assemble
-detailed datasets of energy demand from a combination of historical and modeled
-data.
+The mappings that answer these questions are explicitly registered with dsgrid as dimension 
+mappings. This way they are clearly documented and usable in automated queries. Explicit, 
+programmatically checked and used dimensions and dimension mappings are key features that help 
+dsgrid efficiently and reliably assemble detailed datasets of energy demand from a combination of 
+historical and modeled data.
 
-dsgrid supports two different types of mappings:
+Currently, dsgrid supports two different types of mappings:
 
-1. ``Dataset-to-Project``: These are mappings from the dimensions defined by a dataset to
-   the dimensions defined by a project that are of the same dimension type. They get declared when
-   submitting a dataset to a project.
-2. ``Base-to-Supplemental``: These are mappings from the project's base dimensions to its
-   supplemental dimensions used for queries. These get defined when registering a project.
+1. ``Dataset-to-Project``: These are mappings from a dataset's dimension to a project's base 
+   dimension of the same dimension type. They are declared and registered when a dataset is 
+   submitted to a project.
+2. ``Base-to-Supplemental``: These are mappings from a project's base dimensions to its
+   supplemental dimensions, which are the alternate data resolutions available for use in queries. 
+   Base-to-supplemental dimensions are defined when registering a project.
 
 Queries
 ^^^^^^^
@@ -174,7 +189,15 @@ TODO
 
 Derived Datasets
 ^^^^^^^^^^^^^^^^
-TODO
+During the creation of a dsgrid project, one of the key tasks is to use queries to create 
+derived datasets. As their name implies, derived datasets are dsgrid datasets and must 
+meet all requirements that status implies, but they are created by combining multiple datasets 
+already in the project. Because they are formed from datasets already mapped to the project base 
+dimensions, defining the dimensions of derived datasets is typically straightforward and is either 
+fully or mostly automated by dsgrid. Derived datasets are the mechanism dsgrid provides to do 
+things like apply growth rates or calculate residuals. Registering derived datasets with the 
+project enables dsgrid modelers to bootstrap data into providing a complete and straightforward 
+accounting of a region's energy demand over a specified timeframe.
 
 Published Projects
 ^^^^^^^^^^^^^^^^^^
@@ -182,19 +205,24 @@ TODO
 
 Tasks
 -----
-TODO
 
 Project Coordinators
 ^^^^^^^^^^^^^^^^^^^^
-TODO
+dsgrid project coordinators :ref:`create projects <tutorial_create_a_project>`, collaborate with 
+dataset contributors to get datasets added to the project, :ref:`create derived datasets 
+<tutorial_create_a_derived_dataset>`, :ref:`write queries <tutorial_query_a_project>`, analyze and
+publish data. 
 
 Dataset Contributors
 ^^^^^^^^^^^^^^^^^^^^
-TODO
+The role of dataset contributors is primarily to :ref:`create, register, and submit datasets 
+<tutorial_create_and_submit_a_dataset>`. Of course, dataset contributors might also be project 
+coordinators and/or data users.
 
 Data Users
 ^^^^^^^^^^
-TODO
+Data users might access data provided by a project coordinator through formal publication or other
+dissemination channels, or they might :ref:`write their own queries <tutorial_query_a_project>`.
 
 Computational Environment
 -------------------------

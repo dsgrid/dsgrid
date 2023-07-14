@@ -96,10 +96,16 @@ If you don't copy the files, you can specify the config file with `arangodb --co
 
 #### Local
 Run the ArangoDB Docker container by following instructions at
-https://www.arangodb.com/download-major/docker/. For example:
+https://www.arangodb.com/download-major/docker/. Note the details about data persistence.
+
+For example:
 
 ```
-docker run --name=arango-container -p 8529:8529 -e ARANGO_ROOT_PASSWORD=openSesame arangodb/arangodb:3.10.4
+$ docker create --name arangodb-persist arangodb true
+```
+
+```
+$ docker run --name=arango-container --volumes-from arangodb-persist -p 8529:8529 -e ARANGO_ROOT_PASSWORD=openSesame arangodb/arangodb:3.10.4
 ```
 
 Once the docker container is running, Arango commands will need to be preceded with `docker exec`. For example, using the container name from above:

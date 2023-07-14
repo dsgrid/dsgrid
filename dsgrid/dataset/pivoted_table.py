@@ -4,6 +4,7 @@ from typing import List
 
 import pyspark.sql.functions as F
 
+import dsgrid.units.energy as energy
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.query.models import (
@@ -13,7 +14,10 @@ from dsgrid.query.models import (
     DimensionMetadataModel,
 )
 from dsgrid.query.query_context import QueryContext
-from dsgrid.utils.dataset import map_and_reduce_pivoted_dimension, remove_invalid_null_timestamps
+from dsgrid.utils.dataset import (
+    map_and_reduce_pivoted_dimension,
+    remove_invalid_null_timestamps,
+)
 from dsgrid.utils.spark import get_unique_values
 from .table_format_handler_base import TableFormatHandlerBase
 
@@ -168,8 +172,17 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 agg.aggregation_function.__name__,
                 rename=False,
             )
-            column_names = [dimension_query_name]
             dim_type = dim_config.model.dimension_type
+            if dim_type == DimensionType.METRIC:
+                df = energy.convert_units(
+                    df,
+                    new_pivoted_columns,
+                    self._project_config.get_base_dimension(dim_type).get_records_dataframe(),
+                    mapping_records,
+                    dim_config.get_records_dataframe(),
+                )
+
+            column_names = [dimension_query_name]
             if context.model.result.column_type == ColumnType.DIMENSION_TYPES:
                 column_names = context.get_dimension_column_names_by_query_name(
                     dim_type, dim_type_to_query_name[dim_type]
@@ -211,6 +224,12 @@ class PivotedTableHandler(TableFormatHandlerBase):
             return df
 
         pivoted_dimension_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
+        # TODO: This does not handle the scenario where the metric dimension is stacked and
+        # needs unit conversion. Raise an exception until we have a dataset that can be used
+        # for testing.
+        if pivoted_dimension_type != DimensionType.METRIC:
+            raise NotImplementedError(f"{pivoted_dimension_type=} is not supported yet")
+
         pivoted_columns = set(context.get_pivoted_columns(dataset_id=self.dataset_id))
         final_metadata = DatasetDimensionsMetadataModel()
         dim_type_to_query_name = self.project_config.get_base_dimension_to_query_name_mapping()

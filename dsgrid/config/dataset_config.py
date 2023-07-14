@@ -305,6 +305,11 @@ class DatasetConfigModel(DSGBaseModel):
         description="List of data tags",
         default=[],
     )
+    enable_unit_conversion: bool = Field(
+        default=True,
+        description="If the dataset uses its dimension mapping for the metric dimension to also "
+        "perform unit conversion, then this value should be false.",
+    )
     # This field must be listed before dimensions.
     use_project_geography_time_zone: bool = Field(
         default=False,

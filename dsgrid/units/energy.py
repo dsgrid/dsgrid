@@ -14,6 +14,11 @@ GWH = "GWh"
 TWH = "TWh"
 THERM = "therm"
 MBTU = "MBtu"
+
+# TODO: Verify that this is the right definition of Therm to support and/or 
+# support multiple Therm definitions.
+
+# Conversion factors for US Therms
 KWH_PER_THERM = 29.3001111
 KWH_PER_MBTU = 0.293071
 THERMS_PER_MBTU = 0.01

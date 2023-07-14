@@ -22,7 +22,7 @@ Steps
 
 .. code-block:: console
 
-   $ export PATH=PATH:~/repos/HPC/applications/spark/spark_scripts
+   $ export PATH=$PATH:~/repos/HPC/applications/spark/spark_scripts
 
 3. Allocate one or more nodes.
 

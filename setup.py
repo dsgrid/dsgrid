@@ -25,7 +25,6 @@ test_requires = [
 ]
 
 doc_requires = [
-    "erdantic",  # preferable to install with conda, i.e. `conda install erdantic -c conda-forge`
     "furo",
     "ghp-import",
     "numpydoc",
@@ -34,7 +33,7 @@ doc_requires = [
     "sphinx-copybutton",
     "sphinx_argparse",
     "sphinxcontrib.programoutput",
-    "autodoc_pydantic",
+    "autodoc_pydantic[erdantic]",
 ]
 
 release_requires = ["twine", "setuptools", "wheel"]

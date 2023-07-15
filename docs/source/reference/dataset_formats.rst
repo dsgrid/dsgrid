@@ -9,8 +9,9 @@ you need a new format, please contact the dsgrid team to discuss it.
 
 Requirements
 =============
-1. Metric data must be stored in Parquet files. If you need or want another optimized columnar file
-   format, please contact the dsgrid team. TODO: Describe our (limited) support for CSV?
+1. Metric data should usually be stored in Parquet files. Tiny datasets like those for growth rates
+   can be stored in CSV files. If you need or want another optimized columnar file format, please
+   contact the dsgrid team.
 2. If the data tables contain time-series data, each unique time array must contain an identical
    range of timestamps.
 3. Tables must be pivoted with the records of one dimension. This is usually much more efficient

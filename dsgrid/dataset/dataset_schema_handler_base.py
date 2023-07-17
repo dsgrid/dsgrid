@@ -1,7 +1,6 @@
 import abc
 import logging
 import os
-from typing import List
 
 import pyspark.sql.functions as F
 
@@ -75,10 +74,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def filter_data(self, dimensions: List[DatasetSimpleModel]):
+    def filter_data(self, dimensions: list[DatasetSimpleModel]):
         """Filter the load data by dimensions and rewrite the files.
 
-        dimensions : List[DimensionSimpleModel]
+        dimensions : list[DimensionSimpleModel]
         """
 
     @property
@@ -111,7 +110,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         Returns
         -------
-        List: List of column names.
+        list[str]
+            List of column names.
 
         """
         dim_type = self._config.model.data_schema.load_data_column_dimension
@@ -157,7 +157,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         Returns
         -------
-        List: List of column names.
+        list[str]
+            List of column names.
 
         """
         time_cols = self._get_time_dimension_columns()

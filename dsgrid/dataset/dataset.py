@@ -42,7 +42,7 @@ class Dataset(DatasetBase):
         config : DatasetConfig
         dimension_mgr : DimensionRegistryManager
         dimension_mapping_mgr : DimensionMappingRegistryManager
-        mapping_references: List[DimensionMappingReferenceListModel]
+        mapping_references: list[DimensionMappingReferenceListModel]
         project_time_dim: TimeDimensionBaseConfig
 
         Returns

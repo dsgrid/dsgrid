@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from typing import List
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
@@ -107,7 +106,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return dim_table
 
     @track_timing(timer_stats_collector)
-    def filter_data(self, dimensions: List[DimensionSimpleModel]):
+    def filter_data(self, dimensions: list[DimensionSimpleModel]):
         load_df = self._load_data
         pivoted_dimension_type = self.get_pivoted_dimension_type()
         time_columns = set(

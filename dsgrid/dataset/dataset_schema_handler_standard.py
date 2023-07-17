@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from typing import List
 
 import pyspark.sql.functions as F
 
@@ -278,7 +277,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
 
     @track_timing(timer_stats_collector)
-    def filter_data(self, dimensions: List[DimensionSimpleModel]):
+    def filter_data(self, dimensions: list[DimensionSimpleModel]):
         lookup = self._load_data_lookup
         lookup.cache()
         load_df = self._load_data

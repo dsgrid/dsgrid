@@ -178,10 +178,10 @@ def get_row(i, field, fields, field_items, cls, indent_level=1):
             "(:class:`~dsgrid.config.dimensions.DateTimeDimensionModel`), "
             f"the config field requirements include:{n}"
             # TODO: find alternative way to not hardcode this path
-            f"{n}{t1}{t}{t}{t}.. include:: ../../_build/config_rsts/DimensionModel.rst{n}"
+            f"{n}{t1}{t}{t}{t}.. include:: ../../../../_build/config_rsts/DimensionModel.rst{n}"
             f"{n}{t1}{t}{t}* if ``dimension.type`` == Time (:class:`~dsgrid.config.dimensions."
             f"DateTimeDimensionModel`), the config field requirements include:{n}"
-            f"{n}{t1}{t}{t}{t}.. include:: ../../_build/config_rsts/DateTimeDimensionModel.rst{n}"
+            f"{n}{t1}{t}{t}{t}.. include:: ../../../../_build/config_rsts/DateTimeDimensionModel.rst{n}"
         )
 
     elif field_items[field]:

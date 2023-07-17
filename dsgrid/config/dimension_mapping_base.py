@@ -1,5 +1,5 @@
 import logging
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import Field, validator
 
@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 
 
 class DimensionMappingType(DSGEnum):
+    """Defines the operation dsgrid will apply to the data during a mapping."""
+
     # optional from_fraction col, FRACTION_SUM_EQ1 when grouped by from_id
     ONE_TO_ONE = "one_to_one"  # includes rename, down-selection
     MANY_TO_ONE_AGGREGATION = "many_to_one_aggregation"
@@ -38,11 +40,8 @@ class DimensionMappingType(DSGEnum):
 
 
 class DimensionMappingArchetype(DSGEnum):
-    """Dimension mapping archetype, used to check:
-    - whether duplicates are allowed in from and to dimension;
-    - from_fraction sum check:
-        - whether sum of from_fraction should be = 1 when group by from_id
-        - whether sum of from_fraction should be = 1 when group by to_id
+    """Dimension mapping archetype, used to check whether duplicates are allowed in from/to
+    dimensions and apply rules about the sum of the from_fraction column.
     """
 
     ONE_TO_ONE_MAP_FRACTION_SUM_FROM_ID_EQ1 = EnumValue(
@@ -349,7 +348,7 @@ class DimensionMappingReferenceModel(DSGBaseModel):
 class DimensionMappingReferenceListModel(DSGBaseModel):
     """List of dimension mapping references used by the dimensions_mappings.json5 config"""
 
-    references: List[DimensionMappingReferenceModel] = Field(
+    references: list[DimensionMappingReferenceModel] = Field(
         title="references",
         description="List of dimension mapping references",
     )

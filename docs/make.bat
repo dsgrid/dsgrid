@@ -25,11 +25,7 @@ if errorlevel 9009 (
 	exit /b 1
 )
 
-python ..\dev\md_to_rst.py %SOURCEDIR%/md_files.txt
 rmdir /s /q %SOURCEDIR%\api
-sphinx-apidoc -o %SOURCEDIR%/api ../dsgrid
-python make_config_model_rst.py -o %BUILDDIR%/config_rsts
-python make_example_configs.py
 %SPHINXBUILD% -M %1 %SOURCEDIR% %BUILDDIR% %SPHINXOPTS% %O%
 goto end
 

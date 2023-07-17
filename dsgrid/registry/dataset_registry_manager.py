@@ -4,7 +4,7 @@ import getpass
 import logging
 import os
 from pathlib import Path
-from typing import Union, List, Dict
+from typing import Union
 
 from prettytable import PrettyTable
 
@@ -133,7 +133,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._datasets[key] = config
         return config
 
-    def acquire_registry_locks(self, config_ids: List[str]):
+    def acquire_registry_locks(self, config_ids: list[str]):
         for dataset_id in config_ids:
             lock_file = self.get_registry_lock_file(dataset_id)
             self.cloud_interface.make_lock_file(lock_file)
@@ -305,9 +305,9 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        filters: List[str] = None,
-        max_width: Union[int, Dict] = None,
-        drop_fields: List[str] = None,
+        filters: list[str] = None,
+        max_width: Union[int, dict] = None,
+        drop_fields: list[str] = None,
         return_table: bool = False,
         **kwargs,
     ):

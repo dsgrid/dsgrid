@@ -89,7 +89,6 @@ instance/
 
 # Sphinx documentation
 docs/_build/
-docs/source/index.rst
 docs/source/api/
 
 # PyBuilder

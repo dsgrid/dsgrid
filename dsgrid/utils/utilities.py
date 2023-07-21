@@ -91,12 +91,17 @@ def check_uniqueness(iterable, tag):
     tag : str
         tag to add to the exception string
 
+    Returns
+    -------
+    set[str]
+
     """
     values = set()
     for item in iterable:
         if item in values:
             raise ValueError(f"duplicate {tag}: {item}")
         values.add(item)
+    return values
 
 
 def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list[str] = None):

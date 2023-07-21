@@ -1,8 +1,10 @@
 import itertools
 import logging
 import os
+from pathlib import Path
 from typing import Dict, List, Set, Optional
 
+import pandas as pd
 from pydantic import Field
 from pydantic import root_validator, validator
 
@@ -46,6 +48,64 @@ from .dimensions import (
 logger = logging.getLogger(__name__)
 
 
+class SubsetDimensionModel(DSGBaseModel):
+    """Defines the records for a subset dimension."""
+
+    selector: str
+    description: str
+    records: list[str] = []
+
+
+class SubsetDimensionsModel(DSGBaseModel):
+    """Defines one or more subset dimensions for a dimension type."""
+
+    name: str
+    display_name: str
+    dimension_query_name: Optional[str] = Field(
+        title="dimension_query_name",
+        description="Auto-generated query name for SQL queries.",
+    )
+    description: str
+    dimension_type: DimensionType = Field(
+        title="dimension_type",
+        alias="type",
+        description="Type of the dimension",
+        options=DimensionType.format_for_docs(),
+    )
+    filename: Optional[str] = Field(
+        title="filename",
+        alias="file",
+        description="Filename containing dimension records. Only assigned for user input and "
+        "output purposes. The registry database stores records in the dimension JSON document.",
+    )
+    dimensions: list[SubsetDimensionModel] = Field(
+        title="dimensions",
+        description="Dimensions to create",  # TODO DT
+    )
+
+    @validator("dimensions")
+    def load_records(cls, dimensions, values):
+        """Load the records for each subset dimension."""
+        if values.get("filename") is None:
+            return dimensions
+
+        name = values["name"]
+        mappings = load_subset_dimensions(Path(values["filename"]))
+        selectors = check_uniqueness([x.selector for x in dimensions], "subset dimension selector")
+
+        diff = selectors.symmetric_difference(mappings)
+        if diff:
+            raise ValueError(
+                f"subset dimension {name} selectors have a mismatch with the records file column names: {diff}"
+            )
+
+        for dim in dimensions:
+            dim.records = mappings[dim.selector]
+
+        values["filename"] = None
+        return dimensions
+
+
 class DimensionsModel(DSGBaseModel):
     """Contains dimensions defined by a project"""
 
@@ -67,6 +127,15 @@ class DimensionsModel(DSGBaseModel):
         requirements=(
             "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
             " one dimension reference per type is allowed.",
+        ),
+        default=[],
+    )
+    subset_dimensions: list[SubsetDimensionsModel] = Field(
+        title="subset_dimensions",
+        description="List of subset dimensions",
+        notes=(
+            "Subset dimensions are used to specify subsets of dimension records that a dataset ",
+            "must support, dimensionality of derived datasets, and query filters.",
         ),
         default=[],
     )
@@ -152,6 +221,18 @@ class DimensionsModel(DSGBaseModel):
     def handle_dimension_union(cls, values):
         return handle_dimension_union(values)
 
+    @validator("subset_dimensions")
+    def check_subset_dimensions(cls, subset_dimensions):
+        """Check that each subset dimension has a unique name."""
+        check_uniqueness([x.name for x in subset_dimensions], "subset dimensions name")
+        return subset_dimensions
+
+
+class RequiredSubsetDimensionRecordsModel(DSGBaseModel):
+
+    name: str = Field(description="Name of a subset dimension")
+    selectors: list[str] = Field(description="One or more selectors in the subset dimension")
+
 
 class RequiredSupplementalDimensionRecordsModel(DSGBaseModel):
 
@@ -164,6 +245,7 @@ class RequiredSupplementalDimensionRecordsModel(DSGBaseModel):
 class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
 
     base: list[str] = []
+    subset: list[RequiredSubsetDimensionRecordsModel] = []
     supplemental: list[RequiredSupplementalDimensionRecordsModel] = []
 
 
@@ -862,6 +944,7 @@ class ProjectConfig(ConfigBase):
             dataset.required_dimensions.single_dimensional, dimension_type.value
         )
         record_ids = self._get_required_record_ids_from_base(requirements, dimension_type)
+        record_ids.update(self._get_required_record_ids_from_subsets(requirements, dimension_type))
         record_ids.update(
             self._get_required_record_ids_from_supplementals(requirements, dimension_type)
         )
@@ -869,6 +952,7 @@ class ProjectConfig(ConfigBase):
         for multi_req in dataset.required_dimensions.multi_dimensional:
             req = getattr(multi_req, dimension_type.value)
             record_ids.update(req.base)
+            record_ids.update(self._get_required_record_ids_from_subsets(req, dimension_type))
             record_ids.update(
                 self._get_required_record_ids_from_supplementals(req, dimension_type)
             )
@@ -974,6 +1058,28 @@ class ProjectConfig(ConfigBase):
 
         return record_ids
 
+    def _get_subset_dimension_records(self, dimension_type: DimensionType, name: str, selector):
+        for subset in self.model.dimensions.subset_dimensions:
+            if dimension_type == subset.dimension_type and subset.name == name:
+                for dim in subset.dimensions:
+                    if dim.selector == selector:
+                        return dim.records
+
+        raise DSGInvalidDimension(
+            f"subset dimension selector not found: {dimension_type=} {name=} {selector=}"
+        )
+
+    def _get_required_record_ids_from_subsets(
+        self, req: RequiredDimensionRecordsByTypeModel, dimension_type: DimensionType
+    ):
+        record_ids = set()
+        for subset in req.subset:
+            for selector in subset.selectors:
+                record_ids.update(
+                    set(self._get_subset_dimension_records(dimension_type, subset.name, selector))
+                )
+        return record_ids
+
     def _get_required_record_ids_from_supplementals(
         self, req: RequiredDimensionRecordsByTypeModel, dimension_type: DimensionType
     ):
@@ -986,7 +1092,7 @@ class ProjectConfig(ConfigBase):
             dim = supp_name_to_dim.get(supp.name)
             if dim is None:
                 raise DSGInvalidDimensionAssociation(
-                    f"Supplemental dimension of type={dimension_type} with name={req.name} "
+                    f"Supplemental dimension of type={dimension_type} with name={supp.name} "
                     "does not exist"
                 )
             supp_replacements = self._get_record_ids_from_one_supplemental(supp, dim)
@@ -1010,6 +1116,7 @@ class ProjectConfig(ConfigBase):
     @track_timing(timer_stats_collector)
     def _make_dimension_association_table(self, dataset_id, pivoted_dimension):
         required_dimensions = self.get_dataset(dataset_id).required_dimensions
+        # TODO DT: multi-dim + subsets?
         multi_dfs = self._build_multi_dim_requirement_associations(
             required_dimensions.multi_dimensional,
             pivoted_dimension,
@@ -1028,6 +1135,7 @@ class ProjectConfig(ConfigBase):
             dimension_type = DimensionType(field)
             req = getattr(required_dimensions.single_dimensional, field)
             record_ids = self._get_required_record_ids_from_base(req, dimension_type)
+            record_ids.update(self._get_required_record_ids_from_subsets(req, dimension_type))
             record_ids.update(
                 self._get_required_record_ids_from_supplementals(req, dimension_type)
             )
@@ -1120,3 +1228,13 @@ class ProjectConfig(ConfigBase):
 
         """
         return self._supplemental_dimensions
+
+
+def load_subset_dimensions(filename: Path) -> dict[str, list[str]]:
+    """Return a mapping of subset dimension name to record IDs."""
+    df = pd.read_csv(filename, index_col="id")
+    if len(df.columns) == 1:
+        raise DSGInvalidDimension(
+            "A subset dimension records file must at least one dimension column."
+        )
+    return {x: df[x].dropna().index.to_list() for x in df.columns}

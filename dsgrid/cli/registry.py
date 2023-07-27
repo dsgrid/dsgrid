@@ -639,6 +639,14 @@ def update_project(
     help="Exclude base dimension query names.",
 )
 @click.option(
+    "-S",
+    "--exclude-subset",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Exclude subset dimension query names.",
+)
+@click.option(
     "-s",
     "--exclude-supplemental",
     is_flag=True,
@@ -648,37 +656,43 @@ def update_project(
 )
 @click.pass_obj
 def list_project_dimension_query_names(
-    registry_manager: RegistryManager, project_id, exclude_base, exclude_supplemental
+    registry_manager: RegistryManager,
+    project_id,
+    exclude_base,
+    exclude_subset,
+    exclude_supplemental,
 ):
     """List the project's dimension query names."""
-    if exclude_base and exclude_supplemental:
-        print("exclude_base and exclude_supplemental cannot both be set", file=sys.stderr)
+    if exclude_base and exclude_subset and exclude_supplemental:
+        print(
+            "exclude_base, exclude_subset, and exclude_supplemental cannot all be set",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
     manager = registry_manager.project_manager
     project_config = manager.get_by_id(project_id)
-    base_query_names_by_type = project_config.get_base_dimension_to_query_name_mapping()
-    supp_query_names_by_type = project_config.get_supplemental_dimension_to_query_name_mapping()
+    base = None if exclude_base else project_config.get_base_dimension_to_query_name_mapping()
+    sub = None if exclude_subset else project_config.get_subset_dimension_to_query_name_mapping()
+    supp = (
+        None
+        if exclude_supplemental
+        else project_config.get_supplemental_dimension_to_query_name_mapping()
+    )
 
     dimensions = sorted(DimensionType, key=lambda x: x.value)
-    if not exclude_base and not exclude_supplemental:
-        print("Dimension query names for base and supplemental dimensions:")
-        for dimension_type in dimensions:
-            base_dim = base_query_names_by_type[dimension_type]
-            supp_dims = " ".join(supp_query_names_by_type[dimension_type])
-            print(f"  {dimension_type.value}: base={base_dim} supplemental=[{supp_dims}]")
-    elif exclude_supplemental:
-        print("Dimension query names for base dimensions:")
-        for dimension_type in dimensions:
-            base_dim = base_query_names_by_type[dimension_type]
-            print(f"  {dimension_type.value}: {base_dim}")
-    elif exclude_base:
-        print("Dimension query names for supplemental dimensions:")
-        for dimension_type in dimensions:
-            supp_dims = " ".join(supp_query_names_by_type[dimension_type])
-            print(f"  {dimension_type.value}: [{supp_dims}]")
-    else:
-        assert False
+    lines = []
+    for dim_type in dimensions:
+        lines.append(f"  {dim_type.value}:")
+        if base:
+            lines.append(f"    base: {base[dim_type]}")
+        if sub:
+            lines.append("    subset: " + " ".join(sub[dim_type]))
+        if supp:
+            lines.append("    supplemental: " + " ".join(supp[dim_type]))
+    print("Dimension query names:")
+    for line in lines:
+        print(line)
 
 
 """

@@ -28,7 +28,7 @@ How to run dsgrid on Eagle
     $ spark-submit --master=spark://$(hostname):7077 $(which dsgrid-cli.py) [command] [options] [args]
 
 6. Because you started a screen session at the beginning, if you disconnect from your ssh session
-   for any reason you can pick your work back up by ssh'ing to the same login node you used the 
+   for any reason you can pick your work back up by ssh'ing to the same login node you used the
    first time and resuming your screen session:
 
 .. code-block:: console

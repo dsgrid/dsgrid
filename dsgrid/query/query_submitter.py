@@ -5,7 +5,8 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
-from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.dimension.base_models import DimensionCategory
+from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.utils.spark import (
     read_dataframe,
     try_read_dataframe,
@@ -115,6 +116,16 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             raise NotImplementedError(f"Unsupported {context.get_table_format_type()=}")
         return handler
 
+    def _run_checks(self, model):
+        subsets = set(self.project.config.list_dimension_query_names(DimensionCategory.SUBSET))
+        for agg in model.result.aggregations:
+            for _, column in agg.iter_dimensions_to_keep():
+                dimension_query_name = column.dimension_query_name
+                if column.dimension_query_name in subsets:
+                    raise DSGInvalidQuery(
+                        f"subset dimensions cannot be used in aggregations: {dimension_query_name=}"
+                    )
+
     def _run_query(
         self,
         model,
@@ -123,6 +134,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         zip_file=False,
         force=False,
     ):
+        self._run_checks(model)
         context = QueryContext(model)
         context.model.project.version = str(self._project.version)
         output_dir = self._output_dir / context.model.name
@@ -132,6 +144,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 "overwrite an existing query results directory. "
                 "Choose a different path or pass force=True."
             )
+
+        for dim_filter in model.project.dataset.params.dimension_filters:
+            dim_filter.preprocess(self._project.config)
 
         df = None
         if load_cached_table:

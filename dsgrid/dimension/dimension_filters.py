@@ -26,6 +26,9 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
     def apply_filter(self, df):
         """Apply the filter to a DataFrame"""
 
+    def preprocess(self, project_config):
+        """Perform optional preprocessing activities with the ProjectConfig."""
+
     def _make_value_str(self, value):
         if isinstance(value, str):
             return f"'{value}'"
@@ -197,6 +200,34 @@ class DimensionFilterBetweenColumnOperatorModel(DimensionFilterBaseModel):
         if self.negate:
             return df.filter(~F.col(column).between(self.lower_bound, self.upper_bound))
         return df.filter(F.col(column).between(self.lower_bound, self.upper_bound))
+
+
+class SubsetDimensionFilterModel(DimensionFilterBaseModel):
+    """Filters base dimension records that match a subset dimension."""
+
+    negate: bool = Field(
+        title="negate",
+        description="Filter out values that match this subset dimension.",
+        default=False,
+    )
+    records: set[str] = Field(
+        title="records",
+        description="Subset dimension records. Must get assigned from dimension_query_name at "
+        "runtime by calling preprocess().",
+        default=[],
+    )
+
+    def preprocess(self, project_config):
+        self.records = project_config.get_dimension(self.dimension_query_name).get_unique_ids()
+
+    def apply_filter(self, df, column=None):
+        if not self.records:
+            raise ValueError(f"SubsetDimensionFilterModel  does not have records: {self}")
+
+        column = column or self.column
+        if self.negate:
+            return df.filter(F.col(column).isin(self.records))
+        return df.filter(F.col(column).isin(self.records))
 
 
 class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterBaseModel):

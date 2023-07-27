@@ -189,8 +189,15 @@ class DimensionRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def register(self, config_file, submitter, log_message):
         context = RegistrationContext()
-        config = DimensionsConfig.load(config_file)
-        return self.register_from_config(config, submitter, log_message, context=context)
+        error_occurred = False
+        try:
+            config = DimensionsConfig.load(config_file)
+            return self.register_from_config(config, submitter, log_message, context=context)
+        except Exception:
+            error_occurred = True
+            raise
+        finally:
+            context.finalize(error_occurred)
 
     def _register(self, config, submitter, log_message, context):
         existing_ids = self._replace_duplicates(config)
@@ -284,6 +291,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         table = PrettyTable(title="Dimensions")
         all_field_names = (
             "Type",
+            "Query Name",
             "ID",
             "Version",
             "Date",
@@ -317,6 +325,7 @@ class DimensionRegistryManager(RegistryManagerBase):
 
             all_fields = (
                 model.dimension_type.value,
+                model.dimension_query_name,
                 model.dimension_id,
                 registration.version,
                 registration.date.strftime("%Y-%m-%d %H:%M:%S"),

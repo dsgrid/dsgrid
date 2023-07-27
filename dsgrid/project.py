@@ -10,7 +10,7 @@ from pyspark.sql.types import DoubleType
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.dataset.growth_rates import apply_growth_rate_123
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGInvalidQuery, DSGValueNotRegistered
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import (
@@ -88,9 +88,11 @@ class Project:
             If dataset_id is not in this project's config.
         """
         if dataset_id not in self.list_datasets():
-            raise DSGValueNotRegistered(f"{dataset_id} is not expected by {self.config.project_id}")
+            raise DSGValueNotRegistered(
+                f"{dataset_id} is not expected by {self.config.project_id}"
+            )
 
-        return (dataset_id in self._dataset_configs)
+        return dataset_id in self._dataset_configs
 
     def get_dataset(self, dataset_id):
         """Returns a Dataset. Calls load_dataset if it hasn't already been loaded.
@@ -227,14 +229,16 @@ class Project:
 
     def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
         record_ids = {}
-        base_query_names = self._config.get_base_dimension_query_names()
+        supp_query_names = set(
+            self._config.list_dimension_query_names(category=DimensionCategory.SUPPLEMENTAL)
+        )
 
         for dim_filter in context.model.project.dataset.params.dimension_filters:
             dim_type = dim_filter.dimension_type
             query_name = dim_filter.dimension_query_name
             df = self._config.get_dimension_records(query_name)
             df = dim_filter.apply_filter(df).select("id")
-            if query_name not in base_query_names:
+            if query_name in supp_query_names:
                 mapping_records = self._config.get_base_to_supplemental_mapping_records(query_name)
                 df = (
                     mapping_records.join(df, on=mapping_records.to_id == df.id)

@@ -4,7 +4,7 @@ import logging
 import pyspark.sql.functions as F
 
 import dsgrid.units.energy as energy
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.query.models import (
     AggregationModel,
@@ -140,7 +140,10 @@ class PivotedTableHandler(TableFormatHandlerBase):
         new_pivoted_columns = []  # Will be the pivoted columns after the last aggregation.
         pivoted_dim_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
         dim_type_to_query_name = self.project_config.get_base_dimension_to_query_name_mapping()
-        base_query_names = set(dim_type_to_query_name.values())
+        base_names = set(self.project_config.list_dimension_query_names(DimensionCategory.BASE))
+        supp_names = set(
+            self.project_config.list_dimension_query_names(DimensionCategory.SUPPLEMENTAL)
+        )
         for agg in aggregations:
             dimension_query_name = None
             for _, column in agg.iter_dimensions_to_keep():
@@ -148,7 +151,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 # No work is required if the user requested the base dimension for the pivoted
                 # dimension or if this pivoted column has already been handled.
                 if (
-                    query_name not in base_query_names
+                    query_name not in base_names
                     and query_name not in context.get_dimension_column_names(pivoted_dim_type)
                 ):
                     if column.function is not None:
@@ -161,9 +164,13 @@ class PivotedTableHandler(TableFormatHandlerBase):
             if dimension_query_name is None:
                 continue
             dim_config = self.project_config.get_dimension(dimension_query_name)
+            dim_type = dim_config.model.dimension_type
+            if dimension_query_name not in supp_names:
+                raise Exception(f"Bug: {dimension_query_name=} is not a supplemental dimension")
             mapping_records = self.project_config.get_base_to_supplemental_mapping_records(
-                dimension_query_name
+                dim_config.model.dimension_query_name
             )
+            to_unit_records = dim_config.get_records_dataframe()
             df, new_pivoted_columns, dropped_columns = map_and_reduce_pivoted_dimension(
                 df,
                 mapping_records,
@@ -171,15 +178,18 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 agg.aggregation_function.__name__,
                 rename=False,
             )
-            dim_type = dim_config.model.dimension_type
-            if dim_type == DimensionType.METRIC:
-                df = energy.convert_units(
-                    df,
-                    new_pivoted_columns,
-                    self._project_config.get_base_dimension(dim_type).get_records_dataframe(),
-                    mapping_records,
-                    dim_config.get_records_dataframe(),
+            if dim_type != DimensionType.METRIC:
+                raise NotImplementedError(
+                    "Aggregation of a pivoted column that is not the metric dimension is not "
+                    f"yet supported: {dim_type}"
                 )
+            df = energy.convert_units(
+                df,
+                new_pivoted_columns,
+                self._project_config.get_base_dimension(dim_type).get_records_dataframe(),
+                mapping_records,
+                to_unit_records,
+            )
 
             column_names = [dimension_query_name]
             if context.model.result.column_type == ColumnType.DIMENSION_TYPES:

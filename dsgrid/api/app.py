@@ -1,3 +1,4 @@
+import itertools
 import os
 import sys
 from tempfile import NamedTemporaryFile
@@ -135,7 +136,7 @@ async def list_project_dimensions(project_id: str):
     for item in project.get_dimension_query_names_model().dict().values():
         dimension = create_project_dimension_model(project.get_dimension(item["base"]).model, True)
         dimensions.append(dimension)
-        for query_name in item["supplemental"]:
+        for query_name in itertools.chain(item["subset"], item["supplemental"]):
             dimension = create_project_dimension_model(
                 project.get_dimension(query_name).model, False
             )

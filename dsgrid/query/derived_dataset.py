@@ -11,7 +11,7 @@ from dsgrid.config.dataset_config import (
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimensions import DimensionModel
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
 from dsgrid.query.query_submitter import QuerySubmitterBase
@@ -68,7 +68,9 @@ def create_derived_dataset_config_from_query(
     # base-to-supplemental mapping that the user will need to register.
     dimension_references = []
     dimension_mapping_references = []
-    base_dim_query_names = project.config.get_base_dimension_query_names()
+    base_dim_query_names = set(
+        project.config.list_dimension_query_names(category=DimensionCategory.BASE)
+    )
     num_new_supplemental_dimensions = 0
     for dim_type in DimensionType:
         dimension_query_names = metadata.dimensions.get_dimension_query_names(dim_type)
@@ -100,6 +102,13 @@ def create_derived_dataset_config_from_query(
                     _get_supplemental_dimension_mapping_reference(dim.model, project.config)
                 )
         else:
+            subset_dim_ref = project.config.get_matching_subset_dimension(
+                dim_type, unique_data_records
+            )
+            if subset_dim_ref is not None:
+                dimension_references.append(subset_dim_ref.serialize())
+                continue
+
             supp_dim = _get_matching_supplemental_dimension(
                 project.config, dim_type, unique_data_records
             )
@@ -165,7 +174,10 @@ def _is_dimension_valid_for_dataset(dim_config, unique_data_records):
     records = dim_config.get_records_dataframe()
     dim_values = get_unique_values(records, "id")
     diff = dim_values.symmetric_difference(unique_data_records)
-    return not bool(diff)
+    if not diff:
+        return True
+
+    return False
 
 
 def _get_matching_supplemental_dimension(project_config, dimension_type, unique_data_records):

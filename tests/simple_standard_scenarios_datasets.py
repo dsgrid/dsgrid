@@ -77,6 +77,11 @@ def build_expected_datasets():
         ["model_year"],
     )
     tempo = build_tempo()
+    # Convert to project units - MWh
+    for column in ("electricity_cooling", "electricity_heating", "natural_gas_heating"):
+        comstock = comstock.withColumn(column, F.col(column) / 1000)
+        resstock = resstock.withColumn(column, F.col(column) / 1000)
+    tempo = tempo.withColumn("L1andL2", F.col("L1andL2") / 1000)
     EXPECTED_DATASET_PATH.mkdir(exist_ok=True)
     comstock.coalesce(1).write.mode("overwrite").parquet(
         str(EXPECTED_DATASET_PATH / "comstock_projected.parquet")
@@ -99,7 +104,8 @@ def apply_load_mapping_aeo_com(aeo_com):
     return (
         aeo_com.withColumn("electricity_cooling", F.col("elec_cooling") * 1.0)
         .withColumn("electricity_heating", F.col("elec_heating") * 1.0)
-        .drop("elec_cooling", "elec_heating")
+        .withColumn("natural_gas_heating", F.col("ng_heating") * 1.0)
+        .drop("elec_cooling", "elec_heating", "ng_heating")
     )
 
 
@@ -147,7 +153,7 @@ def map_aeo_com_subsectors(aeo_com):
         .agg(
             F.sum("electricity_cooling").alias("electricity_cooling"),
             F.sum("electricity_heating").alias("electricity_heating"),
-            F.sum("ng_heating").alias("ng_heating"),
+            F.sum("natural_gas_heating").alias("natural_gas_heating"),
         )
     )
 
@@ -172,7 +178,8 @@ def apply_load_mapping_aeo_res(aeo_res):
     return (
         aeo_res.withColumn("electricity_cooling", F.col("elec_heat_cool") * 1.0)
         .withColumn("electricity_heating", F.col("elec_heat_cool") * 1.0)
-        .drop("elec_heat_cool")
+        .withColumn("natural_gas_heating", F.col("ng_heat_cool") * 1.0)
+        .drop("elec_heat_cool", "ng_heat_cool")
     )
 
 
@@ -185,7 +192,7 @@ def make_projection_df(aeo, ld_df, join_columns):
     ld_df = ld_df.crossJoin(years_df)
     base_year = 2018
     gr_df = aeo
-    pivoted_columns = ("electricity_cooling", "electricity_heating")
+    pivoted_columns = ("electricity_cooling", "electricity_heating", "natural_gas_heating")
     for column in pivoted_columns:
         gr_col = column + "__gr"
         gr_df = gr_df.withColumn(
@@ -198,7 +205,7 @@ def make_projection_df(aeo, ld_df, join_columns):
         gr_col = column + "__gr"
         df = df.withColumn(column, df[column] * df[gr_col]).drop(gr_col)
 
-    return df.cache()
+    return df
 
 
 def build_tempo():
@@ -216,7 +223,7 @@ def build_tempo():
     tempo_data_mapped_time = tempo._handler._convert_time_dimension(
         load_data.join(lookup, on="id").drop("id"), project.config, [], ["L1andL2"]
     )
-    return tempo_data_mapped_time.cache()
+    return tempo_data_mapped_time
 
 
 def generate_raw_stats(path):

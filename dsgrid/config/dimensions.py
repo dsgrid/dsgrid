@@ -171,25 +171,13 @@ class DimensionBaseModel(DSGBaseModel):
 
     @validator("display_name")
     def check_display_name(cls, display_name):
-        if display_name == "":
-            raise ValueError(f'Empty name field for dimension: "{cls}"')
-        if REGEX_VALID_REGISTRY_DISPLAY_NAME.search(display_name) is None:
-            raise ValueError(f"display_name={display_name} does not meet the requirements")
-        return display_name
+        return check_display_name(display_name)
 
     @validator("dimension_query_name")
     def check_query_name(cls, dimension_query_name, values):
         if "display_name" not in values:
             return dimension_query_name
-
-        generated_query_name = values["display_name"].lower().replace(" ", "_").replace("-", "_")
-
-        if dimension_query_name is not None and dimension_query_name != generated_query_name:
-            raise ValueError(
-                f"dimension_query_name cannot be set by the user: {dimension_query_name}"
-            )
-
-        return generated_query_name
+        return generate_dimension_query_name(dimension_query_name, values["display_name"])
 
     @validator("module", always=True)
     def check_module(cls, module):
@@ -694,3 +682,35 @@ def create_project_dimension_model(model, is_base):
     data = create_dimension_common_model(model).dict()
     data["is_base"] = is_base
     return ProjectDimensionModel(**data)
+
+
+def check_display_name(display_name: str):
+    """Check that a dimension display name meets all requirements.
+
+    Raises
+    ------
+    ValueError
+        Raised if the display_name is invalid.
+    """
+    if display_name == "":
+        raise ValueError("display_name cannot be empty")
+    if REGEX_VALID_REGISTRY_DISPLAY_NAME.search(display_name) is None:
+        raise ValueError(f"{display_name=} does not meet the requirements")
+    return display_name
+
+
+def generate_dimension_query_name(dimension_query_name: str, display_name: str) -> str:
+    """Generate a dimension query name from a display name.
+
+    Raises
+    ------
+    ValueError
+        Raised if the dimension_query_name was set by the user and does not match the generated
+        name.
+    """
+    generated_query_name = display_name.lower().replace(" ", "_").replace("-", "_")
+
+    if dimension_query_name is not None and dimension_query_name != generated_query_name:
+        raise ValueError(f"dimension_query_name cannot be set by the user: {dimension_query_name}")
+
+    return generated_query_name

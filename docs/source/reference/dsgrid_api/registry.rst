@@ -54,7 +54,8 @@ Examples
         DatabaseConnection(
             hostname="dsgrid-registry.hpc.nrel.gov",
             database="standard-scenarios",
-        )
+        ),
+        offline_mode=True,
     )
     project = manager.project_manager.load_project("dsgrid_conus_2022")
     geo_dim = project.config.get_base_dimension(DimensionType.GEOGRAPHY)

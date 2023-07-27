@@ -152,3 +152,23 @@ def test_register_project_and_dataset(tmp_registry_db):
         ["--database-name", db_name, "--offline", "registry", "dimensions", "remove", dim_id],
     )
     assert result.exit_code == 0
+
+
+def test_list_project_dimension_query_names(cached_registry):
+    conn = cached_registry
+    runner = CliRunner(mix_stderr=False)
+    cmd = [
+        "--database-name",
+        conn.database,
+        "--offline",
+        "registry",
+        "projects",
+        "list-dimension-query-names",
+        "test_efs",
+    ]
+    result = runner.invoke(cli, cmd)
+    assert result.exit_code == 0
+    assert "base: county" in result.stdout
+    assert "subset: commercial_subsectors2 residential_subsectors" in result.stdout
+    assert "supplemental: all_subsectors commercial_subsectors" in result.stdout
+    assert "supplemental: all_geographies census_division census_region state" in result.stdout

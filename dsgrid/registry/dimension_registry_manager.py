@@ -89,7 +89,7 @@ class DimensionRegistryManager(RegistryManagerBase):
     @staticmethod
     def _get_matching_time_dimension(existing_dims, new_dim):
         for time_dim in existing_dims:
-            if type(time_dim) != type(new_dim):
+            if type(time_dim) is not type(new_dim):
                 continue
             match = True
             exclude = set(("description", "dimension_id", "key", "id", "rev", "version"))

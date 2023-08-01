@@ -16,7 +16,7 @@ with open(here / "dsgrid" / "_version.py", encoding="utf-8") as f:
 with open(here / "README.md", encoding="utf-8") as f:
     readme = f.read()
 
-dev_requires = ["black>=22.3.0", "pre-commit", "devtools", "jupyter", "flake8", "pyarrow"]
+dev_requires = ["black>=22.3.0", "pre-commit", "devtools", "flake8", "pyarrow"]
 
 test_requires = [
     "httpx",  # starlette, used by fastapi, requires this as an optional dependency for testing.

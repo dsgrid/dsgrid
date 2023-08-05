@@ -31,6 +31,7 @@ doc_requires = [
     "sphinx",
     "sphinx-click",
     "sphinx-copybutton",
+    "sphinx-tabs",
     "sphinx_argparse",
     "sphinxcontrib.programoutput",
     "autodoc_pydantic[erdantic]",

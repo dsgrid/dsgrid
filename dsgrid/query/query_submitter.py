@@ -145,9 +145,6 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 "Choose a different path or pass force=True."
             )
 
-        for dim_filter in model.project.dataset.params.dimension_filters:
-            dim_filter.preprocess(self._project.config)
-
         df = None
         if load_cached_table:
             df, metadata = self._try_read_cache(context)
@@ -194,6 +191,12 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     def _apply_filters(self, df, context: QueryContext):
         for dim_filter in context.model.result.dimension_filters:
             query_name = dim_filter.dimension_query_name
+            dim = self._project.config.get_dimension(query_name)
+            if dim.model.dimension_type == context.get_pivoted_dimension_type():
+                # TODO: issue #256
+                raise NotImplementedError(
+                    f"Post-filters do not yet support the pivoted dimension type: {query_name=}"
+                )
             if query_name not in df.columns:
                 # Consider catching this exception and still write to a file.
                 # It could mean writing a lot of data the user doesn't want.

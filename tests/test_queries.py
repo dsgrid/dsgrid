@@ -17,7 +17,7 @@ from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
     DimensionFilterColumnOperatorModel,
-    SubsetDimensionFilterModel,
+    SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.loggers import setup_logging
@@ -435,9 +435,9 @@ class QueryTestElectricityValues(QueryTestBase):
 
     NAME = "electricity-values"
 
-    def __init__(self, use_subset_dimension, *args, **kwargs):
+    def __init__(self, use_supplemental_dimension, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._use_subset_dimension = use_subset_dimension
+        self._use_supplemental_dimension = use_supplemental_dimension
 
     def make_query(self):
         self._model = ProjectQueryModel(
@@ -491,11 +491,14 @@ class QueryTestElectricityValues(QueryTestBase):
                 replace_ids_with_names=True,
             ),
         )
-        if self._use_subset_dimension:
+        if self._use_supplemental_dimension:
             self._model.project.dataset.params.dimension_filters.append(
-                SubsetDimensionFilterModel(
+                SupplementalDimensionFilterColumnOperatorModel(
                     dimension_type=DimensionType.METRIC,
-                    dimension_query_name="electricity_end_uses",
+                    dimension_query_name="end_uses_by_fuel_type",
+                    operator="isin",
+                    column="fuel_id",
+                    value=["electricity"],
                 )
             )
         else:
@@ -569,9 +572,12 @@ class QueryTestElectricityUse(QueryTestBase):
                     ],
                     params=ProjectQueryDatasetParamsModel(
                         dimension_filters=[
-                            SubsetDimensionFilterModel(
+                            SupplementalDimensionFilterColumnOperatorModel(
                                 dimension_type=DimensionType.METRIC,
-                                dimension_query_name="electricity_end_uses",
+                                dimension_query_name="end_uses_by_fuel_type",
+                                operator="isin",
+                                column="fuel_id",
+                                value=["electricity"],
                             ),
                         ],
                     ),
@@ -640,9 +646,12 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                     ],
                     params=ProjectQueryDatasetParamsModel(
                         dimension_filters=[
-                            SubsetDimensionFilterModel(
+                            SupplementalDimensionFilterColumnOperatorModel(
                                 dimension_type=DimensionType.METRIC,
-                                dimension_query_name="electricity_end_uses",
+                                dimension_query_name="end_uses_by_fuel_type",
+                                operator="isin",
+                                column="fuel_id",
+                                value=["electricity"],
                             ),
                         ],
                     ),
@@ -904,9 +913,12 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                     ],
                     params=ProjectQueryDatasetParamsModel(
                         dimension_filters=[
-                            SubsetDimensionFilterModel(
+                            SupplementalDimensionFilterColumnOperatorModel(
                                 dimension_type=DimensionType.METRIC,
-                                dimension_query_name="electricity_end_uses",
+                                dimension_query_name="end_uses_by_fuel_type",
+                                operator="isin",
+                                column="fuel_id",
+                                value=["electricity"],
                             ),
                         ],
                     ),
@@ -1086,9 +1098,12 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                     ],
                     params=ProjectQueryDatasetParamsModel(
                         dimension_filters=[
-                            SubsetDimensionFilterModel(
+                            SupplementalDimensionFilterColumnOperatorModel(
                                 dimension_type=DimensionType.METRIC,
-                                dimension_query_name="electricity_end_uses",
+                                dimension_query_name="end_uses_by_fuel_type",
+                                operator="isin",
+                                column="fuel_id",
+                                value=["electricity"],
                             ),
                         ],
                     ),

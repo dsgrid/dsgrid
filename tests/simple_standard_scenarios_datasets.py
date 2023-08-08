@@ -10,6 +10,7 @@ from pyspark.sql import SparkSession
 from dsgrid.config.mapping_tables import MappingTableRecordModel
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.files import dump_data, load_data
 from dsgrid.utils.spark import models_to_dataframe
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
 from dsgrid.tests.utils import read_csv_single_table_format, read_parquet_two_table_format
@@ -23,24 +24,12 @@ BUILDING_COUNTY_MAPPING = {
     "36047": "G3600470",
     "36081": "G3600810",
 }
+STATS_FILENAME = "raw_stats.json"
 Datasets = namedtuple("Datasets", ["comstock", "resstock", "tempo"])
 
 
-def read_datasets(path):
-    path = EXPECTED_DATASET_PATH
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    comstock = spark.read.parquet(str(path / "comstock_projected.parquet"))
-    resstock = spark.read.parquet(str(path / "resstock_projected.parquet"))
-    tempo = spark.read.parquet(str(path / "tempo_mapped.parquet"))
-    datasets = Datasets(
-        comstock=comstock,
-        resstock=resstock,
-        tempo=tempo,
-    )
-    return datasets
-
-
 def build_expected_datasets():
+    """Build the expected datasets and save summarized stats to a JSON file."""
     path = REGISTRY_PATH
     aeo_com = map_aeo_com_subsectors(
         map_aeo_com_county_to_comstock_county(
@@ -82,22 +71,22 @@ def build_expected_datasets():
         comstock = comstock.withColumn(column, F.col(column) / 1000)
         resstock = resstock.withColumn(column, F.col(column) / 1000)
     tempo = tempo.withColumn("L1andL2", F.col("L1andL2") / 1000)
-    EXPECTED_DATASET_PATH.mkdir(exist_ok=True)
-    comstock.coalesce(1).write.mode("overwrite").parquet(
-        str(EXPECTED_DATASET_PATH / "comstock_projected.parquet")
-    )
-    resstock.coalesce(1).write.mode("overwrite").parquet(
-        str(EXPECTED_DATASET_PATH / "resstock_projected.parquet")
-    )
-    tempo.coalesce(1).write.mode("overwrite").parquet(
-        str(EXPECTED_DATASET_PATH / "tempo_mapped.parquet")
-    )
+
     datasets = Datasets(
         comstock=comstock,
         resstock=resstock,
         tempo=tempo,
     )
-    return datasets
+    stats = generate_raw_stats(datasets)
+    EXPECTED_DATASET_PATH.mkdir(exist_ok=True)
+    filename = EXPECTED_DATASET_PATH / STATS_FILENAME
+    dump_data(stats, filename, indent=2)
+    print(f"Wrote stats to {filename}")
+
+
+def load_dataset_stats() -> dict:
+    """Load the saved dataset stats."""
+    return load_data(EXPECTED_DATASET_PATH / STATS_FILENAME)
 
 
 def apply_load_mapping_aeo_com(aeo_com):
@@ -226,8 +215,7 @@ def build_tempo():
     return tempo_data_mapped_time
 
 
-def generate_raw_stats(path):
-    datasets = read_datasets(path)
+def generate_raw_stats(datasets):
     stats = {"overall": defaultdict(dict), "by_county": {}}
     for project_county in BUILDING_COUNTY_MAPPING:
         stats["by_county"][project_county] = defaultdict(dict)
@@ -326,4 +314,3 @@ def perform_op_by_electricity(stats, table, name, operation):
 
 if __name__ == "__main__":
     build_expected_datasets()
-    print(f"Built expected simple-standard-scenarios datasets at {EXPECTED_DATASET_PATH}")

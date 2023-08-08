@@ -242,6 +242,11 @@ previous step to a dsgrid-test-data repository in the directory
 `dsgrid-test-data/filtered_registries/simple_standard_scenarios`. Make a branch, commit, push
 it to GitHub, and open a pull request.
 
+4. Run `python tests/simple_standard_scenarios_datasets.py` from the dsgrid base directory and add
+the modified file
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios/expected_datasets/raw_stats.json`
+to the same pull request.
+
 ### Run tests
 
 To run all tests, including AWS tests:

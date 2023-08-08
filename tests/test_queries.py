@@ -3,7 +3,6 @@ import logging
 import math
 import shutil
 import tempfile
-import time
 from pathlib import Path
 
 import pyspark.sql.functions as F
@@ -44,7 +43,7 @@ from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.utils import read_parquet
-from .simple_standard_scenarios_datasets import REGISTRY_PATH, generate_raw_stats
+from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
 DIMENSION_MAPPING_SCHEMA = StructType(
@@ -350,8 +349,6 @@ def run_query_test(test_query_cls, *args, expected_values=None):
 class QueryTestBase(abc.ABC):
     """Base class for all test queries"""
 
-    stats = None
-
     def __init__(self, registry_path, project, output_dir=Path("queries")):
         self._registry_path = Path(registry_path)
         self._project = project
@@ -397,12 +394,7 @@ class QueryTestBase(abc.ABC):
         -------
         dict
         """
-        if QueryTestBase.stats is None:
-            start = time.time()
-            QueryTestBase.stats = generate_raw_stats(self._registry_path)
-            duration = time.time() - start
-            logger.info("Generate raw stats took %s seconds", duration)
-        return QueryTestBase.stats
+        return load_dataset_stats()
 
     @abc.abstractmethod
     def make_query(self):

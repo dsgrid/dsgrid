@@ -90,7 +90,7 @@ setup(
         "pandas~=1.5",
         "prettytable",
         "pydantic~=1.10.11",
-        "pyspark==3.3.1",  # Keep this synced with the spark version in Dockerfile.
+        "pyspark==3.4.1",  # Keep this synced with the spark version in Dockerfile.
         "python-arango",
         "requests",
         "s3path",

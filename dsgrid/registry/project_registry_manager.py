@@ -282,7 +282,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             tmp_dirs.append(supp_dir)
             if model.dimensions.subset_dimensions:
                 logger.info("Register subset dimensions")
-                self._register_dimensions_from_subset_dimensions(
+                self._register_from_subset_dimensions(
                     model.dimensions.subset_dimensions,
                     model.dimensions.base_dimension_references,
                     context,
@@ -396,7 +396,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimensions.clear()
         return dimension_references
 
-    def _register_dimensions_from_subset_dimensions(
+    def _register_from_subset_dimensions(
         self, subset_dimensions, base_dimension_references, context, submitter, log_message
     ):
         with TemporaryDirectory() as tmpdir:

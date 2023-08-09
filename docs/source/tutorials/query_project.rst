@@ -16,6 +16,7 @@ This query will accomplish the following:
 - Filter data for only model years 2030, 2040, and 2050.
 - Aggregate county-level load data into state-level.
 - Aggregate load data by fuel type.
+- Aggregate hourly data into annual data.
 - Drop the subsector dimension.
 
 Steps
@@ -103,6 +104,8 @@ ssh to a login node to begin the tutorial.
               "time": [
                 {
                   "dimension_query_name": "time_est",
+                  "function": "year",
+                  "alias": "year"
                 }
               ],
               "weather_year": [

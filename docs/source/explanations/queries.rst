@@ -39,7 +39,7 @@ dsgrid performs the following steps:
 
 5. Apply any dimension_filters defined in the ``result`` data model of the query.
 
-6. Apply any aggregations or disaggregations defined in the the ``result`` data model of the query.
+6. Apply any aggregations or disaggregations defined in the ``result`` data model of the query.
 
 7. If the field ``replace_ids_with_names`` in the ``result`` data model is ``true``, replace all
    dimension record IDs with names.

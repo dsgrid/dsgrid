@@ -15,10 +15,15 @@ All examples except ``DimensionFilterBetweenColumnOperatorModel`` assume that th
 filtered is the dimension record table. ``DimensionFilterBetweenColumnOperatorModel`` assumes that
 the table is the load data dataframe with time-series information.
 
+.. note:: Whenever multiple filters are provided in an array dsgrid performs an ``and`` across all
+   filters.
+
 1. Filter the table where a dimension column matches an expression. This example filters the
    geography dimension by selecting only data where the county matches the ID ``06037`` (Los
    Angeles, CA). This is equivalent to ``column == "06037"``. You can use any mathematical
    operator.
+
+.. note:: All values for dimensions in the filters must be strings.
 
 .. tabs::
 
@@ -49,7 +54,7 @@ the table is the load data dataframe with time-series information.
 
    .. code-tab:: py pyspark
 
-      df.filter("geography == 'county'")
+      df.filter("geography == '06037'")
 
 
 2. Similar to the first but use a raw expression. ``DimensionFilterExpressionModel`` creates a
@@ -86,7 +91,7 @@ the table is the load data dataframe with time-series information.
 
    .. code-tab:: py pyspark
 
-      df.filter("geography == 'county'")
+      df.filter("geography == '06037'")
 
 3. Filter a table where a dimension column matches a Spark SQL operator. This is useful for cases
    where you want to match non-exact strings or use a list of possible values.
@@ -186,7 +191,7 @@ the table is the load data dataframe with time-series information.
 
       df.filter("fuel_id == 'electricity'")
 
-5. Filter a table with times between two timestamps.
+5. Filter a table with times between two timestamps (inclusive on both sides).
 
 .. tabs::
 

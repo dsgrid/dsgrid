@@ -21,6 +21,7 @@ from dsgrid.dimension.dimension_filters import (
     SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
+from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
@@ -309,13 +310,19 @@ def run_project_query(
     )
     project = registry_manager.project_manager.load_project(query.project.project_id)
     fs_interface = make_filesystem_interface(output)
-    ProjectQuerySubmitter(project, fs_interface.path(output)).submit(
-        query,
-        persist_intermediate_table=persist_intermediate_table,
-        load_cached_table=load_cached_table,
-        zip_file=zip_file,
-        force=force,
-    )
+    ret = 0
+    try:
+        ProjectQuerySubmitter(project, fs_interface.path(output)).submit(
+            query,
+            persist_intermediate_table=persist_intermediate_table,
+            load_cached_table=load_cached_table,
+            zip_file=zip_file,
+            force=force,
+        )
+    except DSGInvalidQuery as exc:
+        logger.error("Query failed: %s", exc)
+        ret = 1
+    sys.exit(ret)
 
 
 @click.command("create_dataset")

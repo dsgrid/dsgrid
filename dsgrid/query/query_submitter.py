@@ -121,9 +121,22 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         for agg in model.result.aggregations:
             for _, column in agg.iter_dimensions_to_keep():
                 dimension_query_name = column.dimension_query_name
-                if column.dimension_query_name in subsets:
+                if dimension_query_name in subsets:
+                    dim_type = self._project.config.get_dimension(
+                        dimension_query_name
+                    ).model.dimension_type
+                    base_name = self._project.config.get_base_dimension(
+                        dim_type
+                    ).model.dimension_query_name
+                    supp_names = " ".join(
+                        self._project.config.get_supplemental_dimension_to_query_name_mapping()[
+                            dim_type
+                        ]
+                    )
                     raise DSGInvalidQuery(
-                        f"subset dimensions cannot be used in aggregations: {dimension_query_name=}"
+                        f"Subset dimensions cannot be used in aggregations: "
+                        f"{dimension_query_name=}. Only base and supplemental dimensions are "
+                        f"allowed. base={base_name} supplemental={supp_names}"
                     )
 
     def _run_query(

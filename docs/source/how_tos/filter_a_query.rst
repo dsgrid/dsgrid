@@ -156,8 +156,8 @@ the table is the load data dataframe with time-series information.
       df.filter(df["model_year"].isin(["2030", "2040", "2050"])) \
         .filter(df["sector"].startswith("com"))
 
-4. Filter a table with values from a supplemental dimension. This example filters the table to
-   include only end uses with a fuel type of electricity.
+4. Filter a table with values from a subset dimension. This example filters the table to
+   include only electricity end uses.
 
 .. tabs::
 
@@ -166,12 +166,40 @@ the table is the load data dataframe with time-series information.
       dimension_filters: [
         {
           dimension_type: "metric",
-          dimension_query_name: "end_uses_by_fuel_type",
-          column: "fuel_id",
+          dimension_query_names: ["electricity_end_uses"],
+          filter_type: "subset"
+        },
+      ],
+
+   .. code-tab:: py
+
+      dimension_filters=[
+          SubsetDimensionFilterModel(
+              dimension_type=DimensionType.METRIC,
+              dimension_query_names=["electricity_end_uses"],
+          ),
+      ]
+
+   .. code-tab:: py pyspark
+
+      df.filter(df["end_use"].isin(["electricity_cooling", "electricity_heating"]))
+
+5. Filter a table with values from a supplemental dimension. This example filters the table to
+   include only end uses with a fuel type of electricity.  Note that in many cases this filter type
+   is redundant with subset filters.
+
+.. tabs::
+
+   .. code-tab:: js JSON5
+
+      dimension_filters: [
+        {
+          dimension_type: "subsector",
+          dimension_query_name: "subsectors_by_sector",
+          column: "id",
           operator: "isin",
-          value: ["electricity"],
-          filter_type: "SupplementalDimensionFilterColumnOperatorModel"
-          negate: false,
+          value: ["commercial_subsectors", "residential_subsectors"],
+          filter_type: "supplemental_column_operator"
         },
       ],
 
@@ -179,19 +207,19 @@ the table is the load data dataframe with time-series information.
 
       dimension_filters=[
           SupplementalDimensionFilterColumnOperatorModel(
-              dimension_type=DimensionType.METRIC,
-              dimension_query_name="end_uses_by_fuel_type",
-              column="fuel_id",
+              dimension_type=DimensionType.SUBSECTOR,
+              dimension_query_name="subsectors_by_sector",
+              column="id",
               operator="isin",
-              value=["electricity"],
+              value=["commercial_subsectors", "residential_subsectors"],
           ),
       ]
 
    .. code-tab:: py pyspark
 
-      df.filter("fuel_id == 'electricity'")
+      df.filter(df["id"].isin(["commercial_subsectors", "residential_subsectors"]))
 
-5. Filter a table with times between two timestamps (inclusive on both sides).
+6. Filter a table with times between two timestamps (inclusive on both sides).
 
 .. tabs::
 

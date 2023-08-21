@@ -78,7 +78,7 @@ class SubsetDimensionSelectorModel(DSGBaseModel):
     )
 
 
-class SubsetDimensionModel(DSGBaseModel):
+class SubsetDimensionGroupModel(DSGBaseModel):
     """Defines one or more subset dimension selectors for a dimension type."""
 
     name: str
@@ -181,9 +181,9 @@ class DimensionsModel(DSGBaseModel):
         ),
         default=[],
     )
-    subset_dimensions: list[SubsetDimensionModel] = Field(
+    subset_dimensions: list[SubsetDimensionGroupModel] = Field(
         title="subset_dimensions",
-        description="List of subset dimensions",
+        description="List of subset group dimensions",
         notes=(
             "Subset dimensions are used to specify subsets of dimension records that a dataset ",
             "must support, dimensionality of derived datasets, and query filters.",

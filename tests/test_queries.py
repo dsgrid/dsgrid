@@ -16,6 +16,7 @@ from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
     DimensionFilterColumnOperatorModel,
+    SubsetDimensionFilterModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.exceptions import DSGInvalidQuery
@@ -97,8 +98,8 @@ def la_expected_electricity_hour_16(tmp_path_factory):
 
 
 def test_electricity_values():
-    run_query_test(QueryTestElectricityValues, True)
-    run_query_test(QueryTestElectricityValues, False)
+    for category in DimensionCategory:
+        run_query_test(QueryTestElectricityValues, category)
 
 
 def test_electricity_use_by_county():
@@ -112,7 +113,8 @@ def test_electricity_use_by_state():
 
 
 def test_electricity_use_with_results_filter():
-    run_query_test(QueryTestElectricityUseFilterResults, "county", "sum")
+    run_query_test(QueryTestElectricityUseFilterResults, "county", "sum", DimensionCategory.BASE)
+    run_query_test(QueryTestElectricityUseFilterResults, "county", "sum", DimensionCategory.SUBSET)
 
 
 def test_total_electricity_use_with_filter():
@@ -247,7 +249,7 @@ def test_query_cli_create_validate(tmp_path):
         "-F",
         "supplemental_column_operator",
         "-F",
-        "raw",
+        "expression_raw",
         "--force",
         "my_query",
         "dsgrid_conus_2022",
@@ -269,7 +271,9 @@ def test_query_cli_run(tmp_path):
     project = get_project(
         QueryTestElectricityValues.get_database_name(), QueryTestElectricityValues.get_project_id()
     )
-    query = QueryTestElectricityValues(True, REGISTRY_PATH, project, output_dir=output_dir)
+    query = QueryTestElectricityValues(
+        DimensionCategory.BASE, REGISTRY_PATH, project, output_dir=output_dir
+    )
     filename = tmp_path / "query.json"
     filename.write_text(query.make_query().json(indent=2))
     cmd = [
@@ -427,9 +431,9 @@ class QueryTestElectricityValues(QueryTestBase):
 
     NAME = "electricity-values"
 
-    def __init__(self, use_supplemental_dimension, *args, **kwargs):
+    def __init__(self, category: DimensionCategory, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._use_supplemental_dimension = use_supplemental_dimension
+        self._category = category
 
     def make_query(self):
         self._model = ProjectQueryModel(
@@ -483,26 +487,32 @@ class QueryTestElectricityValues(QueryTestBase):
                 replace_ids_with_names=True,
             ),
         )
-        if self._use_supplemental_dimension:
-            self._model.project.dataset.params.dimension_filters.append(
-                SupplementalDimensionFilterColumnOperatorModel(
-                    dimension_type=DimensionType.METRIC,
-                    dimension_query_name="end_uses_by_fuel_type",
-                    operator="isin",
-                    column="fuel_id",
-                    value=["electricity"],
-                )
-            )
-        else:
-            self._model.project.dataset.params.dimension_filters.append(
-                DimensionFilterExpressionModel(
+        match self._category:
+            case DimensionCategory.BASE:
+                filter_model = DimensionFilterExpressionModel(
                     dimension_type=DimensionType.METRIC,
                     dimension_query_name="end_use",
                     operator="==",
                     column="fuel_id",
                     value="electricity",
                 )
-            )
+            case DimensionCategory.SUBSET:
+                filter_model = SubsetDimensionFilterModel(
+                    dimension_type=DimensionType.METRIC,
+                    dimension_query_names=["electricity_end_uses"],
+                )
+            case DimensionCategory.SUPPLEMENTAL:
+                filter_model = SupplementalDimensionFilterColumnOperatorModel(
+                    dimension_type=DimensionType.METRIC,
+                    dimension_query_name="end_uses_by_fuel_type",
+                    operator="isin",
+                    column="fuel_id",
+                    value=["electricity"],
+                )
+            case _:
+                assert False, f"{self._category=}"
+
+        self._model.project.dataset.params.dimension_filters.append(filter_model)
         return self._model
 
     def validate(self, expected_values=None):
@@ -602,6 +612,7 @@ class QueryTestElectricityUse(QueryTestBase):
                 self._op,
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
+                "comstock_resstock",
                 4,
             )
         elif self._geography == "state":
@@ -609,6 +620,7 @@ class QueryTestElectricityUse(QueryTestBase):
                 self._op,
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
+                "comstock_resstock",
             )
         else:
             assert False, self._geography
@@ -618,11 +630,12 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
 
     NAME = "total_electricity_use"
 
-    def __init__(self, geography, op, *args, **kwargs):
+    def __init__(self, geography, op, metric_dimension_category, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert geography in ("county", "state"), geography
         self._geography = geography
         self._op = op
+        self._metric_dimension_category = metric_dimension_category
 
     def make_query(self):
         self._model = ProjectQueryModel(
@@ -643,7 +656,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                                 dimension_query_name="end_uses_by_fuel_type",
                                 operator="isin",
                                 column="fuel_id",
-                                value=["electricity"],
+                                value=["electricity", "natural_gas"],
                             ),
                         ],
                     ),
@@ -669,14 +682,37 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                     DimensionFilterColumnOperatorModel(
                         dimension_type=DimensionType.GEOGRAPHY,
                         dimension_query_name=self._geography,
-                        column=self._geography,
                         operator="isin",
                         value=["06037", "36047"] if self._geography == "county" else ["CA", "NY"],
-                    )
+                    ),
+                    SubsetDimensionFilterModel(
+                        dimension_type=DimensionType.SUBSECTOR,
+                        dimension_query_names=["commercial_subsectors"],
+                    ),
                 ],
                 output_format="parquet",
             ),
         )
+
+        match self._metric_dimension_category:
+            case DimensionCategory.BASE:
+                self._model.result.dimension_filters.append(
+                    DimensionFilterColumnOperatorModel(
+                        dimension_type=DimensionType.METRIC,
+                        dimension_query_name="end_use",
+                        operator="isin",
+                        value=["electricity_cooling", "electricity_heating"],
+                    ),
+                )
+            case DimensionCategory.SUBSET:
+                self._model.result.dimension_filters.append(
+                    SubsetDimensionFilterModel(
+                        dimension_type=DimensionType.METRIC,
+                        dimension_query_names=["electricity_end_uses"],
+                    ),
+                )
+            case _:
+                assert False, self._metric_dimension_category
         return self._model
 
     def validate(self, expected_values=None):
@@ -685,6 +721,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                 self._op,
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
+                "comstock",
                 2,
             )
         elif self._geography == "state":
@@ -692,6 +729,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                 self._op,
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
+                "comstock",
             )
         else:
             assert False, self._geography
@@ -750,6 +788,7 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
             "sum",
             self.output_dir / self.name / "table.parquet",
             self.get_raw_stats(),
+            "comstock_resstock",
             1,
         )
 
@@ -1166,6 +1205,7 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
                 "sum",
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
+                "comstock_resstock",
                 4,
             )
         elif self._geography == "state":
@@ -1173,6 +1213,7 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
                 "sum",
                 self.output_dir / self.name / "table.parquet",
                 self.get_raw_stats(),
+                "comstock_resstock",
             )
         logger.error(
             "Validation is not supported with geography=%s",
@@ -1243,7 +1284,9 @@ def perform_op(df, column, operation):
     return df.select(column).agg(operation(column).alias("tmp_col")).collect()[0].tmp_col
 
 
-def validate_electricity_use_by_county(op, results_path, raw_stats, expected_county_count):
+def validate_electricity_use_by_county(
+    op, results_path, raw_stats, datasets, expected_county_count
+):
     spark = SparkSession.builder.appName("dgrid").getOrCreate()
     results = spark.read.parquet(str(results_path))
     counties = [str(x.county) for x in results.select("county").distinct().collect()]
@@ -1252,20 +1295,20 @@ def validate_electricity_use_by_county(op, results_path, raw_stats, expected_cou
     for county in counties:
         col = "electricity_end_uses"
         actual = results.filter(f"county == '{county}'").collect()[0][col]
-        expected = stats[county]["comstock_resstock"][op]["electricity"]
+        expected = stats[county][datasets][op]["electricity"]
         assert math.isclose(actual, expected)
 
 
-def validate_electricity_use_by_state(op, results_path, raw_stats):
+def validate_electricity_use_by_state(op, results_path, raw_stats, datasets):
     spark = SparkSession.builder.appName("dgrid").getOrCreate()
     results = spark.read.parquet(str(results_path))
     if op == "sum":
-        exp_ca = get_expected_ca_sum_electricity(raw_stats)
-        exp_ny = get_expected_ny_sum_electricity(raw_stats)
+        exp_ca = get_expected_ca_sum_electricity(raw_stats, datasets)
+        exp_ny = get_expected_ny_sum_electricity(raw_stats, datasets)
     else:
         assert op == "max", op
-        exp_ca = get_expected_ca_max_electricity(raw_stats)
-        exp_ny = get_expected_ny_max_electricity(raw_stats)
+        exp_ca = get_expected_ca_max_electricity(raw_stats, datasets)
+        exp_ny = get_expected_ny_max_electricity(raw_stats, datasets)
     col = "electricity_end_uses"
     actual_ca = results.filter("state == 'CA'").collect()[0][col]
     actual_ny = results.filter("state == 'NY'").collect()[0][col]
@@ -1273,39 +1316,39 @@ def validate_electricity_use_by_state(op, results_path, raw_stats):
     assert math.isclose(actual_ny, exp_ny)
 
 
-def get_expected_ca_max_electricity(raw_stats):
+def get_expected_ca_max_electricity(raw_stats, datasets):
     by_county = raw_stats["by_county"]
     return max(
         (
-            by_county["06037"]["comstock_resstock"]["max"]["electricity"],
-            by_county["06073"]["comstock_resstock"]["max"]["electricity"],
+            by_county["06037"][datasets]["max"]["electricity"],
+            by_county["06073"][datasets]["max"]["electricity"],
         )
     )
 
 
-def get_expected_ny_max_electricity(raw_stats):
+def get_expected_ny_max_electricity(raw_stats, datasets):
     by_county = raw_stats["by_county"]
     return max(
         (
-            by_county["36047"]["comstock_resstock"]["max"]["electricity"],
-            by_county["36081"]["comstock_resstock"]["max"]["electricity"],
+            by_county["36047"][datasets]["max"]["electricity"],
+            by_county["36081"][datasets]["max"]["electricity"],
         )
     )
 
 
-def get_expected_ca_sum_electricity(raw_stats):
+def get_expected_ca_sum_electricity(raw_stats, datasets):
     by_county = raw_stats["by_county"]
     return (
-        by_county["06037"]["comstock_resstock"]["sum"]["electricity"]
-        + by_county["06073"]["comstock_resstock"]["sum"]["electricity"]
+        by_county["06037"][datasets]["sum"]["electricity"]
+        + by_county["06073"][datasets]["sum"]["electricity"]
     )
 
 
-def get_expected_ny_sum_electricity(raw_stats):
+def get_expected_ny_sum_electricity(raw_stats, datasets):
     by_county = raw_stats["by_county"]
     return (
-        by_county["36047"]["comstock_resstock"]["sum"]["electricity"]
-        + by_county["36081"]["comstock_resstock"]["sum"]["electricity"]
+        by_county["36047"][datasets]["sum"]["electricity"]
+        + by_county["36081"][datasets]["sum"]["electricity"]
     )
 
 

@@ -6,8 +6,10 @@ from zipfile import ZipFile
 
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
 from dsgrid.dimension.base_models import DimensionCategory
+from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
 from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.utils.spark import (
+    get_unique_values,
     read_dataframe,
     try_read_dataframe,
     write_dataframe_and_auto_partition,
@@ -203,20 +205,40 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     def _apply_filters(self, df, context: QueryContext):
         for dim_filter in context.model.result.dimension_filters:
-            query_name = dim_filter.dimension_query_name
-            dim = self._project.config.get_dimension(query_name)
-            if dim.model.dimension_type == context.get_pivoted_dimension_type():
-                # TODO: issue #256
-                raise NotImplementedError(
-                    f"Post-filters do not yet support the pivoted dimension type: {query_name=}"
+            if isinstance(dim_filter, SubsetDimensionFilterModel):
+                records = dim_filter.get_filtered_records_dataframe(
+                    self.project.config.get_dimension
                 )
-            if query_name not in df.columns:
-                # Consider catching this exception and still write to a file.
-                # It could mean writing a lot of data the user doesn't want.
-                raise DSGInvalidParameter(
-                    f"filter column {query_name} is not in the dataframe: {df.columns}"
-                )
-            df = dim_filter.apply_filter(df)
+                if dim_filter.dimension_type == context.get_pivoted_dimension_type():
+                    df = self._drop_filtered_pivoted_columns(df, context, records)
+                else:
+                    column = dim_filter.dimension_type.value
+                    df = df.join(records.select("id"), on=df[column] == records["id"]).drop("id")
+            else:
+                if dim_filter.dimension_type == context.get_pivoted_dimension_type():
+                    dim_records = self.project.config.get_dimension_records(
+                        dim_filter.dimension_query_name
+                    )
+                    records = dim_filter.apply_filter(dim_records, column="id")
+                    df = self._drop_filtered_pivoted_columns(df, context, records)
+                else:
+                    query_name = dim_filter.dimension_query_name
+                    if query_name not in df.columns:
+                        # Consider catching this exception and still write to a file.
+                        # It could mean writing a lot of data the user doesn't want.
+                        raise DSGInvalidParameter(
+                            f"filter column {query_name} is not in the dataframe: {df.columns}"
+                        )
+                    df = dim_filter.apply_filter(df, column=query_name)
+        return df
+
+    @staticmethod
+    def _drop_filtered_pivoted_columns(df, context: QueryContext, records):
+        record_ids = get_unique_values(records, "id")
+        drop_columns = context.get_pivoted_columns() - record_ids
+        df = df.drop(*drop_columns)
+        pivoted_columns = (record_ids - drop_columns).intersection(df.columns)
+        context.set_pivoted_columns(pivoted_columns)
         return df
 
     @track_timing(timer_stats_collector)

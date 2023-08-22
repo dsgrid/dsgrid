@@ -28,13 +28,13 @@ doc_requires = [
     "furo",
     "ghp-import",
     "numpydoc",
-    "sphinx",
-    "sphinx-click",
-    "sphinx-copybutton",
-    "sphinx-tabs",
-    "sphinx_argparse",
+    "sphinx~=7.2",
+    "sphinx-click~=5.0",
+    "sphinx-copybutton~=0.5.2",
+    "sphinx-tabs~=3.4",
+    "sphinx_argparse~=0.4.0",
     "sphinxcontrib.programoutput",
-    "autodoc_pydantic[erdantic]",
+    "autodoc_pydantic[erdantic]~=1.9",
 ]
 
 release_requires = ["twine", "setuptools", "wheel"]
@@ -78,16 +78,14 @@ setup(
     ],
     test_suite="tests",
     install_requires=[
-        "awscli",
+        "awscliv2",
         "boto3",
         "click>=8",
         "dash",
         "dash_bootstrap_components",
         "fastapi",
         "json5",
-        "numpy~=1.23.0",  # pyspark uses numpy.bool, which was removed in numpy 1.24
-        # Remove this restriction when pyspark is fixed.
-        "pandas~=1.5",
+        "pandas",
         "prettytable",
         "pydantic~=1.10.11",
         "pyspark==3.4.1",  # Keep this synced with the spark version in Dockerfile.

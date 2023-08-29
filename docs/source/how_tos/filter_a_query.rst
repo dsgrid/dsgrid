@@ -20,8 +20,10 @@ the table is the load data dataframe with time-series information.
 
 1. Filter the table where a dimension column matches an expression. This example filters the
    geography dimension by selecting only data where the county matches the ID ``06037`` (Los
-   Angeles, CA). This is equivalent to ``column == "06037"``. You can use any mathematical
-   operator.
+   Angeles, CA). This is equivalent to ``column == "06037"``. You can use any SQL expression.
+   Refer to the `Spark documentation
+   <https://spark.apache.org/docs/latest/api/python/reference/pyspark.sql/api/pyspark.sql.DataFrame.filter.html>`_
+   for more information.
 
 .. note:: All values for dimensions in the filters must be strings.
 
@@ -93,8 +95,9 @@ the table is the load data dataframe with time-series information.
 
       df.filter("geography == '06037'")
 
-3. Filter a table where a dimension column matches a Spark SQL operator. This is useful for cases
-   where you want to match non-exact strings or use a list of possible values.
+3. Filter a table where the specified column matches the specified value(s) according to the Spark
+   SQL operator. This is useful for cases where you want to match partial strings or use a list of
+   possible values.
 
 .. tabs::
 
@@ -182,11 +185,13 @@ the table is the load data dataframe with time-series information.
 
    .. code-tab:: py pyspark
 
+      # Note that these are example dimension record IDs for demonstration purposes.
       df.filter(df["end_use"].isin(["electricity_cooling", "electricity_heating"]))
 
-5. Filter a table with values from a supplemental dimension. This example filters the table to
-   include only end uses with a fuel type of electricity.  Note that in many cases this filter type
-   is redundant with subset filters.
+5. Filter a table with records from a supplemental dimension. This example filters the table to
+   include only counties in Colorado or New Mexico. Note that it does not change the dimensionality
+   of the data or perform aggregations. It only tells dsgrid to filter out counties that don't have
+   a mapping in the supplemental dimension records.
 
 .. tabs::
 
@@ -194,11 +199,11 @@ the table is the load data dataframe with time-series information.
 
       dimension_filters: [
         {
-          dimension_type: "subsector",
-          dimension_query_name: "subsectors_by_sector",
+          dimension_type: "geography",
+          dimension_query_name: "state",
           column: "id",
           operator: "isin",
-          value: ["commercial_subsectors", "residential_subsectors"],
+          value: ["CO", "NM"],
           filter_type: "supplemental_column_operator"
         },
       ],
@@ -207,17 +212,17 @@ the table is the load data dataframe with time-series information.
 
       dimension_filters=[
           SupplementalDimensionFilterColumnOperatorModel(
-              dimension_type=DimensionType.SUBSECTOR,
-              dimension_query_name="subsectors_by_sector",
+              dimension_type=DimensionType.GEOGRAPHY,
+              dimension_query_name="state",
               column="id",
               operator="isin",
-              value=["commercial_subsectors", "residential_subsectors"],
+              value=["CO", "NM"],
           ),
       ]
 
    .. code-tab:: py pyspark
 
-      df.filter(df["id"].isin(["commercial_subsectors", "residential_subsectors"]))
+      df.filter(df["id"].isin(["CO", "NM"]))
 
 6. Filter a table with times between two timestamps (inclusive on both sides).
 

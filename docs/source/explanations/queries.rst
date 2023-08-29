@@ -21,10 +21,12 @@ dsgrid performs the following steps:
    - Map dataset dimensions to the project.
    - Convert units.
    - Evaluate the Spark job by writing the dataframe to the filesystem in the directory
-     ``query_output/cached_project_mapped_datasets``. The ``SparkSession`` is restarted for this
-     query. If custom Spark configuration parameters are defined in the ``spark_conf_per_dataset``
-     data model of the query for this dataset, dsgrid will apply them. The value
-     `spark.sql.shuffle.partitions`` may need to be increased for very large datasets.
+     ``query_output/cached_project_mapped_datasets``.
+
+     - dsgrid restarts the ``SparkSession`` for this query. If custom Spark configuration
+       parameters are defined in the ``spark_conf_per_dataset`` data model of the query for this
+       dataset, dsgrid will apply them in the new session.
+     - The value `spark.sql.shuffle.partitions`` may need to be increased for very large datasets.
 
 .. note:: Currently, there is no way to skip caching of the dataset. If it is not performed, the
    Spark job can grow too large and take too long to complete in normal compute node allocations.
@@ -33,8 +35,8 @@ dsgrid performs the following steps:
    The default is to take a union of all datasets.
 
 4. If the option ``--persist-intermediate-table`` is ``true`` (which is the default) then dsgrid
-   will evaluate the Spark job by writing the dataframe to the filesystem in the directory
-   ``query_output/cached_tables``. This can be disabled by setting
+   will evaluate the Spark query from the previous step by writing the dataframe to the filesystem
+   in the directory ``query_output/cached_tables``. This can be disabled by setting
    ``--no-persist-intermediate-table``.
 
 5. Apply any dimension_filters defined in the ``result`` data model of the query.

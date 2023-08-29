@@ -294,6 +294,27 @@ class DimensionsModel(DSGBaseModel):
         )
         return subset_dimensions
 
+    @root_validator
+    def check_dimension_query_names(cls, values):
+        """Check that all dimension query names are unique."""
+        query_names = set()
+
+        def add_name(name):
+            if name in query_names:
+                raise ValueError(f"dimension_query_name={name} is not unique in the project")
+            query_names.add(name)
+
+        for dim in values["base_dimensions"]:
+            add_name(dim.dimension_query_name)
+        for dim in values["supplemental_dimensions"]:
+            add_name(dim.dimension_query_name)
+        for group in values["subset_dimensions"]:
+            add_name(group.display_name)
+            for selector in group.selectors:
+                add_name(selector.name)
+
+        return values
+
 
 class RequiredSubsetDimensionRecordsModel(DSGBaseModel):
 

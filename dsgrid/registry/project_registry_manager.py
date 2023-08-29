@@ -399,6 +399,10 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _register_from_subset_dimensions(
         self, subset_dimensions, base_dimension_references, context, submitter, log_message
     ):
+        """Registers a dimension for each subset specified in the project config's subset
+        dimension groups. Appends references to those dimensions to subset_dimensions, which is
+        part of the project config.
+        """
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             dimensions = []
@@ -429,6 +433,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     if key in subset_refs:
                         raise Exception(f"Bug: unhandled case of duplicate dimension name: {key=}")
                     subset_refs[key] = subset_dimension
+
             dim_model = DimensionsConfigModel(dimensions=dimensions)
             dims_config = DimensionsConfig.load_from_model(dim_model)
             dimension_ids = self._dimension_mgr.register_from_config(
@@ -452,35 +457,37 @@ class ProjectRegistryManager(RegistryManagerBase):
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             dimensions = []
-            for subset_dimension in model.dimensions.subset_dimensions:
-                dimension_type = subset_dimension.dimension_type
+            for subset_dimension_group in model.dimensions.subset_dimensions:
+                if not subset_dimension_group.create_supplemental_dimensions:
+                    continue
+                dimension_type = subset_dimension_group.dimension_type
                 base_dim = None
                 for ref in model.dimensions.base_dimension_references:
                     if ref.dimension_type == dimension_type:
                         base_dim = self._dimension_mgr.get_by_id(ref.dimension_id)
                         break
-                assert base_dim is not None, subset_dimension
+                assert base_dim is not None, subset_dimension_group
                 records = {"id": [], "name": []}
                 # The pydantic validator has already checked consistency of these columns.
-                for column in subset_dimension.selectors[0].column_values:
+                for column in subset_dimension_group.selectors[0].column_values:
                     records[column] = []
-                for selector in subset_dimension.selectors:
+                for selector in subset_dimension_group.selectors:
                     records["id"].append(selector.name)
                     records["name"].append(selector.description)
                     if selector.column_values:
                         for column, value in selector.column_values.items():
                             records[column].append(value)
-                filename = tmp_path / f"{subset_dimension.dimension_query_name}.csv"
+                filename = tmp_path / f"{subset_dimension_group.dimension_query_name}.csv"
                 pd.DataFrame(records).to_csv(filename, index=False)
 
                 dim = DimensionModel(
                     filename=str(filename),
-                    name=subset_dimension.name,
-                    display_name=subset_dimension.display_name,
+                    name=subset_dimension_group.name,
+                    display_name=subset_dimension_group.display_name,
                     dimension_type=dimension_type,
                     module=base_dim.model.module,
                     class_name=base_dim.model.class_name,
-                    description=subset_dimension.description,
+                    description=subset_dimension_group.description,
                 )
                 dimensions.append(dim)
 
@@ -497,24 +504,28 @@ class ProjectRegistryManager(RegistryManagerBase):
         self, src_dir, supp_dir, model
     ):
         new_mappings = []
-        for subset_dimension in model.dimensions.subset_dimensions:
-            dimension_type = subset_dimension.dimension_type
+        for subset_dimension_group in model.dimensions.subset_dimensions:
+            if not subset_dimension_group.create_supplemental_dimensions:
+                continue
+            dimension_type = subset_dimension_group.dimension_type
             base_dim = None
             for ref in model.dimensions.base_dimension_references:
                 if ref.dimension_type == dimension_type:
                     base_dim = self._dimension_mgr.get_by_id(ref.dimension_id)
                     break
-            assert base_dim is not None, subset_dimension
+            assert base_dim is not None, subset_dimension_group
             base_dim_record_ids = base_dim.get_unique_ids()
             mapping_records = []
             new_ids = set()
-            for selector in subset_dimension.selectors:
+            for selector in subset_dimension_group.selectors:
                 for record_id in selector.records:
                     mapping_records.append({"from_id": record_id, "to_id": selector.name})
                     new_ids.add(record_id)
             for record_id in base_dim_record_ids.difference(new_ids):
                 mapping_records.append({"from_id": record_id, "to_id": ""})
-            map_record_file = supp_dir / f"{subset_dimension.dimension_query_name}_mapping.csv"
+            map_record_file = (
+                supp_dir / f"{subset_dimension_group.dimension_query_name}_mapping.csv"
+            )
             pd.DataFrame.from_records(mapping_records).to_csv(map_record_file, index=False)
 
             with in_other_dir(src_dir):
@@ -527,9 +538,9 @@ class ProjectRegistryManager(RegistryManagerBase):
                     ),
                     to_dimension=DimensionReferenceByNameModel(
                         dimension_type=dimension_type,
-                        name=subset_dimension.name,
+                        name=subset_dimension_group.name,
                     ),
-                    description=f"Aggregation map for {subset_dimension.name}",
+                    description=f"Aggregation map for {subset_dimension_group.name}",
                 )
                 new_mappings.append(mapping)
 

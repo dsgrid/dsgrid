@@ -473,7 +473,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     records[column] = []
                 for selector in subset_dimension_group.selectors:
                     records["id"].append(selector.name)
-                    records["name"].append(selector.description)
+                    records["name"].append(selector.name)
                     if selector.column_values:
                         for column, value in selector.column_values.items():
                             records[column].append(value)

@@ -66,10 +66,11 @@ class SubsetDimensionSelectorModel(DSGBaseModel):
     description: str
     column_values: dict[str, str] = Field(
         title="column_values",
-        description="Optional columns to populate in the records table. For example, if one "
-        "selector defines the end uses for one sector, the records table needs to define the "
-        "fields 'fuel_id' and 'unit.' The user would assign something like this: "
-        "{'fuel_id': 'all_fuels', 'unit': 'MWh'}",
+        description="Optional columns to populate in the subset dimension group's supplemental "
+        "dimension records table. For example, if each selector in the group defines the end "
+        "uses for one sector (e.g., commercial_end_uses, transportation_end_uses), the "
+        "supplemental dimension records table needs to define the 'fuel_id' and 'unit' fields of "
+        "the EnergyEndUse data model.",
         default={},
     )
     records: list[str] = Field(

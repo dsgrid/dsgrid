@@ -11,7 +11,7 @@ from pydantic import validator, root_validator
 from pydantic import Field
 
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeIntervalType,
@@ -665,7 +665,7 @@ class DimensionCommonModel(DSGBaseModel):
 class ProjectDimensionModel(DimensionCommonModel):
     """Common attributes for all dimensions that are assigned to a project"""
 
-    is_base: bool
+    category: DimensionCategory
 
 
 def create_dimension_common_model(model):
@@ -678,9 +678,9 @@ def create_dimension_common_model(model):
     return DimensionCommonModel(**data)
 
 
-def create_project_dimension_model(model, is_base):
+def create_project_dimension_model(model, category: DimensionCategory):
     data = create_dimension_common_model(model).dict()
-    data["is_base"] = is_base
+    data["category"] = category.value
     return ProjectDimensionModel(**data)
 
 

@@ -1,4 +1,3 @@
-import itertools
 import os
 import sys
 from tempfile import NamedTemporaryFile
@@ -12,7 +11,7 @@ from fastapi.responses import Response, FileResponse
 
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.config.dimensions import create_dimension_common_model, create_project_dimension_model
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGValueNotStored
 from dsgrid.loggers import setup_logging
 from dsgrid.query.models import (
@@ -134,11 +133,18 @@ async def list_project_dimensions(project_id: str):
     project = mgr.get_by_id(project_id)
     dimensions = []
     for item in project.get_dimension_query_names_model().dict().values():
-        dimension = create_project_dimension_model(project.get_dimension(item["base"]).model, True)
+        dimension = create_project_dimension_model(
+            project.get_dimension(item["base"]).model, DimensionCategory.BASE
+        )
         dimensions.append(dimension)
-        for query_name in itertools.chain(item["subset"], item["supplemental"]):
+        for query_name in item["subset"]:
             dimension = create_project_dimension_model(
-                project.get_dimension(query_name).model, False
+                project.get_dimension(query_name).model, DimensionCategory.SUBSET
+            )
+            dimensions.append(dimension)
+        for query_name in item["supplemental"]:
+            dimension = create_project_dimension_model(
+                project.get_dimension(query_name).model, DimensionCategory.SUPPLEMENTAL
             )
             dimensions.append(dimension)
 

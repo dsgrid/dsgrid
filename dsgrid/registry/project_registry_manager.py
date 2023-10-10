@@ -295,12 +295,10 @@ class ProjectRegistryManager(RegistryManagerBase):
                     submitter,
                     log_message,
                 )
-                model.dimension_mappings.base_to_supplemental += (
-                    self._add_supplemental_dimension_mappings_from_subset_dimensions(
-                        src_dir,
-                        supp_dir,
-                        model,
-                    )
+                self._add_supplemental_dimension_mappings_from_subset_dimensions(
+                    src_dir,
+                    supp_dir,
+                    model,
                 )
             if model.dimensions.supplemental_dimensions:
                 logger.info("Register supplemental dimensions")
@@ -454,11 +452,15 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _register_supplemental_dimensions_from_subset_dimensions(
         self, model, context, submitter, log_message
     ):
+        """Registers a supplemental dimension for each subset specified in the project config's
+        subset dimension groups. Appends references to those dimensions to the project config's
+        supplemental_dimension_references list.
+        """
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             dimensions = []
             for subset_dimension_group in model.dimensions.subset_dimensions:
-                if not subset_dimension_group.create_supplemental_dimensions:
+                if not subset_dimension_group.create_supplemental_dimension:
                     continue
                 dimension_type = subset_dimension_group.dimension_type
                 base_dim = None
@@ -503,9 +505,9 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _add_supplemental_dimension_mappings_from_subset_dimensions(
         self, src_dir, supp_dir, model
     ):
-        new_mappings = []
+        """Create base-to-supplemental mappings and add them to the project config."""
         for subset_dimension_group in model.dimensions.subset_dimensions:
-            if not subset_dimension_group.create_supplemental_dimensions:
+            if not subset_dimension_group.create_supplemental_dimension:
                 continue
             dimension_type = subset_dimension_group.dimension_type
             base_dim = None
@@ -542,9 +544,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     ),
                     description=f"Aggregation map for {subset_dimension_group.name}",
                 )
-                new_mappings.append(mapping)
-
-        return new_mappings
+                model.dimension_mappings.base_to_supplemental.append(mapping)
 
     def _register_all_in_one_dimensions(
         self,

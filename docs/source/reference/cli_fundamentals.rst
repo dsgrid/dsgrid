@@ -86,7 +86,7 @@ name as needed.
 
 .. code-block:: console
 
-   $ dsgrid config create -u http://dsgrid-registry.hpc.nrel.gov:8529 -n standard-scenarios --offline
+   $ dsgrid config create -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios --offline
    Wrote dsgrid config to /Users/dthom/.dsgrid.json5
 
 Environment variables

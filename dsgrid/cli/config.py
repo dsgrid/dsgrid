@@ -24,7 +24,7 @@ def config():
     help="Enable tracking of function timings.",
 )
 @click.option(
-    "-n",
+    "-N",
     "--database-name",
     type=str,
     default=None,

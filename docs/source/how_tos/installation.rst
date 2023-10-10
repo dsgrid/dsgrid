@@ -110,10 +110,10 @@ with this command:
 
 .. code-block:: console
 
-    $ dsgrid -u http://dsgrid-registry.hpc.nrel.gov:8529 -n standard-scenarios registry projects list
+    $ dsgrid -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios registry projects list
 
 You can test your installation similarly if you are using a different registry, just change the
-ArangoDB URL (-u) and database name (-n) arguments to match your set-up.
+ArangoDB URL (-u) and database name (-N) arguments to match your set-up.
 
 Save your configuration
 =======================
@@ -127,10 +127,10 @@ The appropriate configuration for using the shared registry at NREL is:
 
 .. code-block:: console
 
-    $ dsgrid config create -u http://dsgrid-registry.hpc.nrel.gov:8529 -n standard-scenarios --offline
+    $ dsgrid config create -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios --offline
 
 Similar to testing your installation, you can save the correct configurations for other set-ups
-by changing the ArangoDB URL (-u) and database name (-n) arguments of the above command.
+by changing the ArangoDB URL (-u) and database name (-N) arguments of the above command.
 
 .. todo:: Access from AWS
 

@@ -16,7 +16,7 @@ How to run dsgrid on Eagle
 
 .. code-block:: console
 
-    $ dsgrid config create -u http://dsgrid-registry.hpc.nrel.gov:8529 -n standard-scenarios --offline
+    $ dsgrid config create -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios --offline
 
 4. Start a Spark cluster with your desired number of compute nodes by following the instructions at
    :ref:`how-to-start-spark-cluster-eagle`.

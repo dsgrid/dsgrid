@@ -5,8 +5,6 @@ import logging
 from pathlib import Path
 from setuptools import setup, find_packages
 
-from pygments.lexers.shell import BashSessionLexer, PowerShellSessionLexer
-
 logger = logging.getLogger(__name__)
 
 here = Path(__file__).parent.resolve()

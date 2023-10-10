@@ -59,7 +59,7 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf.setMaster(cluster)
-    spark = SparkSession.builder.config(conf=conf).enableHiveSupport().getOrCreate()
+    spark = SparkSession.builder.config(conf=conf).getOrCreate()
 
     with disable_console_logging():
         log_spark_conf(spark)

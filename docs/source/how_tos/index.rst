@@ -16,5 +16,6 @@ This guide lists the steps to perform common dsgrid operations.
    create_dataset_dimensions
    create_derived_dataset
    query_project
+   filter_a_query
    run_dsgrid_on_eagle
    spark_cluster_on_eagle

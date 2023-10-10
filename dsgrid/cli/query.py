@@ -14,13 +14,16 @@ from dsgrid.cli.common import (
 )
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
+    DimensionFilterType,
     DimensionFilterExpressionModel,
     DimensionFilterExpressionRawModel,
     DimensionFilterBetweenColumnOperatorModel,
     DimensionFilterColumnOperatorModel,
+    SubsetDimensionFilterModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
+from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
@@ -96,15 +99,7 @@ _COMMON_RUN_OPTIONS = (
 @click.option(
     "-F",
     "--filters",
-    type=click.Choice(
-        [
-            "expression",
-            "between_column_operator",
-            "column_operator",
-            "supplemental_column_operator",
-            "raw",
-        ]
-    ),
+    type=click.Choice([x.value for x in DimensionFilterType]),
     multiple=True,
     help="Add a dimension filter. Requires user customization.",
 )
@@ -200,40 +195,47 @@ def create_project_query(
     )
 
     for dim_filter in filters:
-        if dim_filter == "expression":
-            flt = DimensionFilterExpressionModel(
-                dimension_type=DimensionType.GEOGRAPHY,
-                dimension_query_name="county",
-                operator="==",
-                value="",
-            )
-        elif dim_filter == "between_column_operator":
-            flt = DimensionFilterBetweenColumnOperatorModel(
-                dimension_type=DimensionType.TIME,
-                dimension_query_name="time_est",
-                lower_bound="",
-                upper_bound="",
-            )
-        elif dim_filter == "column_operator":
-            flt = DimensionFilterColumnOperatorModel(
-                dimension_type=DimensionType.GEOGRAPHY,
-                dimension_query_name="county",
-                value="",
-                operator="contains",
-            )
-        elif dim_filter == "supplemental_column_operator":
-            flt = SupplementalDimensionFilterColumnOperatorModel(
-                dimension_type=DimensionType.GEOGRAPHY,
-                dimension_query_name="state",
-            )
-        elif dim_filter == "raw":
-            flt = DimensionFilterExpressionRawModel(
-                dimension_type=DimensionType.GEOGRAPHY,
-                dimension_query_name="county",
-                value="== '06037'",
-            )
-        else:
-            assert False
+        filter_type = DimensionFilterType(dim_filter)
+        match filter_type:
+            case DimensionFilterType.EXPRESSION:
+                flt = DimensionFilterExpressionModel(
+                    dimension_type=DimensionType.GEOGRAPHY,
+                    dimension_query_name="county",
+                    operator="==",
+                    value="",
+                )
+            case DimensionFilterType.BETWEEN_COLUMN_OPERATOR:
+                flt = DimensionFilterBetweenColumnOperatorModel(
+                    dimension_type=DimensionType.TIME,
+                    dimension_query_name="time_est",
+                    lower_bound="",
+                    upper_bound="",
+                )
+            case DimensionFilterType.COLUMN_OPERATOR:
+                flt = DimensionFilterColumnOperatorModel(
+                    dimension_type=DimensionType.GEOGRAPHY,
+                    dimension_query_name="county",
+                    value="",
+                    operator="contains",
+                )
+            case DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR:
+                flt = SupplementalDimensionFilterColumnOperatorModel(
+                    dimension_type=DimensionType.GEOGRAPHY,
+                    dimension_query_name="state",
+                )
+            case DimensionFilterType.EXPRESSION_RAW:
+                flt = DimensionFilterExpressionRawModel(
+                    dimension_type=DimensionType.GEOGRAPHY,
+                    dimension_query_name="county",
+                    value="== '06037'",
+                )
+            case DimensionFilterType.SUBSET:
+                flt = SubsetDimensionFilterModel(
+                    dimension_type=DimensionType.SUBSECTOR,
+                    dimension_query_names=["commercial_subsectors", "residential_subsectors"],
+                )
+            case _:
+                raise NotImplementedError(f"Bug: {filter_type}")
         query.project.dataset.params.dimension_filters.append(flt)
 
     if default_result_aggregation:
@@ -309,13 +311,19 @@ def run_project_query(
     )
     project = registry_manager.project_manager.load_project(query.project.project_id)
     fs_interface = make_filesystem_interface(output)
-    ProjectQuerySubmitter(project, fs_interface.path(output)).submit(
-        query,
-        persist_intermediate_table=persist_intermediate_table,
-        load_cached_table=load_cached_table,
-        zip_file=zip_file,
-        force=force,
-    )
+    ret = 0
+    try:
+        ProjectQuerySubmitter(project, fs_interface.path(output)).submit(
+            query,
+            persist_intermediate_table=persist_intermediate_table,
+            load_cached_table=load_cached_table,
+            zip_file=zip_file,
+            force=force,
+        )
+    except DSGInvalidQuery as exc:
+        logger.error("Query failed: %s", exc)
+        ret = 1
+    sys.exit(ret)
 
 
 @click.command("create_dataset")

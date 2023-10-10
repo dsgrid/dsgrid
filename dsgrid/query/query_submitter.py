@@ -5,8 +5,11 @@ from pathlib import Path
 from zipfile import ZipFile
 
 from dsgrid.dataset.pivoted_table import PivotedTableHandler
-from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.dimension.base_models import DimensionCategory
+from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
+from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.utils.spark import (
+    get_unique_values,
     read_dataframe,
     try_read_dataframe,
     write_dataframe_and_auto_partition,
@@ -115,6 +118,29 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             raise NotImplementedError(f"Unsupported {context.get_table_format_type()=}")
         return handler
 
+    def _run_checks(self, model):
+        subsets = set(self.project.config.list_dimension_query_names(DimensionCategory.SUBSET))
+        for agg in model.result.aggregations:
+            for _, column in agg.iter_dimensions_to_keep():
+                dimension_query_name = column.dimension_query_name
+                if dimension_query_name in subsets:
+                    dim_type = self._project.config.get_dimension(
+                        dimension_query_name
+                    ).model.dimension_type
+                    base_name = self._project.config.get_base_dimension(
+                        dim_type
+                    ).model.dimension_query_name
+                    supp_names = " ".join(
+                        self._project.config.get_supplemental_dimension_to_query_name_mapping()[
+                            dim_type
+                        ]
+                    )
+                    raise DSGInvalidQuery(
+                        f"Subset dimensions cannot be used in aggregations: "
+                        f"{dimension_query_name=}. Only base and supplemental dimensions are "
+                        f"allowed. base={base_name} supplemental={supp_names}"
+                    )
+
     def _run_query(
         self,
         model,
@@ -123,6 +149,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         zip_file=False,
         force=False,
     ):
+        self._run_checks(model)
         context = QueryContext(model)
         context.model.project.version = str(self._project.version)
         output_dir = self._output_dir / context.model.name
@@ -178,14 +205,40 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     def _apply_filters(self, df, context: QueryContext):
         for dim_filter in context.model.result.dimension_filters:
-            query_name = dim_filter.dimension_query_name
-            if query_name not in df.columns:
-                # Consider catching this exception and still write to a file.
-                # It could mean writing a lot of data the user doesn't want.
-                raise DSGInvalidParameter(
-                    f"filter column {query_name} is not in the dataframe: {df.columns}"
+            if isinstance(dim_filter, SubsetDimensionFilterModel):
+                records = dim_filter.get_filtered_records_dataframe(
+                    self.project.config.get_dimension
                 )
-            df = dim_filter.apply_filter(df)
+                if dim_filter.dimension_type == context.get_pivoted_dimension_type():
+                    df = self._drop_filtered_pivoted_columns(df, context, records)
+                else:
+                    column = dim_filter.dimension_type.value
+                    df = df.join(records.select("id"), on=df[column] == records["id"]).drop("id")
+            else:
+                if dim_filter.dimension_type == context.get_pivoted_dimension_type():
+                    dim_records = self.project.config.get_dimension_records(
+                        dim_filter.dimension_query_name
+                    )
+                    records = dim_filter.apply_filter(dim_records, column="id")
+                    df = self._drop_filtered_pivoted_columns(df, context, records)
+                else:
+                    query_name = dim_filter.dimension_query_name
+                    if query_name not in df.columns:
+                        # Consider catching this exception and still write to a file.
+                        # It could mean writing a lot of data the user doesn't want.
+                        raise DSGInvalidParameter(
+                            f"filter column {query_name} is not in the dataframe: {df.columns}"
+                        )
+                    df = dim_filter.apply_filter(df, column=query_name)
+        return df
+
+    @staticmethod
+    def _drop_filtered_pivoted_columns(df, context: QueryContext, records):
+        record_ids = get_unique_values(records, "id")
+        drop_columns = context.get_pivoted_columns() - record_ids
+        df = df.drop(*drop_columns)
+        pivoted_columns = (record_ids - drop_columns).intersection(df.columns)
+        context.set_pivoted_columns(pivoted_columns)
         return df
 
     @track_timing(timer_stats_collector)

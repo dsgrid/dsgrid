@@ -35,6 +35,14 @@ class DimensionType(DSGEnum):
             )
 
 
+class DimensionCategory(DSGEnum):
+    """Types of dimension categories in a project"""
+
+    BASE = "base"
+    SUBSET = "subset"
+    SUPPLEMENTAL = "supplemental"
+
+
 class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 

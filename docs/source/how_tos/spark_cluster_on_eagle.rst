@@ -34,7 +34,7 @@ Steps
 
 .. code-block:: console
 
-   $ create_config.sh -c /datasets/images/apache_spark/spark_py310.sif
+   $ create_config.sh -c /datasets/images/apache_spark/spark341_py311.sif
 
 5. Configure the Spark settings. Run -h to see the available options.
 

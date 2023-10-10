@@ -40,7 +40,7 @@
         },
         {
           "dimension_type": "metric",
-          "dimension_query_name": "electricity",
+          "dimension_query_name": "electricity_end_uses",
           "column": "id",
           "value": "%",
           "operator": "like",

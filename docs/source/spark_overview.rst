@@ -315,7 +315,7 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
 .. code-block:: console
 
-    $ create_config.sh -c /projects/dsgrid/containers/spark_py310.sif
+    $ create_config.sh -c /projects/dsgrid/containers/spark341_py311.sif
 
 4. Configure Spark parameters based on the amount of memory and CPU in each compute node. dsgrid
    jobs on Eagle seem to work better with dynamic allocation enabled.

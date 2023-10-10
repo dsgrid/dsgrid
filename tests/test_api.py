@@ -80,7 +80,7 @@ def test_get_project():
 
 def test_list_datasets():
     response = ListDatasetsResponse(**check_response("/datasets").json())
-    assert len(response.datasets) == 9
+    assert len(response.datasets) == 12
     assert (
         response.datasets[0].dataset_id == "aeo2021_reference_commercial_energy_use_growth_factors"
     )
@@ -123,6 +123,7 @@ def test_list_project_supplemental_dimension_query_names():
         "all_geographies",
         "census_division",
         "census_region",
+        "conus",
         "reeds_pca",
         "state",
     ]

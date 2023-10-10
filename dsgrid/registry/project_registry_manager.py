@@ -6,10 +6,13 @@ import logging
 import os
 import shutil
 import tempfile
+from collections import defaultdict
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Union
 
 import json5
+import pandas as pd
 from prettytable import PrettyTable
 
 from dsgrid.dimension.base_models import DimensionType
@@ -25,6 +28,7 @@ from dsgrid.config.dimension_association_manager import remove_project_dimension
 from dsgrid.config.dimensions import DimensionModel, DimensionReferenceByNameModel
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.config.dimension_mapping_base import (
+    DimensionReferenceModel,
     DimensionMappingReferenceModel,
     DimensionMappingReferenceListModel,
     DimensionMappingType,
@@ -171,8 +175,21 @@ class ProjectRegistryManager(RegistryManagerBase):
         base_to_supp_mappings = self._dimension_mapping_mgr.load_dimension_mappings(
             config.model.dimension_mappings.base_to_supplemental_references
         )
-        config.update_dimensions(base_dimensions, supplemental_dimensions)
+        subset_dimensions = self._get_subset_dimensions(config)
+        config.update_dimensions(base_dimensions, subset_dimensions, supplemental_dimensions)
         config.update_dimension_mappings(base_to_supp_mappings)
+
+    def _get_subset_dimensions(self, config: ProjectConfig):
+        subset_dimensions = defaultdict(dict)
+        for subset_dim in config.model.dimensions.subset_dimensions:
+            selectors = {
+                ConfigKey(x.dimension_id, x.version): self._dimension_mgr.get_by_id(
+                    x.dimension_id, version=x.version
+                )
+                for x in subset_dim.selector_references
+            }
+            subset_dimensions[subset_dim.dimension_type][subset_dim.name] = selectors
+        return subset_dimensions
 
     def load_project(self, project_id: str, version=None) -> Project:
         """Load a project from the registry.
@@ -259,6 +276,30 @@ class ProjectRegistryManager(RegistryManagerBase):
                     submitter,
                     log_message,
                 )
+            supp_dir = src_dir / _SUPPLEMENTAL_TMP_DIR
+            assert not supp_dir.exists(), f"{supp_dir} exists"
+            supp_dir.mkdir()
+            tmp_dirs.append(supp_dir)
+            if model.dimensions.subset_dimensions:
+                logger.info("Register subset dimensions")
+                self._register_from_subset_dimensions(
+                    model.dimensions.subset_dimensions,
+                    model.dimensions.base_dimension_references,
+                    context,
+                    submitter,
+                    log_message,
+                )
+                self._register_supplemental_dimensions_from_subset_dimensions(
+                    model,
+                    context,
+                    submitter,
+                    log_message,
+                )
+                self._add_supplemental_dimension_mappings_from_subset_dimensions(
+                    src_dir,
+                    supp_dir,
+                    model,
+                )
             if model.dimensions.supplemental_dimensions:
                 logger.info("Register supplemental dimensions")
                 self._register_dimensions_from_models(
@@ -269,10 +310,6 @@ class ProjectRegistryManager(RegistryManagerBase):
                     log_message,
                 )
             logger.info("Register all-in-one supplemental dimensions")
-            supp_dir = src_dir / _SUPPLEMENTAL_TMP_DIR
-            assert not supp_dir.exists(), f"{supp_dir} exists"
-            supp_dir.mkdir()
-            tmp_dirs.append(supp_dir)
             model.dimension_mappings.base_to_supplemental += self._register_all_in_one_dimensions(
                 src_dir,
                 supp_dir,
@@ -291,6 +328,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                 )
 
             self._update_dimensions_and_mappings(config)
+            for subset_dimension in model.dimensions.subset_dimensions:
+                subset_dimension.selectors.clear()
             self._register(config, submitter, log_message)
             context.add_id(RegistryType.PROJECT, config.model.project_id, self)
         finally:
@@ -354,6 +393,158 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimension_references += self._dimension_mgr.make_dimension_references(dimension_ids)
         dimensions.clear()
         return dimension_references
+
+    def _register_from_subset_dimensions(
+        self, subset_dimensions, base_dimension_references, context, submitter, log_message
+    ):
+        """Registers a dimension for each subset specified in the project config's subset
+        dimension groups. Appends references to those dimensions to subset_dimensions, which is
+        part of the project config.
+        """
+        with TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            dimensions = []
+            subset_refs = {}
+            for subset_dimension in subset_dimensions:
+                base_dim = None
+                for ref in base_dimension_references:
+                    if ref.dimension_type == subset_dimension.dimension_type:
+                        base_dim = self._dimension_mgr.get_by_id(ref.dimension_id)
+                        break
+                assert base_dim is not None, subset_dimension
+                base_records = base_dim.get_records_dataframe()
+                for selector in subset_dimension.selectors:
+                    new_records = base_records.filter(base_records["id"].isin(selector.records))
+                    filename = tmp_path / f"{subset_dimension.name}_{selector.name}.csv"
+                    new_records.toPandas().to_csv(filename, index=False)
+                    dim = DimensionModel(
+                        filename=str(filename),
+                        name=selector.name,
+                        display_name=selector.name,
+                        dimension_type=subset_dimension.dimension_type,
+                        module=base_dim.model.module,
+                        class_name=base_dim.model.class_name,
+                        description=selector.description,
+                    )
+                    dimensions.append(dim)
+                    key = (subset_dimension.dimension_type, selector.name)
+                    if key in subset_refs:
+                        raise Exception(f"Bug: unhandled case of duplicate dimension name: {key=}")
+                    subset_refs[key] = subset_dimension
+
+            dim_model = DimensionsConfigModel(dimensions=dimensions)
+            dims_config = DimensionsConfig.load_from_model(dim_model)
+            dimension_ids = self._dimension_mgr.register_from_config(
+                dims_config, submitter, log_message, context=context
+            )
+            for dimension_id in dimension_ids:
+                dim = self._dimension_mgr.get_by_id(dimension_id)
+                key = (dim.model.dimension_type, dim.model.name)
+                subset_dim = subset_refs[key]
+                subset_dim.selector_references.append(
+                    DimensionReferenceModel(
+                        dimension_id=dimension_id,
+                        dimension_type=subset_dim.dimension_type,
+                        version="1.0.0",
+                    )
+                )
+
+    def _register_supplemental_dimensions_from_subset_dimensions(
+        self, model, context, submitter, log_message
+    ):
+        """Registers a supplemental dimension for each subset specified in the project config's
+        subset dimension groups. Appends references to those dimensions to the project config's
+        supplemental_dimension_references list.
+        """
+        with TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            dimensions = []
+            for subset_dimension_group in model.dimensions.subset_dimensions:
+                if not subset_dimension_group.create_supplemental_dimension:
+                    continue
+                dimension_type = subset_dimension_group.dimension_type
+                base_dim = None
+                for ref in model.dimensions.base_dimension_references:
+                    if ref.dimension_type == dimension_type:
+                        base_dim = self._dimension_mgr.get_by_id(ref.dimension_id)
+                        break
+                assert base_dim is not None, subset_dimension_group
+                records = {"id": [], "name": []}
+                # The pydantic validator has already checked consistency of these columns.
+                for column in subset_dimension_group.selectors[0].column_values:
+                    records[column] = []
+                for selector in subset_dimension_group.selectors:
+                    records["id"].append(selector.name)
+                    records["name"].append(selector.name)
+                    if selector.column_values:
+                        for column, value in selector.column_values.items():
+                            records[column].append(value)
+                filename = tmp_path / f"{subset_dimension_group.dimension_query_name}.csv"
+                pd.DataFrame(records).to_csv(filename, index=False)
+
+                dim = DimensionModel(
+                    filename=str(filename),
+                    name=subset_dimension_group.name,
+                    display_name=subset_dimension_group.display_name,
+                    dimension_type=dimension_type,
+                    module=base_dim.model.module,
+                    class_name=base_dim.model.class_name,
+                    description=subset_dimension_group.description,
+                )
+                dimensions.append(dim)
+
+        dim_model = DimensionsConfigModel(dimensions=dimensions)
+        dims_config = DimensionsConfig.load_from_model(dim_model)
+        dimension_ids = self._dimension_mgr.register_from_config(
+            dims_config, submitter, log_message, context=context
+        )
+        model.dimensions.supplemental_dimension_references += (
+            self._dimension_mgr.make_dimension_references(dimension_ids)
+        )
+
+    def _add_supplemental_dimension_mappings_from_subset_dimensions(
+        self, src_dir, supp_dir, model
+    ):
+        """Create base-to-supplemental mappings and add them to the project config."""
+        for subset_dimension_group in model.dimensions.subset_dimensions:
+            if not subset_dimension_group.create_supplemental_dimension:
+                continue
+            dimension_type = subset_dimension_group.dimension_type
+            base_dim = None
+            for ref in model.dimensions.base_dimension_references:
+                if ref.dimension_type == dimension_type:
+                    base_dim = self._dimension_mgr.get_by_id(ref.dimension_id)
+                    break
+            assert base_dim is not None, subset_dimension_group
+            base_dim_record_ids = base_dim.get_unique_ids()
+            mapping_records = []
+            new_ids = set()
+            for selector in subset_dimension_group.selectors:
+                for record_id in selector.records:
+                    mapping_records.append({"from_id": record_id, "to_id": selector.name})
+                    new_ids.add(record_id)
+            for record_id in base_dim_record_ids.difference(new_ids):
+                mapping_records.append({"from_id": record_id, "to_id": ""})
+            map_record_file = (
+                supp_dir / f"{subset_dimension_group.dimension_query_name}_mapping.csv"
+            )
+            pd.DataFrame.from_records(mapping_records).to_csv(map_record_file, index=False)
+
+            with in_other_dir(src_dir):
+                mapping = MappingTableByNameModel(
+                    filename=str(Path(_SUPPLEMENTAL_TMP_DIR) / map_record_file.name),
+                    mapping_type=DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS,
+                    from_dimension=DimensionReferenceByNameModel(
+                        dimension_type=dimension_type,
+                        name=base_dim.model.name,
+                    ),
+                    to_dimension=DimensionReferenceByNameModel(
+                        dimension_type=dimension_type,
+                        name=subset_dimension_group.name,
+                    ),
+                    description=f"Aggregation map for {subset_dimension_group.name}",
+                )
+                model.dimension_mappings.base_to_supplemental.append(mapping)
 
     def _register_all_in_one_dimensions(
         self,

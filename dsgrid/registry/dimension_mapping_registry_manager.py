@@ -295,8 +295,15 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
     def register(self, config_file, submitter, log_message):
         context = RegistrationContext()
-        config = DimensionMappingsConfig.load(config_file)
-        return self.register_from_config(config, submitter, log_message, context=context)
+        error_occurred = False
+        try:
+            config = DimensionMappingsConfig.load(config_file)
+            return self.register_from_config(config, submitter, log_message, context=context)
+        except Exception:
+            error_occurred = True
+            raise
+        finally:
+            context.finalize(error_occurred)
 
     @track_timing(timer_stats_collector)
     def register_from_config(

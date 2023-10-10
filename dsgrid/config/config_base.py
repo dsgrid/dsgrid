@@ -135,7 +135,7 @@ class ConfigWithRecordFileBase(ConfigBase, abc.ABC):
             if filename.exists() and not force:
                 raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
 
-        self.get_records_dataframe().toPandas().to_csv(records_file)
+        self.get_records_dataframe().toPandas().to_csv(records_file, index=False)
         model_data = self.model.serialize()
         model_data["file"] = records_file.name
         dst_config_file.write_text(json5.dumps(model_data, indent=2))

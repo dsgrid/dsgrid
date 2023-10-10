@@ -3,11 +3,13 @@ import logging
 from typing import Any, Dict, Union
 
 import pyspark.sql.functions as F
+from pyspark.sql import DataFrame
 from pydantic import Field, validator, root_validator
 
+from dsgrid.data_models import DSGEnum
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidField
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
 
 
 logger = logging.getLogger(__name__)
@@ -17,14 +19,24 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
     """Base model for all filters"""
 
     dimension_type: DimensionType
-    dimension_query_name: str
     column: str = Field(
         title="column", description="Column of dimension records to use", default="id"
     )
 
     @abc.abstractmethod
-    def apply_filter(self, df):
+    def apply_filter(self, df, column=None):
         """Apply the filter to a DataFrame"""
+
+    def dict(self, *args, **kwargs):
+        # Add the type of the class so that we can deserialize with the right model.
+        data = super().dict(*args, **kwargs)
+        data["filter_type"] = _class_to_enum[self.__class__].value
+        return data
+
+    @root_validator(pre=True)
+    def remove_filter_type(cls, values):
+        values.pop("filter_type", None)
+        return values
 
     def _make_value_str(self, value):
         if isinstance(value, str):
@@ -37,19 +49,20 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
     def _make_values_str(self, values):
         return ", ".join((f"{self._make_value_str(x)}" for x in values))
 
-    def dict(self, *args, **kwargs):
-        # Add the type of the class so that we can deserialize with the right model.
-        data = super().dict(*args, **kwargs)
-        data["filter_type"] = self.__class__.__name__
-        return data
 
-    @root_validator(pre=True)
-    def remove_filter_type(cls, values):
-        values.pop("filter_type", None)
-        return values
+class DimensionFilterSingleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
+    """Base model for all filters based on expressions"""
+
+    dimension_query_name: str
 
 
-class _DimensionFilterWithWhereClauseModel(DimensionFilterBaseModel, abc.ABC):
+class DimensionFilterMultipleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
+    """Base model for all filters based on expressions"""
+
+    dimension_query_names: list[str]
+
+
+class _DimensionFilterWithWhereClauseModel(DimensionFilterSingleQueryNameBaseModel, abc.ABC):
     def apply_filter(self, df, column=None):
         return df.filter(self.where_clause(column=column))
 
@@ -140,7 +153,7 @@ def check_operator(operator):
     return operator
 
 
-class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
+class DimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel):
     """Filters a table where a dimension column matches a Spark SQL operator.
 
     Examples:
@@ -175,7 +188,7 @@ class DimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
         return df.filter(method(self.value))
 
 
-class DimensionFilterBetweenColumnOperatorModel(DimensionFilterBaseModel):
+class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel):
     """Filters a table where a dimension column is between the lower bound and upper bound,
     inclusive.
 
@@ -199,7 +212,46 @@ class DimensionFilterBetweenColumnOperatorModel(DimensionFilterBaseModel):
         return df.filter(F.col(column).between(self.lower_bound, self.upper_bound))
 
 
-class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
+class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
+    """Filters base dimension records that match a subset dimension."""
+
+    dimension_query_names: list[str]
+
+    @validator("dimension_query_names")
+    def check_dimension_query_names(cls, dimension_query_names):
+        if not dimension_query_names:
+            raise ValueError("dimension_query_names cannot be empty")
+        return dimension_query_names
+
+    def apply_filter(self, df, column=None):
+        raise NotImplementedError(f"apply_filter must not be called on {self.__class__.__name__}")
+
+    def get_filtered_records_dataframe(self, dimension_accessor) -> DataFrame:
+        """Return a dataframe containing the filter records."""
+        df = None
+        dim_type = None
+        for query_name in self.dimension_query_names:
+            dim = dimension_accessor(query_name)
+            records = dim.get_records_dataframe()
+            if df is None:
+                df = records
+                dim_type = dim.model.dimension_type
+            else:
+                if dim.model.dimension_type != dim_type:
+                    raise DSGInvalidParameter(
+                        f"Mismatch in dimension types for {self}: "
+                        f"{dim_type} != {dim.model.dimension_type}"
+                    )
+                if records.columns != df.columns:
+                    raise DSGInvalidParameter(
+                        f"Mismatch in records columns for {self}: "
+                        f"{df.columns} != {records.columns}"
+                    )
+                df = df.union(records)
+        return df
+
+
+class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel):
     """Filters base dimension records that have a valid mapping to a supplemental dimension."""
 
     value: Any = Field(title="value", description="Value to filter on", default="%")
@@ -227,23 +279,32 @@ class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterBaseModel):
         return df.filter(method(self.value))
 
 
-def _get_filter_subclasses(filter_class, subclasses=None):
-    if subclasses is None:
-        subclasses = {}
-    for cls in filter_class.__subclasses__():
-        subclasses[str(cls.__name__)] = cls
-        if cls.__subclasses__():
-            # Recurse.
-            subclasses = _get_filter_subclasses(cls, subclasses)
-    return subclasses
-
-
 def make_dimension_filter(values: Dict):
     """Construct the correct filter per the key filter_type"""
-    if values["filter_type"] not in _FILTER_SUBCLASSES:
-        raise Exception(f"{values['filter_type']} is not defined in dimension_filters.py")
-    return _FILTER_SUBCLASSES[values["filter_type"]](**values)
+    filter_type = DimensionFilterType(values["filter_type"])
+    if filter_type not in _enum_to_class:
+        raise DSGInvalidParameter(f"{filter_type=} is not defined in dimension_filters.py")
+    return _enum_to_class[filter_type](**values)
 
 
-# Keep this definition at the end of the file.
-_FILTER_SUBCLASSES = _get_filter_subclasses(DimensionFilterBaseModel)
+class DimensionFilterType(DSGEnum):
+    """Filter types that can be specified in queries."""
+
+    EXPRESSION = "expression"
+    EXPRESSION_RAW = "expression_raw"
+    COLUMN_OPERATOR = "column_operator"
+    BETWEEN_COLUMN_OPERATOR = "between_column_operator"
+    SUBSET = "subset"
+    SUPPLEMENTAL_COLUMN_OPERATOR = "supplemental_column_operator"
+
+
+_enum_to_class = {
+    DimensionFilterType.EXPRESSION: DimensionFilterExpressionModel,
+    DimensionFilterType.EXPRESSION_RAW: DimensionFilterExpressionRawModel,
+    DimensionFilterType.COLUMN_OPERATOR: DimensionFilterColumnOperatorModel,
+    DimensionFilterType.BETWEEN_COLUMN_OPERATOR: DimensionFilterBetweenColumnOperatorModel,
+    DimensionFilterType.SUBSET: SubsetDimensionFilterModel,
+    DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR: SupplementalDimensionFilterColumnOperatorModel,
+}
+
+_class_to_enum = {v: k for k, v in _enum_to_class.items()}

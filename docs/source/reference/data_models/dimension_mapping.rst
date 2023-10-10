@@ -19,7 +19,7 @@ Dimension Mapping Reference
 .. autopydantic_model:: dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel
 .. autopydantic_model:: dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel
 
-.. TODO DT: separate by base-to-supplemental and dataset-to-project
+.. TODO: separate by base-to-supplemental and dataset-to-project
 .. autopydantic_model:: dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel
 .. autopydantic_model:: dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableListModel
 .. autopydantic_model:: dsgrid.config.dimension_mapping_base.DimensionMappingDatasetToProjectBaseModel

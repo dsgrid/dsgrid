@@ -3,7 +3,7 @@ from collections import defaultdict
 
 from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
-from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimensionMapping
 from dsgrid.registry.registry_manager import RegistryManager
 
@@ -21,13 +21,18 @@ def test_project_load(cached_registry):
     config = project.config
     dim = config.get_base_dimension(DimensionType.GEOGRAPHY)
     assert dim.model.dimension_type == DimensionType.GEOGRAPHY
-    supp_dims = config.list_supplemental_dimensions(DimensionType.GEOGRAPHY)
-    assert len(supp_dims) == 4
+    geo_supp_dims = config.list_supplemental_dimensions(DimensionType.GEOGRAPHY)
+    assert len(geo_supp_dims) == 4
+    subsector_supp_dims = config.list_supplemental_dimensions(DimensionType.SUBSECTOR)
+    assert len(subsector_supp_dims) == 3
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.GEOGRAPHY)
     mappings = config.get_base_to_supplemental_dimension_mappings_by_types(DimensionType.GEOGRAPHY)
     assert len(mappings) == 4
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SECTOR)
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SUBSECTOR)
+    subset_dims = config.list_dimension_query_names(category=DimensionCategory.SUBSET)
+    assert subset_dims == ["commercial_subsectors2", "residential_subsectors"]
+    config.get_dimension("residential_subsectors").get_unique_ids() == {"MidriseApartment"}
 
     records = project.config.get_dimension_records("all_subsectors").collect()
     assert len(records) == 1

@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pyspark
 import pytest
+from pydantic import ValidationError
 
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
-    DSGInvalidDimension,
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
 )
@@ -149,7 +149,7 @@ def test_duplicate_project_dimension_display_names(tmp_registry_db):
         if dim["display_name"] == "State":
             dim["display_name"] = "County"
     dump_data(data, project_file)
-    with pytest.raises(DSGInvalidDimension):
+    with pytest.raises(ValidationError):
         manager.project_manager.register(project_file, user, log_message)
 
 

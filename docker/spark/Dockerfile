@@ -3,31 +3,31 @@
 
 # USAGE:
 # Do not run this while connected to the VPN. You may get a certificate error while downloading spark.
-# docker build --tag spark_py310 --build-arg VERSION=x.y.z .
+# docker build --tag spark_py311 --build-arg VERSION=x.y.z .
 
 # This container can be converted to a Singularity container on Eagle with these commands:
 # Save and upload the docker image to Eagle.
-# $ docker save -o spark_py310_vx.y.z.tar spark_py310
-# $ scp spark_py310_vx.y.z.tar <username>@eagle.hpc.nrel.gov:/projects/dsgrid/containers
+# $ docker save -o spark_py311_vx.y.z.tar spark_py311
+# $ scp spark_py311_vx.y.z.tar <username>@eagle.hpc.nrel.gov:/projects/dsgrid/containers
 # Acquire a compute node.
 # $ export SINGULARITY_TMPDIR=/tmp/scratch
 # $ module load singularity-container
 # Create writable image for testing and development or read-only image for production.
 # Writable
-# $ singularity build --sandbox spark_py310 docker-archive://spark_py310_v0.1.0.tar
+# $ singularity build --sandbox spark_py311 docker-archive://spark_py311_v0.1.0.tar
 # Read-only
-# $ singularity build spark_py310_v0.1.0.sif docker-archive://spark_py310_v0.1.0.tar
+# $ singularity build spark_py311_v0.1.0.sif docker-archive://spark_py311_v0.1.0.tar
 
 # Note: Apache provides a container with Spark and Python installed, but as of now it is Python 3.9
-# and dsgrid requires 3.10. Whenever they have a newer Python, we can simplify this.
+# and dsgrid requires 3.10+. Whenever they have a newer Python, we can simplify this.
 # The Apache container is
 # FROM apache/spark-py
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 USER root
 
 ARG VERSION
-ARG SPARK_VERSION=3.3.1
+ARG SPARK_VERSION=3.4.1
 ARG HADOOP_VERSION=3
 ARG FULL_STR=spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}
 
@@ -75,7 +75,7 @@ RUN wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/${FULL_STR}.tgz \
 
 RUN pip install ipython jupyter pandas pyarrow
 
-ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH $PATH:${SPARK_HOME}/bin:${SPARK_HOME}/sbin
 ENV PYSPARK_DRIVER_PYTHON=ipython
 

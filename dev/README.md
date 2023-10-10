@@ -1,6 +1,6 @@
 # dsgrid Developer README
 
-[Dependencies](#developer-dependencies) | [Tests](#tests) | [Spark](#spark) | [EFS Project Repository](#testingexploring-with-the-efs-project-repository) | [Interactive Exploration](#interactive-exploration) 
+[Dependencies](#developer-dependencies) | [Tests](#tests) | [Spark](#spark) | [EFS Project Repository](#testingexploring-with-the-efs-project-repository) | [Interactive Exploration](#interactive-exploration)
 
 ## Developer Dependencies
 
@@ -241,6 +241,11 @@ previous step to a dsgrid-test-data repository in the directory
 `dump/data_path_*.data.json` to ensure that the `data_path` value is set to
 `dsgrid-test-data/filtered_registries/simple_standard_scenarios`. Make a branch, commit, push
 it to GitHub, and open a pull request.
+
+4. Run `python tests/simple_standard_scenarios_datasets.py` from the dsgrid base directory and add
+the modified file
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios/expected_datasets/raw_stats.json`
+to the same pull request.
 
 ### Run tests
 

@@ -115,6 +115,8 @@ with this command:
 You can test your installation similarly if you are using a different registry, just change the
 ArangoDB URL (-u) and database name (-N) arguments to match your set-up.
 
+.. _configure_dsgrid:
+
 Save your configuration
 =======================
 

@@ -17,16 +17,44 @@ Steps to make a dsgrid Conda environment:
    installation size.
 2. Create a suitable environment.
 
-.. code-block:: bash
+.. code-block:: console
 
-    conda create -n dsgrid python=3.10
+    $ conda create -n dsgrid python=3.10
 
 3. Activate the environment:
 
-.. code-block:: bash
+.. code-block:: console
 
-    conda activate dsgrid
+    $ conda activate dsgrid
 
+dsgrid's key dependencies are an `ArangoDB registry <#registry>`_, which can be 
+`shared <#nrel-shared-registry>`_ or `standalone <#standalone-registry>`_, and 
+`Apache Spark`_. Apache Spark requires Java, so check if you have it. Both of these 
+commands must work:
+
+.. tabs::
+
+    .. code-tab:: console Mac/Linux
+
+        $ java --version
+        openjdk 11.0.12 2021-07-20
+        $ echo $JAVA_HOME
+        /Users/dthom/brew/Cellar/openjdk@11/11.0.12
+
+        $ # If you don't have java installed:
+        $ conda install openjdk
+
+    .. code-tab:: pwsh-session Windows
+
+        > java --version
+        openjdk 11.0.13 2021-10-19
+        OpenJDK Runtime Environment JBR-11.0.13.7-1751.21-jcef (build 11.0.13+7-b1751.21)
+        OpenJDK 64-Bit Server VM JBR-11.0.13.7-1751.21-jcef (build 11.0.13+7-b1751.21, mixed mode)
+        > echo %JAVA_HOME%
+        C:\Users\ehale\Anaconda3\envs\dsgrid\Library
+
+        > # If you don't have java installed:
+        > conda install openjdk 
 
 Package Installation
 =====================
@@ -62,18 +90,17 @@ NREL. To query the data you must be on the NREL HPC.
 
 Standalone Registry
 -------------------
-To use dsgrid in your own computational environment, you will need to run ArangoDB, and either set
-up a new dsgrid registry or load a dsgrid registry that has been written to disk.
+To use dsgrid in your own computational environment, you will need to run ArangoDB and either set
+up a new dsgrid registry or load a dsgrid registry that has been written to disk. Please see the 
+:ref:`how-to guide on setting up a standalone dsgrid registry <set_up_standalone_registry>`.
 
-.. todo:: Link to how-to for setting up a standalone ArangoDB on laptops, etc.
-
-.. todo:: Link to how-to for setting up a standalone dsgrid registry on Eagle
 
 Apache Spark
 ============
 
 - NREL High Performance Computing: :ref:`how-to-start-spark-cluster-eagle`
 - Standalone resources: [TODO: Provide link]
+
 
 Test your installation
 ======================

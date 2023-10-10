@@ -15,7 +15,7 @@ Documentation Overview
 ======================
 
 If you are new to dsgrid, you'll likely want to start by reading the rest of this page, reading
-the how-to guide on installation, and then choosing a tutorial that corresponds to how you expect
+the :ref:`how-to guide on installation <installation>`, and then choosing a tutorial that corresponds to how you expect
 to be using dsgrid in the near future.
 
 For general use, the documentation is organized into:

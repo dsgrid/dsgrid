@@ -5,7 +5,7 @@
 Query a project
 ***************
 In this tutorial you will learn how to query a dsgrid project for aggregated data. The query will
-use data from the dsgrid registry stored on NREL's HPC Eagle cluster.
+use data from the dsgrid registry stored on NREL's HPC Kestrel cluster.
 
 Query objectives
 ================
@@ -23,7 +23,7 @@ Steps
 =====
 ssh to a login node to begin the tutorial.
 
-1. Follow the instructions at :ref:`how-to-run-dsgrid-eagle` if you have not already done so.
+1. Follow the instructions at :ref:`how-to-run-dsgrid-kestrel` if you have not already done so.
 
 2. Add this content to a file called ``query.json5``:
 
@@ -146,7 +146,7 @@ params:
           }
 
 3. Start a Spark cluster with two compute nodes as described in
-   :ref:`how-to-start-spark-cluster-eagle`.
+   :ref:`how-to-start-spark-cluster-kestrel`.
 
 4. Activate a Python virtual environment that includes ``dsgrid``.
 

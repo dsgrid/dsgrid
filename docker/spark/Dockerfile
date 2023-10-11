@@ -5,18 +5,18 @@
 # Do not run this while connected to the VPN. You may get a certificate error while downloading spark.
 # docker build --tag spark_py311 --build-arg VERSION=x.y.z .
 
-# This container can be converted to a Singularity container on Eagle with these commands:
-# Save and upload the docker image to Eagle.
+# This container can be converted to an Apptainer container on Kestrel with these commands:
+# Save and upload the docker image to Kestrel.
 # $ docker save -o spark_py311_vx.y.z.tar spark_py311
-# $ scp spark_py311_vx.y.z.tar <username>@eagle.hpc.nrel.gov:/projects/dsgrid/containers
-# Acquire a compute node.
-# $ export SINGULARITY_TMPDIR=/tmp/scratch
-# $ module load singularity-container
+# $ scp spark_py311_vx.y.z.tar <username>@kestrel.hpc.nrel.gov:/projects/dsgrid/containers
+# Acquire a compute node with local storage (salloc --tmp=1600G).
+# $ export APPTAINER_CACHEDIR=/tmp/scratch
+# $ module load apptainer
 # Create writable image for testing and development or read-only image for production.
 # Writable
-# $ singularity build --sandbox spark_py311 docker-archive://spark_py311_v0.1.0.tar
+# $ apptainer build --sandbox spark_py311 docker-archive://spark_py311_v0.1.0.tar
 # Read-only
-# $ singularity build spark_py311_v0.1.0.sif docker-archive://spark_py311_v0.1.0.tar
+# $ apptainer build spark_py311_v0.1.0.sif docker-archive://spark_py311_v0.1.0.tar
 
 # Note: Apache provides a container with Spark and Python installed, but as of now it is Python 3.9
 # and dsgrid requires 3.10+. Whenever they have a newer Python, we can simplify this.
@@ -41,7 +41,7 @@ RUN apt-get update \
     tini tmux tree vim wget openssh-client dropbear locales \
     && rm -rf /var/lib/apt/lists/*
 
-# This prevents bash warnings on Eagle.
+# This prevents bash warnings on Kestrel.
 RUN sed -i '/en_US.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen
 ENV LANG en_US.UTF-8

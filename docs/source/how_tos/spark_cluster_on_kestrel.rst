@@ -1,18 +1,23 @@
-.. _how-to-start-spark-cluster-eagle:
+.. _how-to-start-spark-cluster-kestrel:
 
-*************************************
-How to start a Spark cluster on Eagle
-*************************************
+***************************************
+How to start a Spark cluster on Kestrel
+***************************************
 This section assumes that you have cloned the HPC Spark setup scripts from this `repo
 <https://github.com/NREL/HPC.git>`_. If you are unfamiliar with that, please read the full details
 at :ref:`spark-on-hpc`.
 
-This example will acquire one compute node from the ``debug`` partition. If you need more than two
-nodes or more than one hour of runtime, use the ``bigmem`` or ``gpu`` partition.
+Compute Node Types
+==================
+Spark works best with fast local storage. The standard Kestrel nodes do not have any local storage.
+The best candidates are the 256 standard nodes (no GPUs) with 1.92 TB NVMe M.2 drives. Please refer
+to the `Kestrel system configuration page
+<https://www.nrel.gov/hpc/kestrel-system-configuration.html>`_ for specific hardware information.
+The GPU nodes will work well, but at a greater cost in AUs.
 
-.. warning:: Do not use compute nodes from the standard partition on Eagle if your queries will
-   shuffle data. The local storage on those nodes are too slow and will cause timeouts. All bigmem
-   and gpu nodes have fast local storage.
+If those nodes are not available, you may be able to complete your queries by using the standard
+nodes and specifying a path on the Lustre filesystem in the Spark configuration file
+``conf/spark-env.sh``. Change ``SPARK_LOCAL_DIRS`` and ``SPARK_WORKER_DIR``.
 
 Steps
 =====
@@ -28,13 +33,13 @@ Steps
 
 .. code-block:: console
 
-    $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --mem=730G
+    $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G
 
 4. Create the initial config file.
 
 .. code-block:: console
 
-   $ create_config.sh -c /datasets/images/apache_spark/spark341_py311.sif
+   $ create_config.sh -c /projects/dsgrid/containers/spark341_py311.sif
 
 5. Configure the Spark settings. Run -h to see the available options.
 

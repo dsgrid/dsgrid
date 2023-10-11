@@ -289,7 +289,7 @@ class Project:
             # Results were not as good with that solution.
             # Observations on queries with comstock and resstock showed that Spark
             # used many fewer executors on the second query. That was with a standalone
-            # cluster on Eagle with dynamic allocation enabled.
+            # cluster on Kestrel with dynamic allocation enabled.
             # We don't understand why that is the case. It may not be an issue with YARN as
             # the cluster manager on AWS.
             # Queries on standalone clusters will be easier to debug if we restart the session

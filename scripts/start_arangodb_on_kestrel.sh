@@ -18,8 +18,8 @@ if [ ! -d ${ARANGODB3_APPS_DIR} ]; then
     mkdir ${ARANGODB3_APPS_DIR}
 fi
 
-module load singularity-container
-singularity run \
+module load apptainer
+apptainer run \
     -B ${ARANGODB3_DIR}:/var/lib/arangodb3 \
     -B ${ARANGODB3_APPS_DIR}:/var/lib/arangodb3-apps \
     --network-args "portmap=8529:8529" \

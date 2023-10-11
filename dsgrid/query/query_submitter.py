@@ -41,7 +41,7 @@ class QuerySubmitterBase:
 
         # TODO #186: This location will need more consideration.
         # We might want to store cached datasets in the spark-warehouse and let Spark manage it
-        # for us. However, would we share them on Eagle? What happens on Eagle walltime timeouts
+        # for us. However, would we share them on the HPC? What happens on HPC walltime timeouts
         # where the tables are left in intermediate states?
         # This is even more of a problem on AWS.
         self._cached_project_mapped_datasets_dir().mkdir(exist_ok=True, parents=True)

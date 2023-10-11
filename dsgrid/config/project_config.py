@@ -305,11 +305,11 @@ class DimensionsModel(DSGBaseModel):
                 raise ValueError(f"dimension_query_name={name} is not unique in the project")
             query_names.add(name)
 
-        for dim in values["base_dimensions"]:
+        for dim in values.get("base_dimensions", []):
             add_name(dim.dimension_query_name)
-        for dim in values["supplemental_dimensions"]:
+        for dim in values.get("supplemental_dimensions", []):
             add_name(dim.dimension_query_name)
-        for group in values["subset_dimensions"]:
+        for group in values.get("subset_dimensions", []):
             add_name(group.display_name)
             for selector in group.selectors:
                 add_name(selector.name)

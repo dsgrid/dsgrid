@@ -1,8 +1,8 @@
-.. _how-to-run-dsgrid-eagle:
+.. _how-to-run-dsgrid-kestrel:
 
-**************************
-How to run dsgrid on Eagle
-**************************
+****************************
+How to run dsgrid on Kestrel
+****************************
 
 1. ssh to a login node and start a screen session (or similar, e.g., tmux):
 
@@ -19,7 +19,7 @@ How to run dsgrid on Eagle
     $ dsgrid config create -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios --offline
 
 4. Start a Spark cluster with your desired number of compute nodes by following the instructions at
-   :ref:`how-to-start-spark-cluster-eagle`.
+   :ref:`how-to-start-spark-cluster-kestrel`.
 
 5. Run all CPU-intensive dsgrid commands from the first node in your HPC allocation like this:
 

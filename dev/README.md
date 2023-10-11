@@ -20,7 +20,7 @@ pip install -e .[admin] # dev plus what is needed for creating documentation and
 
 **Java**
 Spark requires Java. Most people already have Java installed on their personal computers, so this
-is typically only a problem on Eagle or the cloud. Check if you have it. Both of these commands
+is typically only a problem on an HPC or the cloud. Check if you have it. Both of these commands
 must work.
 ```
 $ java --version
@@ -114,21 +114,21 @@ Once the docker container is running, Arango commands will need to be preceded w
 docker exec arango-container arangorestore ...
 ```
 
-#### Eagle
-The dsgrid repository includes `scripts/start_arangodb_on_eagle.sh`. It will start an ArangoDB
+#### Kestrel
+The dsgrid repository includes `scripts/start_arangodb_on_kestrel.sh`. It will start an ArangoDB
 on a compute node using the debug partition. It stores Arango files in `/scratch/${USER}/arangodb3`
 and `/scratch/${USER}/arangodb3-apps`. If you would like to use a completely new database,
 delete those directories before running the script.
 
 Note that Slurm will log stdout/stderr from `arangod` into `./arango_<job-id>.o/e`.
 
-The repository also includes `scripts/start_spark_and_arango_on_eagle.sh`. It starts Spark as well
+The repository also includes `scripts/start_spark_and_arango_on_kestrel.sh`. It starts Spark as well
 as ArangoDB, but you must have cloned `https://github.com/NREL/HPC.git`. It looks for the repo at
 `~/repos/HPC`, but you can set a custom value on the command line, such as the example below.
 
 You may want to adjust the number and type of nodes in the script based on your Spark requirements.
 ```
-$ sbatch scripts/start_spark_and_arango_on_eagle.sh ~/HPC
+$ sbatch scripts/start_spark_and_arango_on_kestrel.sh ~/HPC
 ```
 
 Note that Slurm will log stdout/stderr from into `./dsgrid_infra<job-id>.o/e`. Look at the .o
@@ -202,7 +202,7 @@ $ docker exec arango-container arangorestore \
     --include-system-collections true
 ```
 
-If you are running on Eagle, run this script from the dsgrid repository. Note that you can run this
+If you are running on an HPC, run this script from the dsgrid repository. Note that you can run this
 command on a login node. `DB_HOSTNAME` is the node name of the compute node running Arango.
 ```
 $ bash scripts/restore_simple_standard_scenarios.sh <path-to-your-local-dsgrid-test-data> <DB_HOSTNAME>
@@ -216,8 +216,8 @@ If you update the configs or data for the StandardScenarios registry then you'll
 the test data repository per these instructions.
 
 1. Register and submit all datasets to a clean registry. The initial registry can be created with
-this command after modifiying the paths specified in the JSON5 file. Four `bigmem` compute nodes
-on Eagle are recommended in order to complete the job in one hour. Two may be sufficient if you
+this command after modifiying the paths specified in the JSON5 file. Three compute nodes
+on Kestrel are recommended in order to complete the job in one hour. Two may be sufficient if you
 run multiple iterations.
 
 Run this from your scratch directory.
@@ -265,10 +265,10 @@ If you only want to run AWS tests:
 pytest tests_aws
 ```
 
-If you're running tests on Eagle and used the `scripts/start_spark_and_arango_on_eagle.sh` or set up a custom configuration you will want to:
+If you're running tests on an HPC and used the `scripts/start_spark_and_arango_on_kestrel.sh` or set up a custom configuration you will want to:
 
 - ssh to the node where Arango is running
-- change to the directory from which you ran the `start_spark_and_arango_on_eagle.sh` script or otherwise identify the full path to the Spark config directory
+- change to the directory from which you ran the `start_spark_and_arango_on_kestrel.sh` script or otherwise identify the full path to the Spark config directory
 - `export SPARK_CONF_DIR=$(pwd)/conf` (You can also get the correct command from `grep SPARK dsgrid_infra*.o`.)
 - `cd ~/dsgrid`
 - `module load conda`
@@ -356,7 +356,7 @@ Clone the repository to your system.
 git clone https://github.com/dsgrid/dsgrid-project-EFS $HOME/dsgrid-project-EFS
 ```
 
-Download the EFS datasets from AWS or Eagle (`/projects/dsgrid/efs_datasets/converted_output/commercial`)
+Download the EFS datasets from AWS or HPC (`/projects/dsgrid/efs_datasets/converted_output/commercial`)
 to a local path and set an environment variable for it.
 
 This is what that directory should contain:
@@ -504,7 +504,7 @@ debug(geography_dim.model)
 
 When developing code to support queries you will need to use a miniature registry. Running against
 full datasets in a project will take forever. Here is an example of how to create a simplified version
-of the StandardScenarios project. Run this on an Eagle compute node after configuring a cluster.
+of the StandardScenarios project. Run this on an HPC compute node after configuring a cluster.
 
 This uses a configuration file from the dsgrid-test-data repository that selects a few dimension records
 from each dataset.

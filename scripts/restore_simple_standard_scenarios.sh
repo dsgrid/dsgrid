@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# HPC/Eagle-only script. Uses Singularity.
+# HPC-only script. Uses Apptainer.
 # Imports the archived simple_standard_scenarios database from your local dsgrid-test-data repo
 # into an ArangoDB instance.
 #
@@ -22,9 +22,9 @@ ARANGODB3_DIR=/scratch/$USER/arangodb3
 ARANGODB3_APPS_DIR=/scratch/$USER/arangodb3-apps
 ARANGODB_CONTAINER=/projects/dsgrid/containers/arangodb.sif
 
-module load singularity-container
+module load apptainer
 echo "${DSGRID_TEST_DATA} ${ARANGODB3_DIR} ${ARANGODB3_APPS_DIR} ${ARANGODB_CONTAINER}"
-singularity run \
+apptainer run \
     -B ${DSGRID_TEST_DATA}:/dsgrid-test-data \
     -B ${ARANGODB3_DIR}:/var/lib/arangodb3 \
     -B ${ARANGODB3_APPS_DIR}:/var/lib/arangodb3-apps \

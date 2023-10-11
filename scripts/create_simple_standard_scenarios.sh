@@ -32,8 +32,8 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
-module load singularity-container
-singularity run \
+module load apptainer
+apptainer run \
     -B /scratch:/scratch \
     /projects/dsgrid/containers/arangodb.sif \
     arangodump \

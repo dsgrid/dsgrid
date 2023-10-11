@@ -94,11 +94,10 @@ To use dsgrid in your own computational environment, you will need to run Arango
 up a new dsgrid registry or load a dsgrid registry that has been written to disk. Please see the 
 :ref:`how-to guide on setting up a standalone dsgrid registry <set_up_standalone_registry>`.
 
-
 Apache Spark
 ============
 
-- NREL High Performance Computing: :ref:`how-to-start-spark-cluster-eagle`
+- NREL High Performance Computing: :ref:`how-to-start-spark-cluster-kestrel`
 - Standalone resources: [TODO: Provide link]
 
 

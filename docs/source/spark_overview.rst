@@ -173,13 +173,13 @@ available at port 4040. You can monitor and debug all aspects of your jobs in th
 can also inspect all cluster configuration settings.
 
 If your Spark cluster is running on a remote system, like an HPC, you may need to open an ssh
-tunnel to the master node. Here is how to do that on NREL's Eagle cluster.
+tunnel to the master node. Here is how to do that on NREL's Kestrel cluster.
 
 On your laptop:
 .. code-block:: console
 
     $ export COMPUTE_NODE=<compute_node_name>
-    $ ssh -L 4040:$COMPUTE_NODE:4040 -L 8080:$COMPUTE_NODE:8080 $USER@eagle.hpc.nrel.gov
+    $ ssh -L 4040:$COMPUTE_NODE:4040 -L 8080:$COMPUTE_NODE:8080 $USER@kestrel.hpc.nrel.gov
 
 
 Installing a Spark Standalone Cluster
@@ -281,7 +281,7 @@ HPC
 ---
 This section describes how you can run Spark jobs on any number of HPC compute nodes.
 The scripts and examples described here rely on the SLURM scheduling system and have been tested
-on NREL's Eagle cluster.
+on NREL's Kestrel cluster.
 
 NREL's HPC GitHub [repository](https://github.com/NREL/HPC) contains scripts that will create an
 ephemeral Spark cluster on compute nodes that you allocate.
@@ -301,7 +301,7 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
     $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --mem=730G
 
-- NREL's Eagle cluster will let you allocate two debug jobs each with two nodes. So, you can use
+- NREL's Kestrel cluster will let you allocate two debug jobs each with two nodes. So, you can use
   these scripts to create a four-node cluster for one hour.
 - If the debug partition is not too full, you can append ``--qos=standby`` to the command above
   and not be charged any AUs.
@@ -318,7 +318,7 @@ calls out choices that you should make to run Spark jobs with dsgrid.
     $ create_config.sh -c /projects/dsgrid/containers/spark341_py311.sif
 
 4. Configure Spark parameters based on the amount of memory and CPU in each compute node. dsgrid
-   jobs on Eagle seem to work better with dynamic allocation enabled.
+   jobs on Kestrel seem to work better with dynamic allocation enabled.
 
    This command must be run on a compute node. The script will check for the environment variable
    ``SLURM_JOB_ID``, which is set by ``SLURM``. If you ssh'd into the compute node, it won't be set and
@@ -517,9 +517,9 @@ We have not observed any downside to having this feature enabled.
 Slow local storage
 ------------------
 Spark will write lots of temporary data to local storage during shuffle operations. If your joins
-cause lots of shuffling, it is very important that your local storage be fast. If you use an Eagle
-node with a slow spinning disk (130 MB/s), your job will likely fail. Use a ``bigmem`` or ``gpu``
-node. They have SSDs that can write data at 2 GB/s.
+cause lots of shuffling, it is very important that your local storage be fast. If you direct Spark
+to use the Lustre filesystem for local storage, you mileage will vary. If the system is idle, it
+might work. If it is saturated, your job will likely fail.
 
 ### Too many executors are involved in a job
 Some of our Spark jobs, particularly those that create large, in-memory tables from dimension

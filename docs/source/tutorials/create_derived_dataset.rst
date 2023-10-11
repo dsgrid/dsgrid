@@ -9,7 +9,7 @@ dataset. The tutorial uses the comstock_conus_2022_projected derived dataset fro
 `dsgrid-project-StandardScenarios <https://github.com/dsgrid/dsgrid-project-StandardScenarios>`_
 as an example.
 
-You can run all commands in this tutorial except the last one on NREL's HPC Eagle cluster (the
+You can run all commands in this tutorial except the last one on NREL's HPC Kestrel cluster (the
 dataset is already registered).
 
 Steps
@@ -17,7 +17,7 @@ Steps
 ssh to a login node to begin the tutorial.
 
 1. You will need at least four compute nodes to create this dataset in about an hour.
-   Follow the instructions at :ref:`how-to-run-dsgrid-eagle` if you have not already done so. The
+   Follow the instructions at :ref:`how-to-run-dsgrid-kestrel` if you have not already done so. The
    instructions now assume that you are logged in to the compute node that is running the Spark
    master process.
 

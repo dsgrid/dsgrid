@@ -36,8 +36,8 @@ printf "Run this command in your environment to use the same configuration:\n\n"
 printf "export SPARK_CONF_DIR=$(pwd)/conf\n\n"
 printf "Starting ArangoDB\n\n"
 
-module load singularity-container
-singularity run \
+module load apptainer
+apptainer run \
     -B ${ARANGODB3_DIR}:/var/lib/arangodb3 \
     -B ${ARANGODB3_APPS_DIR}:/var/lib/arangodb3-apps \
     --network-args "portmap=8529:8529" \

@@ -7,7 +7,10 @@ CLI
 
 List Registry Components
 -------------------------
-You can list components by type: projects, datasets, dimensions, dimension mappings.
+
+Assuming you have already :ref:`configured dsgrid <configure_dsgrid>` to point to the right 
+database (URL and name), you can list components by type: projects, datasets, dimensions, dimension 
+mappings:
 
 .. code-block:: console
 
@@ -27,6 +30,13 @@ You can also list all components at once:
 .. code-block:: console
 
     $ dsgrid registry list
+
+You can also browse different registries by specifying the database URL and name directly on the 
+command line:
+
+.. code-block:: console
+
+    $ dsgrid -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios registry list
 
 
 .. _project-viewer:

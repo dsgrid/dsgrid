@@ -123,7 +123,14 @@ def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list
     records = []
     check_duplicates = check_duplicates or []
     values = {x: set() for x in check_duplicates}
+    length = None
     for row in iterable:
+        if None in row:
+            raise ValueError(f"row has a key that is None: {row=}")
+        if length is None:
+            length = len(row)
+        elif len(row) != length:
+            raise ValueError(f"Rows have inconsistent length: first_row_length={length} {row=}")
         record = cls(**row)
         for name in check_duplicates:
             val = getattr(record, name)

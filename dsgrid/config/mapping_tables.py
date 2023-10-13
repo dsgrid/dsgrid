@@ -8,7 +8,6 @@ from pydantic import Field, validator
 
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingBaseModel,
-    DimensionMappingByNameBaseModel,
     DimensionMappingDatasetToProjectBaseModel,
     DimensionMappingPreRegisteredBaseModel,
 )
@@ -45,7 +44,7 @@ class MappingTableRecordModel(DSGBaseModel):
         return val
 
 
-class MappingTableByNameModel(DimensionMappingByNameBaseModel):
+class MappingTableByNameModel(DimensionMappingPreRegisteredBaseModel):
     """Attributes for a dimension mapping table for soon-to-be registered dimensions by name.
     This will be converted to a MappingTableModel as soon as the dimensions are registered.
     """

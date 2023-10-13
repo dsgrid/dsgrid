@@ -15,6 +15,10 @@ from dsgrid.tests.common import (
     replace_dimension_names_with_current_ids,
 )
 
+STANDARD_SCENARIOS_PROJECT_REPO = (
+    Path(__file__).parent.parent.parent / "dsgrid-project-StandardScenarios"
+)
+
 
 def test_register_dimensions_and_mappings(tmp_registry_db):
     src_dir, tmpdir, db_name = tmp_registry_db
@@ -255,3 +259,29 @@ def test_list_project_dimension_query_names(cached_registry):
     assert "subset: commercial_subsectors2 residential_subsectors" in result.stdout
     assert "supplemental: all_subsectors commercial_subsectors" in result.stdout
     assert "supplemental: all_geographies census_division census_region state" in result.stdout
+
+
+def test_register_standard_scenarios(tmp_registry_db):
+    """Test registration of the StandardScenarios project."""
+    _, tmpdir, db_name = tmp_registry_db
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(admin_cli, ["create-registry", db_name, "-p", str(tmpdir), "--force"])
+    assert result.exit_code == 0
+
+    project_config = STANDARD_SCENARIOS_PROJECT_REPO / "dsgrid_project" / "project.json5"
+
+    result = runner.invoke(
+        cli,
+        [
+            "--database-name",
+            db_name,
+            "--offline",
+            "registry",
+            "projects",
+            "register",
+            str(project_config),
+            "--log-message",
+            "log",
+        ],
+    )
+    assert result.exit_code == 0

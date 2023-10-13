@@ -1,4 +1,8 @@
 [submodule "dsgrid-test-data"]
 	path = dsgrid-test-data
 	url = https://github.com/dsgrid/dsgrid-test-data
-	branch = main
+	branch = dt/issue-249
+[submodule "dsgrid-project-StandardScenarios"]
+	path = dsgrid-project-StandardScenarios
+	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
+	branch = dt/issue-249

@@ -30,6 +30,5 @@ Unregistered Dimension Mappings
 ===============================
 
 .. autopydantic_model:: dsgrid.config.mapping_tables.MappingTableByNameModel
-.. autopydantic_model:: dsgrid.config.dimension_mapping_base.DimensionMappingByNameBaseModel
 .. autopydantic_model:: dsgrid.config.dimension_mapping_base.DimensionMappingPreRegisteredBaseModel
 .. autopydantic_model:: dsgrid.config.dimensions.DimensionReferenceByNameModel

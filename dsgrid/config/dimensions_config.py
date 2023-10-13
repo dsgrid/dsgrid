@@ -40,7 +40,7 @@ class DimensionsConfigModel(DSGBaseModel):
     def check_files(cls, values: dict) -> dict:
         """Validate dimension files are unique across all dimensions"""
         check_uniqueness(
-            (x.filename for x in values if isinstance(x, DimensionModel)),
+            (x.filename for x in values if isinstance(x, DimensionModel) and x.filename),
             "dimension record filename",
         )
         return values

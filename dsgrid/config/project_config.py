@@ -42,8 +42,8 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dataset_config import InputDatasetType
+from .supplemental_dimension import SupplementalDimensionModel
 from .dimension_mapping_base import DimensionMappingReferenceModel
-from .mapping_tables import MappingTableByNameModel
 from .dimensions import (
     DimensionReferenceModel,
     handle_dimension_union,
@@ -204,7 +204,7 @@ class DimensionsModel(DSGBaseModel):
         ),
         default=[],
     )
-    supplemental_dimensions: List = Field(
+    supplemental_dimensions: List[SupplementalDimensionModel] = Field(
         title="supplemental_dimensions",
         description="List of supplemental dimensions. They will be automatically registered "
         "during project registration and then converted to supplemental_dimension_references.",
@@ -216,7 +216,7 @@ class DimensionsModel(DSGBaseModel):
         default=[],
     )
     supplemental_dimension_references: List[DimensionReferenceModel] = Field(
-        title="supplemental_dimensions",
+        title="supplemental_dimension_references",
         description="List of registry references for a project's supplemental dimensions.",
         requirements=(
             "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType`"
@@ -282,7 +282,7 @@ class DimensionsModel(DSGBaseModel):
                 )
         return values
 
-    @validator("base_dimensions", "supplemental_dimensions", pre=True, each_item=True, always=True)
+    @validator("base_dimensions", pre=True, each_item=True, always=True)
     def handle_dimension_union(cls, values):
         return handle_dimension_union(values)
 
@@ -453,15 +453,6 @@ class DimensionMappingsModel(DSGBaseModel):
     """Defines all dimension mappings associated with a dsgrid project,
     including dimension associations, base-to-supplemental mappings, and dataset-to-project mappings."""
 
-    # This may eventually need to be a Union of types.
-    base_to_supplemental: List[MappingTableByNameModel] = Field(
-        title="base_to_supplemental",
-        description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
-        " used to support various queries and dimension transformations. They will be "
-        "automatically registered during project registration and then converted to "
-        "base_to_supplemental_references.",
-        default=[],
-    )
     base_to_supplemental_references: List[DimensionMappingReferenceModel] = Field(
         title="base_to_supplemental_references",
         description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
@@ -551,27 +542,6 @@ class ProjectConfigModel(DSGBaseModel):
         description="Registry database revision",
         dsgrid_internal=True,
     )
-
-    @root_validator(pre=False, skip_on_failure=True)
-    def check_mappings_with_dimensions(cls, values):
-        """Check that dimension mappings refer to dimensions listed in the model."""
-        dimension_names = {
-            (x.name, x.dimension_type)
-            for x in itertools.chain(
-                values["dimensions"].base_dimensions,
-                values["dimensions"].supplemental_dimensions,
-            )
-        }
-        mapping_names = set()
-        for mapping in values["dimension_mappings"].base_to_supplemental:
-            mapping_names.add((mapping.from_dimension.name, mapping.from_dimension.dimension_type))
-            mapping_names.add((mapping.to_dimension.name, mapping.to_dimension.dimension_type))
-
-        diff = mapping_names.difference(dimension_names)
-        if diff:
-            raise ValueError(f"base_to_supplemental mappings contain unknown dimensions: {diff}")
-
-        return values
 
     @validator("project_id")
     def check_project_id_handle(cls, project_id):

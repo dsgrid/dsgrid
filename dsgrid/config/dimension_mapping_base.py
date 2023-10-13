@@ -6,7 +6,7 @@ from pydantic import Field, validator
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDimensionMapping
-from .dimensions import DimensionReferenceModel, DimensionReferenceByNameModel
+from .dimensions import DimensionReferenceModel
 
 logger = logging.getLogger(__name__)
 
@@ -278,19 +278,6 @@ class DimensionMappingPreRegisteredBaseModel(DSGBaseModel):
         title="to_fraction_tolerance",
         description="Tolerance value to apply to the to_fraction column",
         default=1e-9,
-    )
-
-
-class DimensionMappingByNameBaseModel(DimensionMappingPreRegisteredBaseModel):
-    """Base class for mapping soon-to-be registered dimensions by name. Used when automatically
-    registering a project's dimensions and mappings along with the project.
-    """
-
-    from_dimension: DimensionReferenceByNameModel = Field(
-        title="from_dimension", description="Reference to soon-to-be-registered from dimension"
-    )
-    to_dimension: DimensionReferenceByNameModel = Field(
-        title="to_dimension", description="Reference to soon-to-be-registered to dimension"
     )
 
 

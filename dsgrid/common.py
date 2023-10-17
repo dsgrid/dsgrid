@@ -21,5 +21,5 @@ REGISTRY_FILENAME = "registry.json5"
 DATASET_FILENAME = "dataset.json5"
 DIMENSIONS_FILENAME = "dimensions.json5"
 DEFAULT_DB_PASSWORD = "openSesame"
-
+SCALING_FACTOR_COLUMN = "scaling_factor"
 SYNC_EXCLUDE_LIST = ["*.DS_Store", "**/*.lock"]

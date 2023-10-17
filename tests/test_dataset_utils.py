@@ -2,8 +2,10 @@ import math
 
 import pyspark.sql.functions as F
 import pytest
+from pyspark.sql.types import StructType, IntegerType
 
 from dsgrid.utils.dataset import (
+    apply_scaling_factor,
     map_and_reduce_pivoted_dimension,
     is_noop_mapping,
     remove_invalid_null_timestamps,
@@ -244,6 +246,29 @@ def test_remove_invalid_null_timestamps():
     assert result.count() == 6
     assert result.filter("county == 'Boulder'").count() == 2
     assert result.filter(f"county == 'Boulder' and {time_col} is NULL").rdd.isEmpty()
+
+
+def test_apply_scaling_factor():
+    spark = get_spark_session()
+    schema = (
+        StructType()
+        .add("a", IntegerType(), False)
+        .add("b", IntegerType(), False)
+        .add("bystander", IntegerType(), False)
+        .add("scaling_factor", IntegerType(), True)
+    )
+    df = spark.createDataFrame(
+        [
+            {"a": 1, "b": 2, "bystander": 1, "scaling_factor": 5},
+            {"a": 2, "b": 3, "bystander": 1, "scaling_factor": 6},
+            {"a": 3, "b": 4, "bystander": 1, "scaling_factor": None},
+        ],
+        schema=schema,
+    )
+    df2 = apply_scaling_factor(df, ("a", "b"))
+    assert df2.select("a").agg(F.sum("a").alias("sum_a")).collect()[0].sum_a == 1 * 5 + 2 * 6 + 3
+    assert df2.select("b").agg(F.sum("b").alias("sum_b")).collect()[0].sum_b == 2 * 5 + 3 * 6 + 4
+    assert df2.select("bystander").agg(F.sum("bystander").alias("c")).collect()[0].c == 1 + 1 + 1
 
 
 # TODO: enable this when we decide if and how to handle NULL values in mean operations.

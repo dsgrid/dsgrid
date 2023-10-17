@@ -232,6 +232,10 @@ def test_create_composite_dataset_query(tmp_path):
 def test_query_cli_create_validate(tmp_path):
     filename = tmp_path / "query.json5"
     cmd = [
+        "--username",
+        "root",
+        "--password",
+        "openSesame",
         "--offline",
         "--database-name",
         "simple-standard-scenarios",
@@ -277,6 +281,10 @@ def test_query_cli_run(tmp_path):
     filename = tmp_path / "query.json"
     filename.write_text(query.make_query().json(indent=2))
     cmd = [
+        "--username",
+        "root",
+        "--password",
+        "openSesame",
         "--offline",
         "--database-name",
         "simple-standard-scenarios",

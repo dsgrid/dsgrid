@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 
 from dsgrid.utils.timing import timer_stats_collector
-from dsgrid.cli.common import get_log_level_from_str
+from dsgrid.cli.common import get_log_level_from_str, OptionPromptPassword
 from dsgrid.cli.config import config
 from dsgrid.cli.download import download
 from dsgrid.cli.install_notebooks import install_notebooks
@@ -65,11 +65,27 @@ _config = DsgridRuntimeConfig.load()
 )
 @click.option(
     "-u",
-    "--database-url",
+    "--url",
     type=str,
     default=_config.database_url,
     envvar="DSGRID_REGISTRY_DATABASE_URL",
     help="Database URL. Ex: http://localhost:8529",
+)
+@click.option(
+    "-U",
+    "--username",
+    type=str,
+    default=_config.database_user,
+    help="Database username",
+)
+@click.option(
+    "-P",
+    "--password",
+    prompt=True,
+    hide_input=True,
+    cls=OptionPromptPassword,
+    help="dsgrid registry password. Will prompt unless it is passed or the username matches the "
+    "runtime config file.",
 )
 @click.pass_context
 def cli(
@@ -81,7 +97,9 @@ def cli(
     offline,
     timings,
     database_name,
-    database_url,
+    url,
+    username,
+    password,
 ):
     """dsgrid commands"""
     if timings:

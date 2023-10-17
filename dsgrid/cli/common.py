@@ -2,6 +2,10 @@ import logging
 import sys
 from pathlib import Path
 
+import click
+
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
+
 
 logger = logging.getLogger(__name__)
 
@@ -49,3 +53,28 @@ def get_log_level_from_str(level):
 def get_value_from_context(ctx, field) -> str:
     """Get the field value from the root of a click context."""
     return ctx.find_root().params[field]
+
+
+# Copied from
+# https://stackoverflow.com/questions/45868549/creating-a-click-option-with-prompt-that-shows-only-if-default-value-is-empty
+# and modified for our desired password behavior.
+
+
+class OptionPromptPassword(click.Option):
+    """Custom class that only prompts for the password if the user set a different username value
+    than what is in the runtime config file."""
+
+    def get_default(self, ctx):
+        config = DsgridRuntimeConfig.load()
+        username = get_value_from_context(ctx, "username")
+        if username != config.database_user:
+            return None
+        return config.database_password
+
+    def prompt_for_value(self, ctx):
+        default = self.get_default(ctx)
+
+        if default is None:
+            return super().prompt_for_value(ctx)
+
+        return default

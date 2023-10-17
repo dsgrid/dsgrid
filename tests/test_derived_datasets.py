@@ -94,6 +94,10 @@ def test_create_derived_dataset_config(tmp_path):
     result = runner.invoke(
         cli,
         [
+            "--username",
+            "root",
+            "--password",
+            "openSesame",
             "--offline",
             "--database-name",
             "simple-standard-scenarios",
@@ -131,6 +135,10 @@ def test_create_derived_dataset_config(tmp_path):
     result = runner.invoke(
         cli,
         [
+            "--username",
+            "root",
+            "--password",
+            "openSesame",
             "--offline",
             "--database-name",
             "simple-standard-scenarios",

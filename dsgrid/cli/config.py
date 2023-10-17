@@ -32,7 +32,7 @@ def config():
 )
 @click.option(
     "-u",
-    "--database-url",
+    "--url",
     type=str,
     default=None,
     help="Database URL. Ex: http://localhost:8529",
@@ -62,7 +62,7 @@ def config():
 def create(
     timings,
     database_name,
-    database_url,
+    url,
     offline,
     console_level,
     file_level,
@@ -71,7 +71,7 @@ def create(
     dsgrid_config = DsgridRuntimeConfig(
         timings=timings,
         database_name=database_name,
-        database_url=database_url,
+        database_url=url,
         offline=offline,
         console_level=console_level,
         file_level=file_level,

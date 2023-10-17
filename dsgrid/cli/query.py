@@ -22,7 +22,6 @@ from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
-from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
@@ -167,12 +166,11 @@ def create_project_query(
             )
             sys.exit(1)
 
-    config = DsgridRuntimeConfig.load()
     conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "database_url"),
+        get_value_from_context(ctx, "url"),
         database=get_value_from_context(ctx, "database_name"),
-        username=config.database_user,
-        password=config.database_password,
+        username=get_value_from_context(ctx, "username"),
+        password=get_value_from_context(ctx, "password"),
     )
     registry_manager = RegistryManager.load(
         conn,
@@ -297,12 +295,11 @@ def run_project_query(
 ):
     """Run a query on a dsgrid project."""
     query = ProjectQueryModel.from_file(query_definition_file)
-    config = DsgridRuntimeConfig.load()
     conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "database_url"),
+        get_value_from_context(ctx, "url"),
         database=get_value_from_context(ctx, "database_name"),
-        username=config.database_user,
-        password=config.database_password,
+        username=get_value_from_context(ctx, "username"),
+        password=get_value_from_context(ctx, "password"),
     )
     registry_manager = RegistryManager.load(
         conn,
@@ -341,8 +338,10 @@ def create_composite_dataset(
     """Run a query to create a composite dataset."""
     CreateCompositeDatasetQueryModel.from_file(query_definition_file)
     # conn = DatabaseConnection.from_url(
-    #     get_value_from_context(ctx, "database_url"),
+    #     get_value_from_context(ctx, "url"),
     #     database=get_value_from_context(ctx, "database_name"),
+    #     username=get_value_from_context(ctx, "username"),
+    #     password=get_value_from_context(ctx, "password"),
     # )
     # TODO
     print("not implemented yet")
@@ -371,8 +370,10 @@ def query_composite_dataset(
     """Run a query on a composite dataset."""
     CompositeDatasetQueryModel.from_file(query_definition_file)
     # conn = DatabaseConnection.from_url(
-    #     get_value_from_context(ctx, "database_url"),
+    #     get_value_from_context(ctx, "url"),
     #     database=get_value_from_context(ctx, "database_name"),
+    #     username=get_value_from_context(ctx, "username"),
+    #     password=get_value_from_context(ctx, "password"),
     # )
     # TODO
     print("not implemented yet")
@@ -408,12 +409,11 @@ def create_derived_dataset_config(ctx, src, dst, remote_path, force):
     dst_path = fs_interface.path(dst)
     check_output_directory(dst_path, fs_interface, force)
 
-    config = DsgridRuntimeConfig.load()
     conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "database_url"),
+        get_value_from_context(ctx, "url"),
         database=get_value_from_context(ctx, "database_name"),
-        username=config.database_user,
-        password=config.database_password,
+        username=get_value_from_context(ctx, "username"),
+        password=get_value_from_context(ctx, "password"),
     )
     registry_manager = RegistryManager.load(
         conn,

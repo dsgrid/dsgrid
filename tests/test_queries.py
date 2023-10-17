@@ -11,6 +11,7 @@ import pytest
 from click.testing import CliRunner
 from pyspark.sql import SparkSession
 
+from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.cli.dsgrid import cli
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
@@ -232,6 +233,10 @@ def test_create_composite_dataset_query(tmp_path):
 def test_query_cli_create_validate(tmp_path):
     filename = tmp_path / "query.json5"
     cmd = [
+        "--username",
+        "root",
+        "--password",
+        DEFAULT_DB_PASSWORD,
         "--offline",
         "--database-name",
         "simple-standard-scenarios",
@@ -277,6 +282,10 @@ def test_query_cli_run(tmp_path):
     filename = tmp_path / "query.json"
     filename.write_text(query.make_query().json(indent=2))
     cmd = [
+        "--username",
+        "root",
+        "--password",
+        DEFAULT_DB_PASSWORD,
         "--offline",
         "--database-name",
         "simple-standard-scenarios",

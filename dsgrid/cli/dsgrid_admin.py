@@ -7,7 +7,7 @@ from pathlib import Path
 
 import click
 
-from dsgrid.cli.common import get_value_from_context
+from dsgrid.cli.common import get_value_from_context, OptionPromptPassword
 from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
@@ -37,12 +37,28 @@ Click Group Definitions
     "DSGRID_REGISTRY_DATABASE_NAME",
 )
 @click.option(
-    "--database-url",
+    "--url",
     default=_config.database_url,
     show_default=True,
     envvar="DSGRID_REGISTRY_DATABASE_URL",
     help="dsgrid registry database URL. Override with the environment variable "
     "DSGRID_REGISTRY_DATABASE_URL",
+)
+@click.option(
+    "-U",
+    "--username",
+    default=_config.database_user,
+    show_default=True,
+    help="dsgrid registry user name",
+)
+@click.option(
+    "-P",
+    "--password",
+    prompt=True,
+    hide_input=True,
+    cls=OptionPromptPassword,
+    help="dsgrid registry password. Will prompt unless it is passed or the username matches the "
+    "runtime config file.",
 )
 @click.option("-l", "--log-file", default="dsgrid_admin.log", type=str, help="Log to this file.")
 @click.option(
@@ -60,7 +76,7 @@ Click Group Definitions
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def cli(database_name, database_url, log_file, no_prompts, offline, verbose):
+def cli(database_name, url, username, password, log_file, no_prompts, offline, verbose):
     """dsgrid-admin commands"""
     path = Path(log_file)
     level = logging.DEBUG if verbose else logging.INFO
@@ -83,8 +99,10 @@ def registry(ctx, remote_path):
         ctx.obj = None
     else:
         conn = DatabaseConnection.from_url(
-            get_value_from_context(ctx, "database_url"),
+            get_value_from_context(ctx, "url"),
             database=get_value_from_context(ctx, "database_name"),
+            username=get_value_from_context(ctx, "username"),
+            password=get_value_from_context(ctx, "password"),
         )
         ctx.obj = RegistryManager.load(
             conn,
@@ -146,12 +164,11 @@ def create_registry(ctx, db_name, data_path, force):
             print(f"{data_path} already exists. Set --force to overwrite.", file=sys.stderr)
             sys.exit(1)
 
-    config = DsgridRuntimeConfig.load()
     conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "database_url"),
+        get_value_from_context(ctx, "url"),
         database=db_name,
-        username=config.database_user,
-        password=config.database_password,
+        username=get_value_from_context(ctx, "username"),
+        password=get_value_from_context(ctx, "password"),
     )
     RegistryManager.create(conn, data_path)
 
@@ -251,19 +268,20 @@ def make_filtered_registry(
 ):
     """Make a filtered registry for testing purposes."""
     simple_model = RegistrySimpleModel(**load_data(config_file))
-    database_url = get_value_from_context(ctx, "database_url")
-    config = DsgridRuntimeConfig.load()
+    url = get_value_from_context(ctx, "url")
+    username = get_value_from_context(ctx, "username")
+    password = get_value_from_context(ctx, "password")
     src_conn = DatabaseConnection.from_url(
-        database_url,
+        url,
         database=src_database_name,
-        username=config.database_user,
-        password=config.database_password,
+        username=username,
+        password=password,
     )
     dst_conn = DatabaseConnection.from_url(
-        database_url,
+        url,
         database=dst_database_name,
-        username=config.database_user,
-        password=config.database_password,
+        username=username,
+        password=password,
     )
     RegistryManager.copy(
         src_conn,

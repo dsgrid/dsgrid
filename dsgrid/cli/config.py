@@ -1,9 +1,11 @@
 """CLI commands to manage the dsgrid runtime configuration"""
 
+import getpass
 import logging
 
 import click
 
+from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 
 
@@ -32,10 +34,26 @@ def config():
 )
 @click.option(
     "-u",
-    "--database-url",
+    "--url",
     type=str,
     default=None,
     help="Database URL. Ex: http://localhost:8529",
+)
+@click.option(
+    "-U",
+    "--username",
+    type=str,
+    default=getpass.getuser(),
+    help="Database username",
+)
+@click.option(
+    "-P",
+    "--password",
+    prompt=True,
+    hide_input=True,
+    type=str,
+    default=DEFAULT_DB_PASSWORD,
+    help="Database username",
 )
 @click.option(
     "-o",
@@ -62,7 +80,9 @@ def config():
 def create(
     timings,
     database_name,
-    database_url,
+    url,
+    username,
+    password,
     offline,
     console_level,
     file_level,
@@ -71,7 +91,9 @@ def create(
     dsgrid_config = DsgridRuntimeConfig(
         timings=timings,
         database_name=database_name,
-        database_url=database_url,
+        database_url=url,
+        database_user=username,
+        database_password=password,
         offline=offline,
         console_level=console_level,
         file_level=file_level,

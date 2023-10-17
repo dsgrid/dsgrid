@@ -59,7 +59,7 @@ def registry(ctx, remote_path):
     """Manage a registry."""
     config = DsgridRuntimeConfig.load()
     conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "database_url"),
+        get_value_from_context(ctx, "url"),
         database=get_value_from_context(ctx, "database_name"),
         username=config.database_user,
         password=config.database_password,

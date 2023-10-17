@@ -18,6 +18,7 @@ from dsgrid.tests.common import (
 STANDARD_SCENARIOS_PROJECT_REPO = (
     Path(__file__).parent.parent.parent / "dsgrid-project-StandardScenarios"
 )
+DECARB_PROJECT_REPO = Path(__file__).parent.parent.parent / "dsgrid-project-DECARB"
 
 
 def test_register_dimensions_and_mappings(tmp_registry_db):
@@ -265,7 +266,20 @@ def test_register_standard_scenarios(tmp_registry_db):
     """Test registration of the StandardScenarios project."""
     _, tmpdir, db_name = tmp_registry_db
     runner = CliRunner(mix_stderr=False)
-    result = runner.invoke(admin_cli, ["create-registry", db_name, "-p", str(tmpdir), "--force"])
+    result = runner.invoke(
+        admin_cli,
+        [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "create-registry",
+            db_name,
+            "-p",
+            str(tmpdir),
+            "--force",
+        ],
+    )
     assert result.exit_code == 0
 
     project_config = STANDARD_SCENARIOS_PROJECT_REPO / "dsgrid_project" / "project.json5"
@@ -273,6 +287,59 @@ def test_register_standard_scenarios(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "--url",
+            "http://localhost:8529",
+            "--database-name",
+            db_name,
+            "--offline",
+            "registry",
+            "projects",
+            "register",
+            str(project_config),
+            "--log-message",
+            "log",
+        ],
+    )
+    assert result.exit_code == 0
+
+
+def test_register_decarb(tmp_registry_db):
+    """Test registration of the DECARB project."""
+    _, tmpdir, db_name = tmp_registry_db
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        admin_cli,
+        [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "--url",
+            "http://localhost:8529",
+            "create-registry",
+            db_name,
+            "-p",
+            str(tmpdir),
+            "--force",
+        ],
+    )
+    assert result.exit_code == 0
+
+    project_config = DECARB_PROJECT_REPO / "project" / "project.json5"
+
+    result = runner.invoke(
+        cli,
+        [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "--url",
+            "http://localhost:8529",
             "--database-name",
             db_name,
             "--offline",

@@ -10,7 +10,6 @@ from semver import VersionInfo
 
 from dsgrid.cli.common import get_value_from_context
 from dsgrid.common import REMOTE_REGISTRY
-from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import VersionUpdateType
@@ -57,12 +56,11 @@ Click Group Definitions
 @click.pass_context
 def registry(ctx, remote_path):
     """Manage a registry."""
-    config = DsgridRuntimeConfig.load()
     conn = DatabaseConnection.from_url(
         get_value_from_context(ctx, "url"),
         database=get_value_from_context(ctx, "database_name"),
-        username=config.database_user,
-        password=config.database_password,
+        username=get_value_from_context(ctx, "username"),
+        password=get_value_from_context(ctx, "password"),
     )
     no_prompts = ctx.parent.params["no_prompts"]
     offline = get_value_from_context(ctx, "offline")

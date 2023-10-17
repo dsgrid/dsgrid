@@ -20,5 +20,6 @@ PROJECT_FILENAME = "project.json5"
 REGISTRY_FILENAME = "registry.json5"
 DATASET_FILENAME = "dataset.json5"
 DIMENSIONS_FILENAME = "dimensions.json5"
+SCALING_FACTOR_COLUMN = "scaling_factor"
 
 SYNC_EXCLUDE_LIST = ["*.DS_Store", "**/*.lock"]

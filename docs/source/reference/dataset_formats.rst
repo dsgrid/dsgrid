@@ -133,15 +133,20 @@ Two Parquet files comprise the dataset:
     |    53005|   com|  Hospital|      3|
     |    53025|   com|  Hospital|      4|
     |    53045|   com|  Hospital|      5|
-    +---------+---+------------------+-------+
+    +---------+------+----------+-------+
 
 Each unique time array in ``load_data`` must be denoted with an ID that corresponds to a record in
 ``load_data_lookup``. The ID is user-defined. Users may want to use a sequentially-increasing
 integer or encode other information into specific bytes of each integer.
 
+The table may optionally include the column ``scaling_factor`` to account for cases where the value
+columns need to multiplied by a scaling factor. If ``scaling_factor`` does not apply, the value in
+the row can be ``1.0`` or ``null``.
+
 This format minimizes file storage because
 
-1. Time arrays can be shared across combinations of dimension records.
+1. Time arrays can be shared across combinations of dimension records, possibly with different
+   scaling factors.
 2. Dimension information is not repeated for every timestamp. (This could be minimal because of
    compression inside the Parquet files.)
 

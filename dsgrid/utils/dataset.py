@@ -3,8 +3,10 @@ import os
 from collections import defaultdict
 
 import pyspark
+from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
 
+from dsgrid.common import SCALING_FACTOR_COLUMN
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
 from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -137,6 +139,21 @@ def add_column_from_records(df, dimension_records, dimension_name, column_to_add
         how="inner",
     ).drop("record_id")
     return df
+
+
+def apply_scaling_factor(
+    df: DataFrame, value_columns, scaling_factor_column=SCALING_FACTOR_COLUMN
+) -> DataFrame:
+    """Apply the scaling factor to all value columns and then drop the scaling factor column."""
+    for column in value_columns:
+        df = df.withColumn(
+            column,
+            F.when(
+                F.col(scaling_factor_column).isNotNull(),
+                F.col(column) * F.col(scaling_factor_column),
+            ).otherwise(F.col(column)),
+        )
+    return df.drop(scaling_factor_column)
 
 
 @track_timing(timer_stats_collector)

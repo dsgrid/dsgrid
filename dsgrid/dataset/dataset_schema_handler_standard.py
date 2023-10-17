@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pyspark.sql.functions as F
 
+from dsgrid.common import SCALING_FACTOR_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -11,7 +12,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import TableFormatType, ColumnType
 from dsgrid.query.query_context import QueryContext
-from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
+from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows, apply_scaling_factor
 from dsgrid.utils.spark import (
     # create_dataframe_from_pandas,
     read_dataframe,
@@ -66,12 +67,13 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             # There is currently no case that needs model years or value columns.
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
-        lk_df = self._remap_dimension_columns(lk_df)
         null_lk_df = self._remap_dimension_columns(null_lk_df)
         ld_df = self._remap_dimension_columns(ld_df)
         pivoted_columns = set(ld_df.columns).intersection(
             self.get_pivoted_dimension_columns_mapped_to_project()
         )
+        if SCALING_FACTOR_COLUMN in ld_df.columns:
+            ld_df = apply_scaling_factor(ld_df, pivoted_columns)
         ld_df = self._apply_fraction(ld_df, pivoted_columns)
         project_metric_records = project_config.get_base_dimension(
             DimensionType.METRIC
@@ -108,6 +110,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         pivoted_columns = set(ld_df.columns).intersection(
             self.get_pivoted_dimension_columns_mapped_to_project()
         )
+        if "scaling_factor" in ld_df.columns:
+            ld_df = apply_scaling_factor(ld_df, pivoted_columns)
+
         ld_df = self._apply_fraction(ld_df, pivoted_columns)
         project_metric_records = project_config.get_base_dimension(
             DimensionType.METRIC
@@ -166,6 +171,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         for col in self._load_data_lookup.columns:
             if col == "id":
                 found_id = True
+                continue
+            if col == SCALING_FACTOR_COLUMN:
                 continue
             dimension_types.add(DimensionType.from_column(col))
 

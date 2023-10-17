@@ -6,6 +6,7 @@ from pathlib import Path
 
 import json5
 
+from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.files import dump_data
 
@@ -20,7 +21,7 @@ class DsgridRuntimeConfig(DSGBaseModel):
     database_name: str | None = None
     database_url: str | None = "http://localhost:8529"
     database_user: str = "root"
-    database_password: str = "openSesame"
+    database_password: str = DEFAULT_DB_PASSWORD
     offline: bool = False
     console_level: str = "info"
     file_level: str = "info"

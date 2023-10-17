@@ -4,6 +4,7 @@ from pathlib import Path
 
 from arango import ArangoClient
 
+from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidParameter
@@ -25,7 +26,7 @@ class DatabaseConnection(DSGBaseModel):
     hostname: str = "localhost"
     port: int = 8529
     username: str = "root"
-    password: str = "openSesame"
+    password: str = DEFAULT_DB_PASSWORD
 
     @classmethod
     def from_url(cls, url, **kwargs):

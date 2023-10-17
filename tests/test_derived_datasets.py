@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.cli.dsgrid import cli
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.query.derived_dataset import (
@@ -97,7 +98,7 @@ def test_create_derived_dataset_config(tmp_path):
             "--username",
             "root",
             "--password",
-            "openSesame",
+            DEFAULT_DB_PASSWORD,
             "--offline",
             "--database-name",
             "simple-standard-scenarios",
@@ -138,7 +139,7 @@ def test_create_derived_dataset_config(tmp_path):
             "--username",
             "root",
             "--password",
-            "openSesame",
+            DEFAULT_DB_PASSWORD,
             "--offline",
             "--database-name",
             "simple-standard-scenarios",

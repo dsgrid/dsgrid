@@ -12,6 +12,7 @@ from fastapi.responses import Response, FileResponse
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.config.dimensions import create_dimension_common_model, create_project_dimension_model
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGValueNotStored
 from dsgrid.loggers import setup_logging
 from dsgrid.query.models import (
@@ -70,8 +71,12 @@ no_prompts = True
 # subprocesses that run queries.
 # If both processes try to use the Hive metastore, a crash will occur.
 spark = init_spark("dsgrid_api", check_env=False)
+dsgrid_config = DsgridRuntimeConfig.load()
 conn = DatabaseConnection.from_url(
-    DSGRID_REGISTRY_DATABASE_URL, database=DSGRID_REGISTRY_DATABASE_NAME
+    DSGRID_REGISTRY_DATABASE_URL,
+    database=DSGRID_REGISTRY_DATABASE_NAME,
+    username=dsgrid_config.database_user,
+    password=dsgrid_config.database_password,
 )
 manager = RegistryManager.load(
     conn, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts

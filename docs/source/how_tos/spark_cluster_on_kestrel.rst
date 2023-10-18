@@ -4,8 +4,8 @@
 How to start a Spark cluster on Kestrel
 ***************************************
 This section assumes that you have cloned the HPC Spark setup scripts from this `repo
-<https://github.com/NREL/HPC.git>`_. If you are unfamiliar with that, please read the full details
-at :ref:`spark-on-hpc`.
+<https://github.com/daniel-thom/HPC.git>`_ (``kestrel-update`` branch). If you are unfamiliar with
+that, please read the full details at :ref:`spark-on-hpc`.
 
 Compute Node Types
 ==================
@@ -35,25 +35,13 @@ Steps
 
     $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G
 
-4. Create the initial config file.
+4. Configure the Spark settings and start the cluster. Run -h to see the available options.
 
 .. code-block:: console
 
-   $ create_config.sh -c /projects/dsgrid/containers/spark341_py311.sif
+    $ configure_and_start_spark.sh -c /projects/dsgrid/containers/spark341_py311.sif
 
-5. Configure the Spark settings. Run -h to see the available options.
-
-.. code-block:: console
-
-    $ configure_spark.sh
-
-6. Start the cluster.
-
-.. code-block:: console
-
-    $ start_spark_cluster.sh
-
-7. Set the Spark configuration environment variable.
+5. Set the Spark configuration environment variable.
 
 .. code-block:: console
 

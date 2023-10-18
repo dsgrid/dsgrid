@@ -25,11 +25,7 @@ else
 fi
 
 SCRIPT_DIR=${HPC_REPO_DIR}/applications/spark/spark_scripts
-${SCRIPT_DIR}/create_config.sh -c /projects/dsgrid/containers/spark341_py311.sif
-sed -i "s/master_node_memory_overhead_gb = 10/master_node_memory_overhead_gb = 15/" config
-sed -i "s/worker_node_memory_overhead_gb = 5/worker_node_memory_overhead_gb = 10/" config
-${SCRIPT_DIR}/configure_spark.sh
-${SCRIPT_DIR}/start_spark_cluster.sh
+${SCRIPT_DIR}/configure_and_start_spark.sh -c /projects/dsgrid/containers/spark341_py311.sif
 
 printf "\nThe Spark cluster is running at spark://$(hostname):7077 from a configuration at $(pwd)/conf\n\n"
 printf "Run this command in your environment to use the same configuration:\n\n"

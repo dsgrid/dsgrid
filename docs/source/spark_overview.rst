@@ -53,7 +53,7 @@ Spark Overview
 
 Cluster Mode
 ------------
-Apache provides an overview at https://spark.apache.org/docs/3.3.1/cluster-overview.html
+Apache provides an overview at https://spark.apache.org/docs/latest/cluster-overview.html
 
 The most important parts to understand are how dsgrid uses different cluster modes in different
 environments.
@@ -283,10 +283,10 @@ This section describes how you can run Spark jobs on any number of HPC compute n
 The scripts and examples described here rely on the SLURM scheduling system and have been tested
 on NREL's Kestrel cluster.
 
-NREL's HPC GitHub [repository](https://github.com/NREL/HPC) contains scripts that will create an
-ephemeral Spark cluster on compute nodes that you allocate.
+NREL's HPC GitHub [repository](https://github.com/daniel-thom/HPC) (``kestrel-update`` branch)
+contains scripts that will create an ephemeral Spark cluster on compute nodes that you allocate.
 
-The [README](https://github.com/NREL/HPC/blob/master/applications/spark/README.md) in the
+The [README](https://github.com/daniel-thom/HPC/blob/kestrel-update/applications/spark/README.md) in the
 repository has generic instructions to run Spark in a variety of ways. The rest of this section
 calls out choices that you should make to run Spark jobs with dsgrid.
 
@@ -294,28 +294,25 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
 .. code-block:: console
 
-    $ git clone https://github.com/NREL/HPC.git
+    $ git clone https://github.com/daniel-thom/HPC.git
+    $ git checkout kestrel-update
 
 2. Choose compute node(s) with fast local storage. This example will allocate one node.
 .. code-block:: console
 
-    $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --mem=730G
+    $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G
 
-- NREL's Kestrel cluster will let you allocate two debug jobs each with two nodes. So, you can use
-  these scripts to create a four-node cluster for one hour.
+- NREL's Kestrel cluster will let you allocate one debug job each with two nodes. So, you can use
+  these scripts to create a two-node cluster for one hour.
 - If the debug partition is not too full, you can append ``--qos=standby`` to the command above
   and not be charged any AUs.
 
-3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.3.1 and
-   Python 3.10. The team has validated the container below. It was created with this Dockerfile
+3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.4.1 and
+   Python 3.11. The team has validated the container below. It was created with this Dockerfile
    in dsgrid: ``docker/spark/Dockerfile``. The container includes ipython, jupyter, pyspark, pandas,
    and pyarrow, but not dsgrid.
 
-    This command can be run on a login node or a compute node.
-
-.. code-block:: console
-
-    $ create_config.sh -c /projects/dsgrid/containers/spark341_py311.sif
+   ``/projects/dsgrid/containers/spark341_py311.sif``
 
 4. Configure Spark parameters based on the amount of memory and CPU in each compute node. dsgrid
    jobs on Kestrel seem to work better with dynamic allocation enabled.
@@ -328,17 +325,17 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
 .. code-block:: console
 
-    $ configure_spark.sh --dynamic-allocation
+    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark341_py311.sif
 
 .. code-block:: console
 
-    $ configure_spark.sh --dynamic-allocation <SLURM_JOB_ID>
+    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark341_py311.sif <SLURM_JOB_ID>
 
 .. code-block:: console
 
-    $ configure_spark.sh --dynamic-allocation <SLURM_JOB_ID1> <SLURM_JOB_ID2>
+    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark341_py311.sif <SLURM_JOB_ID1> <SLURM_JOB_ID2>
 
-Run ``configure_spark.sh --help`` to see all options.
+Run ``configure_and_start_spark.sh --help`` to see all options.
 
 Alternatively, or in conjunction with the above command, customize the Spark configuration files
 in ``./conf`` as necessary per the HPC instructions.

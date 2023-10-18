@@ -45,8 +45,8 @@ pre-commit install
 
 ## Spark
 You need to have some familiarity with Spark in order to run non-trivial tasks in dsgrid.
-This [page](spark_overview.md) provides an overview and explains various ways to use Spark in
-dsgrid.
+This [page](https://dsgrid.github.io/dsgrid/spark_overview.html) provides an overview and explains
+various ways to use Spark in dsgrid.
 
 ## ArangoDB
 dsgrid stores registry information in an ArangoDB database. You must install it locally in

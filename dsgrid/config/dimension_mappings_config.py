@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import List
 
 from pydantic import Field
+from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel
 from .mapping_tables import MappingTableModel
@@ -16,10 +17,13 @@ class DimensionMappingsConfigModel(DSGBaseModel):
     """Represents dimension mapping model configurations"""
 
     # This may eventually change to a Union if there are more subclasses.
-    mappings: List[MappingTableModel] = Field(
-        title="mappings",
-        description="dimension mappings between and within projects and datasets",
-    )
+    mappings: Annotated[
+        List[MappingTableModel],
+        Field(
+            title="mappings",
+            description="dimension mappings between and within projects and datasets",
+        ),
+    ]
 
 
 class DimensionMappingsConfig(ConfigBase):

@@ -1,10 +1,11 @@
 import abc
 import logging
-from typing import Any, Dict, Union
+from typing import Any, Union, Literal
 
 import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
-from pydantic import Field, validator, root_validator
+from pydantic import field_validator, model_validator, Field
+from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGEnum
 from dsgrid.data_models import DSGBaseModel
@@ -15,25 +16,31 @@ from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
 logger = logging.getLogger(__name__)
 
 
+class DimensionFilterType(DSGEnum):
+    """Filter types that can be specified in queries."""
+
+    EXPRESSION = "expression"
+    EXPRESSION_RAW = "expression_raw"
+    COLUMN_OPERATOR = "column_operator"
+    BETWEEN_COLUMN_OPERATOR = "between_column_operator"
+    SUBSET = "subset"
+    SUPPLEMENTAL_COLUMN_OPERATOR = "supplemental_column_operator"
+
+
 class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
     """Base model for all filters"""
 
     dimension_type: DimensionType
-    column: str = Field(
-        title="column", description="Column of dimension records to use", default="id"
-    )
+    column: Annotated[
+        str, Field(title="column", description="Column of dimension records to use", default="id")
+    ]
 
     @abc.abstractmethod
     def apply_filter(self, df, column=None):
         """Apply the filter to a DataFrame"""
 
-    def dict(self, *args, **kwargs):
-        # Add the type of the class so that we can deserialize with the right model.
-        data = super().dict(*args, **kwargs)
-        data["filter_type"] = _class_to_enum[self.__class__].value
-        return data
-
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def remove_filter_type(cls, values):
         values.pop("filter_type", None)
         return values
@@ -99,6 +106,9 @@ class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
 
     operator: str
     value: Union[str, int, float]
+    filter_type: Literal[
+        DimensionFilterType.EXPRESSION.value
+    ] = DimensionFilterType.EXPRESSION.value
 
     def where_clause(self, column=None):
         column = column or self.column
@@ -126,6 +136,9 @@ class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
     """
 
     value: Union[str, int, float]
+    filter_type: Literal[
+        DimensionFilterType.EXPRESSION_RAW.value
+    ] = DimensionFilterType.EXPRESSION_RAW.value
 
     def where_clause(self, column=None):
         column = column or self.column
@@ -162,20 +175,31 @@ class DimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel
     df.filter(~F.col("sector").startswith("com"))
     """
 
-    operator: str = Field(
-        title="operator", description="Method on pyspark.sql.functions.col to invoke"
-    )
-    value: Any = Field(
-        title="value",
-        description="Value to filter on. Use a two-element list for the between operator.",
-    )
-    negate: bool = Field(
-        title="negate",
-        description="Change the filter to match the negation of the value.",
-        default=False,
-    )
+    operator: Annotated[
+        str, Field(title="operator", description="Method on pyspark.sql.functions.col to invoke")
+    ]
+    value: Annotated[
+        Any,
+        Field(
+            None,
+            title="value",
+            description="Value to filter on. Use a two-element list for the between operator.",
+        ),
+    ]
+    negate: Annotated[
+        bool,
+        Field(
+            title="negate",
+            description="Change the filter to match the negation of the value.",
+            default=False,
+        ),
+    ]
+    filter_type: Literal[
+        DimensionFilterType.COLUMN_OPERATOR.value
+    ] = DimensionFilterType.COLUMN_OPERATOR.value
 
-    @validator("operator")
+    @field_validator("operator")
+    @classmethod
     def check_operator(cls, operator):
         return check_operator(operator)
 
@@ -197,13 +221,23 @@ class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBa
     df.filter(F.col("timestamp").between("2012-07-01 00:00:00", "2012-08-01 00:00:00"))
     """
 
-    lower_bound: Any = Field(title="lower_bound", description="Lower bound, inclusive")
-    upper_bound: Any = Field(title="upper_bound", description="Upper bound, inclusive")
-    negate: bool = Field(
-        title="negate",
-        description="Change the filter to match the negation of the value.",
-        default=False,
-    )
+    lower_bound: Annotated[
+        Any, Field(None, title="lower_bound", description="Lower bound, inclusive")
+    ]
+    upper_bound: Annotated[
+        Any, Field(None, title="upper_bound", description="Upper bound, inclusive")
+    ]
+    negate: Annotated[
+        bool,
+        Field(
+            title="negate",
+            description="Change the filter to match the negation of the value.",
+            default=False,
+        ),
+    ]
+    filter_type: Literal[
+        DimensionFilterType.BETWEEN_COLUMN_OPERATOR.value
+    ] = DimensionFilterType.BETWEEN_COLUMN_OPERATOR.value
 
     def apply_filter(self, df, column=None):
         column = column or self.column
@@ -216,8 +250,10 @@ class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
     """Filters base dimension records that match a subset dimension."""
 
     dimension_query_names: list[str]
+    filter_type: Literal[DimensionFilterType.SUBSET.value] = DimensionFilterType.SUBSET.value
 
-    @validator("dimension_query_names")
+    @field_validator("dimension_query_names")
+    @classmethod
     def check_dimension_query_names(cls, dimension_query_names):
         if not dimension_query_names:
             raise ValueError("dimension_query_names cannot be empty")
@@ -254,19 +290,29 @@ class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
 class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel):
     """Filters base dimension records that have a valid mapping to a supplemental dimension."""
 
-    value: Any = Field(title="value", description="Value to filter on", default="%")
-    operator: str = Field(
-        title="operator",
-        description="Method on pyspark.sql.functions.col to invoke",
-        default="like",
-    )
-    negate: bool = Field(
-        title="negate",
-        description="Filter out valid mappings to this supplemental dimension.",
-        default=False,
-    )
+    value: Annotated[Any, Field(title="value", description="Value to filter on", default="%")]
+    operator: Annotated[
+        str,
+        Field(
+            title="operator",
+            description="Method on pyspark.sql.functions.col to invoke",
+            default="like",
+        ),
+    ]
+    negate: Annotated[
+        bool,
+        Field(
+            title="negate",
+            description="Filter out valid mappings to this supplemental dimension.",
+            default=False,
+        ),
+    ]
+    filter_type: Literal[
+        DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR.value
+    ] = DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR.value
 
-    @validator("operator")
+    @field_validator("operator")
+    @classmethod
     def check_operator(cls, operator):
         return check_operator(operator)
 
@@ -277,34 +323,3 @@ class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterSingleQueryN
         if self.negate:
             return df.filter(~method(self.value))
         return df.filter(method(self.value))
-
-
-def make_dimension_filter(values: Dict):
-    """Construct the correct filter per the key filter_type"""
-    filter_type = DimensionFilterType(values["filter_type"])
-    if filter_type not in _enum_to_class:
-        raise DSGInvalidParameter(f"{filter_type=} is not defined in dimension_filters.py")
-    return _enum_to_class[filter_type](**values)
-
-
-class DimensionFilterType(DSGEnum):
-    """Filter types that can be specified in queries."""
-
-    EXPRESSION = "expression"
-    EXPRESSION_RAW = "expression_raw"
-    COLUMN_OPERATOR = "column_operator"
-    BETWEEN_COLUMN_OPERATOR = "between_column_operator"
-    SUBSET = "subset"
-    SUPPLEMENTAL_COLUMN_OPERATOR = "supplemental_column_operator"
-
-
-_enum_to_class = {
-    DimensionFilterType.EXPRESSION: DimensionFilterExpressionModel,
-    DimensionFilterType.EXPRESSION_RAW: DimensionFilterExpressionRawModel,
-    DimensionFilterType.COLUMN_OPERATOR: DimensionFilterColumnOperatorModel,
-    DimensionFilterType.BETWEEN_COLUMN_OPERATOR: DimensionFilterBetweenColumnOperatorModel,
-    DimensionFilterType.SUBSET: SubsetDimensionFilterModel,
-    DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR: SupplementalDimensionFilterColumnOperatorModel,
-}
-
-_class_to_enum = {v: k for k, v in _enum_to_class.items()}

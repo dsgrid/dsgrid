@@ -85,5 +85,5 @@ def test_project_duplicate_type(config_as_dict):
 
 def test_project_dimension_query_names_model():
     assert not {x.value for x in DimensionType}.difference(
-        ProjectDimensionQueryNamesModel.__fields__
+        ProjectDimensionQueryNamesModel.model_fields
     )

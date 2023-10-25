@@ -209,7 +209,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
             logger.info("Replaced dimensions with supplemental records %s", new_pivoted_columns)
 
         if new_pivoted_columns:
-            context.set_pivoted_columns(new_pivoted_columns, dataset_id=self.dataset_id)
+            context.set_pivoted_columns(set(new_pivoted_columns), dataset_id=self.dataset_id)
 
         return df
 

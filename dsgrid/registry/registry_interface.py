@@ -4,6 +4,7 @@ import logging
 from typing import Optional
 
 from pydantic import Field
+from typing_extensions import Annotated
 
 from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.config.dimensions import handle_dimension_union
@@ -22,21 +23,39 @@ class RegistryModel(DSGBaseModel):
     """Base model for a registry root"""
 
     registry_type: str
-    id: Optional[str] = Field(
-        alias="_id",
-        description="Registry database ID",
-        dsgrid_internal=True,
-    )
-    key: Optional[str] = Field(
-        alias="_key",
-        description="Registry database key",
-        dsgrid_internal=True,
-    )
-    rev: Optional[str] = Field(
-        alias="_rev",
-        description="Registry database revision",
-        dsgrid_internal=True,
-    )
+    id: Annotated[
+        Optional[str],
+        Field(
+            None,
+            alias="_id",
+            description="Registry database ID",
+            json_schema_extra={
+                "dsgrid_internal": True,
+            },
+        ),
+    ]
+    key: Annotated[
+        Optional[str],
+        Field(
+            None,
+            alias="_key",
+            description="Registry database key",
+            json_schema_extra={
+                "dsgrid_internal": True,
+            },
+        ),
+    ]
+    rev: Annotated[
+        Optional[str],
+        Field(
+            None,
+            alias="_rev",
+            description="Registry database revision",
+            json_schema_extra={
+                "dsgrid_internal": True,
+            },
+        ),
+    ]
 
 
 class DatasetRegistryModel(RegistryModel):
@@ -166,14 +185,19 @@ class RegistryInterfaceBase(abc.ABC):
         if self._uses_model_id_in_db():
             data["_key"] = model_id
         res = self._db.collection(self.root_collection_name()).insert(data)
-        data.update(res)
+        data["id"] = res["_id"]
+        data["key"] = res["_key"]
+        data["rev"] = res["_rev"]
+        data.pop("_key", None)
         root = type(root)(**data)
 
         data = _serialize_new_model(model)
         if not self._uses_model_id_in_db():
             data[self._get_model_id_field()] = root.key
         res = self.collection(self._collection_name()).insert(data)
-        data.update(res)
+        data["id"] = res["_id"]
+        data["key"] = res["_key"]
+        data["rev"] = res["_rev"]
         model = self._make_dsgrid_model(data)
 
         self._db.insert_latest_edge(root, model)
@@ -336,7 +360,7 @@ class DimensionRegistryInterface(RegistryInterfaceBase):
         return "dimension_id"
 
     def _make_dsgrid_model(self, db_data: dict):
-        return handle_dimension_union(db_data)
+        return handle_dimension_union([db_data])[0]
 
     @staticmethod
     def _get_root_class():
@@ -468,7 +492,7 @@ def _serialize_model(model):
 
 def _serialize_new_model(model):
     data = model.serialize()
-    for field in ("_id", "_key", "_rev"):
+    for field in ("_id", "id", "_key", "key", "_rev", "rev"):
         val = data.pop(field, None)
         if val is not None:
             raise Exception(f"{field}={val} cannot be set on a new registry insertion")

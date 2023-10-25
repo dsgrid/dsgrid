@@ -616,7 +616,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             "dimension cls",
         )
         for dataset_id in config.list_unregistered_dataset_ids():
-            for field in RequiredDimensionRecordsModel.__fields__:
+            for field in RequiredDimensionRecordsModel.model_fields:
                 # This will check that all dimension record IDs listed in the requirements
                 # exist in the project.
                 config.get_required_dimension_record_ids(dataset_id, DimensionType(field))

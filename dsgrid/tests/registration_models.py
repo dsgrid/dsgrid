@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pydantic import validator
+from pydantic import field_validator
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
@@ -15,24 +15,26 @@ class DatasetRegistrationModel(DSGBaseModel):
     dataset_id: str
     dataset_path: str | Path
     config_file: str | Path
-    dimension_mapping_file: str | Path | None
-    dimension_mapping_references_file: str | Path | None
+    dimension_mapping_file: str | Path | None = None
+    dimension_mapping_references_file: str | Path | None = None
     replace_dimension_names_with_ids: bool = False
     replace_dimension_mapping_names_with_ids: bool = False
     register_dataset: bool = True
     submit_to_project: bool = True
     autogen_reverse_supplemental_mappings: set[str | DimensionType] = set()
 
-    @validator(
+    @field_validator(
         "dataset_path",
         "config_file",
         "dimension_mapping_file",
         "dimension_mapping_references_file",
     )
+    @classmethod
     def fix_path(cls, val):
         return Path(val) if isinstance(val, str) else val
 
-    @validator("autogen_reverse_supplemental_mappings")
+    @field_validator("autogen_reverse_supplemental_mappings")
+    @classmethod
     def fix_autogen_reverse_supplemental_mappings(cls, val):
         return {DimensionType(x) for x in val}
 
@@ -44,7 +46,8 @@ class ProjectRegistrationModel(DSGBaseModel):
     datasets: list[DatasetRegistrationModel]
     register_project: bool = True
 
-    @validator("config_file")
+    @field_validator("config_file")
+    @classmethod
     def fix_path(cls, val):
         return Path(val) if isinstance(val, str) else val
 
@@ -56,7 +59,8 @@ class RegistrationModel(DSGBaseModel):
     data_path: str | Path
     projects: list[ProjectRegistrationModel]
 
-    @validator("data_path")
+    @field_validator("data_path")
+    @classmethod
     def fix_path(cls, val):
         return Path(val) if isinstance(val, str) else val
 

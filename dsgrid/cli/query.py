@@ -33,7 +33,6 @@ from dsgrid.query.models import (
     CreateCompositeDatasetQueryModel,
     CompositeDatasetQueryModel,
     StandaloneDatasetModel,
-    DatasetType,
     DatasetModel,
 )
 from dsgrid.query.query_submitter import (
@@ -185,7 +184,7 @@ def create_project_query(
             dataset=DatasetModel(
                 dataset_id=dataset_id,
                 source_datasets=[
-                    StandaloneDatasetModel(dataset_type=DatasetType.STANDALONE, dataset_id=x)
+                    StandaloneDatasetModel(dataset_id=x)
                     for x in project.config.list_registered_dataset_ids()
                 ],
             ),
@@ -248,7 +247,7 @@ def create_project_query(
                 ),
             ]
 
-    query_file.write_text(query.json(indent=2))
+    query_file.write_text(query.model_dump_json(indent=2))
     print(f"Wrote query to {query_file}")
 
 

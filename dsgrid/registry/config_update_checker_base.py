@@ -18,11 +18,12 @@ class ConfigUpdateCheckerBase(abc.ABC):
         self._changed_fields = set()
 
     def _check_common(self):
-        for field, attrs in self._type.__fields__.items():
+        for field, attrs in self._type.model_fields.items():
             old = getattr(self._old_model, field)
             new = getattr(self._new_model, field)
             if old != new:
-                if not attrs.field_info.extra.get("updateable", True):
+                extra = attrs.json_schema_extra
+                if extra and not extra.get("updateable", True):
                     raise DSGInvalidOperation(f"{self._type}.{field} cannot be updated")
                 self._changed_fields.add(field)
                 logger.info("%s %s changed from %s to %s.", self._type, field, old, new)

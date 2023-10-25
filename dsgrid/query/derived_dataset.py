@@ -202,9 +202,9 @@ def _make_dataset_config(
         "dataset_id": dataset_id,
         "dataset_type": InputDatasetType.MODELED.value,
         "data_source": "",
-        "data_schema_type": DataSchemaType.ONE_TABLE.value,
         "data_schema": {
             "load_data_column_dimension": pivoted_dim_type,
+            "data_schema_type": DataSchemaType.ONE_TABLE.value,
         },
         "dataset_version": "1.0.0",
         "description": "",

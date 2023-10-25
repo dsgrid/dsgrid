@@ -103,7 +103,7 @@ class ConfigBase(abc.ABC):
         filename = Path(path) / self.config_filename()
         if filename.exists() and not force:
             raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
-        filename.write_text(self.model.json(indent=2))
+        filename.write_text(self.model.model_dump_json(indent=2))
         return filename
 
 

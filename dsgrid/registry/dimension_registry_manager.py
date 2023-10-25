@@ -93,7 +93,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 continue
             match = True
             exclude = set(("description", "dimension_id", "key", "id", "rev", "version"))
-            for field in type(new_dim).__fields__:
+            for field in type(new_dim).model_fields:
                 if field not in exclude and getattr(new_dim, field) != getattr(time_dim, field):
                     match = False
                     break

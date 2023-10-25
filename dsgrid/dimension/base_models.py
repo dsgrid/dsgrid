@@ -2,7 +2,8 @@
 
 from typing import Optional
 
-from pydantic import Field, root_validator
+from pydantic import Field
+from typing_extensions import Annotated
 
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.data_models import DSGBaseModel, DSGEnum
@@ -47,14 +48,20 @@ class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 
     # TODO: add support/links for docs
-    id: str = Field(
-        title="ID",
-        description="Unique identifier within a dimension",
-    )
-    name: str = Field(
-        title="name",
-        description="User-defined name",
-    )
+    id: Annotated[
+        str,
+        Field(
+            title="ID",
+            description="Unique identifier within a dimension",
+        ),
+    ]
+    name: Annotated[
+        str,
+        Field(
+            title="name",
+            description="User-defined name",
+        ),
+    ]
 
 
 class MetricDimensionBaseModel(DimensionRecordBaseModel):
@@ -64,24 +71,19 @@ class MetricDimensionBaseModel(DimensionRecordBaseModel):
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
-    time_zone: Optional[TimeZone] = Field(
-        title="Local Prevailing Time Zone",
-        description="""
+    time_zone: Annotated[
+        Optional[TimeZone],
+        Field(
+            None,
+            title="Local Prevailing Time Zone",
+            description="""
         These time zone information are used in reference to project timezone
         to convert between project time and local times as necessary.
         All Prevailing timezones account for daylight savings time.
         If a location does not observe daylight savings, use Standard timezones.
         """,
-    )
-
-    # This validator can be removed after the next rebuild of the StandardScenarios registry.
-    # The existing version was built when "none" was an option for time_zone.
-    # 5/17/2023
-    @root_validator(pre=True)
-    def handle_legacy_values(cls, values):
-        if values.get("time_zone") == "none":
-            values.pop("time_zone")
-        return values
+        ),
+    ]
 
 
 class DataSourceDimensionBaseModel(DimensionRecordBaseModel):

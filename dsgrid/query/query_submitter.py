@@ -85,7 +85,7 @@ class QuerySubmitterBase:
         filename = self._cached_table_filename(cached_dir)
         df = write_dataframe_and_auto_partition(df, filename)
 
-        self.metadata_filename(cached_dir).write_text(context.metadata.json(indent=2))
+        self.metadata_filename(cached_dir).write_text(context.metadata.model_dump_json(indent=2))
         self.query_filename(cached_dir).write_text(text)
         logger.info("Persisted intermediate table to %s", filename)
         return df
@@ -273,7 +273,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         else:
             raise NotImplementedError(f"Unsupported output_format={suffix}")
         self.query_filename(output_dir).write_text(context.model.serialize()[1])
-        self.metadata_filename(output_dir).write_text(context.metadata.json(indent=2))
+        self.metadata_filename(output_dir).write_text(context.metadata.model_dump_json(indent=2))
         logger.info("Wrote query=%s output table to %s", context.model.name, filename)
 
 
@@ -395,4 +395,4 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         output_dir.mkdir(exist_ok=True)
         filename = output_dir / "table.parquet"
         self._save_result(context, df, filename, repartition)
-        self.metadata_filename(output_dir).write_text(context.metadata.json(indent=2))
+        self.metadata_filename(output_dir).write_text(context.metadata.model_dump_json(indent=2))

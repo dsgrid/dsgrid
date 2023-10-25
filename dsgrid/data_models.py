@@ -3,12 +3,9 @@
 from enum import Enum
 import json
 import logging
-from datetime import datetime, timedelta
 from pathlib import Path
 
-from pydantic import BaseModel, ValidationError
-from pydantic.json import isoformat, timedelta_isoformat
-from semver import VersionInfo
+from pydantic import ConfigDict, BaseModel, ValidationError
 
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.utils.files import in_other_dir, load_data
@@ -17,24 +14,25 @@ from dsgrid.utils.files import in_other_dir, load_data
 logger = logging.getLogger(__name__)
 
 
+def make_model_config(title, **kwargs) -> ConfigDict:
+    """Return a Pydantic config"""
+    return ConfigDict(
+        title=title,
+        str_strip_whitespace=True,
+        validate_assignment=True,
+        validate_default=True,
+        extra="forbid",
+        use_enum_values=False,
+        arbitrary_types_allowed=True,
+        populate_by_name=True,
+        **kwargs,
+    )
+
+
 class DSGBaseModel(BaseModel):
     """Base data model for all dsgrid data models"""
 
-    class Config:
-        title = "DSGBaseModel"
-        anystr_strip_whitespace = True
-        validate_assignment = True
-        validate_all = True
-        extra = "forbid"
-        use_enum_values = False
-        arbitrary_types_allowed = True
-        allow_population_by_field_name = True
-        json_encoders = {
-            datetime: isoformat,
-            timedelta: timedelta_isoformat,
-            VersionInfo: lambda x: str(x),
-            Enum: lambda x: x.value,
-        }
+    model_config = make_model_config("DSGBaseModel")
 
     @classmethod
     def load(cls, filename):
@@ -59,30 +57,25 @@ class DSGBaseModel(BaseModel):
                 raise
 
     @classmethod
-    def schema_json(cls, by_alias=True, indent=None) -> str:
-        data = cls.schema(by_alias=by_alias)
-        return json.dumps(data, indent=indent, cls=ExtendedJSONEncoder)
-
-    @classmethod
     def get_fields_with_extra_attribute(cls, attribute):
         fields = set()
-        for f, attrs in cls.__fields__.items():
-            if attrs.field_info.extra.get(attribute):
+        for f, attrs in cls.model_fields.items():
+            if attrs.json_schema_extra.get(attribute):
                 fields.add(f)
         return fields
 
-    def dict(self, *args, by_alias=True, **kwargs):
-        return super().dict(*args, by_alias=by_alias, **self._handle_kwargs(**kwargs))
+    def model_dump(self, *args, by_alias=True, **kwargs):
+        return super().model_dump(*args, by_alias=by_alias, **self._handle_kwargs(**kwargs))
 
-    def json(self, *args, by_alias=True, **kwargs):
-        return super().json(*args, by_alias=by_alias, **self._handle_kwargs(**kwargs))
+    def model_dump_json(self, *args, by_alias=True, **kwargs):
+        return super().model_dump_json(*args, by_alias=by_alias, **self._handle_kwargs(**kwargs))
 
     @staticmethod
     def _handle_kwargs(**kwargs):
         return {k: v for k, v in kwargs.items() if k not in ("by_alias",)}
 
     def serialize(self, *args, **kwargs):
-        return json.loads(self.json(*args, **kwargs))
+        return json.loads(self.model_dump_json(*args, **kwargs))
 
     @classmethod
     def from_file(cls, filename: Path):
@@ -136,15 +129,15 @@ class DSGEnum(Enum):
         return desc
 
 
-class ExtendedJSONEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, VersionInfo):
-            return str(obj)
-        if isinstance(obj, Enum):
-            return obj.value
-        if isinstance(obj, datetime):
-            return isoformat(obj)
-        if isinstance(obj, timedelta):
-            return timedelta_isoformat(obj)
-
-        return json.JSONEncoder.default(self, obj)
+# class ExtendedJSONEncoder(json.JSONEncoder):
+#    def default(self, obj):
+#        if isinstance(obj, VersionInfo):
+#            return str(obj)
+#        if isinstance(obj, Enum):
+#            return obj.value
+#        if isinstance(obj, datetime):
+#            return isoformat(obj)
+#        if isinstance(obj, timedelta):
+#            return timedelta_isoformat(obj)
+#
+#        return json.JSONEncoder.default(self, obj)

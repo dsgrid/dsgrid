@@ -137,7 +137,7 @@ async def list_project_dimensions(project_id: str):
     mgr = manager.project_manager
     project = mgr.get_by_id(project_id)
     dimensions = []
-    for item in project.get_dimension_query_names_model().dict().values():
+    for item in project.get_dimension_query_names_model().model_dump().values():
         dimension = create_project_dimension_model(
             project.get_dimension(item["base"]).model, DimensionCategory.BASE
         )
@@ -270,7 +270,11 @@ async def list_dimension_records(dimension_id: str):
     """List the records for the dimension ID."""
     mgr = manager.dimension_manager
     model = mgr.get_by_id(dimension_id).model
-    records = [] if model.dimension_type == DimensionType.TIME else model.records
+    records = (
+        []
+        if model.dimension_type == DimensionType.TIME
+        else [x.model_dump() for x in model.records]
+    )
     return ListDimensionRecordsResponse(records=records)
 
 
@@ -364,7 +368,7 @@ def download_async_task_archive_file(async_task_id: int):
 def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_task_id):
     with NamedTemporaryFile(mode="w", suffix=".json") as fp:
         query = spark_query.query
-        fp.write(query.json())
+        fp.write(query.model_dump_json())
         fp.write("\n")
         fp.flush()
         output_dir = Path(QUERY_OUTPUT_DIR)

@@ -127,7 +127,7 @@ class QueryContext:
         self._dataset_metadata[dataset_id] = DatasetMetadataModel()
 
     def serialize_dataset_metadata_to_file(self, dataset_id, filename: Path):
-        filename.write_text(self._dataset_metadata[dataset_id].json(indent=2))
+        filename.write_text(self._dataset_metadata[dataset_id].model_dump_json(indent=2))
 
     def set_dataset_metadata_from_file(self, dataset_id, filename: Path):
         assert dataset_id not in self._dataset_metadata, dataset_id

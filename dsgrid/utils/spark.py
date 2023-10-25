@@ -8,7 +8,7 @@ import os
 import shutil
 from contextlib import contextmanager
 from pathlib import Path
-from typing import AnyStr, Union
+from typing import AnyStr, Union, get_origin, get_args
 
 import pandas as pd
 import pyspark
@@ -314,15 +314,18 @@ def models_to_dataframe(models, table_name=None):
     schema = StructType()
     for i, model in enumerate(models):
         dct = {}
-        for f in cls.__fields__:
+        for f in cls.model_fields:
             val = getattr(model, f)
             if isinstance(val, enum.Enum):
                 val = val.value
             if i == 0:
                 if val is None:
-                    python_type = cls.__fields__[f].type_
-                    if issubclass(python_type, enum.Enum):
-                        python_type = type(next(iter(python_type)).value)
+                    python_type = cls.model_fields[f].annotation
+                    if get_origin(python_type) is Union:
+                        args = get_args(python_type)
+                        if issubclass(args[0], enum.Enum):
+                            python_type = type(next(iter(args[0])).value)
+                    # else: will likely fail below
                 else:
                     python_type = type(val)
                 spark_type = PYTHON_TO_SPARK_TYPES[python_type]()
@@ -696,7 +699,8 @@ def try_load_stored_table(table_name, database=DSGRID_DB_NAME):
 
     """
     spark = get_spark_session()
-    if spark.catalog.tableExists(table_name, dbName=database):
+    full_name = f"{database}.{table_name}"
+    if spark.catalog.tableExists(full_name):
         return spark.table(table_name)
     return None
 
@@ -714,14 +718,16 @@ def union(dfs) -> pyspark.sql.DataFrame:
 
 def is_table_stored(table_name, database=DSGRID_DB_NAME):
     spark = get_spark_session()
-    return spark.catalog.tableExists(table_name, dbName=database)
+    full_name = f"{database}.{table_name}"
+    return spark.catalog.tableExists(full_name)
 
 
 def save_table(table, table_name, overwrite=True, database=DSGRID_DB_NAME):
+    full_name = f"{database}.{table_name}"
     if overwrite:
-        table.write.mode("overwrite").saveAsTable(table_name)
+        table.write.mode("overwrite").saveAsTable(full_name)
     else:
-        table.write.saveAsTable(table_name)
+        table.write.saveAsTable(full_name)
 
 
 def list_tables(database=DSGRID_DB_NAME):

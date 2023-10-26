@@ -185,9 +185,9 @@ class RegistryInterfaceBase(abc.ABC):
         if self._uses_model_id_in_db():
             data["_key"] = model_id
         res = self._db.collection(self.root_collection_name()).insert(data)
-        data["id"] = res["_id"]
-        data["key"] = res["_key"]
-        data["rev"] = res["_rev"]
+        db_keys = (("id", "_id"), ("key", "_key"), ("rev", "_rev"))
+        for new, old in db_keys:
+            data[new] = res[old]
         data.pop("_key", None)
         root = type(root)(**data)
 
@@ -195,9 +195,8 @@ class RegistryInterfaceBase(abc.ABC):
         if not self._uses_model_id_in_db():
             data[self._get_model_id_field()] = root.key
         res = self.collection(self._collection_name()).insert(data)
-        data["id"] = res["_id"]
-        data["key"] = res["_key"]
-        data["rev"] = res["_rev"]
+        for new, old in db_keys:
+            data[new] = res[old]
         model = self._make_dsgrid_model(data)
 
         self._db.insert_latest_edge(root, model)

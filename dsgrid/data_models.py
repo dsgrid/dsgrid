@@ -127,17 +127,3 @@ class DSGEnum(Enum):
         for e in cls:
             desc[f"``{e.value}``"] = f"{e.description}"
         return desc
-
-
-# class ExtendedJSONEncoder(json.JSONEncoder):
-#    def default(self, obj):
-#        if isinstance(obj, VersionInfo):
-#            return str(obj)
-#        if isinstance(obj, Enum):
-#            return obj.value
-#        if isinstance(obj, datetime):
-#            return isoformat(obj)
-#        if isinstance(obj, timedelta):
-#            return timedelta_isoformat(obj)
-#
-#        return json.JSONEncoder.default(self, obj)

@@ -64,9 +64,9 @@ class OptionPromptPassword(click.Option):
     """Custom class that only prompts for the password if the user set a different username value
     than what is in the runtime config file."""
 
-    def get_default(self, ctx):
+    def get_default(self, ctx, **kwargs):
         config = DsgridRuntimeConfig.load()
-        username = get_value_from_context(ctx, "username")
+        username = ctx.find_root().params.get("username")
         if username != config.database_user:
             return None
         return config.database_password

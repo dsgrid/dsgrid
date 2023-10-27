@@ -14,10 +14,9 @@ from dsgrid.utils.files import in_other_dir, load_data
 logger = logging.getLogger(__name__)
 
 
-def make_model_config(title, **kwargs) -> ConfigDict:
+def make_model_config(**kwargs) -> ConfigDict:
     """Return a Pydantic config"""
     return ConfigDict(
-        title=title,
         str_strip_whitespace=True,
         validate_assignment=True,
         validate_default=True,
@@ -32,7 +31,7 @@ def make_model_config(title, **kwargs) -> ConfigDict:
 class DSGBaseModel(BaseModel):
     """Base data model for all dsgrid data models"""
 
-    model_config = make_model_config("DSGBaseModel")
+    model_config = make_model_config()
 
     @classmethod
     def load(cls, filename):

@@ -101,7 +101,7 @@ class DimensionQueryNamesModel(DSGBaseModel):
     If a value is empty, that dimension will be aggregated and dropped from the table.
     """
 
-    model_config = make_model_config("DatasetDimensionsMetadataModel", protected_namespaces=())
+    model_config = make_model_config(protected_namespaces=())
 
     geography: list[Union[str, ColumnModel]]
     metric: list[Union[str, ColumnModel]]
@@ -198,7 +198,7 @@ class DimensionMetadataModel(DSGBaseModel):
 class DatasetDimensionsMetadataModel(DSGBaseModel):
     """Records the dimensions and columns of a dataset as it is transformed by a query."""
 
-    model_config = make_model_config("DatasetDimensionsMetadataModel", protected_namespaces=())
+    model_config = make_model_config(protected_namespaces=())
 
     geography: list[DimensionMetadataModel] = []
     metric: list[DimensionMetadataModel] = []

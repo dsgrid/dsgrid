@@ -398,7 +398,7 @@ class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
 class RequiredDimensionRecordsModel(DSGBaseModel):
 
     # This is here because Pydantic doesn't like fields that start with 'model_'
-    model_config = make_model_config("RequiredDimensionRecordsModel", protected_namespaces=())
+    model_config = make_model_config(protected_namespaces=())
 
     # time is excluded
     geography: RequiredDimensionRecordsByTypeModel = RequiredDimensionRecordsByTypeModel()
@@ -719,7 +719,7 @@ class ProjectDimensionQueryNamesModel(DSGBaseModel):
     """Defines the query names for all base and supplemental dimensions in the project."""
 
     # This is here because Pydantic doesn't like fields that start with 'model_'
-    model_config = make_model_config("ProjectDimensionQueryNamesModel", protected_namespaces=())
+    model_config = make_model_config(protected_namespaces=())
 
     geography: DimensionsByCategoryModel
     metric: DimensionsByCategoryModel

@@ -8,6 +8,7 @@ from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE_TIME
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
+from dsgrid.config.dimensions import DateTimeDimensionModel
 from dsgrid.config.representative_period_time_dimension_config import (
     RepresentativePeriodTimeDimensionConfig,
 )
@@ -127,10 +128,12 @@ def check_date_range_creation(time_dimension_model):
 
 def check_validation_error_365_days(time_dimension_model):
     with pytest.raises(ValidationError):
-        time_dimension_model.ranges[0].start = "2018"
-        time_dimension_model.ranges[0].end = "2050"
-        time_dimension_model.str_format = "%Y"
-        time_dimension_model.frequency = datetime.timedelta(days=365)
+        data = time_dimension_model.model_dump()
+        data["ranges"][0]["start"] = "2018"
+        data["ranges"][0]["end"] = "2050"
+        data["str_format"] = "%Y"
+        data["frequency"] = datetime.timedelta(days=365)
+        DateTimeDimensionModel.model_validate(data)
 
 
 def check_register_annual_time(annual_time_dimension_model):

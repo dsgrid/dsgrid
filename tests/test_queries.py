@@ -280,7 +280,7 @@ def test_query_cli_run(tmp_path):
         DimensionCategory.BASE, REGISTRY_PATH, project, output_dir=output_dir
     )
     filename = tmp_path / "query.json"
-    filename.write_text(query.make_query().json(indent=2))
+    filename.write_text(query.make_query().model_dump_json(indent=2))
     cmd = [
         "--username",
         "root",
@@ -306,7 +306,7 @@ def test_query_cli_run(tmp_path):
 def test_dimension_query_names_model():
     # Test that this model is defined with all dimension types.
     diff = {x.value for x in DimensionType}.symmetric_difference(
-        set(DimensionQueryNamesModel.__fields__)
+        set(DimensionQueryNamesModel.model_fields)
     )
     assert not diff
 
@@ -925,12 +925,12 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
             case ColumnType.DIMENSION_QUERY_NAMES:
                 assert "time_est" in df.columns
                 for column in self._geography_columns:
-                    assert column in df.columns
+                    assert column.dimension_query_name in df.columns
             case ColumnType.DIMENSION_TYPES:
                 assert "timestamp" in df.columns
                 assert "geography" in df.columns
                 for column in self._geography_columns:
-                    assert column not in df.columns
+                    assert column.dimension_query_name not in df.columns
             case _:
                 assert False, f"Bug: add support for {self._column_type}"
 

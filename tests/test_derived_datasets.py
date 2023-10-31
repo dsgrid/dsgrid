@@ -78,6 +78,7 @@ def test_resstock_projection_invalid_query_column_type(valid_query):
 
 def test_resstock_projection_invalid_query_supplemental_columns(valid_query):
     query = valid_query
+    query.result.column_type = ColumnType.DIMENSION_QUERY_NAMES
     query.result.supplemental_columns = ["state"]
     assert not does_query_support_a_derived_dataset(query)
 

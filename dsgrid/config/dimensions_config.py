@@ -1,14 +1,13 @@
 import logging
 from pathlib import Path
-from typing import List
 
-from pydantic import Field
-from pydantic import validator
+from pydantic import field_validator, Field
+from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
-from .dimensions import DimensionModel, handle_dimension_union
+from .dimensions import DimensionModel, DimensionsListModel
 
 logger = logging.getLogger(__name__)
 
@@ -19,24 +18,16 @@ class DimensionsConfigModel(DSGBaseModel):
     Used when registering multiple dimensions in one command.
     """
 
-    dimensions: List = Field(
-        title="dimensions",
-        description="Dimensions for submission to the dimension registry",
-    )
-    # Pydantic doesn't cleanly handle this list of a Union of types.
-    # They will eventually fix it. Refer to https://github.com/samuelcolvin/pydantic/issues/619
-    # We tried to implement workarounds but always eventually hit cases where Pydantic
-    # would try to construct the wrong type and raise ValueError.
-    # Until they implement the feature we will use an untyped list and handle each of our types
-    # manually.
-    # Union[
-    #    DimensionModel,
-    #    DateTimeDimensionModel,
-    #    AnnualTimeDimensionModel,
-    #    RepresentativePeriodTimeDimensionModel,
-    # ]
+    dimensions: Annotated[
+        DimensionsListModel,
+        Field(
+            title="dimensions",
+            description="Dimensions for submission to the dimension registry",
+        ),
+    ]
 
-    @validator("dimensions")
+    @field_validator("dimensions")
+    @classmethod
     def check_files(cls, values: dict) -> dict:
         """Validate dimension files are unique across all dimensions"""
         check_uniqueness(
@@ -45,7 +36,8 @@ class DimensionsConfigModel(DSGBaseModel):
         )
         return values
 
-    @validator("dimensions")
+    @field_validator("dimensions")
+    @classmethod
     def check_names(cls, values: dict) -> dict:
         """Validate dimension names are unique across all dimensions."""
         check_uniqueness(
@@ -53,10 +45,6 @@ class DimensionsConfigModel(DSGBaseModel):
             "dimension record name",
         )
         return values
-
-    @validator("dimensions", pre=True, each_item=True, always=True)
-    def handle_dimension_union(cls, values):
-        return handle_dimension_union(values)
 
 
 class DimensionsConfig(ConfigBase):

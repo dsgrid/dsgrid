@@ -39,7 +39,7 @@ class DsgridRuntimeConfig(DSGBaseModel):
     def dump(self):
         """Dump the config to the user's home directory."""
         path = self.path()
-        dump_data(self.dict(), path, indent=2)
+        dump_data(self.model_dump(), path, indent=2)
         print(f"Wrote dsgrid config to {path}", file=sys.stderr)
 
     @staticmethod

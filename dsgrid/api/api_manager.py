@@ -175,4 +175,4 @@ class Store:
         return cls(store_file, StoreModel())
 
     def persist(self):
-        self._store_file.write_text(self.data.json(indent=2))
+        self._store_file.write_text(self.data.model_dump_json(indent=2))

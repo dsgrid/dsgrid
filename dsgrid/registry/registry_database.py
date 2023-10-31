@@ -63,7 +63,7 @@ class RegistryDatabase:
         client.collection("data_path").insert({"data_path": str(data_path)})
         data_path.mkdir(exist_ok=True)
         registry_file = data_path / "registry.json5"
-        registry_file.write_text(conn.json(indent=2))
+        registry_file.write_text(conn.model_dump_json(indent=2))
 
         graph = client.create_graph(GRAPH)
         graph.create_vertex_collection(Collection.PROJECT_ROOTS.value)

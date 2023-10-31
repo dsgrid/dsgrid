@@ -1,10 +1,10 @@
 import csv
 import logging
 import os
-from pathlib import Path
 from typing import List, Optional, Union
 
-from pydantic import Field, validator
+from pydantic import field_validator, Field, ValidationInfo, field_serializer
+from typing_extensions import Annotated
 
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingBaseModel,
@@ -23,21 +23,32 @@ logger = logging.getLogger(__name__)
 class MappingTableRecordModel(DSGBaseModel):
     """Represents one record in dimension mapping record files. Maps one dimension to another."""
 
-    from_id: str = Field(
-        title="from_id",
-        description="Source mapping",
-    )
-    to_id: Union[str, None] = Field(
-        title="to_id",
-        description="Destination mapping",
-    )
-    from_fraction: float = Field(
-        title="from_fraction",
-        description="Fraction of from_id to map to to_id",
-        default=1.0,
-    )
+    from_id: Annotated[
+        str,
+        Field(
+            title="from_id",
+            description="Source mapping",
+        ),
+    ]
+    to_id: Annotated[
+        Union[str, None],
+        Field(
+            None,
+            title="to_id",
+            description="Destination mapping",
+        ),
+    ]
+    from_fraction: Annotated[
+        float,
+        Field(
+            title="from_fraction",
+            description="Fraction of from_id to map to to_id",
+            default=1.0,
+        ),
+    ]
 
-    @validator("from_id", "to_id")
+    @field_validator("from_id", "to_id")
+    @classmethod
     def check_to_id(cls, val):
         if val == "":
             return None
@@ -49,11 +60,14 @@ class MappingTableByNameModel(DimensionMappingPreRegisteredBaseModel):
     This will be converted to a MappingTableModel as soon as the dimensions are registered.
     """
 
-    filename: str = Field(
-        title="filename",
-        alias="file",
-        description="Filename containing association table records.",
-    )
+    filename: Annotated[
+        str,
+        Field(
+            title="filename",
+            alias="file",
+            description="Filename containing association table records.",
+        ),
+    ]
 
 
 class DatasetBaseToProjectMappingTableModel(DimensionMappingDatasetToProjectBaseModel):
@@ -62,11 +76,14 @@ class DatasetBaseToProjectMappingTableModel(DimensionMappingDatasetToProjectBase
     the dimensions are registered.
     """
 
-    filename: str = Field(
-        title="filename",
-        alias="file",
-        description="Filename containing association table records.",
-    )
+    filename: Annotated[
+        str,
+        Field(
+            title="filename",
+            alias="file",
+            description="Filename containing association table records.",
+        ),
+    ]
 
 
 class DatasetBaseToProjectMappingTableListModel(DSGBaseModel):
@@ -78,70 +95,79 @@ class DatasetBaseToProjectMappingTableListModel(DSGBaseModel):
 class MappingTableModel(DimensionMappingBaseModel):
     """Attributes for a dimension mapping table"""
 
-    filename: Optional[str] = Field(
-        title="filename",
-        alias="file",
-        description="Filename containing association table records. Only assigned for user input "
-        "and output purposes. The registry database stores records in the mapping JSON document.",
-    )
-    file_hash: Optional[str] = Field(
-        title="file_hash",
-        description="Hash of the contents of the file, computed by dsgrid.",
-        dsg_internal=True,
-    )
-    records: List = Field(
-        title="records",
-        description="dimension mapping records in filename that get loaded at runtime",
-        dsg_internal=True,
-        default=[],
-    )
+    filename: Annotated[
+        Optional[str],
+        Field(
+            title="filename",
+            alias="file",
+            default=None,
+            description="Filename containing association table records. Only assigned for user input "
+            "and output purposes. The registry database stores records in the mapping JSON document.",
+        ),
+    ]
+    file_hash: Annotated[
+        Optional[str],
+        Field(
+            title="file_hash",
+            description="Hash of the contents of the file, computed by dsgrid.",
+            json_schema_extra={
+                "dsgrid_internal": True,
+            },
+            default=None,
+        ),
+    ]
+    records: Annotated[
+        List,
+        Field(
+            title="records",
+            description="dimension mapping records in filename that get loaded at runtime",
+            json_schema_extra={
+                "dsgrid_internal": True,
+            },
+            default=[],
+        ),
+    ]
 
-    @validator("filename")
+    @field_validator("filename")
+    @classmethod
     def check_filename(cls, filename):
         """Validate record file"""
-        if filename is not None and not os.path.isfile(filename):
-            raise ValueError(f"{filename} does not exist")
+        if filename is not None:
+            if not os.path.isfile(filename):
+                raise ValueError(f"{filename} does not exist")
+            if not filename.endswith(".csv"):
+                raise ValueError(f"only CSV is supported: {filename}")
         return filename
 
-    @validator("file_hash")
-    def compute_file_hash(cls, file_hash, values):
+    @field_validator("file_hash")
+    @classmethod
+    def compute_file_hash(cls, file_hash, info: ValidationInfo):
         """Compute file hash."""
-        if "filename" not in values:
-            return file_hash  # this means filename validator fail
-        return file_hash or compute_file_hash(values["filename"])
+        if "filename" not in info.data:
+            return file_hash
 
-    @validator("records", always=True)
-    def add_records(cls, records, values):
+        if not file_hash:
+            file_hash = compute_file_hash(info.data["filename"])
+        return file_hash
+
+    @field_validator("records")
+    @classmethod
+    def add_records(cls, records, info: ValidationInfo):
         """Add records from the file."""
-        if "filename" not in values:
-            return []  # this means filename validator fail
+        if "filename" not in info.data:
+            return records
 
         if records:
             if isinstance(records[0], dict):
                 records = convert_record_dicts_to_classes(records, MappingTableRecordModel)
             return records
 
-        filename = Path(values["filename"])
-        if not filename.name.endswith(".csv"):
-            raise ValueError(f"only CSV is supported: {filename}")
-
-        with open(filename, encoding="utf8") as f_in:
+        with open(info.data["filename"], encoding="utf8") as f_in:
             return convert_record_dicts_to_classes(csv.DictReader(f_in), MappingTableRecordModel)
 
-    def dict(self, *args, **kwargs):
-        return super().dict(*args, **self._handle_kwargs(**kwargs))
-
-    def json(self, *args, **kwargs):
-        return super().json(*args, **self._handle_kwargs(**kwargs))
-
-    @staticmethod
-    def _handle_kwargs(**kwargs):
-        exclude = {"file", "filename"}
-        if "exclude" in kwargs and kwargs["exclude"] is not None:
-            kwargs["exclude"].union(exclude)
-        else:
-            kwargs["exclude"] = exclude
-        return kwargs
+    @field_serializer("filename")
+    def serialize_cls(self, val, _):
+        return None
 
     @classmethod
     def from_pre_registered_model(

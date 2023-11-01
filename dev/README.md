@@ -15,7 +15,7 @@ pip install -e .[dev] # includes what is needed for tests and code development
 
 # or
 
-pip install -e .[admin] # dev plus what is needed for creating documentation and releasing packages
+pip install -e .[dev,doc] # dev plus what is needed for creating documentation and releasing packages
 ```
 
 **Java**

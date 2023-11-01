@@ -312,7 +312,7 @@ calls out choices that you should make to run Spark jobs with dsgrid.
    in dsgrid: ``docker/spark/Dockerfile``. The container includes ipython, jupyter, pyspark, pandas,
    and pyarrow, but not dsgrid.
 
-   ``/projects/dsgrid/containers/spark341_py311.sif``
+   ``/projects/dsgrid/containers/spark350_py311.sif``
 
 4. Configure Spark parameters based on the amount of memory and CPU in each compute node. dsgrid
    jobs on Kestrel seem to work better with dynamic allocation enabled.
@@ -325,15 +325,15 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark341_py311.sif
+    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark350_py311.sif
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark341_py311.sif <SLURM_JOB_ID>
+    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark350_py311.sif <SLURM_JOB_ID>
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark341_py311.sif <SLURM_JOB_ID1> <SLURM_JOB_ID2>
+    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark350_py311.sif <SLURM_JOB_ID1> <SLURM_JOB_ID2>
 
 Run ``configure_and_start_spark.sh --help`` to see all options.
 

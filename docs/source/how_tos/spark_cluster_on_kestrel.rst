@@ -39,7 +39,7 @@ Steps
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -c /projects/dsgrid/containers/spark341_py311.sif
+    $ configure_and_start_spark.sh -c /projects/dsgrid/containers/spark350_py311.sif
 
 5. Set the Spark configuration environment variable.
 

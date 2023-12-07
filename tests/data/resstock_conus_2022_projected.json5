@@ -28,6 +28,10 @@
     "reports": [],
     "column_type": "dimension_types",
     "output_format": "parquet",
+    "table_format": {
+      format_type: "pivoted",
+      pivoted_dimension_type: "metric",
+    },
     "sort_columns": [],
     "dimension_filters": [],
     "time_zone": null

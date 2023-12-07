@@ -73,7 +73,10 @@ instructions on how to assign values in this file.
       // people being modeled. dsgrid will map times to the project's geography time zone.
       use_project_geography_time_zone: true,
       data_schema: {
-        load_data_column_dimension: "metric",
+        table_format: {
+          format_type: "pivoted",
+          pivoted_dimension_type: "metric",
+        },
       },
 
 

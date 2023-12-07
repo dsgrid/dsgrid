@@ -5,6 +5,7 @@ import logging
 import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.exceptions import DSGInvalidDimension, DSGInvalidParameter
 
 
@@ -35,6 +36,7 @@ def to_kwh(unit_col, value_col):
         .when(F.col(unit_col) == TWH, (F.col(value_col) * 1_000_000_000))
         .when(F.col(unit_col) == THERM, (F.col(value_col) * KWH_PER_THERM))
         .when(F.col(unit_col) == MBTU, (F.col(value_col) * KWH_PER_MBTU))
+        .when(F.col(unit_col) == "", F.col(value_col))
         .otherwise(None)
     )
 
@@ -48,6 +50,7 @@ def to_mwh(unit_col, value_col):
         .when(F.col(unit_col) == TWH, (F.col(value_col) * 1_000_000))
         .when(F.col(unit_col) == THERM, (F.col(value_col) * KWH_PER_THERM / 1_000))
         .when(F.col(unit_col) == MBTU, (F.col(value_col) * KWH_PER_MBTU / 1_000))
+        .when(F.col(unit_col) == "", F.col(value_col))
         .otherwise(None)
     )
 
@@ -56,11 +59,13 @@ def to_gwh(unit_col, value_col):
     """Convert a column to gWh."""
     return (
         F.when(F.col(unit_col) == KWH, (F.col(value_col) / 1_000_000))
+        .when(F.col(unit_col) == "", F.col(value_col))
         .when(F.col(unit_col) == MWH, (F.col(value_col) / 1_000))
         .when(F.col(unit_col) == GWH, F.col(value_col))
         .when(F.col(unit_col) == TWH, (F.col(value_col) * 1_000))
         .when(F.col(unit_col) == THERM, (F.col(value_col) * KWH_PER_THERM / 1_000_000))
         .when(F.col(unit_col) == MBTU, (F.col(value_col) * KWH_PER_MBTU / 1_000_000))
+        .when(F.col(unit_col) == "", F.col(value_col))
         .otherwise(None)
     )
 
@@ -74,6 +79,7 @@ def to_twh(unit_col, value_col):
         .when(F.col(unit_col) == TWH, F.col(value_col))
         .when(F.col(unit_col) == THERM, (F.col(value_col) * KWH_PER_THERM / 1_000_000_000))
         .when(F.col(unit_col) == MBTU, (F.col(value_col) * KWH_PER_MBTU / 1_000_000_000))
+        .when(F.col(unit_col) == "", F.col(value_col))
         .otherwise(None)
     )
 
@@ -87,6 +93,7 @@ def to_therm(unit_col, value_col):
         .when(F.col(unit_col) == TWH, (F.col(value_col) / KWH_PER_THERM / 1_000_000_000))
         .when(F.col(unit_col) == THERM, F.col(value_col))
         .when(F.col(unit_col) == MBTU, (F.col(value_col) * THERMS_PER_MBTU))
+        .when(F.col(unit_col) == "", F.col(value_col))
         .otherwise(None)
     )
 
@@ -100,19 +107,152 @@ def to_mbtu(unit_col, value_col):
         .when(F.col(unit_col) == TWH, (F.col(value_col) / KWH_PER_MBTU / 1_000_000_000))
         .when(F.col(unit_col) == THERM, (F.col(value_col) / THERMS_PER_MBTU))
         .when(F.col(unit_col) == MBTU, F.col(value_col))
+        .when(F.col(unit_col) == "", F.col(value_col))
         .otherwise(None)
     )
 
 
-def convert_units(df, columns, from_records, from_to_records, to_unit_records) -> DataFrame:
+def from_any_to_any(from_unit_col, to_unit_col, value_col):
+    """Convert a column based on from/to columns."""
+    return (
+        F.when(F.col(from_unit_col) == F.col(to_unit_col), F.col(value_col))
+        .when(F.col(from_unit_col) == "", F.col(value_col))
+        # From KWh
+        .when(
+            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == MWH), F.col(value_col) / 1_000
+        )
+        .when(
+            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == GWH),
+            F.col(value_col) / 1_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == TWH),
+            F.col(value_col) / 1_000_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == THERM),
+            F.col(value_col) / KWH_PER_THERM,
+        )
+        .when(
+            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == MBTU),
+            F.col(value_col) / KWH_PER_MBTU,
+        )
+        # From MWh
+        .when(
+            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == KWH), F.col(value_col) * 1_000
+        )
+        .when(
+            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == GWH), F.col(value_col) / 1_000
+        )
+        .when(
+            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == TWH),
+            F.col(value_col) / 1_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == THERM),
+            F.col(value_col) / KWH_PER_THERM * 1_000,
+        )
+        .when(
+            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == MBTU),
+            F.col(value_col) / KWH_PER_MBTU * 1_000,
+        )
+        # From GWh
+        .when(
+            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == KWH),
+            F.col(value_col) * 1_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == MWH),
+            F.col(value_col) * 1_000,
+        )
+        .when(
+            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == TWH), F.col(value_col) / 1_000
+        )
+        .when(
+            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == THERM),
+            F.col(value_col) / KWH_PER_THERM * 1_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == MBTU),
+            F.col(value_col) / KWH_PER_MBTU * 1_000_000,
+        )
+        # From TWh
+        .when(
+            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == KWH),
+            F.col(value_col) * 1_000_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == MWH),
+            F.col(value_col) * 1_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == GWH), F.col(value_col) * 1_000
+        )
+        .when(
+            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == THERM),
+            F.col(value_col) / KWH_PER_THERM * 1_000_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == MBTU),
+            F.col(value_col) / KWH_PER_MBTU * 1_000_000_000,
+        )
+        # From Therms
+        .when(
+            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == KWH),
+            F.col(value_col) * KWH_PER_THERM,
+        )
+        .when(
+            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == MWH),
+            F.col(value_col) * KWH_PER_THERM / 1_000,
+        )
+        .when(
+            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == GWH),
+            F.col(value_col) * KWH_PER_THERM / 1_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == TWH),
+            F.col(value_col) * KWH_PER_THERM / 1_000_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == MBTU),
+            F.col(value_col) / THERMS_PER_MBTU,
+        )
+        # From MBTU
+        .when(
+            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == KWH),
+            F.col(value_col) * KWH_PER_MBTU,
+        )
+        .when(
+            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == MWH),
+            F.col(value_col) * KWH_PER_MBTU / 1_000,
+        )
+        .when(
+            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == GWH),
+            F.col(value_col) * KWH_PER_MBTU / 1_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == TWH),
+            F.col(value_col) * KWH_PER_MBTU / 1_000_000_000,
+        )
+        .when(
+            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == THERM),
+            F.col(value_col) * THERMS_PER_MBTU,
+        )
+        .otherwise(None)
+    )
+
+
+def convert_units_pivoted(
+    df, columns, from_records, from_to_records, to_unit_records
+) -> DataFrame:
     """Convert the specified columns of the dataframe to the target units.
 
     Parameters
     ----------
     df : DataFrame
         Load data table
-    columns : list[str]
-        Columns in dataframe to convert
+    columns : list[tuple]
+        Columns in dataframe to convert (variable_column, value_column)
     from_records : DataFrame
         Metric dimension records for the columns being converted
     from_to_records : DataFrame
@@ -144,6 +284,39 @@ def convert_units(df, columns, from_records, from_to_records, to_unit_records) -
             )
 
     return df
+
+
+def convert_units_unpivoted(
+    df, metric_column, from_records, from_to_records, to_unit_records
+) -> DataFrame:
+    """Convert the value column of the dataframe to the target units.
+
+    Parameters
+    ----------
+    df : DataFrame
+        Load data table
+    metric_column : str
+        Column in dataframe with metric record IDs
+    from_records : DataFrame
+        Metric dimension records for the columns being converted
+    from_to_records : DataFrame
+        Records that map the record IDs in columns to the target IDs
+    to_unit_records : DataFrame
+        Metric dimension records for the target IDs
+    """
+    # TODO DT: what about unitless datasets, such as AEO growth rates? Need to return early.
+    unit_col = "unit"  # must match EnergyEndUse.unit
+    tmp1 = from_records.select("id", unit_col).withColumnRenamed(unit_col, "from_unit")
+    tmp2 = from_to_records.select("from_id", "to_id")
+    unit_df = (
+        tmp1.join(tmp2, on=tmp1["id"] == tmp2["from_id"]).select("to_id", "from_unit").distinct()
+    )
+    df = df.join(unit_df, on=df[metric_column] == unit_df["to_id"]).drop("to_id")
+    tmp3 = to_unit_records.select("id", "unit").withColumnRenamed(unit_col, "to_unit")
+    df = df.join(tmp3, on=df[metric_column] == tmp3["id"]).drop("id")
+    return df.withColumn(VALUE_COLUMN, from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)).drop(
+        "from_unit", "to_unit"
+    )
 
 
 _CONVERSION_FUNCTIONS = {

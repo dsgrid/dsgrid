@@ -1,10 +1,17 @@
 import logging
 from pathlib import Path
 
+from pyspark.sql import DataFrame
+
+from dsgrid.dataset.models import (
+    TableFormatType,
+    PivotedTableFormatModel,
+    UnpivotedTableFormatModel,
+)
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.query.models import ColumnType, DimensionMetadataModel
+from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.utils.spark import get_spark_session
-from .models import ProjectQueryModel, DatasetMetadataModel, TableFormatType
+from .models import ColumnType, DatasetMetadataModel, DimensionMetadataModel, ProjectQueryModel
 
 
 logger = logging.getLogger(__name__)
@@ -15,9 +22,9 @@ class QueryContext:
 
     def __init__(self, model: ProjectQueryModel):
         self._model = model
-        self._record_ids_by_dimension_type = {}  # DimensionType to DataFrame
-        self._metadata = DatasetMetadataModel()
-        self._dataset_metadata = {}  # dataset_id to DatasetMetadataModel
+        self._record_ids_by_dimension_type: dict[DimensionType, DataFrame] = {}
+        self._metadata = DatasetMetadataModel(table_format=self.model.result.table_format)
+        self._dataset_metadata: dict[str, DatasetMetadataModel] = {}
 
     @property
     def metadata(self):
@@ -43,42 +50,48 @@ class QueryContext:
                         main_metadata.append(metadata)
                         keys.add(key)
 
-        self._metadata.pivoted.columns.clear()
+        if isinstance(self._metadata.table_format, PivotedTableFormatModel):
+            self._consolidate_pivoted_metadata()
+
+    def _consolidate_pivoted_metadata(self):
         for dataset_metadata in self._dataset_metadata.values():
-            if dataset_metadata.table_format_type == TableFormatType.PIVOTED:
-                self.add_pivoted_columns(dataset_metadata.pivoted.columns)
-                if self.get_pivoted_dimension_type() is None:
-                    self.set_pivoted_dimension_type(dataset_metadata.pivoted.dimension_type)
-                    self.set_table_format_type(TableFormatType.PIVOTED)
-                elif dataset_metadata.pivoted.dimension_type != self.get_pivoted_dimension_type():
-                    # TODO #202: Remove this check when we support transforming to long format.
-                    raise Exception(
-                        "Datasets have different pivoted dimension types: "
-                        f"{dataset_metadata.pivoted.dimension_type=} "
-                        f"{self.get_pivoted_dimension_type()=}"
-                    )
+            if dataset_metadata.get_table_format_type() != TableFormatType.PIVOTED:
+                raise Exception(f"Bug: dataset is not pivoted: {dataset_metadata}")
+            if (
+                dataset_metadata.table_format.pivoted_dimension_type
+                != self.get_pivoted_dimension_type()
+            ):
+                raise DSGInvalidQuery(
+                    "Datasets have different pivoted dimension types: "
+                    f"{dataset_metadata.table_format.pivoted_dimension_type=} "
+                    f"{self.get_pivoted_dimension_type()=}. "
+                    "Please set the output format to 'unpivoted'."
+                )
 
     def get_pivoted_columns(self, dataset_id=None):
-        return self._get_metadata(dataset_id).pivoted.columns
-
-    def set_pivoted_columns(self, columns, dataset_id=None):
-        self._get_metadata(dataset_id).pivoted.columns = columns
-        logger.debug("Set pivoted columns dataset_id=%s: %s", dataset_id, columns)
-
-    def add_pivoted_columns(self, columns, dataset_id=None):
-        self._get_metadata(dataset_id).pivoted.columns.update(columns)
+        metadata = self._get_metadata(dataset_id)
+        if isinstance(metadata.table_format, UnpivotedTableFormatModel):
+            return set()
+        return self.get_dimension_column_names(
+            metadata.table_format.pivoted_dimension_type, dataset_id=dataset_id
+        )
 
     def get_pivoted_dimension_type(self, dataset_id=None):
-        return self._get_metadata(dataset_id).pivoted.dimension_type
+        metadata = self._get_metadata(dataset_id=dataset_id)
+        if isinstance(metadata.table_format, UnpivotedTableFormatModel):
+            return None
+        return metadata.table_format.pivoted_dimension_type
 
-    def set_pivoted_dimension_type(self, val, dataset_id=None):
-        self._get_metadata(dataset_id).pivoted.dimension_type = val
+    def get_table_format_type(self, dataset_id=None) -> TableFormatType:
+        val = self._get_metadata(dataset_id).table_format.format_type
+        if not isinstance(val, TableFormatType):
+            val = TableFormatType(val)
+        return val
 
-    def get_table_format_type(self, dataset_id=None):
-        return self._get_metadata(dataset_id).table_format_type
-
-    def set_table_format_type(self, val, dataset_id=None):
-        self._get_metadata(dataset_id).table_format_type = val
+    def set_table_format_type(self, val: TableFormatType, dataset_id=None):
+        if not isinstance(val, TableFormatType):
+            val = TableFormatType(val)
+        self._get_metadata(dataset_id).table_format.format_type = val
 
     def get_dimension_column_names(self, dimension_type: DimensionType, dataset_id=None):
         return self._get_metadata(dataset_id).dimensions.get_column_names(dimension_type)
@@ -95,36 +108,71 @@ class QueryContext:
     def set_dataset_metadata(
         self,
         dataset_id,
-        pivoted_columns,
         column_type,
-        pivoted_dimension_type,
         table_format_type,
         project_config,
+        pivoted_columns=None,
+        pivoted_dimension_type=None,
     ):
-        self.init_dataset_metadata(dataset_id)
-        self.set_pivoted_columns(pivoted_columns, dataset_id=dataset_id)
-        self.set_pivoted_dimension_type(pivoted_dimension_type, dataset_id=dataset_id)
-        self.set_table_format_type(table_format_type, dataset_id=dataset_id)
+        if table_format_type == TableFormatType.PIVOTED and (
+            not pivoted_columns or not pivoted_dimension_type
+        ):
+            raise Exception(
+                f"Bug: {table_format_type=} {pivoted_columns=} {pivoted_dimension_type=}"
+            )
+        match table_format_type:
+            case TableFormatType.PIVOTED:
+                table_format = PivotedTableFormatModel(
+                    pivoted_dimension_type=pivoted_dimension_type
+                )
+            case TableFormatType.UNPIVOTED:
+                table_format = UnpivotedTableFormatModel()
+            case _:
+                raise NotImplementedError(str(table_format_type))
+        self._dataset_metadata[dataset_id] = DatasetMetadataModel(table_format=table_format)
         for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
-            match (column_type, dim_type):
-                case (ColumnType.DIMENSION_QUERY_NAMES, _):
-                    column_names = [name]
-                case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
+            is_pivoted_dim_type = (
+                table_format_type == TableFormatType.PIVOTED and dim_type == pivoted_dimension_type
+            )
+            match (table_format_type, column_type, dim_type, is_pivoted_dim_type):
+                case (_, ColumnType.DIMENSION_TYPES, DimensionType.TIME, False):
                     # This uses the project dimension because the dataset is being mapped.
                     time_columns = project_config.get_load_data_time_columns(name)
                     column_names = time_columns
-                case (ColumnType.DIMENSION_TYPES, _):
+                case (
+                    TableFormatType.PIVOTED,
+                    ColumnType.DIMENSION_QUERY_NAMES | ColumnType.DIMENSION_TYPES,
+                    _,
+                    True,
+                ):
+                    column_names = list(pivoted_columns)
+                    assert pivoted_columns.issubset(
+                        project_config.get_dimension(name).get_unique_ids()
+                    )
+                case (
+                    TableFormatType.PIVOTED | TableFormatType.UNPIVOTED,
+                    ColumnType.DIMENSION_QUERY_NAMES,
+                    _,
+                    False,
+                ):
+                    column_names = [name]
+                case (
+                    TableFormatType.PIVOTED | TableFormatType.UNPIVOTED,
+                    ColumnType.DIMENSION_TYPES,
+                    _,
+                    False,
+                ):
                     column_names = [dim_type.value]
                 case _:
-                    raise NotImplementedError(f"Bug: need to support {column_type=}")
+                    raise NotImplementedError(
+                        f"Bug: need to support {table_format_type=} {column_type=} {dim_type=} "
+                        f"{is_pivoted_dim_type=}"
+                    )
             self.add_dimension_metadata(
                 dim_type,
                 DimensionMetadataModel(dimension_query_name=name, column_names=column_names),
                 dataset_id=dataset_id,
             )
-
-    def init_dataset_metadata(self, dataset_id):
-        self._dataset_metadata[dataset_id] = DatasetMetadataModel()
 
     def serialize_dataset_metadata_to_file(self, dataset_id, filename: Path):
         filename.write_text(self._dataset_metadata[dataset_id].model_dump_json(indent=2))
@@ -157,7 +205,7 @@ class QueryContext:
         for metadata in self.get_dimension_metadata(dimension_type, dataset_id=dataset_id):
             if metadata.dimension_query_name == query_name:
                 return metadata.column_names
-        raise Exception(f"No base dimension match: {dimension_type=} {query_name=}")
+        raise Exception(f"No dimension match: {dimension_type=} {query_name=}")
 
     def get_dimension_metadata(
         self,

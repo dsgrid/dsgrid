@@ -27,9 +27,9 @@ Steps to make a dsgrid Conda environment:
 
     $ conda activate dsgrid
 
-dsgrid's key dependencies are an `ArangoDB registry <#registry>`_, which can be 
-`shared <#nrel-shared-registry>`_ or `standalone <#standalone-registry>`_, and 
-`Apache Spark`_. Apache Spark requires Java, so check if you have it. Both of these 
+dsgrid's key dependencies are an `ArangoDB registry <#registry>`_, which can be
+`shared <#nrel-shared-registry>`_ or `standalone <#standalone-registry>`_, and
+`Apache Spark`_. Apache Spark requires Java, so check if you have it. Both of these
 commands must work:
 
 .. tabs::
@@ -54,7 +54,7 @@ commands must work:
         C:\Users\ehale\Anaconda3\envs\dsgrid\Library
 
         > # If you don't have java installed:
-        > conda install openjdk 
+        > conda install openjdk
 
 Package Installation
 =====================
@@ -91,7 +91,7 @@ NREL. To query the data you must be on the NREL HPC.
 Standalone Registry
 -------------------
 To use dsgrid in your own computational environment, you will need to run ArangoDB and either set
-up a new dsgrid registry or load a dsgrid registry that has been written to disk. Please see the 
+up a new dsgrid registry or load a dsgrid registry that has been written to disk. Please see the
 :ref:`how-to guide on setting up a standalone dsgrid registry <set_up_standalone_registry>`.
 
 Apache Spark

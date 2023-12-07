@@ -21,7 +21,6 @@ Data Models
 .. autoclass:: dsgrid.query.models.ColumnType
 .. autoclass:: dsgrid.query.models.DatasetType
 .. autoclass:: dsgrid.query.models.ReportType
-.. autoclass:: dsgrid.query.models.TableFormatType
 
 Submission
 ==========

@@ -56,7 +56,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
     project_config = project_mgr.get_by_id(project_id, "1.1.0")
-    assert project_config.model.status == ProjectRegistryStatus.COMPLETE
+    assert project_config.model.status == ProjectRegistryStatus.IN_PROGRESS
     dataset = project_config.get_dataset(dataset_id)
     assert dataset.status == DatasetRegistryStatus.REGISTERED
 

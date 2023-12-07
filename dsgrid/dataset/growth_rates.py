@@ -17,7 +17,7 @@ def apply_growth_rate_123(
     growth_rate_df,
     time_columns,
     model_year_column,
-    pivoted_columns,
+    value_columns,
 ):
     """Applies the growth rate to the initial_value dataframe.
 
@@ -27,7 +27,7 @@ def apply_growth_rate_123(
     growth_rate_df : pyspark.sql.DataFrame
     time_columns : set[str]
     model_year_column : str
-    pivoted_columns : set[str]
+    value_columns : set[str]
 
     Returns
     -------
@@ -43,17 +43,17 @@ def apply_growth_rate_123(
         return col + "_gr"
 
     gr_df = growth_rate_df
-    for column in pivoted_columns:
+    for column in value_columns:
         gr_col = renamed(column)
         gr_df = gr_df.withColumn(
             gr_col,
             F.pow((1 + F.col(column)), F.col(model_year_column).cast(IntegerType()) - base_year),
         ).drop(column)
 
-    dim_columns = set(initial_value_df.columns) - pivoted_columns - time_columns
+    dim_columns = set(initial_value_df.columns) - value_columns - time_columns
     df = initial_value_df.join(gr_df, on=list(dim_columns))
     for column in df.columns:
-        if column in pivoted_columns:
+        if column in value_columns:
             gr_column = renamed(column)
             df = df.withColumn(column, df[column] * df[gr_column])
 

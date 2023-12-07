@@ -164,7 +164,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
     tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
     time_cols = tempo_time_dim.get_load_data_time_columns()
-    enduse_cols = tempo._handler.get_pivoted_dimension_columns()
+    enduse_cols = tempo._handler.config.get_pivoted_dimension_columns()
 
     # get sum from converted_data
     groupby_cols = [col for col in converted_data.columns if col not in enduse_cols + [ptime_col]]

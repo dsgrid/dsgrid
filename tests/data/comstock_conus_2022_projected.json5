@@ -25,6 +25,10 @@
     "replace_ids_with_names": false,
     "aggregations": [
     ],
+    "table_format": {
+      format_type: "pivoted",
+      pivoted_dimension_type: "metric",
+    },
     "reports": [],
     "column_type": "dimension_types",
     "output_format": "parquet",

@@ -1031,8 +1031,10 @@ class ProjectRegistryManager(RegistryManagerBase):
             mapping_references,
             project_time_dim=project_config.get_base_dimension(DimensionType.TIME),
         )
-        pivoted_dimension = handler.get_pivoted_dimension_type()
-        exclude_dims = {DimensionType.TIME, pivoted_dimension}
+        pivoted_dimension = handler.config.get_pivoted_dimension_type()
+        exclude_dims = {DimensionType.TIME}
+        if pivoted_dimension is not None:
+            exclude_dims.add(pivoted_dimension)
 
         dim_table = handler.get_unique_dimension_rows().drop("id")
         dataset_id = dataset_config.config_id
@@ -1076,17 +1078,18 @@ class ProjectRegistryManager(RegistryManagerBase):
             raise DSGInvalidDataset(
                 f"Dataset {dataset_config.config_id} is missing required dimension records"
             )
-        project_pivoted_ids = project_config.get_required_dimension_record_ids(
-            dataset_id, pivoted_dimension
-        )
-        self._check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id)
+        if pivoted_dimension is not None:
+            project_pivoted_ids = project_config.get_required_dimension_record_ids(
+                dataset_id, pivoted_dimension
+            )
+            self._check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id)
 
     @staticmethod
     def _check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id):
         """pivoted dimension record is the same as project's unless a relevant association is provided."""
         logger.info("Check pivoted dimension columns.")
         d_dim_ids = handler.get_pivoted_dimension_columns_mapped_to_project()
-        pivoted_dim = handler.get_pivoted_dimension_type()
+        pivoted_dim = handler.config.get_pivoted_dimension_type()
 
         if d_dim_ids.symmetric_difference(project_pivoted_ids):
             raise DSGInvalidDataset(

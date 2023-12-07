@@ -11,6 +11,7 @@ import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
+from dsgrid.dataset.models import TableFormatType
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.api.models import AsyncTaskStatus, SparkSubmitProjectQueryRequest
 from dsgrid.api.response_models import (
@@ -32,10 +33,7 @@ from dsgrid.api.response_models import (
     ListTableFormatTypesResponse,
     SparkSubmitProjectQueryResponse,
 )
-from dsgrid.query.models import (
-    ReportType,
-    TableFormatType,
-)
+from dsgrid.query.models import ReportType
 from dsgrid.utils.files import load_data
 
 logger = logging.getLogger(__name__)

@@ -9,10 +9,10 @@ from dsgrid.utils.py_expression_eval import Parser
 class DatasetExpressionHandler:
     """Abstracts SQL expressions for dataset combinations with mathematical expressions."""
 
-    def __init__(self, df: DataFrame, dimension_columns: list[str], pivoted_columns: list[str]):
+    def __init__(self, df: DataFrame, dimension_columns: list[str], value_columns: list[str]):
         self.df = df
         self.dimension_columns = dimension_columns
-        self.pivoted_columns = pivoted_columns
+        self.value_columns = value_columns
 
     def _op(self, other, op):
         orig_self_count = self.df.count()
@@ -27,11 +27,11 @@ class DatasetExpressionHandler:
             return col + "_other"
 
         other_df = other.df
-        for column in self.pivoted_columns:
+        for column in self.value_columns:
             other_df = other_df.withColumnRenamed(column, renamed(column))
         df = self.df.join(other_df, on=self.dimension_columns)
 
-        for column in self.pivoted_columns:
+        for column in self.value_columns:
             other_column = renamed(column)
             df = df.withColumn(column, op(df[column], df[other_column]))
 
@@ -43,7 +43,7 @@ class DatasetExpressionHandler:
                 f"{orig_self_count=} {joined_count=}"
             )
 
-        return DatasetExpressionHandler(df, self.dimension_columns, self.pivoted_columns)
+        return DatasetExpressionHandler(df, self.dimension_columns, self.value_columns)
 
     def __add__(self, other):
         return self._op(other, operator.add)
@@ -61,7 +61,7 @@ class DatasetExpressionHandler:
                 f"{self.df.columns=} vs {other.df.columns=}"
             )
         return DatasetExpressionHandler(
-            self.df.union(other.df), self.dimension_columns, self.pivoted_columns
+            self.df.union(other.df), self.dimension_columns, self.value_columns
         )
 
 

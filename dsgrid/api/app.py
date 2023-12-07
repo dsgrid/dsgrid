@@ -10,15 +10,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response, FileResponse
 
 from dsgrid.common import REMOTE_REGISTRY
+from dsgrid.dataset.models import TableFormatType
 from dsgrid.config.dimensions import create_dimension_common_model, create_project_dimension_model
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGValueNotStored
 from dsgrid.loggers import setup_logging
-from dsgrid.query.models import (
-    ReportType,
-    TableFormatType,
-)
+from dsgrid.query.models import ReportType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.run_command import run_command

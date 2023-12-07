@@ -11,6 +11,7 @@ from dsgrid.config.dataset_config import (
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimensions import DimensionModel
+from dsgrid.dataset.models import TableFormatType
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
@@ -53,6 +54,11 @@ def create_derived_dataset_config_from_query(
         return False
 
     metadata = DatasetMetadataModel.from_file(metadata_file)
+    format_type = metadata.get_table_format_type()
+    table_format = {"format_type": format_type.value}
+    if format_type == TableFormatType.PIVOTED:
+        table_format["pivoted_dimension_type"] = metadata.table_format.pivoted_dimension_type.value
+
     project = registry_manager.project_manager.load_project(
         query.project.project_id, version=query.project.version
     )
@@ -88,8 +94,11 @@ def create_derived_dataset_config_from_query(
                 continue
             unique_data_records = None
         else:
-            if metadata.pivoted.dimension_type == dim_type:
-                unique_data_records = metadata.pivoted.columns
+            if (
+                format_type == TableFormatType.PIVOTED
+                and metadata.table_format.pivoted_dimension_type == dim_type
+            ):
+                unique_data_records = metadata.dimensions.get_column_names(dim_type)
             else:
                 unique_data_records = _get_unique_data_records(
                     df, dim.model, query.result.column_type
@@ -129,7 +138,7 @@ def create_derived_dataset_config_from_query(
 
     _make_dataset_config(
         query.project.dataset.dataset_id,
-        metadata.pivoted.dimension_type.value,
+        table_format,
         dimension_references,
         dst_path,
         num_new_supplemental_dimensions,
@@ -190,7 +199,7 @@ def _get_matching_supplemental_dimension(project_config, dimension_type, unique_
 
 def _make_dataset_config(
     dataset_id,
-    pivoted_dim_type,
+    table_format: dict[str, str],
     dimension_references,
     path: Path,
     num_new_supplemental_dimensions,
@@ -201,10 +210,9 @@ def _make_dataset_config(
     config = {
         "dataset_id": dataset_id,
         "dataset_type": InputDatasetType.MODELED.value,
-        "data_source": "",
         "data_schema": {
-            "load_data_column_dimension": pivoted_dim_type,
             "data_schema_type": DataSchemaType.ONE_TABLE.value,
+            "table_format": table_format,
         },
         "dataset_version": "1.0.0",
         "description": "",

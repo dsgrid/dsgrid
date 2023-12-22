@@ -235,8 +235,6 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         record_ids = get_unique_values(records, "id")
         drop_columns = context.get_pivoted_columns() - record_ids
         df = df.drop(*drop_columns)
-        # pivoted_columns = (record_ids - drop_columns).intersection(df.columns)
-        # context.set_pivoted_columns(pivoted_columns)
         return df
 
     @track_timing(timer_stats_collector)

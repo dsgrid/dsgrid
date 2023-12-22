@@ -250,18 +250,6 @@ class DatasetDimensionsMetadataModel(DSGBaseModel):
                 break
 
 
-# class PivotedDatasetMetadataModel(DSGBaseModel):
-# columns: set[str] = set()
-# dimension_type: DimensionType
-
-# @field_validator("columns")
-# @classmethod
-# def handle_columns(cls, columns):
-#    if isinstance(columns, list):
-#        return set(columns)
-#    return columns
-
-
 class DatasetMetadataModel(DSGBaseModel):
     """Defines the metadata for a dataset serialized to file."""
 

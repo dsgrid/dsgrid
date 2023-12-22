@@ -304,7 +304,6 @@ def convert_units_unpivoted(
     to_unit_records : DataFrame
         Metric dimension records for the target IDs
     """
-    # TODO DT: what about unitless datasets, such as AEO growth rates? Need to return early.
     unit_col = "unit"  # must match EnergyEndUse.unit
     tmp1 = from_records.select("id", unit_col).withColumnRenamed(unit_col, "from_unit")
     tmp2 = from_to_records.select("from_id", "to_id")

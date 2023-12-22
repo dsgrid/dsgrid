@@ -221,9 +221,10 @@ def convert_table_format_if_needed(
 ):
     ids = set(df.columns) - value_columns
     match (from_format, to_format):
-        case (TableFormatType.PIVOTED, TableFormatType.PIVOTED):
-            pass
-        case (TableFormatType.UNPIVOTED, TableFormatType.UNPIVOTED):
+        case (TableFormatType.PIVOTED, TableFormatType.PIVOTED) | (
+            TableFormatType.UNPIVOTED,
+            TableFormatType.UNPIVOTED,
+        ):
             pass
         case (TableFormatType.UNPIVOTED, TableFormatType.PIVOTED):
             df = df.groupBy(*ids).pivot(pivoted_column_name).sum(VALUE_COLUMN)

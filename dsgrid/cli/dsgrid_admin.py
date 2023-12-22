@@ -171,6 +171,7 @@ def create_registry(ctx, db_name, data_path, force):
         password=get_value_from_context(ctx, "password"),
     )
     RegistryManager.create(conn, data_path)
+    logger.info("Created registry at %s with %s", conn.url, conn.database)
 
 
 """

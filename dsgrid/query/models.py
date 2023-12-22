@@ -1,5 +1,5 @@
 import abc
-import enum
+from enum import Enum
 from typing import Any, Optional, Union, Literal, List, TypeAlias
 
 import pyspark.sql.functions as F
@@ -7,7 +7,7 @@ from pydantic import field_validator, model_validator, Field, field_serializer, 
 from semver import VersionInfo
 from typing_extensions import Annotated
 
-from dsgrid.data_models import DSGBaseModel, DSGEnum, make_model_config
+from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dataset.models import (
     TableFormatModel,
     UnpivotedTableFormatModel,
@@ -94,7 +94,7 @@ class ColumnModel(DSGBaseModel):
         return f"{self.function.__name__}__{self.dimension_query_name})"
 
 
-class ColumnType(DSGEnum):
+class ColumnType(str, Enum):
     """Defines what the columns of a dataset table represent."""
 
     DIMENSION_TYPES = "dimension_types"
@@ -172,7 +172,7 @@ class AggregationModel(DSGBaseModel):
         ]
 
 
-class ReportType(enum.Enum):
+class ReportType(str, Enum):
     """Pre-defined reports"""
 
     PEAK_LOAD = "peak_load"
@@ -299,7 +299,7 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
     ]
 
 
-class DatasetType(enum.Enum):
+class DatasetType(str, Enum):
     """Defines the type of a dataset in a query."""
 
     EXPONENTIAL_GROWTH = "exponential_growth"
@@ -321,9 +321,7 @@ class DatasetBaseModel(DSGBaseModel, abc.ABC):
 class StandaloneDatasetModel(DatasetBaseModel):
     """A dataset with energy use data."""
 
-    dataset_type: Annotated[
-        Literal[DatasetType.STANDALONE.value], Field(default=DatasetType.STANDALONE.value)
-    ]
+    dataset_type: Annotated[Literal[DatasetType.STANDALONE], Field(default=DatasetType.STANDALONE)]
     dataset_id: Annotated[str, Field(description="Dataset identifier")]
 
     def get_dataset_id(self) -> str:
@@ -334,8 +332,8 @@ class ExponentialGrowthDatasetModel(DatasetBaseModel):
     """A dataset with growth rates that can be applied to a standalone dataset."""
 
     dataset_type: Annotated[
-        Literal[DatasetType.EXPONENTIAL_GROWTH.value],
-        Field(default=DatasetType.EXPONENTIAL_GROWTH.value),
+        Literal[DatasetType.EXPONENTIAL_GROWTH],
+        Field(default=DatasetType.EXPONENTIAL_GROWTH),
     ]
     dataset_id: Annotated[str, Field(description="Identifier for the resulting dataset")]
     initial_value_dataset_id: Annotated[str, Field(description="Principal dataset identifier")]

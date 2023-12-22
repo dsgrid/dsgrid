@@ -1,28 +1,23 @@
+from enum import Enum
 from typing import Literal, Union
 
 from pydantic import Field
 from typing_extensions import Annotated
 
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 
 
-class TableFormatType(DSGEnum):
+class TableFormatType(str, Enum):
     """Defines the format of value columns in a dataset."""
 
-    PIVOTED = EnumValue(
-        value="pivoted",
-        description="The dataset value columns records are the records of one dimension.",
-    )
-    UNPIVOTED = EnumValue(
-        value="unpivoted",
-        description="The dataset has one column that contains values.",
-    )
+    PIVOTED = "pivoted"
+    UNPIVOTED = "unpivoted"
 
 
 class PivotedTableFormatModel(DSGBaseModel):
-    format_type: Literal[TableFormatType.PIVOTED.value] = TableFormatType.PIVOTED.value
+    format_type: Literal[TableFormatType.PIVOTED] = TableFormatType.PIVOTED
     pivoted_dimension_type: Annotated[
         DimensionType,
         Field(
@@ -34,7 +29,7 @@ class PivotedTableFormatModel(DSGBaseModel):
 
 
 class UnpivotedTableFormatModel(DSGBaseModel):
-    format_type: Literal[TableFormatType.UNPIVOTED.value] = TableFormatType.UNPIVOTED.value
+    format_type: Literal[TableFormatType.UNPIVOTED] = TableFormatType.UNPIVOTED
     value_column: Annotated[
         str,
         Field(

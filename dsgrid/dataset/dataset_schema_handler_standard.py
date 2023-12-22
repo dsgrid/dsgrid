@@ -213,12 +213,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
         else:
             for col in self._load_data.columns:
-                if col == "id":
-                    continue
-                try:
+                if col != "id":
                     load_data_dimensions.add(DimensionType(col))
-                except ValueError:
-                    pass
         expected_dimensions = {d for d in DimensionType if d not in load_data_dimensions}
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:

@@ -220,6 +220,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 ld_df, project_config, model_years=model_years, value_columns=value_columns
             )
 
+        # TODO DT: consider simplifying or consolidating.
         table_handler = make_table_format_handler(
             self._config.get_table_format_type(),
             project_config,

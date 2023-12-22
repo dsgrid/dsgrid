@@ -1,4 +1,5 @@
 import logging
+from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Dict, Literal, Union
 
@@ -100,23 +101,11 @@ class InputDatasetType(DSGEnum):
     BENCHMARK = "benchmark"
 
 
-class DataSchemaType(DSGEnum):
+class DataSchemaType(str, Enum):
     """Data schema types."""
 
-    STANDARD = EnumValue(
-        value="standard",
-        description="""
-        Standard data schema with load_data and load_data_lookup tables.
-        Applies to datasets for which the data are provided in full.
-        """,
-    )
-    ONE_TABLE = EnumValue(
-        value="one_table",
-        description="""
-        One_table data schema with load_data table.
-        Typically appropriate for small, low-temporal resolution datasets.
-        """,
-    )
+    STANDARD = "standard"
+    ONE_TABLE = "one_table"
 
 
 class DSGDatasetParquetType(DSGEnum):
@@ -168,7 +157,7 @@ class DataClassificationType(DSGEnum):
 
 
 class StandardDataSchemaModel(DSGBaseModel):
-    data_schema_type: Literal[DataSchemaType.STANDARD.value]
+    data_schema_type: Literal[DataSchemaType.STANDARD]
     table_format: TableFormatModel
 
     @model_validator(mode="before")
@@ -182,7 +171,7 @@ class StandardDataSchemaModel(DSGBaseModel):
 
 
 class OneTableDataSchemaModel(DSGBaseModel):
-    data_schema_type: Literal[DataSchemaType.ONE_TABLE.value]
+    data_schema_type: Literal[DataSchemaType.ONE_TABLE]
     table_format: TableFormatModel
 
     @model_validator(mode="before")
@@ -195,30 +184,27 @@ class OneTableDataSchemaModel(DSGBaseModel):
         return values
 
 
-class DatasetQualifierType(DSGEnum):
+class DatasetQualifierType(str, Enum):
     QUANTITY = "quantity"
     GROWTH_RATE = "growth_rate"
 
 
-class GrowthRateType(DSGEnum):
+class GrowthRateType(str, Enum):
     EXPONENTIAL_ANNUAL = "exponential_annual"
     EXPONENTIAL_MONTHLY = "exponential_monthly"
 
 
 class QuantityModel(DSGBaseModel):
-    dataset_qualifier_type: Literal[DatasetQualifierType.QUANTITY.value]
+    dataset_qualifier_type: Literal[DatasetQualifierType.QUANTITY]
 
 
 class GrowthRateModel(DSGBaseModel):
-    dataset_qualifier_type: Literal[DatasetQualifierType.GROWTH_RATE.value]
+    dataset_qualifier_type: Literal[DatasetQualifierType.GROWTH_RATE]
     growth_rate_type: Annotated[
         GrowthRateType,
         Field(
             title="growth_rate_type",
             description="Type of growth rates, e.g., exponential_annual",
-            json_schema_extra={
-                "options": GrowthRateType.format_for_docs(),
-            },
         ),
     ]
 
@@ -267,7 +253,7 @@ class DatasetConfigModel(DSGBaseModel):
     dataset_qualifier_metadata: Annotated[
         Optional[Union[QuantityModel, GrowthRateModel]],
         Field(
-            default=QuantityModel(dataset_qualifier_type="quantity"),
+            default=QuantityModel(dataset_qualifier_type=DatasetQualifierType.QUANTITY),
             title="dataset_qualifier_metadata",
             description="Additional metadata to include related to the dataset_qualifier",
             discriminator="dataset_qualifier_type",
@@ -677,14 +663,14 @@ class DatasetConfig(ConfigBase):
         return self.model.data_schema.table_format.pivoted_dimension_type
 
     def get_pivoted_dimension_columns(self) -> list[str]:
-        """Get columns for the dimension that is pivoted in load_data."""
+        """Return the table's pivoted dimension columns or None if the table isn't pivoted."""
         if self.get_table_format_type() != TableFormatType.PIVOTED:
             return []
         dim_type = self.model.data_schema.table_format.pivoted_dimension_type
         return sorted(list(self.get_dimension(dim_type).get_unique_ids()))
 
     def get_value_columns(self) -> list[str]:
-        """Return the columns that contain values."""
+        """Return the table's columns that contain values."""
         match self.get_table_format_type():
             case TableFormatType.PIVOTED:
                 return self.get_pivoted_dimension_columns()

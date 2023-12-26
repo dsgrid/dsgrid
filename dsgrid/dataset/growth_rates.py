@@ -1,6 +1,7 @@
 import logging
 
 import pyspark.sql.functions as F
+from pyspark.sql import DataFrame
 from pyspark.sql.types import IntegerType
 
 from dsgrid.exceptions import DSGInvalidQuery
@@ -13,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 def apply_exponential_growth_rate(
     dataset: ProjectionDatasetModel,
-    initial_value_df,
-    growth_rate_df,
+    initial_value_df: DataFrame,
+    growth_rate_df: DataFrame,
     time_columns,
     model_year_column,
     pivoted_columns,
@@ -62,8 +63,8 @@ def apply_exponential_growth_rate(
 
 
 def apply_annual_multiplier(
-    initial_value_df,
-    growth_rate_df,
+    initial_value_df: DataFrame,
+    growth_rate_df: DataFrame,
     time_columns,
     pivoted_columns,
 ):
@@ -103,7 +104,7 @@ def apply_annual_multiplier(
 
 
 def _process_exponential_growth_rate(
-    dataset: ProjectionDatasetModel,
+    dataset,
     initial_value_df,
     growth_rate_df,
     model_year_column,

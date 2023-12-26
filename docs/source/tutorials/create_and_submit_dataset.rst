@@ -48,7 +48,10 @@ instructions on how to assign values in this file.
       ],
     }
 
-2. Choose a data format as described in :ref:`dataset-formats`. This dataset uses the two-table
+2. Choose a data format as described in :ref:`dataset-formats`. Please note all requirements listed
+   on that page.
+
+   This dataset uses the two-table
    (standard) format with dimension information stored like this:
 
    - Time: Representative period format with hourly data for one week per month.
@@ -272,6 +275,12 @@ Records file snippet::
    ``load_data.parquet`` so that a single table can be produced by joining the two tables on that
    column. If the dataset is missing data for specific dimension combinations, include a row for
    each combination and set ``id`` to ``null``.
+
+.. warning:: All dimension columns must be strings, including columns that look like numbers, such
+   as ``model_year``.
+
+.. warning:: If your dataset uses FIPS county codes, be sure to not inadvertently drop leading
+   zeros.
 
 ::
 

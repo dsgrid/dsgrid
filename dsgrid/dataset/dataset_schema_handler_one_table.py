@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
 
+from pyspark.sql.types import StringType
+
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
@@ -65,6 +67,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 self._check_load_data_unpivoted_columns(self._load_data)
 
         pivoted_dim_found = False
+        schema = self._load_data.schema
         for col in self._load_data.columns:
             if col in time_columns:
                 continue
@@ -77,6 +80,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 pivoted_dim_found = True
                 pivoted_cols.add(col)
             else:
+                if not schema[col].dataType is StringType():
+                    msg = f"dimension column {col} must have data type = StringType"
+                    raise DSGInvalidDataset(msg)
                 dimension_types.add(DimensionType.from_column(col))
 
         if pivoted_dim_found:

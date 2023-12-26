@@ -14,13 +14,10 @@ Requirements
    contact the dsgrid team.
 2. If the data tables contain time-series data, each unique time array must contain an identical
    range of timestamps.
-3. Tables must be pivoted with the records of one dimension. This is usually much more efficient
-   than a "long-narrow" format with a single "metric value" column. Support could be added if
-   necessary.
-4. Values of dimension columns must be strings. This includes ``model_year`` and ``weather_year``.
-5. Each dimension column name except time must match dsgrid dimension types (geography, sector,
+3. Values of dimension columns must be strings. This includes ``model_year`` and ``weather_year``.
+4. Each dimension column name except time must match dsgrid dimension types (geography, sector,
    subsector, etc.).
-6. The values in each dimension column must match the dataset's dimension records.
+5. The values in each dimension column must match the dataset's dimension records.
 
 Recommendations
 ===============

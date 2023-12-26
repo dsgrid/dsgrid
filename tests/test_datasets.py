@@ -120,6 +120,17 @@ def test_invalid_load_data_lookup_column_name(register_dataset):
     expected_errors["match_msg"] = r"column.*is not expected or of a known dimension type"
 
 
+def test_invalid_load_data_lookup_integer_column(register_dataset):
+    _, dataset_path, expected_errors = register_dataset
+    lookup_file = dataset_path / "load_data_lookup.json"
+    data = load_line_delimited_json(lookup_file)
+    for item in data:
+        item["geography"] = int(item["geography"])
+    dump_line_delimited_json(data, lookup_file)
+    expected_errors["exception"] = DSGInvalidDataset
+    expected_errors["match_msg"] = r"geography.*must have data type.*StringType"
+
+
 def test_invalid_load_data_lookup_no_id(register_dataset):
     _, dataset_path, expected_errors = register_dataset
     lookup_file = dataset_path / "load_data_lookup.json"

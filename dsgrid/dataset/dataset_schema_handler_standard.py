@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 import pyspark.sql.functions as F
+from pyspark.sql.types import StringType
 
 from dsgrid.common import SCALING_FACTOR_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
@@ -201,6 +202,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 continue
             if col == SCALING_FACTOR_COLUMN:
                 continue
+            if not self._load_data_lookup.schema[col].dataType is StringType():
+                msg = f"dimension column {col} must have data type = StringType"
+                raise DSGInvalidDataset(msg)
             dimension_types.add(DimensionType.from_column(col))
 
         if not found_id:

@@ -20,7 +20,7 @@ from dsgrid.query.models import (
     ProjectQueryParamsModel,
     ProjectQueryModel,
     QueryResultParamsModel,
-    ExponentialGrowthDatasetModel,
+    ProjectionDatasetModel,
 )
 from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.registry_database import DatabaseConnection
@@ -52,11 +52,11 @@ def valid_query():
             dataset=DatasetModel(
                 dataset_id="resstock_conus_2022_projected",
                 source_datasets=[
-                    ExponentialGrowthDatasetModel(
+                    ProjectionDatasetModel(
                         dataset_id="resstock_conus_2022_projected",
                         initial_value_dataset_id="resstock_conus_2022_reference",
                         growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                        construction_method="formula123",
+                        construction_method="exponential_growth",
                     ),
                 ],
                 params=ProjectQueryDatasetParamsModel(),

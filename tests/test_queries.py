@@ -37,7 +37,7 @@ from dsgrid.query.models import (
     QueryResultParamsModel,
     ReportInputModel,
     ReportType,
-    ExponentialGrowthDatasetModel,
+    ProjectionDatasetModel,
     StandaloneDatasetModel,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
@@ -453,17 +453,17 @@ class QueryTestElectricityValues(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="projected_dg_conus_2022",
                     source_datasets=[
-                        ExponentialGrowthDatasetModel(
+                        ProjectionDatasetModel(
                             dataset_id="comstock_conus_2022_projected",
                             initial_value_dataset_id="comstock_conus_2022_reference",
                             growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
-                            construction_method="formula123",
+                            construction_method="exponential_growth",
                         ),
-                        ExponentialGrowthDatasetModel(
+                        ProjectionDatasetModel(
                             dataset_id="resstock_conus_2022_projected",
                             initial_value_dataset_id="resstock_conus_2022_reference",
                             growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="formula123",
+                            construction_method="exponential_growth",
                         ),
                         # StandaloneDatasetModel(dataset_id="tempo_conus_2022"),
                     ],
@@ -1129,11 +1129,11 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                 dataset=DatasetModel(
                     dataset_id="resstock_conus_2022_projected",
                     source_datasets=[
-                        ExponentialGrowthDatasetModel(
+                        ProjectionDatasetModel(
                             dataset_id="resstock_conus_2022_projected",
                             initial_value_dataset_id="resstock_conus_2022_reference",
                             growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="formula123",
+                            construction_method="exponential_growth",
                         ),
                     ],
                     params=ProjectQueryDatasetParamsModel(

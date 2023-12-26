@@ -4,15 +4,15 @@ import pyspark.sql.functions as F
 from pyspark.sql.types import IntegerType
 
 from dsgrid.exceptions import DSGInvalidQuery
-from dsgrid.query.models import ExponentialGrowthDatasetModel
+from dsgrid.query.models import ProjectionDatasetModel
 from dsgrid.utils.spark import get_unique_values
 
 
 logger = logging.getLogger(__name__)
 
 
-def apply_growth_rate_123(
-    dataset: ExponentialGrowthDatasetModel,
+def apply_exponential_growth_rate(
+    dataset: ProjectionDatasetModel,
     initial_value_df,
     growth_rate_df,
     time_columns,
@@ -70,7 +70,7 @@ def _check_model_years(dataset, initial_value_df, growth_rate_df, model_year_col
         base_year = dataset.base_year
     else:
         raise DSGInvalidQuery(
-            f"ExponentialGrowthDatasetModel base_year={dataset.base_year} is not in {iv_years_sorted}"
+            f"ProjectionDatasetModel base_year={dataset.base_year} is not in {iv_years_sorted}"
         )
 
     if len(iv_years) > 1:

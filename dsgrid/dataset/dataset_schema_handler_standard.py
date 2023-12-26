@@ -9,15 +9,12 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
-from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.query.models import ColumnType
 from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import (
     check_null_value_in_unique_dimension_rows,
     apply_scaling_factor,
-    convert_table_format_if_needed,
 )
 from dsgrid.utils.spark import (
     # create_dataframe_from_pandas,
@@ -139,44 +136,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
 
         ld_df = self._add_null_values(ld_df, null_lk_df)
-
-        table_handler = make_table_format_handler(
-            self._config.get_table_format_type(), project_config, dataset_id=self.dataset_id
-        )
-        pivoted_dim_type = self._config.get_pivoted_dimension_type()
-        pivoted_column_name = None
-        if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
-            ld_df = table_handler.convert_columns_to_query_names(ld_df)
-            if pivoted_dim_type is not None:
-                pivoted_column_name = project_config.get_base_dimension(
-                    pivoted_dim_type
-                ).model.dimension_query_name
-        else:
-            if pivoted_dim_type is not None:
-                pivoted_column_name = pivoted_dim_type.value
-
-        ld_df = self._handle_unpivot_column_rename(ld_df)
-        final_table_format = context.get_table_format_type()
-        ld_df = convert_table_format_if_needed(
-            TableFormatType(self._config.model.data_schema.table_format.format_type),
-            context.get_table_format_type(),
-            pivoted_column_name,
-            ld_df,
-            value_columns,
-        )
-
-        kwargs = {}
-        if final_table_format == TableFormatType.PIVOTED:
-            kwargs["pivoted_columns"] = value_columns
-            kwargs["pivoted_dimension_type"] = self._config.get_pivoted_dimension_type()
-        context.set_dataset_metadata(
-            self.dataset_id,
-            context.model.result.column_type,
-            final_table_format,
-            project_config,
-            **kwargs,
-        )
-        return ld_df
+        return self._finalize_table(context, ld_df, value_columns, project_config)
 
     @staticmethod
     def _add_null_values(ld_df, null_lk_df):

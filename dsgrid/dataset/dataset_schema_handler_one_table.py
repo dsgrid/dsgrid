@@ -7,11 +7,7 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
-from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
-from dsgrid.utils.dataset import (
-    check_null_value_in_unique_dimension_rows,
-    convert_table_format_if_needed,
-)
+from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
 from dsgrid.utils.spark import (
     read_dataframe,
     get_unique_values,
@@ -22,7 +18,6 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.query.models import ColumnType
 from dsgrid.query.query_context import QueryContext
 
 logger = logging.getLogger(__name__)
@@ -80,10 +75,11 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 pivoted_dim_found = True
                 pivoted_cols.add(col)
             else:
+                dim_type = DimensionType.from_column(col)
                 if not schema[col].dataType is StringType():
                     msg = f"dimension column {col} must have data type = StringType"
                     raise DSGInvalidDataset(msg)
-                dimension_types.add(DimensionType.from_column(col))
+                dimension_types.add(dim_type)
 
         if pivoted_dim_found:
             dimension_types.add(pivoted_dim)
@@ -226,44 +222,4 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 ld_df, project_config, model_years=model_years, value_columns=value_columns
             )
 
-        # TODO DT: consider simplifying or consolidating.
-        table_handler = make_table_format_handler(
-            self._config.get_table_format_type(),
-            project_config,
-            dataset_id=self.dataset_id,
-        )
-        pivoted_dim_type = self._config.get_pivoted_dimension_type()
-        pivoted_column_name = None
-        if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
-            ld_df = table_handler.convert_columns_to_query_names(ld_df)
-            if pivoted_dim_type is not None:
-                pivoted_column_name = project_config.get_base_dimension(
-                    pivoted_dim_type
-                ).model.dimension_query_name
-        else:
-            if pivoted_dim_type is not None:
-                pivoted_column_name = pivoted_dim_type.value
-
-        ld_df = self._handle_unpivot_column_rename(ld_df)
-        final_table_format = context.get_table_format_type()
-        ld_df = convert_table_format_if_needed(
-            TableFormatType(self._config.model.data_schema.table_format.format_type),
-            context.get_table_format_type(),
-            pivoted_column_name,
-            ld_df,
-            value_columns,
-        )
-
-        kwargs = {}
-        if final_table_format == TableFormatType.PIVOTED:
-            kwargs["pivoted_columns"] = value_columns
-            kwargs["pivoted_dimension_type"] = self._config.get_pivoted_dimension_type()
-        context.set_dataset_metadata(
-            self.dataset_id,
-            context.model.result.column_type,
-            final_table_format,
-            project_config,
-            **kwargs,
-        )
-
-        return ld_df
+        return self._finalize_table(context, ld_df, value_columns, project_config)

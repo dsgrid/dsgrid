@@ -308,7 +308,7 @@ class DatasetType(enum.Enum):
     DERIVED = "derived"
 
 
-class DatasetConstructionMethod(enum.Enum):
+class DatasetConstructionMethod(str, enum.Enum):
     """Defines the type of construction method for DatasetType.PROJECTION."""
 
     EXPONENTIAL_GROWTH = "exponential_growth"
@@ -342,8 +342,8 @@ class ProjectionDatasetModel(DatasetBaseModel):
     """A dataset with growth rates that can be applied to a standalone dataset."""
 
     dataset_type: Annotated[
-        Literal[DatasetType.PROJECTION.value],
-        Field(default=DatasetType.PROJECTION.value),
+        Literal[DatasetType.PROJECTION],
+        Field(default=DatasetType.PROJECTION),
     ]
     dataset_id: Annotated[str, Field(description="Identifier for the resulting dataset")]
     initial_value_dataset_id: Annotated[str, Field(description="Principal dataset identifier")]

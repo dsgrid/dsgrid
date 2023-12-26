@@ -39,6 +39,7 @@ from dsgrid.query.models import (
     ReportType,
     ProjectionDatasetModel,
     StandaloneDatasetModel,
+    DatasetConstructionMethod,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
@@ -457,13 +458,13 @@ class QueryTestElectricityValues(QueryTestBase):
                             dataset_id="comstock_conus_2022_projected",
                             initial_value_dataset_id="comstock_conus_2022_reference",
                             growth_rate_dataset_id="aeo2021_reference_commercial_energy_use_growth_factors",
-                            construction_method="exponential_growth",
+                            construction_method=DatasetConstructionMethod.EXPONENTIAL_GROWTH,
                         ),
                         ProjectionDatasetModel(
                             dataset_id="resstock_conus_2022_projected",
                             initial_value_dataset_id="resstock_conus_2022_reference",
                             growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="exponential_growth",
+                            construction_method=DatasetConstructionMethod.EXPONENTIAL_GROWTH,
                         ),
                         # StandaloneDatasetModel(dataset_id="tempo_conus_2022"),
                     ],
@@ -1133,7 +1134,7 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                             dataset_id="resstock_conus_2022_projected",
                             initial_value_dataset_id="resstock_conus_2022_reference",
                             growth_rate_dataset_id="aeo2021_reference_residential_energy_use_growth_factors",
-                            construction_method="exponential_growth",
+                            construction_method=DatasetConstructionMethod.EXPONENTIAL_GROWTH,
                         ),
                     ],
                     params=ProjectQueryDatasetParamsModel(

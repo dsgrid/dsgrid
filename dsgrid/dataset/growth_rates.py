@@ -72,7 +72,7 @@ def apply_annual_multiplier(
     where:
       P(t): quantity at year t
       P0: initial quantity
-      r(t): growth rate per year t
+      r(t): growth rate per year t (relative to P0)
 
     Parameters
     ----------

@@ -167,7 +167,7 @@ class AggregationModel(DSGBaseModel):
         ]
 
 
-class ReportType(enum.Enum):
+class ReportType(str, enum.Enum):
     """Pre-defined reports"""
 
     PEAK_LOAD = "peak_load"
@@ -178,7 +178,7 @@ class ReportInputModel(DSGBaseModel):
     inputs: Any = None
 
 
-class TableFormatType(enum.Enum):
+class TableFormatType(str, enum.Enum):
     """Table format types"""
 
     PIVOTED = "pivoted"
@@ -300,7 +300,7 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
     ]
 
 
-class DatasetType(enum.Enum):
+class DatasetType(str, enum.Enum):
     """Defines the type of a dataset in a query."""
 
     PROJECTION = "projection"
@@ -329,9 +329,7 @@ class DatasetBaseModel(DSGBaseModel, abc.ABC):
 class StandaloneDatasetModel(DatasetBaseModel):
     """A dataset with energy use data."""
 
-    dataset_type: Annotated[
-        Literal[DatasetType.STANDALONE.value], Field(default=DatasetType.STANDALONE.value)
-    ]
+    dataset_type: Annotated[Literal[DatasetType.STANDALONE], Field(default=DatasetType.STANDALONE)]
     dataset_id: Annotated[str, Field(description="Dataset identifier")]
 
     def get_dataset_id(self) -> str:
@@ -353,7 +351,7 @@ class ProjectionDatasetModel(DatasetBaseModel):
     construction_method: Annotated[
         DatasetConstructionMethod,
         Field(
-            default=DatasetConstructionMethod.EXPONENTIAL_GROWTH.value,
+            default=DatasetConstructionMethod.EXPONENTIAL_GROWTH,
             description="Specifier for the code that applies the growth rate to the principal dataset",
         ),
     ]

@@ -9,7 +9,7 @@ from pyspark.sql.types import DoubleType
 
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
-from dsgrid.dataset.growth_rates import apply_exponential_growth_rate
+from dsgrid.dataset.growth_rates import apply_exponential_growth_rate, apply_annual_multiplier
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
@@ -407,12 +407,15 @@ class Project:
             logger.info("Build projection dataset %s", dataset.dataset_id)
             iv_df = read_dataframe(iv_path)
             gr_df = read_dataframe(gr_path)
-            if dataset.construction_method == DatasetConstructionMethod.EXPONENTIAL_GROWTH:
-                df = apply_exponential_growth_rate(
-                    dataset, iv_df, gr_df, time_columns, model_year_column, pivoted_columns
-                )
-            else:
-                raise NotImplementedError(f"BUG: Unsupported {dataset.construction_method=}")
+            match dataset.construction_method:
+                case DatasetConstructionMethod.EXPONENTIAL_GROWTH:
+                    df = apply_exponential_growth_rate(
+                        dataset, iv_df, gr_df, time_columns, model_year_column, pivoted_columns
+                    )
+                case DatasetConstructionMethod.ANNUAL_MULTIPLIER:
+                    df = apply_annual_multiplier(iv_df, gr_df, time_columns, pivoted_columns)
+                case _:
+                    raise NotImplementedError(f"BUG: Unsupported {dataset.construction_method=}")
             df = write_dataframe_and_auto_partition(df, dataset_path)
             context.set_dataset_metadata(
                 dataset.dataset_id,

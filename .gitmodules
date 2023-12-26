@@ -1,12 +1,12 @@
 [submodule "dsgrid-test-data"]
 	path = dsgrid-test-data
-	url = git@github.com:dsgrid/dsgrid-test-data.git
+	url = https://github.com/dsgrid/dsgrid-test-data
 	branch = main
 [submodule "dsgrid-project-StandardScenarios"]
 	path = dsgrid-project-StandardScenarios
-	url = git@github.com:dsgrid/dsgrid-project-StandardScenarios.git
+	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
 	branch = ll/growth_rates
 [submodule "dsgrid-project-DECARB"]
 	path = dsgrid-project-DECARB
-	url = git@github.com:dsgrid/dsgrid-project-DECARB.git
+	url = https://github.com/dsgrid/dsgrid-project-DECARB
 	branch = main

@@ -309,10 +309,10 @@ class DatasetType(enum.Enum):
 
 
 class DatasetConstructionMethod(enum.Enum):
-    """Defines the type of a dataset in a query."""
+    """Defines the type of construction method for DatasetType.PROJECTION."""
 
     EXPONENTIAL_GROWTH = "exponential_growth"
-    CONSTANT_MULTIPLIER = "constant_multiplier"
+    ANNUAL_MULTIPLIER = "annual_multiplier"
 
 
 class DatasetBaseModel(DSGBaseModel, abc.ABC):

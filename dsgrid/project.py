@@ -9,7 +9,7 @@ from pyspark.sql.types import DoubleType
 
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
-from dsgrid.dataset.growth_rates import apply_growth_rate_123
+from dsgrid.dataset.growth_rates import apply_exponential_growth_rate, apply_annual_multiplier
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
@@ -18,7 +18,8 @@ from dsgrid.exceptions import DSGInvalidQuery, DSGValueNotRegistered
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import (
     StandaloneDatasetModel,
-    ExponentialGrowthDatasetModel,
+    ProjectionDatasetModel,
+    DatasetConstructionMethod,
     TableFormatType,
     ColumnType,
 )
@@ -171,10 +172,8 @@ class Project:
         for dataset in context.model.project.dataset.source_datasets:
             if isinstance(dataset, StandaloneDatasetModel):
                 path = self._process_dataset(context, cached_datasets_dir, dataset.dataset_id)
-            elif isinstance(dataset, ExponentialGrowthDatasetModel):
-                path = self._process_exponential_growth_dataset(
-                    context, cached_datasets_dir, dataset
-                )
+            elif isinstance(dataset, ProjectionDatasetModel):
+                path = self._process_projection_dataset(context, cached_datasets_dir, dataset)
             else:
                 raise NotImplementedError(f"Unsupported type: {type(dataset)}")
             df_filenames[dataset.dataset_id] = path
@@ -314,13 +313,17 @@ class Project:
         logger.info("Finished processing query for dataset_id=%s", dataset_id)
         return cached_dataset_path
 
-    def _process_exponential_growth_dataset(
+    def _process_projection_dataset(
         self,
         context: QueryContext,
         cached_datasets_dir: Path,
-        dataset: ExponentialGrowthDatasetModel,
+        dataset: ProjectionDatasetModel,
     ) -> Path:
-        logger.info("Apply exponential growth for dataset_id=%s", dataset.initial_value_dataset_id)
+        logger.info(
+            "Apply %s for dataset_id=%s",
+            dataset.construction_method.value,
+            dataset.initial_value_dataset_id,
+        )
         project_version = f"{context.model.project.project_id}__{context.model.project.version}"
         model_hash, text = context.model.project.dataset.params.serialize()
         hash_dir = cached_datasets_dir / project_version / model_hash
@@ -331,7 +334,7 @@ class Project:
         cached_dataset_path = hash_dir / (dataset.dataset_id + ".parquet")
         metadata_file = cached_dataset_path.with_suffix(".json5")
         if try_read_dataframe(cached_dataset_path) is None:
-            self._build_exponential_growth_dataset(
+            self._build_projection_dataset(
                 context,
                 cached_datasets_dir,
                 dataset,
@@ -346,7 +349,7 @@ class Project:
         return cached_dataset_path
 
     @track_timing(timer_stats_collector)
-    def _build_exponential_growth_dataset(
+    def _build_projection_dataset(
         self, context, cached_datasets_dir, dataset, dataset_path, metadata_file
     ):
         def get_myear_column(dataset_id):
@@ -404,12 +407,15 @@ class Project:
             logger.info("Build projection dataset %s", dataset.dataset_id)
             iv_df = read_dataframe(iv_path)
             gr_df = read_dataframe(gr_path)
-            if dataset.construction_method == "formula123":
-                df = apply_growth_rate_123(
-                    dataset, iv_df, gr_df, time_columns, model_year_column, pivoted_columns
-                )
-            else:
-                raise NotImplementedError(f"BUG: Unsupported {dataset.construction_method=}")
+            match dataset.construction_method:
+                case DatasetConstructionMethod.EXPONENTIAL_GROWTH:
+                    df = apply_exponential_growth_rate(
+                        dataset, iv_df, gr_df, time_columns, model_year_column, pivoted_columns
+                    )
+                case DatasetConstructionMethod.ANNUAL_MULTIPLIER:
+                    df = apply_annual_multiplier(iv_df, gr_df, time_columns, pivoted_columns)
+                case _:
+                    raise NotImplementedError(f"BUG: Unsupported {dataset.construction_method=}")
             df = write_dataframe_and_auto_partition(df, dataset_path)
             context.set_dataset_metadata(
                 dataset.dataset_id,

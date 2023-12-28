@@ -10,7 +10,7 @@ Data Models
 .. autopydantic_model:: dsgrid.query.models.QueryResultParamsModel
 .. autopydantic_model:: dsgrid.query.models.DatasetModel
 .. autopydantic_model:: dsgrid.query.models.StandaloneDatasetModel
-.. autopydantic_model:: dsgrid.query.models.ExponentialGrowthDatasetModel
+.. autopydantic_model:: dsgrid.query.models.ProjectionDatasetModel
 .. autopydantic_model:: dsgrid.query.models.AggregationModel
 .. autopydantic_model:: dsgrid.query.models.ColumnModel
 .. autopydantic_model:: dsgrid.query.models.DimensionQueryNamesModel

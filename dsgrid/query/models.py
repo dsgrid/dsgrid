@@ -290,9 +290,16 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
 class DatasetType(str, Enum):
     """Defines the type of a dataset in a query."""
 
-    EXPONENTIAL_GROWTH = "exponential_growth"
+    PROJECTION = "projection"
     STANDALONE = "standalone"
     DERIVED = "derived"
+
+
+class DatasetConstructionMethod(str, Enum):
+    """Defines the type of construction method for DatasetType.PROJECTION."""
+
+    EXPONENTIAL_GROWTH = "exponential_growth"
+    ANNUAL_MULTIPLIER = "annual_multiplier"
 
 
 class DatasetBaseModel(DSGBaseModel, abc.ABC):
@@ -316,12 +323,12 @@ class StandaloneDatasetModel(DatasetBaseModel):
         return self.dataset_id
 
 
-class ExponentialGrowthDatasetModel(DatasetBaseModel):
+class ProjectionDatasetModel(DatasetBaseModel):
     """A dataset with growth rates that can be applied to a standalone dataset."""
 
     dataset_type: Annotated[
-        Literal[DatasetType.EXPONENTIAL_GROWTH],
-        Field(default=DatasetType.EXPONENTIAL_GROWTH),
+        Literal[DatasetType.PROJECTION],
+        Field(default=DatasetType.PROJECTION),
     ]
     dataset_id: Annotated[str, Field(description="Identifier for the resulting dataset")]
     initial_value_dataset_id: Annotated[str, Field(description="Principal dataset identifier")]
@@ -329,9 +336,10 @@ class ExponentialGrowthDatasetModel(DatasetBaseModel):
         str, Field(description="Growth rate dataset identifier to apply to the principal dataset")
     ]
     construction_method: Annotated[
-        str,
+        DatasetConstructionMethod,
         Field(
-            description="Specifier for the code that applies the growth rate to the principal dataset"
+            default=DatasetConstructionMethod.EXPONENTIAL_GROWTH,
+            description="Specifier for the code that applies the growth rate to the principal dataset",
         ),
     ]
     base_year: Annotated[
@@ -353,7 +361,7 @@ class DatasetModel(DSGBaseModel):
 
     dataset_id: Annotated[str, Field(description="Identifier for the resulting dataset")]
     source_datasets: Annotated[
-        List[Union[StandaloneDatasetModel, ExponentialGrowthDatasetModel]],
+        List[Union[StandaloneDatasetModel, ProjectionDatasetModel]],
         Field(
             description="Datasets from which to read. Each must be of type DatasetBaseModel.",
             discriminator="dataset_type",

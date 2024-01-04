@@ -52,14 +52,24 @@ class PivotedTableHandler(TableFormatHandlerBase):
 
         pivoted_columns = copy.deepcopy(context.get_pivoted_columns(dataset_id=self.dataset_id))
         pivoted_dim_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
+        if pivoted_dim_type != DimensionType.METRIC:
+            # TODO
+            msg = f"{pivoted_dim_type=} is not supported yet because it hasn't been tested. "
+            "The code below may work. Please remove this exception after a successful test."
+            raise NotImplementedError(msg)
         base_names = set(self.project_config.list_dimension_query_names(DimensionCategory.BASE))
         supp_names = set(
             self.project_config.list_dimension_query_names(DimensionCategory.SUPPLEMENTAL)
         )
         for agg in aggregations:
             dimension_query_name = None
-            for _, column in agg.iter_dimensions_to_keep():
+            # The metric dimension must be included in an aggregation so that we can handle
+            # possible unit conversions.
+            metric_dim_config = None
+            for dim_type, column in agg.iter_dimensions_to_keep():
                 query_name = column.dimension_query_name
+                if dim_type == DimensionType.METRIC:
+                    metric_dim_config = self.project_config.get_dimension(query_name)
                 # No work is required if the user requested the base dimension for the pivoted
                 # dimension or if this pivoted column has already been handled.
                 if (
@@ -71,14 +81,20 @@ class PivotedTableHandler(TableFormatHandlerBase):
                         raise NotImplementedError(f"column function cannot be set on {column}")
                     dim = self.project_config.get_dimension(query_name)
                     if dim.model.dimension_type == pivoted_dim_type:
+                        if dimension_query_name is not None:
+                            msg = f"Bug: encountered {dimension_query_name=} twice"
+                            raise Exception(msg)
                         dimension_query_name = query_name
-                        break
             if dimension_query_name is None:
                 continue
             dim_config = self.project_config.get_dimension(dimension_query_name)
             dim_type = dim_config.model.dimension_type
             if dimension_query_name not in supp_names:
-                raise Exception(f"Bug: {dimension_query_name=} is not a supplemental dimension")
+                msg = f"Bug: {dimension_query_name=} is not a supplemental dimension"
+                raise Exception(msg)
+            if metric_dim_config.model.dimension_query_name not in supp_names:
+                msg = f"Bug: {metric_dim_config.model.dimension_query_name=} is not a supplemental dimension"
+                raise Exception(msg)
             mapping_records = self.project_config.get_base_to_supplemental_mapping_records(
                 dim_config.model.dimension_query_name
             )
@@ -90,16 +106,15 @@ class PivotedTableHandler(TableFormatHandlerBase):
                 agg.aggregation_function.__name__,
                 rename=False,
             )
-            if dim_type != DimensionType.METRIC:
-                raise NotImplementedError(
-                    "Aggregation of a pivoted column that is not the metric dimension is not "
-                    f"yet supported: {dim_type}"
-                )
+            metric_mapping_records = self.project_config.get_base_to_supplemental_mapping_records(
+                metric_dim_config.model.dimension_query_name
+            )
+            to_unit_records = metric_dim_config.get_records_dataframe()
             df = energy.convert_units_pivoted(
                 df,
                 new_pivoted_columns,
                 self._project_config.get_base_dimension(dim_type).get_records_dataframe(),
-                mapping_records,
+                metric_mapping_records,
                 to_unit_records,
             )
 
@@ -137,12 +152,6 @@ class PivotedTableHandler(TableFormatHandlerBase):
             return df
 
         pivoted_dimension_type = context.get_pivoted_dimension_type(dataset_id=self.dataset_id)
-        # TODO: This does not handle the scenario where the metric dimension is stacked and
-        # needs unit conversion. Raise an exception until we have a dataset that can be used
-        # for testing.
-        if pivoted_dimension_type != DimensionType.METRIC:
-            raise NotImplementedError(f"{pivoted_dimension_type=} is not supported yet")
-
         pivoted_columns = set(
             context.get_dimension_column_names(pivoted_dimension_type, dataset_id=self.dataset_id)
         )

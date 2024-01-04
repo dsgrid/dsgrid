@@ -61,7 +61,7 @@ def make_test_data_registry(
     dataset_path = Path(dataset_path)
     conn = DatabaseConnection(database=database_name)
     create_local_test_registry(registry_path, conn=conn)
-    dataset_dir = Path("datasets/modeled/comstock")
+    dataset_dirs = [Path("datasets/modeled/comstock"), Path("datasets/modeled/comstock_unpivoted")]
 
     user = getpass.getuser()
     log_message = "Initial registration"
@@ -74,11 +74,12 @@ def make_test_data_registry(
 
     project_config_file = src_dir / "project.json5"
     project_id = load_data(project_config_file)["project_id"]
-    dataset_config_file = src_dir / dataset_dir / "dataset.json5"
-    dataset_mapping_file = src_dir / dataset_dir / "dimension_mappings.json5"
-    if not dataset_mapping_file.exists():
-        dataset_mapping_file = None
-    dataset_id = load_data(dataset_config_file)["dataset_id"]
+    dataset_config_files = [src_dir / path / "dataset.json5" for path in dataset_dirs]
+    dataset_mapping_files = [src_dir / path / "dimension_mappings.json5" for path in dataset_dirs]
+    for i, filename in enumerate(dataset_mapping_files):
+        if not filename.exists():
+            dataset_mapping_files[i] = None
+    dataset_ids = [load_data(config_file)["dataset_id"] for config_file in dataset_config_files]
 
     if include_projects:
         print("\n 1. register project: \n")
@@ -88,23 +89,26 @@ def make_test_data_registry(
             log_message,
         )
     if include_datasets:
-        print("\n 2. register dataset: \n")
-        mappings = map_dimension_names_to_ids(manager.dimension_manager)
-        replace_dimension_names_with_current_ids(dataset_config_file, mappings)
-        manager.dataset_manager.register(
-            dataset_config_file,
-            dataset_path / dataset_id,
-            user,
-            log_message,
-        )
-        print("\n 3. submit dataset to project\n")
-        manager.project_manager.submit_dataset(
-            project_id,
-            dataset_id,
-            user,
-            log_message,
-            dimension_mapping_file=dataset_mapping_file,
-        )
+        for i, dataset_config_file in enumerate(dataset_config_files):
+            print("\n 2. register dataset: \n")
+            dataset_id = dataset_ids[i]
+            dataset_mapping_file = dataset_mapping_files[i]
+            mappings = map_dimension_names_to_ids(manager.dimension_manager)
+            replace_dimension_names_with_current_ids(dataset_config_file, mappings)
+            manager.dataset_manager.register(
+                dataset_config_file,
+                dataset_path / dataset_id,
+                user,
+                log_message,
+            )
+            print("\n 3. submit dataset to project\n")
+            manager.project_manager.submit_dataset(
+                project_id,
+                dataset_id,
+                user,
+                log_message,
+                dimension_mapping_file=dataset_mapping_file,
+            )
     return manager
 
 

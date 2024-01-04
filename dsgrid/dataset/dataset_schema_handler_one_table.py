@@ -59,7 +59,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             case _:
                 expected_pivoted_columns = None
                 pivoted_dim = None
-                self._check_load_data_unpivoted_columns(self._load_data)
+                self._check_load_data_unpivoted_value_column(self._load_data)
 
         pivoted_dim_found = False
         schema = self._load_data.schema

@@ -6,8 +6,7 @@ import pyspark
 from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
 
-from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.common import SCALING_FACTOR_COLUMN
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
 from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -209,28 +208,3 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
         .filter(f"{time_column} IS NOT NULL or count_time == 0")
         .select(orig_columns)
     )
-
-
-@track_timing(timer_stats_collector)
-def convert_table_format_if_needed(
-    from_format: TableFormatType,
-    to_format: TableFormatType,
-    pivoted_column_name: str | None,
-    df: DataFrame,
-    value_columns: set[str],
-):
-    ids = set(df.columns) - value_columns
-    match (from_format, to_format):
-        case (TableFormatType.PIVOTED, TableFormatType.PIVOTED) | (
-            TableFormatType.UNPIVOTED,
-            TableFormatType.UNPIVOTED,
-        ):
-            pass
-        case (TableFormatType.UNPIVOTED, TableFormatType.PIVOTED):
-            df = df.groupBy(*ids).pivot(pivoted_column_name).sum(VALUE_COLUMN)
-        case (TableFormatType.PIVOTED, TableFormatType.UNPIVOTED):
-            df = df.unpivot(list(ids), list(value_columns), pivoted_column_name, VALUE_COLUMN)
-        case _:
-            raise NotImplementedError(f"{from_format=} {to_format=}")
-
-    return df

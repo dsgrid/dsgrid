@@ -255,8 +255,9 @@ def convert_units_pivoted(
         Columns in dataframe to convert (variable_column, value_column)
     from_records : DataFrame
         Metric dimension records for the columns being converted
-    from_to_records : DataFrame
+    from_to_records : DataFrame | None
         Records that map the dimension IDs in columns to the target IDs
+        If None, mapping is not required and from_records contain the units.
     to_unit_records : DataFrame
         Metric dimension records for the target IDs
 
@@ -299,20 +300,27 @@ def convert_units_unpivoted(
         Column in dataframe with metric record IDs
     from_records : DataFrame
         Metric dimension records for the columns being converted
-    from_to_records : DataFrame
-        Records that map the record IDs in columns to the target IDs
+    from_to_records : DataFrame | None
+        Records that map the dimension IDs in columns to the target IDs
+        If None, mapping is not required and from_records contain the units.
     to_unit_records : DataFrame
         Metric dimension records for the target IDs
     """
     unit_col = "unit"  # must match EnergyEndUse.unit
     tmp1 = from_records.select("id", unit_col).withColumnRenamed(unit_col, "from_unit")
-    tmp2 = from_to_records.select("from_id", "to_id")
-    unit_df = (
-        tmp1.join(tmp2, on=tmp1["id"] == tmp2["from_id"]).select("to_id", "from_unit").distinct()
-    )
-    df = df.join(unit_df, on=df[metric_column] == unit_df["to_id"]).drop("to_id")
+    if from_to_records is None:
+        unit_df = tmp1.select("id", "from_unit")
+    else:
+        tmp2 = from_to_records.select("from_id", "to_id")
+        unit_df = (
+            tmp1.join(tmp2, on=tmp1["id"] == tmp2["from_id"])
+            .selectExpr("to_id AS id", "from_unit")
+            .distinct()
+        )
+    df = df.join(unit_df, on=df[metric_column] == unit_df["id"]).drop("id")
     tmp3 = to_unit_records.select("id", "unit").withColumnRenamed(unit_col, "to_unit")
     df = df.join(tmp3, on=df[metric_column] == tmp3["id"]).drop("id")
+    logger.info("Converting units from column %s", metric_column)
     return df.withColumn(VALUE_COLUMN, from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)).drop(
         "from_unit", "to_unit"
     )

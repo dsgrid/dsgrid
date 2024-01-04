@@ -17,7 +17,6 @@ from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.utils.dataset import (
-    convert_table_format_if_needed,
     is_noop_mapping,
     map_and_reduce_stacked_dimension,
     map_and_reduce_pivoted_dimension,
@@ -233,7 +232,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 f"unique time array lengths = {len(distinct_ta_counts)}"
             )
 
-    def _check_load_data_unpivoted_columns(self, df):
+    def _check_load_data_unpivoted_value_column(self, df):
         logger.info("Check load data unpivoted columns.")
         if self._config.model.data_schema.table_format.value_column not in df.columns:
             raise DSGInvalidDataset(
@@ -276,37 +275,59 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df
 
     def _finalize_table(self, context: QueryContext, df, value_columns, project_config):
+        orig_table_format = self._config.get_table_format_type()
+        final_table_format = context.get_table_format_type()
         table_handler = make_table_format_handler(
-            self._config.get_table_format_type(),
+            orig_table_format,
             project_config,
             dataset_id=self.dataset_id,
         )
-        pivoted_dim_type = self._config.get_pivoted_dimension_type()
-        pivoted_column_name = None
+
         if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
             df = table_handler.convert_columns_to_query_names(df)
-            if pivoted_dim_type is not None:
-                pivoted_column_name = project_config.get_base_dimension(
-                    pivoted_dim_type
-                ).model.dimension_query_name
-        else:
-            if pivoted_dim_type is not None:
-                pivoted_column_name = pivoted_dim_type.value
-
         df = self._handle_unpivot_column_rename(df)
-        final_table_format = context.get_table_format_type()
-        df = convert_table_format_if_needed(
-            TableFormatType(self._config.model.data_schema.table_format.format_type),
-            context.get_table_format_type(),
-            pivoted_column_name,
-            df,
-            value_columns,
-        )
+
+        pivoted_columns = None
+        if (
+            orig_table_format == TableFormatType.PIVOTED
+            and final_table_format == TableFormatType.UNPIVOTED
+        ):
+            pivoted_column_name = self._get_pivoted_column_name(
+                context, self._config.get_pivoted_dimension_type(), project_config
+            )
+            ids = set(df.columns) - value_columns
+            df = df.unpivot(
+                [x for x in df.columns if x in ids],
+                list(value_columns),
+                pivoted_column_name,
+                VALUE_COLUMN,
+            )
+        elif (
+            orig_table_format == TableFormatType.UNPIVOTED
+            and final_table_format == TableFormatType.PIVOTED
+        ):
+            pivoted_column_name = self._get_pivoted_column_name(
+                context, context.get_pivoted_dimension_type(), project_config
+            )
+            ids = set(df.columns) - {VALUE_COLUMN, pivoted_column_name}
+            df = (
+                df.groupBy(*[x for x in df.columns if x in ids])
+                .pivot(pivoted_column_name)
+                .sum(VALUE_COLUMN)
+            )
+            pivoted_columns = set(df.columns) - ids - {VALUE_COLUMN, pivoted_column_name}
+        elif orig_table_format == final_table_format:
+            if final_table_format == TableFormatType.PIVOTED:
+                pivoted_columns = value_columns
+        elif orig_table_format != final_table_format:
+            msg = f"{orig_table_format=} {final_table_format=}"
+            raise NotImplementedError(msg)
 
         kwargs = {}
         if final_table_format == TableFormatType.PIVOTED:
-            kwargs["pivoted_columns"] = value_columns
-            kwargs["pivoted_dimension_type"] = self._config.get_pivoted_dimension_type()
+            assert pivoted_columns is not None
+            kwargs["pivoted_columns"] = pivoted_columns
+            kwargs["pivoted_dimension_type"] = context.get_pivoted_dimension_type()
         context.set_dataset_metadata(
             self.dataset_id,
             context.model.result.column_type,
@@ -316,6 +337,23 @@ class DatasetSchemaHandlerBase(abc.ABC):
         )
 
         return df
+
+    @staticmethod
+    def _get_pivoted_column_name(
+        context: QueryContext, pivoted_dimension_type: DimensionType, project_config
+    ):
+        match context.model.result.column_type:
+            case ColumnType.DIMENSION_QUERY_NAMES:
+                pivoted_column_name = project_config.get_base_dimension(
+                    pivoted_dimension_type
+                ).model.dimension_query_name
+            case ColumnType.DIMENSION_TYPES:
+                pivoted_column_name = pivoted_dimension_type.value
+            case _:
+                msg = str(context.model.result.column_type)
+                raise NotImplementedError(msg)
+
+        return pivoted_column_name
 
     def _get_dataset_to_project_mapping_records(self, dimension_type: DimensionType):
         config = self._get_dataset_to_project_mapping_config(dimension_type)
@@ -341,13 +379,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return time_cols
 
     def _handle_unpivot_column_rename(self, df: DataFrame):
-        if (
-            self._config.get_table_format_type() == TableFormatType.UNPIVOTED
-            and self._config.model.table_format.value_column != VALUE_COLUMN
-        ):
-            df = df.withColumnRenamed(
-                self._config.model.data_schema.table_format.value_column, VALUE_COLUMN
-            )
+        if self._config.get_table_format_type() != TableFormatType.UNPIVOTED:
+            return df
+
+        value_columns = self._config.get_value_columns()
+        if len(value_columns) != 1:
+            msg = f"length of value columns in an unpivoted table must be 1: {value_columns=}"
+            raise NotImplementedError(msg)
+
+        value_column = value_columns[0]
+        if value_column != VALUE_COLUMN:
+            df = df.withColumnRenamed(value_column, VALUE_COLUMN)
         return df
 
     def _iter_dataset_record_ids(self, context: QueryContext):
@@ -390,6 +432,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 continue
             # Drop rows that don't match requested project record IDs.
             tmp = dataset_record_ids.withColumnRenamed("id", "dataset_record_id")
+            if dim_type.value not in df.columns:
+                # This dimensions is stored in another table (e.g., lookup or load_data)
+                continue
             df = df.join(tmp, on=df[dim_type.value] == tmp.dataset_record_id).drop(
                 "dataset_record_id"
             )

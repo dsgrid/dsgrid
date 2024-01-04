@@ -663,7 +663,9 @@ class DatasetConfig(ConfigBase):
         return self.model.data_schema.table_format.pivoted_dimension_type
 
     def get_pivoted_dimension_columns(self) -> list[str]:
-        """Return the table's pivoted dimension columns or None if the table isn't pivoted."""
+        """Return the table's pivoted dimension columns or an empty list if the table isn't
+        pivoted.
+        """
         if self.get_table_format_type() != TableFormatType.PIVOTED:
             return []
         dim_type = self.model.data_schema.table_format.pivoted_dimension_type

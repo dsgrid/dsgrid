@@ -95,6 +95,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._load_data
 
         self._check_aggregations(context)
+        ld_df = self._prefilter_stacked_dimensions(context, ld_df)
         lk_df = self._prefilter_stacked_dimensions(context, lk_df)
         null_lk_df = lk_df.filter("id is NULL")
         lk_df = lk_df.filter("id is not NULL")
@@ -214,7 +215,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             case TableFormatType.PIVOTED:
                 self._check_load_data_pivoted_columns()
             case TableFormatType.UNPIVOTED:
-                self._check_load_data_unpivoted_columns(self._load_data)
+                self._check_load_data_unpivoted_value_column(self._load_data)
         ld_ids = self._load_data.select("id").distinct()
         ldl_ids = self._load_data_lookup.select("id").distinct()
 

@@ -4,10 +4,11 @@ import logging
 from pathlib import Path
 
 import pyspark.sql.functions as F
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrame
 from pyspark.sql.types import DoubleType
 
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
@@ -41,7 +42,7 @@ class Project:
 
     def __init__(self, config, version, dataset_configs, dimension_mgr, dimension_mapping_mgr):
         self._spark = SparkSession.getActiveSession()
-        self._config = config
+        self._config: ProjectConfig = config
         self._version = version
         self._dataset_configs = dataset_configs
         self._datasets = {}
@@ -49,7 +50,7 @@ class Project:
         self._dimension_mapping_mgr = dimension_mapping_mgr
 
     @property
-    def config(self):
+    def config(self) -> ProjectConfig:
         """Returns the ProjectConfig."""
         return self._config
 
@@ -153,6 +154,11 @@ class Project:
 
         """
         self._datasets.pop(dataset_id, None)
+
+    def transform_dataset(self, dataset_id: str) -> DataFrame:
+        """Transform a dataset by mapping its dimensions to the project's dimensions."""
+        dataset = self.get_dataset(dataset_id)
+        return dataset.make_project_dataframe(self._config)
 
     def _iter_datasets(self):
         for dataset in self.config.model.datasets:

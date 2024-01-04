@@ -319,6 +319,43 @@ def test_dimension_query_names_model():
     assert not diff
 
 
+def test_transform_unpivoted_dataset():
+    project = get_project(QueryTestBase.get_database_name(), QueryTestBase.get_project_id())
+    df = project.transform_dataset("comstock_conus_2022_projected")
+    actual = (
+        df.filter("geography == '06037'")
+        .filter(F.col("metric").isin(["electricity_cooling", "electricity_heating"]))
+        .agg(F.sum("value").alias("total"))
+        .collect()[0]
+    )
+    raw_stats = load_dataset_stats()
+    assert math.isclose(
+        actual.total, raw_stats["by_county"]["06037"]["comstock"]["sum"]["electricity"]
+    )
+
+
+def test_transform_pivoted_dataset():
+    project = get_project(QueryTestBase.get_database_name(), QueryTestBase.get_project_id())
+    df = project.transform_dataset("resstock_conus_2022_projected").filter("geography == '06037'")
+    cooling = (
+        df.select("electricity_cooling")
+        .agg(F.sum("electricity_cooling").alias("cooling"))
+        .collect()[0]
+        .cooling
+    )
+    heating = (
+        df.select("electricity_heating")
+        .agg(F.sum("electricity_heating").alias("heating"))
+        .collect()[0]
+        .heating
+    )
+    raw_stats = load_dataset_stats()
+    assert math.isclose(
+        cooling + heating,
+        raw_stats["by_county"]["06037"]["resstock"]["sum"]["electricity"],
+    )
+
+
 _projects = {}
 
 
@@ -375,6 +412,7 @@ class QueryTestBase(abc.ABC):
         self._project = project
         self._output_dir = Path(output_dir)
         self._model = None
+        self._cached_stats = None
 
     @staticmethod
     def get_database_name():
@@ -415,7 +453,9 @@ class QueryTestBase(abc.ABC):
         -------
         dict
         """
-        return load_dataset_stats()
+        if self._cached_stats is None:
+            self._cached_stats = load_dataset_stats()
+        return self._cached_stats
 
     @abc.abstractmethod
     def make_query(self):
@@ -445,7 +485,6 @@ class QueryTestBase(abc.ABC):
 
 
 class QueryTestElectricityValues(QueryTestBase):
-
     NAME = "electricity-values"
 
     def __init__(self, category: DimensionCategory, *args, **kwargs):
@@ -581,7 +620,6 @@ class QueryTestElectricityValues(QueryTestBase):
 
 
 class QueryTestElectricityUse(QueryTestBase):
-
     NAME = "total_electricity_use"
 
     def __init__(self, geography, op, *args, **kwargs):
@@ -659,7 +697,6 @@ class QueryTestElectricityUse(QueryTestBase):
 
 
 class QueryTestElectricityUseFilterResults(QueryTestBase):
-
     NAME = "total_electricity_use"
 
     def __init__(self, geography, op, metric_dimension_category, *args, **kwargs):
@@ -771,7 +808,6 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
 
 
 class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
-
     NAME = "total_electricity_use"
 
     def make_query(self):
@@ -831,7 +867,6 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
 
 
 class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
-
     NAME = "diurnal_electricity_use_by_county"
 
     def make_query(self):
@@ -905,7 +940,6 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
 
 
 class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
-
     NAME = "total_electricity_use_by_state_and_pca"
 
     def __init__(self, column_type: ColumnType, geography_columns, *args, **kwargs):
@@ -968,7 +1002,6 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
 
 
 class QueryTestPeakLoadByStateSubsector(QueryTestBase):
-
     NAME = "peak-load-by-state-subsector"
 
     def make_query(self):
@@ -1051,7 +1084,6 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
 
 
 class QueryTestMapAnnualTime(QueryTestBase):
-
     NAME = "map-annual-time"
 
     def make_query(self):
@@ -1108,7 +1140,6 @@ class QueryTestMapAnnualTime(QueryTestBase):
 
 
 class QueryTestInvalidAggregation(QueryTestBase):
-
     NAME = "invalid_aggregation"
 
     def make_query(self):
@@ -1149,7 +1180,6 @@ class QueryTestInvalidAggregation(QueryTestBase):
 
 
 class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
-
     NAME = "electricity-values"
 
     def make_query(self):
@@ -1213,7 +1243,6 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
 
 
 class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
-
     NAME = "electricity-values-agg-from-composite-dataset"
 
     def __init__(self, *args, geography="county", **kwargs):
@@ -1270,7 +1299,6 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
 
 
 class QueryTestUnitMapping(QueryTestBase):
-
     NAME = "test_efs_comstock_query"
 
     @staticmethod

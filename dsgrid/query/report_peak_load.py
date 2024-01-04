@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pyspark.sql.functions as F
 
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dimension.base_models import DimensionType
@@ -36,7 +37,7 @@ class PeakLoadReport(ReportsBase):
             value_columns = list(context.get_pivoted_columns())
             group_by_columns = inputs.group_by_columns
         else:
-            value_columns = ["value"]
+            value_columns = [VALUE_COLUMN]
             metric_columns = context.get_dimension_column_names(DimensionType.METRIC)
             if len(metric_columns) > 1:
                 raise Exception(f"Bug: {metric_columns=}")

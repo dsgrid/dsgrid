@@ -39,7 +39,9 @@ class DatabaseConnection(DSGBaseModel):
         port = match.group(2)
         return cls(hostname=hostname, port=port, **kwargs)
 
-    def url(self):
+    @property
+    def url(self) -> str:
+        """Return the URL of the connection."""
         return f"http://{self.hostname}:{self.port}"
 
 
@@ -125,7 +127,7 @@ class RegistryDatabase:
         """Connect to a dsgrid registry database."""
         client = ArangoClient(hosts=f"http://{conn.hostname}:{conn.port}")
         client = client.db(conn.database, username=conn.username, password=conn.password)
-        logger.info("Connected to database=%s at URL=%s", conn.database, conn.url())
+        logger.info("Connected to database=%s at URL=%s", conn.database, conn.url)
         return cls(client)
 
     @classmethod
@@ -152,9 +154,9 @@ class RegistryDatabase:
 
         logger.info(
             "Copied database %s / %s to %s / %s",
-            src_conn.url(),
+            src_conn.url,
             src_conn.database,
-            dst_conn.url(),
+            dst_conn.url,
             dst_conn.database,
         )
         return dst

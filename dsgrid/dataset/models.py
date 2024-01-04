@@ -23,7 +23,8 @@ class PivotedTableFormatModel(DSGBaseModel):
         Field(
             alias="load_data_column_dimension",  # TODO: remove when datasets have been converted
             title="pivoted_dimension_type",
-            description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
+            description="The data dimension whose records are columns (pivoted) that contain "
+            "data values (numeric) in the load_data table.",
         ),
     ]
 
@@ -35,7 +36,7 @@ class UnpivotedTableFormatModel(DSGBaseModel):
         Field(
             default=VALUE_COLUMN,
             title="value_column",
-            description="The name of the column in the dataset that has load values.",
+            description="The name of the load_data column that contains data values (numeric).",
         ),
     ]
 

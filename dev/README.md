@@ -229,7 +229,7 @@ $ spark-submit \
     dsgrid/tests/register.py tests/data/standard_scenarios_registration.json
 ```
 
-2. Acquire a new compute node. It can be any time of node and you only need it for an hour.
+2. Acquire a new compute node. It can be any type of node and you only need it for an hour.
 Create a local version of the dsgrid repository script `scripts/create_simple_standard_scenarios.sh`.
 Edit the environment variables at the top of the script as necessary and then run it. It will
 make a new registry database, and filter the StandardScenarios data, and create a backup of the

@@ -59,7 +59,17 @@ timestamps (i.e., 12pm with no time zone should be written as 12pm UTC).
 
 Formats
 =======
-Input datasets can use the formats below. dsgrid uses the one table format for derived datasets.
+Input datasets can use a one-table or two-table format as described below.
+
+Both formats support pivoting the record IDs of one dimension as an option.
+
+- ``Pivoted``: All dimensions except the pivoted dimension are columns in the table. The record IDs
+  of the pivoted dimension are columns in the table. Several dsgrid datasets
+  pivot the metric dimension in order to avoid many repeated rows of other dimensions. This saves
+  storage space but can make queries more complicated.
+- ``Unpivoted``: The table has one column per dimension (except time, which might have more than
+  one colun). There is one column called ``value`` that contains the data values. This format
+  makes queries simpler. It is also good for cases when there is not a sensible dimension to pivot.
 
 .. _one-table-format:
 
@@ -101,7 +111,7 @@ Two Table Format (Standard)
 Two Parquet files comprise the dataset:
 
 - ``load_data.parquet``: Metric data, usually with time-series data. This example pivots the metric
-  dimensions.
+  dimension records.
 
 ::
 
@@ -146,6 +156,19 @@ This format minimizes file storage because
    scaling factors.
 2. Dimension information is not repeated for every timestamp. (This could be minimal because of
    compression inside the Parquet files.)
+
+Time Formats
+============
+
+DateTime
+--------
+The load data table has one column representing time, typically called ``timestamp``. When written
+to Parquet files the type should be the ``TIMESTAMP`` logical type (integer, not string) and be
+adjusted to UTC. When read into Spark the type should be ``TimestampType`` (not
+``TimestampNTZType``).
+
+Handling of no-time-zone timestamps (Spark type ``TimestampNTZType``) is possible. Contact the
+dsgrid team if you need this.
 
 Annual
 ------

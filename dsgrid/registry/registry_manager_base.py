@@ -29,6 +29,13 @@ class RegistryManagerBase(abc.ABC):
         self._params = params
         self._db = None
 
+        if not path.exists():
+            logger.warning(
+                "The registry path=%s does not exist. You will able to inspect the registry "
+                "contents, but you will not be able to perform any data-related activities.",
+                path,
+            )
+
     @property
     @abc.abstractmethod
     def db(self) -> RegistryInterfaceBase:

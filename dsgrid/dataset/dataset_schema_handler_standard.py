@@ -4,7 +4,7 @@ from pathlib import Path
 import pyspark.sql.functions as F
 from pyspark.sql.types import StringType
 
-from dsgrid.common import SCALING_FACTOR_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
@@ -178,7 +178,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
         else:
             for col in self._load_data.columns:
-                if col != "id":
+                if col not in ("id", VALUE_COLUMN):
                     load_data_dimensions.add(DimensionType(col))
         expected_dimensions = {d for d in DimensionType if d not in load_data_dimensions}
         missing_dimensions = expected_dimensions.difference(dimension_types)

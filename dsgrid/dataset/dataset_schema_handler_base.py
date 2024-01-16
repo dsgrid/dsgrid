@@ -445,7 +445,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # TODO #196:
         return df
 
-    def _remap_dimension_columns(self, df, filtered_records=None):
+    def _remap_dimension_columns(self, df, contains_values: bool, filtered_records=None):
         pivoted_dim_type = self._config.get_pivoted_dimension_type()
         pivoted_columns = set(df.columns).intersection(
             self._config.get_pivoted_dimension_columns()
@@ -468,33 +468,32 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if column in df.columns:
                 df = map_and_reduce_stacked_dimension(df, records, column)
             elif (
-                pivoted_dim_type is not None
+                contains_values
+                and pivoted_dim_type is not None
                 and column == pivoted_dim_type.value
-                and not pivoted_columns.difference(df.columns)
             ):
-                # The dataset might have columns unwanted by the project.
-                columns_to_remove = get_unique_values(records.filter("to_id IS NULL"), "from_id")
-                if columns_to_remove:
-                    df = df.drop(*columns_to_remove)
-                    pivoted_columns.difference_update(columns_to_remove)
-                # TODO #197: Do we want operation to be configurable?
-                operation = "sum"
-                df, _, _ = map_and_reduce_pivoted_dimension(
-                    df,
-                    records,
-                    pivoted_columns,
-                    operation,
-                    rename=False,
-                )
-            elif (
-                pivoted_dim_type is not None
-                and column == pivoted_dim_type.value
-                and pivoted_columns.intersection(df.columns)
-            ):
-                raise NotImplementedError(
-                    f"Unhandled case: column={column} pivoted_columns={pivoted_columns} "
-                    f"df.columns={df.columns}"
-                )
+                if pivoted_columns.issubset(df.columns):
+                    # The dataset might have columns unwanted by the project.
+                    columns_to_remove = get_unique_values(
+                        records.filter("to_id IS NULL"), "from_id"
+                    )
+                    if columns_to_remove:
+                        df = df.drop(*columns_to_remove)
+                        pivoted_columns.difference_update(columns_to_remove)
+                    # TODO #197: Do we want operation to be configurable?
+                    operation = "sum"
+                    df, _, _ = map_and_reduce_pivoted_dimension(
+                        df,
+                        records,
+                        pivoted_columns,
+                        operation,
+                        rename=False,
+                    )
+                else:
+                    raise NotImplementedError(
+                        f"Unhandled case: column={column} pivoted_columns={pivoted_columns} "
+                        f"df.columns={df.columns}"
+                    )
             # else nothing to do
 
         return df

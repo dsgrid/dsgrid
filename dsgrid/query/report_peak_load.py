@@ -33,18 +33,19 @@ class PeakLoadReport(ReportsBase):
         context: QueryContext,
         inputs: PeakLoadInputModel,
     ):
-        if context.get_table_format_type() == TableFormatType.PIVOTED:
-            value_columns = list(context.get_pivoted_columns())
-            group_by_columns = inputs.group_by_columns
-        else:
-            value_columns = [VALUE_COLUMN]
-            metric_columns = context.get_dimension_column_names(DimensionType.METRIC)
-            if len(metric_columns) > 1:
-                raise Exception(f"Bug: {metric_columns=}")
-            metric_column = next(iter(metric_columns))
-            group_by_columns = inputs.group_by_columns[:]
-            if metric_column not in group_by_columns:
-                group_by_columns.append(metric_column)
+        match context.get_table_format_type():
+            case TableFormatType.PIVOTED:
+                value_columns = list(context.get_pivoted_columns())
+                group_by_columns = inputs.group_by_columns
+            case TableFormatType.UNPIVOTED:
+                value_columns = [VALUE_COLUMN]
+                metric_columns = context.get_dimension_column_names(DimensionType.METRIC)
+                if len(metric_columns) > 1:
+                    raise Exception(f"Bug: {metric_columns=}")
+                metric_column = next(iter(metric_columns))
+                group_by_columns = inputs.group_by_columns[:]
+                if metric_column not in group_by_columns:
+                    group_by_columns.append(metric_column)
 
         df = read_dataframe(filename)
         expr = [F.max(x).alias(x) for x in value_columns]

@@ -156,7 +156,6 @@ class TableFormatHandlerBase(abc.ABC):
 
     def replace_ids_with_names(self, df: DataFrame) -> DataFrame:
         """Replace dimension record IDs with names."""
-        # TODO DT: This doesn't change pivoted column names. Is that OK?
         orig = df
         all_query_names = set(self._project_config.list_dimension_query_names())
         for dimension_query_name in set(df.columns).intersection(all_query_names):

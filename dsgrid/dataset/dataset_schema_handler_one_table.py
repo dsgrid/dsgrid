@@ -55,7 +55,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         match self._config.get_table_format_type():
             case TableFormatType.PIVOTED:
                 expected_pivoted_columns = self._config.get_pivoted_dimension_columns()
-                pivoted_dim = self._config.model.data_schema.table_format.pivoted_dimension_type
+                pivoted_dim = self._config.get_pivoted_dimension_type()
             case _:
                 expected_pivoted_columns = None
                 pivoted_dim = None
@@ -121,7 +121,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         dim_cols = [x for x in self._load_data.columns if x not in exclude]
         df = self._load_data.select(*dim_cols).distinct()
 
-        dim_table = self._remap_dimension_columns(df).distinct()
+        dim_table = self._remap_dimension_columns(df, True).distinct()
         check_null_value_in_unique_dimension_rows(dim_table, exclude_columns=exclude)
 
         return dim_table
@@ -172,7 +172,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             # There is currently no case that needs model years or value columns.
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
-        ld_df = self._remap_dimension_columns(ld_df)
+        ld_df = self._remap_dimension_columns(ld_df, True)
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
         ld_df = self._apply_fraction(ld_df, value_columns)
         project_metric_records = project_config.get_base_dimension(
@@ -203,7 +203,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             # There is currently no case that needs model years or value columns.
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
-        ld_df = self._remap_dimension_columns(ld_df, filtered_records=context.get_record_ids())
+        ld_df = self._remap_dimension_columns(
+            ld_df, True, filtered_records=context.get_record_ids()
+        )
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
         ld_df = self._apply_fraction(ld_df, value_columns)
         project_metric_records = project_config.get_base_dimension(

@@ -68,7 +68,7 @@ Both formats support pivoting the record IDs of one dimension as an option.
   pivot the metric dimension in order to avoid many repeated rows of other dimensions. This saves
   storage space but can make queries more complicated.
 - ``Unpivoted``: The table has one column per dimension (except time, which might have more than
-  one colun). There is one column called ``value`` that contains the data values. This format
+  one column) and a column called ``value`` that contains the data values. This format
   makes queries simpler. It is also good for cases when there is not a sensible dimension to pivot.
 
 .. _one-table-format:

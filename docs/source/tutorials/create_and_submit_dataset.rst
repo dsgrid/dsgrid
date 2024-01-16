@@ -271,7 +271,7 @@ Records file snippet::
     |          0|  19|   12| 841.9459|      0.0|109450511|
     +-----------+----+-----+---------+---------+---------+
 
-5. Create ``load_data_lookup.parquet``. The ``id`` column should match the values in
+6. Create ``load_data_lookup.parquet``. The ``id`` column should match the values in
    ``load_data.parquet`` so that a single table can be produced by joining the two tables on that
    column. If the dataset is missing data for specific dimension combinations, include a row for
    each combination and set ``id`` to ``null``.
@@ -310,7 +310,7 @@ Records file snippet::
     |    06085|Single_Driver+Low...|      2022|20060853|ldv_sales_evs_2035|
     +---------+--------------------+----------+--------+------------------+
 
-6. Register and submit the dataset. This requires a properly-configured Spark cluster because of
+7. Register and submit the dataset. This requires a properly-configured Spark cluster because of
    the data size. Smaller datasets may succeed with Spark in local mode. Refer to
    :ref:`spark-overview` to setup a Spark cluster.
 

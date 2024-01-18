@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 from pathlib import Path
@@ -62,8 +63,11 @@ class RegistryDatabase:
         # For AWS there will be other fields.
         client.collection("data_path").insert({"data_path": str(data_path)})
         data_path.mkdir(exist_ok=True)
+        (data_path / "data").mkdir(exist_ok=True)
         registry_file = data_path / "registry.json5"
-        registry_file.write_text(conn.model_dump_json(indent=2))
+        data = conn.model_dump()
+        data.pop("password")
+        registry_file.write_text(json.dumps(data, indent=2))
 
         graph = client.create_graph(GRAPH)
         graph.create_vertex_collection(Collection.PROJECT_ROOTS.value)

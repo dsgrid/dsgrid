@@ -13,7 +13,7 @@ from dsgrid.config.project_config import ProjectConfigModel
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from .common import Collection, DatasetRegistryStatus, RegistrationModel, Edge, RegistryType
-from .registry_database import RegistryDatabase, MAX_CONFIG_VERSIONS
+from .registry_database import RegistryDatabase
 
 
 logger = logging.getLogger(__name__)
@@ -134,11 +134,9 @@ class RegistryInterfaceBase(abc.ABC):
             return
 
         root_id = self._get_root_db_id(model_id)
-        ids = self._db.list_connected_ids(root_id, Edge.UPDATED_TO, MAX_CONFIG_VERSIONS)
-        for _id in ids:
-            self._db.delete_document(self._collection_name(), _id)
-
-        self._db.delete_document(self.root_collection_name(), root_id)
+        db_id = self.get_latest(model_id).id
+        self._db.delete_document(db_id)
+        self._db.delete_document(root_id)
 
     def get_by_version(self, model_id, version):
         """Return the model by version"""
@@ -323,6 +321,12 @@ class DatasetRegistryInterface(RegistryInterfaceBase):
     @staticmethod
     def _make_root_object(model_id):
         return DatasetRegistryModel(dataset_id=model_id, registry_type=RegistryType.DATASET.value)
+
+    def delete_all(self, model_id):
+        super().delete_all(model_id)
+        collection_name = f"{Collection.DATASET_DATA_ROOTS.value}/"
+        db_id = f"{collection_name}/{model_id}"
+        self._db.delete_document(db_id)
 
     @staticmethod
     def root_collection_name():

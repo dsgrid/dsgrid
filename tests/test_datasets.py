@@ -24,26 +24,44 @@ PROJECT_ID = "test_efs"
 DATASET_ID = "test_efs_comstock"
 
 
-@pytest.fixture(scope="module")
-def setup_registry(tmp_path_factory, make_test_project_dir_module, make_test_data_dir_module):
-    if DATASET_ID not in os.listdir(make_test_data_dir_module):
+def make_registry(base_dir, test_project_dir, test_data_dir):
+    if DATASET_ID not in os.listdir(test_data_dir):
         logger.error("test_invalid_datasets requires the dsgrid-test-data repository")
         sys.exit(1)
 
-    base_dir = tmp_path_factory.mktemp("dsgrid")
     manager = make_test_data_registry(
         base_dir,
-        make_test_project_dir_module,
-        dataset_path=make_test_data_dir_module,
+        test_project_dir,
+        dataset_path=test_data_dir,
         include_datasets=False,
         database_name="tmp-dsgrid",
     )
-    dataset_config_path = make_test_project_dir_module / "datasets" / "modeled" / "comstock"
+    dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
     assert dataset_config_path.exists()
     dataset_config_file = dataset_config_path / "dataset.json5"
     mappings = map_dimension_names_to_ids(manager.dimension_manager)
     replace_dimension_names_with_current_ids(dataset_config_file, mappings)
-    yield manager, base_dir, dataset_config_path, make_test_data_dir_module
+    return manager, dataset_config_path
+
+
+@pytest.fixture(scope="module")
+def setup_registry(tmp_path_factory, make_test_project_dir_module, make_test_data_dir_module):
+    """Tests that don't successfully register the dataset can share this fixture."""
+    base_dir = tmp_path_factory.mktemp("dsgrid")
+    test_project_dir = make_test_project_dir_module
+    test_data_dir = make_test_data_dir_module
+    manager, dataset_config_path = make_registry(base_dir, test_project_dir, test_data_dir)
+    yield manager, base_dir, dataset_config_path, test_data_dir
+
+
+@pytest.fixture(scope="function")
+def setup_registry_single(tmp_path_factory, make_test_project_dir, make_test_data_dir):
+    """Tests that successfully register the dataset must use this fixture."""
+    base_dir = tmp_path_factory.mktemp("dsgrid")
+    test_project_dir = make_test_project_dir
+    test_data_dir = make_test_data_dir
+    manager, dataset_config_path = make_registry(base_dir, test_project_dir, test_data_dir)
+    yield manager, base_dir, dataset_config_path, test_data_dir
 
 
 @pytest.fixture
@@ -71,8 +89,8 @@ def register_dataset(setup_registry):
 
 
 @pytest.fixture
-def register_and_submit_dataset(setup_registry):
-    manager, base_dir, dataset_config_path, dataset_path = setup_registry
+def register_and_submit_dataset(setup_registry_single):
+    manager, base_dir, dataset_config_path, dataset_path = setup_registry_single
     test_dir = base_dir / "test_data_dir"
     shutil.copytree(dataset_path, test_dir)
     dataset_config_file = dataset_config_path / "dataset.json5"
@@ -265,3 +283,48 @@ def test_invalid_load_data_lookup_missing_records(register_and_submit_dataset):
     dump_line_delimited_json(bad_data, lookup_file)
     expected_errors["exception"] = DSGInvalidDataset
     expected_errors["match_msg"] = r"missing required dimension records"
+
+
+def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
+    manager, base_dir, dataset_config_path, dataset_path = setup_registry_single
+    test_dir = base_dir / "test_data_dir"
+    shutil.copytree(dataset_path, test_dir)
+    dataset_config_file = dataset_config_path / "dataset.json5"
+    dim_mapping_file = dataset_config_path / "dimension_mappings.json5"
+    dataset_id = load_data(dataset_config_file)["dataset_id"]
+    dataset_path = test_dir / dataset_id
+    lookup_file = dataset_path / "load_data_lookup.json"
+    good_data = load_line_delimited_json(lookup_file)
+    bad_data = [x for x in good_data if x["id"] is not None]
+    dump_line_delimited_json(bad_data, lookup_file)
+
+    try:
+        with pytest.raises(DSGInvalidDataset):
+            manager.project_manager.register_and_submit_dataset(
+                dataset_config_file,
+                dataset_path,
+                PROJECT_ID,
+                getpass.getuser(),
+                "register and submit",
+                dimension_mapping_file=None,
+                dimension_mapping_references_file=None,
+                autogen_reverse_supplemental_mappings=None,
+            )
+
+        dump_line_delimited_json(good_data, lookup_file)
+        manager.project_manager.register_and_submit_dataset(
+            dataset_config_file,
+            dataset_path,
+            PROJECT_ID,
+            getpass.getuser(),
+            "register and submit",
+            dimension_mapping_file=dim_mapping_file,
+        )
+
+    finally:
+        shutil.rmtree(test_dir)
+        missing_record_file = Path(
+            f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
+        )
+        if missing_record_file.exists():
+            shutil.rmtree(missing_record_file)

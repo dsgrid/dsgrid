@@ -543,7 +543,9 @@ class RegistryManager:
             if mode == "data-symlinks":
                 _make_data_symlinks(src_data_path, dst_data_path)
             else:
-                shutil.copytree(src_data_path / "data", dst_data_path / "data", symlinks=True)
+                for path in (src_data_path / "data").iterdir():
+                    dst_path = dst_data_path / "data" / path.name
+                    shutil.copytree(path, dst_path, symlinks=True)
         else:
             raise DSGInvalidParameter(f"mode={mode} is not supported")
 

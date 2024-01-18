@@ -236,6 +236,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         # The dataset_version starts the same as the config but can change later.
         config.model.dataset_version = registration.version
         dataset_registry_dir = self.get_registry_data_directory(dataset_id)
+        if not dataset_registry_dir.parent.exists():
+            msg = (
+                f"The registry data path: {dataset_registry_dir.parent} does not exist "
+                "(at least from the current computer). Please contact the dsgrid team if this is "
+                "unexpected."
+            )
+            raise Exception(msg)
         dataset_path = dataset_registry_dir / registration.version
         dataset_path.mkdir(exist_ok=True, parents=True)
         self.fs_interface.mkdir(dataset_registry_dir)

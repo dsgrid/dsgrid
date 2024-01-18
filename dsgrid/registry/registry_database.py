@@ -3,7 +3,8 @@ import logging
 import re
 from pathlib import Path
 
-from arango import ArangoClient
+from arango.client import ArangoClient
+from arango.database import StandardDatabase
 
 from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.data_models import DSGBaseModel
@@ -47,9 +48,9 @@ class DatabaseConnection(DSGBaseModel):
 class RegistryDatabase:
     """Database containing a dsgrid registry"""
 
-    def __init__(self, client):
-        self._client = client
-        self._graph = client.graph(GRAPH)
+    def __init__(self, db: StandardDatabase):
+        self._db = db
+        self._graph = db.graph(GRAPH)
 
     @classmethod
     def create(cls, conn: DatabaseConnection, data_path: Path):
@@ -128,9 +129,9 @@ class RegistryDatabase:
     def connect(cls, conn: DatabaseConnection):
         """Connect to a dsgrid registry database."""
         client = ArangoClient(hosts=f"http://{conn.hostname}:{conn.port}")
-        client = client.db(conn.database, username=conn.username, password=conn.password)
+        db = client.db(conn.database, username=conn.username, password=conn.password)
         logger.info("Connected to database=%s at URL=%s", conn.database, conn.url())
-        return cls(client)
+        return cls(db)
 
     @classmethod
     def copy(cls, src_conn: DatabaseConnection, dst_conn: DatabaseConnection, dst_data_path):
@@ -139,7 +140,7 @@ class RegistryDatabase:
         cls.delete(dst_conn)
         dst = cls.create(dst_conn, dst_data_path)
         edge_names = set()
-        for collection in src.client.collections():
+        for collection in src.db.collections():
             name = collection["name"]
             # If we keep anything besides data_path here, we need to import it.
             if name in {"dimension_types", "data_path"}:
@@ -148,11 +149,11 @@ class RegistryDatabase:
                 if collection["type"] == "edge":
                     edge_names.add(name)
                     continue
-                for item in src.client.collection(name):
-                    dst.client.collection(name).insert(item)
+                for item in src.db.collection(name):
+                    dst.db.collection(name).insert(item)
         for name in edge_names:
-            for item in src.client.collection(name):
-                dst.client.collection(name).insert(item)
+            for item in src.db.collection(name):
+                dst.db.collection(name).insert(item)
 
         logger.info(
             "Copied database %s / %s to %s / %s",
@@ -185,14 +186,14 @@ class RegistryDatabase:
         self.insert_edge(from_.id, to.id, registration.serialize(), Edge.UPDATED_TO)
 
     def collection(self, name):
-        return self._client.collection(name)
+        return self._db.collection(name)
 
     @property
-    def client(self):
-        return self._client
+    def db(self) -> StandardDatabase:
+        return self._db
 
-    def delete_document(self, collection_name, db_id):
-        self._client.collection(collection_name).delete(db_id)
+    def delete_document(self, db_id):
+        self._graph.delete_vertex(db_id)
 
     def delete_latest_edge(self, root):
         collection = self._graph.edge_collection(Edge.LATEST.value)
@@ -202,12 +203,12 @@ class RegistryDatabase:
 
     def get_data_path(self) -> Path:
         """Return the path where dataset data is stored."""
-        vals = [x for x in self._client.collection("data_path")]
+        vals = [x for x in self._db.collection("data_path")]
         assert len(vals) == 1, vals
         return Path(vals[0]["data_path"])
 
     def get_latest(self, root_db_id):
-        cursor = self._client.aql.execute(
+        cursor = self._db.aql.execute(
             f"""
             FOR v in 1
                 OUTBOUND "{root_db_id}"
@@ -227,7 +228,7 @@ class RegistryDatabase:
         return doc
 
     def get_latest_version(self, root_db_id):
-        cursor = self._client.aql.execute(
+        cursor = self._db.aql.execute(
             f"""
             FOR v, e, p in 1
                 OUTBOUND "{root_db_id}"
@@ -247,7 +248,7 @@ class RegistryDatabase:
         return self.get_version(model_db_id)
 
     def _get_by_version(self, db_id, version):
-        cursor = self._client.aql.execute(
+        cursor = self._db.aql.execute(
             f"""
             FOR v, e, p in 0..{MAX_CONFIG_VERSIONS}
                 OUTBOUND "{db_id}"
@@ -266,7 +267,7 @@ class RegistryDatabase:
 
     def get_registration(self, db_id) -> RegistrationModel:
         """Return the registration information for the id."""
-        cursor = self._client.aql.execute(
+        cursor = self._db.aql.execute(
             f"""
             FOR v, e in 1
                 INBOUND "{db_id}"
@@ -286,7 +287,7 @@ class RegistryDatabase:
 
     def get_initial_registration(self, db_id) -> RegistrationModel:
         """Return the initial registration information for the ID."""
-        cursor = self._client.aql.execute(
+        cursor = self._db.aql.execute(
             f"""
             FOR v, e in 1
                 OUTBOUND "{db_id}"
@@ -316,7 +317,7 @@ class RegistryDatabase:
         -------
         str
         """
-        cursor = self._client.aql.execute(
+        cursor = self._db.aql.execute(
             f"""
             FOR v, e in 1
                 INBOUND "{db_id}"
@@ -335,9 +336,9 @@ class RegistryDatabase:
     def has(self, db_id, version=None):
         collection_name, key = db_id.split("/")
         if version is None:
-            return self._client.collection(collection_name).has(key)
+            return self._db.collection(collection_name).has(key)
 
-        cursor = self._client.aql.execute(
+        cursor = self._db.aql.execute(
             f"""
             FOR v, e, p in 0..{MAX_CONFIG_VERSIONS}
                 OUTBOUND "{db_id}"
@@ -368,12 +369,12 @@ class RegistryDatabase:
 
     def iter_filtered_documents(self, collection, filter_config: dict):
         """Return a generator of documents from a collection based on a filter."""
-        for doc in self._client.collection(collection).find(filter_config):
+        for doc in self._db.collection(collection).find(filter_config):
             yield doc
 
     def iter_updated_to_documents(self, db_id):
         """Return a generator of database documents connected by the 'updated_to' edge."""
-        cursor = self._client.aql.execute(
+        cursor = self._db.aql.execute(
             f"""
             FOR v, e, p in 1..{MAX_CONFIG_VERSIONS}
                 OUTBOUND "{db_id}"
@@ -390,25 +391,8 @@ class RegistryDatabase:
         for doc in cursor:
             yield doc
 
-    def list_connected_ids(self, db_id, edge: Edge, depth):
-        """Return a list of database objects linked to db_id by edge."""
-        cursor = self._client.aql.execute(
-            f"""
-            FOR v in 1..{depth}
-                OUTBOUND "{db_id}"
-                GRAPH "{GRAPH}"
-                OPTIONS {{edgeCollections: ["{edge.value}"]}}
-                RETURN v._id
-        """,
-            count=True,
-        )
-        count = cursor.count()
-        if count == 0:
-            raise DSGValueNotRegistered(f"{db_id=} is not registered")
-        return list(cursor)
-
     def replace_document(self, doc):
-        return self._client.replace_document(doc)
+        return self._db.replace_document(doc)
 
 
 if __name__ == "__main__":

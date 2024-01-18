@@ -11,9 +11,29 @@ from dsgrid.units.energy import (
     TWH,
     MBTU,
     THERM,
-    KWH_PER_MBTU,
-    KWH_PER_THERM,
-    THERMS_PER_MBTU,
+    KILO_TO_MEGA,
+    KILO_TO_GIGA,
+    KILO_TO_TERA,
+    MEGA_TO_KILO,
+    MEGA_TO_GIGA,
+    MEGA_TO_TERA,
+    GIGA_TO_KILO,
+    GIGA_TO_MEGA,
+    GIGA_TO_TERA,
+    TERA_TO_KILO,
+    TERA_TO_MEGA,
+    TERA_TO_GIGA,
+    THERM_TO_KWH,
+    THERM_TO_MWH,
+    THERM_TO_GWH,
+    THERM_TO_TWH,
+    MWH_TO_THERM,
+    GWH_TO_THERM,
+    TWH_TO_THERM,
+    MBTU_TO_KWH,
+    MBTU_TO_MWH,
+    MBTU_TO_GWH,
+    MBTU_TO_TWH,
     to_kwh,
     to_mwh,
     to_gwh,
@@ -23,6 +43,15 @@ from dsgrid.units.energy import (
     from_any_to_any,
 )
 from dsgrid.utils.spark import get_spark_session
+
+
+KWH_VAL = 1234.5
+MWH_VAL = KWH_VAL / 1_000
+GWH_VAL = KWH_VAL / 1_000_000
+TWH_VAL = KWH_VAL / 1_000_000_000
+THERM_VAL = KWH_VAL / THERM_TO_KWH
+MBTU_VAL = KWH_VAL / MBTU_TO_KWH
+UNIT_COLUMNS = ("fans", "cooling", "dryer", "ev_l1l2", "ng_heating", "p_heating")
 
 
 @pytest.fixture(scope="module")
@@ -49,13 +78,13 @@ def pivoted_dataframes(records_dataframe):
     df = spark.createDataFrame(
         [
             {
-                "fans": 1,
-                "cooling": 2,
-                "dryer": 3,
-                "ev_l1l2": 4,
-                "ng_heating": 5,
-                "p_heating": 6,
-                "unitless": 7,
+                "fans": KWH_VAL,
+                "cooling": MWH_VAL,
+                "dryer": GWH_VAL,
+                "ev_l1l2": TWH_VAL,
+                "ng_heating": THERM_VAL,
+                "p_heating": MBTU_VAL,
+                "unitless": KWH_VAL,
             },
         ]
     )
@@ -71,37 +100,37 @@ def unpivoted_dataframes(records_dataframe):
             {
                 "timestamp": 1,
                 "metric": "fans",
-                "value": 1,
+                "value": KWH_VAL,
             },
             {
                 "timestamp": 1,
                 "metric": "cooling",
-                "value": 2,
+                "value": MWH_VAL,
             },
             {
                 "timestamp": 1,
                 "metric": "dryer",
-                "value": 3,
+                "value": GWH_VAL,
             },
             {
                 "timestamp": 1,
                 "metric": "ev_l1l2",
-                "value": 4,
+                "value": TWH_VAL,
             },
             {
                 "timestamp": 1,
                 "metric": "ng_heating",
-                "value": 5,
+                "value": THERM_VAL,
             },
             {
                 "timestamp": 1,
                 "metric": "p_heating",
-                "value": 6,
+                "value": MBTU_VAL,
             },
             {
                 "timestamp": 1,
                 "metric": "unitless",
-                "value": 7,
+                "value": KWH_VAL,
             },
         ]
     )
@@ -109,76 +138,52 @@ def unpivoted_dataframes(records_dataframe):
     df.unpersist()
 
 
-def test_to_kwh(pivoted_dataframes):
+def test_constants():
+    assert KILO_TO_MEGA == 1 / 1_000
+    assert KILO_TO_GIGA == 1 / 1_000_000
+    assert KILO_TO_TERA == 1 / 1_000_000_000
+    assert MEGA_TO_KILO == 1_000
+    assert MEGA_TO_GIGA == 1 / 1_000
+    assert MEGA_TO_TERA == 1 / 1_000_000
+    assert GIGA_TO_KILO == 1_000_000
+    assert GIGA_TO_MEGA == 1_000
+    assert GIGA_TO_TERA == 1 / 1_000
+    assert TERA_TO_KILO == 1_000_000_000
+    assert TERA_TO_MEGA == 1_000_000
+    assert TERA_TO_GIGA == 1_000
+    assert math.isclose(THERM_TO_MWH, THERM_TO_KWH / 1_000)
+    assert math.isclose(THERM_TO_GWH, THERM_TO_KWH / 1_000_000)
+    assert math.isclose(THERM_TO_TWH, THERM_TO_KWH / 1_000_000_000)
+    assert math.isclose(MWH_TO_THERM, 1 * 1_000 / THERM_TO_KWH)
+    assert math.isclose(GWH_TO_THERM, 1 * 1_000_000 / THERM_TO_KWH)
+    assert math.isclose(TWH_TO_THERM, 1 * 1_000_000_000 / THERM_TO_KWH)
+    assert math.isclose(MBTU_TO_MWH, MBTU_TO_KWH / 1_000)
+    assert math.isclose(MBTU_TO_GWH, MBTU_TO_KWH / 1_000_000)
+    assert math.isclose(MBTU_TO_TWH, MBTU_TO_KWH / 1_000_000_000)
+
+
+def check_column_values(row, expected_val):
+    for col in UNIT_COLUMNS:
+        assert math.isclose(row[col], expected_val)
+    assert row["unitless"] == KWH_VAL
+
+
+@pytest.mark.parametrize(
+    "inputs",
+    (
+        (to_kwh, KWH_VAL),
+        (to_mwh, MWH_VAL),
+        (to_gwh, GWH_VAL),
+        (to_twh, TWH_VAL),
+        (to_therm, THERM_VAL),
+        (to_mbtu, MBTU_VAL),
+    ),
+)
+def test_to_units(pivoted_dataframes, inputs):
     df, records = pivoted_dataframes
-    row = _convert_units(df, records, to_kwh)
-    assert row["fans"] == 1
-    assert row["cooling"] == 2 * 1_000
-    assert row["dryer"] == 3 * 1_000_000
-    assert row["ev_l1l2"] == 4 * 1_000_000_000
-    assert row["ng_heating"] == 5 * KWH_PER_THERM
-    assert row["p_heating"] == 6 * KWH_PER_MBTU
-    assert row["unitless"] == 7
-
-
-def test_to_mwh(pivoted_dataframes):
-    df, records = pivoted_dataframes
-    row = _convert_units(df, records, to_mwh)
-    assert row["fans"] == 1 / 1_000
-    assert row["cooling"] == 2
-    assert row["dryer"] == 3 * 1_000
-    assert row["ev_l1l2"] == 4 * 1_000_000
-    assert row["ng_heating"] == 5 * KWH_PER_THERM / 1_000
-    assert row["p_heating"] == 6 * KWH_PER_MBTU / 1_000
-    assert row["unitless"] == 7
-
-
-def test_to_gwh(pivoted_dataframes):
-    df, records = pivoted_dataframes
-    row = _convert_units(df, records, to_gwh)
-    assert row["fans"] == 1 / 1_000_000
-    assert row["cooling"] == 2 / 1_000
-    assert row["dryer"] == 3
-    assert row["ev_l1l2"] == 4 * 1_000
-    assert row["ng_heating"] == 5 * KWH_PER_THERM / 1_000_000
-    assert row["p_heating"] == 6 * KWH_PER_MBTU / 1_000_000
-    assert row["unitless"] == 7
-
-
-def test_to_twh(pivoted_dataframes):
-    df, records = pivoted_dataframes
-    row = _convert_units(df, records, to_twh)
-    assert row["fans"] == 1 / 1_000_000_000
-    assert row["cooling"] == 2 / 1_000_000
-    assert row["dryer"] == 3 / 1_000
-    assert row["ev_l1l2"] == 4
-    assert row["ng_heating"] == 5 * KWH_PER_THERM / 1_000_000_000
-    assert row["p_heating"] == 6 * KWH_PER_MBTU / 1_000_000_000
-    assert row["unitless"] == 7
-
-
-def test_to_therm(pivoted_dataframes):
-    df, records = pivoted_dataframes
-    row = _convert_units(df, records, to_therm)
-    assert row["fans"] == 1 / KWH_PER_THERM
-    assert row["cooling"] == 2 / KWH_PER_THERM / 1_000
-    assert row["dryer"] == 3 / KWH_PER_THERM / 1_000_000
-    assert row["ev_l1l2"] == 4 / KWH_PER_THERM / 1_000_000_000
-    assert row["ng_heating"] == 5
-    assert row["p_heating"] == 6 * THERMS_PER_MBTU
-    assert row["unitless"] == 7
-
-
-def test_to_mbtu(pivoted_dataframes):
-    df, records = pivoted_dataframes
-    row = _convert_units(df, records, to_mbtu)
-    assert row["fans"] == 1 / KWH_PER_MBTU
-    assert row["cooling"] == 2 / KWH_PER_MBTU / 1_000
-    assert row["dryer"] == 3 / KWH_PER_MBTU / 1_000_000
-    assert row["ev_l1l2"] == 4 / KWH_PER_MBTU / 1_000_000_000
-    assert row["ng_heating"] == 5 / THERMS_PER_MBTU
-    assert row["p_heating"] == 6
-    assert row["unitless"] == 7
+    func, expected_val = inputs
+    row = _convert_units(df, records, func)
+    check_column_values(row, expected_val)
 
 
 @pytest.mark.parametrize("to_unit", [KWH, MWH, GWH, TWH, THERM, MBTU])
@@ -194,60 +199,28 @@ def test_from_any_to_any(unpivoted_dataframes, to_unit):
         VALUE_COLUMN, from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)
     )
 
-    fans = res.filter("metric == 'fans'").collect()[0][VALUE_COLUMN]
-    cooling = res.filter("metric == 'cooling'").collect()[0][VALUE_COLUMN]
-    dryer = res.filter("metric == 'dryer'").collect()[0][VALUE_COLUMN]
-    ev_l1l2 = res.filter("metric == 'ev_l1l2'").collect()[0][VALUE_COLUMN]
-    ng_heating = res.filter("metric == 'ng_heating'").collect()[0][VALUE_COLUMN]
-    p_heating = res.filter("metric == 'p_heating'").collect()[0][VALUE_COLUMN]
     unitless = res.filter("metric == 'unitless'").collect()[0][VALUE_COLUMN]
-    assert unitless == 7
+    assert unitless == KWH_VAL
 
     match to_unit:
         case "kWh":
-            assert fans == 1
-            assert cooling == 2 * 1_000
-            assert dryer == 3 * 1_000_000
-            assert ev_l1l2 == 4 * 1_000_000_000
-            assert ng_heating == 5 * KWH_PER_THERM
-            assert p_heating == 6 * KWH_PER_MBTU
+            expected_val = KWH_VAL
         case "MWh":
-            assert math.isclose(fans, 1 / 1_000)
-            assert cooling == 2
-            assert dryer == 3 * 1_000
-            assert ev_l1l2 == 4 * 1_000_000
-            assert math.isclose(ng_heating, 5 / 1_000 * KWH_PER_THERM)
-            assert math.isclose(p_heating, 6 / 1_000 * KWH_PER_MBTU)
+            expected_val = MWH_VAL
         case "GWh":
-            assert math.isclose(fans, 1 / 1_000_000)
-            assert math.isclose(cooling, 2 / 1_000)
-            assert dryer == 3
-            assert ev_l1l2 == 4 * 1_000
-            assert math.isclose(ng_heating, 5 / 1_000_000 * KWH_PER_THERM)
-            assert math.isclose(p_heating, 6 / 1_000_000 * KWH_PER_MBTU)
+            expected_val = GWH_VAL
         case "TWh":
-            assert math.isclose(fans, 1 / 1_000_000_000)
-            assert math.isclose(cooling, 2 / 1_000_000)
-            assert math.isclose(dryer, 3 / 1_000)
-            assert ev_l1l2 == 4
-            assert math.isclose(ng_heating, 5 / 1_000_000_000 * KWH_PER_THERM)
-            assert math.isclose(p_heating, 6 / 1_000_000_000 * KWH_PER_MBTU)
+            expected_val = TWH_VAL
         case "therm":
-            assert math.isclose(fans, 1 / KWH_PER_THERM)
-            assert math.isclose(cooling, 2 * 1_000 / KWH_PER_THERM)
-            assert math.isclose(dryer, 3 * 1_000_000 / KWH_PER_THERM)
-            assert math.isclose(ev_l1l2, 4 * 1_000_000_000 / KWH_PER_THERM)
-            assert ng_heating == 5
-            assert math.isclose(p_heating, 6 * THERMS_PER_MBTU)
+            expected_val = THERM_VAL
         case "MBtu":
-            assert math.isclose(fans, 1 / KWH_PER_MBTU)
-            assert math.isclose(cooling, 2 * 1_000 / KWH_PER_MBTU)
-            assert math.isclose(dryer, 3 * 1_000_000 / KWH_PER_MBTU)
-            assert math.isclose(ev_l1l2, 4 * 1_000_000_000 / KWH_PER_MBTU)
-            assert math.isclose(ng_heating, 5 / THERMS_PER_MBTU)
-            assert p_heating == 6
+            expected_val = MBTU_VAL
         case _:
             assert False, to_unit
+
+    for col in UNIT_COLUMNS:
+        val = res.filter(f"metric == '{col}'").collect()[0][VALUE_COLUMN]
+        assert math.isclose(val, expected_val)
 
 
 def _convert_units(df, records, conversion_func):

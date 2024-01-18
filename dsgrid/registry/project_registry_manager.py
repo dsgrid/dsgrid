@@ -633,6 +633,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimension_mapping_references_file=None,
         autogen_reverse_supplemental_mappings=None,
     ):
+        if not self.has_id(project_id):
+            msg = f"{project_id=}"
+            raise DSGValueNotRegistered(msg)
         context = RegistrationContext()
         error_occurred = False
         try:

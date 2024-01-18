@@ -63,6 +63,7 @@ class RegistryDatabase:
         # For AWS there will be other fields.
         client.collection("data_path").insert({"data_path": str(data_path)})
         data_path.mkdir(exist_ok=True)
+        (data_path / "data").mkdir(exist_ok=True)
         registry_file = data_path / "registry.json5"
         data = conn.model_dump()
         data.pop("password")

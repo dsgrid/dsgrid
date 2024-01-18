@@ -31,7 +31,7 @@ class RegistryManagerBase(abc.ABC):
 
         if not path.exists():
             logger.warning(
-                "The registry path=%s does not exist. You will able to inspect the registry "
+                "The registry data path=%s does not exist. You will able to inspect the registry "
                 "contents, but you will not be able to perform any data-related activities.",
                 path,
             )

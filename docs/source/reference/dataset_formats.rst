@@ -26,6 +26,8 @@ Recommendations
    memory issues. Making them too small adds overhead and hurts performance.
 3. Trivial dimensions (one-element records) should not be stored in the data files. They should
    instead be defined in the dataset config. dsgrid will add them dynamically at runtime.
+4. Consider the appropriate floating point precision. 64-bit floats may be needed but will double
+   the storage space. 32-bit floats may be acceptable.
 
 .. warning:: Currently, the pivoted dimension must be the metric dimension. This limitation is
    expected to be fixed soon.
@@ -66,7 +68,8 @@ Both formats support pivoting the record IDs of one dimension as an option.
 - ``Pivoted``: All dimensions except the pivoted dimension are columns in the table. The record IDs
   of the pivoted dimension are columns in the table. Several dsgrid datasets
   pivot the metric dimension in order to avoid many repeated rows of other dimensions. This saves
-  storage space but can make queries more complicated.
+  storage space but can make queries more complicated. dsgrid handles that complexity on the back
+  end, but this point can still apply to users that inspect the raw datasets.
 - ``Unpivoted``: The table has one column per dimension (except time, which might have more than
   one column) and a column called ``value`` that contains the data values. This format
   makes queries simpler. It is also good for cases when there is not a sensible dimension to pivot.

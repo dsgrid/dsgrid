@@ -47,6 +47,10 @@ MWH_TO_THERM = MEGA_TO_KILO * KWH_TO_THERM
 GWH_TO_THERM = 1 / THERM_TO_GWH
 TWH_TO_THERM = 1 / THERM_TO_TWH
 
+# BTU conversion is based on EIA. This website says 1 kWh = 3,412 BTU.
+# https://www.eia.gov/energyexplained/units-and-calculators/energy-conversion-calculators.php
+# The more precise number below comes from ResStock at
+# https://github.com/NREL/resstock/blob/2e0a82a7bfad0f17ff75a3c66c91a5d72265a847/resources/hpxml-measures/HPXMLtoOpenStudio/resources/unit_conversions.rb
 MBTU_TO_KWH = 293.0710701722222
 MBTU_TO_MWH = MBTU_TO_KWH * KILO_TO_MEGA
 MBTU_TO_GWH = MBTU_TO_KWH * KILO_TO_GIGA

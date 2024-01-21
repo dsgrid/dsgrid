@@ -149,6 +149,7 @@ class SubsetDimensionGroupModel(DSGBaseModel):
             default=True,
         ),
     ]
+    record_ids: set[str] = set()
 
     @field_validator("display_name")
     @classmethod
@@ -177,28 +178,29 @@ class SubsetDimensionGroupModel(DSGBaseModel):
 
         return selectors
 
-    @field_validator("selectors")
-    @classmethod
-    def load_records(cls, selectors, info: ValidationInfo):
+    @model_validator(mode="after")
+    def load_records(self) -> "SubsetDimensionGroupModel":
         """Load the records for each subset dimension selector."""
-        if info.data.get("filename") is None:
-            return selectors
+        if self.filename is None:
+            return self
 
-        name = info.data["name"]
-        mappings = load_subset_dimensions(Path(info.data["filename"]))
-        selector_names = check_uniqueness([x.name for x in selectors], "subset dimension selector")
+        record_ids, mappings = load_subset_dimensions(Path(self.filename))
+        self.record_ids.update(record_ids)
+        selector_names = check_uniqueness(
+            [x.name for x in self.selectors], "subset dimension selector"
+        )
 
         diff = selector_names.symmetric_difference(mappings)
         if diff:
             raise ValueError(
-                f"subset dimension {name} selectors have a mismatch with the records file column names: {diff}"
+                f"subset dimension {self.name} selectors have a mismatch with the records file column names: {diff}"
             )
 
-        for dim in selectors:
+        for dim in self.selectors:
             dim.records = mappings[dim.name]
 
-        info.data["filename"] = None
-        return selectors
+        self.filename = None
+        return self
 
 
 class DimensionsModel(DSGBaseModel):
@@ -453,6 +455,9 @@ class RequiredDimensionsModel(DSGBaseModel):
                 for supp in req.supplemental:
                     num_dims += len(supp.record_ids)
                     record_ids.update(supp.record_ids)
+                num_dims += len(req.subset)
+                for subset in req.subset:
+                    record_ids.update(subset.selectors)
                 intersect = existing.intersection(record_ids)
                 if intersect:
                     raise ValueError(
@@ -1517,11 +1522,13 @@ class ProjectConfig(ConfigBase):
         return self._supplemental_dimensions
 
 
-def load_subset_dimensions(filename: Path) -> dict[str, list[str]]:
+def load_subset_dimensions(filename: Path) -> tuple[set[str], dict[str, list[str]]]:
     """Return a mapping of subset dimension name to record IDs."""
     df = pd.read_csv(filename, index_col="id")
     if len(df.columns) == 0:
         raise DSGInvalidDimension(
             "A subset dimension records file must at least one dimension column."
         )
-    return {x: df[x].dropna().index.to_list() for x in df.columns}
+    record_ids = set(df.index.values)
+    subset_by_dim_name = {x: df[x].dropna().index.to_list() for x in df.columns}
+    return record_ids, subset_by_dim_name

@@ -12,6 +12,7 @@ from typing import Union
 import json5
 import pandas as pd
 from prettytable import PrettyTable
+from pyspark.sql import DataFrame
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
@@ -19,6 +20,7 @@ from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
+    DSGInvalidParameter,
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dataset_config import DatasetConfig
@@ -45,6 +47,7 @@ from dsgrid.config.project_config import (
     ProjectConfig,
     ProjectConfigModel,
     RequiredDimensionRecordsModel,
+    SubsetDimensionGroupModel,
 )
 from dsgrid.project import Project
 from dsgrid.registry.common import (
@@ -421,6 +424,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         break
                 assert base_dim is not None, subset_dimension
                 base_records = base_dim.get_records_dataframe()
+                self._check_subset_dimension_consistency(subset_dimension, base_records)
                 for selector in subset_dimension.selectors:
                     new_records = base_records.filter(base_records["id"].isin(selector.records))
                     filename = tmp_path / f"{subset_dimension.name}_{selector.name}.csv"
@@ -456,6 +460,28 @@ class ProjectRegistryManager(RegistryManagerBase):
                         version="1.0.0",
                     )
                 )
+
+    def _check_subset_dimension_consistency(
+        self,
+        subset_dimension: SubsetDimensionGroupModel,
+        base_records: DataFrame,
+    ) -> None:
+        base_record_ids = get_unique_values(base_records, "id")
+        diff = subset_dimension.record_ids.difference(base_record_ids)
+        if diff:
+            msg = (
+                f"subset dimension {subset_dimension.name} "
+                f"uses dimension records not present in the base dimension: {diff}"
+            )
+            raise DSGInvalidParameter(msg)
+
+        diff = base_record_ids.difference(subset_dimension.record_ids)
+        if diff:
+            msg = (
+                f"subset dimension {subset_dimension.name} "
+                f"does not list these base dimension records: {diff}"
+            )
+            raise DSGInvalidParameter(msg)
 
     def _register_supplemental_dimensions_from_subset_dimensions(
         self, model, context, submitter, log_message
@@ -1079,7 +1105,8 @@ class ProjectRegistryManager(RegistryManagerBase):
             dim_table.unpersist()
 
             raise DSGInvalidDataset(
-                f"Dataset {dataset_config.config_id} is missing required dimension records"
+                f"Dataset {dataset_config.config_id} is missing required dimension records. "
+                "Please look in the log file for more information."
             )
         if pivoted_dimension is not None:
             project_pivoted_ids = project_config.get_required_dimension_record_ids(

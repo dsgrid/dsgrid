@@ -1,6 +1,9 @@
+from typing import Optional
+
 from pyspark.sql import DataFrame
 
-from dsgrid.utils.spark import get_spark_session, try_read_dataframe
+from dsgrid.time.types import DayType
+from dsgrid.utils.spark import get_spark_session, try_read_dataframe, get_type_from_union
 
 
 def test_try_read_dataframe_invalid(tmp_path):
@@ -18,3 +21,8 @@ def test_try_read_dataframe_valid(tmp_path):
     df = try_read_dataframe(filename)
     assert isinstance(df, DataFrame)
     assert df.collect()[0].a == 1
+
+
+def test_get_type_from_union():
+    assert get_type_from_union(Optional[str]) is str
+    assert get_type_from_union(Optional[DayType]) is str

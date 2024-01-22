@@ -5,6 +5,7 @@ from pathlib import Path
 import click
 
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
+from dsgrid.exceptions import DSGBaseException
 
 
 logger = logging.getLogger(__name__)
@@ -53,6 +54,23 @@ def get_log_level_from_str(level):
 def get_value_from_context(ctx, field) -> str:
     """Get the field value from the root of a click context."""
     return ctx.find_root().params[field]
+
+
+def handle_dsgrid_exception(ctx, func, *args, **kwargs):
+    """Handle any dsgrid exceptions as specified by the CLI parameters."""
+    res = None
+    try:
+        res = func(*args, **kwargs)
+        return res, 0
+    except DSGBaseException:
+        exc_type, exc_value, exc_tb = sys.exc_info()
+        filename = exc_tb.tb_frame.f_code.co_filename
+        line = exc_tb.tb_lineno
+        msg = f'{func.__name__} failed: exception={exc_type.__name__} message="{exc_value}" {filename=} {line=}'
+        logger.error(msg)
+        if ctx.find_root().params["reraise_exceptions"]:
+            raise
+        return res, 1
 
 
 # Copied from

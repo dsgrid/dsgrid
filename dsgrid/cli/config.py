@@ -77,6 +77,14 @@ def config():
     show_default=True,
     help="File log level.",
 )
+@click.option(
+    "-r",
+    "--reraise-exceptions",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Re-raise any dsgrid exception. Default is to log the exception and exit.",
+)
 def create(
     timings,
     database_name,
@@ -86,6 +94,7 @@ def create(
     offline,
     console_level,
     file_level,
+    reraise_exceptions,
 ):
     """Create a local dsgrid runtime configuration file."""
     dsgrid_config = DsgridRuntimeConfig(
@@ -97,6 +106,7 @@ def create(
         offline=offline,
         console_level=console_level,
         file_level=file_level,
+        reraise_exceptions=reraise_exceptions,
     )
     dsgrid_config.dump()
 

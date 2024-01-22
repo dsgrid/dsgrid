@@ -8,10 +8,9 @@ from pathlib import Path
 import click
 from semver import VersionInfo
 
-from dsgrid.cli.common import get_value_from_context
+from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import VersionUpdateType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
@@ -144,11 +143,16 @@ def list_dimensions(registry_manager, filter):
     help="reason for submission",
 )
 @click.pass_obj
-def register_dimensions(registry_manager, dimension_config_file, log_message):
+@click.pass_context
+def register_dimensions(ctx, registry_manager, dimension_config_file, log_message):
     """Register new dimensions with the dsgrid repository."""
     manager = registry_manager.dimension_manager
     submitter = getpass.getuser()
-    manager.register(dimension_config_file, submitter, log_message)
+    res = handle_dsgrid_exception(
+        ctx, manager.register, dimension_config_file, submitter, log_message
+    )
+    if res[1] != 0:
+        return 1
 
 
 @click.command(name="dump")
@@ -174,10 +178,15 @@ def register_dimensions(registry_manager, dimension_config_file, log_message):
     help="Overwrite files if they exist.",
 )
 @click.pass_obj
-def dump_dimension(registry_manager, dimension_id, version, directory, force):
+@click.pass_context
+def dump_dimension(ctx, registry_manager, dimension_id, version, directory, force):
     """Dump a dimension config file (and any related data) from the registry."""
     manager = registry_manager.dimension_manager
-    manager.dump(dimension_id, Path(directory), version=version, force=force)
+    res = handle_dsgrid_exception(
+        ctx, manager.dump, dimension_id, Path(directory), version=version, force=force
+    )
+    if res[1] != 0:
+        return 1
 
 
 @click.command(name="update")
@@ -211,15 +220,25 @@ def dump_dimension(registry_manager, dimension_id, version, directory, force):
     help="Version to update; must be the current version.",
 )
 @click.pass_obj
+@click.pass_context
 def update_dimension(
-    registry_manager, dimension_config_file, dimension_id, log_message, update_type, version
+    ctx, registry_manager, dimension_config_file, dimension_id, log_message, update_type, version
 ):
     """Update an existing dimension registry."""
     manager = registry_manager.dimension_manager
     submitter = getpass.getuser()
-    manager.update_from_file(
-        dimension_config_file, dimension_id, submitter, update_type, log_message, version
+    res = handle_dsgrid_exception(
+        ctx,
+        manager.update_from_file,
+        dimension_config_file,
+        dimension_id,
+        submitter,
+        update_type,
+        log_message,
+        version,
     )
+    if res[1] != 0:
+        return 1
 
 
 """
@@ -258,11 +277,16 @@ def list_dimension_mappings(registry_manager, filter):
     help="reason for submission",
 )
 @click.pass_obj
-def register_dimension_mappings(registry_manager, dimension_mapping_config_file, log_message):
+@click.pass_context
+def register_dimension_mappings(ctx, registry_manager, dimension_mapping_config_file, log_message):
     """Register new dimension mappings with the dsgrid repository."""
     submitter = getpass.getuser()
     manager = registry_manager.dimension_mapping_manager
-    manager.register(dimension_mapping_config_file, submitter, log_message)
+    res = handle_dsgrid_exception(
+        ctx, manager.register, dimension_mapping_config_file, submitter, log_message
+    )
+    if res[1] != 0:
+        return 1
 
 
 @click.command(name="dump")
@@ -288,10 +312,15 @@ def register_dimension_mappings(registry_manager, dimension_mapping_config_file,
     help="Overwrite files if they exist.",
 )
 @click.pass_obj
-def dump_dimension_mapping(registry_manager, dimension_mapping_id, version, directory, force):
+@click.pass_context
+def dump_dimension_mapping(ctx, registry_manager, dimension_mapping_id, version, directory, force):
     """Dump a dimension mapping config file (and any related data) from the registry."""
     manager = registry_manager.dimension_mapping_manager
-    manager.dump(dimension_mapping_id, Path(directory), version=version, force=force)
+    res = handle_dsgrid_exception(
+        ctx, manager.dump, dimension_mapping_id, Path(directory), version=version, force=force
+    )
+    if res[1] != 0:
+        return 1
 
 
 @click.command(name="update")
@@ -368,13 +397,12 @@ Project Commands
     """,
 )
 @click.pass_obj
-def list_projects(registry_manager, filter):
+@click.pass_context
+def list_projects(ctx, registry_manager, filter):
     """List the registered projects."""
-    try:
-        registry_manager.project_manager.show(filters=filter)
-    except DSGInvalidParameter as exc:
-        print(exc)
-        sys.exit(1)
+    res = handle_dsgrid_exception(ctx, registry_manager.project_manager.show, filters=filter)
+    if res[1] != 0:
+        return 1
 
 
 @click.command(name="register")
@@ -386,18 +414,24 @@ def list_projects(registry_manager, filter):
     help="reason for submission",
 )
 @click.pass_obj
+@click.pass_context
 def register_project(
+    ctx,
     registry_manager,
     project_config_file,
     log_message,
 ):
     """Register a new project with the dsgrid repository."""
     submitter = getpass.getuser()
-    registry_manager.project_manager.register(
+    res = handle_dsgrid_exception(
+        ctx,
+        registry_manager.project_manager.register,
         project_config_file,
         submitter,
         log_message,
     )
+    if res[1] != 0:
+        return 1
 
 
 @click.command()
@@ -530,7 +564,9 @@ def submit_dataset(
     help="reason for submission",
 )
 @click.pass_obj
+@click.pass_context
 def register_and_submit_dataset(
+    ctx,
     registry_manager,
     dataset_config_file,
     dataset_path,
@@ -543,7 +579,9 @@ def register_and_submit_dataset(
     """Register a dataset and then submit it to a dsgrid project."""
     submitter = getpass.getuser()
     manager = registry_manager.project_manager
-    manager.register_and_submit_dataset(
+    res = handle_dsgrid_exception(
+        ctx,
+        manager.register_and_submit_dataset,
         dataset_config_file,
         dataset_path,
         project_id,
@@ -553,6 +591,8 @@ def register_and_submit_dataset(
         dimension_mapping_references_file=dimension_mapping_references_file,
         autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
     )
+    if res[1] != 0:
+        return 1
 
 
 @click.command(name="dump")
@@ -578,10 +618,15 @@ def register_and_submit_dataset(
     help="Overwrite files if they exist.",
 )
 @click.pass_obj
-def dump_project(registry_manager, project_id, version, directory, force):
+@click.pass_context
+def dump_project(ctx, registry_manager, project_id, version, directory, force):
     """Dump a project config file from the registry."""
     manager = registry_manager.project_manager
-    manager.dump(project_id, directory, version=version, force=force)
+    res = handle_dsgrid_exception(
+        ctx, manager.dump, project_id, directory, version=version, force=force
+    )
+    if res[1] != 0:
+        return 1
 
 
 @click.command(name="update")
@@ -615,15 +660,25 @@ def dump_project(registry_manager, project_id, version, directory, force):
     help="Version to update; must be the current version.",
 )
 @click.pass_obj
+@click.pass_context
 def update_project(
-    registry_manager, project_config_file, project_id, log_message, update_type, version
+    ctx, registry_manager, project_config_file, project_id, log_message, update_type, version
 ):
     """Update an existing project registry."""
     manager = registry_manager.project_manager
     submitter = getpass.getuser()
-    manager.update_from_file(
-        project_config_file, project_id, submitter, update_type, log_message, version
+    res = handle_dsgrid_exception(
+        ctx,
+        manager.update_from_file,
+        project_config_file,
+        project_id,
+        submitter,
+        update_type,
+        log_message,
+        version,
     )
+    if res[1] != 0:
+        return 1
 
 
 @click.command(name="list-dimension-query-names")
@@ -666,7 +721,7 @@ def list_project_dimension_query_names(
             "exclude_base, exclude_subset, and exclude_supplemental cannot all be set",
             file=sys.stderr,
         )
-        sys.exit(1)
+        return 1
 
     manager = registry_manager.project_manager
     project_config = manager.get_by_id(project_id)
@@ -728,11 +783,16 @@ def list_datasets(registry_manager, filter):
     help="reason for submission",
 )
 @click.pass_obj
-def register_dataset(registry_manager, dataset_config_file, dataset_path, log_message):
+@click.pass_context
+def register_dataset(ctx, registry_manager, dataset_config_file, dataset_path, log_message):
     """Register a new dataset with the dsgrid repository."""
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
-    manager.register(dataset_config_file, dataset_path, submitter, log_message)
+    res = handle_dsgrid_exception(
+        ctx, manager.register, dataset_config_file, dataset_path, submitter, log_message
+    )
+    if res[1] != 0:
+        return 1
 
 
 @click.command(name="dump")
@@ -795,15 +855,25 @@ def dump_dataset(registry_manager, dataset_id, version, directory, force):
     help="Version to update; must be the current version.",
 )
 @click.pass_obj
+@click.pass_context
 def update_dataset(
-    registry_manager, dataset_config_file, dataset_id, log_message, update_type, version
+    ctx, registry_manager, dataset_config_file, dataset_id, log_message, update_type, version
 ):
     """Update an existing dataset registry."""
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
-    manager.update_from_file(
-        dataset_config_file, dataset_id, submitter, update_type, log_message, version
+    res = handle_dsgrid_exception(
+        ctx,
+        manager.update_from_file,
+        dataset_config_file,
+        dataset_id,
+        submitter,
+        update_type,
+        log_message,
+        version,
     )
+    if res[1] != 0:
+        return 1
 
 
 @click.command()

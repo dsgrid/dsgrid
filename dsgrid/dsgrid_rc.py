@@ -26,6 +26,7 @@ class DsgridRuntimeConfig(DSGBaseModel):
     console_level: str = "info"
     file_level: str = "info"
     timings: bool = False
+    reraise_exceptions: bool = False
 
     @classmethod
     def load(cls):

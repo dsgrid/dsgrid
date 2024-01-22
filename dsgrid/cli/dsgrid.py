@@ -87,6 +87,14 @@ _config = DsgridRuntimeConfig.load()
     help="dsgrid registry password. Will prompt unless it is passed or the username matches the "
     "runtime config file.",
 )
+@click.option(
+    "-r",
+    "--reraise-exceptions",
+    is_flag=True,
+    default=_config.reraise_exceptions,
+    show_default=True,
+    help="Re-raise any dsgrid exception. Default is to log the exception and exit.",
+)
 @click.pass_context
 def cli(
     ctx,
@@ -100,6 +108,7 @@ def cli(
     url,
     username,
     password,
+    reraise_exceptions,
 ):
     """dsgrid commands"""
     if timings:

@@ -662,6 +662,14 @@ class ProjectRegistryManager(RegistryManagerBase):
         if not self.has_id(project_id):
             msg = f"{project_id=}"
             raise DSGValueNotRegistered(msg)
+
+        dataset_config = DatasetConfig.load_from_user_path(dataset_config_file, dataset_path)
+        dataset_id = dataset_config.model.dataset_id
+        config = self.get_by_id(project_id)
+        # This will raise an exception if the dataset_id is not part of the project or already
+        # registered.
+        self._raise_if_not_unregistered(config, dataset_id)
+
         context = RegistrationContext()
         error_occurred = False
         try:
@@ -764,12 +772,8 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         logger.info("Submit dataset=%s to project=%s.", dataset_id, project_config.config_id)
         self._check_if_not_registered(project_config.config_id)
+        self._raise_if_not_unregistered(project_config, dataset_id)
         dataset_config = self._dataset_mgr.get_by_id(dataset_id)
-        dataset_model = project_config.get_dataset(dataset_id)
-        if dataset_model.status == DatasetRegistryStatus.REGISTERED:
-            raise DSGDuplicateValueRegistered(
-                f"dataset={dataset_id} has already been submitted to project={project_config.config_id}"
-            )
 
         # Issue #241
         # self._check_dataset_time_interval_type(project_config, dataset_config)
@@ -804,6 +808,16 @@ class ProjectRegistryManager(RegistryManagerBase):
             )
 
         self._submit_dataset(project_config, dataset_config, submitter, log_message, references)
+
+    def _raise_if_not_unregistered(self, project_config: ProjectConfig, dataset_id: str) -> None:
+        # This will raise if the dataset is not specified in the project.
+        dataset_model = project_config.get_dataset(dataset_id)
+        status = dataset_model.status
+        if status != DatasetRegistryStatus.UNREGISTERED:
+            raise DSGDuplicateValueRegistered(
+                f"{dataset_id=} cannot be submitted to project={project_config.config_id} with "
+                f"{status=}"
+            )
 
     def _register_mappings_from_file(
         self,

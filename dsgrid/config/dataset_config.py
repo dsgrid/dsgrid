@@ -593,7 +593,7 @@ class DatasetConfig(ConfigBase):
         return config
 
     @classmethod
-    def load_from_user_path(cls, config_file, dataset_path):
+    def load_from_user_path(cls, config_file, dataset_path) -> "DatasetConfig":
         config = cls.load(config_file)
         schema_type = config.get_data_schema_type()
         if str(dataset_path).startswith("s3://"):

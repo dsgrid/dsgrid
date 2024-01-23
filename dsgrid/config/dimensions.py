@@ -546,6 +546,14 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
+    wrap_time_allowed: Annotated[
+        Optional[bool],
+        Field(
+            title="wrap_time_allowed",
+            description="Whether to allow dataset time to be wrapped to project time if different",
+            default=False,
+        ),
+    ]
 
     @model_validator(mode="after")
     def check_time_type_and_class_consistency(self):

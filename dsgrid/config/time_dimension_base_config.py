@@ -181,10 +181,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         """
 
-    def _convert_time_to_project_time_interval(self, df, project_time_dim=None, wrap_time=True):
+    def _convert_time_to_project_time_interval(self, df, project_time_dim=None):
         """Shift time to match project time based on TimeIntervalType
-        If time range spills over into another year after time interval alignment,
+        If wrap_time_allowed in project_time_dim:
+        - If time range spills over into another year after time interval alignment,
         the time range will be wrapped around so it's bounded within the year
+        - Time will also wrapped if dataset has a different time zone than project
         """
         if project_time_dim is None:
             return df
@@ -200,7 +202,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             df, time_col, dtime_interval, ptime_interval, self.get_frequency()
         )
 
-        if wrap_time:
+        if project_time_dim.model.wrap_time_allowed:
             df = self._apply_time_wrap(df, project_time_dim)
 
         return df

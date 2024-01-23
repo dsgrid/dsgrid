@@ -1045,7 +1045,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         ptime = project_config.get_base_dimension(DimensionType.TIME)
 
         df = dtime.build_time_dataframe()
-        dtime._convert_time_to_project_time_interval(df=df, project_time_dim=ptime, wrap_time=True)
+        dtime._convert_time_to_project_time_interval(df, project_time_dim=ptime)
 
     @track_timing(timer_stats_collector)
     def _check_dataset_base_to_project_base_mappings(

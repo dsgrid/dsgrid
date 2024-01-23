@@ -78,21 +78,27 @@ def test_convert_to_project_time(registry_mgr):
         raw_data=tempo_data_with_tz,
         converted_data=tempo_data_mapped_time,
     )
-    compare_time_conversion(
-        resstock_time_dim, project_time_dim, wrap_time=False, expect_error=True
-    )
-    compare_time_conversion(
-        comstock_time_dim, project_time_dim, wrap_time=False, expect_error=True
-    )
-    compare_time_conversion(
-        resstock_time_dim, project_time_dim, wrap_time=True, expect_error=False
-    )
-    compare_time_conversion(
-        comstock_time_dim, project_time_dim, wrap_time=True, expect_error=False
-    )
+
+    project_time_dim.model.wrap_time_allowed = True  # <--- TODO turn to comment
+    # [2.1] test time-wrap when dataset and project have different time interval type
+    # expect no error with original dataset and project time configs
+    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=False)
+    compare_time_conversion(comstock_time_dim, project_time_dim, expect_error=False)
     compare_time_conversion(
         tempo_time_dim, project_time_dim, df=tempo_data_mapped_time, expect_error=False
     )
+    project_time_dim.model.wrap_time_allowed = False
+    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=True)
+    compare_time_conversion(comstock_time_dim, project_time_dim, expect_error=True)
+    project_time_dim.model.wrap_time_allowed = True  # reset
+
+    # [2.2] test time-wrap when dataset and project have different timezone
+    resstock_time_dim.model.timezone = TimeZone.UTC
+    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=False)
+    project_time_dim.model.wrap_time_allowed = False
+    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=True)
+    resstock_time_dim.model.timezone = TimeZone.EST  # reset
+    project_time_dim.model.wrap_time_allowed = True  # reset
 
     # comstock time conversion
     comstock_data = comstock._handler._load_data.join(comstock._handler._load_data_lookup, on="id")
@@ -100,16 +106,16 @@ def test_convert_to_project_time(registry_mgr):
     comstock_time_dim.convert_dataframe(comstock_data_with_tz, project_time_dim)
 
     # [3] test make_project_dataframe()
-    tempo._handler.make_project_dataframe(project.config)
-    comstock._handler.make_project_dataframe(project.config)
-    resstock._handler.make_project_dataframe(project.config)
+    tempo.make_project_dataframe(project.config)
+    comstock.make_project_dataframe(project.config)
+    resstock.make_project_dataframe(project.config)
 
 
-def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None, wrap_time=True):
+def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None):
     project_time = project_time_dim.build_time_dataframe()
     if df is None:
         converted_dataset_time = dataset_time_dim._convert_time_to_project_time_interval(
-            dataset_time_dim.build_time_dataframe(), project_time_dim, wrap_time=wrap_time
+            dataset_time_dim.build_time_dataframe(), project_time_dim=project_time_dim
         )
     else:
         converted_dataset_time = df
@@ -123,16 +129,20 @@ def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None, wrap_t
         )
 
 
-def compare_time_conversion(
-    dataset_time_dim, project_time_dim, df=None, wrap_time=True, expect_error=False
-):
+def compare_time_conversion(dataset_time_dim, project_time_dim, df=None, expect_error=False):
     if expect_error:
         with pytest.raises(DSGDatasetConfigError):
             _compare_time_conversion(
-                dataset_time_dim, project_time_dim, df=df, wrap_time=wrap_time
+                dataset_time_dim,
+                project_time_dim,
+                df=df,
             )
     else:
-        _compare_time_conversion(dataset_time_dim, project_time_dim, df=df, wrap_time=wrap_time)
+        _compare_time_conversion(
+            dataset_time_dim,
+            project_time_dim,
+            df=df,
+        )
 
 
 def check_time_dataframe(time_dim):

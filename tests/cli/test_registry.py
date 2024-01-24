@@ -15,10 +15,8 @@ from dsgrid.tests.common import (
     replace_dimension_names_with_current_ids,
 )
 
-STANDARD_SCENARIOS_PROJECT_REPO = (
-    Path(__file__).parent.parent.parent / "dsgrid-project-StandardScenarios"
-)
-DECARB_PROJECT_REPO = Path(__file__).parent.parent.parent / "dsgrid-project-DECARB"
+STANDARD_SCENARIOS_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-StandardScenarios"
+DECARB_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-DECARB"
 
 
 def test_register_dimensions_and_mappings(tmp_registry_db):

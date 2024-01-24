@@ -79,7 +79,6 @@ def test_convert_to_project_time(registry_mgr):
         converted_data=tempo_data_mapped_time,
     )
 
-    project_time_dim.model.wrap_time_allowed = True  # <--- TODO turn to comment
     # [2.1] test time-wrap when dataset and project have different time interval type
     # expect no error with original dataset and project time configs
     compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=False)

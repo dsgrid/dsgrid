@@ -647,7 +647,6 @@ def restart_spark_with_custom_conf(conf: dict, force=False):
     force : bool
         If True, restart the session even if the config parameters haven't changed.
         You might want to do this in order to clear cached tables or start Spark fresh.
-
     """
     spark = get_spark_session()
     app_name = spark.conf.get("spark.app.name")
@@ -658,8 +657,8 @@ def restart_spark_with_custom_conf(conf: dict, force=False):
             current = spark.conf.get(name, None)
             if current is not None:
                 orig_settings[name] = current
-        restart_spark(name=app_name, spark_conf=conf, force=force)
-        yield
+        new_spark = restart_spark(name=app_name, spark_conf=conf, force=force)
+        yield new_spark
     finally:
         restart_spark(name=app_name, spark_conf=orig_settings, force=force)
 

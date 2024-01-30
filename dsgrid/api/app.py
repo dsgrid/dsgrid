@@ -372,6 +372,7 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
         output_dir = Path(QUERY_OUTPUT_DIR)
         dsgrid_exec = "dsgrid-cli.py"
         base_cmd = (
+            f"--offline "
             f"--url={DSGRID_REGISTRY_DATABASE_URL} "
             f"--database-name={DSGRID_REGISTRY_DATABASE_NAME} "
             f"query project run "

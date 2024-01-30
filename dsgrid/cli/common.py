@@ -73,6 +73,18 @@ def handle_dsgrid_exception(ctx, func, *args, **kwargs):
         return res, 1
 
 
+def handle_scratch_dir(*args):
+    """Handle the user input for scratch_dir. If a path is passed, ensure it exists."""
+    val = args[2]
+    if val is None:
+        return val
+    path = Path(val)
+    if not path.exists:
+        msg = f"scratch-dir={path} does not exist"
+        raise ValueError(msg)
+    return path
+
+
 # Copied from
 # https://stackoverflow.com/questions/45868549/creating-a-click-option-with-prompt-that-shows-only-if-default-value-is-empty
 # and modified for our desired password behavior.

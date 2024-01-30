@@ -1,13 +1,13 @@
 import logging
 from pathlib import Path
 
+from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
-from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
 from dsgrid.utils.spark import (
     read_dataframe,
     get_unique_values,
@@ -110,9 +110,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     f"load_data records do not match dimension records for {name}"
                 )
 
-    def get_unique_dimension_rows(self):
-        """Get distinct combinations of remapped dimensions.
-        Check each col in combination for null value."""
+    def make_dimension_association_table(self) -> DataFrame:
         time_cols = set(self._get_time_dimension_columns())
         pivoted_cols = set(self._config.get_pivoted_dimension_columns())
         exclude = time_cols.union(pivoted_cols)
@@ -120,11 +118,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             exclude.add(VALUE_COLUMN)
         dim_cols = [x for x in self._load_data.columns if x not in exclude]
         df = self._load_data.select(*dim_cols).distinct()
-
-        dim_table = self._remap_dimension_columns(df, True).distinct()
-        check_null_value_in_unique_dimension_rows(dim_table, exclude_columns=exclude)
-
-        return dim_table
+        return self._remap_dimension_columns(df, True).distinct()
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel]):

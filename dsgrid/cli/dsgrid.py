@@ -6,7 +6,7 @@ from pathlib import Path
 import click
 
 from dsgrid.utils.timing import timer_stats_collector
-from dsgrid.cli.common import get_log_level_from_str, OptionPromptPassword
+from dsgrid.cli.common import get_log_level_from_str, handle_scratch_dir, OptionPromptPassword
 from dsgrid.cli.config import config
 from dsgrid.cli.download import download
 from dsgrid.cli.install_notebooks import install_notebooks
@@ -95,6 +95,14 @@ _config = DsgridRuntimeConfig.load()
     show_default=True,
     help="Re-raise any dsgrid exception. Default is to log the exception and exit.",
 )
+@click.option(
+    "-s",
+    "--scratch-dir",
+    default=_config.scratch_dir,
+    callback=handle_scratch_dir,
+    help="Temporary directory for dsgrid. Must be accessible on all compute nodes. Defaults to "
+    "the current directory.",
+)
 @click.pass_context
 def cli(
     ctx,
@@ -109,6 +117,7 @@ def cli(
     username,
     password,
     reraise_exceptions,
+    scratch_dir,
 ):
     """dsgrid commands"""
     if timings:

@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 
 import json5
+from pyspark.sql import DataFrame
 
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.utils.spark import models_to_dataframe
@@ -113,7 +114,7 @@ class ConfigWithRecordFileBase(ConfigBase, abc.ABC):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def get_records_dataframe(self):
+    def get_records_dataframe(self) -> DataFrame:
         """Return the records in a spark dataframe. Cached on first call."""
         # id provides uniqueness and the config_id could help inspect what's in cache in case we
         # ever need that.

@@ -1,22 +1,33 @@
 """Spark helper functions"""
 
+import atexit
 import enum
 import itertools
 import logging
 import math
 import os
 import shutil
+import tempfile
 from contextlib import contextmanager
 from pathlib import Path
-from typing import AnyStr, Union, get_origin, get_args
+from typing import Iterable, Union, get_origin, get_args
 
 import pandas as pd
 import pyspark
-from pyspark.sql import Row, SparkSession
-from pyspark.sql.types import StructType, StringType, DoubleType, IntegerType, BooleanType
+import sqlalchemy.orm
+from pyspark.sql import DataFrame, Row, SparkSession
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    StringType,
+    DoubleType,
+    IntegerType,
+    BooleanType,
+)
 from pyspark import SparkConf
 
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter, DSGInvalidFile
+from dsgrid.data_models import DSGBaseModel
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile
 from dsgrid.loggers import disable_console_logging
 from dsgrid.utils.files import load_data
 from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
@@ -88,6 +99,12 @@ def restart_spark(*args, force=False, **kwargs):
         conf = kwargs.get("spark_conf", {})
         for key, val in conf.items():
             current = spark.conf.get(key, None)
+            if isinstance(current, str):
+                match current.lower():
+                    case "true":
+                        current = True
+                    case "false":
+                        current = False
             if current is not None and current != val:
                 logger.info("SparkSession needs restart because of %s = %s", key, val)
                 needs_restart = True
@@ -111,7 +128,7 @@ def log_spark_conf(spark: SparkSession):
 
 
 @track_timing(timer_stats_collector)
-def create_dataframe(records, table_name=None, require_unique=None):
+def create_dataframe(records, table_name=None, require_unique=None) -> DataFrame:
     """Create a spark DataFrame from a list of records.
 
     Parameters
@@ -122,15 +139,17 @@ def create_dataframe(records, table_name=None, require_unique=None):
         If set, cache the DataFrame in memory with this name. Must be unique.
     require_unique : list
         list of column names (str) to check for uniqueness
-
-    Returns
-    -------
-    spark.sql.DataFrame
-
     """
     df = get_spark_session().createDataFrame(records)
     _post_process_dataframe(df, table_name=table_name, require_unique=require_unique)
     return df
+
+
+@track_timing(timer_stats_collector)
+def create_dataframe_from_ids(ids: Iterable[str], column: str) -> DataFrame:
+    """Create a spark DataFrame from a list of dimension IDs."""
+    schema = StructType([StructField(column, StringType())])
+    return get_spark_session().createDataFrame([[x] for x in ids], schema)
 
 
 def create_dataframe_from_pandas(df):
@@ -170,7 +189,12 @@ def try_read_dataframe(filename: Path, delete_if_invalid=True, **kwargs):
 
 
 @track_timing(timer_stats_collector)
-def read_dataframe(filename, table_name=None, require_unique=None, read_with_spark=True):
+def read_dataframe(
+    filename: str | Path,
+    table_name: str | None = None,
+    require_unique: None | bool = None,
+    read_with_spark: bool = True,
+) -> DataFrame:
     """Create a spark DataFrame from a file.
 
     Supported formats when read_with_spark=True: .csv, .json, .parquet
@@ -210,6 +234,11 @@ def read_dataframe(filename, table_name=None, require_unique=None, read_with_spa
     df = func(str(filename))
     _post_process_dataframe(df, table_name=table_name, require_unique=require_unique)
     return df
+
+
+def read_parquet(filename: Path) -> DataFrame:
+    """Read a DataFrame from a file path."""
+    return get_spark_session().read.parquet(str(filename))
 
 
 def _read_with_spark(filename):
@@ -263,19 +292,8 @@ def _post_process_dataframe(df, table_name=None, require_unique=None):
                     raise DSGInvalidField(f"DataFrame has duplicate entries for {column}")
 
 
-def get_unique_values(df, columns: Union[AnyStr, list]):
-    """Return the unique values of a dataframe in one column or a list of columns.
-
-    Parameters
-    ----------
-    df : pyspark.sql.DataFrame
-    column : str or list of str
-
-    Returns
-    -------
-    set
-
-    """
+def get_unique_values(df: DataFrame, columns: str | list[str]) -> set:
+    """Return the unique values of a dataframe in one column or a list of columns."""
     dfc = df.select(columns).distinct().collect()
     if isinstance(columns, list):
         values = {tuple(getattr(row, col) for col in columns) for row in dfc}
@@ -286,7 +304,7 @@ def get_unique_values(df, columns: Union[AnyStr, list]):
 
 
 @track_timing(timer_stats_collector)
-def models_to_dataframe(models, table_name=None):
+def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = None) -> DataFrame:
     """Converts a list of Pydantic models to a Spark DataFrame.
 
     Parameters
@@ -294,11 +312,6 @@ def models_to_dataframe(models, table_name=None):
     models : list
     table_name : str | None
         If set, a unique ID to use as the cached table name. Return from cache if already stored.
-
-    Returns
-    -------
-    pyspark.sql.DataFrame
-
     """
     spark = get_spark_session()
     if (
@@ -343,7 +356,7 @@ def models_to_dataframe(models, table_name=None):
 
 
 @track_timing(timer_stats_collector)
-def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True):
+def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True) -> DataFrame:
     """Return a DataFrame created from the IDs of dimension_types.
 
     Parameters
@@ -352,11 +365,6 @@ def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True):
         Iterable of lists of record IDs
     dimension_types : tuple
     cache : If True, cache the DataFrame.
-
-    Returns
-    -------
-    pyspark.sql.DataFrame
-
     """
     schema = StructType()
     for dimension_type in dimension_types:
@@ -407,21 +415,11 @@ def check_for_nulls(df, exclude_columns=None):
 
 
 @track_timing(timer_stats_collector)
-def overwrite_dataframe_file(filename, df):
+def overwrite_dataframe_file(filename: Path | str, df: DataFrame) -> DataFrame:
     """Perform an in-place overwrite of a Spark DataFrame, accounting for different file types
     and symlinks.
 
     Do not attempt to access the original dataframe unless it was fully cached.
-
-    Parameters
-    ----------
-    filename : str
-    df : pyspark.sql.DataFrame
-
-    Returns
-    -------
-    pyspark.sql.DataFrame
-
     """
     spark = get_spark_session()
     suffix = Path(filename).suffix
@@ -448,12 +446,10 @@ def overwrite_dataframe_file(filename, df):
 
 @track_timing(timer_stats_collector)
 def write_dataframe_and_auto_partition(
-    df, filename, partition_size_mb=128, columns=None, rtol_pct=50
-):
-    """Write a dataframe to a file and then automatically coalesce or repartition it if needed.
-    If the file already exists, it will be overwritten.
-
-    Only Parquet files are supported.
+    df: DataFrame, filename: Path, partition_size_mb=128, columns=None, rtol_pct=50
+) -> DataFrame:
+    """Write a dataframe to a Parquet file and then automatically coalesce or repartition it if
+    needed. If the file already exists, it will be overwritten.
 
     Parameters
     ----------
@@ -467,18 +463,11 @@ def write_dataframe_and_auto_partition(
         Don't repartition or coalesce if the relative difference between desired and actual
         partitions is within this tolerance as a percentage.
 
-    Returns
-    -------
-    pyspark.sql.DataFrame
-
     Raises
     ------
     DSGInvalidParameter
         Raised if a non-Parquet file is passed
-
     """
-    if filename.suffix != ".parquet":
-        raise DSGInvalidParameter(f"Only parquet files are supported: {filename}")
     spark = get_spark_session()
     if filename.exists():
         df = overwrite_dataframe_file(filename, df)
@@ -508,18 +497,13 @@ def write_dataframe_and_auto_partition(
 
 
 @track_timing(timer_stats_collector)
-def write_dataframe(df, filename):
+def write_dataframe(df: DataFrame, filename: str | Path) -> None:
     """Write a Spark DataFrame, accounting for different file types.
 
     Parameters
     ----------
     filename : str
     df : pyspark.sql.DataFrame
-
-    Returns
-    -------
-    pyspark.sql.DataFrame
-
     """
     suffix = Path(filename).suffix
     name = str(filename)
@@ -531,49 +515,20 @@ def write_dataframe(df, filename):
         df.write.json(name)
 
 
-def sql(query):
-    """Run a SQL query with Spark.
-
-    Parameters
-    ----------
-    query : str
-
-    Returns
-    -------
-    pyspark.sql.DataFrame
-
-    """
+def sql(query: str) -> DataFrame:
+    """Run a SQL query with Spark."""
     logger.debug("Run SQL query [%s]", query)
     return get_spark_session().sql(query)
 
 
-def sql_from_sqlalchemy(query):
-    """Run a SQL query with Spark where the query was generated by sqlalchemy.
-
-    Parameters
-    ----------
-    query : sqlalchemy.orm.query.Query
-
-    Returns
-    -------
-    pyspark.sql.DataFrame
-
-    """
+def sql_from_sqlalchemy(query: sqlalchemy.orm.query.Query) -> DataFrame:
+    """Run a SQL query with Spark where the query was generated by sqlalchemy."""
     logger.debug("sqlchemy query = %s", query)
     return sql(str(query).replace('"', ""))
 
 
-def cross_join_dfs(dfs):
-    """Perform a cross join of all dataframes in dfs.
-
-    Parameters
-    ----------
-    dfs : list[pyspark.sql.DataFrame]
-
-    Returns
-    pyspark.sql.DataFrame
-
-    """
+def cross_join_dfs(dfs: list[DataFrame]) -> DataFrame:
+    """Perform a cross join of all dataframes in dfs."""
     if len(dfs) == 1:
         return dfs[0]
 
@@ -584,26 +539,66 @@ def cross_join_dfs(dfs):
 
 
 @track_timing(timer_stats_collector)
-def create_dataframe_from_product(data: dict):
-    """Create a dataframe by taking a product of values/columns in a dict. This is significantly
-    faster than creating a dataframe from each column and cross-joining them with Spark.
+def create_dataframe_from_product(data: dict[str, list[str]], scratch_dir: Path) -> DataFrame:
+    """Create a dataframe by taking a product of values/columns in a dict.
 
     Parameters
     ----------
     data : dict
         Columns on which to perform a cross product.
         {"sector": [com], "subsector": ["SmallOffice", "LargeOffice"]}
-
-    Returns
-    -------
-    pyspark.sql.DataFrame
-
     """
-    spark = get_spark_session()
+    # dthom: 1/29/2024
+    # This implementation creates a product of all columns in Python, writes them to temporary
+    # CSV files, and then loads that back into Spark.
+    # This is the fastest way I've found to pass a large dataframe from the Spark driver (Python
+    # app) to the Spark workers on compute nodes.
+    # The total size of a table can be large depending on the numbers of dimensions. For example,
+    # comstock_conus_2022_projected is 3108 counties * 41 model years * 21 end uses * 14 subsectors * 3 scenarios
+    #   112_391_496 rows. The CSV files are ~7.7 GB.
+    #   (Note that, due to compression, the same table in Parquet is 7 MB.)
+    # This is not ideal because it writes temporary files to the filesystem.
+    # Other solutions tried:
+    # 1. spark.createDataFrame(spark.sparkContext.parallelize(itertools.product(*(data.values()))), list(data.keys))
+    #    Reasonably fast until the data is larger than Spark's max RPC message size. Then it fails.
+    # 2. Create an RDD and then call rdd.flatMap with the output of itertools.product. Very slow.
+    # 3. Create one Spark DataFrame per column and then cross-join all of them. Extremely slow.
+    # 4. Create one pyarrow Table, write to temp Parquet, read back in Spark. ~2x slower
+    #    than CSV implementaion.
+
+    # Note: This location must be accessible on all compute nodes.
+    scratch_dir.mkdir(exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=scratch_dir) as f:
+        csv_dir = Path(f.name + ".csv")
+    csv_dir.mkdir()
     columns = list(data.keys())
-    df = spark.createDataFrame(
-        spark.sparkContext.parallelize(itertools.product(*(data.values()))), columns
-    )
+    schema = StructType([StructField(x, StringType()) for x in columns])
+
+    def open_file(index):
+        filename = csv_dir / f"part{index}.csv"
+        return open(filename, "w", encoding="utf-8")
+
+    max_size = 128 * 1024 * 1024
+    size = 0
+    partition_index = 1
+    f_out = open_file(partition_index)
+    try:
+        for row in itertools.product(*(data.values())):
+            size += f_out.write(",".join(row))
+            size += f_out.write("\n")
+            if size >= max_size:
+                size = 0
+                f_out.close()
+                partition_index += 1
+                filename = csv_dir / f"part{partition_index}.csv"
+                f_out = open(filename, "w", encoding="utf-8")
+    finally:
+        if not f_out.closed:
+            f_out.close()
+
+    spark = get_spark_session()
+    df = spark.read.csv(str(csv_dir), header=False, schema=schema)
+    atexit.register(lambda: shutil.rmtree(csv_dir))
     return df
 
 
@@ -669,35 +664,16 @@ def restart_spark_with_custom_conf(conf: dict, force=False):
         restart_spark(name=app_name, spark_conf=orig_settings, force=force)
 
 
-def load_stored_table(table_name):
-    """Return a table stored in the Spark warehouse.
-
-    Parameters
-    ----------
-    table_name : str
-
-    Returns
-    -------
-    pyspark.sql.DataFrame
-
-    """
+def load_stored_table(table_name: str) -> DataFrame:
+    """Return a table stored in the Spark warehouse."""
     spark = get_spark_session()
     return spark.table(table_name)
 
 
-def try_load_stored_table(table_name, database=DSGRID_DB_NAME):
-    """Return a table if it is stored in the Spark warehouse.
-
-    Parameters
-    ----------
-    table_name : str
-    database : str, optional
-
-    Returns
-    -------
-    pyspark.sql.DataFrame | None
-
-    """
+def try_load_stored_table(
+    table_name: str, database: str | None = DSGRID_DB_NAME
+) -> DataFrame | None:
+    """Return a table if it is stored in the Spark warehouse."""
     spark = get_spark_session()
     full_name = f"{database}.{table_name}"
     if spark.catalog.tableExists(full_name):
@@ -705,7 +681,7 @@ def try_load_stored_table(table_name, database=DSGRID_DB_NAME):
     return None
 
 
-def union(dfs) -> pyspark.sql.DataFrame:
+def union(dfs: list[DataFrame]) -> DataFrame:
     """Return a union of the dataframes, ensuring that the columns match."""
     df = dfs[0]
     if len(dfs) > 1:

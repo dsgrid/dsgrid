@@ -1,6 +1,7 @@
 import abc
 import logging
 import os
+from typing import Union
 
 from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
@@ -8,6 +9,7 @@ import pyspark.sql.functions as F
 import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
@@ -37,13 +39,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
         config,
         dimension_mgr,
         dimension_mapping_mgr,
-        mapping_references=None,
+        mapping_references: Union[None, list[DimensionMappingReferenceModel]] = None,
         project_time_dim=None,
     ):
-        self._config = config
+        self._config: DatasetConfig = config
         self._dimension_mgr = dimension_mgr
         self._dimension_mapping_mgr = dimension_mapping_mgr
-        self._mapping_references = mapping_references
+        self._mapping_references: list[DimensionMappingReferenceModel] = mapping_references or []
         self._project_time_dim = project_time_dim
 
     @classmethod
@@ -68,15 +70,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def get_unique_dimension_rows(self):
-        """Return a dataframe containing unique dimension combinations that exist in the rows of
-        the data table.
-
-        Returns
-        -------
-        pyspark.sql.DataFrame
-
-        """
+    def make_dimension_association_table(self) -> DataFrame:
+        """Return a dataframe containing one row for each unique dimension combination except time."""
 
     @abc.abstractmethod
     def filter_data(self, dimensions: list[DatasetSimpleModel]):
@@ -445,7 +440,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # TODO #196:
         return df
 
-    def _remap_dimension_columns(self, df, contains_values: bool, filtered_records=None):
+    def _remap_dimension_columns(
+        self,
+        df: DataFrame,
+        contains_values: bool,
+        filtered_records: None | dict = None,
+    ) -> DataFrame:
         pivoted_dim_type = self._config.get_pivoted_dimension_type()
         pivoted_columns = set(df.columns).intersection(
             self._config.get_pivoted_dimension_columns()

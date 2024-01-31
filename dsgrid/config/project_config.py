@@ -31,6 +31,7 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     check_config_id_strict,
 )
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     get_unique_values,
     cross_join_dfs,
@@ -546,7 +547,7 @@ class InputDatasetModel(DSGBaseModel):
 
 class DimensionMappingsModel(DSGBaseModel):
     """Defines all dimension mappings associated with a dsgrid project,
-    including dimension associations, base-to-supplemental mappings, and dataset-to-project mappings.
+    including base-to-supplemental mappings and dataset-to-project mappings.
     """
 
     base_to_supplemental_references: Annotated[
@@ -1109,7 +1110,7 @@ class ProjectConfig(ConfigBase):
         return record_ids
 
     def _build_multi_dim_requirement_associations(
-        self, multi_dim_reqs: list[RequiredDimensionRecordsModel], scratch_dir: Path
+        self, multi_dim_reqs: list[RequiredDimensionRecordsModel], context: ScratchDirContext
     ):
         dfs_by_dim_combo = {}
 
@@ -1135,14 +1136,14 @@ class ProjectConfig(ConfigBase):
                 dim_combo.append(dim_type.value)
                 if record_ids:
                     columns[field] = list(record_ids)
-            df = create_dataframe_from_product(columns, scratch_dir)
-            df2 = df.select(*sorted(df.columns))
+            df = create_dataframe_from_product(columns, context)
+            df = df.select(*sorted(df.columns))
 
             dim_combo = tuple(sorted(dim_combo))
             if dim_combo in dfs_by_dim_combo:
-                dfs_by_dim_combo[dim_combo] = dfs_by_dim_combo[dim_combo].union(df2)
+                dfs_by_dim_combo[dim_combo] = dfs_by_dim_combo[dim_combo].union(df)
             else:
-                dfs_by_dim_combo[dim_combo] = df2
+                dfs_by_dim_combo[dim_combo] = df
 
         return list(dfs_by_dim_combo.values())
 
@@ -1210,13 +1211,15 @@ class ProjectConfig(ConfigBase):
         return record_ids
 
     @track_timing(timer_stats_collector)
-    def make_dimension_association_table(self, dataset_id, scratch_dir: Path) -> DataFrame:
+    def make_dimension_association_table(
+        self, dataset_id, context: ScratchDirContext
+    ) -> DataFrame:
         """Build a table that includes all combinations of dimension records that must be provided
         by the dataset.
         """
         required_dimensions = self.get_dataset(dataset_id).required_dimensions
         multi_dfs = self._build_multi_dim_requirement_associations(
-            required_dimensions.multi_dimensional, scratch_dir
+            required_dimensions.multi_dimensional, context
         )
 
         # Project config construction asserts that there is no intersection of dimensions in
@@ -1236,7 +1239,7 @@ class ProjectConfig(ConfigBase):
             )
             single_dfs[field] = list(record_ids)
 
-        single_df = create_dataframe_from_product(single_dfs, scratch_dir)
+        single_df = create_dataframe_from_product(single_dfs, context)
         return cross_join_dfs(multi_dfs + [single_df])
 
     def _map_supplemental_record_to_base_records(self, dim, supplemental_id):

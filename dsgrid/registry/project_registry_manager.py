@@ -1,14 +1,12 @@
 """Manages the registry for dimension projects"""
 
-import atexit
 import getpass
 import logging
 import os
-import shutil
 import tempfile
 from collections import defaultdict
 from pathlib import Path
-from tempfile import TemporaryDirectory, NamedTemporaryFile
+from tempfile import TemporaryDirectory
 from typing import Type, Union
 
 import json5
@@ -60,6 +58,7 @@ from dsgrid.registry.common import (
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     models_to_dataframe,
     get_unique_values,
@@ -1065,57 +1064,64 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_time_dim=project_config.get_base_dimension(DimensionType.TIME),
         )
         dataset_id = dataset_config.config_id
-        mapped_dataset_table = handler.make_dimension_association_table()
-        project_table = self._make_dimension_associations(project_config, dataset_id)
-        cols = sorted(project_table.columns)
 
-        diff = project_table.select(*cols).exceptAll(mapped_dataset_table.select(*cols))
-        if not diff.rdd.isEmpty():
-            project_id = project_config.config_id
-            out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
-            diff.cache()
-            diff.write.options(header=True).mode("overwrite").csv(out_file)
-            logger.error(
-                "Dataset %s is missing required dimension records from project %s. "
-                "Recorded missing records in %s",
-                dataset_id,
-                project_id,
-                out_file,
-            )
-            diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
-            diff.unpersist()
-            mapped_dataset_table.cache()
-            dataset_counts = {}
-            for col in diff.columns:
-                dataset_counts[col] = mapped_dataset_table.select(col).distinct().count()
-                if dataset_counts[col] != diff_counts[col]:
-                    logger.error(
-                        "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
-                        col,
-                        dataset_counts[col],
-                        diff_counts[col],
-                    )
-            mapped_dataset_table.unpersist()
+        with ScratchDirContext(self._params.scratch_dir) as context:
+            mapped_dataset_table = handler.make_dimension_association_table()
+            project_table = self._make_dimension_associations(project_config, dataset_id, context)
+            cols = sorted(project_table.columns)
 
-            raise DSGInvalidDataset(
-                f"Dataset {dataset_config.config_id} is missing required dimension records. "
-                "Please look in the log file for more information."
-            )
+            diff = project_table.select(*cols).exceptAll(mapped_dataset_table.select(*cols))
+            if not diff.rdd.isEmpty():
+                self._handle_dimension_association_errors(
+                    diff, mapped_dataset_table, dataset_config, project_config.config_id
+                )
+
+    def _handle_dimension_association_errors(
+        self, diff, mapped_dataset_table, dataset_config, project_id
+    ):
+        dataset_id = dataset_config.config_id
+        out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
+        diff.cache()
+        diff.write.options(header=True).mode("overwrite").csv(out_file)
+        logger.error(
+            "Dataset %s is missing required dimension records from project %s. "
+            "Recorded missing records in %s",
+            dataset_id,
+            project_id,
+            out_file,
+        )
+        diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
+        diff.unpersist()
+        mapped_dataset_table.cache()
+        dataset_counts = {}
+        for col in diff.columns:
+            dataset_counts[col] = mapped_dataset_table.select(col).distinct().count()
+            if dataset_counts[col] != diff_counts[col]:
+                logger.error(
+                    "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
+                    col,
+                    dataset_counts[col],
+                    diff_counts[col],
+                )
+        mapped_dataset_table.unpersist()
+
+        raise DSGInvalidDataset(
+            f"Dataset {dataset_config.config_id} is missing required dimension records. "
+            "Please look in the log file for more information."
+        )
 
     @track_timing(timer_stats_collector)
     def _make_dimension_associations(
         self,
         config: ProjectConfig,
         dataset_id: str,
+        context: ScratchDirContext,
     ):
-        self._params.scratch_dir.mkdir(exist_ok=True)
-        with NamedTemporaryFile(dir=self._params.scratch_dir) as f:
-            path = Path(f.name)
-
         logger.info("Make dimension association table for %s", dataset_id)
-        df = config.make_dimension_association_table(dataset_id, self._params.scratch_dir)
+        path = context.get_temp_filename()
+        df = config.make_dimension_association_table(dataset_id, context)
         df = write_dataframe_and_auto_partition(df, path)
-        atexit.register(lambda: shutil.rmtree(path))
+        context.add_tracked_path(path)
         logger.info("Wrote dimension associations for dataset %s", dataset_id)
         return df
 

@@ -38,9 +38,6 @@ def test_project_load(cached_registry):
     assert len(records) == 1
     assert records[0].id == "all_subsectors"
 
-    # table = project.config.load_dimension_associations(DATASET_ID, DimensionType.METRIC)
-    # assert table.count() > 0
-
     with pytest.raises(DSGValueNotRegistered):
         project = mgr.project_manager.load_project(PROJECT_ID, version="0.0.0")
         assert isinstance(project, Project)

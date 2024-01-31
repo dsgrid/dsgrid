@@ -1,13 +1,11 @@
 """Spark helper functions"""
 
-import atexit
 import enum
 import itertools
 import logging
 import math
 import os
 import shutil
-import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Iterable, Union, get_origin, get_args
@@ -30,6 +28,7 @@ from dsgrid.data_models import DSGBaseModel
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile
 from dsgrid.loggers import disable_console_logging
 from dsgrid.utils.files import load_data
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 
 
@@ -539,7 +538,9 @@ def cross_join_dfs(dfs: list[DataFrame]) -> DataFrame:
 
 
 @track_timing(timer_stats_collector)
-def create_dataframe_from_product(data: dict[str, list[str]], scratch_dir: Path) -> DataFrame:
+def create_dataframe_from_product(
+    data: dict[str, list[str]], context: ScratchDirContext
+) -> DataFrame:
     """Create a dataframe by taking a product of values/columns in a dict.
 
     Parameters
@@ -547,6 +548,8 @@ def create_dataframe_from_product(data: dict[str, list[str]], scratch_dir: Path)
     data : dict
         Columns on which to perform a cross product.
         {"sector": [com], "subsector": ["SmallOffice", "LargeOffice"]}
+    context : ScratchDirContext
+        Manages temporary files.
     """
     # dthom: 1/29/2024
     # This implementation creates a product of all columns in Python, writes them to temporary
@@ -567,9 +570,7 @@ def create_dataframe_from_product(data: dict[str, list[str]], scratch_dir: Path)
     #    than CSV implementaion.
 
     # Note: This location must be accessible on all compute nodes.
-    scratch_dir.mkdir(exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=scratch_dir) as f:
-        csv_dir = Path(f.name + ".csv")
+    csv_dir = context.get_temp_filename()
     csv_dir.mkdir()
     columns = list(data.keys())
     schema = StructType([StructField(x, StringType()) for x in columns])
@@ -596,9 +597,9 @@ def create_dataframe_from_product(data: dict[str, list[str]], scratch_dir: Path)
         if not f_out.closed:
             f_out.close()
 
+    context.add_tracked_path(csv_dir)
     spark = get_spark_session()
     df = spark.read.csv(str(csv_dir), header=False, schema=schema)
-    atexit.register(lambda: shutil.rmtree(csv_dir))
     return df
 
 

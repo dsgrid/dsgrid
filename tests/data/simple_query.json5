@@ -6,14 +6,11 @@
     "dataset": {
       "dataset_id": "conus_2022",
       "source_datasets": [
-      {
-        "dataset_id": "resstock_conus_2022_projected",
-        "dataset_type": "standalone",
-      },
+        {
+          "dataset_id": "resstock_conus_2022_projected",
+          "dataset_type": "standalone",
+        },
       ],
-    "params": {
-      "table_format": "pivoted"
-    },
     },
     "excluded_dataset_ids": [],
     "include_dsgrid_dataset_components": false,
@@ -38,7 +35,7 @@
             "06037"
           ],
           "negate": false,
-          "filter_type": "DimensionFilterColumnOperatorModel"
+          "filter_type": "column_operator"
         },
     ],
     "time_zone": null

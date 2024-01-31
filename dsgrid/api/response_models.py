@@ -101,7 +101,7 @@ class ListTableFormatTypesResponse(DSGBaseModel):
 class SparkSubmitProjectQueryResponse(DSGBaseModel):
     """Defines the response to the submit_project_query command."""
 
-    async_task_id: str
+    async_task_id: int
 
 
 class ListAsyncTasksResponse(DSGBaseModel):

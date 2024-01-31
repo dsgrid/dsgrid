@@ -1,9 +1,13 @@
+from functools import reduce
+
 from pyspark.sql import DataFrame
 
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     get_spark_session,
     try_read_dataframe,
     restart_spark_with_custom_conf,
+    create_dataframe_from_product,
 )
 
 
@@ -43,3 +47,15 @@ def test_restart_spark():
     with restart_spark_with_custom_conf(conf=conf) as new_spark:
         assert new_spark.conf.get("spark.sql.shuffle.partitions") == new_partitions
         assert new_spark.conf.get("spark.rdd.compress") == new_compress
+
+
+def test_create_dataframe_from_product(tmp_path):
+    with ScratchDirContext(tmp_path / "scratch") as context:
+        data = {
+            "geography": [f"county_{i}" for i in range(200)],
+            "scenario": [f"scenario_{i}" for i in range(10)],
+            "model_year": [str(x) for x in range(2020, 2030)],
+            "sector": ["com", "ind", "res", "trans"],
+        }
+        df = create_dataframe_from_product(data, context, max_partition_size_mb=1)
+        assert df.count() == reduce(lambda x, y: x * y, [len(x) for x in data.values()])

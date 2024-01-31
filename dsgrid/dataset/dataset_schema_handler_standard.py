@@ -14,7 +14,6 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import (
-    check_null_value_in_dimension_rows,
     apply_scaling_factor,
 )
 from dsgrid.utils.spark import (
@@ -212,7 +211,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 raise DSGInvalidDataset(
                     f"load_data_lookup records do not match dimension records for {name}"
                 )
-        check_null_value_in_dimension_rows(self._load_data_lookup)
 
     @track_timing(timer_stats_collector)
     def _check_dataset_internal_consistency(self):

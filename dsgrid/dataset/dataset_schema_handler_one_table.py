@@ -45,6 +45,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         """Dimension check in load_data, excludes time:
         * check that data matches record for each dimension.
         * check that all data dimension combinations exist. Time is handled separately.
+        * Check for any NULL values in dimension columns.
         """
         logger.info("Check one table dataset consistency.")
         dimension_types = set()
@@ -100,6 +101,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 data_records = set(pivoted_cols)
             else:
                 data_records = get_unique_values(self._load_data, name)
+                if None in data_records:
+                    raise DSGInvalidDataset(
+                        f"{self._config.config_id} has a NULL value for {dimension_type}"
+                    )
             if dim_records != data_records:
                 logger.error(
                     "Mismatch in load_data records. dimension=%s mismatched=%s",

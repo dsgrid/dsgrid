@@ -39,6 +39,8 @@ logger = logging.getLogger(__name__)
 # Doing so has caused conflicts in tests with the Derby db.
 DSGRID_DB_NAME = "default"
 
+MAX_PARTITION_SIZE_MB = 128
+
 PYTHON_TO_SPARK_TYPES = {
     int: IntegerType,
     float: DoubleType,
@@ -445,7 +447,11 @@ def overwrite_dataframe_file(filename: Path | str, df: DataFrame) -> DataFrame:
 
 @track_timing(timer_stats_collector)
 def write_dataframe_and_auto_partition(
-    df: DataFrame, filename: Path, partition_size_mb=128, columns=None, rtol_pct=50
+    df: DataFrame,
+    filename: Path,
+    partition_size_mb=MAX_PARTITION_SIZE_MB,
+    columns=None,
+    rtol_pct=50,
 ) -> DataFrame:
     """Write a dataframe to a Parquet file and then automatically coalesce or repartition it if
     needed. If the file already exists, it will be overwritten.
@@ -539,7 +545,9 @@ def cross_join_dfs(dfs: list[DataFrame]) -> DataFrame:
 
 @track_timing(timer_stats_collector)
 def create_dataframe_from_product(
-    data: dict[str, list[str]], context: ScratchDirContext
+    data: dict[str, list[str]],
+    context: ScratchDirContext,
+    max_partition_size_mb=MAX_PARTITION_SIZE_MB,
 ) -> DataFrame:
     """Create a dataframe by taking a product of values/columns in a dict.
 
@@ -579,7 +587,7 @@ def create_dataframe_from_product(
         filename = csv_dir / f"part{index}.csv"
         return open(filename, "w", encoding="utf-8")
 
-    max_size = 128 * 1024 * 1024
+    max_size = max_partition_size_mb * 1024 * 1024
     size = 0
     partition_index = 1
     f_out = open_file(partition_index)

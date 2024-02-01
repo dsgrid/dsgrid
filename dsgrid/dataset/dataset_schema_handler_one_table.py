@@ -9,6 +9,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.utils.spark import (
+    create_dataframe_from_ids,
     read_dataframe,
     get_unique_values,
     overwrite_dataframe_file,
@@ -116,14 +117,21 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 )
 
     def make_dimension_association_table(self) -> DataFrame:
-        time_cols = set(self._get_time_dimension_columns())
-        pivoted_cols = set(self._config.get_pivoted_dimension_columns())
-        exclude = time_cols.union(pivoted_cols)
-        if self._config.get_table_format_type() == TableFormatType.UNPIVOTED:
-            exclude.add(VALUE_COLUMN)
+        exclude = set(self._get_time_dimension_columns())
+        exclude.update(self._config.get_value_columns())
         dim_cols = [x for x in self._load_data.columns if x not in exclude]
+
         df = self._load_data.select(*dim_cols).distinct()
-        return self._remap_dimension_columns(df, True).distinct()
+        df = self._remap_dimension_columns(df, True).distinct()
+
+        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+            pivoted_cols = set(self.get_pivoted_dimension_columns_mapped_to_project())
+            pivoted_dims = create_dataframe_from_ids(
+                pivoted_cols, self._config.get_pivoted_dimension_type().value
+            )
+            df = df.crossJoin(pivoted_dims)
+
+        return df
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel]):

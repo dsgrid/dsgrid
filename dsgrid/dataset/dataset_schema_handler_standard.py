@@ -50,12 +50,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_dataset_internal_consistency()
 
     def make_dimension_association_table(self) -> DataFrame:
-        stacked_dims = self._remap_dimension_columns(self._load_data_lookup, False).distinct()
-        pivoted_cols = self.get_pivoted_dimension_columns_mapped_to_project()
-        pivoted_dims = create_dataframe_from_ids(
-            pivoted_cols, self._config.get_pivoted_dimension_type().value
-        )
-        return stacked_dims.crossJoin(pivoted_dims)
+        df = self._remap_dimension_columns(self._load_data_lookup, False).distinct()
+        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+            pivoted_cols = self.get_pivoted_dimension_columns_mapped_to_project()
+            pivoted_dims = create_dataframe_from_ids(
+                pivoted_cols, self._config.get_pivoted_dimension_type().value
+            )
+            df = df.crossJoin(pivoted_dims)
+
+        return df
 
     def make_project_dataframe(self, project_config):
         # TODO: Can we remove NULLs at registration time?

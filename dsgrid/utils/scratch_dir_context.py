@@ -26,9 +26,17 @@ class ScratchDirContext:
         """Return a list of paths being tracked."""
         return self._paths[:]
 
-    def get_temp_filename(self) -> Path:
-        """Return a temporary filename based in the scratch directory."""
-        with NamedTemporaryFile(dir=self._scratch_dir) as f:
+    def get_temp_filename(self, prefix=None, suffix=None) -> Path:
+        """Return a temporary filename based in the scratch directory.
+
+        Parameters
+        ----------
+        prefix : str | None
+            Forwarded to NamedTemporaryFile.
+        suffix : str | None
+            Forwarded to NamedTemporaryFile.
+        """
+        with NamedTemporaryFile(dir=self._scratch_dir, prefix=prefix, suffix=suffix) as f:
             return Path(f.name)
 
     def finalize(self) -> None:

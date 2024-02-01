@@ -1118,8 +1118,8 @@ class ProjectRegistryManager(RegistryManagerBase):
         context: ScratchDirContext,
     ):
         logger.info("Make dimension association table for %s", dataset_id)
-        path = context.get_temp_filename()
         df = config.make_dimension_association_table(dataset_id, context)
+        path = context.get_temp_filename(suffix=".parquet")
         df = write_dataframe_and_auto_partition(df, path)
         context.add_tracked_path(path)
         logger.info("Wrote dimension associations for dataset %s", dataset_id)

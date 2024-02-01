@@ -578,7 +578,7 @@ def create_dataframe_from_product(
     #    than CSV implementaion.
 
     # Note: This location must be accessible on all compute nodes.
-    csv_dir = context.get_temp_filename()
+    csv_dir = context.get_temp_filename(suffix=".csv")
     csv_dir.mkdir()
     columns = list(data.keys())
     schema = StructType([StructField(x, StringType()) for x in columns])

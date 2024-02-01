@@ -6,6 +6,7 @@ import logging
 import click
 
 from dsgrid.common import DEFAULT_DB_PASSWORD
+from dsgrid.cli.common import handle_scratch_dir
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 
 
@@ -85,6 +86,14 @@ def config():
     show_default=True,
     help="Re-raise any dsgrid exception. Default is to log the exception and exit.",
 )
+@click.option(
+    "-s",
+    "--scratch-dir",
+    default=None,
+    callback=handle_scratch_dir,
+    help="Base directory for dsgrid temporary directories. Must be accessible on all compute "
+    "nodes. Defaults to the current directory.",
+)
 def create(
     timings,
     database_name,
@@ -95,6 +104,7 @@ def create(
     console_level,
     file_level,
     reraise_exceptions,
+    scratch_dir,
 ):
     """Create a local dsgrid runtime configuration file."""
     dsgrid_config = DsgridRuntimeConfig(
@@ -107,6 +117,7 @@ def create(
         console_level=console_level,
         file_level=file_level,
         reraise_exceptions=reraise_exceptions,
+        scratch_dir=scratch_dir,
     )
     dsgrid_config.dump()
 

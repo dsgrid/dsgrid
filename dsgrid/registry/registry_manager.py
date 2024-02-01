@@ -101,8 +101,8 @@ class RegistryManager:
         use_remote_data_path : None, str
             Path to remote registry.
         scratch_dir : None | Path
-            Temporary directory for dsgrid. Must be available on all compute nodes. Default is
-            current directory.
+            Base directory for dsgrid temporary directories. Must be accessible on all compute
+            nodes. Defaults to the current directory.
 
         Returns
         -------
@@ -183,8 +183,8 @@ class RegistryManager:
         no_prompts : bool
             If no_prompts is False, the user will be prompted to continue sync pulling the registry if lock files exist.
         scratch_dir : None | Path
-            Temporary directory for dsgrid. Must be available on all compute nodes. Default is
-            current directory.
+            Base directory for dsgrid temporary directories. Must be accessible on all compute
+            nodes. Defaults to the current directory.
 
         Returns
         -------

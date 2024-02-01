@@ -100,8 +100,8 @@ _config = DsgridRuntimeConfig.load()
     "--scratch-dir",
     default=_config.scratch_dir,
     callback=handle_scratch_dir,
-    help="Temporary directory for dsgrid. Must be accessible on all compute nodes. Defaults to "
-    "the current directory.",
+    help="Base directory for dsgrid temporary directories. Must be accessible on all compute "
+    "nodes. Defaults to the current directory.",
 )
 @click.pass_context
 def cli(

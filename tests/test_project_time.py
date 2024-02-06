@@ -21,9 +21,39 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def registry_mgr():
+def project():
     conn = DatabaseConnection(database="simple-standard-scenarios")
-    return RegistryManager.load(conn, offline_mode=True)
+    registry_mgr = RegistryManager.load(conn, offline_mode=True)
+    project_id = "dsgrid_conus_2022"
+    project = registry_mgr.project_manager.load_project(project_id)
+    return project
+
+
+@pytest.fixture
+def resstock(project):
+    dataset_id = "resstock_conus_2022_reference"
+    project.load_dataset(dataset_id)
+    return project.get_dataset(dataset_id)
+
+
+@pytest.fixture
+def resstock_inputdatasetmodel(project):
+    dataset_id = "resstock_conus_2022_reference"
+    return project.config.get_dataset(dataset_id)
+
+
+@pytest.fixture
+def comstock(project):
+    dataset_id = "comstock_conus_2022_reference"
+    project.load_dataset(dataset_id)
+    return project.get_dataset(dataset_id)
+
+
+@pytest.fixture
+def tempo(project):
+    dataset_id = "tempo_conus_2022"
+    project.load_dataset(dataset_id)
+    return project.get_dataset(dataset_id)
 
 
 def test_no_unexpected_timezone():
@@ -33,40 +63,22 @@ def test_no_unexpected_timezone():
         ), f"{tzo} can either be prevailing or standard"
 
 
-def test_convert_to_project_time(registry_mgr):
-    project_id = "dsgrid_conus_2022"
-    project = registry_mgr.project_manager.load_project(project_id)
-
-    dataset_id = "resstock_conus_2022_reference"
-    project.load_dataset(dataset_id)
-    resstock = project.get_dataset(dataset_id)
-
-    dataset_id = "comstock_conus_2022_reference"
-    project.load_dataset(dataset_id)
-    comstock = project.get_dataset(dataset_id)
-
-    dataset_id = "tempo_conus_2022"
-    project.load_dataset(dataset_id)
-    tempo = project.get_dataset(dataset_id)
-    tempo_load_data = tempo._handler._load_data
-    tempo_load_data_lookup = tempo._handler._load_data_lookup
-
-    # different ways to access project_time_dim:
-    project_time_dim = project.config.get_base_dimension(
-        DimensionType.TIME
-    )  # or tempo._handler._project_time_dim
-    resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
-    comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
-    comstock_geo_dim = comstock._handler.config.get_dimension(DimensionType.GEOGRAPHY)
-    tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
-
-    # [1] test build_time_dataframe()
+def test_build_time_dataframe(project, resstock, comstock):
+    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
+    # alteratively, project_time_dim = resstock._handler._project_time_dim
+    resstock_time_dim = resstock.config.get_dimension(DimensionType.TIME)
+    comstock_time_dim = comstock.config.get_dimension(DimensionType.TIME)
     check_time_dataframe(project_time_dim)
     check_time_dataframe(resstock_time_dim)
     check_time_dataframe(comstock_time_dim)
 
-    # [2] test convert time
-    tempo_data = tempo_load_data.join(tempo_load_data_lookup, on="id").drop("id")
+
+def test_convert_time_for_tempo(project, tempo):
+    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
+
+    tempo_data = tempo._handler._load_data.join(tempo._handler._load_data_lookup, on="id").drop(
+        "id"
+    )
     tempo_data_mapped_time = tempo._handler._convert_time_dimension(tempo_data, project.config)
     tempo_data_with_tz = add_time_zone(
         tempo_data, project.config.get_base_dimension(DimensionType.GEOGRAPHY)
@@ -79,42 +91,86 @@ def test_convert_to_project_time(registry_mgr):
         converted_data=tempo_data_mapped_time,
     )
 
-    # [2.1] test time-wrap when dataset and project have different time interval type
-    # expect no error with original dataset and project time configs
+
+def test_convert_time_for_comstock(project, comstock):
+    comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
+
+    comstock_data = comstock._handler._load_data.join(comstock._handler._load_data_lookup, on="id")
+    comstock_data_with_tz = add_time_zone(
+        comstock_data, comstock._handler.config.get_dimension(DimensionType.GEOGRAPHY)
+    )
+    comstock_time_dim.convert_dataframe(
+        comstock_data_with_tz, project.config.get_base_dimension(DimensionType.TIME)
+    )
+
+
+def test_convert_to_project_time_1(project, resstock, comstock, tempo):
+    """test convert time for different time interval type"""
+    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
+    resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
+    comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
+    tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
+    tempo_data = tempo._handler._load_data.join(tempo._handler._load_data_lookup, on="id").drop(
+        "id"
+    )
+    tempo_data_mapped_time = tempo._handler._convert_time_dimension(tempo_data, project.config)
+
+    # project: period-beginning, dataset: period-ending, same time range
     compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=False)
     compare_time_conversion(comstock_time_dim, project_time_dim, expect_error=False)
     compare_time_conversion(
         tempo_time_dim, project_time_dim, df=tempo_data_mapped_time, expect_error=False
     )
-    project_time_dim.model.wrap_time_allowed = False
-    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=True)
-    compare_time_conversion(comstock_time_dim, project_time_dim, expect_error=True)
-    project_time_dim.model.wrap_time_allowed = True  # reset
 
-    # [2.2] test time-wrap when dataset and project have different timezone
-    resstock_time_dim.model.timezone = TimeZone.UTC
+    # project, dataset same time range and time interval type
+    project_time_dim.model.time_interval_type = resstock_time_dim.model.time_interval_type
     compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=False)
-    project_time_dim.model.wrap_time_allowed = False
+    compare_time_conversion(
+        tempo_time_dim, project_time_dim, df=tempo_data_mapped_time, expect_error=False
+    )
+
+    # project: period-ending, dataset: period-begining, same time range
+    comstock_time_dim.model.time_interval_type = TimeIntervalType.PERIOD_BEGINNING
+    compare_time_conversion(comstock_time_dim, project_time_dim, expect_error=False)
+    tempo_time_dim.model.time_interval_type = TimeIntervalType.PERIOD_BEGINNING
+    compare_time_conversion(
+        tempo_time_dim, project_time_dim, df=tempo_data_mapped_time, expect_error=False
+    )
+
+
+def test_convert_to_project_time_2(project, resstock, comstock, tempo):
+    """test convert time for different time zone"""
+    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
+    resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
+
+    resstock_time_dim.model.timezone = TimeZone.UTC
+    # no error expected because time is being wrapped from time_interval_type alignment
+    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=False)
+    # project, dataset same time range and time interval type but different time zone, wrap_time is needed
+    resstock_time_dim.model.time_interval_type = project_time_dim.model.time_interval_type
     compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=True)
-    resstock_time_dim.model.timezone = TimeZone.EST  # reset
-    project_time_dim.model.wrap_time_allowed = True  # reset
+    compare_time_conversion(
+        resstock_time_dim, project_time_dim, wrap_time=True, expect_error=False
+    )
+    project_time_dim.model.timezone = TimeZone.PST
+    compare_time_conversion(
+        resstock_time_dim, project_time_dim, wrap_time=True, expect_error=False
+    )
 
-    # comstock time conversion
-    comstock_data = comstock._handler._load_data.join(comstock._handler._load_data_lookup, on="id")
-    comstock_data_with_tz = add_time_zone(comstock_data, comstock_geo_dim)
-    comstock_time_dim.convert_dataframe(comstock_data_with_tz, project_time_dim)
 
-    # [3] test make_project_dataframe()
+def test_make_project_datafrme(project, resstock, comstock, tempo):
     tempo.make_project_dataframe(project.config)
     comstock.make_project_dataframe(project.config)
     resstock.make_project_dataframe(project.config)
 
 
-def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None):
+def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None, wrap_time=False):
     project_time = project_time_dim.build_time_dataframe()
     if df is None:
         converted_dataset_time = dataset_time_dim._convert_time_to_project_time_interval(
-            dataset_time_dim.build_time_dataframe(), project_time_dim=project_time_dim
+            dataset_time_dim.build_time_dataframe(),
+            project_time_dim=project_time_dim,
+            wrap_time=wrap_time,
         )
     else:
         converted_dataset_time = df
@@ -128,20 +184,16 @@ def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None):
         )
 
 
-def compare_time_conversion(dataset_time_dim, project_time_dim, df=None, expect_error=False):
+def compare_time_conversion(
+    dataset_time_dim, project_time_dim, df=None, wrap_time=False, expect_error=False
+):
     if expect_error:
         with pytest.raises(DSGDatasetConfigError):
             _compare_time_conversion(
-                dataset_time_dim,
-                project_time_dim,
-                df=df,
+                dataset_time_dim, project_time_dim, df=df, wrap_time=wrap_time
             )
     else:
-        _compare_time_conversion(
-            dataset_time_dim,
-            project_time_dim,
-            df=df,
-        )
+        _compare_time_conversion(dataset_time_dim, project_time_dim, df=df, wrap_time=wrap_time)
 
 
 def check_time_dataframe(time_dim):
@@ -247,7 +299,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
     try:
         project_time_df = project_time_dim.build_time_dataframe()
-        project_time_df = project_time_dim._align_time_interval_type(
+        project_time_df = project_time_dim._shift_time_interval(
             project_time_df,
             ptime_col,
             ptime_int,

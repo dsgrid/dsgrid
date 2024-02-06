@@ -543,6 +543,14 @@ class InputDatasetModel(DSGBaseModel):
             },
         ),
     ]
+    wrap_time_allowed: Annotated[
+        bool,
+        Field(
+            title="wrap_time_allowed",
+            description="Whether to allow dataset time to be wrapped to project time if different",
+            default=False,
+        ),
+    ]
 
 
 class DimensionMappingsModel(DSGBaseModel):

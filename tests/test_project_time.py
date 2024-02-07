@@ -146,9 +146,15 @@ def test_convert_to_project_time_2(project, resstock, comstock, tempo):
     resstock_time_dim.model.timezone = TimeZone.UTC
     # no error expected because time is being wrapped from time_interval_type alignment
     compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=False)
+
     # project, dataset same time range and time interval type but different time zone, wrap_time is needed
     resstock_time_dim.model.time_interval_type = project_time_dim.model.time_interval_type
-    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=True)
+    dataset_id = "resstock_conus_2022_reference"
+    wrap_time = project.config.get_dataset(dataset_id).wrap_time_allowed
+    assert wrap_time is False, f"{wrap_time=} for {dataset_id=}, expecting False"
+    compare_time_conversion(
+        resstock_time_dim, project_time_dim, wrap_time=wrap_time, expect_error=True
+    )
     compare_time_conversion(
         resstock_time_dim, project_time_dim, wrap_time=True, expect_error=False
     )
@@ -158,7 +164,7 @@ def test_convert_to_project_time_2(project, resstock, comstock, tempo):
     )
 
 
-def test_make_project_datafrme(project, resstock, comstock, tempo):
+def test_make_project_dataframe(project, resstock, comstock, tempo):
     tempo.make_project_dataframe(project.config)
     comstock.make_project_dataframe(project.config)
     resstock.make_project_dataframe(project.config)

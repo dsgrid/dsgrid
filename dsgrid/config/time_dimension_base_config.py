@@ -1,5 +1,6 @@
 import abc
 from datetime import datetime, timedelta
+from typing import Optional
 
 import pandas as pd
 import pyspark.sql.functions as F
@@ -14,7 +15,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     """Base class for all time dimension configs"""
 
     @abc.abstractmethod
-    def check_dataset_time_consistency(self, load_data_df, time_columns: list):
+    def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]):
         """Check consistency of the load data with the time dimension.
 
         Parameters
@@ -30,7 +31,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def build_time_dataframe(self, model_years: list = None):
+    def build_time_dataframe(self, model_years: Optional[list[int]] = None):
         """Build time dimension as specified in config in a spark dataframe.
 
         Parameters
@@ -61,8 +62,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         self,
         df,
         project_time_dim,
-        model_years: list = None,
-        value_columns: set = None,
+        model_years: Optional[list[int]] = None,
+        value_columns: Optional[set[str]] = None,
         wrap_time_allowed: bool = False,
     ):
         """Convert input df to use project's time format and time zone.
@@ -138,7 +139,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df.withColumnRenamed(time_cols[0], self.model.dimension_query_name)
 
     @abc.abstractmethod
-    def get_time_ranges(self, model_years: list = None):
+    def get_time_ranges(self, model_years: Optional[list[int]] = None):
         """Return time ranges with timezone applied.
 
         Parameters
@@ -175,7 +176,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def list_expected_dataset_timestamps(self, model_years: list = None):
+    def list_expected_dataset_timestamps(self, model_years: Optional[list[int]] = None):
         """Return a list of the timestamps expected in the load_data table.
 
         Parameters
@@ -194,11 +195,13 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     def _convert_time_to_project_time_interval(
         self, df, project_time_dim=None, wrap_time: bool = False
     ):
-        """Shift time to match project time based on TimeIntervalType
-        If wrap_time_allowed in project_time_dim:
-        -
-
-        - Time will also wrapped if dataset has a different time zone than project
+        """
+        Shift time to match project time based on TimeIntervalType, time zone,
+        and other attributes.
+        - Time-wrapping is applied as needed as part of align_time_interval_type
+        - Separately, input wrap_time allows time-wrapping to be applied if dataset
+        has a different time zone than project. wrap_time_allowed is specified by
+        the project's InputDatasetModel.
         """
         if project_time_dim is None:
             return df
@@ -212,7 +215,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df
 
     def _align_time_interval_type(self, df, project_time_dim):
-        """Align time interval type between df and project_time_dim
+        """Align time interval type between df and project_time_dim.
         If time range spills over into another year after time interval alignment,
         the time range will be wrapped around so it's bounded within the year.
         """
@@ -243,11 +246,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         from_time_interval: TimeIntervalType,
         to_time_interval: TimeIntervalType,
         time_step: timedelta,
-        new_time_column: str = None,
+        new_time_column: Optional[str] = None,
     ):
         """
-        Shift time_column by time_step in df as needed by comparing from_time_interval to to_time_interval.
-        If new_time_column is None, time_column is shifted in place, else shifted time is added as new_time_column in df.
+        Shift time_column by time_step in df as needed by comparing from_time_interval
+        to to_time_interval. If new_time_column is None, time_column is shifted in
+        place, else shifted time is added as new_time_column in df.
         """
         assert (
             from_time_interval != to_time_interval
@@ -305,18 +309,18 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         if difference == "symmetric":
             return dataset_time.symmetric_difference(project_time)
 
-        raise ValueError(f"Unsupport function input {difference=}")
+        raise ValueError(f"Unsupported function input {difference=}")
 
     @staticmethod
     def _apply_time_wrap(df, project_time_dim, diff: set):
-        """apply time-wrapping"""
+        """Apply time-wrapping"""
 
         time_col = project_time_dim.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
 
         project_time = {
-            row[0]
+            row[time_col]
             for row in project_time_dim.build_time_dataframe()
             .select(time_col)
             .filter(f"{time_col} IS NOT NULL")
@@ -363,8 +367,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         self,
         time_ranges: TimeRangeModel,
         str_format: str,
-        model_years: list = None,
-        tz: TimeZone = None,
+        model_years: Optional[list[int]] = None,
+        tz: Optional[TimeZone] = None,
     ):
         ranges = []
         allowed_year = None

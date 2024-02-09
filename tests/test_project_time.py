@@ -65,7 +65,6 @@ def test_no_unexpected_timezone():
 
 def test_build_time_dataframe(project, resstock, comstock):
     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
-    # alteratively, project_time_dim = resstock._handler._project_time_dim
     resstock_time_dim = resstock.config.get_dimension(DimensionType.TIME)
     comstock_time_dim = comstock.config.get_dimension(DimensionType.TIME)
     check_time_dataframe(project_time_dim)

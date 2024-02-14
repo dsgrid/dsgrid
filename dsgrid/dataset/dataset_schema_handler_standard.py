@@ -50,7 +50,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_dataset_internal_consistency()
 
     def make_dimension_association_table(self) -> DataFrame:
-        df = self._remap_dimension_columns(self._load_data_lookup, False).distinct()
+        df = self._remap_dimension_columns(self._load_data_lookup, False)
+        df = self._remove_non_dimension_columns(df).distinct()
         if self._config.get_table_format_type() == TableFormatType.PIVOTED:
             pivoted_cols = self.get_pivoted_dimension_columns_mapped_to_project()
             pivoted_dims = create_dataframe_from_ids(

@@ -546,3 +546,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
             load_data_df = load_data_df.drop("time_zone")
 
         return load_data_df
+
+    def _remove_non_dimension_columns(self, df: DataFrame) -> DataFrame:
+        allowed_columns = {x.value for x in DimensionType}
+        columns = [x for x in df.columns if x in allowed_columns]
+        return df.select(*columns)

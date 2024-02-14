@@ -122,7 +122,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         dim_cols = [x for x in self._load_data.columns if x not in exclude]
 
         df = self._load_data.select(*dim_cols).distinct()
-        df = self._remap_dimension_columns(df, True).distinct()
+        df = self._remap_dimension_columns(df, True)
+        df = self._remove_non_dimension_columns(df).distinct()
 
         if self._config.get_table_format_type() == TableFormatType.PIVOTED:
             pivoted_cols = set(self.get_pivoted_dimension_columns_mapped_to_project())

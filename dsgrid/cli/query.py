@@ -11,6 +11,7 @@ from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.cli.common import (
     check_output_directory,
     get_value_from_context,
+    handle_dsgrid_exception,
 )
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
@@ -22,7 +23,6 @@ from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
-from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
@@ -163,7 +163,7 @@ def create_project_query(
                 f"{query_file} already exists. Choose a different name or pass --force to overwrite it.",
                 file=sys.stderr,
             )
-            sys.exit(1)
+            return 1
 
     conn = DatabaseConnection.from_url(
         get_value_from_context(ctx, "url"),
@@ -307,19 +307,18 @@ def run_project_query(
     )
     project = registry_manager.project_manager.load_project(query.project.project_id)
     fs_interface = make_filesystem_interface(output)
-    ret = 0
-    try:
-        ProjectQuerySubmitter(project, fs_interface.path(output)).submit(
-            query,
-            persist_intermediate_table=persist_intermediate_table,
-            load_cached_table=load_cached_table,
-            zip_file=zip_file,
-            force=force,
-        )
-    except DSGInvalidQuery as exc:
-        logger.error("Query failed: %s", exc)
-        ret = 1
-    sys.exit(ret)
+    submitter = ProjectQuerySubmitter(project, fs_interface.path(output))
+    res = handle_dsgrid_exception(
+        ctx,
+        submitter.submit,
+        query,
+        persist_intermediate_table=persist_intermediate_table,
+        load_cached_table=load_cached_table,
+        zip_file=zip_file,
+        force=force,
+    )
+    if res[1] != 0:
+        return 1
 
 
 @click.command("create_dataset")
@@ -344,7 +343,7 @@ def create_composite_dataset(
     # )
     # TODO
     print("not implemented yet")
-    sys.exit(1)
+    return 1
     # registry_manager = RegistryManager.load(
     #     conn,
     #     remote_path=remote_path,
@@ -376,7 +375,7 @@ def query_composite_dataset(
     # )
     # TODO
     print("not implemented yet")
-    sys.exit(1)
+    return 1
     # registry_manager = RegistryManager.load(
     #     registry_path,
     #     remote_path=remote_path,
@@ -404,7 +403,7 @@ def create_derived_dataset_config(ctx, src, dst, remote_path, force):
     src_path = fs_interface.path(src)
     if not src_path.exists():
         print(f"{src} does not exist", file=sys.stderr)
-        sys.exit(1)
+        return 1
     dst_path = fs_interface.path(dst)
     check_output_directory(dst_path, fs_interface, force)
 
@@ -422,7 +421,7 @@ def create_derived_dataset_config(ctx, src, dst, remote_path, force):
     result = create_derived_dataset_config_from_query(src_path, dst_path, registry_manager)
     if not result:
         logger.error("The query defined in %s does not support a derived dataset.", src)
-        sys.exit(1)
+        return 1
 
 
 @click.group()

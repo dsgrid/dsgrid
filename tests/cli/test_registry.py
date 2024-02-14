@@ -262,8 +262,8 @@ def test_list_project_dimension_query_names(cached_registry):
     assert "supplemental: all_geographies census_division census_region state" in result.stdout
 
 
-def test_register_standard_scenarios(tmp_registry_db):
-    """Test registration of the StandardScenarios project."""
+def test_register_dsgrid_projects(tmp_registry_db):
+    """Test registration of the real dsgrid projects."""
     _, tmpdir, db_name = tmp_registry_db
     runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
@@ -282,73 +282,31 @@ def test_register_standard_scenarios(tmp_registry_db):
     )
     assert result.exit_code == 0
 
-    project_config = STANDARD_SCENARIOS_PROJECT_REPO / "dsgrid_project" / "project.json5"
-
-    result = runner.invoke(
-        cli,
-        [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--url",
-            "http://localhost:8529",
-            "--database-name",
-            db_name,
-            "--offline",
-            "registry",
-            "projects",
-            "register",
-            str(project_config),
-            "--log-message",
-            "log",
-        ],
+    project_configs = (
+        STANDARD_SCENARIOS_PROJECT_REPO / "dsgrid_project" / "project.json5",
+        DECARB_PROJECT_REPO / "project" / "project.json5",
     )
-    assert result.exit_code == 0
 
-
-def test_register_decarb(tmp_registry_db):
-    """Test registration of the DECARB project."""
-    _, tmpdir, db_name = tmp_registry_db
-    runner = CliRunner(mix_stderr=False)
-    result = runner.invoke(
-        admin_cli,
-        [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--url",
-            "http://localhost:8529",
-            "create-registry",
-            db_name,
-            "-p",
-            str(tmpdir),
-            "--force",
-        ],
-    )
-    assert result.exit_code == 0
-
-    project_config = DECARB_PROJECT_REPO / "project" / "project.json5"
-
-    result = runner.invoke(
-        cli,
-        [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--url",
-            "http://localhost:8529",
-            "--database-name",
-            db_name,
-            "--offline",
-            "registry",
-            "projects",
-            "register",
-            str(project_config),
-            "--log-message",
-            "log",
-        ],
-    )
-    assert result.exit_code == 0
+    # Test these together because they share dimensions and mappings.
+    for project_config in project_configs:
+        result = runner.invoke(
+            cli,
+            [
+                "--username",
+                "root",
+                "--password",
+                DEFAULT_DB_PASSWORD,
+                "--url",
+                "http://localhost:8529",
+                "--database-name",
+                db_name,
+                "--offline",
+                "registry",
+                "projects",
+                "register",
+                str(project_config),
+                "--log-message",
+                "log",
+            ],
+        )
+        assert result.exit_code == 0

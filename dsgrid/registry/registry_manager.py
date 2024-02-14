@@ -22,6 +22,7 @@ from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidParameter
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.filesystem.factory import make_filesystem_interface
@@ -82,7 +83,12 @@ class RegistryManager:
 
     @classmethod
     def create(
-        cls, conn: DatabaseConnection, data_path: Path, remote_path=REMOTE_REGISTRY, user=None
+        cls,
+        conn: DatabaseConnection,
+        data_path: Path,
+        remote_path=REMOTE_REGISTRY,
+        user=None,
+        scratch_dir=None,
     ):
         """Creates a new RegistryManager at the given path.
 
@@ -94,6 +100,9 @@ class RegistryManager:
             Path to remote registry.
         use_remote_data_path : None, str
             Path to remote registry.
+        scratch_dir : None | Path
+            Base directory for dsgrid temporary directories. Must be accessible on all compute
+            nodes. Defaults to the current directory.
 
         Returns
         -------
@@ -112,8 +121,15 @@ class RegistryManager:
         cloud_interface = make_cloud_storage_interface(
             data_path, "", offline=True, uuid=uid, user=user
         )
+        scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         params = RegistryManagerParams(
-            Path(data_path), remote_path, False, fs_interface, cloud_interface, offline=True
+            base_path=Path(data_path),
+            remote_path=remote_path,
+            use_remote_data=False,
+            fs_interface=fs_interface,
+            cloud_interface=cloud_interface,
+            offline=True,
+            scratch_dir=scratch_dir,
         )
         RegistryDatabase.delete(conn)
         db = RegistryDatabase.create(conn, data_path)
@@ -148,6 +164,7 @@ class RegistryManager:
         offline_mode=False,
         user=None,
         no_prompts=False,
+        scratch_dir=None,
     ):
         """Loads a registry from the given path.
 
@@ -165,6 +182,9 @@ class RegistryManager:
             username
         no_prompts : bool
             If no_prompts is False, the user will be prompted to continue sync pulling the registry if lock files exist.
+        scratch_dir : None | Path
+            Base directory for dsgrid temporary directories. Must be accessible on all compute
+            nodes. Defaults to the current directory.
 
         Returns
         -------
@@ -225,8 +245,15 @@ class RegistryManager:
                     delete_local=True,
                 )
 
+        scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         params = RegistryManagerParams(
-            data_path, remote_path, use_remote_data, fs_interface, cloud_interface, offline_mode
+            base_path=data_path,
+            remote_path=remote_path,
+            use_remote_data=use_remote_data,
+            fs_interface=fs_interface,
+            cloud_interface=cloud_interface,
+            offline=offline_mode,
+            scratch_dir=scratch_dir,
         )
 
         logger.info(

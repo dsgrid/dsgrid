@@ -1,14 +1,15 @@
 import logging
 from pathlib import Path
 
+from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
-from dsgrid.utils.dataset import check_null_value_in_unique_dimension_rows
 from dsgrid.utils.spark import (
+    create_dataframe_from_ids,
     read_dataframe,
     get_unique_values,
     overwrite_dataframe_file,
@@ -45,6 +46,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         """Dimension check in load_data, excludes time:
         * check that data matches record for each dimension.
         * check that all data dimension combinations exist. Time is handled separately.
+        * Check for any NULL values in dimension columns.
         """
         logger.info("Check one table dataset consistency.")
         dimension_types = set()
@@ -100,6 +102,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 data_records = set(pivoted_cols)
             else:
                 data_records = get_unique_values(self._load_data, name)
+                if None in data_records:
+                    raise DSGInvalidDataset(
+                        f"{self._config.config_id} has a NULL value for {dimension_type}"
+                    )
             if dim_records != data_records:
                 logger.error(
                     "Mismatch in load_data records. dimension=%s mismatched=%s",
@@ -110,21 +116,23 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     f"load_data records do not match dimension records for {name}"
                 )
 
-    def get_unique_dimension_rows(self):
-        """Get distinct combinations of remapped dimensions.
-        Check each col in combination for null value."""
-        time_cols = set(self._get_time_dimension_columns())
-        pivoted_cols = set(self._config.get_pivoted_dimension_columns())
-        exclude = time_cols.union(pivoted_cols)
-        if self._config.get_table_format_type() == TableFormatType.UNPIVOTED:
-            exclude.add(VALUE_COLUMN)
+    def make_dimension_association_table(self) -> DataFrame:
+        exclude = set(self._get_time_dimension_columns())
+        exclude.update(self._config.get_value_columns())
         dim_cols = [x for x in self._load_data.columns if x not in exclude]
+
         df = self._load_data.select(*dim_cols).distinct()
+        df = self._remap_dimension_columns(df, True)
+        df = self._remove_non_dimension_columns(df).distinct()
 
-        dim_table = self._remap_dimension_columns(df, True).distinct()
-        check_null_value_in_unique_dimension_rows(dim_table, exclude_columns=exclude)
+        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+            pivoted_cols = set(self.get_pivoted_dimension_columns_mapped_to_project())
+            pivoted_dims = create_dataframe_from_ids(
+                pivoted_cols, self._config.get_pivoted_dimension_type().value
+            )
+            df = df.crossJoin(pivoted_dims)
 
-        return dim_table
+        return df
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel]):

@@ -30,7 +30,7 @@ from dsgrid.utils.spark import read_dataframe
 
 
 REGISTRY_PATH = (
-    Path(__file__).absolute().parent.parent
+    Path(__file__).absolute().parents[1]
     / "dsgrid-test-data"
     / "filtered_registries"
     / "simple_standard_scenarios"

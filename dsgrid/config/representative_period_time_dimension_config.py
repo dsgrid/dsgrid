@@ -64,7 +64,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     return self.build_time_dataframe()
 
-    def convert_dataframe(self, df, project_time_dim, model_years=None, value_columns=None):
+    def convert_dataframe(
+        self, df, project_time_dim, model_years=None, value_columns=None, wrap_time_allowed=False
+    ):
         # in spark.dayofweek: 1=Sunday, 7=Saturday
         # dsgrid uses python standard library (same for pandas), which has day_of_week: 0=Monday, 6=Sunday
         # the mapping is: python.dt.day_of_week = [(i+7-2)%7 for i in spark.dayofweek]
@@ -103,7 +105,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         try:
             project_time_df = project_time_dim.build_time_dataframe()
             map_time = "timestamp_to_map"
-            project_time_df = self._align_time_interval_type(
+            project_time_df = self._shift_time_interval(
                 project_time_df,
                 ptime_col,
                 project_time_dim.get_time_interval_type(),

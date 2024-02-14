@@ -90,8 +90,12 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     #     )
     #     return df2
 
-    def convert_dataframe(self, df, project_time_dim, model_years=None, value_columns=None):
-        df = self._convert_time_to_project_time_interval(df=df, project_time_dim=project_time_dim)
+    def convert_dataframe(
+        self, df, project_time_dim, model_years=None, value_columns=None, wrap_time_allowed=False
+    ):
+        df = self._convert_time_to_project_time_interval(
+            df=df, project_time_dim=project_time_dim, wrap_time=wrap_time_allowed
+        )
         return df
 
     def get_frequency(self):

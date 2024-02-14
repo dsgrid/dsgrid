@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 
 
-PROJECT_REPO = Path(__file__).resolve().parent.parent / "dsgrid-test-data" / "test_efs"
+PROJECT_REPO = Path(__file__).resolve().parents[1] / "dsgrid-test-data" / "test_efs"
 
 base_dir = PROJECT_REPO / "dsgrid_project"
 dataset_dir = base_dir / "datasets" / "modeled" / "comstock"

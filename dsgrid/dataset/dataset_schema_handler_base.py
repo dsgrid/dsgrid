@@ -525,6 +525,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _convert_time_dimension(
         self, load_data_df, project_config, model_years=None, value_columns=None
     ):
+        input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
+        wrap_time_allowed = input_dataset_model.wrap_time_allowed
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if time_dim.model.is_time_zone_required_in_geography():
             if self._config.model.use_project_geography_time_zone:
@@ -540,6 +542,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             self._project_time_dim,
             model_years=model_years,
             value_columns=value_columns,
+            wrap_time_allowed=wrap_time_allowed,
         )
 
         if time_dim.model.is_time_zone_required_in_geography():

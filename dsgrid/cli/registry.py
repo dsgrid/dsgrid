@@ -898,7 +898,7 @@ def update_dataset(
 )
 def data_sync(ctx, registry_manager, project_id, dataset_id):
     """Sync the official dsgrid registry data to the local system."""
-    no_prompts = ctx.parent.parent.params["no_prompts"]
+    no_prompts = ctx.parents[1].params["no_prompts"]
     registry_manager.data_sync(project_id, dataset_id, no_prompts)
 
 

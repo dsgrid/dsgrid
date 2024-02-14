@@ -22,7 +22,7 @@ def build_package():
     :return: path to package
     :rtype: pathlib.Path
     """
-    pkgdir = Path(__file__).resolve().parent.parent
+    pkgdir = Path(__file__).resolve().parents[1]
 
     subprocess.run(
         [sys.executable, "setup.py", "sdist"],

@@ -21,7 +21,9 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     pass
 
-    def convert_dataframe(self, df, project_time_dim, model_years=None, value_columns=None):
+    def convert_dataframe(
+        self, df, project_time_dim, model_years=None, value_columns=None, wrap_time_allowed=False
+    ):
         return df
 
     def get_frequency(self):

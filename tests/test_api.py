@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import shutil
@@ -8,7 +7,6 @@ from pathlib import Path
 from zipfile import ZipFile
 
 import pandas as pd
-import pytest
 from fastapi.testclient import TestClient
 
 from dsgrid.dataset.models import TableFormatType
@@ -180,14 +178,13 @@ def test_list_table_format_types():
 
 # This doesn't work in all environments, especially HPC. There are conflicts with the
 # metastore_db directory.
-@pytest.mark.skip
 def test_submit_project_query(setup_api_server):
     query = SparkSubmitProjectQueryRequest(
         use_spark_submit=False,
         query=load_data(Path(__file__).parent / "data" / "simple_query.json5"),
     )
     async_task_id = SparkSubmitProjectQueryResponse(
-        **check_response("/queries/projects", data=json.loads(query.json())).json()
+        **check_response("/queries/projects", data=query.model_dump(mode="json")).json()
     ).async_task_id
     status = GetAsyncTaskResponse(
         **check_response(f"/async_tasks/status/{async_task_id}").json()

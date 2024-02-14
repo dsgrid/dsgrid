@@ -20,21 +20,25 @@ from dsgrid.utils.filters import ACCEPTED_OPS
 logger = logging.getLogger(__name__)
 
 
-def _version_info_callback(ctx, param, val):
+def _version_info_callback(*args):
+    val = args[2]
     if val is None:
         return val
     return VersionInfo.parse(val)
 
 
-def _version_info_required_callback(ctx, param, val):
+def _version_info_required_callback(*args):
+    val = args[2]
     return VersionInfo.parse(val)
 
 
-def _version_update_callback(ctx, param, val):
+def _version_update_callback(*args):
+    val = args[2]
     return VersionUpdateType(val)
 
 
-def _path_callback(ctx, param, val):
+def _path_callback(*args):
+    val = args[2]
     if val is None:
         return val
     return Path(val)
@@ -61,13 +65,14 @@ def registry(ctx, remote_path):
         username=get_value_from_context(ctx, "username"),
         password=get_value_from_context(ctx, "password"),
     )
+    scratch_dir = get_value_from_context(ctx, "scratch_dir")
     no_prompts = ctx.parent.params["no_prompts"]
     offline = get_value_from_context(ctx, "offline")
     if "--help" in sys.argv:
         ctx.obj = None
     else:
         ctx.obj = RegistryManager.load(
-            conn, remote_path, offline_mode=offline, no_prompts=no_prompts
+            conn, remote_path, offline_mode=offline, no_prompts=no_prompts, scratch_dir=scratch_dir
         )
 
 

@@ -69,19 +69,27 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._dimension_mgr = val
 
     def _replace_duplicates(self, config: DimensionMappingsConfig):
+        def make_key(model):
+            return (
+                model.from_dimension.dimension_id,
+                model.to_dimension.dimension_id,
+                model.file_hash,
+            )
+
         hashes = {}
         for model in self.db.iter_models(all_versions=True):
-            hashes[model.file_hash] = model
+            key = make_key(model)
+            if key in hashes:
+                msg = f"Bug: the same file_hash exists in multiple mappings: {model.mapping_id} {key}"
+                raise Exception(msg)
+            hashes[key] = model
 
         # TODO: This only works if the matching dimension is the latest.
         existing_ids = set()
         for i, mapping in enumerate(config.model.mappings):
-            existing = hashes.get(mapping.file_hash)
-            if (
-                existing is not None
-                and mapping.from_dimension.dimension_type == existing.from_dimension.dimension_type
-                and mapping.to_dimension.dimension_type == existing.to_dimension.dimension_type
-            ):
+            key = make_key(mapping)
+            existing = hashes.get(key)
+            if existing is not None:
                 logger.info(
                     "Replace mapping of %s to %s with existing mapping ID %s",
                     mapping.from_dimension.dimension_id,

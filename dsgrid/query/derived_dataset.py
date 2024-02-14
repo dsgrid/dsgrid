@@ -221,6 +221,7 @@ def _make_dataset_config(
         "origin_date": "",
         "origin_project": "",
         "origin_version": "",
+        "data_source": "",
         "source": "",
         "data_classification": data_classification,
         "use_project_geography_time_zone": True,

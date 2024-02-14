@@ -117,7 +117,15 @@ ConfigKey = namedtuple("ConfigKey", ["id", "version"])
 # Obviates the need to pass parameters to many constructors.
 RegistryManagerParams = namedtuple(
     "RegistryManagerParams",
-    ["base_path", "remote_path", "use_remote_data", "fs_interface", "cloud_interface", "offline"],
+    [
+        "base_path",
+        "remote_path",
+        "use_remote_data",
+        "fs_interface",
+        "cloud_interface",
+        "offline",
+        "scratch_dir",
+    ],
 )
 
 

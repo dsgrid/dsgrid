@@ -63,8 +63,8 @@ class RegistryManagerBase(abc.ABC):
         return mgr
 
     @classmethod
-    def _load(cls, path, fs_interface):
-        mgr = cls(path, fs_interface)
+    def _load(cls, path, fs_interface, *args):
+        mgr = cls(path, fs_interface, *args)
         return mgr
 
     @staticmethod

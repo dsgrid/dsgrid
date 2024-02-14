@@ -925,13 +925,22 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
 
     def validate(self, expected_values):
         filename = self.output_dir / self.name / "table.parquet"
-        df = read_parquet(str(filename))
+        df = read_parquet(filename)
         assert not {"end_uses_by_fuel_type", "county", "hour"}.difference(df.columns)
         hour = 16
+        county = "06037"
+        end_use = "electricity_end_uses"
+        assert (
+            df.filter(f"county == '{county}' and end_uses_by_fuel_type == '{end_use}'")
+            .select("hour")
+            .distinct()
+            .count()
+            == 24
+        )
         filtered_values = (
-            df.filter("county == '06037'")
+            df.filter(f"county == '{county}'")
             .filter(f"hour == {hour}")
-            .filter("end_uses_by_fuel_type == 'electricity_end_uses'")
+            .filter(f"end_uses_by_fuel_type == '{end_use}'")
             .collect()
         )
         assert len(filtered_values) == 1

@@ -1,5 +1,6 @@
 import abc
 import logging
+from enum import Enum
 from typing import Any, Union, Literal
 
 import pyspark.sql.functions as F
@@ -7,7 +8,6 @@ from pyspark.sql import DataFrame
 from pydantic import field_validator, model_validator, Field
 from typing_extensions import Annotated
 
-from dsgrid.data_models import DSGEnum
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
@@ -16,7 +16,7 @@ from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
 logger = logging.getLogger(__name__)
 
 
-class DimensionFilterType(DSGEnum):
+class DimensionFilterType(str, Enum):
     """Filter types that can be specified in queries."""
 
     EXPRESSION = "expression"
@@ -106,9 +106,7 @@ class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
 
     operator: str
     value: Union[str, int, float]
-    filter_type: Literal[
-        DimensionFilterType.EXPRESSION.value
-    ] = DimensionFilterType.EXPRESSION.value
+    filter_type: Literal[DimensionFilterType.EXPRESSION] = DimensionFilterType.EXPRESSION
 
     def where_clause(self, column=None):
         column = column or self.column
@@ -136,9 +134,7 @@ class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
     """
 
     value: Union[str, int, float]
-    filter_type: Literal[
-        DimensionFilterType.EXPRESSION_RAW.value
-    ] = DimensionFilterType.EXPRESSION_RAW.value
+    filter_type: Literal[DimensionFilterType.EXPRESSION_RAW] = DimensionFilterType.EXPRESSION_RAW
 
     def where_clause(self, column=None):
         column = column or self.column
@@ -194,9 +190,7 @@ class DimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel
             default=False,
         ),
     ]
-    filter_type: Literal[
-        DimensionFilterType.COLUMN_OPERATOR.value
-    ] = DimensionFilterType.COLUMN_OPERATOR.value
+    filter_type: Literal[DimensionFilterType.COLUMN_OPERATOR] = DimensionFilterType.COLUMN_OPERATOR
 
     @field_validator("operator")
     @classmethod
@@ -236,8 +230,8 @@ class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBa
         ),
     ]
     filter_type: Literal[
-        DimensionFilterType.BETWEEN_COLUMN_OPERATOR.value
-    ] = DimensionFilterType.BETWEEN_COLUMN_OPERATOR.value
+        DimensionFilterType.BETWEEN_COLUMN_OPERATOR
+    ] = DimensionFilterType.BETWEEN_COLUMN_OPERATOR
 
     def apply_filter(self, df, column=None):
         column = column or self.column
@@ -250,7 +244,7 @@ class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
     """Filters base dimension records that match a subset dimension."""
 
     dimension_query_names: list[str]
-    filter_type: Literal[DimensionFilterType.SUBSET.value] = DimensionFilterType.SUBSET.value
+    filter_type: Literal[DimensionFilterType.SUBSET] = DimensionFilterType.SUBSET
 
     @field_validator("dimension_query_names")
     @classmethod
@@ -308,8 +302,8 @@ class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterSingleQueryN
         ),
     ]
     filter_type: Literal[
-        DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR.value
-    ] = DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR.value
+        DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR
+    ] = DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR
 
     @field_validator("operator")
     @classmethod

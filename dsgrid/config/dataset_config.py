@@ -1,4 +1,5 @@
 import logging
+from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Dict, Literal, Union
 
@@ -6,6 +7,7 @@ from pydantic import field_validator, model_validator, Field
 from typing_extensions import Annotated
 import pyspark.sql.functions as F
 
+from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
@@ -99,23 +101,11 @@ class InputDatasetType(DSGEnum):
     BENCHMARK = "benchmark"
 
 
-class DataSchemaType(DSGEnum):
+class DataSchemaType(str, Enum):
     """Data schema types."""
 
-    STANDARD = EnumValue(
-        value="standard",
-        description="""
-        Standard data schema with load_data and load_data_lookup tables.
-        Applies to datasets for which the data are provided in full.
-        """,
-    )
-    ONE_TABLE = EnumValue(
-        value="one_table",
-        description="""
-        One_table data schema with load_data table.
-        Typically appropriate for small, low-temporal resolution datasets.
-        """,
-    )
+    STANDARD = "standard"
+    ONE_TABLE = "one_table"
 
 
 class DSGDatasetParquetType(DSGEnum):
@@ -167,51 +157,54 @@ class DataClassificationType(DSGEnum):
 
 
 class StandardDataSchemaModel(DSGBaseModel):
-    data_schema_type: Literal[DataSchemaType.STANDARD.value]
-    load_data_column_dimension: Annotated[
-        DimensionType,
-        Field(
-            title="load_data_column_dimension",
-            description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
-        ),
-    ]
+    data_schema_type: Literal[DataSchemaType.STANDARD]
+    table_format: TableFormatModel
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy(cls, values: dict) -> dict:
+        if "load_data_column_dimension" in values:
+            values["table_format"] = PivotedTableFormatModel(
+                pivoted_dimension_type=values.pop("load_data_column_dimension")
+            )
+        return values
 
 
 class OneTableDataSchemaModel(DSGBaseModel):
-    data_schema_type: Literal[DataSchemaType.ONE_TABLE.value]
-    load_data_column_dimension: Annotated[
-        DimensionType,
-        Field(
-            title="load_data_column_dimension",
-            description="The data dimension for which its values are in column form (pivoted) in the load_data table.",
-        ),
-    ]
+    data_schema_type: Literal[DataSchemaType.ONE_TABLE]
+    table_format: TableFormatModel
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy(cls, values: dict) -> dict:
+        if "load_data_column_dimension" in values:
+            values["table_format"] = PivotedTableFormatModel(
+                pivoted_dimension_type=values.pop("load_data_column_dimension")
+            )
+        return values
 
 
-class DatasetQualifierType(DSGEnum):
+class DatasetQualifierType(str, Enum):
     QUANTITY = "quantity"
     GROWTH_RATE = "growth_rate"
 
 
-class GrowthRateType(DSGEnum):
+class GrowthRateType(str, Enum):
     EXPONENTIAL_ANNUAL = "exponential_annual"
     EXPONENTIAL_MONTHLY = "exponential_monthly"
 
 
 class QuantityModel(DSGBaseModel):
-    dataset_qualifier_type: Literal[DatasetQualifierType.QUANTITY.value]
+    dataset_qualifier_type: Literal[DatasetQualifierType.QUANTITY]
 
 
 class GrowthRateModel(DSGBaseModel):
-    dataset_qualifier_type: Literal[DatasetQualifierType.GROWTH_RATE.value]
+    dataset_qualifier_type: Literal[DatasetQualifierType.GROWTH_RATE]
     growth_rate_type: Annotated[
         GrowthRateType,
         Field(
             title="growth_rate_type",
             description="Type of growth rates, e.g., exponential_annual",
-            json_schema_extra={
-                "options": GrowthRateType.format_for_docs(),
-            },
         ),
     ]
 
@@ -260,7 +253,7 @@ class DatasetConfigModel(DSGBaseModel):
     dataset_qualifier_metadata: Annotated[
         Optional[Union[QuantityModel, GrowthRateModel]],
         Field(
-            default=QuantityModel(dataset_qualifier_type="quantity"),
+            default=QuantityModel(dataset_qualifier_type=DatasetQualifierType.QUANTITY),
             title="dataset_qualifier_metadata",
             description="Additional metadata to include related to the dataset_qualifier",
             discriminator="dataset_qualifier_type",
@@ -602,17 +595,17 @@ class DatasetConfig(ConfigBase):
     @classmethod
     def load_from_user_path(cls, config_file, dataset_path):
         config = cls.load(config_file)
-        schema_type = config.model.data_schema.data_schema_type
+        schema_type = config.get_data_schema_type()
         if str(dataset_path).startswith("s3://"):
             # TODO: This may need to handle AWS s3 at some point.
             raise DSGInvalidParameter("Registering a dataset from an S3 path is not supported.")
         if not dataset_path.exists():
             raise DSGInvalidParameter(f"Dataset {dataset_path} does not exist")
         dataset_path = str(dataset_path)
-        if schema_type == DataSchemaType.STANDARD.value:
+        if schema_type == DataSchemaType.STANDARD:
             check_load_data_filename(dataset_path)
             check_load_data_lookup_filename(dataset_path)
-        elif schema_type == DataSchemaType.ONE_TABLE.value:
+        elif schema_type == DataSchemaType.ONE_TABLE:
             check_load_data_filename(dataset_path)
         else:
             raise DSGInvalidParameter(f"data_schema_type={schema_type} not supported.")
@@ -662,6 +655,39 @@ class DatasetConfig(ConfigBase):
             if dim_config.model.dimension_type == dimension_type:
                 return dim_config
         assert False, dimension_type
+
+    def get_pivoted_dimension_type(self) -> DimensionType | None:
+        """Return the table's pivoted dimension type or None if the table isn't pivoted."""
+        if self.get_table_format_type() != TableFormatType.PIVOTED:
+            return None
+        return self.model.data_schema.table_format.pivoted_dimension_type
+
+    def get_pivoted_dimension_columns(self) -> list[str]:
+        """Return the table's pivoted dimension columns or an empty list if the table isn't
+        pivoted.
+        """
+        if self.get_table_format_type() != TableFormatType.PIVOTED:
+            return []
+        dim_type = self.model.data_schema.table_format.pivoted_dimension_type
+        return sorted(list(self.get_dimension(dim_type).get_unique_ids()))
+
+    def get_value_columns(self) -> list[str]:
+        """Return the table's columns that contain values."""
+        match self.get_table_format_type():
+            case TableFormatType.PIVOTED:
+                return self.get_pivoted_dimension_columns()
+            case TableFormatType.UNPIVOTED:
+                return [self.model.data_schema.table_format.value_column]
+            case _:
+                raise NotImplementedError(str(self.get_table_format_type()))
+
+    def get_data_schema_type(self) -> DataSchemaType:
+        """Return the schema type of the table."""
+        return DataSchemaType(self.model.data_schema.data_schema_type)
+
+    def get_table_format_type(self) -> TableFormatType:
+        """Return the format type of the table."""
+        return TableFormatType(self._model.data_schema.table_format.format_type)
 
     def add_trivial_dimensions(self, df):
         """Add trivial 1-element dimensions to load_data_lookup."""

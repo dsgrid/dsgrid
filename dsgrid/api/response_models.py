@@ -1,12 +1,10 @@
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.config.dimensions import DimensionCommonModel, ProjectDimensionModel
 from dsgrid.config.project_config import ProjectConfigModel, ProjectDimensionQueryNamesModel
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.dataset.models import TableFormatType
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.query.models import (
-    ReportType,
-    TableFormatType,
-)
+from dsgrid.query.models import ReportType
 from .models import AsyncTaskModel
 
 

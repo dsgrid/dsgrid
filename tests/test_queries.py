@@ -11,8 +11,12 @@ import pytest
 from click.testing import CliRunner
 from pyspark.sql import SparkSession
 
-from dsgrid.common import DEFAULT_DB_PASSWORD
+from dsgrid.common import DEFAULT_DB_PASSWORD, VALUE_COLUMN
 from dsgrid.cli.dsgrid import cli
+from dsgrid.dataset.models import (
+    PivotedTableFormatModel,
+    UnpivotedTableFormatModel,
+)
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
@@ -77,6 +81,9 @@ def la_expected_electricity_hour_16(tmp_path_factory):
                     StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
                 ],
             ),
+        ),
+        result=QueryResultParamsModel(
+            table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC)
         ),
     )
     ProjectQuerySubmitter(project, output_dir).submit(
@@ -312,6 +319,43 @@ def test_dimension_query_names_model():
     assert not diff
 
 
+def test_transform_unpivoted_dataset():
+    project = get_project(QueryTestBase.get_database_name(), QueryTestBase.get_project_id())
+    df = project.transform_dataset("comstock_conus_2022_projected")
+    actual = (
+        df.filter("geography == '06037'")
+        .filter(F.col("metric").isin(["electricity_cooling", "electricity_heating"]))
+        .agg(F.sum("value").alias("total"))
+        .collect()[0]
+    )
+    raw_stats = load_dataset_stats()
+    assert math.isclose(
+        actual.total, raw_stats["by_county"]["06037"]["comstock"]["sum"]["electricity"]
+    )
+
+
+def test_transform_pivoted_dataset():
+    project = get_project(QueryTestBase.get_database_name(), QueryTestBase.get_project_id())
+    df = project.transform_dataset("resstock_conus_2022_projected").filter("geography == '06037'")
+    cooling = (
+        df.select("electricity_cooling")
+        .agg(F.sum("electricity_cooling").alias("cooling"))
+        .collect()[0]
+        .cooling
+    )
+    heating = (
+        df.select("electricity_heating")
+        .agg(F.sum("electricity_heating").alias("heating"))
+        .collect()[0]
+        .heating
+    )
+    raw_stats = load_dataset_stats()
+    assert math.isclose(
+        cooling + heating,
+        raw_stats["by_county"]["06037"]["resstock"]["sum"]["electricity"],
+    )
+
+
 _projects = {}
 
 
@@ -354,7 +398,7 @@ def run_query_test(test_query_cls, *args, expected_values=None):
                 load_cached_table=load_cached_table,
                 force=True,
             )
-            query.validate(expected_values=expected_values)
+            assert query.validate(expected_values=expected_values)
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -368,6 +412,7 @@ class QueryTestBase(abc.ABC):
         self._project = project
         self._output_dir = Path(output_dir)
         self._model = None
+        self._cached_stats = None
 
     @staticmethod
     def get_database_name():
@@ -408,7 +453,9 @@ class QueryTestBase(abc.ABC):
         -------
         dict
         """
-        return load_dataset_stats()
+        if self._cached_stats is None:
+            self._cached_stats = load_dataset_stats()
+        return self._cached_stats
 
     @abc.abstractmethod
     def make_query(self):
@@ -438,7 +485,6 @@ class QueryTestBase(abc.ABC):
 
 
 class QueryTestElectricityValues(QueryTestBase):
-
     NAME = "electricity-values"
 
     def __init__(self, category: DimensionCategory, *args, **kwargs):
@@ -495,6 +541,7 @@ class QueryTestElectricityValues(QueryTestBase):
             result=QueryResultParamsModel(
                 supplemental_columns=["state"],
                 replace_ids_with_names=True,
+                table_format=UnpivotedTableFormatModel(),
             ),
         )
         match self._category:
@@ -542,7 +589,7 @@ class QueryTestElectricityValues(QueryTestBase):
         supp_columns = {x.get_column_name() for x in self._model.result.supplemental_columns}
         non_value_columns.update(supp_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
-        expected = ["electricity_cooling", "electricity_heating"]
+        expected = [VALUE_COLUMN]
         # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating"]
         success = value_columns == expected
         if not success:
@@ -554,15 +601,25 @@ class QueryTestElectricityValues(QueryTestBase):
             logger.error("County name = %s is not present", county_name)
             success = False
         if success:
-            total_cooling = df.agg(F.sum("electricity_cooling").alias("sum")).collect()[0].sum
-            total_heating = df.agg(F.sum("electricity_heating").alias("sum")).collect()[0].sum
+            total_cooling = (
+                df.filter("end_use == 'Cooling'")
+                .agg(F.sum(VALUE_COLUMN).alias("sum"))
+                .collect()[0]
+                .sum
+            )
+            total_heating = (
+                df.filter("end_use == 'Heating'")
+                .agg(F.sum(VALUE_COLUMN).alias("sum"))
+                .collect()[0]
+                .sum
+            )
             expected = self.get_raw_stats()["by_county"][county]["comstock_resstock"]["sum"]
             assert math.isclose(total_cooling, expected["electricity_cooling"])
             assert math.isclose(total_heating, expected["electricity_heating"])
+        return success
 
 
 class QueryTestElectricityUse(QueryTestBase):
-
     NAME = "total_electricity_use"
 
     def __init__(self, geography, op, *args, **kwargs):
@@ -612,6 +669,7 @@ class QueryTestElectricityUse(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
+                table_format=UnpivotedTableFormatModel(),
             ),
         )
         return self._model
@@ -635,9 +693,10 @@ class QueryTestElectricityUse(QueryTestBase):
         else:
             assert False, self._geography
 
+        return True
+
 
 class QueryTestElectricityUseFilterResults(QueryTestBase):
-
     NAME = "total_electricity_use"
 
     def __init__(self, geography, op, metric_dimension_category, *args, **kwargs):
@@ -701,6 +760,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
+                table_format=UnpivotedTableFormatModel(),
             ),
         )
 
@@ -744,9 +804,10 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
         else:
             assert False, self._geography
 
+        return True
+
 
 class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
-
     NAME = "total_electricity_use"
 
     def make_query(self):
@@ -789,6 +850,7 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
+                table_format=UnpivotedTableFormatModel(),
             ),
         )
         return self._model
@@ -801,10 +863,10 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
             "comstock_resstock",
             1,
         )
+        return True
 
 
 class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
-
     NAME = "diurnal_electricity_use_by_county"
 
     def make_query(self):
@@ -856,6 +918,7 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                 ],
                 sort_columns=["county", "hour"],
                 output_format="parquet",
+                table_format=UnpivotedTableFormatModel(),
             ),
         )
         return self._model
@@ -863,19 +926,20 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
     def validate(self, expected_values):
         filename = self.output_dir / self.name / "table.parquet"
         df = read_parquet(str(filename))
-        assert not {"electricity_end_uses", "county", "hour"}.difference(df.columns)
+        assert not {"end_uses_by_fuel_type", "county", "hour"}.difference(df.columns)
         hour = 16
-        val = (
+        filtered_values = (
             df.filter("county == '06037'")
             .filter(f"hour == {hour}")
-            .collect()[0]
-            .electricity_end_uses
+            .filter("end_uses_by_fuel_type == 'electricity_end_uses'")
+            .collect()
         )
-        assert math.isclose(val, expected_values["la_electricity_hour_16"])
+        assert len(filtered_values) == 1
+        assert math.isclose(filtered_values[0].value, expected_values["la_electricity_hour_16"])
+        return True
 
 
 class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
-
     NAME = "total_electricity_use_by_state_and_pca"
 
     def __init__(self, column_type: ColumnType, geography_columns, *args, **kwargs):
@@ -934,10 +998,10 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                     assert column.dimension_query_name not in df.columns
             case _:
                 assert False, f"Bug: add support for {self._column_type}"
+        return True
 
 
 class QueryTestPeakLoadByStateSubsector(QueryTestBase):
-
     NAME = "peak-load-by-state-subsector"
 
     def make_query(self):
@@ -1008,20 +1072,18 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                 & (tdf.subsector == subsector)
                 & (tdf.model_year == model_year)
                 & (tdf.scenario == scenario)
+                & (tdf.end_uses_by_fuel_type == "electricity_end_uses")
             )
 
         expected = (
-            df.filter(make_expr(df))
-            .agg(F.max("electricity_end_uses").alias("max_val"))
-            .collect()[0]
-            .max_val
+            df.filter(make_expr(df)).agg(F.max(VALUE_COLUMN).alias("max_val")).collect()[0].max_val
         )
-        actual = peak_load.filter(make_expr(peak_load)).collect()[0].electricity_end_uses
+        actual = peak_load.filter(make_expr(peak_load)).collect()[0][VALUE_COLUMN]
         assert math.isclose(actual, expected)
+        return True
 
 
 class QueryTestMapAnnualTime(QueryTestBase):
-
     NAME = "map-annual-time"
 
     def make_query(self):
@@ -1056,6 +1118,7 @@ class QueryTestMapAnnualTime(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
+                table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
             ),
         )
         return self._model
@@ -1073,10 +1136,10 @@ class QueryTestMapAnnualTime(QueryTestBase):
             .total_electricity
         )
         assert math.isclose(actual_ca_res, expected_ca_res)
+        return True
 
 
 class QueryTestInvalidAggregation(QueryTestBase):
-
     NAME = "invalid_aggregation"
 
     def make_query(self):
@@ -1117,7 +1180,6 @@ class QueryTestInvalidAggregation(QueryTestBase):
 
 
 class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
-
     NAME = "electricity-values"
 
     def make_query(self):
@@ -1150,6 +1212,9 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                     ),
                 ),
             ),
+            result=QueryResultParamsModel(
+                table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
+            ),
         )
         return self._model
 
@@ -1174,10 +1239,10 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
         expected = self.get_raw_stats()["overall"]["resstock"]["sum"]
         assert math.isclose(total_cooling, expected["electricity_cooling"])
         assert math.isclose(total_heating, expected["electricity_heating"])
+        return True
 
 
 class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
-
     NAME = "electricity-values-agg-from-composite-dataset"
 
     def __init__(self, *args, geography="county", **kwargs):
@@ -1205,6 +1270,7 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
+                table_format=UnpivotedTableFormatModel(),
             ),
         )
         return self._model
@@ -1233,7 +1299,6 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
 
 
 class QueryTestUnitMapping(QueryTestBase):
-
     NAME = "test_efs_comstock_query"
 
     @staticmethod
@@ -1259,6 +1324,7 @@ class QueryTestUnitMapping(QueryTestBase):
             ),
             result=QueryResultParamsModel(
                 output_format="parquet",
+                table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
             ),
         )
         return self._model
@@ -1288,6 +1354,7 @@ class QueryTestUnitMapping(QueryTestBase):
         )
         assert actual.fans == expected.com_fans * 0.9
         assert actual.cooling == expected.com_cooling * 1000
+        return True
 
 
 def perform_op(df, column, operation):
@@ -1302,9 +1369,11 @@ def validate_electricity_use_by_county(
     counties = [str(x.county) for x in results.select("county").distinct().collect()]
     assert len(counties) == expected_county_count, counties
     stats = raw_stats["by_county"]
+    col = "end_uses_by_fuel_type"
     for county in counties:
-        col = "electricity_end_uses"
-        actual = results.filter(f"county == '{county}'").collect()[0][col]
+        actual = results.filter(
+            f"county == '{county}' and {col} == 'electricity_end_uses'"
+        ).collect()[0][VALUE_COLUMN]
         expected = stats[county][datasets][op]["electricity"]
         assert math.isclose(actual, expected)
 
@@ -1319,9 +1388,13 @@ def validate_electricity_use_by_state(op, results_path, raw_stats, datasets):
         assert op == "max", op
         exp_ca = get_expected_ca_max_electricity(raw_stats, datasets)
         exp_ny = get_expected_ny_max_electricity(raw_stats, datasets)
-    col = "electricity_end_uses"
-    actual_ca = results.filter("state == 'CA'").collect()[0][col]
-    actual_ny = results.filter("state == 'NY'").collect()[0][col]
+    col = "end_uses_by_fuel_type"
+    actual_ca = results.filter(f"state == 'CA' and {col} == 'electricity_end_uses'").collect()[0][
+        VALUE_COLUMN
+    ]
+    actual_ny = results.filter(f"state == 'NY' and {col} == 'electricity_end_uses'").collect()[0][
+        VALUE_COLUMN
+    ]
     assert math.isclose(actual_ca, exp_ca)
     assert math.isclose(actual_ny, exp_ny)
 

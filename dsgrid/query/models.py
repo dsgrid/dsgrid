@@ -1,5 +1,5 @@
 import abc
-import enum
+from enum import Enum
 from typing import Any, Optional, Union, Literal, List, TypeAlias
 
 import pyspark.sql.functions as F
@@ -7,7 +7,12 @@ from pydantic import field_validator, model_validator, Field, field_serializer, 
 from semver import VersionInfo
 from typing_extensions import Annotated
 
-from dsgrid.data_models import DSGBaseModel, DSGEnum, make_model_config
+from dsgrid.data_models import DSGBaseModel, make_model_config
+from dsgrid.dataset.models import (
+    TableFormatModel,
+    UnpivotedTableFormatModel,
+    TableFormatType,
+)
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
     DimensionFilterExpressionModel,
@@ -89,7 +94,7 @@ class ColumnModel(DSGBaseModel):
         return f"{self.function.__name__}__{self.dimension_query_name})"
 
 
-class ColumnType(DSGEnum):
+class ColumnType(str, Enum):
     """Defines what the columns of a dataset table represent."""
 
     DIMENSION_TYPES = "dimension_types"
@@ -167,7 +172,7 @@ class AggregationModel(DSGBaseModel):
         ]
 
 
-class ReportType(str, enum.Enum):
+class ReportType(str, Enum):
     """Pre-defined reports"""
 
     PEAK_LOAD = "peak_load"
@@ -178,18 +183,18 @@ class ReportInputModel(DSGBaseModel):
     inputs: Any = None
 
 
-class TableFormatType(str, enum.Enum):
-    """Table format types"""
-
-    PIVOTED = "pivoted"
-    LONG = "long"
-
-
 class DimensionMetadataModel(DSGBaseModel):
     """Defines the columns in a table for a dimension."""
 
     dimension_query_name: str
-    column_names: list[str]
+    column_names: Annotated[
+        list[str],
+        Field(
+            description="Columns associated with this dimension. Could be a dimension query name, "
+            "the string-ified DimensionType, multiple strings as can happen with time, or dimension "
+            "record IDS if the dimension is pivoted."
+        ),
+    ]
 
     def make_key(self):
         return "__".join([self.dimension_query_name] + self.column_names)
@@ -245,24 +250,15 @@ class DatasetDimensionsMetadataModel(DSGBaseModel):
                 break
 
 
-class PivotedDatasetMetadataModel(DSGBaseModel):
-    columns: set[str] = set()
-    dimension_type: Optional[DimensionType] = None
-
-    @field_validator("columns")
-    @classmethod
-    def handle_columns(cls, columns):
-        if isinstance(columns, list):
-            return set(columns)
-        return columns
-
-
 class DatasetMetadataModel(DSGBaseModel):
     """Defines the metadata for a dataset serialized to file."""
 
     dimensions: DatasetDimensionsMetadataModel = DatasetDimensionsMetadataModel()
-    pivoted: PivotedDatasetMetadataModel = PivotedDatasetMetadataModel()
-    table_format_type: Optional[TableFormatType] = None
+    table_format: TableFormatModel
+
+    def get_table_format_type(self) -> TableFormatType:
+        """Return the format type of the table."""
+        return TableFormatType(self.table_format.format_type)
 
 
 class CacheableQueryBaseModel(DSGBaseModel):
@@ -285,22 +281,13 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
     dimension_filters: Annotated[
         list[DimensionFilters],
         Field(
-            # Use Any here because we don't want Pydantic to try to discern the types.
             description="Filters to apply to all datasets",
             default=[],
         ),
     ]
-    # TODO #202: Should this be a result param instead of project? Or both?
-    table_format: Annotated[
-        TableFormatType,
-        Field(
-            description="Controls table format",
-            default=TableFormatType.PIVOTED,
-        ),
-    ]
 
 
-class DatasetType(str, enum.Enum):
+class DatasetType(str, Enum):
     """Defines the type of a dataset in a query."""
 
     PROJECTION = "projection"
@@ -308,7 +295,7 @@ class DatasetType(str, enum.Enum):
     DERIVED = "derived"
 
 
-class DatasetConstructionMethod(str, enum.Enum):
+class DatasetConstructionMethod(str, Enum):
     """Defines the type of construction method for DatasetType.PROJECTION."""
 
     EXPONENTIAL_GROWTH = "exponential_growth"
@@ -441,9 +428,6 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
             raise ValueError("drop_dimensions is not supported yet")
         if values.get("excluded_dataset_ids", []):
             raise ValueError("excluded_dataset_ids is not supported yet")
-        fmt = TableFormatType.PIVOTED.value
-        if values.get("table_format", fmt) not in (fmt, TableFormatType.PIVOTED):
-            raise ValueError(f"only table_format={fmt} is currently supported")
         return values
 
     def get_spark_conf(self, dataset_id) -> dict[str, Any]:
@@ -516,6 +500,7 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
             default=ColumnType.DIMENSION_QUERY_NAMES,
         ),
     ]
+    table_format: TableFormatModel = UnpivotedTableFormatModel()
     output_format: Annotated[
         str, Field(description="Output file format: csv or parquet", default="parquet")
     ]
@@ -529,7 +514,6 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     dimension_filters: Annotated[
         list[DimensionFilters],
         Field(
-            # Use Any here because we don't want Pydantic to try to discern the types.
             description="Filters to apply to the result. Must contain columns in the result.",
             default=[],
         ),
@@ -589,8 +573,8 @@ class ProjectQueryModel(QueryBaseModel):
     result: Annotated[
         QueryResultParamsModel,
         Field(
-            description="Controls the output results",
             default=QueryResultParamsModel(),
+            description="Controls the output results",
         ),
     ]
 

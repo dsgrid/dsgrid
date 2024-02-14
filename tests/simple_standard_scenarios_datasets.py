@@ -7,10 +7,16 @@ import pyspark.sql.functions as F
 from pyspark.sql.types import IntegerType
 from pyspark.sql import SparkSession
 
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.mapping_tables import MappingTableRecordModel
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.files import (
+    dump_data,
+    load_data,
+    load_line_delimited_json,
+    dump_line_delimited_json,
+)
 from dsgrid.utils.spark import models_to_dataframe
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
 from dsgrid.tests.utils import read_csv_single_table_format, read_parquet_two_table_format
@@ -18,6 +24,7 @@ from dsgrid.tests.utils import read_csv_single_table_format, read_parquet_two_ta
 
 REGISTRY_PATH = Path("dsgrid-test-data/filtered_registries/simple_standard_scenarios")
 EXPECTED_DATASET_PATH = REGISTRY_PATH / "expected_datasets"
+BUILDING_PIVOTED_COLUMNS = ("electricity_cooling", "electricity_heating", "natural_gas_heating")
 BUILDING_COUNTY_MAPPING = {
     "06037": "G0600370",
     "06073": "G0600730",
@@ -181,7 +188,7 @@ def make_projection_df(aeo, ld_df, join_columns):
     ld_df = ld_df.crossJoin(years_df)
     base_year = 2018
     gr_df = aeo
-    pivoted_columns = ("electricity_cooling", "electricity_heating", "natural_gas_heating")
+    pivoted_columns = BUILDING_PIVOTED_COLUMNS
     for column in pivoted_columns:
         gr_col = column + "__gr"
         gr_df = gr_df.withColumn(
@@ -312,5 +319,66 @@ def perform_op_by_electricity(stats, table, name, operation):
     stats[name]["count"] = table.count()
 
 
+def make_unpivoted_datasets():
+    """Convert the ComStock datasets to unpivoted format for test coverage."""
+    path = REGISTRY_PATH
+    comstock_reference_path = (
+        path / "data" / "comstock_conus_2022_reference" / "1.0.0" / "load_data.parquet"
+    )
+    comstock_projected_path = (
+        path / "data" / "comstock_conus_2022_projected" / "1.0.0" / "table.parquet"
+    )
+    convert_table_to_unpivoted(comstock_reference_path, BUILDING_PIVOTED_COLUMNS, "metric")
+    convert_table_to_unpivoted(comstock_projected_path, BUILDING_PIVOTED_COLUMNS, "metric")
+    dataset_schemas = {
+        "comstock_conus_2022_reference": {
+            "data_schema_type": "standard",
+            "table_format": {
+                "format_type": "unpivoted",
+                "value_column": "value",
+            },
+        },
+        "comstock_conus_2022_projected": {
+            "data_schema_type": "one_table",
+            "table_format": {
+                "format_type": "unpivoted",
+                "value_column": "value",
+            },
+        },
+    }
+    change_dataset_schemas(dataset_schemas)
+    print(f"Changed datasets to unpivoted format: {list(dataset_schemas.keys())}")
+
+
+def convert_table_to_unpivoted(path: Path, pivoted_columns, variable_column_name: str):
+    spark = SparkSession.builder.appName("dgrid").getOrCreate()
+    df = spark.read.load(str(path)).cache()
+    df.count()
+    try:
+        ids = set(df.columns).difference(pivoted_columns)
+        df.unpivot(
+            [x for x in df.columns if x in ids],
+            list(pivoted_columns),
+            variable_column_name,
+            VALUE_COLUMN,
+        ).coalesce(1).write.mode("overwrite").parquet(str(path))
+    finally:
+        df.unpersist()
+
+
+def change_dataset_schemas(dataset_schemas: dict):
+    filenames = list((REGISTRY_PATH / "dump").glob("datasets_*data.json"))
+    assert len(filenames) == 1
+    count = 0
+    datasets = load_line_delimited_json(filenames[0])
+    for dataset in datasets:
+        if dataset["dataset_id"] in dataset_schemas:
+            dataset["data_schema"] = dataset_schemas[dataset["dataset_id"]]
+            count += 1
+    assert count == len(dataset_schemas)
+    dump_line_delimited_json(datasets, filenames[0])
+
+
 if __name__ == "__main__":
     build_expected_datasets()
+    make_unpivoted_datasets()

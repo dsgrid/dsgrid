@@ -14,13 +14,10 @@ Requirements
    contact the dsgrid team.
 2. If the data tables contain time-series data, each unique time array must contain an identical
    range of timestamps.
-3. Tables must be pivoted with the records of one dimension. This is usually much more efficient
-   than a "long-narrow" format with a single "metric value" column. Support could be added if
-   necessary.
-4. Values of dimension columns must be strings. This includes ``model_year`` and ``weather_year``.
-5. Each dimension column name except time must match dsgrid dimension types (geography, sector,
+3. Values of dimension columns must be strings. This includes ``model_year`` and ``weather_year``.
+4. Each dimension column name except time must match dsgrid dimension types (geography, sector,
    subsector, etc.).
-6. The values in each dimension column must match the dataset's dimension records.
+5. The values in each dimension column must match the dataset's dimension records.
 
 Recommendations
 ===============
@@ -29,6 +26,8 @@ Recommendations
    memory issues. Making them too small adds overhead and hurts performance.
 3. Trivial dimensions (one-element records) should not be stored in the data files. They should
    instead be defined in the dataset config. dsgrid will add them dynamically at runtime.
+4. Consider the appropriate floating point precision. 64-bit floats may be needed but will double
+   the storage space. 32-bit floats may be acceptable.
 
 .. warning:: Currently, the pivoted dimension must be the metric dimension. This limitation is
    expected to be fixed soon.
@@ -62,7 +61,18 @@ timestamps (i.e., 12pm with no time zone should be written as 12pm UTC).
 
 Formats
 =======
-Input datasets can use the formats below. dsgrid uses the one table format for derived datasets.
+Input datasets can use a one-table or two-table format as described below.
+
+Both formats support pivoting the record IDs of one dimension as an option.
+
+- ``Pivoted``: All dimensions except the pivoted dimension are columns in the table. The record IDs
+  of the pivoted dimension are columns in the table. Several dsgrid datasets
+  pivot the metric dimension in order to avoid many repeated rows of other dimensions. This saves
+  storage space but can make queries more complicated. dsgrid handles that complexity on the back
+  end, but this point can still apply to users that inspect the raw datasets.
+- ``Unpivoted``: The table has one column per dimension (except time, which might have more than
+  one column) and a column called ``value`` that contains the data values. This format
+  makes queries simpler. It is also good for cases when there is not a sensible dimension to pivot.
 
 .. _one-table-format:
 
@@ -104,7 +114,7 @@ Two Table Format (Standard)
 Two Parquet files comprise the dataset:
 
 - ``load_data.parquet``: Metric data, usually with time-series data. This example pivots the metric
-  dimensions.
+  dimension records.
 
 ::
 
@@ -149,6 +159,19 @@ This format minimizes file storage because
    scaling factors.
 2. Dimension information is not repeated for every timestamp. (This could be minimal because of
    compression inside the Parquet files.)
+
+Time Formats
+============
+
+DateTime
+--------
+The load data table has one column representing time, typically called ``timestamp``. When written
+to Parquet files the type should be the ``TIMESTAMP`` logical type (integer, not string) and be
+adjusted to UTC. When read into Spark the type should be ``TimestampType`` (not
+``TimestampNTZType``).
+
+Handling of no-time-zone timestamps (Spark type ``TimestampNTZType``) is possible. Contact the
+dsgrid team if you need this.
 
 Annual
 ------

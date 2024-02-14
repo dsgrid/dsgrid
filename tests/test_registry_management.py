@@ -44,7 +44,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     project_id = project_ids[0]
     dataset_ids = dataset_mgr.list_ids()
     dataset_id = dataset_ids[0]
-    assert len(dataset_ids) == 1
+    assert len(dataset_ids) == 2
     dimension_ids = dimension_mgr.list_ids()
     assert dimension_ids
     dimension_id = dimension_ids[0]
@@ -56,7 +56,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
     project_config = project_mgr.get_by_id(project_id, "1.1.0")
-    assert project_config.model.status == ProjectRegistryStatus.COMPLETE
+    assert project_config.model.status == ProjectRegistryStatus.IN_PROGRESS
     dataset = project_config.get_dataset(dataset_id)
     assert dataset.status == DatasetRegistryStatus.REGISTERED
 
@@ -297,7 +297,7 @@ def test_auto_updates(tmp_registry_db):
     assert found
 
     assert project.model.datasets[0].version == "1.1.0"
-    assert project_mgr.get_latest_version(project_id) == "1.2.0"
+    assert project_mgr.get_latest_version(project_id) == "1.3.0"
     assert dataset_mgr.get_latest_version(dataset_id) == "1.1.0"
 
     # The project should get updated again if we update the dimension mapping.
@@ -305,13 +305,13 @@ def test_auto_updates(tmp_registry_db):
     dimension_mapping_mgr.update(mapping, VersionUpdateType.PATCH, "test update")
     assert dimension_mapping_mgr.get_latest_version(mapping.config_id) == "1.1.1"
     mgr.update_dependent_configs(mapping, VersionUpdateType.PATCH, "test update")
-    assert project_mgr.get_latest_version(project_id) == "1.2.1"
+    assert project_mgr.get_latest_version(project_id) == "1.3.1"
 
     # And again if we update the dataset.
     dataset.model.description += "test update"
     dataset_mgr.update(dataset, VersionUpdateType.PATCH, "test update")
     mgr.update_dependent_configs(dataset, VersionUpdateType.PATCH, "test update")
-    assert project_mgr.get_latest_version(project_id) == "1.2.2"
+    assert project_mgr.get_latest_version(project_id) == "1.3.2"
 
 
 def test_invalid_dimension_mapping(tmp_registry_db):

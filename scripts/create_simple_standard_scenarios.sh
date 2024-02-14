@@ -44,10 +44,13 @@ apptainer run \
     --compress-output false \
     --include-system-collections true
 
-echo ""
-echo "Created a registry database called ${DSGRID_REGISTRY_SIMPLE_DB_NAME} with filtered StandardScenarios data."
-echo "The registry dumped in JSON format is at ${DUMP_DIR}."
-echo "The load data for the registry is at ${SIMPLE_SS_DATA}."
-echo "Run 'python tests/simple_standard_scenarios_datasets.py' to generate the summary of dataset stats for tests."
-echo "The changed files need to be committed in git and pushed back to GitHub."
-echo "Overwrite the relevant files in ${DSGRID_REPO}/dsgrid-test-data/filtered_registries/simple_standard_scenarios/ and open a pull request."
+read -r -d "" USAGE << EOM
+
+Created a registry database called ${DSGRID_REGISTRY_SIMPLE_DB_NAME} with filtered StandardScenarios data.
+The registry dumped in JSON format is at ${DUMP_DIR}.
+The load data for the registry is at ${SIMPLE_SS_DATA}.
+Run 'python tests/simple_standard_scenarios_datasets.py' to unpivot the ComStock datasets and
+generate the summary of dataset stats for tests.
+The changed files need to be committed in git and pushed back to GitHub.
+Overwrite the relevant files in ${DSGRID_REPO}/dsgrid-test-data/filtered_registries/simple_standard_scenarios/ and open a pull request.
+EOM

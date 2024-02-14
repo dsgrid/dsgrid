@@ -23,6 +23,9 @@
     "replace_ids_with_names": false,
     "aggregations": [],
     "reports": [],
+    "table_format": {
+      "format_type": "unpivoted",
+    },
     "output_format": "parquet",
     "sort_columns": [],
     "dimension_filters": [

@@ -18,7 +18,7 @@ def apply_exponential_growth_rate(
     growth_rate_df: DataFrame,
     time_columns,
     model_year_column,
-    pivoted_columns,
+    value_columns,
 ):
     """Applies exponential growth rate to the initial_value dataframe as follows:
     P(t) = P0*(1+r)^(t-t0)
@@ -36,7 +36,7 @@ def apply_exponential_growth_rate(
     growth_rate_df : pyspark.sql.DataFrame
     time_columns : set[str]
     model_year_column : str
-    pivoted_columns : set[str]
+    value_columns : set[str]
 
     Returns
     -------
@@ -49,14 +49,14 @@ def apply_exponential_growth_rate(
         initial_value_df,
         growth_rate_df,
         model_year_column,
-        pivoted_columns,
+        value_columns,
     )
 
     df = apply_annual_multiplier(
         initial_value_df,
         growth_rate_df,
         time_columns,
-        pivoted_columns,
+        value_columns,
     )
 
     return df
@@ -66,7 +66,7 @@ def apply_annual_multiplier(
     initial_value_df: DataFrame,
     growth_rate_df: DataFrame,
     time_columns,
-    pivoted_columns,
+    value_columns,
 ):
     """Applies annual growth rate to the initial_value dataframe as follows:
     P(t) = P0 * r(t)
@@ -77,10 +77,11 @@ def apply_annual_multiplier(
 
     Parameters
     ----------
+    dataset : ProjectionDatasetModel
     initial_value_df : pyspark.sql.DataFrame
     growth_rate_df : pyspark.sql.DataFrame
     time_columns : set[str]
-    pivoted_columns : set[str]
+    value_columns : set[str]
 
     Returns
     -------
@@ -93,10 +94,10 @@ def apply_annual_multiplier(
 
     orig_columns = initial_value_df.columns
 
-    dim_columns = set(initial_value_df.columns) - pivoted_columns - time_columns
+    dim_columns = set(initial_value_df.columns) - value_columns - time_columns
     df = initial_value_df.join(growth_rate_df, on=list(dim_columns))
     for column in df.columns:
-        if column in pivoted_columns:
+        if column in value_columns:
             gr_column = renamed(column)
             df = df.withColumn(column, df[column] * df[gr_column])
 
@@ -108,7 +109,7 @@ def _process_exponential_growth_rate(
     initial_value_df,
     growth_rate_df,
     model_year_column,
-    pivoted_columns,
+    value_columns,
 ):
     def renamed(col):
         return col + "_gr"
@@ -118,7 +119,7 @@ def _process_exponential_growth_rate(
     )
 
     gr_df = growth_rate_df
-    for column in pivoted_columns:
+    for column in value_columns:
         gr_col = renamed(column)
         gr_df = gr_df.withColumn(
             gr_col,

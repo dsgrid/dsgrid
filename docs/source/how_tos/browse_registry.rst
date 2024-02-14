@@ -8,8 +8,8 @@ CLI
 List Registry Components
 -------------------------
 
-Assuming you have already :ref:`configured dsgrid <configure_dsgrid>` to point to the right 
-database (URL and name), you can list components by type: projects, datasets, dimensions, dimension 
+Assuming you have already :ref:`configured dsgrid <configure_dsgrid>` to point to the right
+database (URL and name), you can list components by type: projects, datasets, dimensions, dimension
 mappings:
 
 .. code-block:: console
@@ -31,7 +31,7 @@ You can also list all components at once:
 
     $ dsgrid registry list
 
-You can also browse different registries by specifying the database URL and name directly on the 
+You can also browse different registries by specifying the database URL and name directly on the
 command line:
 
 .. code-block:: console

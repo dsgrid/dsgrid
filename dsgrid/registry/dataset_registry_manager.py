@@ -246,6 +246,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         dataset_path = dataset_registry_dir / registration.version
         dataset_path.mkdir(exist_ok=True, parents=True)
         self.fs_interface.mkdir(dataset_registry_dir)
+        found_files = False
         for filename in ALLOWED_DATA_FILES:
             path = Path(config.dataset_path) / filename
             if path.exists():
@@ -253,6 +254,10 @@ class DatasetRegistryManager(RegistryManagerBase):
                 # Writing with Spark is much faster than copying or rsync if there are
                 # multiple nodes in the cluster - much more parallelism.
                 write_dataframe(read_dataframe(path), dst)
+                found_files = True
+        if not found_files:
+            msg = f"Did not find any data files in {config.dataset_path}"
+            raise DSGInvalidDataset(msg)
 
         self._db.insert(config.model, registration)
         logger.info(

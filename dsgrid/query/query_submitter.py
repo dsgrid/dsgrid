@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 from zipfile import ZipFile
 
-from dsgrid.dataset.pivoted_table import PivotedTableHandler
+from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionCategory
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
 from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
@@ -22,7 +22,6 @@ from .models import (
     CompositeDatasetQueryModel,
     ReportType,
     DatasetMetadataModel,
-    TableFormatType,
 )
 from .query_context import QueryContext
 from .report_peak_load import PeakLoadReport
@@ -111,13 +110,6 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     def project(self):
         return self._project
 
-    def _make_table_handler(self, context: QueryContext):
-        if context.get_table_format_type() == TableFormatType.PIVOTED:
-            handler = PivotedTableHandler(self._project.config)
-        else:
-            raise NotImplementedError(f"Unsupported {context.get_table_format_type()=}")
-        return handler
-
     def _run_checks(self, model):
         subsets = set(self.project.config.list_dimension_query_names(DimensionCategory.SUBSET))
         for agg in model.result.aggregations:
@@ -173,7 +165,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if persist_intermediate_table and not is_cached:
             df = self._persist_intermediate_result(context, df)
 
-        handler = self._make_table_handler(context)
+        handler = make_table_format_handler(context.get_table_format_type(), self._project.config)
         if context.model.result.supplemental_columns:
             df = handler.add_columns(
                 df,
@@ -204,18 +196,24 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         return df, context
 
     def _apply_filters(self, df, context: QueryContext):
+        pivoted_dim_type = context.get_pivoted_dimension_type()
         for dim_filter in context.model.result.dimension_filters:
+            column_names = context.get_dimension_column_names(dim_filter.dimension_type)
+            if len(column_names) > 1:
+                raise NotImplementedError(
+                    f"Cannot filter {dim_filter} when there are multiple {column_names=}"
+                )
             if isinstance(dim_filter, SubsetDimensionFilterModel):
                 records = dim_filter.get_filtered_records_dataframe(
                     self.project.config.get_dimension
                 )
-                if dim_filter.dimension_type == context.get_pivoted_dimension_type():
+                if pivoted_dim_type is not None and dim_filter.dimension_type == pivoted_dim_type:
                     df = self._drop_filtered_pivoted_columns(df, context, records)
                 else:
-                    column = dim_filter.dimension_type.value
+                    column = next(iter(column_names))
                     df = df.join(records.select("id"), on=df[column] == records["id"]).drop("id")
             else:
-                if dim_filter.dimension_type == context.get_pivoted_dimension_type():
+                if pivoted_dim_type is not None and dim_filter.dimension_type == pivoted_dim_type:
                     dim_records = self.project.config.get_dimension_records(
                         dim_filter.dimension_query_name
                     )
@@ -237,8 +235,6 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         record_ids = get_unique_values(records, "id")
         drop_columns = context.get_pivoted_columns() - record_ids
         df = df.drop(*drop_columns)
-        pivoted_columns = (record_ids - drop_columns).intersection(df.columns)
-        context.set_pivoted_columns(pivoted_columns)
         return df
 
     @track_timing(timer_stats_collector)
@@ -323,9 +319,6 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
     """Submits queries for a composite dataset."""
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
     @track_timing(timer_stats_collector)
     def create_dataset(
         self,
@@ -366,7 +359,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         # orig_query = self._load_composite_dataset_query(query.dataset_id)
         context = QueryContext(query)
         df, context.metadata = self._read_dataset(query.dataset_id)
-        handler = self._make_table_handler(context)
+        handler = make_table_format_handler(context.get_table_format_type(), self._project.config)
 
         repartition = False
         if context.model.result.aggregations:

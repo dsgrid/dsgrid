@@ -83,8 +83,8 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
 
     load_data_df = dataset._handler._load_data
     load_data_lookup_df = dataset._handler._load_data_lookup
-    mapped_load_data = dataset._handler._remap_dimension_columns(load_data_df)
-    mapped_load_data_lookup = dataset._handler._remap_dimension_columns(load_data_lookup_df)
+    mapped_load_data = dataset._handler._remap_dimension_columns(load_data_df, True)
+    mapped_load_data_lookup = dataset._handler._remap_dimension_columns(load_data_lookup_df, False)
 
     # [1] check that mapped tables contain all to_id records from mappings
     table_is_lookup = False
@@ -93,7 +93,7 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
         mapping_config = dataset._handler._dimension_mapping_mgr.get_by_id(ref.mapping_id)
         to_records = mapping_config.get_unique_to_ids()  # set
 
-        if column == dataset._handler.get_pivoted_dimension_type().value:
+        if column == dataset._handler.config.get_pivoted_dimension_type().value:
             diff = to_records.difference(mapped_load_data.columns)
         else:
             if column in mapped_load_data_lookup.columns:
@@ -135,7 +135,7 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
     for ref in dataset._handler._mapping_references:
         column = ref.from_dimension_type.value
 
-        if column == dataset._handler.get_pivoted_dimension_type().value:
+        if column == dataset._handler.config.get_pivoted_dimension_type().value:
             assert "fraction" not in mapped_load_data.columns
 
             mapping_config = dataset._handler._dimension_mapping_mgr.get_by_id(ref.mapping_id)
@@ -144,7 +144,8 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
             # apply mapping to load_data.sum(), then compare to mapped_load_data.sum()
             # 2B.1 get total enduse loads from each table
             sum_query = [
-                f"SUM({col}) AS {col}" for col in dataset._handler.get_pivoted_dimension_columns()
+                f"SUM({col}) AS {col}"
+                for col in dataset._handler.config.get_pivoted_dimension_columns()
             ]
             load_data_sum = load_data_df.selectExpr(*sum_query)
 

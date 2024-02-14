@@ -233,7 +233,7 @@ class DimensionBaseModel(DSGBaseModel):
                  Please be more descriptive in your naming.
                  Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable,
                  identifiable, and reusable for other datasets and projects.
-                 e.g., 'time-2012-est-houlry-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name.
+                 e.g., 'time-2012-est-hourly-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name.
                  """
             )
         return name

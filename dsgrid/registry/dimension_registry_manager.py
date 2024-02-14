@@ -75,8 +75,13 @@ class DimensionRegistryManager(RegistryManagerBase):
                         replace_dim = True
                     else:
                         logger.info(
-                            "Register new dimension even though records are duplicate: %s",
+                            "Register new dimension even though records are duplicate with "
+                            "existing dimension. Existing name/display_name=%s/%s. "
+                            "New name/display_name=%s/%s",
+                            existing.name,
+                            existing.display_name,
                             dim.name,
+                            dim.display_name,
                         )
             if replace_dim:
                 logger.info(
@@ -201,33 +206,39 @@ class DimensionRegistryManager(RegistryManagerBase):
 
     def _register(self, config, submitter, log_message, context):
         existing_ids = self._replace_duplicates(config)
-        # TODO: check that id does not already exist in .dsgrid-registry
-
         registration = make_initial_config_registration(submitter, log_message)
-        dimension_ids = []
+
+        # This function will either register the dimension specified by each model or re-use an
+        # existing ID. The returned list must be in the same order as the list of models.
+        final_dimension_ids = []
+        registered_dimension_ids = []
+
         try:
             # Guarantee that registration of dimensions is all or none.
             for dim in config.model.dimensions:
                 if dim.id is None:
                     dim = self.db.insert(dim, registration)
+                    final_dimension_ids.append(dim.dimension_id)
+                    registered_dimension_ids.append(dim.dimension_id)
+                    logger.info(
+                        "%s Registered dimension id=%s type=%s version=%s name=%s",
+                        self._log_offline_mode_prefix(),
+                        dim.id,
+                        dim.dimension_type.value,
+                        registration.version,
+                        dim.name,
+                    )
                 else:
-                    assert dim.dimension_id in existing_ids
-                    continue
-                logger.info(
-                    "%s Registered dimension id=%s type=%s version=%s name=%s",
-                    self._log_offline_mode_prefix(),
-                    dim.id,
-                    dim.dimension_type.value,
-                    registration.version,
-                    dim.name,
-                )
-                dimension_ids.append(dim.dimension_id)
+                    if dim.dimension_id not in existing_ids:
+                        msg = f"Bug: {dim.dimension_id=} should have been in existing_ids"
+                        raise Exception(msg)
+                    final_dimension_ids.append(dim.dimension_id)
         except Exception:
-            if dimension_ids:
+            if registered_dimension_ids:
                 logger.warning(
                     "Exception occured after partial completion of dimension registration."
                 )
-                for dimension_id in dimension_ids:
+                for dimension_id in registered_dimension_ids:
                     self.remove(dimension_id)
             raise
 
@@ -237,9 +248,8 @@ class DimensionRegistryManager(RegistryManagerBase):
             registration.version,
         )
 
-        context.add_ids(RegistryType.DIMENSION, dimension_ids, self)
-        dimension_ids.extend(existing_ids)
-        return dimension_ids
+        context.add_ids(RegistryType.DIMENSION, registered_dimension_ids, self)
+        return final_dimension_ids
 
     def make_dimension_references(self, dimension_ids: list[str]):
         """Return a list of dimension references from a list of registered dimension IDs.

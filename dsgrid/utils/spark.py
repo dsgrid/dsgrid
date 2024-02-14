@@ -8,7 +8,7 @@ import os
 import shutil
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterable, Union, get_origin, get_args
+from typing import Iterable, Type, Union, get_origin, get_args
 
 import pandas as pd
 import pyspark
@@ -336,10 +336,10 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
                 if val is None:
                     python_type = cls.model_fields[f].annotation
                     if get_origin(python_type) is Union:
-                        args = get_args(python_type)
-                        if issubclass(args[0], enum.Enum):
-                            python_type = type(next(iter(args[0])).value)
+                        python_type = get_type_from_union(python_type)
                     # else: will likely fail below
+                    # Need to add more logic to detect the actual type or add to
+                    # PYTHON_TO_SPARK_TYPES.
                 else:
                     python_type = type(val)
                 spark_type = PYTHON_TO_SPARK_TYPES[python_type]()
@@ -354,6 +354,33 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
         df.cache()
 
     return df
+
+
+def get_type_from_union(python_type) -> Type:
+    """Return the Python type from a Union.
+
+    Only works if it is Union of NoneType and something.
+
+    Raises
+    ------
+    NotImplementedError
+        Raised if the code does know how to determine the type.
+    """
+    args = get_args(python_type)
+    if issubclass(args[0], enum.Enum):
+        python_type = type(next(iter(args[0])).value)
+    else:
+        types = [x for x in args if not issubclass(x, type(None))]
+        if not types:
+            msg = f"Unhandled Union type: {python_type=} {args=}"
+            raise NotImplementedError(msg)
+        elif len(types) > 1:
+            msg = f"Unhandled Union type: {types=}"
+            raise NotImplementedError(msg)
+        else:
+            python_type = types[0]
+
+    return python_type
 
 
 @track_timing(timer_stats_collector)

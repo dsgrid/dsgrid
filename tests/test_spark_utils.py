@@ -1,10 +1,13 @@
 from functools import reduce
+from typing import Optional
 
 from pyspark.sql import DataFrame
 
+from dsgrid.time.types import DayType
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     get_spark_session,
+    get_type_from_union,
     try_read_dataframe,
     restart_spark_with_custom_conf,
     create_dataframe_from_product,
@@ -59,3 +62,8 @@ def test_create_dataframe_from_product(tmp_path):
         }
         df = create_dataframe_from_product(data, context, max_partition_size_mb=1)
         assert df.count() == reduce(lambda x, y: x * y, [len(x) for x in data.values()])
+
+
+def test_get_type_from_union():
+    assert get_type_from_union(Optional[str]) is str
+    assert get_type_from_union(Optional[DayType]) is str

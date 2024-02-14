@@ -15,10 +15,10 @@ class RegistrationContext:
     def __init__(self):
         self._managers = {
             # This order is required for cleanup in self.finalize().
+            RegistryType.PROJECT: None,
+            RegistryType.DATASET: None,
             RegistryType.DIMENSION_MAPPING: None,
             RegistryType.DIMENSION: None,
-            RegistryType.DATASET: None,
-            RegistryType.PROJECT: None,
         }
 
     def __del__(self):

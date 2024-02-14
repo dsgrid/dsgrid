@@ -21,21 +21,21 @@ MEGA = 1_000_000
 GIGA = 1_000_000_000
 TERA = 1_000_000_000_000
 
-KILO_TO_MEGA = 1 / KILO
-KILO_TO_GIGA = 1 / MEGA
-KILO_TO_TERA = 1 / GIGA
+KILO_TO_MEGA = KILO / MEGA
+KILO_TO_GIGA = KILO / GIGA
+KILO_TO_TERA = KILO / TERA
 
-MEGA_TO_KILO = KILO
-MEGA_TO_GIGA = 1 / KILO
-MEGA_TO_TERA = 1 / MEGA
+MEGA_TO_KILO = MEGA / KILO
+MEGA_TO_GIGA = MEGA / GIGA
+MEGA_TO_TERA = MEGA / TERA
 
-GIGA_TO_KILO = MEGA
-GIGA_TO_MEGA = KILO
-GIGA_TO_TERA = 1 / KILO
+GIGA_TO_KILO = GIGA / KILO
+GIGA_TO_MEGA = GIGA / MEGA
+GIGA_TO_TERA = GIGA / TERA
 
-TERA_TO_KILO = GIGA
-TERA_TO_MEGA = MEGA
-TERA_TO_GIGA = KILO
+TERA_TO_KILO = TERA / KILO
+TERA_TO_MEGA = TERA / MEGA
+TERA_TO_GIGA = TERA / GIGA
 
 THERM_TO_KWH = 29.307107017222222
 THERM_TO_MWH = THERM_TO_KWH * KILO_TO_MEGA
@@ -43,7 +43,7 @@ THERM_TO_GWH = THERM_TO_KWH * KILO_TO_GIGA
 THERM_TO_TWH = THERM_TO_KWH * KILO_TO_TERA
 
 KWH_TO_THERM = 1 / THERM_TO_KWH
-MWH_TO_THERM = MEGA_TO_KILO * KWH_TO_THERM
+MWH_TO_THERM = 1 / THERM_TO_MWH
 GWH_TO_THERM = 1 / THERM_TO_GWH
 TWH_TO_THERM = 1 / THERM_TO_TWH
 
@@ -156,132 +156,12 @@ def from_any_to_any(from_unit_col, to_unit_col, value_col):
     return (
         F.when(F.col(from_unit_col) == F.col(to_unit_col), F.col(value_col))
         .when(F.col(from_unit_col) == "", F.col(value_col))
-        # From KWh
-        .when(
-            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == MWH),
-            F.col(value_col) * KILO_TO_MEGA,
-        )
-        .when(
-            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == GWH),
-            F.col(value_col) * KILO_TO_GIGA,
-        )
-        .when(
-            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == TWH),
-            F.col(value_col) * KILO_TO_TERA,
-        )
-        .when(
-            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == THERM),
-            F.col(value_col) * KWH_TO_THERM,
-        )
-        .when(
-            (F.col(from_unit_col) == KWH) & (F.col(to_unit_col) == MBTU),
-            F.col(value_col) * KWH_TO_MBTU,
-        )
-        # From MWh
-        .when(
-            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == KWH),
-            F.col(value_col) * MEGA_TO_KILO,
-        )
-        .when(
-            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == GWH),
-            F.col(value_col) * MEGA_TO_GIGA,
-        )
-        .when(
-            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == TWH),
-            F.col(value_col) * MEGA_TO_TERA,
-        )
-        .when(
-            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == THERM),
-            F.col(value_col) * MWH_TO_THERM,
-        )
-        .when(
-            (F.col(from_unit_col) == MWH) & (F.col(to_unit_col) == MBTU),
-            F.col(value_col) * MWH_TO_MBTU,
-        )
-        # From GWh
-        .when(
-            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == KWH),
-            F.col(value_col) * GIGA_TO_KILO,
-        )
-        .when(
-            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == MWH),
-            F.col(value_col) * GIGA_TO_MEGA,
-        )
-        .when(
-            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == TWH),
-            F.col(value_col) * GIGA_TO_TERA,
-        )
-        .when(
-            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == THERM),
-            F.col(value_col) * GWH_TO_THERM,
-        )
-        .when(
-            (F.col(from_unit_col) == GWH) & (F.col(to_unit_col) == MBTU),
-            F.col(value_col) * GWH_TO_MBTU,
-        )
-        # From TWh
-        .when(
-            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == KWH),
-            F.col(value_col) * TERA_TO_KILO,
-        )
-        .when(
-            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == MWH),
-            F.col(value_col) * TERA_TO_MEGA,
-        )
-        .when(
-            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == GWH),
-            F.col(value_col) * TERA_TO_GIGA,
-        )
-        .when(
-            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == THERM),
-            F.col(value_col) * TWH_TO_THERM,
-        )
-        .when(
-            (F.col(from_unit_col) == TWH) & (F.col(to_unit_col) == MBTU),
-            F.col(value_col) * TWH_TO_MBTU,
-        )
-        # From Therms
-        .when(
-            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == KWH),
-            F.col(value_col) * THERM_TO_KWH,
-        )
-        .when(
-            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == MWH),
-            F.col(value_col) * THERM_TO_MWH,
-        )
-        .when(
-            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == GWH),
-            F.col(value_col) * THERM_TO_GWH,
-        )
-        .when(
-            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == TWH),
-            F.col(value_col) * THERM_TO_TWH,
-        )
-        .when(
-            (F.col(from_unit_col) == THERM) & (F.col(to_unit_col) == MBTU),
-            F.col(value_col) * THERM_TO_MBTU,
-        )
-        # From MBTU
-        .when(
-            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == KWH),
-            F.col(value_col) * MBTU_TO_KWH,
-        )
-        .when(
-            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == MWH),
-            F.col(value_col) * MBTU_TO_MWH,
-        )
-        .when(
-            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == GWH),
-            F.col(value_col) * MBTU_TO_GWH,
-        )
-        .when(
-            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == TWH),
-            F.col(value_col) * MBTU_TO_TWH,
-        )
-        .when(
-            (F.col(from_unit_col) == MBTU) & (F.col(to_unit_col) == THERM),
-            F.col(value_col) * MBTU_TO_THERM,
-        )
+        .when(F.col(to_unit_col) == KWH, to_kwh(from_unit_col, value_col))
+        .when(F.col(to_unit_col) == MWH, to_mwh(from_unit_col, value_col))
+        .when(F.col(to_unit_col) == GWH, to_gwh(from_unit_col, value_col))
+        .when(F.col(to_unit_col) == TWH, to_twh(from_unit_col, value_col))
+        .when(F.col(to_unit_col) == THERM, to_therm(from_unit_col, value_col))
+        .when(F.col(to_unit_col) == MBTU, to_mbtu(from_unit_col, value_col))
         .otherwise(None)
     )
 

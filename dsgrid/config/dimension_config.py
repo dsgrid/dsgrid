@@ -1,6 +1,6 @@
 import abc
 import logging
-
+from typing import Union
 
 from .config_base import ConfigBase, ConfigWithRecordFileBase
 from .dimensions import DimensionModel
@@ -49,3 +49,6 @@ class DimensionConfig(DimensionBaseConfigWithFiles):
 
         """
         return {x.id for x in self.model.records}
+
+
+DimensionBaseConfig = Union[DimensionBaseConfigWithFiles, DimensionBaseConfigWithoutFiles]

@@ -231,10 +231,10 @@ class TableFormatHandlerBase(abc.ABC):
             # The table could have NULL timestamps that designate expected-missing data.
             # Those rows could be obsolete after aggregating stacked dimensions.
             # This is an expensive operation, so only do it if the dataframe changed.
-            pivoted_columns = context.get_pivoted_columns()
+            value_columns = context.get_value_columns()
             time_columns = context.get_dimension_column_names(DimensionType.TIME)
             if time_columns:
-                stacked_columns = set(df.columns) - pivoted_columns.union(time_columns)
+                stacked_columns = set(df.columns) - value_columns.union(time_columns)
                 df = remove_invalid_null_timestamps(df, time_columns, stacked_columns)
 
         return df

@@ -155,3 +155,4 @@ emr/running_cluster_id.txt
 emr/emr_config.yml
 spark-warehouse
 metastore_db
+__dsgrid_scratch__

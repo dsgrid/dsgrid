@@ -12,7 +12,7 @@ from dsgrid.registry.common import VersionUpdateType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.utils.files import dump_data, load_data
 
-TEST_PROJECT_PATH = Path(__file__).absolute().parent.parent.parent / "dsgrid-test-data"
+TEST_PROJECT_PATH = Path(__file__).absolute().parents[2] / "dsgrid-test-data"
 TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_efs"
 TEST_STANDARD_SCENARIOS_PROJECT_REPO = TEST_PROJECT_PATH / "standard_scenarios_2021"
 TEST_DATASET_DIRECTORY = TEST_PROJECT_PATH / "datasets"

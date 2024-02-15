@@ -1,18 +1,17 @@
 import itertools
 import logging
-import os
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Type
 
 import pandas as pd
 from pydantic import field_validator, model_validator, Field, ValidationInfo
+from pyspark.sql import DataFrame
 from typing_extensions import Annotated
 
-from dsgrid.config.dimension_association_manager import (
-    try_load_dimension_associations,
-    save_dimension_associations,
-)
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dimension_config import DimensionBaseConfig
+from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dimension.base_models import (
     check_required_dimensions,
@@ -32,11 +31,11 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     check_config_id_strict,
 )
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     get_unique_values,
     cross_join_dfs,
     create_dataframe_from_product,
-    load_stored_table,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
@@ -149,6 +148,7 @@ class SubsetDimensionGroupModel(DSGBaseModel):
             default=True,
         ),
     ]
+    record_ids: set[str] = set()
 
     @field_validator("display_name")
     @classmethod
@@ -177,28 +177,29 @@ class SubsetDimensionGroupModel(DSGBaseModel):
 
         return selectors
 
-    @field_validator("selectors")
-    @classmethod
-    def load_records(cls, selectors, info: ValidationInfo):
+    @model_validator(mode="after")
+    def load_records(self) -> "SubsetDimensionGroupModel":
         """Load the records for each subset dimension selector."""
-        if info.data.get("filename") is None:
-            return selectors
+        if self.filename is None:
+            return self
 
-        name = info.data["name"]
-        mappings = load_subset_dimensions(Path(info.data["filename"]))
-        selector_names = check_uniqueness([x.name for x in selectors], "subset dimension selector")
+        record_ids, mappings = load_subset_dimensions(Path(self.filename))
+        self.record_ids.update(record_ids)
+        selector_names = check_uniqueness(
+            [x.name for x in self.selectors], "subset dimension selector"
+        )
 
         diff = selector_names.symmetric_difference(mappings)
         if diff:
             raise ValueError(
-                f"subset dimension {name} selectors have a mismatch with the records file column names: {diff}"
+                f"subset dimension {self.name} selectors have a mismatch with the records file column names: {diff}"
             )
 
-        for dim in selectors:
+        for dim in self.selectors:
             dim.records = mappings[dim.name]
 
-        info.data["filename"] = None
-        return selectors
+        self.filename = None
+        return self
 
 
 class DimensionsModel(DSGBaseModel):
@@ -453,6 +454,9 @@ class RequiredDimensionsModel(DSGBaseModel):
                 for supp in req.supplemental:
                     num_dims += len(supp.record_ids)
                     record_ids.update(supp.record_ids)
+                num_dims += len(req.subset)
+                for subset in req.subset:
+                    record_ids.update(subset.selectors)
                 intersect = existing.intersection(record_ids)
                 if intersect:
                     raise ValueError(
@@ -539,11 +543,20 @@ class InputDatasetModel(DSGBaseModel):
             },
         ),
     ]
+    wrap_time_allowed: Annotated[
+        bool,
+        Field(
+            title="wrap_time_allowed",
+            description="Whether to allow dataset time to be wrapped to project time if different",
+            default=False,
+        ),
+    ]
 
 
 class DimensionMappingsModel(DSGBaseModel):
     """Defines all dimension mappings associated with a dsgrid project,
-    including dimension associations, base-to-supplemental mappings, and dataset-to-project mappings."""
+    including base-to-supplemental mappings and dataset-to-project mappings.
+    """
 
     base_to_supplemental_references: Annotated[
         List[DimensionMappingReferenceModel],
@@ -745,89 +758,42 @@ class ProjectConfig(ConfigBase):
         self._dimensions_by_query_name = {}
 
     @staticmethod
-    def model_class():
+    def model_class() -> Type:
         return ProjectConfigModel
 
     @staticmethod
-    def config_filename():
+    def config_filename() -> str:
         return "project.json5"
 
-    def get_base_dimension(self, dimension_type: DimensionType):
-        """Return the base dimension matching dimension_type.
-
-        Parameters
-        ----------
-        dimension_type : DimensionType
-
-        Returns
-        -------
-        DimensionConfig
-
-        """
+    def get_base_dimension(self, dimension_type: DimensionType) -> DimensionBaseConfig:
+        """Return the base dimension matching dimension_type."""
         for dim_config in self.base_dimensions.values():
             if dim_config.model.dimension_type == dimension_type:
                 return dim_config
         assert False, dimension_type
 
-    def get_base_dimension_and_version(self, dimension_type: DimensionType):
-        """Return the base dimension and version matching dimension_type.
-
-        Parameters
-        ----------
-        dimension_type : DimensionType
-
-        Returns
-        -------
-        DimensionConfig, str
-
-        """
+    def get_base_dimension_and_version(
+        self, dimension_type: DimensionType
+    ) -> tuple[DimensionBaseConfig, str]:
+        """Return the base dimension and version matching dimension_type."""
         for key, dim_config in self.base_dimensions.items():
             if dim_config.model.dimension_type == dimension_type:
                 return dim_config, key.version
         assert False, dimension_type
 
-    def get_dimension(self, dimension_query_name: str):
-        """Return an instance of DimensionBaseConfig.
-
-        Parameters
-        ----------
-        dimension_query_name : str
-
-        Returns
-        -------
-        DimensionBaseConfig
-
-        """
+    def get_dimension(self, dimension_query_name: str) -> DimensionBaseConfig:
+        """Return an instance of DimensionBaseConfig."""
         dim = self._dimensions_by_query_name.get(dimension_query_name)
         if dim is None:
             raise DSGInvalidDimension(f"dimension_query_name={dimension_query_name} is not stored")
         return dim
 
-    def get_dimension_records(self, dimension_query_name: str):
-        """Return a DataFrame containing the records for a dimension.
-
-        Parameters
-        ----------
-        dimension_query_name : str
-
-        Returns
-        -------
-        DimensionBaseConfig
-
-        """
+    def get_dimension_records(self, dimension_query_name: str) -> DataFrame:
+        """Return a DataFrame containing the records for a dimension."""
         return self.get_dimension(dimension_query_name).get_records_dataframe()
 
-    def get_dimension_reference(self, dimension_id: str):
-        """Return the reference of the dimension matching dimension_id.
-
-        Parameters
-        ----------
-        dimension_id : str
-
-        Returns
-        -------
-        DimensionReferenceModel
-        """
+    def get_dimension_reference(self, dimension_id: str) -> DimensionReferenceModel:
+        """Return the reference of the dimension matching dimension_id."""
         for ref in itertools.chain(
             self.model.dimensions.base_dimension_references,
             self.model.dimensions.supplemental_dimension_references,
@@ -837,7 +803,9 @@ class ProjectConfig(ConfigBase):
 
         raise DSGInvalidDimension(f"{dimension_id} is not stored")
 
-    def list_supplemental_dimensions(self, dimension_type: DimensionType, sort_by=None):
+    def list_supplemental_dimensions(
+        self, dimension_type: DimensionType, sort_by=None
+    ) -> list[DimensionBaseConfig]:
         """Return the supplemental dimensions matching dimension (if any).
 
         Parameters
@@ -845,11 +813,6 @@ class ProjectConfig(ConfigBase):
         dimension_type : DimensionType
         sort_by : str | None
             If set, sort the dimensions by this dimension attribute.
-
-        Returns
-        -------
-        List[DimensionConfig]
-
         """
         dims = [
             x
@@ -860,18 +823,10 @@ class ProjectConfig(ConfigBase):
             dims.sort(key=lambda x: getattr(x.model, sort_by))
         return dims
 
-    def get_matching_subset_dimension(self, dimension_type, unique_data_records):
-        """Return a dimension reference if there is a matching subset dimension, otherwise None.
-
-        Parameters
-        ----------
-        dimension_type : DimensionType
-        unique_data_records : set[str]
-
-        Returns
-        -------
-        DimensionReferenceModel | None
-        """
+    def get_matching_subset_dimension(
+        self, dimension_type: DimensionType, unique_data_records: set[str]
+    ) -> DimensionReferenceModel | None:
+        """Return a dimension reference if there is a matching subset dimension, otherwise None."""
         for group in self.model.dimensions.subset_dimensions:
             if group.dimension_type == dimension_type:
                 for ref in group.selector_references:
@@ -884,37 +839,20 @@ class ProjectConfig(ConfigBase):
                         return ref
         return None
 
-    def get_base_to_supplemental_dimension_mappings_by_types(self, dimension_type: DimensionType):
-        """Return the base-to-supplemental dimension mappings for the dimension (if any).
-
-        Parameters
-        ----------
-        dimension : DimensionType
-
-        Returns
-        -------
-        list
-            List of DimensionMappingConfig
-
-        """
+    def get_base_to_supplemental_dimension_mappings_by_types(
+        self, dimension_type: DimensionType
+    ) -> list[MappingTableConfig]:
+        """Return the base-to-supplemental dimension mappings for the dimension (if any)."""
         return [
             x
             for x in self._base_to_supplemental_mappings.values()
             if x.model.from_dimension.dimension_type == dimension_type
         ]
 
-    def get_base_to_supplemental_config(self, dimension_query_name: str):
-        """Return the project's base-to-supplemental dimension mapping config.
-
-        Parameters
-        ----------
-        dimension_query_name : str
-
-        Returns
-        -------
-        ConfigKey, DimensionMappingConfig
-
-        """
+    def get_base_to_supplemental_config(
+        self, dimension_query_name: str
+    ) -> tuple[ConfigKey, MappingTableConfig]:
+        """Return the project's base-to-supplemental dimension mapping config."""
         dim = self.get_dimension(dimension_query_name)
         dimension_type = dim.model.dimension_type
         base_dim = self.get_base_dimension(dimension_type)
@@ -931,22 +869,12 @@ class ProjectConfig(ConfigBase):
             f"No mapping is stored for {dimension_type}/{dimension_query_name}"
         )
 
-    def get_base_to_supplemental_mapping_records(self, dimension_query_name: str):
-        """Return the project's base-to-supplemental dimension mapping records.
-
-        Parameters
-        ----------
-        dimension_query_name : str
-
-        Returns
-        -------
-        pyspark.sql.DataFrame
-
-        """
+    def get_base_to_supplemental_mapping_records(self, dimension_query_name: str) -> DataFrame:
+        """Return the project's base-to-supplemental dimension mapping records."""
         _, config = self.get_base_to_supplemental_config(dimension_query_name)
         return config.get_records_dataframe().filter("to_id is not NULL")
 
-    def has_base_to_supplemental_dimension_mapping_types(self, dimension_type):
+    def has_base_to_supplemental_dimension_mapping_types(self, dimension_type) -> bool:
         """Return True if the config has these base-to-supplemental mappings."""
         return self._has_mapping(
             dimension_type,
@@ -964,19 +892,13 @@ class ProjectConfig(ConfigBase):
                 return True
         return False
 
-    def list_dimension_query_names(self, category: DimensionCategory | None = None):
+    def list_dimension_query_names(self, category: DimensionCategory | None = None) -> list[str]:
         """Return query names for all dimensions in the project.
 
         Parameters
         ----------
         category : DimensionCategory | None
             Optionally, filter return by category.
-
-        Returns
-        -------
-        list
-            Sorted list of strings
-
         """
         if category is None:
             return sorted(self._dimensions_by_query_name.keys())
@@ -993,7 +915,7 @@ class ProjectConfig(ConfigBase):
 
         return sorted((x.model.dimension_query_name for x in method()))
 
-    def list_dimension_query_names_by_type(self, dimension_type: DimensionType):
+    def list_dimension_query_names_by_type(self, dimension_type: DimensionType) -> list[str]:
         """List the query names available for a dimension type."""
         return [
             x.model.dimension_query_name
@@ -1002,13 +924,7 @@ class ProjectConfig(ConfigBase):
         ]
 
     def get_base_dimension_to_query_name_mapping(self) -> dict[DimensionType, str]:
-        """Return a mapping of DimensionType to query name for base dimensions.
-
-        Returns
-        -------
-        dict
-
-        """
+        """Return a mapping of DimensionType to query name for base dimensions."""
         query_names = {}
         for dimension_type in DimensionType:
             dim = self.get_base_dimension(dimension_type)
@@ -1016,13 +932,7 @@ class ProjectConfig(ConfigBase):
         return query_names
 
     def get_subset_dimension_to_query_name_mapping(self) -> dict[DimensionType, list[str]]:
-        """Return a mapping of DimensionType to query name for subset dimensions.
-
-        Returns
-        -------
-        dict
-
-        """
+        """Return a mapping of DimensionType to query name for subset dimensions."""
         query_names = defaultdict(list)
         for dimension_type in DimensionType:
             if dimension_type in self._subset_dimensions:
@@ -1032,13 +942,7 @@ class ProjectConfig(ConfigBase):
         return query_names
 
     def get_supplemental_dimension_to_query_name_mapping(self) -> dict[DimensionType, List[str]]:
-        """Return a mapping of DimensionType to query name for supplemental dimensions.
-
-        Returns
-        -------
-        dict
-
-        """
+        """Return a mapping of DimensionType to query name for supplemental dimensions."""
         query_names = {}
         for dimension_type in DimensionType:
             query_names[dimension_type] = [
@@ -1049,7 +953,7 @@ class ProjectConfig(ConfigBase):
             ]
         return query_names
 
-    def get_dimension_query_names_model(self):
+    def get_dimension_query_names_model(self) -> ProjectDimensionQueryNamesModel:
         """Return an instance of ProjectDimensionQueryNamesModel for the project."""
         base_query_names_by_type = self.get_base_dimension_to_query_name_mapping()
         subset_query_names_by_type = self.get_subset_dimension_to_query_name_mapping()
@@ -1081,20 +985,15 @@ class ProjectConfig(ConfigBase):
         # TODO: Once we start using these we may need to store by (from, to) as key instead.
 
     @track_timing(timer_stats_collector)
-    def add_dataset_dimension_mappings(self, dataset_config, references):
+    def add_dataset_dimension_mappings(
+        self, dataset_config: DatasetConfig, references: list[DimensionMappingReferenceModel]
+    ):
         """Add a dataset's dimension mappings to the project.
-
-        Parameters
-        ----------
-        dataset_config : DatasetConfig
-        references : list
-            list of DimensionMappingReferenceModel
 
         Raises
         ------
         DSGInvalidDimensionMapping
             Raised if a requirement is violated.
-
         """
         if dataset_config.model.dataset_id not in self.model.dimension_mappings.dataset_to_project:
             self.model.dimension_mappings.dataset_to_project[dataset_config.model.dataset_id] = []
@@ -1112,7 +1011,7 @@ class ProjectConfig(ConfigBase):
                 )
 
     @property
-    def config_id(self):
+    def config_id(self) -> str:
         return self._model.project_id
 
     def get_dataset(self, dataset_id) -> InputDatasetModel:
@@ -1125,7 +1024,7 @@ class ProjectConfig(ConfigBase):
             f"project_id={self._model.project_id} does not have dataset_id={dataset_id}"
         )
 
-    def has_dataset(self, dataset_id, status=None):
+    def has_dataset(self, dataset_id: str, status=None | DatasetRegistryStatus) -> bool:
         """Return True if the dataset_id is present in the configuration.
 
         Parameters
@@ -1143,17 +1042,8 @@ class ProjectConfig(ConfigBase):
         # TODO: what about benchmark and historical?
         return False
 
-    def get_load_data_time_columns(self, dimension_query_name):
-        """Return the time dimension columns expected in the load data table for this query name.
-
-        Parameters
-        ----------
-        dimension_query_name : str
-
-        Returns
-        -------
-        list
-        """
+    def get_load_data_time_columns(self, dimension_query_name: str) -> list[str]:
+        """Return the time dimension columns expected in the load data table for this query name."""
         dim = self.get_dimension(dimension_query_name)
         time_columns = dim.get_load_data_time_columns()
         return time_columns
@@ -1188,27 +1078,13 @@ class ProjectConfig(ConfigBase):
             self._iter_supplemental_dimensions(),
         )
 
-    def list_registered_dataset_ids(self):
-        """List registered datasets associated with the project.
-
-        Returns
-        -------
-        list
-            list of dataset IDs
-
-        """
+    def list_registered_dataset_ids(self) -> list[str]:
+        """List registered datasets associated with the project."""
         status = DatasetRegistryStatus.REGISTERED
         return [x.dataset_id for x in self._iter_datasets_by_status(status)]
 
-    def list_unregistered_dataset_ids(self):
-        """List unregistered datasets associated with project registry.
-
-        Returns
-        -------
-        list
-            list of dataset IDs
-
-        """
+    def list_unregistered_dataset_ids(self) -> list[str]:
+        """List unregistered datasets associated with project registry."""
         status = DatasetRegistryStatus.UNREGISTERED
         return [x.dataset_id for x in self._iter_datasets_by_status(status)]
 
@@ -1217,19 +1093,10 @@ class ProjectConfig(ConfigBase):
             if dataset.status == status:
                 yield dataset
 
-    def get_required_dimension_record_ids(self, dataset_id, dimension_type: DimensionType):
-        """Return the required base dimension record IDs for the dataset and dimension type.
-
-        Parameters
-        ----------
-        dataset_id : str
-        dimension_type : DimensionType
-
-        Returns
-        -------
-        set[str]
-
-        """
+    def get_required_dimension_record_ids(
+        self, dataset_id: str, dimension_type: DimensionType
+    ) -> set[str]:
+        """Return the required base dimension record IDs for the dataset and dimension type."""
         dataset = self.get_dataset(dataset_id)
         requirements = getattr(
             dataset.required_dimensions.single_dimensional, dimension_type.value
@@ -1250,53 +1117,9 @@ class ProjectConfig(ConfigBase):
 
         return record_ids
 
-    def load_dimension_associations(self, dataset_id, pivoted_dimension=None, try_load_cache=True):
-        """Return a table with required dimension associations.
-
-        Parameters
-        ----------
-        dataset_id : str
-        pivoted_dimension : DimensionType | None
-        try_load_cache : bool
-            Try to load table from Spark warehouse, defaults to True.
-
-        Returns
-        -------
-        pyspark.sql.DataFrame
-
-        """
-        if try_load_cache:
-            table = try_load_dimension_associations(self.config_id, dataset_id, pivoted_dimension)
-        else:
-            table = None
-        if table is None:
-            logger.info(
-                "Build dimension associations table for project_id=%s dataset_id=%s "
-                "pivoted_dimension=%s.",
-                self.config_id,
-                dataset_id,
-                pivoted_dimension,
-            )
-            table = self._make_dimension_association_table(dataset_id, pivoted_dimension)
-            if os.environ.get("__DSGRID_SKIP_SAVING_DIMENSION_ASSOCIATIONS__") is not None:
-                logger.warning("Skip saving dimension associations.")
-            else:
-                # We expect these tables to be very small in files because of compression.
-                table_name = save_dimension_associations(
-                    table.coalesce(1), self.config_id, dataset_id, pivoted_dimension
-                )
-                # It will be much faster to load the persisted table.
-                table = load_stored_table(table_name)
-        else:
-            logger.info(
-                "Loaded cached dimension associations for %s dataset_id=%s pivoted_dimension=%s",
-                self.config_id,
-                dataset_id,
-                pivoted_dimension,
-            )
-        return table
-
-    def _build_multi_dim_requirement_associations(self, multi_dim_reqs, pivoted_dimension):
+    def _build_multi_dim_requirement_associations(
+        self, multi_dim_reqs: list[RequiredDimensionRecordsModel], context: ScratchDirContext
+    ):
         dfs_by_dim_combo = {}
 
         # Example: Partial sector and subsector combinations are required.
@@ -1316,18 +1139,12 @@ class ProjectConfig(ConfigBase):
                 dim_type = DimensionType(field)
                 req = getattr(multi_req, field)
                 record_ids = set(req.base)
-                if record_ids:
-                    if dim_type == pivoted_dimension:
-                        raise NotImplementedError(
-                            f"Unhandled condition: multi_dimensional requirement cannot contain "
-                            f"the pivoted dimension: dimension={dim_type} records={record_ids}"
-                        )
                 record_ids.update(self._get_required_record_ids_from_subsets(req))
                 record_ids.update(self._get_required_record_ids_from_supplementals(req, dim_type))
                 dim_combo.append(dim_type.value)
                 if record_ids:
                     columns[field] = list(record_ids)
-            df = create_dataframe_from_product(columns)
+            df = create_dataframe_from_product(columns, context)
             df = df.select(*sorted(df.columns))
 
             dim_combo = tuple(sorted(dim_combo))
@@ -1402,18 +1219,20 @@ class ProjectConfig(ConfigBase):
         return record_ids
 
     @track_timing(timer_stats_collector)
-    def _make_dimension_association_table(self, dataset_id, pivoted_dimension):
+    def make_dimension_association_table(
+        self, dataset_id, context: ScratchDirContext
+    ) -> DataFrame:
+        """Build a table that includes all combinations of dimension records that must be provided
+        by the dataset.
+        """
         required_dimensions = self.get_dataset(dataset_id).required_dimensions
         multi_dfs = self._build_multi_dim_requirement_associations(
-            required_dimensions.multi_dimensional,
-            pivoted_dimension,
+            required_dimensions.multi_dimensional, context
         )
 
         # Project config construction asserts that there is no intersection of dimensions in
         # multi and single.
         existing = set()
-        if pivoted_dimension is not None:
-            existing.add(pivoted_dimension.value)
         for df in multi_dfs:
             existing.update(set(df.columns))
 
@@ -1428,7 +1247,7 @@ class ProjectConfig(ConfigBase):
             )
             single_dfs[field] = list(record_ids)
 
-        single_df = create_dataframe_from_product(single_dfs)
+        single_df = create_dataframe_from_product(single_dfs, context)
         return cross_join_dfs(multi_dfs + [single_df])
 
     def _map_supplemental_record_to_base_records(self, dim, supplemental_id):
@@ -1448,40 +1267,22 @@ class ProjectConfig(ConfigBase):
 
         return get_unique_values(mapping_records, "from_id")
 
-    def are_all_datasets_submitted(self):
-        """Return True if all datasets have been submitted.
-
-        Returns
-        -------
-        bool
-
-        """
+    def are_all_datasets_submitted(self) -> bool:
+        """Return True if all datasets have been submitted."""
         return not self.list_unregistered_dataset_ids()
 
-    def set_status(self, status):
-        """Set the project status to the given value.
-
-        Parameters
-        ----------
-        status : ProjectRegistryStatus
-
-        """
+    def set_status(self, status: ProjectRegistryStatus) -> None:
+        """Set the project status to the given value."""
         self.model.status = status
         logger.info("Set project_id=%s status=%s", self.config_id, status)
 
-    def set_dataset_status(self, dataset_id, status):
+    def set_dataset_status(self, dataset_id: str, status: DatasetRegistryStatus):
         """Set the dataset status to the given value.
-
-        Parameters
-        ----------
-        dataset_id : str
-        status : DatasetRegistryStatus
 
         Raises
         ------
         ValueError
             Raised if dataset_id is not stored.
-
         """
         dataset = self.get_dataset(dataset_id)
         dataset.status = status
@@ -1493,7 +1294,7 @@ class ProjectConfig(ConfigBase):
         )
 
     @property
-    def base_dimensions(self):
+    def base_dimensions(self) -> dict:
         """Return the Base Dimensions.
 
         Returns
@@ -1505,7 +1306,7 @@ class ProjectConfig(ConfigBase):
         return self._base_dimensions
 
     @property
-    def supplemental_dimensions(self):
+    def supplemental_dimensions(self) -> dict:
         """Return the supplemental dimensions.
 
         Returns
@@ -1517,11 +1318,13 @@ class ProjectConfig(ConfigBase):
         return self._supplemental_dimensions
 
 
-def load_subset_dimensions(filename: Path) -> dict[str, list[str]]:
+def load_subset_dimensions(filename: Path) -> tuple[set[str], dict[str, list[str]]]:
     """Return a mapping of subset dimension name to record IDs."""
     df = pd.read_csv(filename, index_col="id")
     if len(df.columns) == 0:
         raise DSGInvalidDimension(
             "A subset dimension records file must at least one dimension column."
         )
-    return {x: df[x].dropna().index.to_list() for x in df.columns}
+    record_ids = set(df.index.values)
+    subset_by_dim_name = {x: df[x].dropna().index.to_list() for x in df.columns}
+    return record_ids, subset_by_dim_name

@@ -37,7 +37,7 @@ the table is the load data dataframe with time-series information.
           dimension_query_name: "county",
           operator: "==",
           value: "06037",
-          filter_type: "DimensionFilterExpressionModel",
+          filter_type: "expression",
           negate: false,
         },
       ]
@@ -75,7 +75,7 @@ the table is the load data dataframe with time-series information.
           dimension_type: "geography",
           dimension_query_name: "county",
           value: "== '06037'",
-          filter_type: "DimensionFilterExpressionRawModel",
+          filter_type: "expression_raw",
           negate: false,
         },
       ]
@@ -114,7 +114,7 @@ the table is the load data dataframe with time-series information.
             "2040",
             "2050",
           ],
-          filter_type: "DimensionFilterColumnOperatorModel"
+          filter_type: "column_operator"
           negate: false,
         },
         {
@@ -123,7 +123,7 @@ the table is the load data dataframe with time-series information.
           column: "id",
           operator: "startswith",
           value: "com",
-          filter_type: "DimensionFilterColumnOperatorModel"
+          filter_type: "column_operator"
           negate: false,
         },
       ],
@@ -149,7 +149,7 @@ the table is the load data dataframe with time-series information.
               column="id",
               operator="startswith",
               value="com",
-              filter_type="DimensionFilterColumnOperatorModel"
+              filter_type="column_operator"
               negate=False,
           ),
       ]
@@ -237,7 +237,7 @@ the table is the load data dataframe with time-series information.
           column: "time_est",
           lower_bound: "2012-07-01 00:00:00",
           upper_bound: "2012-08-01 00:00:00",
-          filter_type: "DimensionFilterBetweenColumnOperatorModel"
+          filter_type: "between_column_operator"
           negate: false,
         },
       ],

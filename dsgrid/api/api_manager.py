@@ -37,7 +37,7 @@ class ApiManager:
         finally:
             self._lock.release()
 
-    def initialize_async_task(self, task_type: AsyncTaskType):
+    def initialize_async_task(self, task_type: AsyncTaskType) -> int:
         self._lock.acquire()
         try:
             num_outstanding = len(self._store.data.outstanding_async_tasks)
@@ -128,7 +128,7 @@ class ApiManager:
         finally:
             self._lock.release()
 
-    def _get_next_async_task_id(self):
+    def _get_next_async_task_id(self) -> int:
         self._lock.acquire()
         try:
             next_id = self._store.data.next_async_task_id

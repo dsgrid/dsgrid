@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 import pyspark.sql.functions as F
+from pyspark.sql import DataFrame
 from pyspark.sql.types import StringType
 
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
@@ -13,11 +14,10 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import (
-    check_null_value_in_unique_dimension_rows,
     apply_scaling_factor,
 )
 from dsgrid.utils.spark import (
-    # create_dataframe_from_pandas,
+    create_dataframe_from_ids,
     read_dataframe,
     get_unique_values,
     overwrite_dataframe_file,
@@ -49,13 +49,17 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_dataset_time_consistency(self._load_data)
         self._check_dataset_internal_consistency()
 
-    @track_timing(timer_stats_collector)
-    def get_unique_dimension_rows(self):
-        """Get distinct combinations of remapped dimensions, including id.
-        Check each col in combination for null value."""
-        dim_table = self._remap_dimension_columns(self._load_data_lookup, False).distinct()
-        check_null_value_in_unique_dimension_rows(dim_table)
-        return dim_table
+    def make_dimension_association_table(self) -> DataFrame:
+        df = self._remap_dimension_columns(self._load_data_lookup, False)
+        df = self._remove_non_dimension_columns(df).distinct()
+        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+            pivoted_cols = self.get_pivoted_dimension_columns_mapped_to_project()
+            pivoted_dims = create_dataframe_from_ids(
+                pivoted_cols, self._config.get_pivoted_dimension_type().value
+            )
+            df = df.crossJoin(pivoted_dims)
+
+        return df
 
     def make_project_dataframe(self, project_config):
         # TODO: Can we remove NULLs at registration time?
@@ -155,6 +159,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         """Dimension check in load_data_lookup, excludes time:
         * check that data matches record for each dimension.
         * check that all data dimension combinations exist. Time is handled separately.
+        * Check for any NULL values in dimension columns.
         """
         logger.info("Check lookup data consistency.")
         found_id = False

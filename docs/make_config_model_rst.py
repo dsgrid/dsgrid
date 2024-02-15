@@ -39,7 +39,7 @@ def get_class_path(cls_name):
         try:
             mod = importlib.import_module(module)
             if hasattr(mod, cls_name):
-                dsgrid_path = Path(__file__).resolve().parent.parent
+                dsgrid_path = Path(__file__).resolve().parents[1]
                 module_file = dsgrid_path / (module.replace(".", "/") + ".py")
                 with open(module_file, "r") as f:
                     if f"class {cls_name}" in f.read():

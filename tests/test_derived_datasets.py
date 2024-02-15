@@ -1,5 +1,4 @@
 import logging
-import math
 import shutil
 from collections import namedtuple
 from pathlib import Path
@@ -31,7 +30,7 @@ from dsgrid.utils.spark import read_dataframe
 
 
 REGISTRY_PATH = (
-    Path(__file__).absolute().parent.parent
+    Path(__file__).absolute().parents[1]
     / "dsgrid-test-data"
     / "filtered_registries"
     / "simple_standard_scenarios"
@@ -125,15 +124,8 @@ def test_create_derived_dataset_config(tmp_path):
     new_df = read_dataframe(query_output / "table.parquet")
     assert sorted(new_df.columns) == sorted(orig_df.columns)
     orig_data = orig_df.sort(*orig_df.columns).collect()
-    new_data = new_df.sort(*orig_df.columns).collect()
-    assert len(orig_data) == len(new_data)
-    value_columns = ("electricity_cooling", "electricity_heating")
-    # The projected datasets were generated with incorrect unit conversions for gas.
-    # TODO: regenerate the datasets after conversions are fixed.
-    # value_columns = ("electricity_cooling", "electricity_heating", "natural_gas_heating")
-    for i in range(len(orig_data)):
-        for col in value_columns:
-            assert math.isclose(getattr(new_data[i], col), getattr(orig_data[i], col))
+    new_data = new_df.select(*orig_df.columns).sort(*orig_df.columns).collect()
+    assert new_data == orig_data
 
     # Create the config in the CLI and Python API to get test coverage in both places.
     dataset_dir = tmp_path / dataset_id

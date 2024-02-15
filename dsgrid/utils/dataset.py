@@ -157,11 +157,11 @@ def apply_scaling_factor(
 
 
 @track_timing(timer_stats_collector)
-def check_null_value_in_unique_dimension_rows(dim_table, exclude_columns=None):
-    if os.environ.get("__DSGRID_SKIP_CHECK_NULL_UNIQUE_DIMENSION__"):
+def check_null_value_in_dimension_rows(dim_table, exclude_columns=None):
+    if os.environ.get("__DSGRID_SKIP_CHECK_NULL_DIMENSION__"):
         # This has intermittently caused GC-related timeouts for TEMPO.
         # Leave a backdoor to skip these checks, which may eventually be removed.
-        logger.warning("Skip check_null_value_in_unique_dimension_rows")
+        logger.warning("Skip check_null_value_in_dimension_rows")
         return
 
     try:

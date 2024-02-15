@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from dsgrid.common import VALUE_COLUMN
 
 from pyspark.sql import DataFrame
 
@@ -68,7 +69,18 @@ class QueryContext:
                     "Please set the output format to 'unpivoted'."
                 )
 
-    def get_pivoted_columns(self, dataset_id=None):
+    def get_value_columns(self) -> set[str]:
+        """Return the value columns in the final dataset."""
+        match self.get_table_format_type():
+            case TableFormatType.PIVOTED:
+                return self.get_pivoted_columns()
+            case TableFormatType.UNPIVOTED:
+                return {VALUE_COLUMN}
+            case _:
+                msg = str(self.get_table_format_type())
+                raise NotImplementedError(msg)
+
+    def get_pivoted_columns(self, dataset_id=None) -> set[str]:
         metadata = self._get_metadata(dataset_id)
         if isinstance(metadata.table_format, UnpivotedTableFormatModel):
             return set()

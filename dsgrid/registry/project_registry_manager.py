@@ -7,11 +7,12 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Union
+from typing import Type, Union
 
 import json5
 import pandas as pd
 from prettytable import PrettyTable
+from pyspark.sql import DataFrame
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
@@ -19,10 +20,10 @@ from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
     DSGDuplicateValueRegistered,
+    DSGInvalidParameter,
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.config.dimension_association_manager import remove_project_dimension_associations
 from dsgrid.config.dimensions import DimensionModel
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.config.dimension_mapping_base import (
@@ -45,6 +46,7 @@ from dsgrid.config.project_config import (
     ProjectConfig,
     ProjectConfigModel,
     RequiredDimensionRecordsModel,
+    SubsetDimensionGroupModel,
 )
 from dsgrid.project import Project
 from dsgrid.registry.common import (
@@ -56,10 +58,11 @@ from dsgrid.registry.common import (
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     models_to_dataframe,
     get_unique_values,
-    restart_spark_with_custom_conf,
+    write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
@@ -81,26 +84,38 @@ logger = logging.getLogger(__name__)
 class ProjectRegistryManager(RegistryManagerBase):
     """Manages registered dimension projects."""
 
-    def __init__(self, path, params):
+    def __init__(
+        self,
+        path: Path,
+        params,
+        dataset_manager: DatasetRegistryManager,
+        dimension_manager: DimensionRegistryManager,
+        dimension_mapping_manager: DimensionMappingRegistryManager,
+        db: ProjectRegistryInterface,
+    ):
         super().__init__(path, params)
-        self._projects = {}  # ConfigKey to ProjectModel
-        self._dataset_mgr = None
-        self._dimension_mgr = None
-        self._dimension_mapping_mgr = None
+        self._projects: dict[ConfigKey, ProjectConfig] = {}
+        self._dataset_mgr = dataset_manager
+        self._dimension_mgr = dimension_manager
+        self._dimension_mapping_mgr = dimension_mapping_manager
+        self._db = db
 
     @classmethod
     def load(
-        cls, path, fs_interface, dataset_manager, dimension_manager, dimension_mapping_manager, db
+        cls,
+        path: Path,
+        fs_interface,
+        dataset_manager: DatasetRegistryManager,
+        dimension_manager: DimensionRegistryManager,
+        dimension_mapping_manager: DimensionMappingRegistryManager,
+        db: ProjectRegistryInterface,
     ):
-        mgr = cls._load(path, fs_interface)
-        mgr.dataset_manager = dataset_manager
-        mgr.dimension_manager = dimension_manager
-        mgr.dimension_mapping_manager = dimension_mapping_manager
-        mgr.db = db
-        return mgr
+        return cls._load(
+            path, fs_interface, dataset_manager, dimension_manager, dimension_mapping_manager, db
+        )
 
     @staticmethod
-    def config_class():
+    def config_class() -> Type:
         return ProjectConfig
 
     @property
@@ -112,32 +127,20 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._db = db
 
     @staticmethod
-    def name():
+    def name() -> str:
         return "Projects"
 
     @property
-    def dataset_manager(self):
+    def dataset_manager(self) -> DatasetRegistryManager:
         return self._dataset_mgr
 
-    @dataset_manager.setter
-    def dataset_manager(self, val: DatasetRegistryManager):
-        self._dataset_mgr = val
-
     @property
-    def dimension_manager(self):
+    def dimension_manager(self) -> DimensionRegistryManager:
         return self._dimension_mgr
 
-    @dimension_manager.setter
-    def dimension_manager(self, val: DimensionRegistryManager):
-        self._dimension_mgr = val
-
     @property
-    def dimension_mapping_manager(self):
+    def dimension_mapping_manager(self) -> DimensionMappingRegistryManager:
         return self._dimension_mapping_mgr
-
-    @dimension_mapping_manager.setter
-    def dimension_mapping_manager(self, val: DimensionMappingRegistryManager):
-        self._dimension_mapping_mgr = val
 
     def finalize_registration(self, config_ids, error_occurred):
         assert len(config_ids) == 1
@@ -232,10 +235,10 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     def register_from_config(
         self,
-        config,
-        src_dir,
-        submitter,
-        log_message,
+        config: ProjectConfig,
+        src_dir: Path,
+        submitter: str,
+        log_message: str,
         context=None,
     ):
         error_occurred = False
@@ -333,9 +336,9 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     def _register_supplemental_dimensions_from_models(
         self,
-        src_dir,
-        model,
-        dimensions,
+        src_dir: Path,
+        model: ProjectConfigModel,
+        dimensions: list,
         context,
         submitter,
         log_message,
@@ -421,6 +424,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         break
                 assert base_dim is not None, subset_dimension
                 base_records = base_dim.get_records_dataframe()
+                self._check_subset_dimension_consistency(subset_dimension, base_records)
                 for selector in subset_dimension.selectors:
                     new_records = base_records.filter(base_records["id"].isin(selector.records))
                     filename = tmp_path / f"{subset_dimension.name}_{selector.name}.csv"
@@ -456,6 +460,28 @@ class ProjectRegistryManager(RegistryManagerBase):
                         version="1.0.0",
                     )
                 )
+
+    def _check_subset_dimension_consistency(
+        self,
+        subset_dimension: SubsetDimensionGroupModel,
+        base_records: DataFrame,
+    ) -> None:
+        base_record_ids = get_unique_values(base_records, "id")
+        diff = subset_dimension.record_ids.difference(base_record_ids)
+        if diff:
+            msg = (
+                f"subset dimension {subset_dimension.name} "
+                f"uses dimension records not present in the base dimension: {diff}"
+            )
+            raise DSGInvalidParameter(msg)
+
+        diff = base_record_ids.difference(subset_dimension.record_ids)
+        if diff:
+            msg = (
+                f"subset dimension {subset_dimension.name} "
+                f"does not list these base dimension records: {diff}"
+            )
+            raise DSGInvalidParameter(msg)
 
     def _register_supplemental_dimensions_from_subset_dimensions(
         self, model, context, submitter, log_message
@@ -593,10 +619,9 @@ class ProjectRegistryManager(RegistryManagerBase):
             )
 
     @track_timing(timer_stats_collector)
-    def _register(self, config: ProjectConfig, submitter, log_message):
+    def _register(self, config: ProjectConfig, submitter: str, log_message: str):
         registration = make_initial_config_registration(submitter, log_message)
         self._run_checks(config)
-        remove_project_dimension_associations(config.model.project_id)
 
         model = self.db.insert(config.model, registration)
         logger.info(
@@ -624,11 +649,11 @@ class ProjectRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def register_and_submit_dataset(
         self,
-        dataset_config_file,
-        dataset_path,
-        project_id,
-        submitter,
-        log_message,
+        dataset_config_file: Path,
+        dataset_path: Path,
+        project_id: str,
+        submitter: str,
+        log_message: str,
         dimension_mapping_file=None,
         dimension_mapping_references_file=None,
         autogen_reverse_supplemental_mappings=None,
@@ -636,6 +661,14 @@ class ProjectRegistryManager(RegistryManagerBase):
         if not self.has_id(project_id):
             msg = f"{project_id=}"
             raise DSGValueNotRegistered(msg)
+
+        dataset_config = DatasetConfig.load_from_user_path(dataset_config_file, dataset_path)
+        dataset_id = dataset_config.model.dataset_id
+        config = self.get_by_id(project_id)
+        # This will raise an exception if the dataset_id is not part of the project or already
+        # registered.
+        self._raise_if_not_unregistered(config, dataset_id)
+
         context = RegistrationContext()
         error_occurred = False
         try:
@@ -665,10 +698,10 @@ class ProjectRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def submit_dataset(
         self,
-        project_id,
-        dataset_id,
-        submitter,
-        log_message,
+        project_id: str,
+        dataset_id: str,
+        submitter: str,
+        log_message: str,
         dimension_mapping_file=None,
         dimension_mapping_references_file=None,
         autogen_reverse_supplemental_mappings=None,
@@ -738,12 +771,8 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         logger.info("Submit dataset=%s to project=%s.", dataset_id, project_config.config_id)
         self._check_if_not_registered(project_config.config_id)
+        self._raise_if_not_unregistered(project_config, dataset_id)
         dataset_config = self._dataset_mgr.get_by_id(dataset_id)
-        dataset_model = project_config.get_dataset(dataset_id)
-        if dataset_model.status == DatasetRegistryStatus.REGISTERED:
-            raise DSGDuplicateValueRegistered(
-                f"dataset={dataset_id} has already been submitted to project={project_config.config_id}"
-            )
 
         # Issue #241
         # self._check_dataset_time_interval_type(project_config, dataset_config)
@@ -779,14 +808,24 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         self._submit_dataset(project_config, dataset_config, submitter, log_message, references)
 
+    def _raise_if_not_unregistered(self, project_config: ProjectConfig, dataset_id: str) -> None:
+        # This will raise if the dataset is not specified in the project.
+        dataset_model = project_config.get_dataset(dataset_id)
+        status = dataset_model.status
+        if status != DatasetRegistryStatus.UNREGISTERED:
+            raise DSGDuplicateValueRegistered(
+                f"{dataset_id=} cannot be submitted to project={project_config.config_id} with "
+                f"{status=}"
+            )
+
     def _register_mappings_from_file(
         self,
-        project_config,
-        dataset_config,
-        dimension_mapping_file,
-        submitter,
-        log_message,
-        context,
+        project_config: ProjectConfig,
+        dataset_config: DatasetConfig,
+        dimension_mapping_file: Path,
+        submitter: str,
+        log_message: str,
+        context: RegistrationContext,
     ):
         references = []
         src_dir = dimension_mapping_file.parent
@@ -937,7 +976,9 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         return references
 
-    def _try_get_mapping(self, project_config, from_dim, from_version, to_dim, to_version):
+    def _try_get_mapping(
+        self, project_config: ProjectConfig, from_dim, from_version, to_dim, to_version
+    ):
         dimension_type = from_dim.model.dimension_type
         for ref in project_config.model.dimension_mappings.base_to_supplemental_references:
             if (
@@ -967,22 +1008,11 @@ class ProjectRegistryManager(RegistryManagerBase):
         if os.environ.get("__DSGRID_SKIP_CHECK_DATASET_TO_PROJECT_MAPPING__") is not None:
             logger.warning("Skip dataset-to-project mapping checks")
         else:
-            # This operation can be very problematic if there are many executors and runs much
-            # faster with a single executor on a single core.
-            # The dynamic allocation settings will only take effect if the worker was started
-            # with spark.shuffle.service.enabled=true
-            conf = {
-                "spark.dynamicAllocation.enabled": True,
-                "spark.dynamicAllocation.shuffleTracking.enabled": True,
-                "spark.dynamicAllocation.maxExecutors": 1,
-                "spark.executor.cores": 1,
-            }
-            with restart_spark_with_custom_conf(conf):
-                self._check_dataset_base_to_project_base_mappings(
-                    project_config,
-                    dataset_config,
-                    mapping_references,
-                )
+            self._check_dataset_base_to_project_base_mappings(
+                project_config,
+                dataset_config,
+                mapping_references,
+            )
 
         dataset_model = project_config.get_dataset(dataset_config.model.dataset_id)
 
@@ -998,7 +1028,6 @@ class ProjectRegistryManager(RegistryManagerBase):
             submitter,
             VersionUpdateType.MINOR,
             log_message,
-            clear_cached_association_tables=False,
         )
 
         logger.info(
@@ -1015,8 +1044,13 @@ class ProjectRegistryManager(RegistryManagerBase):
         dtime = dataset_config.get_dimension(DimensionType.TIME)
         ptime = project_config.get_base_dimension(DimensionType.TIME)
 
+        dataset_id = dataset_config.model.dataset_id
+        wrap_time = project_config.get_dataset(dataset_id).wrap_time_allowed
+
         df = dtime.build_time_dataframe()
-        dtime._convert_time_to_project_time_interval(df=df, project_time_dim=ptime, wrap_time=True)
+        dtime._convert_time_to_project_time_interval(
+            df, project_time_dim=ptime, wrap_time=wrap_time
+        )
 
     @track_timing(timer_stats_collector)
     def _check_dataset_base_to_project_base_mappings(
@@ -1034,73 +1068,67 @@ class ProjectRegistryManager(RegistryManagerBase):
             mapping_references,
             project_time_dim=project_config.get_base_dimension(DimensionType.TIME),
         )
-        pivoted_dimension = handler.config.get_pivoted_dimension_type()
-        exclude_dims = {DimensionType.TIME}
-        if pivoted_dimension is not None:
-            exclude_dims.add(pivoted_dimension)
-
-        dim_table = handler.get_unique_dimension_rows().drop("id")
         dataset_id = dataset_config.config_id
-        assoc_table = project_config.load_dimension_associations(
-            dataset_id, pivoted_dimension=pivoted_dimension, try_load_cache=False
+
+        with ScratchDirContext(self._params.scratch_dir) as context:
+            mapped_dataset_table = handler.make_dimension_association_table()
+            project_table = self._make_dimension_associations(project_config, dataset_id, context)
+            cols = sorted(project_table.columns)
+
+            diff = project_table.select(*cols).exceptAll(mapped_dataset_table.select(*cols))
+            if not diff.rdd.isEmpty():
+                self._handle_dimension_association_errors(
+                    diff, mapped_dataset_table, dataset_config, project_config.config_id
+                )
+
+    def _handle_dimension_association_errors(
+        self, diff, mapped_dataset_table, dataset_config, project_id
+    ):
+        dataset_id = dataset_config.config_id
+        out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
+        diff.cache()
+        diff.write.options(header=True).mode("overwrite").csv(out_file)
+        logger.error(
+            "Dataset %s is missing required dimension records from project %s. "
+            "Recorded missing records in %s",
+            dataset_id,
+            project_id,
+            out_file,
+        )
+        diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
+        diff.unpersist()
+        mapped_dataset_table.cache()
+        dataset_counts = {}
+        for col in diff.columns:
+            dataset_counts[col] = mapped_dataset_table.select(col).distinct().count()
+            if dataset_counts[col] != diff_counts[col]:
+                logger.error(
+                    "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
+                    col,
+                    dataset_counts[col],
+                    diff_counts[col],
+                )
+        mapped_dataset_table.unpersist()
+
+        raise DSGInvalidDataset(
+            f"Dataset {dataset_config.config_id} is missing required dimension records. "
+            "Please look in the log file for more information."
         )
 
-        dimension_types = set(DimensionType).difference(exclude_dims)
-        cols = [x.value for x in dimension_types]
-        project_table = assoc_table.select(*cols).distinct()
-        diff = project_table.exceptAll(dim_table.select(*cols).distinct())
-        if not diff.rdd.isEmpty():
-            project_id = project_config.config_id
-            out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
-            diff.cache()
-            diff.write.options(header=True).mode("overwrite").csv(out_file)
-            logger.error(
-                "Dataset %s is missing required dimension records from project %s. "
-                "Recorded missing records in %s",
-                dataset_id,
-                project_id,
-                out_file,
-            )
-            diff_counts = {}
-            for col in diff.columns:
-                diff_counts[col] = diff.select(col).distinct().count()
-            diff.unpersist()
-            dim_table.cache()
-            dataset_counts = {}
-            for col in diff.columns:
-                dataset_counts[col] = dim_table.select(col).distinct().count()
-                if dataset_counts[col] != diff_counts[col]:
-                    logger.error(
-                        "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
-                        col,
-                        dataset_counts[col],
-                        diff_counts[col],
-                    )
-            dim_table.unpersist()
-
-            raise DSGInvalidDataset(
-                f"Dataset {dataset_config.config_id} is missing required dimension records"
-            )
-        if pivoted_dimension is not None:
-            project_pivoted_ids = project_config.get_required_dimension_record_ids(
-                dataset_id, pivoted_dimension
-            )
-            self._check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id)
-
-    @staticmethod
-    def _check_pivoted_dimension_columns(handler, project_pivoted_ids, dataset_id):
-        """pivoted dimension record is the same as project's unless a relevant association is provided."""
-        logger.info("Check pivoted dimension columns.")
-        d_dim_ids = handler.get_pivoted_dimension_columns_mapped_to_project()
-        pivoted_dim = handler.config.get_pivoted_dimension_type()
-
-        if d_dim_ids.symmetric_difference(project_pivoted_ids):
-            raise DSGInvalidDataset(
-                f"Mismatch between project and {dataset_id} dataset pivoted {pivoted_dim.value} dimension, "
-                "please double-check data, and any relevant association_table and dimension_mapping. "
-                f"\n - Invalid column(s) in {dataset_id} load data according to project: {d_dim_ids.difference(project_pivoted_ids)}"
-                f"\n - Missing column(s) in {dataset_id} load data according to project: {project_pivoted_ids.difference(d_dim_ids)}"
-            )
+    @track_timing(timer_stats_collector)
+    def _make_dimension_associations(
+        self,
+        config: ProjectConfig,
+        dataset_id: str,
+        context: ScratchDirContext,
+    ):
+        logger.info("Make dimension association table for %s", dataset_id)
+        df = config.make_dimension_association_table(dataset_id, context)
+        path = context.get_temp_filename(suffix=".parquet")
+        df = write_dataframe_and_auto_partition(df, path)
+        context.add_tracked_path(path)
+        logger.info("Wrote dimension associations for dataset %s", dataset_id)
+        return df
 
     def update_from_file(
         self, config_file, config_id, submitter, update_type, log_message, version
@@ -1111,20 +1139,19 @@ class ProjectRegistryManager(RegistryManagerBase):
         self.update(config, update_type, log_message, submitter=submitter)
 
     @track_timing(timer_stats_collector)
-    def update(self, config, update_type, log_message, submitter=None):
-        if submitter is None:
-            submitter = getpass.getuser()
-        # Until we have robust checking of changes to dimension requirements, always clear
-        # the cached association tables in a user update.
-        return self._update(
-            config, submitter, update_type, log_message, clear_cached_association_tables=True
-        )
+    def update(
+        self, config: ProjectConfig, update_type: VersionUpdateType, log_message, submitter=None
+    ):
+        submitter = submitter or getpass.getuser()
+        return self._update(config, submitter, update_type, log_message)
 
     def _update(
-        self, config, submitter, update_type, log_message, clear_cached_association_tables
+        self,
+        config: ProjectConfig,
+        submitter: str,
+        update_type: VersionUpdateType,
+        log_message: str,
     ):
-        if clear_cached_association_tables:
-            remove_project_dimension_associations(config.model.project_id)
         old_config = self.get_by_id(config.model.project_id)
         old_version = old_config.model.version
         checker = ProjectUpdateChecker(old_config.model, config.model)
@@ -1141,7 +1168,7 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         return model
 
-    def remove(self, project_id):
+    def remove(self, project_id: str):
         self.db.delete_all(project_id)
         for key in [x for x in self._projects if x.id == project_id]:
             self._projects.pop(key)
@@ -1150,9 +1177,9 @@ class ProjectRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        filters: list[str] = None,
-        max_width: Union[int, dict] = None,
-        drop_fields: list[str] = None,
+        filters: list[str] | None = None,
+        max_width: Union[int, dict] | None = None,
+        drop_fields: list[str] | None = None,
         return_table: bool = False,
         **kwargs,
     ):

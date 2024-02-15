@@ -4,20 +4,29 @@ import getpass
 import logging
 import os
 from pathlib import Path
-from typing import Union
+from typing import Type, Union
 
 from prettytable import PrettyTable
 
-from dsgrid.config.dataset_config import DatasetConfig, ALLOWED_DATA_FILES
+from dsgrid.config.dataset_config import (
+    DatasetConfig,
+    ALLOWED_DATA_FILES,
+)
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.utils.spark import read_dataframe, write_dataframe
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
+from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from dsgrid.utils.spark import (
+    read_dataframe,
+    write_dataframe,
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
+    VersionUpdateType,
     make_initial_config_registration,
     ConfigKey,
     RegistryType,
@@ -32,34 +41,41 @@ logger = logging.getLogger(__name__)
 class DatasetRegistryManager(RegistryManagerBase):
     """Manages registered dimension datasets."""
 
-    def __init__(self, path, fs_interface):
+    def __init__(
+        self,
+        path,
+        fs_interface,
+        dimension_manager: DimensionRegistryManager,
+        dimension_mapping_manager: DimensionMappingRegistryManager,
+        db: DatasetRegistryInterface,
+    ):
         super().__init__(path, fs_interface)
-        self._datasets = {}  # ConfigKey to DatasetModel
-        self._dimension_mgr = None
-        self._dimension_mapping_mgr = None
+        self._datasets: dict[ConfigKey, DatasetConfig] = {}
+        self._dimension_mgr = dimension_manager
+        self._dimension_mapping_mgr = dimension_mapping_manager
+        self._db = db
 
     @classmethod
-    def load(cls, path, params, dimension_manager, dimension_mapping_manager, db):
-        mgr = cls._load(path, params)
-        mgr.dimension_manager = dimension_manager
-        mgr.dimension_mapping_manager = dimension_mapping_manager
-        mgr.db = db
-        return mgr
+    def load(
+        cls,
+        path: Path,
+        params,
+        dimension_manager: DimensionRegistryManager,
+        dimension_mapping_manager: DimensionMappingRegistryManager,
+        db: DatasetRegistryInterface,
+    ):
+        return cls._load(path, params, dimension_manager, dimension_mapping_manager, db)
 
     @staticmethod
-    def config_class():
+    def config_class() -> Type:
         return DatasetConfig
 
     @property
     def db(self) -> DatasetRegistryInterface:
         return self._db
 
-    @db.setter
-    def db(self, db: DatasetRegistryInterface):
-        self._db = db
-
     @staticmethod
-    def name():
+    def name() -> str:
         return "Datasets"
 
     def _get_registry_data_path(self):
@@ -84,20 +100,12 @@ class DatasetRegistryManager(RegistryManagerBase):
         schema_handler.check_consistency()
 
     @property
-    def dimension_manager(self):
+    def dimension_manager(self) -> DimensionRegistryManager:
         return self._dimension_mgr
 
-    @dimension_manager.setter
-    def dimension_manager(self, val):
-        self._dimension_mgr = val
-
     @property
-    def dimension_mapping_manager(self):
+    def dimension_mapping_manager(self) -> DimensionMappingRegistryManager:
         return self._dimension_mapping_mgr
-
-    @dimension_mapping_manager.setter
-    def dimension_mapping_manager(self, val):
-        self._dimension_mapping_mgr = val
 
     def finalize_registration(self, config_ids, error_occurred):
         assert len(config_ids) == 1, config_ids
@@ -113,7 +121,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 self.sync_push(self.get_registry_data_directory(dataset_id))
             self.cloud_interface.remove_lock_file(lock_file)
 
-    def get_by_id(self, dataset_id, version=None):
+    def get_by_id(self, dataset_id: str, version=None):
         if version is None:
             version = self._db.get_latest_version(dataset_id)
 
@@ -138,7 +146,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             lock_file = self.get_registry_lock_file(dataset_id)
             self.cloud_interface.make_lock_file(lock_file)
 
-    def get_registry_lock_file(self, config_id):
+    def get_registry_lock_file(self, config_id: str):
         return f"configs/.locks/{config_id}.lock"
 
     def _update_dimensions(self, config: DatasetConfig):
@@ -148,11 +156,11 @@ class DatasetRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def register(
         self,
-        config_file,
-        dataset_path,
-        submitter,
-        log_message,
-        context=None,
+        config_file: Path,
+        dataset_path: Path,
+        submitter: str,
+        log_message: str,
+        context: RegistrationContext | None = None,
     ):
         config = DatasetConfig.load_from_user_path(config_file, dataset_path)
         self._update_dimensions(config)
@@ -163,11 +171,11 @@ class DatasetRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def register_from_config(
         self,
-        config,
-        dataset_path,
-        submitter,
-        log_message,
-        context=None,
+        config: DatasetConfig,
+        dataset_path: Path,
+        submitter: str,
+        log_message: str,
+        context: RegistrationContext | None = None,
     ):
         error_occurred = False
         need_to_finalize = context is None
@@ -268,7 +276,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         )
 
     def update_from_file(
-        self, config_file, dataset_id, submitter, update_type, log_message, version
+        self,
+        config_file: Path,
+        dataset_id: str,
+        submitter: str,
+        update_type: VersionUpdateType,
+        log_message: str,
+        version: str,
     ):
         dataset_path = self._params.base_path / "data" / dataset_id / version
         config = DatasetConfig.load_from_user_path(config_file, dataset_path)
@@ -277,7 +291,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         self.update(config, update_type, log_message, submitter)
 
     @track_timing(timer_stats_collector)
-    def update(self, config, update_type, log_message, submitter=None):
+    def update(
+        self,
+        config: DatasetConfig,
+        update_type: VersionUpdateType,
+        log_message: str,
+        submitter: str | None = None,
+    ):
         if submitter is None:
             submitter = getpass.getuser()
         lock_file_path = self.get_registry_lock_file(config.model.dataset_id)
@@ -286,7 +306,13 @@ class DatasetRegistryManager(RegistryManagerBase):
             # is called again.
             return self._update(config, submitter, update_type, log_message)
 
-    def _update(self, config, submitter, update_type, log_message):
+    def _update(
+        self,
+        config: DatasetConfig,
+        submitter: str,
+        update_type: VersionUpdateType,
+        log_message: str,
+    ):
         self._run_checks(config)
         dataset_id = config.model.dataset_id
         cur_model = self.db.get_latest(dataset_id)
@@ -305,7 +331,7 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         return model
 
-    def remove(self, dataset_id):
+    def remove(self, dataset_id: str):
         config = self.get_by_id(dataset_id)
         if self.fs_interface.exists(config.dataset_path):
             self.fs_interface.rm_tree(Path(config.dataset_path).parent)
@@ -317,9 +343,9 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        filters: list[str] = None,
-        max_width: Union[int, dict] = None,
-        drop_fields: list[str] = None,
+        filters: list[str] | None = None,
+        max_width: Union[int, dict] | None = None,
+        drop_fields: list[str] | None = None,
         return_table: bool = False,
         **kwargs,
     ):

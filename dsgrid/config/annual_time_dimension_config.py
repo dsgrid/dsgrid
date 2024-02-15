@@ -64,7 +64,9 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     return self.build_time_dataframe()
 
-    def convert_dataframe(self, df, project_time_dim, model_years=None, value_columns=None):
+    def convert_dataframe(
+        self, df, project_time_dim, model_years=None, value_columns=None, wrap_time_allowed=False
+    ):
         assert model_years is not None
         assert value_columns is not None
         match self.model.measurement_type:

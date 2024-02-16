@@ -153,7 +153,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         dimensions = self._dimension_mgr.load_dimensions(config.model.dimension_references)
         config.update_dimensions(dimensions)
 
-    @track_timing(timer_stats_collector)
     def register(
         self,
         config_file: Path,

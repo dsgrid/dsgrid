@@ -2,9 +2,10 @@ import abc
 import calendar
 import logging
 from datetime import datetime, timedelta
+from typing import Type
+
 from pyspark.sql.types import StructType, StructField, IntegerType
 import pyspark.sql.functions as F
-
 import pandas as pd
 
 from dsgrid.dimension.time import (
@@ -14,7 +15,10 @@ from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
 )
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.time.types import OneWeekPerMonthByHourType
+from dsgrid.time.types import (
+    OneWeekPerMonthByHourType,
+    OneWeekdayDayAndOneWeekendDayPerMonthByHourType,
+)
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import RepresentativePeriodTimeDimensionModel
@@ -29,14 +33,18 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # As of now there is only one format. We expect this to grow.
+        # We expect the list of required formats to grow.
         # It's possible that one function (or set of functions) can handle all permutations
         # of parameters. We can make that determination once we have requirements for more
         # formats.
-        if self.model.format == RepresentativePeriodFormat.ONE_WEEK_PER_MONTH_BY_HOUR:
-            self._format_handler = OneWeekPerMonthByHourHandler()
-        else:
-            assert False, f"Unsupported {self.model.format}"
+        match self.model.format:
+            case RepresentativePeriodFormat.ONE_WEEK_PER_MONTH_BY_HOUR:
+                self._format_handler = OneWeekPerMonthByHourHandler()
+            case RepresentativePeriodFormat.ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR:
+                self._format_handler = OneWeekdayDayAndWeekendDayPerMonthByHourHandler()
+            case _:
+                msg = self.model.format.value
+                raise NotImplementedError(msg)
 
     @staticmethod
     def model_class():
@@ -100,6 +108,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         session_tz_orig = spark.conf.get("spark.sql.session.timeZone")
         spark.conf.set("spark.sql.session.timeZone", "UTC")
         session_tz = spark.conf.get("spark.sql.session.timeZone")
+        if session_tz is None:
+            msg = "Failed to get spark.sql.session.timeZone"
+            raise Exception(msg)
 
         time_df = None
         try:
@@ -114,7 +125,6 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                 new_time_column=map_time,
             )
 
-            idx = 0
             for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
                 local_time_df = project_time_df.withColumn(
                     "time_zone", F.lit(tz_value)
@@ -128,13 +138,14 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                     expr = f"{func}(local_time) AS {col}"
                     if col == "day_of_week":
                         expr = f"mod(dayofweek(local_time)+7-2, 7) AS {col}"
+                    elif col == "is_weekday":
+                        expr = f"(dayofweek(local_time) < 5) AS {col}"
                     select.append(expr)
                 local_time_df = local_time_df.selectExpr(*select)
-                if idx == 0:
+                if time_df is None:
                     time_df = local_time_df
                 else:
                     time_df = time_df.union(local_time_df)
-                idx += 1
         finally:
             # reset session timezone
             spark.conf.set("spark.sql.session.timeZone", session_tz_orig)
@@ -181,7 +192,11 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 class RepresentativeTimeFormatHandlerBase(abc.ABC):
     """Provides implementations for different representative time formats."""
 
+    @staticmethod
     @abc.abstractmethod
+    def get_representative_time_type() -> Type:
+        """Return the time type representing the data."""
+
     def check_dataset_time_consistency(self, expected_timestamps, load_data_df, time_columns):
         """Check consistency between time ranges from the time dimension and load data.
 
@@ -196,6 +211,38 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
         DSGInvalidDataset
 
         """
+        logger.info("Check %s dataset time consistency.", self.__class__.__name__)
+        actual_timestamps = []
+        for row in load_data_df.select(*time_columns).distinct().sort(*time_columns).collect():
+            data = row.asDict()
+            num_none = 0
+            for val in data.values():
+                if val is None:
+                    num_none += 1
+            if num_none > 0:
+                if num_none != len(data):
+                    raise DSGInvalidDataset(
+                        f"If any time column is null then all columns must be null: {data}"
+                    )
+            else:
+                actual_timestamps.append(self.get_representative_time_type()(**data))
+
+        if expected_timestamps != actual_timestamps:
+            mismatch = sorted(
+                set(expected_timestamps).symmetric_difference(set(actual_timestamps))
+            )
+            raise DSGInvalidDataset(
+                f"load_data timestamps do not match expected times. mismatch={mismatch}"
+            )
+        logger.info("Verified that expected_timestamps equal actual_timestamps")
+
+        actual_len = len(actual_timestamps)
+        expected_len = len(expected_timestamps)
+        if actual_len != expected_len:
+            raise DSGInvalidDataset(
+                f"Length of time arrays is incorrect: actual={actual_len} expected={expected_len}"
+            )
+        logger.info("Verified that all time arrays have the same, correct length.")
 
     @abc.abstractmethod
     def get_frequency(self):
@@ -244,39 +291,9 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
 class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     """Handler for format with hourly data that includes one week per month."""
 
-    def check_dataset_time_consistency(self, expected_timestamps, load_data_df, time_columns):
-        logger.info("Check OneWeekPerMonthByHourHandler dataset time consistency.")
-        actual_timestamps = []
-        for row in load_data_df.select(*time_columns).distinct().sort(*time_columns).collect():
-            data = row.asDict()
-            num_none = 0
-            for val in data.values():
-                if val is None:
-                    num_none += 1
-            if num_none > 0:
-                if num_none != len(data):
-                    raise DSGInvalidDataset(
-                        f"If any time column is null then all columns must be null: {data}"
-                    )
-            else:
-                actual_timestamps.append(OneWeekPerMonthByHourType(**data))
-
-        if expected_timestamps != actual_timestamps:
-            mismatch = sorted(
-                set(expected_timestamps).symmetric_difference(set(actual_timestamps))
-            )
-            raise DSGInvalidDataset(
-                f"load_data timestamps do not match expected times. mismatch={mismatch}"
-            )
-        logger.info("Verified that expected_timestamps equal actual_timestamps")
-
-        actual_len = len(actual_timestamps)
-        expected_len = len(expected_timestamps)
-        if actual_len != expected_len:
-            raise DSGInvalidDataset(
-                f"Length of time arrays is incorrect: actual={actual_len} expected={expected_len}"
-            )
-        logger.info("Verified that all time arrays have the same, correct length.")
+    @staticmethod
+    def get_representative_time_type():
+        return OneWeekPerMonthByHourType
 
     def get_frequency(self):
         return timedelta(hours=1)
@@ -313,6 +330,39 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
                     for hour in range(24):
                         ts = OneWeekPerMonthByHourType(
                             month=month, day_of_week=day_of_week, hour=hour
+                        )
+                        timestamps.append(ts)
+        return timestamps
+
+
+class OneWeekdayDayAndWeekendDayPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
+    """Handler for format with hourly data that includes one weekday day and one weekend day
+    per month.
+    """
+
+    @staticmethod
+    def get_representative_time_type():
+        return OneWeekdayDayAndOneWeekendDayPerMonthByHourType
+
+    def get_frequency(self):
+        return timedelta(hours=1)
+
+    def get_time_ranges(self, ranges, time_interval_type, _):
+        raise NotImplementedError("get_time_ranges")
+
+    @staticmethod
+    def get_load_data_time_columns():
+        return list(OneWeekdayDayAndOneWeekendDayPerMonthByHourType._fields)
+
+    def list_expected_dataset_timestamps(self, ranges):
+        timestamps = []
+        for model in ranges:
+            for month in range(model.start, model.end + 1):
+                # This is sorted because we sort time columns in the load data.
+                for is_weekday in sorted((False, True)):
+                    for hour in range(24):
+                        ts = OneWeekdayDayAndOneWeekendDayPerMonthByHourType(
+                            month=month, hour=hour, is_weekday=is_weekday
                         )
                         timestamps.append(ts)
         return timestamps

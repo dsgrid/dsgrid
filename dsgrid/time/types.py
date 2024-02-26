@@ -42,6 +42,7 @@ class OneWeekPerMonthByHourType(NamedTuple):
     """Columns of representative time with one week per month."""
 
     month: int
+    # 0 = Monday, 6 = Sunday. Follows pyspark.sql.functions.weekday and Python datetime.weekday.
     day_of_week: int
     hour: int
 

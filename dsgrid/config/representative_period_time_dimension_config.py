@@ -75,10 +75,6 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def convert_dataframe(
         self, df, project_time_dim, model_years=None, value_columns=None, wrap_time_allowed=False
     ):
-        # in spark.dayofweek: 1=Sunday, 7=Saturday
-        # dsgrid uses python standard library (same for pandas), which has day_of_week: 0=Monday, 6=Sunday
-        # the mapping is: python.dt.day_of_week = [(i+7-2)%7 for i in spark.dayofweek]
-
         if project_time_dim is None:
             return df
         if (
@@ -137,9 +133,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                     func = col.replace("_", "")
                     expr = f"{func}(local_time) AS {col}"
                     if col == "day_of_week":
-                        expr = f"mod(dayofweek(local_time)+7-2, 7) AS {col}"
+                        expr = f"weekday(local_time) AS {col}"
                     elif col == "is_weekday":
-                        expr = f"(dayofweek(local_time) < 5) AS {col}"
+                        expr = f"(weekday(local_time) < 5) AS {col}"
                     select.append(expr)
                 local_time_df = local_time_df.selectExpr(*select)
                 if time_df is None:

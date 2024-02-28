@@ -98,9 +98,9 @@ completely new database, delete those directories before running the script.
 Note that Slurm will log stdout/stderr from ``arangod`` into ``./arango_<job-id>.o/e``.
 
 The repository also includes ``scripts/start_spark_and_arango_on_kestrel.sh``. It starts Spark as
-well as ArangoDB, but you must have cloned ``https://github.com/daniel-thom/HPC.git``
-(``kestrel-update`` branch). It looks for the repo at ``~/repos/HPC``, but you can set a custom
-value on the command line, such as the example below.
+well as ArangoDB, but you must have cloned ``https://github.com/NREL/HPC.git``. It looks for the
+repo at ``~/repos/HPC``, but you can set a custom value on the command line, such as the example
+below.
 
 You may want to adjust the number and type of nodes in the script based on your Spark requirements.
 

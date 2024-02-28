@@ -283,10 +283,10 @@ This section describes how you can run Spark jobs on any number of HPC compute n
 The scripts and examples described here rely on the SLURM scheduling system and have been tested
 on NREL's Kestrel cluster.
 
-NREL's HPC GitHub [repository](https://github.com/daniel-thom/HPC) (``kestrel-update`` branch)
-contains scripts that will create an ephemeral Spark cluster on compute nodes that you allocate.
+NREL's HPC GitHub [repository](https://github.com/NREL/HPC) contains scripts that will create an
+ephemeral Spark cluster on compute nodes that you allocate.
 
-The [README](https://github.com/daniel-thom/HPC/blob/kestrel-update/applications/spark/README.md) in the
+The [README](https://github.com/NREL/HPC/blob/master/applications/spark/README.md) in the
 repository has generic instructions to run Spark in a variety of ways. The rest of this section
 calls out choices that you should make to run Spark jobs with dsgrid.
 
@@ -294,8 +294,7 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
 .. code-block:: console
 
-    $ git clone https://github.com/daniel-thom/HPC.git
-    $ git checkout kestrel-update
+    $ git clone https://github.com/NREL/HPC.git
 
 2. Choose compute node(s) with fast local storage. This example will allocate one node.
 .. code-block:: console

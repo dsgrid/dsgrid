@@ -4,8 +4,8 @@
 How to start a Spark cluster on Kestrel
 ***************************************
 This section assumes that you have cloned the HPC Spark setup scripts from this `repo
-<https://github.com/daniel-thom/HPC.git>`_ (``kestrel-update`` branch). If you are unfamiliar with
-that, please read the full details at :ref:`spark-on-hpc`.
+<https://github.com/NREL/HPC.git>`_. If you are unfamiliar with that, please read the full details
+at :ref:`spark-on-hpc`.
 
 Compute Node Types
 ==================

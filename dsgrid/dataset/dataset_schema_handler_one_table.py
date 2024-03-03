@@ -180,6 +180,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             # There is currently no case that needs model years or value columns.
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
+        # TODO: This might need to handle data skew in the future.
         ld_df = self._remap_dimension_columns(ld_df, True)
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
         ld_df = self._apply_fraction(ld_df, value_columns)
@@ -212,7 +213,11 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         ld_df = self._remap_dimension_columns(
-            ld_df, True, filtered_records=context.get_record_ids()
+            ld_df,
+            True,
+            filtered_records=context.get_record_ids(),
+            handle_data_skew=True,
+            scratch_dir_context=context.scratch_dir_context,
         )
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
         ld_df = self._apply_fraction(ld_df, value_columns)
@@ -220,6 +225,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
+        # print("start write")
+        # breakpoint()
+        # ld_df.write.mode("overwrite").parquet("tmp.parquet")
+        # spark = get_spark_session()
+        # ld_df = spark.read.load("tmp.parquet")
+        # print("done with read back")
         if not convert_time_before_project_mapping:
             m_year_df = context.try_get_record_ids_by_dimension_type(DimensionType.MODEL_YEAR)
             if m_year_df is None:

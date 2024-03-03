@@ -1,6 +1,5 @@
 import logging
 from pathlib import Path
-from dsgrid.common import VALUE_COLUMN
 
 from pyspark.sql import DataFrame
 
@@ -9,9 +8,11 @@ from dsgrid.dataset.models import (
     PivotedTableFormatModel,
     UnpivotedTableFormatModel,
 )
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from .models import ColumnType, DatasetMetadataModel, DimensionMetadataModel, ProjectQueryModel
 
 
@@ -21,11 +22,12 @@ logger = logging.getLogger(__name__)
 class QueryContext:
     """Maintains context of the query as it is processed through the stack."""
 
-    def __init__(self, model: ProjectQueryModel):
+    def __init__(self, model: ProjectQueryModel, scratch_dir_context: ScratchDirContext):
         self._model = model
         self._record_ids_by_dimension_type: dict[DimensionType, DataFrame] = {}
         self._metadata = DatasetMetadataModel(table_format=self.model.result.table_format)
         self._dataset_metadata: dict[str, DatasetMetadataModel] = {}
+        self._scratch_dir_context = scratch_dir_context
 
     @property
     def metadata(self):
@@ -38,6 +40,11 @@ class QueryContext:
     @property
     def model(self):
         return self._model
+
+    @property
+    def scratch_dir_context(self) -> ScratchDirContext:
+        """Return the context for managing scratch directories."""
+        return self._scratch_dir_context
 
     def consolidate_dataset_metadata(self):
         for dim_type in DimensionType:

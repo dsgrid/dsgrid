@@ -293,6 +293,7 @@ def run_project_query(
     force,
 ):
     """Run a query on a dsgrid project."""
+    scratch_dir = get_value_from_context(ctx, "scratch_dir")
     query = ProjectQueryModel.from_file(query_definition_file)
     conn = DatabaseConnection.from_url(
         get_value_from_context(ctx, "url"),
@@ -312,6 +313,7 @@ def run_project_query(
         ctx,
         submitter.submit,
         query,
+        scratch_dir,
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
         zip_file=zip_file,

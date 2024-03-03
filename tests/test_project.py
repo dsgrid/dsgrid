@@ -5,7 +5,9 @@ from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimensionMapping
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 
 PROJECT_ID = "test_efs"
@@ -80,7 +82,12 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
 
     load_data_df = dataset._handler._load_data
     load_data_lookup_df = dataset._handler._load_data_lookup
-    mapped_load_data = dataset._handler._remap_dimension_columns(load_data_df, True)
+    mapped_load_data = dataset._handler._remap_dimension_columns(
+        load_data_df,
+        True,
+        handle_data_skew=True,
+        scratch_dir_context=ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir()),
+    )
     mapped_load_data_lookup = dataset._handler._remap_dimension_columns(load_data_lookup_df, False)
 
     # [1] check that mapped tables contain all to_id records from mappings

@@ -94,7 +94,7 @@ class Project:
         """
         if dataset_id not in self.list_datasets():
             raise DSGValueNotRegistered(
-                f"{dataset_id} is not expected by {self.config.project_id}"
+                f"{dataset_id} is not expected by {self.config.model.project_id}"
             )
 
         return dataset_id in self._dataset_configs

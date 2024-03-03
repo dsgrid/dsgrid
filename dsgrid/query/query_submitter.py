@@ -2,12 +2,15 @@ import abc
 import logging
 import shutil
 from pathlib import Path
+from typing import Optional
 from zipfile import ZipFile
 
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionCategory
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
 from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.utils.spark import (
     get_unique_values,
     read_dataframe,
@@ -135,6 +138,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     def _run_query(
         self,
+        scratch_dir_context: ScratchDirContext,
         model,
         load_cached_table,
         persist_intermediate_table,
@@ -142,7 +146,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         force=False,
     ):
         self._run_checks(model)
-        context = QueryContext(model)
+        context = QueryContext(model, scratch_dir_context=scratch_dir_context)
         context.model.project.version = str(self._project.version)
         output_dir = self._output_dir / context.model.name
         if output_dir.exists() and not force:
@@ -280,6 +284,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
     def submit(
         self,
         model: ProjectQueryModel,
+        scratch_dir: Optional[Path] = None,
         persist_intermediate_table=True,
         load_cached_table=True,
         zip_file=False,
@@ -309,11 +314,17 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
             Raised if the model defines a project version
         DSGInvalidQuery
             Raised if the query is invalid
-
         """
-        return self._run_query(
-            model, load_cached_table, persist_intermediate_table, zip_file=zip_file, force=force
-        )[0]
+        scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
+        with ScratchDirContext(scratch_dir) as scratch_dir_context:
+            return self._run_query(
+                scratch_dir_context,
+                model,
+                load_cached_table,
+                persist_intermediate_table=persist_intermediate_table,
+                zip_file=zip_file,
+                force=force,
+            )[0]
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
@@ -323,6 +334,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
     def create_dataset(
         self,
         model: CreateCompositeDatasetQueryModel,
+        scratch_dir: Optional[Path] = None,
         persist_intermediate_table=False,
         load_cached_table=True,
         force=False,
@@ -340,34 +352,46 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             If True, overwrite any existing output directory.
 
         """
-        df, context = self._run_query(
-            model, load_cached_table, persist_intermediate_table, force=force
-        )
-        self._save_composite_dataset(context, df, not persist_intermediate_table)
+        scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
+        with ScratchDirContext(scratch_dir) as scratch_dir_context:
+            df, context = self._run_query(
+                scratch_dir_context,
+                model,
+                load_cached_table,
+                persist_intermediate_table,
+                force=force,
+            )
+            self._save_composite_dataset(context, df, not persist_intermediate_table)
 
     @track_timing(timer_stats_collector)
     def submit(
         self,
         query: CompositeDatasetQueryModel,
+        scratch_dir: Optional[Path] = None,
     ):
         """Submit a query to an composite dataset and produce result tables.
 
         Parameters
         ----------
         query : CompositeDatasetQueryModel
+        scratch_dir : Optional[Path]
         """
+        scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         # orig_query = self._load_composite_dataset_query(query.dataset_id)
-        context = QueryContext(query)
-        df, context.metadata = self._read_dataset(query.dataset_id)
-        handler = make_table_format_handler(context.get_table_format_type(), self._project.config)
+        with ScratchDirContext(scratch_dir) as scratch_dir_context:
+            context = QueryContext(query, scratch_dir_context)
+            df, context.metadata = self._read_dataset(query.dataset_id)
+            handler = make_table_format_handler(
+                context.get_table_format_type(), self._project.config
+            )
 
-        repartition = False
-        if context.model.result.aggregations:
-            df = handler.process_aggregations(df, context.model.result.aggregations, context)
+            repartition = False
+            if context.model.result.aggregations:
+                df = handler.process_aggregations(df, context.model.result.aggregations, context)
 
-        if context.model.result.replace_ids_with_names:
-            df = handler.replace_ids_with_names(df)
-        self._save_query_results(context, df, repartition)
+            if context.model.result.replace_ids_with_names:
+                df = handler.replace_ids_with_names(df)
+            self._save_query_results(context, df, repartition)
 
     def _load_composite_dataset_query(self, dataset_id):
         filename = self._composite_datasets_dir() / dataset_id / "query.json"

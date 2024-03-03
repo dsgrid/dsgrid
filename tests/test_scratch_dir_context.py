@@ -11,7 +11,6 @@ def add_content(context: ScratchDirContext) -> tuple[Path, list[Path]]:
         assert not filename.exists()
         filename.touch()
         files.append(filename)
-        context.add_tracked_path(filename)
 
     directory = context.scratch_dir / "my_dir"
     directory.mkdir()

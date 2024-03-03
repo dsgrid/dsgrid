@@ -583,8 +583,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # We experienced an issue with the DECARB buildings dataset where the disaggregation of
         # region to county caused a major issue where one Spark executor thread got stuck,
         # seemingly indefinitely. A message like this was repeated continually.
-        # UnsafeExternalSorter - Thread 24 spilling sort data of 59.0 GB to disk
-        # It appears to be caused by data skew, though the imbalance didn't seem to severe.
+        # UnsafeExternalSorter: Thread 152 spilling sort data of 4.0 GiB to disk (0  time so far)
+        # It appears to be caused by data skew, though the imbalance didn't seem too severe.
         # Using a variation of what online sources call a "salting technique" solves the issue.
         # Apply the technique to mappings that will cause an explosion of rows.
         # Note that this probably isn't needed in all cases and we may need to adjust in the
@@ -602,14 +602,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 logger.info("DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true; skip repartitions")
                 return df
 
-            logger.info(
-                "Repartition with randomized key after mapping %s",
-                mapping_config.model.to_dimension.dimension_type.value,
-            )
             filename = scratch_dir_context.get_temp_filename(suffix=".parquet")
-            key_col = "salted_key"
-            df.withColumn(key_col, F.rand()).repartition(key_col).write.parquet(str(filename))
-            df = read_parquet(filename).drop(key_col)
-            logger.info("Read back repartitioned table")
+            # Salting techniques online talk about adding or modifying a column with random values.
+            # Our value columns should be sufficient. Using one is much quicker than adding
+            # potentially billions of floats.
+            # We may need to alter the approach if a dataset has unbalanced, repeated values.
+            value_column = next(iter(self._config.get_value_columns()))
+            logger.info(
+                "Repartition after mapping %s with column=%s",
+                mapping_config.model.to_dimension.dimension_type.value,
+                value_column,
+            )
+            df.repartition(value_column).write.parquet(str(filename))
+            df = read_parquet(filename)
+            logger.info("Completed repartition.")
 
         return df

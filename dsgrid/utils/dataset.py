@@ -14,12 +14,10 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 logger = logging.getLogger(__name__)
 
 
-@track_timing(timer_stats_collector)
 def map_and_reduce_stacked_dimension(df, records, column):
     if "fraction" not in df.columns:
         df = df.withColumn("fraction", F.lit(1.0))
     # map and consolidate from_fraction only
-    # TODO: can remove this if we do it at registration time
     records = records.filter("to_id IS NOT NULL")
 
     df = (
@@ -27,7 +25,7 @@ def map_and_reduce_stacked_dimension(df, records, column):
         .drop("from_id")
         .drop(column)
         .withColumnRenamed("to_id", column)
-    ).filter(f"{column} IS NOT NULL")
+    )
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
     df = df.fillna(1.0, subset=["from_fraction"]).selectExpr(
         *nonfraction_cols, "fraction*from_fraction AS fraction"

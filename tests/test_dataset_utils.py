@@ -1,15 +1,21 @@
+import logging
 import math
+import os
 
 import pyspark.sql.functions as F
 import pytest
 from pyspark.sql.types import StructType, IntegerType
 
+from dsgrid.config.dimension_mapping_base import DimensionMappingType
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.dataset import (
     apply_scaling_factor,
     map_and_reduce_pivoted_dimension,
     is_noop_mapping,
     remove_invalid_null_timestamps,
+    repartition_if_needed_by_mapping,
 )
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_spark_session
 
 
@@ -269,6 +275,52 @@ def test_apply_scaling_factor():
     assert df2.select("a").agg(F.sum("a").alias("sum_a")).collect()[0].sum_a == 1 * 5 + 2 * 6 + 3
     assert df2.select("b").agg(F.sum("b").alias("sum_b")).collect()[0].sum_b == 2 * 5 + 3 * 6 + 4
     assert df2.select("bystander").agg(F.sum("bystander").alias("c")).collect()[0].c == 1 + 1 + 1
+
+
+def test_repartition_if_needed_by_mapping(tmp_path, caplog, dataframes):
+    df, _, value_columns = dataframes
+    context = ScratchDirContext(tmp_path)
+    with caplog.at_level(logging.INFO):
+        df = repartition_if_needed_by_mapping(
+            df,
+            value_columns,
+            DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
+            DimensionType.GEOGRAPHY,
+            context,
+        )
+        assert "Completed repartition" in caplog.text
+
+
+def test_repartition_if_needed_by_mapping_override(tmp_path, caplog, dataframes):
+    df, _, value_columns = dataframes
+    context = ScratchDirContext(tmp_path)
+    os.environ["DSGRID_SKIP_MAPPING_SKEW_REPARTITION"] = "true"
+    try:
+        with caplog.at_level(logging.INFO):
+            df = repartition_if_needed_by_mapping(
+                df,
+                value_columns,
+                DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
+                DimensionType.GEOGRAPHY,
+                context,
+            )
+            assert "DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true" in caplog.text
+    finally:
+        os.environ.pop("DSGRID_SKIP_MAPPING_SKEW_REPARTITION")
+
+
+def test_repartition_if_needed_by_mapping_not_needed(tmp_path, caplog, dataframes):
+    df, _, value_columns = dataframes
+    context = ScratchDirContext(tmp_path)
+    with caplog.at_level(logging.DEBUG):
+        df = repartition_if_needed_by_mapping(
+            df,
+            value_columns,
+            DimensionMappingType.ONE_TO_ONE,
+            DimensionType.GEOGRAPHY,
+            context,
+        )
+        assert "Repartition is not needed" in caplog.text
 
 
 # TODO: enable this when we decide if and how to handle NULL values in mean operations.

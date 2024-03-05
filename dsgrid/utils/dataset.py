@@ -7,8 +7,11 @@ from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
 
 from dsgrid.common import SCALING_FACTOR_COLUMN
+from dsgrid.config.dimension_mapping_base import DimensionMappingType
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
-from dsgrid.utils.spark import check_for_nulls
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.utils.spark import check_for_nulls, read_parquet
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -206,3 +209,56 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
         .filter(f"{time_column} IS NOT NULL or count_time == 0")
         .select(orig_columns)
     )
+
+
+@track_timing(timer_stats_collector)
+def repartition_if_needed_by_mapping(
+    df: DataFrame,
+    value_columns: list[str],
+    mapping_type: DimensionMappingType,
+    dimension_type: DimensionType,
+    scratch_dir_context: ScratchDirContext,
+) -> DataFrame:
+    """Repartition the dataframe if the mapping will cause data skew."""
+    # We experienced an issue with the DECARB buildings dataset where the disaggregation of
+    # region to county caused a major issue where one Spark executor thread got stuck,
+    # seemingly indefinitely. A message like this was repeated continually.
+    # UnsafeExternalSorter: Thread 152 spilling sort data of 4.0 GiB to disk (0  time so far)
+    # It appears to be caused by data skew, though the imbalance didn't seem too severe.
+    # Using a variation of what online sources call a "salting technique" solves the issue.
+    # Apply the technique to mappings that will cause an explosion of rows.
+    # Note that this probably isn't needed in all cases and we may need to adjust in the
+    # future.
+    # The case with buildings was particularly severe because it is an unpivoted dataset.
+
+    # Note: log messages below are checked in the tests.
+    if mapping_type in {
+        DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
+        DimensionMappingType.ONE_TO_MANY_ASSIGNMENT,
+        DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS,
+        DimensionMappingType.MANY_TO_MANY_DISAGGREGATION,
+        # This is usually happening with scenario and hasn't caused a problem.
+        # DimensionMappingType.DUPLICATION,
+    }:
+        if os.environ.get("DSGRID_SKIP_MAPPING_SKEW_REPARTITION", "false").lower() == "true":
+            logger.info("DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true; skip repartitions")
+            return df
+
+        filename = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        # Salting techniques online talk about adding or modifying a column with random values.
+        # Our value columns should be sufficient. Using one is much quicker than adding
+        # potentially billions of floats.
+        # We may need to alter the approach if a dataset has unbalanced, repeated values.
+        value_column = next(iter(value_columns))
+        logger.info(
+            "Repartition after mapping %s with column=%s",
+            dimension_type.value,
+            value_column,
+        )
+        df.repartition(value_column).write.parquet(str(filename))
+        df = read_parquet(filename)
+        logger.info("Completed repartition.")
+    else:
+        logger.debug("Repartition is not needed for mapping_type %s", mapping_type)
+
+    return df

@@ -11,9 +11,7 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
-    DimensionMappingType,
 )
-from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
@@ -28,9 +26,10 @@ from dsgrid.utils.dataset import (
     map_and_reduce_pivoted_dimension,
     add_time_zone,
     ordered_subset_columns,
+    repartition_if_needed_by_mapping,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import get_unique_values, read_parquet
+from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -484,7 +483,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if column in df.columns:
                 df = map_and_reduce_stacked_dimension(df, records, column)
                 if handle_data_skew:
-                    df = self._repartition_if_needed(df, mapping_config, scratch_dir_context)
+                    df = repartition_if_needed_by_mapping(
+                        df,
+                        self._config.get_value_columns(),
+                        mapping_config.model.mapping_type,
+                        mapping_config.model.to_dimension.dimension_type,
+                        scratch_dir_context,
+                    )
             elif (
                 contains_values
                 and pivoted_dim_type is not None
@@ -572,49 +577,3 @@ class DatasetSchemaHandlerBase(abc.ABC):
         allowed_columns = {x.value for x in DimensionType}
         columns = [x for x in df.columns if x in allowed_columns]
         return df.select(*columns)
-
-    @track_timing(timer_stats_collector)
-    def _repartition_if_needed(
-        self,
-        df: DataFrame,
-        mapping_config: MappingTableConfig,
-        scratch_dir_context: ScratchDirContext,
-    ) -> DataFrame:
-        # We experienced an issue with the DECARB buildings dataset where the disaggregation of
-        # region to county caused a major issue where one Spark executor thread got stuck,
-        # seemingly indefinitely. A message like this was repeated continually.
-        # UnsafeExternalSorter: Thread 152 spilling sort data of 4.0 GiB to disk (0  time so far)
-        # It appears to be caused by data skew, though the imbalance didn't seem too severe.
-        # Using a variation of what online sources call a "salting technique" solves the issue.
-        # Apply the technique to mappings that will cause an explosion of rows.
-        # Note that this probably isn't needed in all cases and we may need to adjust in the
-        # future.
-        # The case with buildings was particularly severe because it is an unpivoted dataset.
-        if mapping_config.model.mapping_type in {
-            DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
-            DimensionMappingType.ONE_TO_MANY_ASSIGNMENT,
-            DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS,
-            DimensionMappingType.MANY_TO_MANY_DISAGGREGATION,
-            # This is usually happening with scenario and hasn't caused a problem.
-            # DimensionMappingType.DUPLICATION,
-        }:
-            if os.environ.get("DSGRID_SKIP_MAPPING_SKEW_REPARTITION", "false").lower() == "true":
-                logger.info("DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true; skip repartitions")
-                return df
-
-            filename = scratch_dir_context.get_temp_filename(suffix=".parquet")
-            # Salting techniques online talk about adding or modifying a column with random values.
-            # Our value columns should be sufficient. Using one is much quicker than adding
-            # potentially billions of floats.
-            # We may need to alter the approach if a dataset has unbalanced, repeated values.
-            value_column = next(iter(self._config.get_value_columns()))
-            logger.info(
-                "Repartition after mapping %s with column=%s",
-                mapping_config.model.to_dimension.dimension_type.value,
-                value_column,
-            )
-            df.repartition(value_column).write.parquet(str(filename))
-            df = read_parquet(filename)
-            logger.info("Completed repartition.")
-
-        return df

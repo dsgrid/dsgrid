@@ -485,9 +485,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 if handle_data_skew:
                     df = repartition_if_needed_by_mapping(
                         df,
-                        self._config.get_value_columns(),
                         mapping_config.model.mapping_type,
-                        mapping_config.model.to_dimension.dimension_type,
                         scratch_dir_context,
                     )
             elif (

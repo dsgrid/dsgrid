@@ -8,7 +8,6 @@ import pyspark.sql.functions as F
 
 from dsgrid.common import SCALING_FACTOR_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
-from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import check_for_nulls, read_parquet
@@ -214,9 +213,7 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
 @track_timing(timer_stats_collector)
 def repartition_if_needed_by_mapping(
     df: DataFrame,
-    value_columns: list[str],
     mapping_type: DimensionMappingType,
-    dimension_type: DimensionType,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Repartition the dataframe if the mapping will cause data skew."""
@@ -234,9 +231,10 @@ def repartition_if_needed_by_mapping(
     # Note: log messages below are checked in the tests.
     if mapping_type in {
         DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
-        DimensionMappingType.ONE_TO_MANY_ASSIGNMENT,
-        DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS,
-        DimensionMappingType.MANY_TO_MANY_DISAGGREGATION,
+        # These cases might be problematic in the future.
+        # DimensionMappingType.ONE_TO_MANY_ASSIGNMENT,
+        # DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS,
+        # DimensionMappingType.MANY_TO_MANY_DISAGGREGATION,
         # This is usually happening with scenario and hasn't caused a problem.
         # DimensionMappingType.DUPLICATION,
     }:
@@ -246,17 +244,14 @@ def repartition_if_needed_by_mapping(
 
         filename = scratch_dir_context.get_temp_filename(suffix=".parquet")
         # Salting techniques online talk about adding or modifying a column with random values.
-        # Our value columns should be sufficient. Using one is much quicker than adding
-        # potentially billions of floats.
-        # We may need to alter the approach if a dataset has unbalanced, repeated values.
-        value_column = next(iter(value_columns))
-        logger.info(
-            "Repartition after mapping %s with column=%s",
-            dimension_type.value,
-            value_column,
+        # We might be able to use one of our value columns. However, there are cases where there
+        # could be many instances of zero or null. So, add a new column with random values.
+        logger.info("Repartition after mapping %s", mapping_type)
+        salted_column = "salted_key"
+        df.withColumn(salted_column, F.rand()).repartition(salted_column).write.parquet(
+            str(filename)
         )
-        df.repartition(value_column).write.parquet(str(filename))
-        df = read_parquet(filename)
+        df = read_parquet(filename).drop(salted_column)
         logger.info("Completed repartition.")
     else:
         logger.debug("Repartition is not needed for mapping_type %s", mapping_type)

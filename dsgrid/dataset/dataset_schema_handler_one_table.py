@@ -225,12 +225,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-        # print("start write")
-        # breakpoint()
-        # ld_df.write.mode("overwrite").parquet("tmp.parquet")
-        # spark = get_spark_session()
-        # ld_df = spark.read.load("tmp.parquet")
-        # print("done with read back")
         if not convert_time_before_project_mapping:
             m_year_df = context.try_get_record_ids_by_dimension_type(DimensionType.MODEL_YEAR)
             if m_year_df is None:

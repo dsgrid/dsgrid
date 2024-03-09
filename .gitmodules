@@ -1,7 +1,7 @@
 [submodule "dsgrid-test-data"]
 	path = dsgrid-test-data
 	url = https://github.com/dsgrid/dsgrid-test-data
-	branch = main
+	branch = ll/industrial_time
 [submodule "dsgrid-project-StandardScenarios"]
 	path = dsgrid-project-StandardScenarios
 	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios

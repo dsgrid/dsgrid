@@ -7,11 +7,12 @@ import logging
 from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE_TIME
-from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.dimensions import DateTimeDimensionModel
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.representative_period_time_dimension_config import (
     RepresentativePeriodTimeDimensionConfig,
 )
+from dsgrid.config.indexed_time_dimension_config import IndexedTimeDimensionConfig
 from dsgrid.dimension.time import LeapDayAdjustmentType
 
 
@@ -19,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.fixture
-def time_dimension_model1():
+def time_dimension_model0():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
@@ -27,7 +28,7 @@ def time_dimension_model1():
 
 
 @pytest.fixture
-def time_dimension_model2():
+def time_dimension_model1():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
@@ -35,7 +36,7 @@ def time_dimension_model2():
 
 
 @pytest.fixture
-def time_dimension_model3():
+def time_dimension_model2():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
@@ -56,6 +57,14 @@ def representative_time_dimension_model():
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
     yield model.dimensions[4]  # RepresentativeTimeDimensionModel
+
+
+@pytest.fixture
+def indexed_time_dimension_model():
+    file = DIMENSION_CONFIG_FILE_TIME
+    config_as_dict = load_data(file)
+    model = DimensionsConfigModel(**config_as_dict)
+    yield model.dimensions[5]  # IndexedTimeDimensionModel
 
 
 def check_date_range_creation(time_dimension_model):
@@ -89,23 +98,32 @@ def check_date_range_creation(time_dimension_model):
     years = set(ts.year)
     ts_to_drop = []
     for yr in years:
-        if time_dimension_model.leap_day_adjustment == LeapDayAdjustmentType.NONE:
+        if time_dimension_model.data_adjustment.leap_day_adjustment == LeapDayAdjustmentType.NONE:
             pass
-        elif time_dimension_model.leap_day_adjustment == LeapDayAdjustmentType.DROP_JAN1:
+        elif (
+            time_dimension_model.data_adjustment.leap_day_adjustment
+            == LeapDayAdjustmentType.DROP_JAN1
+        ):
             ts_to_drop = (
                 ts_to_drop
                 + pd.date_range(
                     start=f"{yr}-01-01", freq=freq, periods=24 / hours, tz=tz
                 ).to_list()
             )
-        elif time_dimension_model.leap_day_adjustment == LeapDayAdjustmentType.DROP_DEC31:
+        elif (
+            time_dimension_model.data_adjustment.leap_day_adjustment
+            == LeapDayAdjustmentType.DROP_DEC31
+        ):
             ts_to_drop = (
                 ts_to_drop
                 + pd.date_range(
                     start=f"{yr}-12-31", freq=freq, periods=24 / hours, tz=tz
                 ).to_list()
             )
-        elif time_dimension_model.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29:
+        elif (
+            time_dimension_model.data_adjustment.leap_day_adjustment
+            == LeapDayAdjustmentType.DROP_FEB29
+        ):
             if yr % 4 == 0:
                 ts_to_drop = (
                     ts_to_drop
@@ -141,26 +159,24 @@ def check_register_annual_time(annual_time_dimension_model):
 
 
 # Test funcs:
+def test_time_dimension_model0(time_dimension_model0):
+    check_date_range_creation(time_dimension_model0)
 
 
 def test_time_dimension_model1(time_dimension_model1):
     check_date_range_creation(time_dimension_model1)
+    check_validation_error_365_days(time_dimension_model1)
 
 
 def test_time_dimension_model2(time_dimension_model2):
     check_date_range_creation(time_dimension_model2)
-    check_validation_error_365_days(time_dimension_model2)
 
 
-def test_time_dimension_model3(time_dimension_model3):
-    check_date_range_creation(time_dimension_model3)
-
-
-def test_time_dimension_model4(annual_time_dimension_model):
+def test_time_dimension_model3(annual_time_dimension_model):
     check_register_annual_time(annual_time_dimension_model)
 
 
-def test_time_dimension_model5(representative_time_dimension_model):
+def test_time_dimension_model4(representative_time_dimension_model):
     config = RepresentativePeriodTimeDimensionConfig(representative_time_dimension_model)
     if config.model.format.value == "one_week_per_month_by_hour":
         n_times = len(config.list_expected_dataset_timestamps())
@@ -170,10 +186,29 @@ def test_time_dimension_model5(representative_time_dimension_model):
     config.get_time_ranges()  # TODO: this is not correct yet in terms of year, maybe this functionality should exist in project instead
 
 
-def test_time_dimension_model_lead_day_adj(time_dimension_model1):
-    time_dimension_model1.leap_day_adjustment = LeapDayAdjustmentType.DROP_DEC31
-    check_date_range_creation(time_dimension_model1)
-    time_dimension_model1.leap_day_adjustment = LeapDayAdjustmentType.DROP_JAN1
-    check_date_range_creation(time_dimension_model1)
-    time_dimension_model1.leap_day_adjustment = LeapDayAdjustmentType.DROP_FEB29
-    check_date_range_creation(time_dimension_model1)
+def test_time_dimension_model_lead_day_adj(time_dimension_model0):
+    time_dimension_model0.data_adjustment.leap_day_adjustment = LeapDayAdjustmentType.DROP_DEC31
+    check_date_range_creation(time_dimension_model0)
+    time_dimension_model0.data_adjustment.leap_day_adjustment = LeapDayAdjustmentType.DROP_JAN1
+    check_date_range_creation(time_dimension_model0)
+    time_dimension_model0.data_adjustment.leap_day_adjustment = LeapDayAdjustmentType.DROP_FEB29
+    check_date_range_creation(time_dimension_model0)
+
+
+def test_time_dimension_model5(
+    time_dimension_model0, indexed_time_dimension_model, representative_time_dimension_model
+):
+    # not done yet
+    model0 = time_dimension_model0
+    config0 = DateTimeDimensionConfig(model0)
+
+    model1 = indexed_time_dimension_model
+    config1 = IndexedTimeDimensionConfig(model1)
+
+    model2 = representative_time_dimension_model
+    config2 = RepresentativePeriodTimeDimensionConfig(model2)
+
+    config0.get_time_ranges()
+    config1.get_time_ranges()
+    config2.get_time_ranges()
+    # breakpoint()

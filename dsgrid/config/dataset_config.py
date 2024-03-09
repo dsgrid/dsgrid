@@ -486,19 +486,11 @@ class DatasetConfigModel(DSGBaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
-        if "data_schema_type" in values:
-            if "data_schema_type" in values["data_schema"]:
+        if "leap_day_adjustment" in values:
+            if values["leap_day_adjustment"] != "none":
                 raise ValueError(f"Unknown data_schema format: {values=}")
-            values["data_schema"]["data_schema_type"] = values.pop("data_schema_type")
+            values.pop("leap_day_adjustment")
 
-        if "dataset_qualifier" in values:
-            if values["dataset_qualifier_metadata"] is None:
-                values["dataset_qualifier_metadata"] = {}
-            if "dataset_qualifier_type" in values["dataset_qualifier_metadata"]:
-                raise ValueError(f"Unknown dataset_qualifier_metadata format: {values=}")
-            values["dataset_qualifier_metadata"]["dataset_qualifier_type"] = values.pop(
-                "dataset_qualifier"
-            )
         return values
 
     @field_validator("dataset_id")

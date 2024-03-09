@@ -406,3 +406,13 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         ranges.sort(key=lambda x: x[0])
         return ranges
+
+    def _get_tzinfo_from_geography(geography_dim):
+        """Get tzinfo from time_zone column of geography dimension record"""
+        # TODO assign it to use
+        geo_records = geography_dim.get_records_dataframe()
+        geo_tz_values = [
+            row.time_zone for row in geo_records.select("time_zone").distinct().collect()
+        ]
+        geo_tzinfos = [TimeZone(tz).tz for tz in geo_tz_values]
+        return geo_tzinfos

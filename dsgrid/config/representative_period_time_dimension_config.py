@@ -91,8 +91,18 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         assert "time_zone" in df.columns, df.columns
         geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
         assert geo_tz_values
-        geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
-        assert geo_tz_names
+        geo_tz_to_map = [TimeZone(tz) for tz in geo_tz_values]
+        # if self.model.timezone == TimeZone.LOCAL_PREVAILING:
+        #     # this means map hourly data according to local clock time
+        #     # ensure that there are at least some prevailing time
+        #     prevailing_tz = [tz.is_prevailing() for tz in geo_tz_to_map]
+        #     if prevailing_tz.sum() == 0:
+        #         raise ValueError(f"dataset time is in {self.model.timezone}, expecting geography dimension "
+        #                          "time_zone to be in local prevailing time, but all are in standard time.")
+        # if self.model.timezone == TimeZone.LOCAL_STANDARD:
+        #     # this means map hourly data according to local standard time
+        #     geo_tz_to_map = [tz.get_standard_time() for tz in geo_tz_to_map]
+        geo_tz_to_map = [tz.tz_name for tz in geo_tz_to_map]  # covert to tz_name
 
         # create time map
         # temporarily set session time to UTC for timeinfo extraction
@@ -121,7 +131,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                 new_time_column=map_time,
             )
 
-            for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
+            for tz_value, tz_name in zip(geo_tz_values, geo_tz_to_map):
                 local_time_df = project_time_df.withColumn(
                     "time_zone", F.lit(tz_value)
                 ).withColumn(
@@ -172,8 +182,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         return self._format_handler.get_load_data_time_columns()
 
     def get_tzinfo(self):
-        # TBD
-        return None
+        return None  # self.model.timezone.tz
 
     def get_time_interval_type(self):
         return self.model.time_interval_type

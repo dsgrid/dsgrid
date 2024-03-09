@@ -14,6 +14,7 @@ class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
+    INDEXED = "indexed"
     NOOP = "noop"
 
 
@@ -41,17 +42,41 @@ class LeapDayAdjustmentType(DSGEnum):
 
     DROP_DEC31 = EnumValue(
         value="drop_dec31",
-        description="To adjust for leap years, December 31st gets dropped",
+        description="To adjust for leap years, December 31st timestamps and data get dropped.",
     )
     DROP_FEB29 = EnumValue(
         value="drop_feb29",
-        description="Feburary 29th is dropped. Currently not yet supported by dsgrid.",
+        description="Feburary 29th timestamps and data are dropped. Currently not yet supported by dsgrid.",
     )
     DROP_JAN1 = EnumValue(
         value="drop_jan1",
-        description="To adjust for leap years, January 1st gets dropped",
+        description="To adjust for leap years, January 1st timestamps and data get dropped.",
     )
     NONE = EnumValue(value="none", description="No leap day adjustment made.")
+
+
+class DaylightSavingSpringForwardType(DSGEnum):
+    """Daylight saving spring forward adjustment enum types"""
+
+    DROP = EnumValue(
+        value="drop",
+        description="Drop timestamp(s) and associated data for the spring forward hour (2AM in March)",
+    )
+    NONE = EnumValue(value="none", description="No daylight saving adjustment for data.")
+
+
+class DaylightSavingFallBackType(DSGEnum):
+    """Daylight saving fall back adjustment enum types"""
+
+    INTERPOLATE = EnumValue(
+        value="interpolate",
+        description="Fill data by interpolating between the left and right edges of the dataframe.",
+    )
+    DUPLICATE = EnumValue(
+        value="duplicate",
+        description="Fill data by duplicating the fall-back hour (2AM in November)",
+    )
+    NONE = EnumValue(value="none", description="No daylight saving adjustment for data.")
 
 
 class TimeIntervalType(DSGEnum):
@@ -185,6 +210,18 @@ class TimeZone(DSGEnum):
         tz=ZoneInfo("US/Eastern"),
         tz_name="US/Eastern",
     )
+    LOCAL_PREVAILING = EnumValue(
+        value="LocalPrevailing",
+        description="Local Prevailing Time. Clock time local to the geography dimension of the dataset",
+        tz=None,
+        tz_name="LocalPrevailing",
+    )
+    LOCAL_STANDARD = EnumValue(
+        value="LocalStandard",
+        description="Local Standard Time. Standard time local to the geography dimension of the dataset",
+        tz=None,
+        tz_name="LocalStandard",
+    )
 
     def get_standard_time(self):
         """get equivalent standard time"""
@@ -202,6 +239,8 @@ class TimeZone(DSGEnum):
             return TimeZone.CST
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EST
+        if self in [TimeZone.LOCAL_STANDARD, TimeZone.LOCAL_PREVAILING]:
+            return TimeZone.LOCAL_STANDARD
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def get_prevailing_time(self):
@@ -220,6 +259,8 @@ class TimeZone(DSGEnum):
             return TimeZone.CPT
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EPT
+        if self in [TimeZone.LOCAL_STANDARD, TimeZone.LOCAL_PREVAILING]:
+            return TimeZone.LOCAL_PREVAILING
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def is_standard(self):
@@ -231,13 +272,21 @@ class TimeZone(DSGEnum):
             TimeZone.MST,
             TimeZone.CST,
             TimeZone.EST,
+            TimeZone.LOCAL_STANDARD,
         ]
         if self in lst:
             return True
         return False
 
     def is_prevailing(self):
-        lst = [TimeZone.APT, TimeZone.PPT, TimeZone.MPT, TimeZone.CPT, TimeZone.EPT]
+        lst = [
+            TimeZone.APT,
+            TimeZone.PPT,
+            TimeZone.MPT,
+            TimeZone.CPT,
+            TimeZone.EPT,
+            TimeZone.LOCAL_PREVAILING,
+        ]
         if self in lst:
             return True
         return False

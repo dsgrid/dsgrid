@@ -535,8 +535,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df.drop("fraction")
 
     def _convert_time_before_project_mapping(self):
-        # The only expected case for this returning True is representative time with a custom
-        # geography.
         time_dim = self._config.get_dimension(DimensionType.TIME)
         val = (
             time_dim.model.is_time_zone_required_in_geography()

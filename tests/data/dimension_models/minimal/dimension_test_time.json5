@@ -1,6 +1,6 @@
 {
   dimensions: [
-    { // #[1] 8760
+    { // #[0] 8760
       type: "time",
       class_name: "Time",
       time_type: "datetime",
@@ -19,7 +19,7 @@
       timezone: "EasternStandard",
       measurement_type: "total",
     },
-    { // #[2] # daily
+    { // #[1] # daily
       type: "time",
       class_name: "Time",
       time_type: "datetime",
@@ -38,7 +38,7 @@
       timezone: "UTC",
       measurement_type: "total",
     },
-    { // #[3]
+    { // #[2]
       type: "time",
       class_name: "Time",
       time_type: "datetime",
@@ -55,10 +55,10 @@
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
       timezone: "EasternPrevailing",
-      leap_day_adjustment: "none",
+      data_adjustment: {leap_day_adjustment: "none"},
       measurement_type: "max",
     },
-    { // #[4]
+    { // #[3]
       type: "time",
       class_name: "AnnualTime",
       time_type: "annual",
@@ -76,7 +76,7 @@
       include_leap_day: true,
       measurement_type: "mean",
     },
-    { // #[5]
+    { // #[4]
       "class": "Time",
       type: "time",
       name: "Time of Week by Month",
@@ -92,6 +92,39 @@
       measurement_type: "total",
       format: "one_week_per_month_by_hour",
       description: "TEMPO Time - Month (representing seasons), day of week, and hour of day.",
+    },
+    { // #[5]
+      "class": "Time",
+      type: "time",
+      name: "Local-time-2022-indexed",
+      display_name: "time",
+      time_type: "indexed",
+      index_ranges: [
+	      {
+          start: 0,
+          end: 8759,
+	        interval: 1,
+        },
+      ],
+      ranges: [
+        {
+          start: "2018-01-01 00:00:00",
+          end: "2018-12-31 23:00:00",
+        },
+      ],
+      str_format: "%Y-%m-%d %H:%M:%S",
+      frequency: "P0DT1H0M0.000000S",
+      timezone: "LocalStandard",
+      time_interval_type: "period_ending",
+      measurement_type: "total",
+      data_adjustment: {
+        daylight_saving_adjustment:
+          {
+            spring_forward_hour: "drop",
+            fall_back_hour: "interpolate",
+          },
+      },
+      description: "Industrial time, indexed, stitched from representative diurnal profiles in county local standard time, data and timestamps need adjustment to local prevailing time",
     },
   ],
 }

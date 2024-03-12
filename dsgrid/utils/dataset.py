@@ -216,7 +216,7 @@ def repartition_if_needed_by_mapping(
     mapping_type: DimensionMappingType,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
-    """Repartition the dataframe if the mapping will cause data skew."""
+    """Repartition the dataframe if the mapping might cause data skew."""
     # We experienced an issue with the DECARB buildings dataset where the disaggregation of
     # region to county caused a major issue where one Spark executor thread got stuck,
     # seemingly indefinitely. A message like this was repeated continually.

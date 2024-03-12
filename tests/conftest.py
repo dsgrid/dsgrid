@@ -80,14 +80,6 @@ def _get_latest_commit():
     return commit
 
 
-@pytest.fixture(scope="module")
-def setup_api_server():
-    yield
-    for path in (os.environ["DSGRID_QUERY_OUTPUT_DIR"], os.environ["DSGRID_API_SERVER_STORE_DIR"]):
-        if os.path.exists(path):
-            shutil.rmtree(path)
-
-
 @pytest.fixture
 def spark_session():
     spark = init_spark("dsgrid_test")

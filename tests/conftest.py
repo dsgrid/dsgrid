@@ -10,7 +10,7 @@ import pytest
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.utils.files import load_data
 from dsgrid.utils.run_command import run_command, check_run_command
-from dsgrid.utils.spark import init_spark
+from dsgrid.utils.spark import init_spark, get_spark_session
 from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
     TEST_PROJECT_PATH,
@@ -155,3 +155,12 @@ def tmp_registry_db(make_test_project_dir, tmp_path):
     RegistryDatabase.delete(conn)
     yield make_test_project_dir, tmp_path, database_name
     RegistryDatabase.delete(conn)
+
+
+@pytest.fixture
+def spark_time_zone(request):
+    spark = get_spark_session()
+    orig = spark.conf.get("spark.sql.session.timeZone")
+    spark.conf.set("spark.sql.session.timeZone", request.param)
+    yield
+    spark.conf.set("spark.sql.session.timeZone", orig)

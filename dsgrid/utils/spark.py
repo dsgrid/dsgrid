@@ -632,7 +632,6 @@ def create_dataframe_from_product(
         if not f_out.closed:
             f_out.close()
 
-    context.add_tracked_path(csv_dir)
     spark = get_spark_session()
     df = spark.read.csv(str(csv_dir), header=False, schema=schema)
     return df

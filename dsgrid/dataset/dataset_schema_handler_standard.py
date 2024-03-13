@@ -74,6 +74,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             # There is currently no case that needs model years or value columns.
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
+        # TODO: This might need to handle data skew in the future.
         null_lk_df = self._remap_dimension_columns(null_lk_df, False)
         ld_df = self._remap_dimension_columns(ld_df, True)
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
@@ -115,7 +116,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         ld_df = self._remap_dimension_columns(
-            ld_df, True, filtered_records=context.get_record_ids()
+            ld_df,
+            True,
+            filtered_records=context.get_record_ids(),
+            handle_data_skew=True,
+            scratch_dir_context=context.scratch_dir_context,
         )
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
         if "scaling_factor" in ld_df.columns:

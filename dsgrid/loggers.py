@@ -60,7 +60,7 @@ def setup_logging(
             },
         },
         "loggers": {
-            name: {"handlers": ["console", "file"], "level": "DEBUG", "propagate": False},
+            name: {"handlers": ["console", "file"], "level": "DEBUG", "propagate": True},
         },
     }
 
@@ -71,7 +71,7 @@ def setup_logging(
         log_config["loggers"][package] = {
             "handlers": ["console"],
             "level": "DEBUG",
-            "propagate": False,
+            "propagate": True,
         }
         if filename is not None:
             log_config["loggers"][package]["handlers"].append("file")

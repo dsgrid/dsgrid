@@ -1,7 +1,7 @@
 import abc
 import logging
 import os
-from typing import Union
+from typing import Optional, Union
 
 from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
@@ -9,7 +9,9 @@ import pyspark.sql.functions as F
 import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
+from dsgrid.config.dimension_mapping_base import (
+    DimensionMappingReferenceModel,
+)
 from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
@@ -24,7 +26,9 @@ from dsgrid.utils.dataset import (
     map_and_reduce_pivoted_dimension,
     add_time_zone,
     ordered_subset_columns,
+    repartition_if_needed_by_mapping,
 )
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
@@ -445,7 +449,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
         df: DataFrame,
         contains_values: bool,
         filtered_records: None | dict = None,
+        handle_data_skew=False,
+        scratch_dir_context: Optional[ScratchDirContext] = None,
     ) -> DataFrame:
+        if handle_data_skew and scratch_dir_context is None:
+            msg = "Bug: conflicting inputs: handle_data_skew requires a scratch_dir_context"
+            raise Exception(msg)
+
         pivoted_dim_type = self._config.get_pivoted_dimension_type()
         pivoted_columns = set(df.columns).intersection(
             self._config.get_pivoted_dimension_columns()
@@ -455,6 +465,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
             column = dim_type.value
             mapping_config = self._dimension_mapping_mgr.get_by_id(
                 ref.mapping_id, version=ref.version
+            )
+            logger.info(
+                "Mapping dimension type %s mapping_type=%s",
+                dim_type,
+                mapping_config.model.mapping_type,
             )
             records = mapping_config.get_records_dataframe()
             if filtered_records is not None and dim_type in filtered_records:
@@ -467,6 +482,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 continue
             if column in df.columns:
                 df = map_and_reduce_stacked_dimension(df, records, column)
+                if handle_data_skew:
+                    df = repartition_if_needed_by_mapping(
+                        df,
+                        mapping_config.model.mapping_type,
+                        scratch_dir_context,
+                    )
             elif (
                 contains_values
                 and pivoted_dim_type is not None

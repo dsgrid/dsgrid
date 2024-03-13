@@ -9,7 +9,7 @@ class ScratchDirContext:
 
     def __init__(self, scratch_dir: Path):
         self._scratch_dir = scratch_dir
-        self._paths: list[Path] = []
+        self._paths: set[Path] = set()
         if not self._scratch_dir.exists():
             self._scratch_dir.mkdir()
 
@@ -20,13 +20,13 @@ class ScratchDirContext:
 
     def add_tracked_path(self, path: Path) -> None:
         """Add tracking of a path in the scratch directory."""
-        self._paths.append(path)
+        self._paths.add(path)
 
     def list_tracked_paths(self) -> list[Path]:
         """Return a list of paths being tracked."""
-        return self._paths[:]
+        return list(self._paths)
 
-    def get_temp_filename(self, prefix=None, suffix=None) -> Path:
+    def get_temp_filename(self, prefix=None, suffix=None, add_tracked_path=True) -> Path:
         """Return a temporary filename based in the scratch directory.
 
         Parameters
@@ -35,8 +35,13 @@ class ScratchDirContext:
             Forwarded to NamedTemporaryFile.
         suffix : str | None
             Forwarded to NamedTemporaryFile.
+        add_tracked_path : bool
+            If True, add tracking of the path
         """
         with NamedTemporaryFile(dir=self._scratch_dir, prefix=prefix, suffix=suffix) as f:
+            path = Path(f.name)
+            if add_tracked_path:
+                self._paths.add(path)
             return Path(f.name)
 
     def finalize(self) -> None:

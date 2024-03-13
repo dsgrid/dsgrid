@@ -7,19 +7,19 @@ from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
 
 from dsgrid.common import SCALING_FACTOR_COLUMN
+from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
-from dsgrid.utils.spark import check_for_nulls
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.utils.spark import check_for_nulls, read_parquet
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
 
 
-@track_timing(timer_stats_collector)
 def map_and_reduce_stacked_dimension(df, records, column):
     if "fraction" not in df.columns:
         df = df.withColumn("fraction", F.lit(1.0))
     # map and consolidate from_fraction only
-    # TODO: can remove this if we do it at registration time
     records = records.filter("to_id IS NOT NULL")
 
     df = (
@@ -27,7 +27,7 @@ def map_and_reduce_stacked_dimension(df, records, column):
         .drop("from_id")
         .drop(column)
         .withColumnRenamed("to_id", column)
-    ).filter(f"{column} IS NOT NULL")
+    )
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
     df = df.fillna(1.0, subset=["from_fraction"]).selectExpr(
         *nonfraction_cols, "fraction*from_fraction AS fraction"
@@ -208,3 +208,52 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
         .filter(f"{time_column} IS NOT NULL or count_time == 0")
         .select(orig_columns)
     )
+
+
+@track_timing(timer_stats_collector)
+def repartition_if_needed_by_mapping(
+    df: DataFrame,
+    mapping_type: DimensionMappingType,
+    scratch_dir_context: ScratchDirContext,
+) -> DataFrame:
+    """Repartition the dataframe if the mapping might cause data skew."""
+    # We experienced an issue with the DECARB buildings dataset where the disaggregation of
+    # region to county caused a major issue where one Spark executor thread got stuck,
+    # seemingly indefinitely. A message like this was repeated continually.
+    # UnsafeExternalSorter: Thread 152 spilling sort data of 4.0 GiB to disk (0  time so far)
+    # It appears to be caused by data skew, though the imbalance didn't seem too severe.
+    # Using a variation of what online sources call a "salting technique" solves the issue.
+    # Apply the technique to mappings that will cause an explosion of rows.
+    # Note that this probably isn't needed in all cases and we may need to adjust in the
+    # future.
+    # The case with buildings was particularly severe because it is an unpivoted dataset.
+
+    # Note: log messages below are checked in the tests.
+    if mapping_type in {
+        DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
+        # These cases might be problematic in the future.
+        # DimensionMappingType.ONE_TO_MANY_ASSIGNMENT,
+        # DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS,
+        # DimensionMappingType.MANY_TO_MANY_DISAGGREGATION,
+        # This is usually happening with scenario and hasn't caused a problem.
+        # DimensionMappingType.DUPLICATION,
+    }:
+        if os.environ.get("DSGRID_SKIP_MAPPING_SKEW_REPARTITION", "false").lower() == "true":
+            logger.info("DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true; skip repartitions")
+            return df
+
+        filename = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        # Salting techniques online talk about adding or modifying a column with random values.
+        # We might be able to use one of our value columns. However, there are cases where there
+        # could be many instances of zero or null. So, add a new column with random values.
+        logger.info("Repartition after mapping %s", mapping_type)
+        salted_column = "salted_key"
+        df.withColumn(salted_column, F.rand()).repartition(salted_column).write.parquet(
+            str(filename)
+        )
+        df = read_parquet(filename).drop(salted_column)
+        logger.info("Completed repartition.")
+    else:
+        logger.debug("Repartition is not needed for mapping_type %s", mapping_type)
+
+    return df

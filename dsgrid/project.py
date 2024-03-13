@@ -268,6 +268,10 @@ class Project:
         record_ids = {}
         for dim_filter in context.model.project.dataset.params.dimension_filters:
             dim_type = dim_filter.dimension_type
+            if dim_type == DimensionType.TIME:
+                # TODO #196
+                # This needs to handled by the dataset handler function _prefilter_time_dimension
+                raise NotImplementedError("Pre-filtering time is not supported yet")
             if isinstance(dim_filter, SubsetDimensionFilterModel):
                 df = dim_filter.get_filtered_records_dataframe(self._config.get_dimension).select(
                     "id"

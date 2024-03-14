@@ -127,11 +127,13 @@ IPython
     $ export PYSPARK_DRIVER_PYTHON=ipython
 
 Local mode:
+
 .. code-block:: console
 
     $ pyspark
 
 Cluster mode:
+
 .. code-block:: console
 
     $ pyspark --master=spark://$(hostname):7077
@@ -146,11 +148,13 @@ Jupyter
     $ export PYSPARK_DRIVER_PYTHON_OPTS="notebook --no-browser --port=8889 --ip=0.0.0.0"
 
 Local mode:
+
 .. code-block:: console
 
     $ pyspark
 
 Cluster mode:
+
 .. code-block:: console
 
     $ pyspark --master=spark://$(hostname):7077
@@ -297,6 +301,7 @@ calls out choices that you should make to run Spark jobs with dsgrid.
     $ git clone https://github.com/NREL/HPC.git
 
 2. Choose compute node(s) with fast local storage. This example will allocate one node.
+
 .. code-block:: console
 
     $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G

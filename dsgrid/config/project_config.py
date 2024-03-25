@@ -395,6 +395,10 @@ class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
     subset: list[RequiredSubsetDimensionRecordsModel] = []
     supplemental: list[RequiredSupplementalDimensionRecordsModel] = []
 
+    def defines_dimension_requirement(self) -> bool:
+        """Returns True if the model defines a dimension requirement."""
+        return bool(self.base) or bool(self.subset) or bool(self.supplemental)
+
 
 class RequiredDimensionRecordsModel(DSGBaseModel):
 
@@ -413,8 +417,8 @@ class RequiredDimensionRecordsModel(DSGBaseModel):
 
 class RequiredDimensionsModel(DSGBaseModel):
     """Defines required record IDs that must exist for each dimension in a dataset.
-    Record IDs can reside in the project's base or supplemental dimensions. Using supplemental
-    dimensions is recommended. dsgrid will substitute base records for mapped supplemental records
+    Record IDs can reside in the project's base, subset, or supplemental dimensions. Using subset
+    dimensions is recommended. dsgrid will substitute base records for mapped subset records
     at runtime. If no records are listed for a dimension then all project base records are
     required.
     """
@@ -438,34 +442,31 @@ class RequiredDimensionsModel(DSGBaseModel):
 
     @model_validator(mode="after")
     def check_for_duplicates(self) -> "RequiredDimensionsModel":
-        existing = set()
+        single_dimensional = set()
+
         for field in RequiredDimensionRecordsModel.model_fields:
             req = getattr(self.single_dimensional, field)
-            existing.update(req.base)
-            for supp in req.supplemental:
-                existing.update(supp.record_ids)
+            if req.defines_dimension_requirement():
+                single_dimensional.add(field)
 
         for item in self.multi_dimensional:
             num_dims = 0
             for field in RequiredDimensionRecordsModel.model_fields:
                 req = getattr(item, field)
-                num_dims += len(req.base)
-                record_ids = set(req.base)
-                for supp in req.supplemental:
-                    num_dims += len(supp.record_ids)
-                    record_ids.update(supp.record_ids)
-                num_dims += len(req.subset)
-                for subset in req.subset:
-                    record_ids.update(subset.selectors)
-                intersect = existing.intersection(record_ids)
-                if intersect:
-                    raise ValueError(
-                        f"dimensions cannot be defined in both single_dimensional and multi_dimensional: {intersect}"
-                    )
+                if req.base or req.subset or req.supplemental:
+                    if field in single_dimensional:
+                        msg = (
+                            "dimensions cannot be defined in both single_dimensional and "
+                            f"multi_dimensional sections: {field}"
+                        )
+                        raise ValueError(msg)
+                    num_dims += 1
             if num_dims < 2:
-                raise ValueError(
-                    f"A multi_dimensional dimension requirement must contain at least two dimensions: {item}"
+                msg = (
+                    "A multi_dimensional dimension requirement must contain at least two "
+                    f"dimensions: {item}"
                 )
+                raise ValueError(msg)
 
         return self
 
@@ -1132,18 +1133,30 @@ class ProjectConfig(ConfigBase):
         # ]
         # This code will replace supplemental records with base records and return a list of
         # dataframes of those combinations - one per unique combination of dimensions.
+
+        needed_base_dimension_records = _get_needed_base_dimensions(multi_dim_reqs)
         for multi_req in multi_dim_reqs:
             dim_combo = []
             columns = {}
-            for field in RequiredDimensionRecordsModel.model_fields:
+            for field in sorted(RequiredDimensionRecordsModel.model_fields):
                 dim_type = DimensionType(field)
                 req = getattr(multi_req, field)
+                if req.base and field in needed_base_dimension_records:
+                    msg = f"Bug: {field=} {req.base=} {needed_base_dimension_records[field]}"
+                    raise Exception(msg)
                 record_ids = set(req.base)
                 record_ids.update(self._get_required_record_ids_from_subsets(req))
                 record_ids.update(self._get_required_record_ids_from_supplementals(req, dim_type))
-                dim_combo.append(dim_type.value)
                 if record_ids:
                     columns[field] = list(record_ids)
+                    dim_combo.append(dim_type.value)
+            key = tuple(dim_combo)
+            if key in needed_base_dimension_records:
+                for field in needed_base_dimension_records[key]:
+                    dim_type = DimensionType(field)
+                    columns[field] = list(self.get_base_dimension(dim_type).get_unique_ids())
+                    dim_combo.append(field)
+
             df = create_dataframe_from_product(columns, context)
             df = df.select(*sorted(df.columns))
 
@@ -1176,7 +1189,8 @@ class ProjectConfig(ConfigBase):
                     if dim.model.name == selector_name:
                         return dim.get_unique_ids()
 
-        raise DSGInvalidDimension(f"subset dimension selector not found: {name=} {selector_name=}")
+        msg = f"subset dimension selector not found: {name=} {selector_name=}"
+        raise DSGInvalidDimension(msg)
 
     def _get_required_record_ids_from_subsets(self, req: RequiredDimensionRecordsByTypeModel):
         record_ids = set()
@@ -1316,6 +1330,36 @@ class ProjectConfig(ConfigBase):
 
         """
         return self._supplemental_dimensions
+
+
+def _get_needed_base_dimensions(
+    multi_dim_reqs: list[RequiredDimensionRecordsModel],
+) -> dict[tuple[str, ...], tuple[str, ...]]:
+    """Returns a dictionary that informs the caller about which base dimension records need to
+    be added to each multi-dimensional requirement.
+
+    If there is partial overlap in dimension type across multi-dimensional requirements then
+    all missing dimensions require the base dimension records.
+    """
+    combos = set()
+    for multi_req in multi_dim_reqs:
+        dimensions = []
+        for field in sorted(RequiredDimensionRecordsModel.model_fields):
+            req = getattr(multi_req, field)
+            if req.defines_dimension_requirement():
+                dimensions.append(field)
+        combos.add(tuple(dimensions))
+
+    needed_base_dimension_records = {}
+    for combo in combos:
+        set_combo = set(combo)
+        for other in combos:
+            if combo is not other and set_combo.intersection(other):
+                set_combo.update(other)
+        if len(set_combo) > len(combo):
+            needed_base_dimension_records[combo] = tuple(sorted((set_combo.difference(combo))))
+
+    return needed_base_dimension_records
 
 
 def load_subset_dimensions(filename: Path) -> tuple[set[str], dict[str, list[str]]]:

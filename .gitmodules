@@ -9,4 +9,4 @@
 [submodule "dsgrid-project-DECARB"]
 	path = dsgrid-project-DECARB
 	url = https://github.com/dsgrid/dsgrid-project-DECARB
-	branch = main
+	branch = dt/multi-dim-requirements

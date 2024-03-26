@@ -449,24 +449,36 @@ class RequiredDimensionsModel(DSGBaseModel):
             if req.defines_dimension_requirement():
                 single_dimensional.add(field)
 
+        dim_combos = set()
         for item in self.multi_dimensional:
-            num_dims = 0
+            dims = []
             for field in RequiredDimensionRecordsModel.model_fields:
                 req = getattr(item, field)
-                if req.base or req.subset or req.supplemental:
+                if req.defines_dimension_requirement():
                     if field in single_dimensional:
                         msg = (
                             "dimensions cannot be defined in both single_dimensional and "
                             f"multi_dimensional sections: {field}"
                         )
                         raise ValueError(msg)
-                    num_dims += 1
-            if num_dims < 2:
+                    dims.append(field)
+            if len(dims) < 2:
                 msg = (
                     "A multi_dimensional dimension requirement must contain at least two "
                     f"dimensions: {item}"
                 )
                 raise ValueError(msg)
+            dim_combo = tuple(sorted(dims))
+            if dim_combo not in dim_combos:
+                for other in dim_combos:
+                    if set(dim_combo).intersection(other):
+                        msg = (
+                            "All descriptors in the multi-dimensional requirements with an "
+                            "intersection of dimensions must have a full intersection. "
+                            f"dimension_set1 = {other} dimension_set2 = {dim_combo}"
+                        )
+                        raise ValueError(msg)
+            dim_combos.add(dim_combo)
 
         return self
 
@@ -1134,28 +1146,22 @@ class ProjectConfig(ConfigBase):
         # This code will replace supplemental records with base records and return a list of
         # dataframes of those combinations - one per unique combination of dimensions.
 
-        needed_base_dimension_records = _get_needed_base_dimensions(multi_dim_reqs)
         for multi_req in multi_dim_reqs:
             dim_combo = []
             columns = {}
             for field in sorted(RequiredDimensionRecordsModel.model_fields):
                 dim_type = DimensionType(field)
                 req = getattr(multi_req, field)
-                if req.base and field in needed_base_dimension_records:
-                    msg = f"Bug: {field=} {req.base=} {needed_base_dimension_records[field]}"
-                    raise Exception(msg)
-                record_ids = set(req.base)
+                record_ids = (
+                    self.get_base_dimension(dim_type).get_unique_ids()
+                    if req.base == ["__all__"]
+                    else set(req.base)
+                )
                 record_ids.update(self._get_required_record_ids_from_subsets(req))
                 record_ids.update(self._get_required_record_ids_from_supplementals(req, dim_type))
                 if record_ids:
                     columns[field] = list(record_ids)
                     dim_combo.append(dim_type.value)
-            key = tuple(dim_combo)
-            if key in needed_base_dimension_records:
-                for field in needed_base_dimension_records[key]:
-                    dim_type = DimensionType(field)
-                    columns[field] = list(self.get_base_dimension(dim_type).get_unique_ids())
-                    dim_combo.append(field)
 
             df = create_dataframe_from_product(columns, context)
             df = df.select(*sorted(df.columns))
@@ -1330,36 +1336,6 @@ class ProjectConfig(ConfigBase):
 
         """
         return self._supplemental_dimensions
-
-
-def _get_needed_base_dimensions(
-    multi_dim_reqs: list[RequiredDimensionRecordsModel],
-) -> dict[tuple[str, ...], tuple[str, ...]]:
-    """Returns a dictionary that informs the caller about which base dimension records need to
-    be added to each multi-dimensional requirement.
-
-    If there is partial overlap in dimension type across multi-dimensional requirements then
-    all missing dimensions require the base dimension records.
-    """
-    combos = set()
-    for multi_req in multi_dim_reqs:
-        dimensions = []
-        for field in sorted(RequiredDimensionRecordsModel.model_fields):
-            req = getattr(multi_req, field)
-            if req.defines_dimension_requirement():
-                dimensions.append(field)
-        combos.add(tuple(dimensions))
-
-    needed_base_dimension_records = {}
-    for combo in combos:
-        set_combo = set(combo)
-        for other in combos:
-            if combo is not other and set_combo.intersection(other):
-                set_combo.update(other)
-        if len(set_combo) > len(combo):
-            needed_base_dimension_records[combo] = tuple(sorted((set_combo.difference(combo))))
-
-    return needed_base_dimension_records
 
 
 def load_subset_dimensions(filename: Path) -> tuple[set[str], dict[str, list[str]]]:

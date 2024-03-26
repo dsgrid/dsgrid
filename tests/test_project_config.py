@@ -11,7 +11,6 @@ from dsgrid.config.project_config import (
     ProjectDimensionQueryNamesModel,
     RequiredDimensionsModel,
     RequiredDimensionRecordsModel,
-    _get_needed_base_dimensions,
 )
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
@@ -110,7 +109,7 @@ def test_duplicate_dimension_requirements():
         )
 
 
-def test_invalid_multi_dimensional_requirement():
+def test_invalid_multi_dimensional_requirement_too_few():
     single_dim_data = {"subsector": {"base": ["subsectors"]}}
     multi_dim_data = [{"metric": {"base": ["electricity_ev_ldv_home_l1"]}}]
     with pytest.raises(ValueError, match="at least two"):
@@ -120,51 +119,21 @@ def test_invalid_multi_dimensional_requirement():
         )
 
 
-def test_get_needed_base_dimensions():
-    data = [
+def test_invalid_multi_dimensional_requirement_partial_intersection():
+    single_dim_data = {"sector": {"base": ["sector1"]}}
+    multi_dim_data = [
         {
-            "subsector": {
-                "base": ["bev_compact"],
-            },
-            "metric": {
-                "base": ["electricity_ev_ldv_home_l1"],
-            },
-            "model_year": {
-                "base": ["2028", "2030", "2035"],
-            },
+            "metric": {"base": ["metric1"]},
+            "subsector": {"base": ["subsector1"]},
         },
         {
-            "metric": {
-                "base": ["electricity_ev_mhdv_depot_ac", "electricity_ev_mhdv_depot_dc"],
-            },
-            "subsector": {
-                "base": ["bev_light_medium_truck", "bev_medium_truck"],
-            },
-        },
-        {
-            "subsector": {
-                "base": ["rail_transit"],
-            },
-            "metric": {
-                "base": ["electricity_rail_transit"],
-            },
-            "geography": {"base": ["04013", "04019", "05119", "06001"]},
-        },
-        {
-            "sector": {
-                "subset": [{"name": "test", "selectors": ["transportation_sectors"]}],
-            },
-            "scenario": {
-                "base": ["high"],
-            },
+            "metric": {"base": ["metric2"]},
+            "subsector": {"base": ["subsector2"]},
+            "geography": {"base": ["geography1"]},
         },
     ]
-    models = [RequiredDimensionRecordsModel(**x) for x in data]
-    res = _get_needed_base_dimensions(models)
-    assert res.get(("metric", "subsector")) == (
-        "geography",
-        "model_year",
-    )
-    assert res.get(("metric", "model_year", "subsector")) == ("geography",)
-    assert res.get(("geography", "metric", "subsector")) == ("model_year",)
-    assert ("scenario", "sector") not in res
+    with pytest.raises(ValueError, match="must have a full intersection"):
+        RequiredDimensionsModel(
+            single_dimensional=RequiredDimensionRecordsModel(**single_dim_data),
+            multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
+        )

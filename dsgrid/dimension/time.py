@@ -29,6 +29,11 @@ class RepresentativePeriodFormat(DSGEnum):
         frequency=datetime.timedelta(hours=1),
         description="load_data columns use 'month', 'day_of_week', 'hour' to specify time",
     )
+    ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR = EnumValue(
+        value="one_weekday_day_and_one_weekend_day_per_month_by_hour",
+        frequency=datetime.timedelta(hours=1),
+        description="load_data columns use 'month', 'hour', 'is_weekday' to specify time",
+    )
 
 
 class LeapDayAdjustmentType(DSGEnum):

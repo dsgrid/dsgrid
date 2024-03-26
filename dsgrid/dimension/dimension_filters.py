@@ -278,6 +278,8 @@ class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
                         f"{df.columns} != {records.columns}"
                     )
                 df = df.union(records)
+
+        assert df is not None
         return df
 
 

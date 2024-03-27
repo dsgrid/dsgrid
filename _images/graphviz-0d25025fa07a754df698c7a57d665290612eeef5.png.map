@@ -1,0 +1,38 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.config.project_config.RequiredDimensionRecordsByTypeModel
+
+Base data model for all dsgrid data models
+" alt="" coords="1401,162,2048,274"/>
+<area shape="rect" id="node2" title="dsgrid.config.project_config.RequiredSubsetDimensionRecordsModel
+
+Base data model for all dsgrid data models
+
+Attributes:
+ &#160;&#160;&#160;name (str): Name of a subset dimension
+ &#160;&#160;&#160;selectors (list[str]): One or more selectors in the subset dimension
+" alt="" coords="2229,167,2670,251"/>
+<area shape="rect" id="node3" title="dsgrid.config.project_config.RequiredSupplementalDimensionRecordsModel
+
+Base data model for all dsgrid data models
+
+Attributes:
+ &#160;&#160;&#160;name (str): Name of a supplemental dimension
+ &#160;&#160;&#160;record_ids (list[str]): One or more record IDs in the supplemental dimension
+" alt="" coords="2192,299,2707,383"/>
+<area shape="rect" id="node4" title="dsgrid.config.project_config.RequiredDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="716,49,1257,273"/>
+<area shape="rect" id="node5" title="dsgrid.config.project_config.RequiredDimensionsModel
+
+Defines required record IDs that must exist for each dimension in a dataset.
+Record IDs can reside in the project&#39;s base, subset, or supplemental dimensions. Using subset
+dimensions is recommended. dsgrid will substitute base records for mapped subset records
+at runtime. If no records are listed for a dimension then all project base records are
+required.
+
+Attributes:
+ &#160;&#160;&#160;single_dimensional (RequiredDimensionRecordsModel): Required records for a single dimension. Default is geography=RequiredDimensionRecordsByTypeModel(base=[], subset=[], supplemental=[]) metric=RequiredDimensionRecordsByTypeModel(base=[], subset=[], supplemental=[]) model_year=RequiredDimensionRecordsByTypeModel(base=[], subset=[], supplemental=[]) scenario=RequiredDimensionRecordsByTypeModel(base=[], subset=[], supplemental=[]) sector=RequiredDimensionRecordsByTypeModel(base=[], subset=[], supplemental=[]) subsector=RequiredDimensionRecordsByTypeModel(base=[], subset=[], supplemental=[]) weather_year=RequiredDimensionRecordsByTypeModel(base=[], subset=[], supplemental=[]).
+ &#160;&#160;&#160;multi_dimensional (list[RequiredDimensionRecordsModel]): Required records for a combination of dimensions. For example, there may be a dataset requirement for only one subsector for a given sector instead of a cross product. Default is [].
+" alt="" coords="5,5,572,89"/>
+</map>

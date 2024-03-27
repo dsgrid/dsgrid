@@ -1,0 +1,26 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.config.project_config.RequiredDimensionRecordsByTypeModel
+
+Base data model for all dsgrid data models
+" alt="" coords="691,119,1337,231"/>
+<area shape="rect" id="node2" title="dsgrid.config.project_config.RequiredSubsetDimensionRecordsModel
+
+Base data model for all dsgrid data models
+
+Attributes:
+ &#160;&#160;&#160;name (str): Name of a subset dimension
+ &#160;&#160;&#160;selectors (list[str]): One or more selectors in the subset dimension
+" alt="" coords="1518,123,1959,207"/>
+<area shape="rect" id="node3" title="dsgrid.config.project_config.RequiredSupplementalDimensionRecordsModel
+
+Base data model for all dsgrid data models
+
+Attributes:
+ &#160;&#160;&#160;name (str): Name of a supplemental dimension
+ &#160;&#160;&#160;record_ids (list[str]): One or more record IDs in the supplemental dimension
+" alt="" coords="1481,255,1996,339"/>
+<area shape="rect" id="node4" title="dsgrid.config.project_config.RequiredDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="5,5,547,229"/>
+</map>

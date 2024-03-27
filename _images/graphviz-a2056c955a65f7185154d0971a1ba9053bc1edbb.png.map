@@ -1,0 +1,121 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.dimension.dimension_filters.DimensionFilterBetweenColumnOperatorModel
+
+Filters a table where a dimension column is between the lower bound and upper bound,
+inclusive.
+
+Examples:
+import pyspark.sql.functions as F
+df.filter(F.col(&quot;timestamp&quot;).between(&quot;2012&#45;07&#45;01 00:00:00&quot;, &quot;2012&#45;08&#45;01 00:00:00&quot;))
+
+Attributes:
+ &#160;&#160;&#160;column (str): Column of dimension records to use. Default is &#39;id&#39;.
+ &#160;&#160;&#160;lower_bound (Any): Lower bound, inclusive. Default is None.
+ &#160;&#160;&#160;upper_bound (Any): Upper bound, inclusive. Default is None.
+ &#160;&#160;&#160;negate (bool): Change the filter to match the negation of the value. Default is False.
+" alt="" coords="4590,16,5386,36"/>
+<area shape="rect" id="node2" title="dsgrid.dimension.dimension_filters.DimensionFilterColumnOperatorModel
+
+Filters a table where a dimension column matches a Spark SQL operator.
+
+Examples:
+import pyspark.sql.functions as F
+df.filter(F.col(&quot;geography&quot;).like(&quot;abc%&quot;))
+df.filter(~F.col(&quot;sector&quot;).startswith(&quot;com&quot;))
+
+Attributes:
+ &#160;&#160;&#160;column (str): Column of dimension records to use. Default is &#39;id&#39;.
+ &#160;&#160;&#160;operator (str): Method on pyspark.sql.functions.col to invoke
+ &#160;&#160;&#160;value (Any): Value to filter on. Use a two&#45;element list for the between operator. Default is None.
+ &#160;&#160;&#160;negate (bool): Change the filter to match the negation of the value. Default is False.
+" alt="" coords="4631,84,5345,104"/>
+<area shape="rect" id="node3" title="dsgrid.dimension.dimension_filters.DimensionFilterExpressionModel
+
+Filters a table where a dimension column matches an expression.
+
+Example:
+ &#160;&#160;&#160;DimensionFilterExpressionModel(
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_type=DimensionType.GEOGRAPHY,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_query_name=&quot;county&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;operator=&quot;==&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;value=&quot;06037&quot;,
+ &#160;&#160;&#160;),
+is equivalent to
+ &#160;&#160;&#160;df.filter(&quot;county == &#39;06037&#39;&quot;)
+
+Attributes:
+ &#160;&#160;&#160;column (str): Column of dimension records to use. Default is &#39;id&#39;.
+" alt="" coords="4658,152,5318,172"/>
+<area shape="rect" id="node4" title="dsgrid.dimension.dimension_filters.DimensionFilterExpressionRawModel
+
+Filters a table where a dimension column matches an expression.
+Uses the passed string with no modification.
+
+Example:
+ &#160;&#160;&#160;DimensionFilterExpressionRawModel(
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_type=DimensionType.GEOGRAPHY,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;dimension_query_name=&quot;county&quot;,
+ &#160;&#160;&#160;&#160;&#160;&#160;&#160;value=&quot;== &#39;06037&#39;&quot;,
+ &#160;&#160;&#160;),
+is equivalent to
+ &#160;&#160;&#160;df.filter(&quot;county == &#39;06037&#39;&quot;)
+
+The difference between this class and DimensionFilterExpressionModel is that the latter
+will attempt to add quotes as necessary.
+
+Attributes:
+ &#160;&#160;&#160;column (str): Column of dimension records to use. Default is &#39;id&#39;.
+" alt="" coords="4637,220,5339,240"/>
+<area shape="rect" id="node5" title="dsgrid.dimension.dimension_filters.SubsetDimensionFilterModel
+
+Filters base dimension records that match a subset dimension.
+
+Attributes:
+ &#160;&#160;&#160;column (str): Column of dimension records to use. Default is &#39;id&#39;.
+" alt="" coords="4678,288,5298,308"/>
+<area shape="rect" id="node6" title="dsgrid.dimension.dimension_filters.SupplementalDimensionFilterColumnOperatorModel
+
+Filters base dimension records that have a valid mapping to a supplemental dimension.
+
+Attributes:
+ &#160;&#160;&#160;column (str): Column of dimension records to use. Default is &#39;id&#39;.
+ &#160;&#160;&#160;value (Any): Value to filter on. Default is &#39;%&#39;.
+ &#160;&#160;&#160;operator (str): Method on pyspark.sql.functions.col to invoke. Default is &#39;like&#39;.
+ &#160;&#160;&#160;negate (bool): Filter out valid mappings to this supplemental dimension. Default is False.
+" alt="" coords="4565,356,5411,376"/>
+<area shape="rect" id="node7" title="dsgrid.query.models.DatasetModel
+
+Specifies the datasets to use in a project query.
+
+Attributes:
+ &#160;&#160;&#160;dataset_id (str): Identifier for the resulting dataset
+ &#160;&#160;&#160;source_datasets (List[Union[StandaloneDatasetModel, ProjectionDatasetModel]]): Datasets from which to read. Each must be of type DatasetBaseModel.
+ &#160;&#160;&#160;expression (UnionType[str, NoneType]): Expression to combine datasets. Default is to take a union of all datasets. Default is None.
+ &#160;&#160;&#160;params (ProjectQueryDatasetParamsModel): Parameters affecting datasets. Used for caching intermediate tables. Default is dimension_filters=[].
+" alt="" coords="5,24,779,164"/>
+<area shape="rect" id="node8" title="dsgrid.query.models.ProjectQueryDatasetParamsModel
+
+Parameters in a project query that only apply to datasets
+
+Attributes:
+ &#160;&#160;&#160;dimension_filters (list[Annotated[Union[DimensionFilterExpressionModel, DimensionFilterExpressionRawModel, DimensionFilterColumnOperatorModel, DimensionFilterBetweenColumnOperatorModel, SubsetDimensionFilterModel, SupplementalDimensionFilterColumnOperatorModel], FieldInfo(annotation=NoneType, required=True, discriminator=&#39;filter_type&#39;)]]): Filters to apply to all datasets. Default is [].
+" alt="" coords="923,154,4421,210"/>
+<area shape="rect" id="node9" title="dsgrid.query.models.ProjectionDatasetModel
+
+A dataset with growth rates that can be applied to a standalone dataset.
+
+Attributes:
+ &#160;&#160;&#160;dataset_id (str): Identifier for the resulting dataset
+ &#160;&#160;&#160;initial_value_dataset_id (str): Principal dataset identifier
+ &#160;&#160;&#160;growth_rate_dataset_id (str): Growth rate dataset identifier to apply to the principal dataset
+ &#160;&#160;&#160;construction_method (DatasetConstructionMethod(str, Enum)): Specifier for the code that applies the growth rate to the principal dataset. Default is &#39;exponential_growth&#39;.
+ &#160;&#160;&#160;base_year (Optional[int]): Base year of the dataset to use in growth rate application. Must be a year defined in the principal dataset&#39;s model year dimension. If None, there must be only one model year in that dimension and it will be used. Default is None.
+" alt="" coords="2457,17,2887,37"/>
+<area shape="rect" id="node10" title="dsgrid.query.models.StandaloneDatasetModel
+
+A dataset with energy use data.
+
+Attributes:
+ &#160;&#160;&#160;dataset_id (str): Dataset identifier
+" alt="" coords="2452,85,2892,105"/>
+</map>

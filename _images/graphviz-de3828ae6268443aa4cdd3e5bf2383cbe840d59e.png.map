@@ -1,0 +1,10 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.MonthRangeModel
+
+Defines a continuous range of time.
+
+Attributes:
+ &#160;&#160;&#160;start (int): First month in the data (January is 1, December is 12)
+ &#160;&#160;&#160;end (int): Last month in the data (inclusive)
+" alt="" coords="137,5,348,89"/>
+</map>

@@ -1,0 +1,10 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.TimeRangeModel
+
+Defines a continuous range of time.
+
+Attributes:
+ &#160;&#160;&#160;start (str): First timestamp in the data
+ &#160;&#160;&#160;end (str): Last timestamp in the data (inclusive)
+" alt="" coords="146,5,339,89"/>
+</map>

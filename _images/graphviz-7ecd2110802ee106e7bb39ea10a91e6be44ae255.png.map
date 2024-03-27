@@ -1,0 +1,23 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.query.models.AggregationModel
+
+Aggregate on one or more dimensions.
+
+Attributes:
+ &#160;&#160;&#160;aggregation_function (Any): Must be a function name in pyspark.sql.functions. Default is None.
+ &#160;&#160;&#160;dimensions (DimensionQueryNamesModel): Dimensions on which to aggregate
+" alt="" coords="5,5,509,89"/>
+<area shape="rect" id="node2" title="dsgrid.query.models.DimensionQueryNamesModel
+
+Defines the list of dimensions to which the value columns should be aggregated.
+If a value is empty, that dimension will be aggregated and dropped from the table.
+" alt="" coords="653,63,1084,315"/>
+<area shape="rect" id="node3" title="dsgrid.query.models.ColumnModel
+
+Defines one column in a SQL aggregation statement.
+
+Attributes:
+ &#160;&#160;&#160;function (Optional[Any]): Function or name of function in pyspark.sql.functions. Default is None.
+ &#160;&#160;&#160;alias (Optional[str]): Name of the resulting column. Default is None.
+" alt="" coords="1228,190,1600,302"/>
+</map>

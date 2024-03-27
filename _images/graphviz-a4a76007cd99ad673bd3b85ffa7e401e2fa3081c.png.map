@@ -1,0 +1,11 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.DimensionReferenceModel
+
+Reference to a dimension stored in the registry
+
+Attributes:
+ &#160;&#160;&#160;dimension_type (DimensionType(DSGEnum)): Type of the dimension
+ &#160;&#160;&#160;dimension_id (str): Unique ID of the dimension in the registry
+ &#160;&#160;&#160;version (str): Version of the dimension
+" alt="" coords="29,5,456,117"/>
+</map>

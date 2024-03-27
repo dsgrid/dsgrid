@@ -1,0 +1,10 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.query.models.ColumnModel
+
+Defines one column in a SQL aggregation statement.
+
+Attributes:
+ &#160;&#160;&#160;function (Optional[Any]): Function or name of function in pyspark.sql.functions. Default is None.
+ &#160;&#160;&#160;alias (Optional[str]): Name of the resulting column. Default is None.
+" alt="" coords="57,5,429,117"/>
+</map>

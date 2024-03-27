@@ -1,0 +1,17 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.config.mapping_tables.DatasetBaseToProjectMappingTableModel
+
+Attributes for a dimension mapping table to map soon&#45;to&#45;be&#45;registered dataset base
+dimensions to a project&#39;s dimensions. This will be converted to a MappingTableModel as soon as
+the dimensions are registered.
+
+Attributes:
+ &#160;&#160;&#160;mapping_type (DimensionMappingType(DSGEnum)): Type/purpose of the dimension mapping. Default is &#39;many_to_one_aggregation&#39;.
+ &#160;&#160;&#160;archetype (Optional[DimensionMappingArchetype(DSGEnum)]): Dimension mapping archetype, determined based on mapping_type. Default is None.
+ &#160;&#160;&#160;description (str): Description of dimension mapping
+ &#160;&#160;&#160;from_fraction_tolerance (Optional[float]): Tolerance value to apply to the from_fraction column. Default is 1e&#45;09.
+ &#160;&#160;&#160;to_fraction_tolerance (Optional[float]): Tolerance value to apply to the to_fraction column. Default is 1e&#45;09.
+ &#160;&#160;&#160;dimension_type (DimensionType(DSGEnum)): Dimension types that will be mapped
+ &#160;&#160;&#160;filename (str): Filename containing association table records.
+" alt="" coords="5,5,739,229"/>
+</map>

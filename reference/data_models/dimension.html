@@ -1,0 +1,1193 @@
+<!doctype html>
+<html class="no-js" lang="en" data-content_root="../../">
+  <head><meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="index" title="Index" href="../../genindex.html" /><link rel="search" title="Search" href="../../search.html" /><link rel="next" title="Dimension Mapping Config" href="dimension_mapping.html" /><link rel="prev" title="Dataset Config" href="dataset.html" />
+
+    <!-- Generated with Sphinx 7.2.6 and Furo 2024.01.29 -->
+        <title>Dimension Config - dsgrid 0.1.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=a746c00c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=135e06be" />
+    <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=eafc0fe6" />
+    <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/tabs.css?v=a5c4661c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=36a5483c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/style.css?v=8b3f099a" />
+    
+    
+
+
+<style>
+  body {
+    --color-code-background: #f8f8f8;
+  --color-code-foreground: black;
+  
+  }
+  @media not print {
+    body[data-theme="dark"] {
+      --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+    }
+    @media (prefers-color-scheme: dark) {
+      body:not([data-theme="light"]) {
+        --color-code-background: #202020;
+  --color-code-foreground: #d0d0d0;
+  
+      }
+    }
+  }
+</style></head>
+  <body>
+    
+    <script>
+      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+    </script>
+    
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="svg-toc" viewBox="0 0 24 24">
+    <title>Contents</title>
+    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
+      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
+    </svg>
+  </symbol>
+  <symbol id="svg-menu" viewBox="0 0 24 24">
+    <title>Menu</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
+    <title>Expand</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
+      <polyline points="9 18 15 12 9 6"></polyline>
+    </svg>
+  </symbol>
+  <symbol id="svg-sun" viewBox="0 0 24 24">
+    <title>Light mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
+      <circle cx="12" cy="12" r="5"></circle>
+      <line x1="12" y1="1" x2="12" y2="3"></line>
+      <line x1="12" y1="21" x2="12" y2="23"></line>
+      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+      <line x1="1" y1="12" x2="3" y2="12"></line>
+      <line x1="21" y1="12" x2="23" y2="12"></line>
+      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+    </svg>
+  </symbol>
+  <symbol id="svg-moon" viewBox="0 0 24 24">
+    <title>Dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
+      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
+    </svg>
+  </symbol>
+  <symbol id="svg-sun-half" viewBox="0 0 24 24">
+    <title>Auto light/dark mode</title>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-shadow">
+      <path stroke="none" d="M0 0h24v24H0z" fill="none"/>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M13 12h5" />
+      <path d="M13 15h4" />
+      <path d="M13 18h1" />
+      <path d="M13 9h4" />
+      <path d="M13 6h1" />
+    </svg>
+  </symbol>
+</svg>
+
+<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation">
+<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc">
+<label class="overlay sidebar-overlay" for="__navigation">
+  <div class="visually-hidden">Hide navigation sidebar</div>
+</label>
+<label class="overlay toc-overlay" for="__toc">
+  <div class="visually-hidden">Hide table of contents sidebar</div>
+</label>
+
+
+
+<div class="page">
+  <header class="mobile-header">
+    <div class="header-left">
+      <label class="nav-overlay-icon" for="__navigation">
+        <div class="visually-hidden">Toggle site navigation sidebar</div>
+        <i class="icon"><svg><use href="#svg-menu"></use></svg></i>
+      </label>
+    </div>
+    <div class="header-center">
+      <a href="../../index.html"><div class="brand">dsgrid 0.1.0 documentation</div></a>
+    </div>
+    <div class="header-right">
+      <div class="theme-toggle-container theme-toggle-header">
+        <button class="theme-toggle">
+          <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+          <svg class="theme-icon-when-auto"><use href="#svg-sun-half"></use></svg>
+          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+        </button>
+      </div>
+      <label class="toc-overlay-icon toc-header-icon" for="__toc">
+        <div class="visually-hidden">Toggle table of contents sidebar</div>
+        <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+      </label>
+    </div>
+  </header>
+  <aside class="sidebar-drawer">
+    <div class="sidebar-container">
+      
+      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
+  
+  
+  <span class="sidebar-brand-text">dsgrid 0.1.0 documentation</span>
+  
+</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
+  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
+  <input type="hidden" name="check_keywords" value="yes">
+  <input type="hidden" name="area" value="default">
+</form>
+<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
+  <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../tutorials/index.html">Tutorials</a><input class="toctree-checkbox" id="toctree-checkbox-1" name="toctree-checkbox-1" role="switch" type="checkbox"/><label for="toctree-checkbox-1"><div class="visually-hidden">Toggle navigation of Tutorials</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/create_project.html">Create a Project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/create_and_submit_dataset.html">Create and Submit a Dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/query_project.html">Query a project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../tutorials/create_derived_dataset.html">Create a derived dataset</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../how_tos/index.html">How-To Guides</a><input class="toctree-checkbox" id="toctree-checkbox-2" name="toctree-checkbox-2" role="switch" type="checkbox"/><label for="toctree-checkbox-2"><div class="visually-hidden">Toggle navigation of How-To Guides</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/installation.html">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/browse_registry.html">How to Browse the Registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/create_project_base_dimensions.html">How to create project base dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/create_project_supplemental_dimensions.html">How to create project supplemental dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/create_dataset_dimensions.html">How to create dataset dimensions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/create_derived_dataset.html">How to create a derived dataset</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/query_project.html">How to query a project</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/filter_a_query.html">How to filter a query</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/set_up_standalone_registry.html">How to Set Up a Standalone Registry</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/run_dsgrid_on_kestrel.html">How to run dsgrid on Kestrel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../../how_tos/spark_cluster_on_kestrel.html">How to start a Spark cluster on Kestrel</a></li>
+</ul>
+</li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../explanations/index.html">Explanations</a><input class="toctree-checkbox" id="toctree-checkbox-3" name="toctree-checkbox-3" role="switch" type="checkbox"/><label for="toctree-checkbox-3"><div class="visually-hidden">Toggle navigation of Explanations</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../explanations/components/index.html">Components</a><input class="toctree-checkbox" id="toctree-checkbox-4" name="toctree-checkbox-4" role="switch" type="checkbox"/><label for="toctree-checkbox-4"><div class="visually-hidden">Toggle navigation of Components</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/projects.html">Projects</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/datasets.html">Datasets</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/dimensions.html">Dimensions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/dimension_mappings.html">Dimension Mappings</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../../explanations/components/derived_datasets.html">Derived Datasets</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="../../explanations/queries.html">Queries</a></li>
+</ul>
+</li>
+<li class="toctree-l1 current has-children"><a class="reference internal" href="../index.html">Reference</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-5" name="toctree-checkbox-5" role="switch" type="checkbox"/><label for="toctree-checkbox-5"><div class="visually-hidden">Toggle navigation of Reference</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="../cli_fundamentals.html">CLI Fundamentals</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../cli.html">CLI Reference</a></li>
+<li class="toctree-l2"><a class="reference internal" href="../dataset_formats.html">Dataset Formats</a></li>
+<li class="toctree-l2 current has-children"><a class="reference internal" href="index.html">Data Models</a><input checked="" class="toctree-checkbox" id="toctree-checkbox-6" name="toctree-checkbox-6" role="switch" type="checkbox"/><label for="toctree-checkbox-6"><div class="visually-hidden">Toggle navigation of Data Models</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="project.html">Project Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dataset.html">Dataset Config</a></li>
+<li class="toctree-l3 current current-page"><a class="current reference internal" href="#">Dimension Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="dimension_mapping.html">Dimension Mapping Config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="enums.html">Enums</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../dsgrid_api/index.html">dsgrid API</a><input class="toctree-checkbox" id="toctree-checkbox-7" name="toctree-checkbox-7" role="switch" type="checkbox"/><label for="toctree-checkbox-7"><div class="visually-hidden">Toggle navigation of dsgrid API</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul>
+<li class="toctree-l3"><a class="reference internal" href="../dsgrid_api/registry.html">Registry</a></li>
+<li class="toctree-l3"><a class="reference internal" href="../dsgrid_api/query.html">Query</a></li>
+</ul>
+</li>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../architecture.html">Architecture</a><input class="toctree-checkbox" id="toctree-checkbox-8" name="toctree-checkbox-8" role="switch" type="checkbox"/><label for="toctree-checkbox-8"><div class="visually-hidden">Toggle navigation of Architecture</div><i class="icon"><svg><use href="#svg-arrow-right"></use></svg></i></label><ul class="simple">
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="../../spark_overview.html">Apache Spark</a></li>
+</ul>
+
+</div>
+</div>
+
+      </div>
+      
+    </div>
+  </aside>
+  <div class="main">
+    <div class="content">
+      <div class="article-container">
+        <a href="#" class="back-to-top muted-link">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
+          </svg>
+          <span>Back to top</span>
+        </a>
+        <div class="content-icon-container">
+          
+<div class="theme-toggle-container theme-toggle-content">
+            <button class="theme-toggle">
+              <div class="visually-hidden">Toggle Light / Dark / Auto color theme</div>
+              <svg class="theme-icon-when-auto"><use href="#svg-sun-half"></use></svg>
+              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
+              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
+            </button>
+          </div>
+          <label class="toc-overlay-icon toc-content-icon" for="__toc">
+            <div class="visually-hidden">Toggle table of contents sidebar</div>
+            <i class="icon"><svg><use href="#svg-toc"></use></svg></i>
+          </label>
+        </div>
+        <article role="main">
+          <section id="dimension-config">
+<span id="id1"></span><h1>Dimension Config<a class="headerlink" href="#dimension-config" title="Link to this heading">#</a></h1>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimensions.</span></span><span class="sig-name descname"><span class="pre">DimensionModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DimensionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DimensionModel" title="Link to this definition">#</a></dt>
+<dd><p>Defines a non-time dimension</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>__init__</cite> uses <cite>__pydantic_self__</cite> instead of the more common <cite>self</cite> for the first arg to
+allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-a41be188050e0178253d4584ae87564632f74756.png" alt="digraph &quot;Entity Relationship Diagram&quot; {
+   graph [fontcolor=gray66,
+      fontsize=9,
+      label=&quot;Created by erdantic v0.6.0 &lt;https://github.com/drivendataorg/erdantic&gt;&quot;,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   &quot;dsgrid.config.dimensions.DimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;display_name&lt;/td&gt;&lt;td port=&quot;display_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_query_name&lt;/td&gt;&lt;td port=&quot;dimension_query_name&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Optional[Any]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;key&lt;/td&gt;&lt;td port=&quot;key&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;rev&lt;/td&gt;&lt;td port=&quot;rev&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;filename&lt;/td&gt;&lt;td port=&quot;filename&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;file_hash&lt;/td&gt;&lt;td port=&quot;file_hash&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;records&lt;/td&gt;&lt;td port=&quot;records&quot;&gt;list[]&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DimensionModel&amp;#xA;&amp;#xA;Defines a non-time dimension&amp;#xA;&amp;#xA;Attributes:&amp;#xA;    name (str): Dimension \
+name&amp;#xA;    display_name (str): Display name. Source for auto-generated dimension_query_name.&amp;#xA;    dimension_query_name (Optional[\
+str]): Auto-generated query name for SQL queries. Default is None.&amp;#xA;    dimension_type (DimensionType(DSGEnum)): Type of the \
+dimension&amp;#xA;    dimension_id (Optional[str]): Unique identifier, generated by dsgrid. Default is None.&amp;#xA;    version (Optional[\
+str]): Version, generated by dsgrid. Default is None.&amp;#xA;    module (Optional[str]): Python module with the dimension class. Default \
+is 'dsgrid.dimension.standard'.&amp;#xA;    class_name (str): Dimension record model class name&amp;#xA;    cls (Optional[Any]): Dimension \
+record model class. Default is None.&amp;#xA;    description (str): A description of the dimension records that is helpful, memorable, \
+and identifiable&amp;#xA;    id (Optional[str]): Registry database ID. Default is None.&amp;#xA;    key (Optional[str]): Registry database \
+key. Default is None.&amp;#xA;    rev (Optional[str]): Registry database revision. Default is None.&amp;#xA;    filename (Optional[str]): \
+Filename containing dimension records. Only assigned for user input and output purposes. The registry database stores records in \
+the dimension JSON document. Default is None.&amp;#xA;    file_hash (Optional[str]): Hash of the contents of the file. Default is None.&amp;#\
+xA;    records (list[]): Dimension records in filename that get loaded at runtime. Default is [].&amp;#xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.file_hash" title="dsgrid.config.dimensions.DimensionModel.file_hash"><code class="xref py py-obj docutils literal notranslate"><span class="pre">file_hash</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.filename" title="dsgrid.config.dimensions.DimensionModel.filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filename</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.records" title="dsgrid.config.dimensions.DimensionModel.records"><code class="xref py py-obj docutils literal notranslate"><span class="pre">records</span> <span class="pre">(List)</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.add_records" title="dsgrid.config.dimensions.DimensionModel.add_records"><code class="xref py py-obj docutils literal notranslate"><span class="pre">add_records</span></code></a> » <a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.records" title="dsgrid.config.dimensions.DimensionModel.records"><code class="xref py py-obj docutils literal notranslate"><span class="pre">records</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.check_file" title="dsgrid.config.dimensions.DimensionModel.check_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_file</span></code></a> » <a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.filename" title="dsgrid.config.dimensions.DimensionModel.filename"><code class="xref py py-obj docutils literal notranslate"><span class="pre">filename</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.compute_file_hash" title="dsgrid.config.dimensions.DimensionModel.compute_file_hash"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_file_hash</span></code></a> » <a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.file_hash" title="dsgrid.config.dimensions.DimensionModel.file_hash"><code class="xref py py-obj docutils literal notranslate"><span class="pre">file_hash</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionModel.file_hash">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">file_hash</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DimensionModel.file_hash" title="Link to this definition">#</a></dt>
+<dd><p>Hash of the contents of the file</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.compute_file_hash" title="dsgrid.config.dimensions.DimensionModel.compute_file_hash"><code class="xref py py-obj docutils literal notranslate"><span class="pre">compute_file_hash</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionModel.filename">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">filename</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"> <span class="pre">(alias</span> <span class="pre">'file')</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DimensionModel.filename" title="Link to this definition">#</a></dt>
+<dd><p>Filename containing dimension records. Only assigned for user input and output purposes. The registry database stores records in the dimension JSON document.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.check_file" title="dsgrid.config.dimensions.DimensionModel.check_file"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_file</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionModel.records">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">records</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">[]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DimensionModel.records" title="Link to this definition">#</a></dt>
+<dd><p>Dimension records in filename that get loaded at runtime</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.add_records" title="dsgrid.config.dimensions.DimensionModel.add_records"><code class="xref py py-obj docutils literal notranslate"><span class="pre">add_records</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionModel.add_records">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">add_records</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.records" title="dsgrid.config.dimensions.DimensionModel.records"><em class="xref py py-obj"><span class="pre">records</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DimensionModel.add_records"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DimensionModel.add_records" title="Link to this definition">#</a></dt>
+<dd><p>Add records from the file.</p>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionModel.check_file">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_file</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.filename" title="dsgrid.config.dimensions.DimensionModel.filename"><em class="xref py py-obj"><span class="pre">filename</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DimensionModel.check_file"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DimensionModel.check_file" title="Link to this definition">#</a></dt>
+<dd><p>Validate that dimension file exists and has no errors</p>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionModel.compute_file_hash">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">compute_file_hash</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.file_hash" title="dsgrid.config.dimensions.DimensionModel.file_hash"><em class="xref py py-obj"><span class="pre">file_hash</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DimensionModel.compute_file_hash"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DimensionModel.compute_file_hash" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionModel.serialize_cls">
+<span class="sig-name descname"><span class="pre">serialize_cls</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">val</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">_</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DimensionModel.serialize_cls"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DimensionModel.serialize_cls" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<section id="datetime-dimension-config">
+<span id="date-time-dimension-config"></span><h2>DateTime Dimension Config<a class="headerlink" href="#datetime-dimension-config" title="Link to this heading">#</a></h2>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimensions.</span></span><span class="sig-name descname"><span class="pre">DateTimeDimensionModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DateTimeDimensionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel" title="Link to this definition">#</a></dt>
+<dd><p>Defines a time dimension where timestamps translate to datetime objects.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>__init__</cite> uses <cite>__pydantic_self__</cite> instead of the more common <cite>self</cite> for the first arg to
+allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-20f1e7e00e72b4b8fcf98710e1f10fec106c0467.png" alt="digraph &quot;Entity Relationship Diagram&quot; {
+   graph [fontcolor=gray66,
+      fontsize=9,
+      label=&quot;Created by erdantic v0.6.0 &lt;https://github.com/drivendataorg/erdantic&gt;&quot;,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DateTimeDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;display_name&lt;/td&gt;&lt;td port=&quot;display_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_query_name&lt;/td&gt;&lt;td port=&quot;dimension_query_name&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Optional[Any]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;key&lt;/td&gt;&lt;td port=&quot;key&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;rev&lt;/td&gt;&lt;td port=&quot;rev&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;measurement_type&lt;/td&gt;&lt;td port=&quot;measurement_type&quot;&gt;MeasurementType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;str_format&lt;/td&gt;&lt;td port=&quot;str_format&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;frequency&lt;/td&gt;&lt;td port=&quot;frequency&quot;&gt;timedelta&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ranges&lt;/td&gt;&lt;td port=&quot;ranges&quot;&gt;List[TimeRangeModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;leap_day_adjustment&lt;/td&gt;&lt;td port=&quot;leap_day_adjustment&quot;&gt;Optional[LeapDayAdjustmentType(DSGEnum)]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_interval_type&lt;/td&gt;&lt;td port=&quot;time_interval_type&quot;&gt;TimeIntervalType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;timezone&lt;/td&gt;&lt;td port=&quot;timezone&quot;&gt;TimeZone(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DateTimeDimensionModel&amp;#xA;&amp;#xA;Defines a time dimension where timestamps translate to datetime objects.&amp;#\
+xA;&amp;#xA;Attributes:&amp;#xA;    name (str): Dimension name&amp;#xA;    display_name (str): Display name. Source for auto-generated dimension_\
+query_name.&amp;#xA;    dimension_query_name (Optional[str]): Auto-generated query name for SQL queries. Default is None.&amp;#xA;    dimension_\
+type (DimensionType(DSGEnum)): Type of the dimension&amp;#xA;    dimension_id (Optional[str]): Unique identifier, generated by dsgrid. \
+Default is None.&amp;#xA;    version (Optional[str]): Version, generated by dsgrid. Default is None.&amp;#xA;    module (Optional[str]): \
+Python module with the dimension class. Default is 'dsgrid.dimension.standard'.&amp;#xA;    class_name (str): Dimension record model \
+class name&amp;#xA;    cls (Optional[Any]): Dimension record model class. Default is None.&amp;#xA;    description (str): A description \
+of the dimension records that is helpful, memorable, and identifiable&amp;#xA;    id (Optional[str]): Registry database ID. Default \
+is None.&amp;#xA;    key (Optional[str]): Registry database key. Default is None.&amp;#xA;    rev (Optional[str]): Registry database revision. \
+Default is None.&amp;#xA;    time_type (TimeDimensionType(DSGEnum)): &amp;#xA;        Type of time dimension:&amp;#xA;            datetime, \
+annual, representative_period, noop. Default is TimeDimensionType.DATETIME.&amp;#xA;    measurement_type (MeasurementType(DSGEnum)): &amp;#\
+xA;        The type of measurement represented by a value associated with a timestamp:&amp;#xA;            mean, min, max, measured, \
+total. Default is MeasurementType.TOTAL.&amp;#xA;    str_format (Optional[str]): Timestamp string format. Default is '%Y-%m-%d %H:%M:%\
+s'.&amp;#xA;    frequency (timedelta): Resolution of the timestamps&amp;#xA;    ranges (List[TimeRangeModel]): Defines the continuous ranges \
+of time in the data, inclusive of start and end time.&amp;#xA;    leap_day_adjustment (Optional[LeapDayAdjustmentType(DSGEnum)]): Leap \
+day adjustment method applied to time data. Default is LeapDayAdjustmentType.NONE.&amp;#xA;    time_interval_type (TimeIntervalType(\
+DSGEnum)): The range of time that the value associated with a timestamp represents, e.g., period-beginning&amp;#xA;    timezone (TimeZone(\
+DSGEnum)): &amp;#xA;        Time zone of data:&amp;#xA;            UTC,&amp;#xA;            HawaiiAleutianStandard,&amp;#xA;            AlaskaStandard, \
+AlaskaPrevailing,&amp;#xA;            PacificStandard, PacificPrevailing,&amp;#xA;            MountainStandard, MountainPrevailing,&amp;#xA;            \
+CentralStandard, CentralPrevailing,&amp;#xA;            EasternStandard, EasternPrevailing,&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.TimeRangeModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;TimeRangeModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;start&lt;/td&gt;&lt;td port=&quot;start&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;end&lt;/td&gt;&lt;td port=&quot;end&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.TimeRangeModel&amp;#xA;&amp;#xA;Defines a continuous range of time.&amp;#xA;&amp;#xA;Attributes:&amp;#xA;    start (str): First \
+timestamp in the data&amp;#xA;    end (str): Last timestamp in the data (inclusive)&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.DateTimeDimensionModel&quot;:ranges:e -&gt; &quot;dsgrid.config.dimensions.TimeRangeModel&quot;:_root:w   [arrowhead=crowodot];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.frequency" title="dsgrid.config.dimensions.DateTimeDimensionModel.frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">frequency</span> <span class="pre">(datetime.timedelta)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.leap_day_adjustment" title="dsgrid.config.dimensions.DateTimeDimensionModel.leap_day_adjustment"><code class="xref py py-obj docutils literal notranslate"><span class="pre">leap_day_adjustment</span> <span class="pre">(dsgrid.dimension.time.LeapDayAdjustmentType</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.measurement_type" title="dsgrid.config.dimensions.DateTimeDimensionModel.measurement_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">measurement_type</span> <span class="pre">(dsgrid.dimension.time.MeasurementType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.ranges" title="dsgrid.config.dimensions.DateTimeDimensionModel.ranges"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ranges</span> <span class="pre">(List[dsgrid.config.dimensions.TimeRangeModel])</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.str_format" title="dsgrid.config.dimensions.DateTimeDimensionModel.str_format"><code class="xref py py-obj docutils literal notranslate"><span class="pre">str_format</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.time_interval_type" title="dsgrid.config.dimensions.DateTimeDimensionModel.time_interval_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time_interval_type</span> <span class="pre">(dsgrid.dimension.time.TimeIntervalType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.timezone" title="dsgrid.config.dimensions.DateTimeDimensionModel.timezone"><code class="xref py py-obj docutils literal notranslate"><span class="pre">timezone</span> <span class="pre">(dsgrid.dimension.time.TimeZone)</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_frequency</span></code></a> » <code class="xref py py-obj docutils literal notranslate"><span class="pre">all</span> <span class="pre">fields</span></code></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a> » <code class="xref py py-obj docutils literal notranslate"><span class="pre">all</span> <span class="pre">fields</span></code></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_times" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_times"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_times</span></code></a> » <a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.ranges" title="dsgrid.config.dimensions.DateTimeDimensionModel.ranges"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ranges</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.frequency">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">frequency</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">timedelta</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.frequency" title="Link to this definition">#</a></dt>
+<dd><p>Resolution of the timestamps</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_frequency</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.leap_day_adjustment">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">leap_day_adjustment</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.LeapDayAdjustmentType" title="dsgrid.dimension.time.LeapDayAdjustmentType"><span class="pre">LeapDayAdjustmentType</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">LeapDayAdjustmentType.NONE</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.leap_day_adjustment" title="Link to this definition">#</a></dt>
+<dd><p>Leap day adjustment method applied to time data</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_frequency</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.measurement_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">measurement_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.MeasurementType" title="dsgrid.dimension.time.MeasurementType"><span class="pre">MeasurementType</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">MeasurementType.TOTAL</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.measurement_type" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>The type of measurement represented by a value associated with a timestamp:</dt><dd><p>mean, min, max, measured, total</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_frequency</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.ranges">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ranges</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#dsgrid.config.dimensions.TimeRangeModel" title="dsgrid.config.dimensions.TimeRangeModel"><span class="pre">TimeRangeModel</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.ranges" title="Link to this definition">#</a></dt>
+<dd><p>Defines the continuous ranges of time in the data, inclusive of start and end time.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_frequency</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_times" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_times"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_times</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.str_format">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">str_format</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'%Y-%m-%d</span> <span class="pre">%H:%M:%s'</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.str_format" title="Link to this definition">#</a></dt>
+<dd><p>Timestamp string format</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_frequency</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.time_interval_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">time_interval_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.TimeIntervalType" title="dsgrid.dimension.time.TimeIntervalType"><span class="pre">TimeIntervalType</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.time_interval_type" title="Link to this definition">#</a></dt>
+<dd><p>The range of time that the value associated with a timestamp represents, e.g., period-beginning</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_frequency</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.timezone">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">timezone</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.TimeZone" title="dsgrid.dimension.time.TimeZone"><span class="pre">TimeZone</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.timezone" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>Time zone of data:</dt><dd><p>UTC,
+HawaiiAleutianStandard,
+AlaskaStandard, AlaskaPrevailing,
+PacificStandard, PacificPrevailing,
+MountainStandard, MountainPrevailing,
+CentralStandard, CentralPrevailing,
+EasternStandard, EasternPrevailing,</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_frequency</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_frequency</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><em class="xref py py-obj"><span class="pre">all</span> <span class="pre">fields</span></em><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DateTimeDimensionModel.check_frequency"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_time_type_and_class_consistency</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><em class="xref py py-obj"><span class="pre">all</span> <span class="pre">fields</span></em><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DateTimeDimensionModel.check_time_type_and_class_consistency"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.check_times">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_times</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.ranges" title="dsgrid.config.dimensions.DateTimeDimensionModel.ranges"><em class="xref py py-obj"><span class="pre">ranges</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DateTimeDimensionModel.check_times"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_times" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DateTimeDimensionModel.is_time_zone_required_in_geography">
+<span class="sig-name descname"><span class="pre">is_time_zone_required_in_geography</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DateTimeDimensionModel.is_time_zone_required_in_geography"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DateTimeDimensionModel.is_time_zone_required_in_geography" title="Link to this definition">#</a></dt>
+<dd><p>Returns True if the geography dimension records must contain a time_zone column.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="annual-time-dimension-config">
+<span id="id2"></span><h2>Annual Time Dimension Config<a class="headerlink" href="#annual-time-dimension-config" title="Link to this heading">#</a></h2>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.AnnualTimeDimensionModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimensions.</span></span><span class="sig-name descname"><span class="pre">AnnualTimeDimensionModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#AnnualTimeDimensionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel" title="Link to this definition">#</a></dt>
+<dd><p>Defines an annual time dimension where timestamps are years.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>__init__</cite> uses <cite>__pydantic_self__</cite> instead of the more common <cite>self</cite> for the first arg to
+allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-716b297f8e21c5afc4dc4dbcf36c5f0fe9108850.png" alt="digraph &quot;Entity Relationship Diagram&quot; {
+   graph [fontcolor=gray66,
+      fontsize=9,
+      label=&quot;Created by erdantic v0.6.0 &lt;https://github.com/drivendataorg/erdantic&gt;&quot;,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   &quot;dsgrid.config.dimensions.AnnualTimeDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;AnnualTimeDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;display_name&lt;/td&gt;&lt;td port=&quot;display_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_query_name&lt;/td&gt;&lt;td port=&quot;dimension_query_name&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Optional[Any]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;key&lt;/td&gt;&lt;td port=&quot;key&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;rev&lt;/td&gt;&lt;td port=&quot;rev&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;measurement_type&lt;/td&gt;&lt;td port=&quot;measurement_type&quot;&gt;MeasurementType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;str_format&lt;/td&gt;&lt;td port=&quot;str_format&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ranges&lt;/td&gt;&lt;td port=&quot;ranges&quot;&gt;List[TimeRangeModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;include_leap_day&lt;/td&gt;&lt;td port=&quot;include_leap_day&quot;&gt;bool&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.AnnualTimeDimensionModel&amp;#xA;&amp;#xA;Defines an annual time dimension where timestamps are years.&amp;#xA;&amp;#xA;\
+Attributes:&amp;#xA;    name (str): Dimension name&amp;#xA;    display_name (str): Display name. Source for auto-generated dimension_query_\
+name.&amp;#xA;    dimension_query_name (Optional[str]): Auto-generated query name for SQL queries. Default is None.&amp;#xA;    dimension_\
+type (DimensionType(DSGEnum)): Type of the dimension&amp;#xA;    dimension_id (Optional[str]): Unique identifier, generated by dsgrid. \
+Default is None.&amp;#xA;    version (Optional[str]): Version, generated by dsgrid. Default is None.&amp;#xA;    module (Optional[str]): \
+Python module with the dimension class. Default is 'dsgrid.dimension.standard'.&amp;#xA;    class_name (str): Dimension record model \
+class name&amp;#xA;    cls (Optional[Any]): Dimension record model class. Default is None.&amp;#xA;    description (str): A description \
+of the dimension records that is helpful, memorable, and identifiable&amp;#xA;    id (Optional[str]): Registry database ID. Default \
+is None.&amp;#xA;    key (Optional[str]): Registry database key. Default is None.&amp;#xA;    rev (Optional[str]): Registry database revision. \
+Default is None.&amp;#xA;    measurement_type (MeasurementType(DSGEnum)): &amp;#xA;        The type of measurement represented by a value \
+associated with a timestamp:&amp;#xA;            mean, min, max, measured, total. Default is MeasurementType.TOTAL.&amp;#xA;    str_format (\
+Optional[str]): Timestamp string format. Default is '%Y'.&amp;#xA;    ranges (List[TimeRangeModel]): Defines the contiguous ranges of \
+time in the data, inclusive of start and end time.&amp;#xA;    include_leap_day (bool): Whether annual time includes leap day. Default \
+is False.&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.TimeRangeModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;TimeRangeModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;start&lt;/td&gt;&lt;td port=&quot;start&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;end&lt;/td&gt;&lt;td port=&quot;end&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.TimeRangeModel&amp;#xA;&amp;#xA;Defines a continuous range of time.&amp;#xA;&amp;#xA;Attributes:&amp;#xA;    start (str): First \
+timestamp in the data&amp;#xA;    end (str): Last timestamp in the data (inclusive)&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.AnnualTimeDimensionModel&quot;:ranges:e -&gt; &quot;dsgrid.config.dimensions.TimeRangeModel&quot;:_root:w   [arrowhead=crowodot];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.include_leap_day" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.include_leap_day"><code class="xref py py-obj docutils literal notranslate"><span class="pre">include_leap_day</span> <span class="pre">(bool)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.measurement_type" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.measurement_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">measurement_type</span> <span class="pre">(dsgrid.dimension.time.MeasurementType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.ranges" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.ranges"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ranges</span> <span class="pre">(List[dsgrid.config.dimensions.TimeRangeModel])</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.str_format" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.str_format"><code class="xref py py-obj docutils literal notranslate"><span class="pre">str_format</span> <span class="pre">(str</span> <span class="pre">|</span> <span class="pre">None)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.time_type" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.time_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time_type</span> <span class="pre">(dsgrid.dimension.time.TimeDimensionType)</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a> » <code class="xref py py-obj docutils literal notranslate"><span class="pre">all</span> <span class="pre">fields</span></code></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_times" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_times"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_times</span></code></a> » <a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.ranges" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.ranges"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ranges</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.AnnualTimeDimensionModel.include_leap_day">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">include_leap_day</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">False</span></em><a class="headerlink" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.include_leap_day" title="Link to this definition">#</a></dt>
+<dd><p>Whether annual time includes leap day.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.AnnualTimeDimensionModel.measurement_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">measurement_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.MeasurementType" title="dsgrid.dimension.time.MeasurementType"><span class="pre">MeasurementType</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">MeasurementType.TOTAL</span></em><a class="headerlink" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.measurement_type" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>The type of measurement represented by a value associated with a timestamp:</dt><dd><p>mean, min, max, measured, total</p>
+</dd>
+</dl>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.AnnualTimeDimensionModel.ranges">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ranges</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#dsgrid.config.dimensions.TimeRangeModel" title="dsgrid.config.dimensions.TimeRangeModel"><span class="pre">TimeRangeModel</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.ranges" title="Link to this definition">#</a></dt>
+<dd><p>Defines the contiguous ranges of time in the data, inclusive of start and end time.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_times" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_times"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_times</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.AnnualTimeDimensionModel.str_format">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">str_format</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'%Y'</span></em><a class="headerlink" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.str_format" title="Link to this definition">#</a></dt>
+<dd><p>Timestamp string format</p>
+<dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.AnnualTimeDimensionModel.time_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">time_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.TimeDimensionType" title="dsgrid.dimension.time.TimeDimensionType"><span class="pre">TimeDimensionType</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">TimeDimensionType.ANNUAL</span></em><a class="headerlink" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.time_type" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_time_type_and_class_consistency</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><em class="xref py py-obj"><span class="pre">all</span> <span class="pre">fields</span></em><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#AnnualTimeDimensionModel.check_time_type_and_class_consistency"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.AnnualTimeDimensionModel.check_times">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_times</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.ranges" title="dsgrid.config.dimensions.AnnualTimeDimensionModel.ranges"><em class="xref py py-obj"><span class="pre">ranges</span></em></a><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#AnnualTimeDimensionModel.check_times"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_times" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.AnnualTimeDimensionModel.is_time_zone_required_in_geography">
+<span class="sig-name descname"><span class="pre">is_time_zone_required_in_geography</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#AnnualTimeDimensionModel.is_time_zone_required_in_geography"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.is_time_zone_required_in_geography" title="Link to this definition">#</a></dt>
+<dd><p>Returns True if the geography dimension records must contain a time_zone column.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="representative-period-time-dimension-config">
+<span id="id3"></span><h2>Representative Period Time Dimension Config<a class="headerlink" href="#representative-period-time-dimension-config" title="Link to this heading">#</a></h2>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimensions.</span></span><span class="sig-name descname"><span class="pre">RepresentativePeriodTimeDimensionModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#RepresentativePeriodTimeDimensionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel" title="Link to this definition">#</a></dt>
+<dd><p>Defines a representative time dimension.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>__init__</cite> uses <cite>__pydantic_self__</cite> instead of the more common <cite>self</cite> for the first arg to
+allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-1bd773de052adf1360337a998a3826d029695317.png" alt="digraph &quot;Entity Relationship Diagram&quot; {
+   graph [fontcolor=gray66,
+      fontsize=9,
+      label=&quot;Created by erdantic v0.6.0 &lt;https://github.com/drivendataorg/erdantic&gt;&quot;,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   &quot;dsgrid.config.dimensions.MonthRangeModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;MonthRangeModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;start&lt;/td&gt;&lt;td port=&quot;start&quot;&gt;int&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;end&lt;/td&gt;&lt;td port=&quot;end&quot;&gt;int&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.MonthRangeModel&amp;#xA;&amp;#xA;Defines a continuous range of time.&amp;#xA;&amp;#xA;Attributes:&amp;#xA;    start (int): \
+First month in the data (January is 1, December is 12)&amp;#xA;    end (int): Last month in the data (inclusive)&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;RepresentativePeriodTimeDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;display_name&lt;/td&gt;&lt;td port=&quot;display_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_query_name&lt;/td&gt;&lt;td port=&quot;dimension_query_name&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Optional[Any]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;key&lt;/td&gt;&lt;td port=&quot;key&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;rev&lt;/td&gt;&lt;td port=&quot;rev&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;measurement_type&lt;/td&gt;&lt;td port=&quot;measurement_type&quot;&gt;MeasurementType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;format&lt;/td&gt;&lt;td port=&quot;format&quot;&gt;RepresentativePeriodFormat(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;ranges&lt;/td&gt;&lt;td port=&quot;ranges&quot;&gt;List[MonthRangeModel]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_interval_type&lt;/td&gt;&lt;td port=&quot;time_interval_type&quot;&gt;TimeIntervalType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel&amp;#xA;&amp;#xA;Defines a representative time dimension.&amp;#xA;&amp;#xA;Attributes:&amp;#\
+xA;    name (str): Dimension name&amp;#xA;    display_name (str): Display name. Source for auto-generated dimension_query_name.&amp;#xA;    \
+dimension_query_name (Optional[str]): Auto-generated query name for SQL queries. Default is None.&amp;#xA;    dimension_type (DimensionType(\
+DSGEnum)): Type of the dimension&amp;#xA;    dimension_id (Optional[str]): Unique identifier, generated by dsgrid. Default is None.&amp;#\
+xA;    version (Optional[str]): Version, generated by dsgrid. Default is None.&amp;#xA;    module (Optional[str]): Python module with \
+the dimension class. Default is 'dsgrid.dimension.standard'.&amp;#xA;    class_name (str): Dimension record model class name&amp;#xA;    \
+cls (Optional[Any]): Dimension record model class. Default is None.&amp;#xA;    description (str): A description of the dimension records \
+that is helpful, memorable, and identifiable&amp;#xA;    id (Optional[str]): Registry database ID. Default is None.&amp;#xA;    key (Optional[\
+str]): Registry database key. Default is None.&amp;#xA;    rev (Optional[str]): Registry database revision. Default is None.&amp;#xA;    \
+time_type (TimeDimensionType(DSGEnum)): &amp;#xA;        Type of time dimension:&amp;#xA;            datetime, annual, representative_period, \
+noop. Default is TimeDimensionType.DATETIME.&amp;#xA;    measurement_type (MeasurementType(DSGEnum)): &amp;#xA;        The type of measurement \
+represented by a value associated with a timestamp:&amp;#xA;            mean, min, max, measured, total. Default is MeasurementType.TOTAL.&amp;#\
+xA;    format (RepresentativePeriodFormat(DSGEnum)): Format of the timestamps in the load data&amp;#xA;    ranges (List[MonthRangeModel]): \
+Defines the continuous ranges of time in the data, inclusive of start and end time.&amp;#xA;    time_interval_type (TimeIntervalType(\
+DSGEnum)): The range of time that the value associated with a timestamp represents&amp;#xA;&quot;];
+   &quot;dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel&quot;:ranges:e -&gt; &quot;dsgrid.config.dimensions.MonthRangeModel&quot;:_root:w   [arrowhead=crowodot];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.format" title="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.format"><code class="xref py py-obj docutils literal notranslate"><span class="pre">format</span> <span class="pre">(dsgrid.dimension.time.RepresentativePeriodFormat)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.measurement_type" title="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.measurement_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">measurement_type</span> <span class="pre">(dsgrid.dimension.time.MeasurementType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.ranges" title="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.ranges"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ranges</span> <span class="pre">(List[dsgrid.config.dimensions.MonthRangeModel])</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.time_interval_type" title="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.time_interval_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time_interval_type</span> <span class="pre">(dsgrid.dimension.time.TimeIntervalType)</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><p></p></dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.format">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">format</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.RepresentativePeriodFormat" title="dsgrid.dimension.time.RepresentativePeriodFormat"><span class="pre">RepresentativePeriodFormat</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.format" title="Link to this definition">#</a></dt>
+<dd><p>Format of the timestamps in the load data</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.measurement_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">measurement_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.MeasurementType" title="dsgrid.dimension.time.MeasurementType"><span class="pre">MeasurementType</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">MeasurementType.TOTAL</span></em><a class="headerlink" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.measurement_type" title="Link to this definition">#</a></dt>
+<dd><dl class="simple">
+<dt>The type of measurement represented by a value associated with a timestamp:</dt><dd><p>mean, min, max, measured, total</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.ranges">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">ranges</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="#dsgrid.config.dimensions.MonthRangeModel" title="dsgrid.config.dimensions.MonthRangeModel"><span class="pre">MonthRangeModel</span></a><span class="p"><span class="pre">]</span></span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.ranges" title="Link to this definition">#</a></dt>
+<dd><p>Defines the continuous ranges of time in the data, inclusive of start and end time.</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.time_interval_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">time_interval_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.TimeIntervalType" title="dsgrid.dimension.time.TimeIntervalType"><span class="pre">TimeIntervalType</span></a></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.time_interval_type" title="Link to this definition">#</a></dt>
+<dd><p>The range of time that the value associated with a timestamp represents</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.is_time_zone_required_in_geography">
+<span class="sig-name descname"><span class="pre">is_time_zone_required_in_geography</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#RepresentativePeriodTimeDimensionModel.is_time_zone_required_in_geography"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.is_time_zone_required_in_geography" title="Link to this definition">#</a></dt>
+<dd><p>Returns True if the geography dimension records must contain a time_zone column.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="no-op-time-dimension-config">
+<span id="id4"></span><h2>No-op Time Dimension Config<a class="headerlink" href="#no-op-time-dimension-config" title="Link to this heading">#</a></h2>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.NoOpTimeDimensionModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimensions.</span></span><span class="sig-name descname"><span class="pre">NoOpTimeDimensionModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#NoOpTimeDimensionModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel" title="Link to this definition">#</a></dt>
+<dd><p>Defines a NoOp time dimension.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>__init__</cite> uses <cite>__pydantic_self__</cite> instead of the more common <cite>self</cite> for the first arg to
+allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-3ca6c235d6863cae3ef2cede23bdfd2a3cd8ed64.png" alt="digraph &quot;Entity Relationship Diagram&quot; {
+   graph [fontcolor=gray66,
+      fontsize=9,
+      label=&quot;Created by erdantic v0.6.0 &lt;https://github.com/drivendataorg/erdantic&gt;&quot;,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   &quot;dsgrid.config.dimensions.NoOpTimeDimensionModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;NoOpTimeDimensionModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;name&lt;/td&gt;&lt;td port=&quot;name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;display_name&lt;/td&gt;&lt;td port=&quot;display_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_query_name&lt;/td&gt;&lt;td port=&quot;dimension_query_name&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;module&lt;/td&gt;&lt;td port=&quot;module&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;class_name&lt;/td&gt;&lt;td port=&quot;class_name&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;cls&lt;/td&gt;&lt;td port=&quot;cls&quot;&gt;Optional[Any]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;description&lt;/td&gt;&lt;td port=&quot;description&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;id&lt;/td&gt;&lt;td port=&quot;id&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;key&lt;/td&gt;&lt;td port=&quot;key&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;rev&lt;/td&gt;&lt;td port=&quot;rev&quot;&gt;Optional[str]&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;time_type&lt;/td&gt;&lt;td port=&quot;time_type&quot;&gt;TimeDimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.NoOpTimeDimensionModel&amp;#xA;&amp;#xA;Defines a NoOp time dimension.&amp;#xA;&amp;#xA;Attributes:&amp;#xA;    name (str): \
+Dimension name&amp;#xA;    display_name (str): Display name. Source for auto-generated dimension_query_name.&amp;#xA;    dimension_query_\
+name (Optional[str]): Auto-generated query name for SQL queries. Default is None.&amp;#xA;    dimension_type (DimensionType(DSGEnum)): \
+Type of the dimension&amp;#xA;    dimension_id (Optional[str]): Unique identifier, generated by dsgrid. Default is None.&amp;#xA;    version (\
+Optional[str]): Version, generated by dsgrid. Default is None.&amp;#xA;    module (Optional[str]): Python module with the dimension \
+class. Default is 'dsgrid.dimension.standard'.&amp;#xA;    class_name (str): Dimension record model class name&amp;#xA;    cls (Optional[\
+Any]): Dimension record model class. Default is None.&amp;#xA;    description (str): A description of the dimension records that is \
+helpful, memorable, and identifiable&amp;#xA;    id (Optional[str]): Registry database ID. Default is None.&amp;#xA;    key (Optional[str]): \
+Registry database key. Default is None.&amp;#xA;    rev (Optional[str]): Registry database revision. Default is None.&amp;#xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel.time_type" title="dsgrid.config.dimensions.NoOpTimeDimensionModel.time_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time_type</span> <span class="pre">(dsgrid.dimension.time.TimeDimensionType)</span></code></a></p></li>
+</ul>
+</dd>
+<dt class="field-even">Validators<span class="colon">:</span></dt>
+<dd class="field-even"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.NoOpTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a> » <code class="xref py py-obj docutils literal notranslate"><span class="pre">all</span> <span class="pre">fields</span></code></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.NoOpTimeDimensionModel.time_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">time_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.time.TimeDimensionType" title="dsgrid.dimension.time.TimeDimensionType"><span class="pre">TimeDimensionType</span></a></em><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">TimeDimensionType.NOOP</span></em><a class="headerlink" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel.time_type" title="Link to this definition">#</a></dt>
+<dd><dl class="field-list simple">
+<dt class="field-odd">Validated by<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel.check_time_type_and_class_consistency" title="dsgrid.config.dimensions.NoOpTimeDimensionModel.check_time_type_and_class_consistency"><code class="xref py py-obj docutils literal notranslate"><span class="pre">check_time_type_and_class_consistency</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method pydantic_validator">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.NoOpTimeDimensionModel.check_time_type_and_class_consistency">
+<em class="property"><span class="pre">validator</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">check_time_type_and_class_consistency</span></span><em class="autodoc_pydantic_validator_arrow property">&#160; <span class="pre">»</span>&#160; </em><em class="xref py py-obj"><span class="pre">all</span> <span class="pre">fields</span></em><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#NoOpTimeDimensionModel.check_time_type_and_class_consistency"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel.check_time_type_and_class_consistency" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.NoOpTimeDimensionModel.is_time_zone_required_in_geography">
+<span class="sig-name descname"><span class="pre">is_time_zone_required_in_geography</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#NoOpTimeDimensionModel.is_time_zone_required_in_geography"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel.is_time_zone_required_in_geography" title="Link to this definition">#</a></dt>
+<dd><p>Returns True if the geography dimension records must contain a time_zone column.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.TimeRangeModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimensions.</span></span><span class="sig-name descname"><span class="pre">TimeRangeModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#TimeRangeModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.TimeRangeModel" title="Link to this definition">#</a></dt>
+<dd><p>Defines a continuous range of time.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>__init__</cite> uses <cite>__pydantic_self__</cite> instead of the more common <cite>self</cite> for the first arg to
+allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-67a5e05af0d3bd9e0a55b28be0e95a781d4547db.png" alt="digraph &quot;Entity Relationship Diagram&quot; {
+   graph [fontcolor=gray66,
+      fontsize=9,
+      label=&quot;Created by erdantic v0.6.0 &lt;https://github.com/drivendataorg/erdantic&gt;&quot;,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   &quot;dsgrid.config.dimensions.TimeRangeModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;TimeRangeModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;start&lt;/td&gt;&lt;td port=&quot;start&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;end&lt;/td&gt;&lt;td port=&quot;end&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.TimeRangeModel&amp;#xA;&amp;#xA;Defines a continuous range of time.&amp;#xA;&amp;#xA;Attributes:&amp;#xA;    start (str): First \
+timestamp in the data&amp;#xA;    end (str): Last timestamp in the data (inclusive)&amp;#xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.TimeRangeModel.end" title="dsgrid.config.dimensions.TimeRangeModel.end"><code class="xref py py-obj docutils literal notranslate"><span class="pre">end</span> <span class="pre">(str)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.TimeRangeModel.start" title="dsgrid.config.dimensions.TimeRangeModel.start"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start</span> <span class="pre">(str)</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.TimeRangeModel.end">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">end</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.TimeRangeModel.end" title="Link to this definition">#</a></dt>
+<dd><p>Last timestamp in the data (inclusive)</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.TimeRangeModel.start">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">start</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.TimeRangeModel.start" title="Link to this definition">#</a></dt>
+<dd><p>First timestamp in the data</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.MonthRangeModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimensions.</span></span><span class="sig-name descname"><span class="pre">MonthRangeModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#MonthRangeModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.MonthRangeModel" title="Link to this definition">#</a></dt>
+<dd><p>Defines a continuous range of time.</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>__init__</cite> uses <cite>__pydantic_self__</cite> instead of the more common <cite>self</cite> for the first arg to
+allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-de3828ae6268443aa4cdd3e5bf2383cbe840d59e.png" alt="digraph &quot;Entity Relationship Diagram&quot; {
+   graph [fontcolor=gray66,
+      fontsize=9,
+      label=&quot;Created by erdantic v0.6.0 &lt;https://github.com/drivendataorg/erdantic&gt;&quot;,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   &quot;dsgrid.config.dimensions.MonthRangeModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;MonthRangeModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;start&lt;/td&gt;&lt;td port=&quot;start&quot;&gt;int&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;end&lt;/td&gt;&lt;td port=&quot;end&quot;&gt;int&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.MonthRangeModel&amp;#xA;&amp;#xA;Defines a continuous range of time.&amp;#xA;&amp;#xA;Attributes:&amp;#xA;    start (int): \
+First month in the data (January is 1, December is 12)&amp;#xA;    end (int): Last month in the data (inclusive)&amp;#xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.MonthRangeModel.end" title="dsgrid.config.dimensions.MonthRangeModel.end"><code class="xref py py-obj docutils literal notranslate"><span class="pre">end</span> <span class="pre">(int)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.MonthRangeModel.start" title="dsgrid.config.dimensions.MonthRangeModel.start"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start</span> <span class="pre">(int)</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.MonthRangeModel.end">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">end</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.MonthRangeModel.end" title="Link to this definition">#</a></dt>
+<dd><p>Last month in the data (inclusive)</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.MonthRangeModel.start">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">start</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.MonthRangeModel.start" title="Link to this definition">#</a></dt>
+<dd><p>First month in the data (January is 1, December is 12)</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+<section id="dimension-reference">
+<span id="id5"></span><h2>Dimension Reference<a class="headerlink" href="#dimension-reference" title="Link to this heading">#</a></h2>
+<dl class="py class pydantic_model">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionReferenceModel">
+<em class="property"><span class="pre">pydantic</span> <span class="pre">model</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">dsgrid.config.dimensions.</span></span><span class="sig-name descname"><span class="pre">DimensionReferenceModel</span></span><a class="reference internal" href="../../_modules/dsgrid/config/dimensions.html#DimensionReferenceModel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#dsgrid.config.dimensions.DimensionReferenceModel" title="Link to this definition">#</a></dt>
+<dd><p>Reference to a dimension stored in the registry</p>
+<p>Create a new model by parsing and validating input data from keyword arguments.</p>
+<p>Raises [<cite>ValidationError</cite>][pydantic_core.ValidationError] if the input data cannot be
+validated to form a valid model.</p>
+<p><cite>__init__</cite> uses <cite>__pydantic_self__</cite> instead of the more common <cite>self</cite> for the first arg to
+allow <cite>self</cite> as a field name.</p>
+<div class="graphviz"><img src="../../_images/graphviz-2475d0f2ef39f7d8e4ad21f63bf60a89740bdbe8.png" alt="digraph &quot;Entity Relationship Diagram&quot; {
+   graph [fontcolor=gray66,
+      fontsize=9,
+      label=&quot;Created by erdantic v0.6.0 &lt;https://github.com/drivendataorg/erdantic&gt;&quot;,
+      nodesep=0.5,
+      rankdir=LR,
+      ranksep=1.5
+   ];
+   node [fontsize=14,
+      label=&quot;\N&quot;,
+      shape=plain
+   ];
+   &quot;dsgrid.config.dimensions.DimensionReferenceModel&quot;   [label=&lt;&lt;table border=&quot;0&quot; cellborder=&quot;1&quot; cellspacing=&quot;0&quot;&gt;&lt;tr&gt;&lt;td port=&quot;_root&quot; colspan=&quot;2&quot;&gt;&lt;b&gt;DimensionReferenceModel&lt;/b&gt;&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_type&lt;/td&gt;&lt;td port=&quot;dimension_type&quot;&gt;DimensionType(DSGEnum)&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;dimension_id&lt;/td&gt;&lt;td port=&quot;dimension_id&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;tr&gt;&lt;td&gt;version&lt;/td&gt;&lt;td port=&quot;version&quot;&gt;str&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;&gt;,
+      tooltip=&quot;dsgrid.config.dimensions.DimensionReferenceModel&amp;#xA;&amp;#xA;Reference to a dimension stored in the registry&amp;#xA;&amp;#xA;Attributes:&amp;#\
+xA;    dimension_type (DimensionType(DSGEnum)): Type of the dimension&amp;#xA;    dimension_id (str): Unique ID of the dimension in \
+the registry&amp;#xA;    version (str): Version of the dimension&amp;#xA;&quot;];
+}" class="graphviz" /></div>
+<dl class="field-list simple">
+<dt class="field-odd">Fields<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionReferenceModel.dimension_id" title="dsgrid.config.dimensions.DimensionReferenceModel.dimension_id"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dimension_id</span> <span class="pre">(str)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionReferenceModel.dimension_type" title="dsgrid.config.dimensions.DimensionReferenceModel.dimension_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dimension_type</span> <span class="pre">(dsgrid.dimension.base_models.DimensionType)</span></code></a></p></li>
+<li><p><a class="reference internal" href="#dsgrid.config.dimensions.DimensionReferenceModel.version" title="dsgrid.config.dimensions.DimensionReferenceModel.version"><code class="xref py py-obj docutils literal notranslate"><span class="pre">version</span> <span class="pre">(str)</span></code></a></p></li>
+</ul>
+</dd>
+</dl>
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionReferenceModel.dimension_id">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dimension_id</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DimensionReferenceModel.dimension_id" title="Link to this definition">#</a></dt>
+<dd><p>Unique ID of the dimension in the registry</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionReferenceModel.dimension_type">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dimension_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="enums.html#dsgrid.dimension.base_models.DimensionType" title="dsgrid.dimension.base_models.DimensionType"><span class="pre">DimensionType</span></a></em><em class="property"> <span class="pre">[Required]</span></em><em class="property"> <span class="pre">(alias</span> <span class="pre">'type')</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DimensionReferenceModel.dimension_type" title="Link to this definition">#</a></dt>
+<dd><p>Type of the dimension</p>
+</dd></dl>
+
+<dl class="py attribute pydantic_field">
+<dt class="sig sig-object py" id="dsgrid.config.dimensions.DimensionReferenceModel.version">
+<em class="property"><span class="pre">field</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">version</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><em class="property"> <span class="pre">[Required]</span></em><a class="headerlink" href="#dsgrid.config.dimensions.DimensionReferenceModel.version" title="Link to this definition">#</a></dt>
+<dd><p>Version of the dimension</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+</section>
+
+        </article>
+      </div>
+      <footer>
+        
+        <div class="related-pages">
+          <a class="next-page" href="dimension_mapping.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Dimension Mapping Config</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
+          <a class="prev-page" href="dataset.html">
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+              <div class="page-info">
+                <div class="context">
+                  <span>Previous</span>
+                </div>
+                
+                <div class="title">Dataset Config</div>
+                
+              </div>
+            </a>
+        </div>
+        <div class="bottom-of-page">
+          <div class="left-details">
+            <div class="copyright">
+                Copyright &#169; Copyright 2023, The Alliance for Sustainable Energy, LLC
+            </div>
+            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
+            
+            <a href="https://github.com/pradyunsg/furo">Furo</a>
+            
+          </div>
+          <div class="right-details">
+            
+          </div>
+        </div>
+        
+      </footer>
+    </div>
+    <aside class="toc-drawer">
+      
+      
+      <div class="toc-sticky toc-scroll">
+        <div class="toc-title-container">
+          <span class="toc-title">
+            On this page
+          </span>
+        </div>
+        <div class="toc-tree-container">
+          <div class="toc-tree">
+            <ul>
+<li><a class="reference internal" href="#">Dimension Config</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel"><code class="docutils literal notranslate"><span class="pre">DimensionModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.file_hash"><code class="docutils literal notranslate"><span class="pre">DimensionModel.file_hash</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.filename"><code class="docutils literal notranslate"><span class="pre">DimensionModel.filename</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.records"><code class="docutils literal notranslate"><span class="pre">DimensionModel.records</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.add_records"><code class="docutils literal notranslate"><span class="pre">DimensionModel.add_records</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.check_file"><code class="docutils literal notranslate"><span class="pre">DimensionModel.check_file</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.compute_file_hash"><code class="docutils literal notranslate"><span class="pre">DimensionModel.compute_file_hash</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionModel.serialize_cls"><code class="docutils literal notranslate"><span class="pre">DimensionModel.serialize_cls()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#datetime-dimension-config">DateTime Dimension Config</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.frequency"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.frequency</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.leap_day_adjustment"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.leap_day_adjustment</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.measurement_type"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.measurement_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.ranges"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.ranges</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.str_format"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.str_format</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.time_interval_type"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.time_interval_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.timezone"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.timezone</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_frequency"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.check_frequency</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_time_type_and_class_consistency"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.check_time_type_and_class_consistency</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.check_times"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.check_times</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DateTimeDimensionModel.is_time_zone_required_in_geography"><code class="docutils literal notranslate"><span class="pre">DateTimeDimensionModel.is_time_zone_required_in_geography()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#annual-time-dimension-config">Annual Time Dimension Config</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel"><code class="docutils literal notranslate"><span class="pre">AnnualTimeDimensionModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.include_leap_day"><code class="docutils literal notranslate"><span class="pre">AnnualTimeDimensionModel.include_leap_day</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.measurement_type"><code class="docutils literal notranslate"><span class="pre">AnnualTimeDimensionModel.measurement_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.ranges"><code class="docutils literal notranslate"><span class="pre">AnnualTimeDimensionModel.ranges</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.str_format"><code class="docutils literal notranslate"><span class="pre">AnnualTimeDimensionModel.str_format</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.time_type"><code class="docutils literal notranslate"><span class="pre">AnnualTimeDimensionModel.time_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_time_type_and_class_consistency"><code class="docutils literal notranslate"><span class="pre">AnnualTimeDimensionModel.check_time_type_and_class_consistency</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.check_times"><code class="docutils literal notranslate"><span class="pre">AnnualTimeDimensionModel.check_times</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.AnnualTimeDimensionModel.is_time_zone_required_in_geography"><code class="docutils literal notranslate"><span class="pre">AnnualTimeDimensionModel.is_time_zone_required_in_geography()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#representative-period-time-dimension-config">Representative Period Time Dimension Config</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel"><code class="docutils literal notranslate"><span class="pre">RepresentativePeriodTimeDimensionModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.format"><code class="docutils literal notranslate"><span class="pre">RepresentativePeriodTimeDimensionModel.format</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.measurement_type"><code class="docutils literal notranslate"><span class="pre">RepresentativePeriodTimeDimensionModel.measurement_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.ranges"><code class="docutils literal notranslate"><span class="pre">RepresentativePeriodTimeDimensionModel.ranges</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.time_interval_type"><code class="docutils literal notranslate"><span class="pre">RepresentativePeriodTimeDimensionModel.time_interval_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel.is_time_zone_required_in_geography"><code class="docutils literal notranslate"><span class="pre">RepresentativePeriodTimeDimensionModel.is_time_zone_required_in_geography()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#no-op-time-dimension-config">No-op Time Dimension Config</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel"><code class="docutils literal notranslate"><span class="pre">NoOpTimeDimensionModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel.time_type"><code class="docutils literal notranslate"><span class="pre">NoOpTimeDimensionModel.time_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel.check_time_type_and_class_consistency"><code class="docutils literal notranslate"><span class="pre">NoOpTimeDimensionModel.check_time_type_and_class_consistency</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.NoOpTimeDimensionModel.is_time_zone_required_in_geography"><code class="docutils literal notranslate"><span class="pre">NoOpTimeDimensionModel.is_time_zone_required_in_geography()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.TimeRangeModel"><code class="docutils literal notranslate"><span class="pre">TimeRangeModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.TimeRangeModel.end"><code class="docutils literal notranslate"><span class="pre">TimeRangeModel.end</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.TimeRangeModel.start"><code class="docutils literal notranslate"><span class="pre">TimeRangeModel.start</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.MonthRangeModel"><code class="docutils literal notranslate"><span class="pre">MonthRangeModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.MonthRangeModel.end"><code class="docutils literal notranslate"><span class="pre">MonthRangeModel.end</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.MonthRangeModel.start"><code class="docutils literal notranslate"><span class="pre">MonthRangeModel.start</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#dimension-reference">Dimension Reference</a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionReferenceModel"><code class="docutils literal notranslate"><span class="pre">DimensionReferenceModel</span></code></a><ul>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionReferenceModel.dimension_id"><code class="docutils literal notranslate"><span class="pre">DimensionReferenceModel.dimension_id</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionReferenceModel.dimension_type"><code class="docutils literal notranslate"><span class="pre">DimensionReferenceModel.dimension_type</span></code></a></li>
+<li><a class="reference internal" href="#dsgrid.config.dimensions.DimensionReferenceModel.version"><code class="docutils literal notranslate"><span class="pre">DimensionReferenceModel.version</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+          </div>
+        </div>
+      </div>
+      
+      
+    </aside>
+  </div>
+</div><script src="../../_static/documentation_options.js?v=38b66d78"></script>
+    <script src="../../_static/doctools.js?v=888ff710"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/scripts/furo.js?v=32e29ea5"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=3a0c56fd"></script>
+    </body>
+</html>

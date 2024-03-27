@@ -1,0 +1,11 @@
+<map id="Entity Relationship Diagram" name="Entity Relationship Diagram">
+<area shape="rect" id="node1" title="dsgrid.config.mapping_tables.MappingTableRecordModel
+
+Represents one record in dimension mapping record files. Maps one dimension to another.
+
+Attributes:
+ &#160;&#160;&#160;from_id (str): Source mapping
+ &#160;&#160;&#160;to_id (Optional[str]): Destination mapping. Default is None.
+ &#160;&#160;&#160;from_fraction (float): Fraction of from_id to map to to_id. Default is 1.0.
+" alt="" coords="94,5,391,117"/>
+</map>

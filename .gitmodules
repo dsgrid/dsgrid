@@ -7,6 +7,6 @@
 	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
 	branch = main
 [submodule "dsgrid-project-DECARB"]
-	path = dsgrid-project-DECARB
+	path = main
 	url = https://github.com/dsgrid/dsgrid-project-DECARB
 	branch = dt/multi-dim-requirements

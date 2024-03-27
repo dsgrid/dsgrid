@@ -6,7 +6,12 @@ import pytest
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
-from dsgrid.config.project_config import ProjectConfigModel, ProjectDimensionQueryNamesModel
+from dsgrid.config.project_config import (
+    ProjectConfigModel,
+    ProjectDimensionQueryNamesModel,
+    RequiredDimensionsModel,
+    RequiredDimensionRecordsModel,
+)
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     map_dimension_ids_to_names,
@@ -18,7 +23,7 @@ from dsgrid.tests.common import (
 from tests.data.dimension_models.minimal.models import PROJECT_CONFIG_FILE
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def config_as_dict(cached_registry, tmp_path_factory):
     tmp_path = tmp_path_factory.mktemp("dsgrid")
     conn = cached_registry
@@ -87,3 +92,48 @@ def test_project_dimension_query_names_model():
     assert not {x.value for x in DimensionType}.difference(
         ProjectDimensionQueryNamesModel.model_fields
     )
+
+
+def test_duplicate_dimension_requirements():
+    single_dim_data = {"subsector": {"base": ["subsectors"]}}
+    multi_dim_data = [
+        {
+            "subsector": {"base": ["bev_compact"]},
+            "metric": {"base": ["electricity_ev_ldv_home_l1"]},
+        },
+    ]
+    with pytest.raises(ValueError, match="dimensions cannot be defined"):
+        RequiredDimensionsModel(
+            single_dimensional=RequiredDimensionRecordsModel(**single_dim_data),
+            multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
+        )
+
+
+def test_invalid_multi_dimensional_requirement_too_few():
+    single_dim_data = {"subsector": {"base": ["subsectors"]}}
+    multi_dim_data = [{"metric": {"base": ["electricity_ev_ldv_home_l1"]}}]
+    with pytest.raises(ValueError, match="at least two"):
+        RequiredDimensionsModel(
+            single_dimensional=RequiredDimensionRecordsModel(**single_dim_data),
+            multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
+        )
+
+
+def test_invalid_multi_dimensional_requirement_partial_intersection():
+    single_dim_data = {"sector": {"base": ["sector1"]}}
+    multi_dim_data = [
+        {
+            "metric": {"base": ["metric1"]},
+            "subsector": {"base": ["subsector1"]},
+        },
+        {
+            "metric": {"base": ["metric2"]},
+            "subsector": {"base": ["subsector2"]},
+            "geography": {"base": ["geography1"]},
+        },
+    ]
+    with pytest.raises(ValueError, match="must have a full intersection"):
+        RequiredDimensionsModel(
+            single_dimensional=RequiredDimensionRecordsModel(**single_dim_data),
+            multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
+        )

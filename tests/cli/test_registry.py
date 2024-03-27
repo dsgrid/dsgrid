@@ -9,6 +9,7 @@ from dsgrid.cli.dsgrid_admin import cli as admin_cli
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.files import load_data
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.tests.common import TEST_DATASET_DIRECTORY
 from dsgrid.tests.common import (
     map_dimension_names_to_ids,
@@ -308,3 +309,10 @@ def test_register_dsgrid_projects(tmp_registry_db):
             ],
         )
         assert result.exit_code == 0
+
+    conn = DatabaseConnection(database=db_name)
+    manager = RegistryManager.load(conn, offline_mode=True)
+    project = manager.project_manager.load_project("US_DOE_DECARB_2023")
+    config = project.config
+    context = ScratchDirContext(tmpdir)
+    config.make_dimension_association_table("decarb_2023_transport", context)

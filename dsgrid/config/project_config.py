@@ -462,12 +462,14 @@ class RequiredDimensionsModel(DSGBaseModel):
                         )
                         raise ValueError(msg)
                     dims.append(field)
+
             if len(dims) < 2:
                 msg = (
                     "A multi_dimensional dimension requirement must contain at least two "
                     f"dimensions: {item}"
                 )
                 raise ValueError(msg)
+
             dim_combo = tuple(sorted(dims))
             if dim_combo not in dim_combos:
                 for other in dim_combos:

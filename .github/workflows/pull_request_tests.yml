@@ -18,6 +18,8 @@ jobs:
     - uses: actions/checkout@v2
     - name: Setup ArangoDB
       uses: rhizomenetwork/arangodb-action@v1
+      with:
+        arangodb version: "3.11.7"
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v2
       with:

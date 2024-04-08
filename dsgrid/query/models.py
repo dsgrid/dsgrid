@@ -466,7 +466,7 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     """Controls post-processing and storage of CompositeDatasets"""
 
     supplemental_columns: Annotated[
-        list[Union[str, ColumnModel]],
+        list[ColumnModel],
         Field(
             description="Add these supplemental dimension query names as columns in result tables. "
             "Applies to all aggregations.",
@@ -527,13 +527,13 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         ),
     ]
 
-    @field_validator("supplemental_columns")
+    @model_validator(mode="before")
     @classmethod
-    def fix_supplemental_columns(cls, supplemental_columns):
-        for i, column in enumerate(supplemental_columns):
+    def fix_supplemental_columns(cls, values):
+        for i, column in enumerate(values.get("supplemental_columns", [])):
             if isinstance(column, str):
-                supplemental_columns[i] = ColumnModel(dimension_query_name=column)
-        return supplemental_columns
+                values["supplemental_columns"][i] = ColumnModel(dimension_query_name=column)
+        return values
 
     @field_validator("output_format")
     @classmethod

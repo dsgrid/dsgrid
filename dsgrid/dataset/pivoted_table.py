@@ -170,7 +170,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
             if not columns:
                 continue
 
-            df = self.add_columns(df, columns, context, True)
+            df = self.add_columns(df, columns, context, aggregation_columns=pivoted_columns)
             group_by_cols = self._build_group_by_columns(
                 columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata
             )

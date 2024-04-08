@@ -1,6 +1,5 @@
 import logging
 
-
 import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
@@ -66,7 +65,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
             if not columns:
                 continue
 
-            df = self.add_columns(df, columns, context, True)
+            df = self.add_columns(df, columns, context, aggregation_columns=[VALUE_COLUMN])
             group_by_cols = self._build_group_by_columns(
                 columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata
             )

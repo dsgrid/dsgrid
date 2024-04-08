@@ -49,7 +49,9 @@ from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDataset
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.tests.common import TEST_PROJECT_PATH
 from dsgrid.tests.utils import read_parquet
+from dsgrid.utils.files import load_data, dump_data
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
@@ -279,36 +281,85 @@ def test_query_cli_create_validate(tmp_path):
     assert result.exit_code == 0
 
 
-def test_query_cli_run(tmp_path):
-    output_dir = tmp_path / "queries"
-    project = get_project(
-        QueryTestElectricityValues.get_database_name(), QueryTestElectricityValues.get_project_id()
-    )
-    query = QueryTestElectricityValues(
-        DimensionCategory.BASE, REGISTRY_PATH, project, output_dir=output_dir
-    )
-    filename = tmp_path / "query.json"
-    filename.write_text(query.make_query().model_dump_json(indent=2))
-    cmd = [
-        "--username",
-        "root",
-        "--password",
-        DEFAULT_DB_PASSWORD,
-        "--offline",
-        "--database-name",
-        "simple-standard-scenarios",
-        "query",
-        "project",
-        "run",
-        "--output",
-        str(output_dir),
-        str(filename),
-    ]
+@pytest.mark.parametrize(
+    "table_format",
+    [
+        {
+            "format_type": "pivoted",
+            "pivoted_dimension_type": "metric",
+        },
+        {
+            "format_type": "unpivoted",
+        },
+    ],
+)
+def test_query_cli_run(tmp_path, cached_registry, table_format):
+    conn: DatabaseConnection = cached_registry
     shutdown_project()
-    runner = CliRunner(mix_stderr=False)
-    result = runner.invoke(cli, cmd)
-    assert result.exit_code == 0
-    query.validate()
+    output_dir = tmp_path / "queries"
+    baseline_query = TEST_PROJECT_PATH / "test_efs" / "queries" / "baseline.json5"
+    five_year_query = TEST_PROJECT_PATH / "test_efs" / "queries" / "five_year_intervals.json5"
+    for filename in (baseline_query, five_year_query):
+        data = load_data(filename)
+        data["result"]["table_format"] = table_format
+        dst = tmp_path / filename.name
+        dump_data(data, dst)
+        cmd = [
+            "--username",
+            conn.username,
+            "--password",
+            conn.password,
+            "--offline",
+            "--database-name",
+            conn.database,
+            "query",
+            "project",
+            "run",
+            "--output",
+            str(output_dir),
+            str(dst),
+        ]
+        runner = CliRunner(mix_stderr=False)
+        result = runner.invoke(cli, cmd)
+        assert result.exit_code == 0
+
+    baseline_df = read_parquet(output_dir / "baseline" / "table.parquet")
+    baseline_years = sorted(
+        (int(x.model_year) for x in baseline_df.select("model_year").distinct().collect())
+    )
+    assert baseline_years == [2010, 2020, 2030, 2040, 2050]
+    five_year_df = read_parquet(output_dir / "five_year_intervals" / "table.parquet")
+    five_year_years = sorted(
+        (
+            int(x.five_year_intervals)
+            for x in five_year_df.select("five_year_intervals").distinct().collect()
+        )
+    )
+    assert five_year_years == [2010, 2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050]
+
+    def get_pivoted_value_sum(df):
+        row = df.agg(F.sum("cooling").alias("cooling"), F.sum("fans").alias("fans")).collect()[0]
+        return row.cooling + row.fans
+
+    def get_unpivoted_value_sum(df):
+        return df.agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN)).collect()[0][VALUE_COLUMN]
+
+    get_value_sum = (
+        get_pivoted_value_sum
+        if table_format["format_type"] == "pivoted"
+        else get_unpivoted_value_sum
+    )
+    baseline_sum = get_value_sum(baseline_df)
+    baseline_years_str = [str(x) for x in baseline_years]
+    five_year_sum = get_value_sum(
+        five_year_df.filter(F.col("five_year_intervals").isin(baseline_years_str))
+    )
+    assert math.isclose(five_year_sum, baseline_sum)
+
+    val1 = get_value_sum(five_year_df.filter("five_year_intervals == '2020'"))
+    val2 = get_value_sum(five_year_df.filter("five_year_intervals == '2030'"))
+    interpolated_val = get_value_sum(five_year_df.filter("five_year_intervals == '2025'"))
+    assert math.isclose(interpolated_val, val1 / 2 + val2 / 2)
 
 
 def test_dimension_query_names_model():
@@ -539,7 +590,7 @@ class QueryTestElectricityValues(QueryTestBase):
                 ),
             ),
             result=QueryResultParamsModel(
-                supplemental_columns=["state"],
+                supplemental_columns=[ColumnModel(dimension_query_name="state")],
                 replace_ids_with_names=True,
                 table_format=UnpivotedTableFormatModel(),
             ),

@@ -171,12 +171,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
         handler = make_table_format_handler(context.get_table_format_type(), self._project.config)
         if context.model.result.supplemental_columns:
-            df = handler.add_columns(
-                df,
-                context.model.result.supplemental_columns,
-                context,
-                False,
-            )
+            df = handler.add_columns(df, context.model.result.supplemental_columns, context)
         if context.model.result.dimension_filters:
             df = self._apply_filters(df, context)
 

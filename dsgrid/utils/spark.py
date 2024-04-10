@@ -603,6 +603,8 @@ def create_dataframe_from_product(
     # 3. Create one Spark DataFrame per column and then cross-join all of them. Extremely slow.
     # 4. Create one pyarrow Table, write to temp Parquet, read back in Spark. ~2x slower
     #    than CSV implementaion.
+    # 5. Create the joined table via SQLite and then read the contents into Spark with a JDBC
+    #    driver. Much slower.
 
     # Note: This location must be accessible on all compute nodes.
     csv_dir = context.get_temp_filename(suffix=".csv")

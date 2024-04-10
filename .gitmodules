@@ -5,7 +5,7 @@
 [submodule "dsgrid-project-StandardScenarios"]
 	path = dsgrid-project-StandardScenarios
 	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
-	branch = main
+	branch = dt/issue-199
 [submodule "dsgrid-project-DECARB"]
 	path = dsgrid-project-DECARB
 	url = https://github.com/dsgrid/dsgrid-project-DECARB

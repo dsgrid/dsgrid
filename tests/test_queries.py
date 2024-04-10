@@ -108,9 +108,9 @@ def la_expected_electricity_hour_16(tmp_path_factory):
     }
 
 
-def test_electricity_values():
-    for category in DimensionCategory:
-        run_query_test(QueryTestElectricityValues, category)
+@pytest.mark.parametrize("category", list(DimensionCategory))
+def test_electricity_values(category):
+    run_query_test(QueryTestElectricityValues, category)
 
 
 def test_electricity_use_by_county():
@@ -590,7 +590,6 @@ class QueryTestElectricityValues(QueryTestBase):
                 ),
             ),
             result=QueryResultParamsModel(
-                supplemental_columns=[ColumnModel(dimension_query_name="state")],
                 replace_ids_with_names=True,
                 table_format=UnpivotedTableFormatModel(),
             ),
@@ -631,23 +630,18 @@ class QueryTestElectricityValues(QueryTestBase):
             .collect()[0]
             .name
         )
-        df = read_parquet(str(self.output_dir / self.name / "table.parquet"))
+        df = read_parquet(self.output_dir / self.name / "table.parquet")
         assert "natural_gas_heating" not in df.columns
         non_value_columns = set(
             self._project.config.list_dimension_query_names(category=DimensionCategory.BASE)
         )
         non_value_columns.update({"id", "timestamp"})
-        supp_columns = {x.get_column_name() for x in self._model.result.supplemental_columns}
-        non_value_columns.update(supp_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         expected = [VALUE_COLUMN]
         # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating"]
         success = value_columns == expected
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
-        if supp_columns.difference(df.columns):
-            logger.error("supplemental_columns=%s are not present in table", supp_columns)
-            success = False
         if not df.select("county").distinct().filter(f"county == '{county_name}'").collect():
             logger.error("County name = %s is not present", county_name)
             success = False
@@ -1287,12 +1281,10 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
             self._project.config.list_dimension_query_names(category=DimensionCategory.BASE)
         )
         non_value_columns.update({"id", "timestamp"})
-        non_value_columns.update(self._model.result.supplemental_columns)
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         expected = ["electricity_cooling", "electricity_heating"]
         # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating", "fraction"]
         assert value_columns == expected
-        assert not set(self._model.result.supplemental_columns).difference(df.columns)
 
         total_cooling = df.agg(F.sum("electricity_cooling").alias("sum")).collect()[0].sum
         total_heating = df.agg(F.sum("electricity_heating").alias("sum")).collect()[0].sum

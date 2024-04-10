@@ -1,6 +1,8 @@
 import copy
 import logging
 
+from pyspark.sql import DataFrame
+
 import dsgrid.units.energy as energy
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.query.models import (
@@ -23,8 +25,8 @@ class PivotedTableHandler(TableFormatHandlerBase):
         super().__init__(project_config, dataset_id=dataset_id)
 
     def process_aggregations(
-        self, df, aggregations: list[AggregationModel], context: QueryContext
-    ):
+        self, df: DataFrame, aggregations: list[AggregationModel], context: QueryContext
+    ) -> DataFrame:
         df = self.process_pivoted_aggregations(df, aggregations, context)
         orig_id = id(df)
         df = self.process_stacked_aggregations(df, aggregations, context)
@@ -32,8 +34,8 @@ class PivotedTableHandler(TableFormatHandlerBase):
         return df
 
     def process_pivoted_aggregations(
-        self, df, aggregations: list[AggregationModel], context: QueryContext
-    ):
+        self, df: DataFrame, aggregations: list[AggregationModel], context: QueryContext
+    ) -> DataFrame:
         """Aggregate the pivoted dimensional data as specified by aggregations.
 
         Parameters
@@ -170,7 +172,7 @@ class PivotedTableHandler(TableFormatHandlerBase):
             if not columns:
                 continue
 
-            df = self.add_columns(df, columns, context, aggregation_columns=pivoted_columns)
+            df = self.add_columns(df, columns, context, pivoted_columns)
             group_by_cols = self._build_group_by_columns(
                 columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata
             )

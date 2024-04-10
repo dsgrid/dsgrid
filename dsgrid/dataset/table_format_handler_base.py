@@ -1,13 +1,11 @@
 import abc
 import logging
-from typing import Iterable, Optional
+from typing import Iterable
 
 from pyspark.sql import DataFrame
-import pyspark.sql.functions as F
 
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import (
     AggregationModel,
@@ -15,7 +13,6 @@ from dsgrid.query.models import (
     ColumnType,
     DimensionMetadataModel,
 )
-from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.dataset import map_and_reduce_stacked_dimension, remove_invalid_null_timestamps
 
 
@@ -34,7 +31,7 @@ class TableFormatHandlerBase(abc.ABC):
         df: DataFrame,
         column_models: list[ColumnModel],
         context: QueryContext,
-        aggregation_columns: Optional[Iterable[str]] = None,
+        value_columns: Iterable[str],
     ) -> DataFrame:
         """Add columns to the dataframe.
 
@@ -43,9 +40,8 @@ class TableFormatHandlerBase(abc.ABC):
         df : pyspark.sql.DataFrame
         column_models : list
         context : QueryContext
-        aggregation_columns: Optional[Iterable[str]],
-            Columns in the dataframe that contain load values. Should only be passed if adding
-            a column is allwed to change the load values in df.
+        value_columns: Iterable[str]
+            Columns in the dataframe that contain load values.
         """
         columns = set(df.columns)
         dim_type_to_query_name = self.project_config.get_base_dimension_to_query_name_mapping()
@@ -68,18 +64,6 @@ class TableFormatHandlerBase(abc.ABC):
                     "Adding time columns through supplemental mappings is not supported yet."
                 )
             records = self._project_config.get_base_to_supplemental_mapping_records(query_name)
-            if aggregation_columns is None:
-                to_ids = records.groupBy("from_id").agg(F.count("to_id").alias("count_to_id"))
-                counts_of_to_id = get_unique_values(to_ids, "count_to_id")
-                if counts_of_to_id != {1}:
-                    raise DSGInvalidParameter(
-                        f"Mapping dimension query name {query_name} produced duplicate to_ids for one or more from_ids"
-                    )
-                from_fractions = get_unique_values(records, "from_fraction")
-                if len(from_fractions) != 1 and float(next(iter(from_fractions))) != 1.0:
-                    raise DSGInvalidParameter(
-                        f"Mapping dimension query name {query_name} produced from_fractions other than 1.0: {from_fractions}"
-                    )
 
             if column.function is not None:
                 # TODO #200: Do we want to allow this?
@@ -112,14 +96,16 @@ class TableFormatHandlerBase(abc.ABC):
             )
 
         if "fraction" in df.columns:
-            for column in aggregation_columns or []:
+            for column in value_columns:
                 df = df.withColumn(column, df[column] * df["fraction"])
             df = df.drop("fraction")
 
         return df
 
     @abc.abstractmethod
-    def process_aggregations(self, df, aggregations: AggregationModel, context: QueryContext):
+    def process_aggregations(
+        self, df: DataFrame, aggregations: AggregationModel, context: QueryContext
+    ) -> DataFrame:
         """Aggregate the dimensional data as specified by aggregations.
 
         Parameters

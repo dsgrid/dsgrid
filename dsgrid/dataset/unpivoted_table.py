@@ -1,5 +1,7 @@
 import logging
 
+from pyspark.sql import DataFrame
+
 import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
@@ -19,7 +21,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
     """Implements behavior for tables stored in unpivoted format."""
 
     def process_aggregations(
-        self, df, aggregations: list[AggregationModel], context: QueryContext
+        self, df: DataFrame, aggregations: list[AggregationModel], context: QueryContext
     ):
         orig_id = id(df)
         df = self.process_stacked_aggregations(df, aggregations, context)
@@ -65,7 +67,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
             if not columns:
                 continue
 
-            df = self.add_columns(df, columns, context, aggregation_columns=[VALUE_COLUMN])
+            df = self.add_columns(df, columns, context, [VALUE_COLUMN])
             group_by_cols = self._build_group_by_columns(
                 columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata
             )

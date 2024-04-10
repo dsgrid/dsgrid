@@ -185,6 +185,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _check_aggregations(self, context):
         if self._config.get_table_format_type() == TableFormatType.PIVOTED:
             pivoted_type = self._config.get_pivoted_dimension_type()
+            assert pivoted_type is not None
             for agg in context.model.result.aggregations:
                 if not getattr(agg.dimensions, pivoted_type.value):
                     raise DSGInvalidQuery(
@@ -483,6 +484,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if column in df.columns:
                 df = map_and_reduce_stacked_dimension(df, records, column)
                 if handle_data_skew:
+                    assert scratch_dir_context is not None
                     df = repartition_if_needed_by_mapping(
                         df,
                         mapping_config.model.mapping_type,

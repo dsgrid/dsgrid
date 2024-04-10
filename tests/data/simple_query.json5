@@ -16,7 +16,6 @@
     "include_dsgrid_dataset_components": false,
   },
   "result": {
-    "supplemental_columns": [],
     "replace_ids_with_names": false,
     "aggregations": [],
     "reports": [],

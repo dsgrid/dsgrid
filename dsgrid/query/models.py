@@ -465,14 +465,6 @@ class QueryBaseModel(CacheableQueryBaseModel, abc.ABC):
 class QueryResultParamsModel(CacheableQueryBaseModel):
     """Controls post-processing and storage of CompositeDatasets"""
 
-    supplemental_columns: Annotated[
-        list[Union[str, ColumnModel]],
-        Field(
-            description="Add these supplemental dimension query names as columns in result tables. "
-            "Applies to all aggregations.",
-            default=[],
-        ),
-    ]
     replace_ids_with_names: Annotated[
         bool,
         Field(
@@ -527,14 +519,6 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         ),
     ]
 
-    @field_validator("supplemental_columns")
-    @classmethod
-    def fix_supplemental_columns(cls, supplemental_columns):
-        for i, column in enumerate(supplemental_columns):
-            if isinstance(column, str):
-                supplemental_columns[i] = ColumnModel(dimension_query_name=column)
-        return supplemental_columns
-
     @field_validator("output_format")
     @classmethod
     def check_format(cls, fmt):
@@ -546,11 +530,6 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     @model_validator(mode="after")
     def check_column_type(self) -> "QueryResultParamsModel":
         if self.column_type == ColumnType.DIMENSION_TYPES:
-            # Cannot allow duplicate column names.
-            if self.supplemental_columns:
-                raise ValueError(
-                    f"column_type={ColumnType.DIMENSION_TYPES} is incompatible with supplemental_columns"
-                )
             for agg in self.aggregations:
                 for dim_type in DimensionType:
                     columns = getattr(agg.dimensions, dim_type.value)

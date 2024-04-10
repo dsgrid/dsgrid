@@ -603,38 +603,54 @@ def create_dataframe_from_product(
     # 3. Create one Spark DataFrame per column and then cross-join all of them. Extremely slow.
     # 4. Create one pyarrow Table, write to temp Parquet, read back in Spark. ~2x slower
     #    than CSV implementaion.
+    # 5. Create the joined table via SQLite and then read the contents into Spark with a JDBC
+    #    driver. Much slower.
 
     # Note: This location must be accessible on all compute nodes.
     csv_dir = context.get_temp_filename(suffix=".csv")
-    csv_dir.mkdir()
     columns = list(data.keys())
     schema = StructType([StructField(x, StringType()) for x in columns])
 
-    def open_file(index):
-        filename = csv_dir / f"part{index}.csv"
-        return open(filename, "w", encoding="utf-8")
-
-    max_size = max_partition_size_mb * 1024 * 1024
-    size = 0
-    partition_index = 1
-    f_out = open_file(partition_index)
-    try:
+    with CsvPartitionWriter(csv_dir) as writer:
         for row in itertools.product(*(data.values())):
-            size += f_out.write(",".join(row))
-            size += f_out.write("\n")
-            if size >= max_size:
-                size = 0
-                f_out.close()
-                partition_index += 1
-                filename = csv_dir / f"part{partition_index}.csv"
-                f_out = open(filename, "w", encoding="utf-8")
-    finally:
-        if not f_out.closed:
-            f_out.close()
+            writer.add_row(row)
 
     spark = get_spark_session()
     df = spark.read.csv(str(csv_dir), header=False, schema=schema)
     return df
+
+
+class CsvPartitionWriter:
+    """Writes dataframe rows to partitioned CSV files."""
+
+    def __init__(self, directory: Path, max_partition_size_mb: int = MAX_PARTITION_SIZE_MB):
+        self._directory = directory
+        self._directory.mkdir(exist_ok=True)
+        self._max_size = max_partition_size_mb * 1024 * 1024
+        self._size = 0
+        self._index = 1
+        self._fp = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        if self._fp is not None:
+            self._fp.close()
+
+    def add_row(self, row: tuple) -> None:
+        """Add a row to the CSV files."""
+        line = ",".join(row)
+        if self._fp is None:
+            filename = self._directory / f"part{self._index}.csv"
+            self._fp = open(filename, "w", encoding="utf-8")
+        self._size += self._fp.write(line)
+        self._size += self._fp.write("\n")
+        if self._size >= self._max_size:
+            self._fp.close()
+            self._fp = None
+            self._size = 0
+            self._index += 1
 
 
 def get_spark_session() -> SparkSession:

@@ -161,9 +161,6 @@ def does_query_support_a_derived_dataset(query: ProjectQueryModel):
             query.result.column_type.value,
             ColumnType.DIMENSION_TYPES.value,
         )
-    if query.result.supplemental_columns:
-        is_valid = False
-        logger.error("Cannot create a derived dataset from a query with supplemental_columns")
     if query.result.replace_ids_with_names:
         is_valid = False
         logger.error("Cannot create a derived dataset from a query with replace_ids_with_names")

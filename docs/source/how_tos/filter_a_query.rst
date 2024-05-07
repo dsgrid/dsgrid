@@ -1,7 +1,7 @@
 .. _filter-a-query:
 
 *********************
-How to filter a query
+How to Filter a Query
 *********************
 dsgrid offers several ways to filter the result of a query. It is important to understand some
 dsgrid behaviors to get an optimal result. Please refer to :ref:`project-queries-explanation` for

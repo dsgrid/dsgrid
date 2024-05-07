@@ -1,7 +1,7 @@
 .. _how-to-start-spark-cluster-kestrel:
 
 ***************************************
-How to start a Spark cluster on Kestrel
+How to Start a Spark Cluster on Kestrel
 ***************************************
 This section assumes that you have cloned the HPC Spark setup scripts from this `repo
 <https://github.com/NREL/HPC.git>`_. If you are unfamiliar with that, please read the full details

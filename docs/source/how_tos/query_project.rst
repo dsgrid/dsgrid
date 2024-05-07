@@ -1,3 +1,3 @@
 **********************
-How to query a project
+How to Query a Project
 **********************

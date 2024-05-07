@@ -153,6 +153,13 @@ class AggregationModel(DSGBaseModel):
             raise ValueError("aggregation_function cannot be None")
         return aggregation_function
 
+    @field_validator("dimensions")
+    @classmethod
+    def check_for_metric(cls, dimensions):
+        if not dimensions.metric:
+            raise ValueError("An AggregationModel must include the metric dimension.")
+        return dimensions
+
     @field_serializer("aggregation_function")
     def serialize_aggregation_function(self, function, _):
         return function.__name__

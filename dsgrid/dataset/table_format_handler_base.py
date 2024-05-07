@@ -14,6 +14,8 @@ from dsgrid.query.models import (
     DimensionMetadataModel,
 )
 from dsgrid.utils.dataset import map_and_reduce_stacked_dimension, remove_invalid_null_timestamps
+from dsgrid.utils.spark import persist_intermediate_query
+from dsgrid.utils.timing import track_timing, timer_stats_collector
 
 
 logger = logging.getLogger(__name__)
@@ -219,15 +221,20 @@ class TableFormatHandlerBase(abc.ABC):
         return expr
 
     @staticmethod
+    @track_timing(timer_stats_collector)
     def _remove_invalid_null_timestamps(df: DataFrame, orig_id, context: QueryContext):
         if id(df) != orig_id:
             # The table could have NULL timestamps that designate expected-missing data.
             # Those rows could be obsolete after aggregating stacked dimensions.
             # This is an expensive operation, so only do it if the dataframe changed.
             value_columns = context.get_value_columns()
+            if not value_columns:
+                raise Exception("Bug: value_columns cannot be empty")
             time_columns = context.get_dimension_column_names(DimensionType.TIME)
             if time_columns:
+                # Persist the query up to this point to avoid multiple evaluations.
+                df = persist_intermediate_query(df, context.scratch_dir_context)
                 stacked_columns = set(df.columns) - value_columns.union(time_columns)
                 df = remove_invalid_null_timestamps(df, time_columns, stacked_columns)
-
+                logger.info("Removed any rows with invalid null timestamps")
         return df

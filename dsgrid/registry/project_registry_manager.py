@@ -62,7 +62,7 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     models_to_dataframe,
     get_unique_values,
-    write_dataframe_and_auto_partition,
+    persist_intermediate_query,
 )
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
@@ -1124,8 +1124,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         logger.info("Make dimension association table for %s", dataset_id)
         df = config.make_dimension_association_table(dataset_id, context)
-        path = context.get_temp_filename(suffix=".parquet")
-        df = write_dataframe_and_auto_partition(df, path)
+        df = persist_intermediate_query(df, context, auto_partition=True)
         logger.info("Wrote dimension associations for dataset %s", dataset_id)
         return df
 

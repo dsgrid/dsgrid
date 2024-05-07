@@ -187,5 +187,6 @@ class PivotedTableHandler(TableFormatHandlerBase):
             metadata = final_metadata.get_metadata(dim_type)
             if dim_type in dropped_dimensions and metadata:
                 metadata.clear()
-            context.replace_dimension_metadata(dim_type, metadata, dataset_id=self.dataset_id)
+            if dim_type != pivoted_dimension_type:
+                context.replace_dimension_metadata(dim_type, metadata, dataset_id=self.dataset_id)
         return df

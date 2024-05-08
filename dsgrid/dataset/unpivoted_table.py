@@ -58,11 +58,12 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
                 assert dim_type not in dropped_dimensions, dim_type
                 columns.append(column)
                 self._add_column_to_dim_type(column, dim_type, column_to_dim_type)
-                if (
-                    dim_type == DimensionType.METRIC
-                    and column.dimension_query_name != dim_type_to_query_name[DimensionType.METRIC]
-                ):
+                if dim_type == DimensionType.METRIC:
                     metric_query_name = column.dimension_query_name
+
+            if metric_query_name is None:
+                raise Exception(f"Bug: A metric dimension is not included in {agg}")
+
             dropped_dimensions.update(set(agg.list_dropped_dimensions()))
             if not columns:
                 continue
@@ -74,7 +75,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
             op = agg.aggregation_function
             df = df.groupBy(*group_by_cols).agg(op(VALUE_COLUMN).alias(VALUE_COLUMN))
 
-            if metric_query_name is not None:
+            if metric_query_name != dim_type_to_query_name[DimensionType.METRIC]:
                 dim_config = self.project_config.get_dimension(metric_query_name)
                 mapping_records = self.project_config.get_base_to_supplemental_mapping_records(
                     metric_query_name
@@ -89,6 +90,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
                     mapping_records,
                     to_unit_records,
                 )
+
             logger.info(
                 "Aggregated dimensions with groupBy %s and operation %s",
                 group_by_cols,

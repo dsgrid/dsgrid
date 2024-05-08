@@ -146,6 +146,7 @@ Jupyter
 
     $ export PYSPARK_DRIVER_PYTHON=jupyter
     $ export PYSPARK_DRIVER_PYTHON_OPTS="notebook --no-browser --port=8889 --ip=0.0.0.0"
+    $ export SPARK_HOME=$(python -c "import pyspark;print(pyspark.__path__[0])")
 
 Local mode:
 

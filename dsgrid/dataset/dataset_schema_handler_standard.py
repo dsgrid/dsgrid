@@ -17,7 +17,6 @@ from dsgrid.utils.dataset import (
     apply_scaling_factor,
 )
 from dsgrid.utils.spark import (
-    create_dataframe_from_ids,
     read_dataframe,
     get_unique_values,
     overwrite_dataframe_file,
@@ -50,16 +49,17 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._check_dataset_internal_consistency()
 
     def make_dimension_association_table(self) -> DataFrame:
-        df = self._remap_dimension_columns(self._load_data_lookup, False)
-        df = self._remove_non_dimension_columns(df).distinct()
-        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
-            pivoted_cols = self.get_pivoted_dimension_columns_mapped_to_project()
-            pivoted_dims = create_dataframe_from_ids(
-                pivoted_cols, self._config.get_pivoted_dimension_type().value
-            )
-            df = df.crossJoin(pivoted_dims)
-
-        return df
+        lk_df = self._load_data_lookup.filter("id is not NULL")
+        dim_cols = self._list_dimension_columns(self._load_data)
+        df = self._load_data.select("id", *dim_cols).distinct()
+        df = df.join(lk_df, on="id").drop("id")
+        df = self._remap_dimension_columns(df, False).drop("fraction")
+        null_lk_df = (
+            self._remap_dimension_columns(self._load_data_lookup.filter("id is NULL"), False)
+            .drop("fraction")
+            .crossJoin(df.select(*dim_cols).distinct())
+        )
+        return self._add_null_values(df, null_lk_df)
 
     def make_project_dataframe(self, project_config):
         # TODO: Can we remove NULLs at registration time?
@@ -77,7 +77,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         # TODO: This might need to handle data skew in the future.
         null_lk_df = self._remap_dimension_columns(null_lk_df, False)
         ld_df = self._remap_dimension_columns(ld_df, True)
-        value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
+        value_columns = {VALUE_COLUMN}
         if SCALING_FACTOR_COLUMN in ld_df.columns:
             ld_df = apply_scaling_factor(ld_df, value_columns)
         ld_df = self._apply_fraction(ld_df, value_columns)
@@ -92,22 +92,17 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 ld_df, project_config, model_years=model_years, value_columns=value_columns
             )
 
-        ld_df = self._handle_unpivot_column_rename(ld_df)
         return self._add_null_values(ld_df, null_lk_df)
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
         lk_df = self._load_data_lookup
         ld_df = self._load_data
 
-        self._check_aggregations(context)
         ld_df = self._prefilter_stacked_dimensions(context, ld_df)
         lk_df = self._prefilter_stacked_dimensions(context, lk_df)
         null_lk_df = lk_df.filter("id is NULL")
         lk_df = lk_df.filter("id is not NULL")
-        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
-            ld_df = self._prefilter_pivoted_dimensions(context, ld_df)
         ld_df = self._prefilter_time_dimension(context, ld_df)
-
         ld_df = ld_df.join(lk_df, on="id").drop("id")
 
         convert_time_before_project_mapping = self._convert_time_before_project_mapping()
@@ -122,7 +117,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             handle_data_skew=True,
             scratch_dir_context=context.scratch_dir_context,
         )
-        value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
+        value_columns = {VALUE_COLUMN}
         if "scaling_factor" in ld_df.columns:
             ld_df = apply_scaling_factor(ld_df, value_columns)
 
@@ -148,7 +143,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
 
         ld_df = self._add_null_values(ld_df, null_lk_df)
-        return self._finalize_table(context, ld_df, value_columns, project_config)
+        return self._finalize_table(context, ld_df, project_config)
 
     @staticmethod
     def _add_null_values(ld_df, null_lk_df):
@@ -183,18 +178,12 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if not found_id:
             raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
 
-        load_data_dimensions = {DimensionType.TIME}
-        match self._config.get_table_format_type():
-            case TableFormatType.PIVOTED:
-                load_data_dimensions.add(DimensionType(self._config.get_pivoted_dimension_type()))
-            case TableFormatType.UNPIVOTED:
-                for col in self._load_data.columns:
-                    if col not in ("id", VALUE_COLUMN):
-                        load_data_dimensions.add(DimensionType(col))
-            case _:
-                msg = str(self._config.get_table_format_type())
-                raise NotImplementedError(msg)
-        expected_dimensions = {d for d in DimensionType if d not in load_data_dimensions}
+        load_data_dimensions = set(self._list_dimensions(self._load_data))
+        expected_dimensions = {
+            d
+            for d in DimensionType.get_dimension_types_allowed_as_columns()
+            if d not in load_data_dimensions
+        }
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
             raise DSGInvalidDataset(
@@ -303,19 +292,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         lookup.cache()
         load_df = self._load_data
         lookup_columns = set(lookup.columns)
-        time_columns = set(
-            self._config.get_dimension(DimensionType.TIME).get_load_data_time_columns()
-        )
-        pivoted_columns_to_remove = set()
-        pivoted_dimension_type = self._config.get_pivoted_dimension_type()
-        if pivoted_dimension_type is not None:
-            pivoted_columns = set(load_df.columns) - lookup_columns - time_columns
-            for dim in dimensions:
-                column = dim.dimension_type.value
-                if column in lookup_columns:
-                    lookup = lookup.filter(lookup[column].isin(dim.record_ids))
-                elif dim.dimension_type == pivoted_dimension_type:
-                    pivoted_columns_to_remove = pivoted_columns.difference(dim.record_ids)
+        for dim in dimensions:
+            column = dim.dimension_type.value
+            if column in lookup_columns:
+                lookup = lookup.filter(lookup[column].isin(dim.record_ids))
 
         drop_columns = []
         for dim in self._config.model.trivial_dimensions:
@@ -332,7 +312,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ids = next(iter(lookup2.select("id").distinct().select(F.collect_list("id")).first()))
 
         load_df = self._load_data.filter(self._load_data.id.isin(ids))
-        load_df = load_df.drop(*pivoted_columns_to_remove)
         path = Path(self._config.load_data_path)
         if path.suffix == ".csv":
             # write_dataframe_and_auto_partition doesn't support CSV yet

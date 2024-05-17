@@ -106,7 +106,7 @@ class TableFormatHandlerBase(abc.ABC):
 
     @abc.abstractmethod
     def process_aggregations(
-        self, df: DataFrame, aggregations: AggregationModel, context: QueryContext
+        self, df: DataFrame, aggregations: list[AggregationModel], context: QueryContext
     ) -> DataFrame:
         """Aggregate the dimensional data as specified by aggregations.
 

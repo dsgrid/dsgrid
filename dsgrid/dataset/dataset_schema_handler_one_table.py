@@ -9,7 +9,6 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.utils.spark import (
-    create_dataframe_from_ids,
     read_dataframe,
     get_unique_values,
     overwrite_dataframe_file,
@@ -89,7 +88,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if pivoted_dim_found:
             dimension_types.add(pivoted_dim)
 
-        expected_dimensions = {d for d in DimensionType if d != DimensionType.TIME}
+        expected_dimensions = DimensionType.get_dimension_types_allowed_as_columns()
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
             raise DSGInvalidDataset(
@@ -120,22 +119,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 )
 
     def make_dimension_association_table(self) -> DataFrame:
-        exclude = set(self._get_time_dimension_columns())
-        exclude.update(self._config.get_value_columns())
-        dim_cols = [x for x in self._load_data.columns if x not in exclude]
-
+        dim_cols = self._list_dimension_columns(self._load_data)
         df = self._load_data.select(*dim_cols).distinct()
         df = self._remap_dimension_columns(df, True)
-        df = self._remove_non_dimension_columns(df).distinct()
-
-        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
-            pivoted_cols = set(self.get_pivoted_dimension_columns_mapped_to_project())
-            pivoted_dims = create_dataframe_from_ids(
-                pivoted_cols, self._config.get_pivoted_dimension_type().value
-            )
-            df = df.crossJoin(pivoted_dims)
-
-        return df
+        return self._remove_non_dimension_columns(df).distinct()
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel]):
@@ -180,24 +167,22 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._load_data
         # TODO: This might need to handle data skew in the future.
         ld_df = self._remap_dimension_columns(ld_df, True, scratch_dir_context=scratch_dir_context)
-        value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
+        value_columns = {VALUE_COLUMN}
         ld_df = self._apply_fraction(ld_df, value_columns)
         project_metric_records = project_config.get_base_dimension(
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
+
         ld_df = self._convert_time_dimension(
             ld_df, project_config, value_columns, scratch_dir_context
         )
+
         return self._handle_unpivot_column_rename(ld_df)
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
         ld_df = self._load_data
-
-        self._check_aggregations(context)
         ld_df = self._prefilter_stacked_dimensions(context, ld_df)
-        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
-            ld_df = self._prefilter_pivoted_dimensions(context, ld_df)
         ld_df = self._prefilter_time_dimension(context, ld_df)
         ld_df = self._remap_dimension_columns(
             ld_df,
@@ -206,13 +191,11 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             handle_data_skew=True,
             scratch_dir_context=context.scratch_dir_context,
         )
-        value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
+        value_columns = {VALUE_COLUMN}
         ld_df = self._apply_fraction(ld_df, value_columns)
         project_metric_records = project_config.get_base_dimension(
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-        ld_df = self._convert_time_dimension(
-            ld_df, project_config, value_columns, context.scratch_dir_context
-        )
-        return self._finalize_table(context, ld_df, value_columns, project_config)
+
+        return self._finalize_table(context, ld_df, project_config)

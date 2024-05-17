@@ -108,46 +108,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         return self._config
 
-    def get_value_columns_mapped_to_project(self) -> set[str]:
-        """Return the columns that contain values."""
-        match self._config.get_table_format_type():
-            case TableFormatType.PIVOTED:
-                return self.get_pivoted_dimension_columns_mapped_to_project()
-            case TableFormatType.UNPIVOTED:
-                return {VALUE_COLUMN}
-            case _:
-                raise NotImplementedError(str(self._config.get_table_format_type()))
-
-    def get_pivoted_dimension_columns_mapped_to_project(self) -> set[str]:
-        """Get columns for the dimension that is pivoted in load_data and remap them to the
-        project's record names. The returned set will not include columns that the project does
-        not care about.
-        """
-        if self._config.get_table_format_type() != TableFormatType.PIVOTED:
-            return set()
-
-        columns = set(self._config.get_pivoted_dimension_columns())
-        dim_type = self._config.get_pivoted_dimension_type()
-        for ref in self._mapping_references:
-            if ref.from_dimension_type == dim_type:
-                mapping_config = self._dimension_mapping_mgr.get_by_id(
-                    ref.mapping_id, version=ref.version
-                )
-                records = mapping_config.get_records_dataframe()
-                from_ids = get_unique_values(records, "from_id")
-                to_ids = get_unique_values(
-                    records.select("to_id").filter("to_id IS NOT NULL"), "to_id"
-                )
-                diff = from_ids.symmetric_difference(columns)
-                if diff:
-                    raise DSGInvalidDataset(
-                        f"Dimension_mapping={mapping_config.config_id} does not have the same "
-                        f"record IDs as the dataset={self._config.config_id} columns: {diff}"
-                    )
-                return to_ids
-
-        return columns
-
     def get_columns_for_unique_arrays(self, load_data_df):
         """Returns the list of dimension columns aginst which the number of timestamps is checked.
 
@@ -191,16 +151,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         pyspark.sql.DataFrame
 
         """
-
-    def _check_aggregations(self, context):
-        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
-            pivoted_type = self._config.get_pivoted_dimension_type()
-            assert pivoted_type is not None
-            for agg in context.model.result.aggregations:
-                if not getattr(agg.dimensions, pivoted_type.value):
-                    raise DSGInvalidQuery(
-                        f"Pivoted dimension type {pivoted_type.value} is not included in an aggregation"
-                    )
 
     @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency(self, load_data_df):
@@ -278,85 +228,29 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 break
 
         dataset_records = self._config.get_dimension(DimensionType.METRIC).get_records_dataframe()
-        match self._config.get_table_format_type():
-            case TableFormatType.PIVOTED:
-                df = energy.convert_units_pivoted(
-                    df, value_columns, dataset_records, mapping_records, project_metric_records
-                )
-            case TableFormatType.UNPIVOTED:
-                df = energy.convert_units_unpivoted(
-                    df,
-                    DimensionType.METRIC.value,
-                    dataset_records,
-                    mapping_records,
-                    project_metric_records,
-                )
-            case _:
-                raise NotImplementedError(
-                    str(self._config.model.data_schema.table_format.format_type)
-                )
-        return df
+        return energy.convert_units_unpivoted(
+            df,
+            DimensionType.METRIC.value,
+            dataset_records,
+            mapping_records,
+            project_metric_records,
+        )
 
-    def _finalize_table(self, context: QueryContext, df, value_columns, project_config):
-        orig_table_format = self._config.get_table_format_type()
-        final_table_format = context.get_table_format_type()
+    def _finalize_table(self, context: QueryContext, df, project_config):
+        table_format = self._config.get_table_format_type()
         table_handler = make_table_format_handler(
-            orig_table_format,
+            table_format,
             project_config,
             dataset_id=self.dataset_id,
         )
 
         if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
             df = table_handler.convert_columns_to_query_names(df)
-        df = self._handle_unpivot_column_rename(df)
 
-        pivoted_columns = None
-        if (
-            orig_table_format == TableFormatType.PIVOTED
-            and final_table_format == TableFormatType.UNPIVOTED
-        ):
-            pivoted_column_name = self._get_pivoted_column_name(
-                context, self._config.get_pivoted_dimension_type(), project_config
-            )
-            ids = set(df.columns) - value_columns
-            df = df.unpivot(
-                [x for x in df.columns if x in ids],
-                list(value_columns),
-                pivoted_column_name,
-                VALUE_COLUMN,
-            )
-        elif (
-            orig_table_format == TableFormatType.UNPIVOTED
-            and final_table_format == TableFormatType.PIVOTED
-        ):
-            pivoted_column_name = self._get_pivoted_column_name(
-                context, context.get_pivoted_dimension_type(), project_config
-            )
-            ids = set(df.columns) - {VALUE_COLUMN, pivoted_column_name}
-            df = (
-                df.groupBy(*[x for x in df.columns if x in ids])
-                .pivot(pivoted_column_name)
-                .sum(VALUE_COLUMN)
-            )
-            pivoted_columns = set(df.columns) - ids - {VALUE_COLUMN, pivoted_column_name}
-        elif orig_table_format == final_table_format:
-            if final_table_format == TableFormatType.PIVOTED:
-                pivoted_columns = value_columns
-        elif orig_table_format != final_table_format:
-            msg = f"{orig_table_format=} {final_table_format=}"
-            raise NotImplementedError(msg)
-
-        kwargs = {}
-        if final_table_format == TableFormatType.PIVOTED:
-            assert pivoted_columns is not None
-            kwargs["pivoted_columns"] = pivoted_columns
-            kwargs["pivoted_dimension_type"] = context.get_pivoted_dimension_type()
         context.set_dataset_metadata(
             self.dataset_id,
             context.model.result.column_type,
-            final_table_format,
             project_config,
-            **kwargs,
         )
 
         return df
@@ -401,20 +295,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         time_cols = time_dim.get_load_data_time_columns()
         return time_cols
 
-    def _handle_unpivot_column_rename(self, df: DataFrame):
-        if self._config.get_table_format_type() != TableFormatType.UNPIVOTED:
-            return df
-
-        value_columns = self._config.get_value_columns()
-        if len(value_columns) != 1:
-            msg = f"length of value columns in an unpivoted table must be 1: {value_columns=}"
-            raise NotImplementedError(msg)
-
-        value_column = value_columns[0]
-        if value_column != VALUE_COLUMN:
-            df = df.withColumnRenamed(value_column, VALUE_COLUMN)
-        return df
-
     def _iter_dataset_record_ids(self, context: QueryContext):
         for dim_type, project_record_ids in context.get_record_ids().items():
             dataset_mapping = self._get_dataset_to_project_mapping_records(dim_type)
@@ -432,6 +312,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 )
             yield dim_type, dataset_record_ids
 
+    @staticmethod
+    def _list_dimension_columns(df: DataFrame) -> list[str]:
+        columns = DimensionType.get_allowed_dimension_columns()
+        return [x for x in df.columns if x in columns]
+
+    def _list_dimensions(self, df: DataFrame) -> list[DimensionType]:
+        dims = [DimensionType(x) for x in DatasetSchemaHandlerBase._list_dimension_columns(df)]
+        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+            pivoted_type = self._config.get_pivoted_dimension_type()
+            assert pivoted_type is not None
+            dims.append(pivoted_type)
+        return dims
+
     def _prefilter_pivoted_dimensions(self, context: QueryContext, df):
         for dim_type, dataset_record_ids in self._iter_dataset_record_ids(context):
             if dim_type == self._config.get_pivoted_dimension_type():
@@ -446,13 +339,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df
 
     def _prefilter_stacked_dimensions(self, context: QueryContext, df):
-        format_type = self._config.get_table_format_type()
         for dim_type, dataset_record_ids in self._iter_dataset_record_ids(context):
-            if (
-                format_type == TableFormatType.PIVOTED
-                and dim_type == self._config.get_pivoted_dimension_type()
-            ):
-                continue
             # Drop rows that don't match requested project record IDs.
             tmp = dataset_record_ids.withColumnRenamed("id", "dataset_record_id")
             if dim_type.value not in df.columns:
@@ -618,6 +505,5 @@ class DatasetSchemaHandlerBase(abc.ABC):
             logger.warning(msg)
 
     def _remove_non_dimension_columns(self, df: DataFrame) -> DataFrame:
-        allowed_columns = {x.value for x in DimensionType}
-        columns = [x for x in df.columns if x in allowed_columns]
-        return df.select(*columns)
+        allowed_columns = self._list_dimension_columns(df)
+        return df.select(*allowed_columns)

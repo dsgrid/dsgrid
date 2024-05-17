@@ -1108,7 +1108,6 @@ class ProjectRegistryManager(RegistryManagerBase):
                     diff_counts[col],
                 )
         mapped_dataset_table.unpersist()
-
         raise DSGInvalidDataset(
             f"Dataset {dataset_config.config_id} is missing required dimension records. "
             "Please look in the log file for more information."

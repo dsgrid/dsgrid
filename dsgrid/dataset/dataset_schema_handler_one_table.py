@@ -121,7 +121,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def make_dimension_association_table(self) -> DataFrame:
         dim_cols = self._list_dimension_columns(self._load_data)
         df = self._load_data.select(*dim_cols).distinct()
-        df = self._remap_dimension_columns(df, True)
+        df = self._remap_dimension_columns(df)
         return self._remove_non_dimension_columns(df).distinct()
 
     @track_timing(timer_stats_collector)
@@ -166,7 +166,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         ld_df = self._load_data
         # TODO: This might need to handle data skew in the future.
-        ld_df = self._remap_dimension_columns(ld_df, True, scratch_dir_context=scratch_dir_context)
+        ld_df = self._remap_dimension_columns(ld_df, scratch_dir_context=scratch_dir_context)
         value_columns = {VALUE_COLUMN}
         ld_df = self._apply_fraction(ld_df, value_columns)
         project_metric_records = project_config.get_base_dimension(
@@ -186,7 +186,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._prefilter_time_dimension(context, ld_df)
         ld_df = self._remap_dimension_columns(
             ld_df,
-            True,
             filtered_records=context.get_record_ids(),
             handle_data_skew=True,
             scratch_dir_context=context.scratch_dir_context,

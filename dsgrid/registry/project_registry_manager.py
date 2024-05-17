@@ -63,7 +63,6 @@ from dsgrid.utils.spark import (
     models_to_dataframe,
     get_unique_values,
     persist_intermediate_table,
-    write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (

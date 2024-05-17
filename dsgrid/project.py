@@ -5,9 +5,7 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-import pyspark.sql.functions as F
-from pyspark.sql import SparkSession, DataFrame
-from pyspark.sql.types import DoubleType
+from pyspark.sql import SparkSession
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.project_config import ProjectConfig

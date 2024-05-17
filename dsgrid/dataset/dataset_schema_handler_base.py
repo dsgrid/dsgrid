@@ -12,7 +12,6 @@ from dsgrid.config.annual_time_dimension_config import (
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 
 import dsgrid.units.energy as energy
-from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig, InputDatasetType
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
@@ -21,7 +20,7 @@ from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
+from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.dimension.time import (
     TimeDimensionType,
     DaylightSavingAdjustmentModel,
@@ -32,13 +31,11 @@ from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
     is_noop_mapping,
     map_and_reduce_stacked_dimension,
-    map_and_reduce_pivoted_dimension,
     add_time_zone,
     ordered_subset_columns,
     repartition_if_needed_by_mapping,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import get_unique_values
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -358,7 +355,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _remap_dimension_columns(
         self,
         df: DataFrame,
-        contains_values: bool,
         filtered_records: None | dict = None,
         handle_data_skew=False,
         scratch_dir_context: Optional[ScratchDirContext] = None,
@@ -367,10 +363,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
             msg = "Bug: conflicting inputs: handle_data_skew requires a scratch_dir_context"
             raise Exception(msg)
 
-        pivoted_dim_type = self._config.get_pivoted_dimension_type()
-        pivoted_columns = set(df.columns).intersection(
-            self._config.get_pivoted_dimension_columns()
-        )
         for ref in self._mapping_references:
             dim_type = ref.from_dimension_type
             column = dim_type.value
@@ -400,34 +392,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         mapping_config.model.mapping_type,
                         scratch_dir_context,
                     )
-            elif (
-                contains_values
-                and pivoted_dim_type is not None
-                and column == pivoted_dim_type.value
-            ):
-                if pivoted_columns.issubset(df.columns):
-                    # The dataset might have columns unwanted by the project.
-                    columns_to_remove = get_unique_values(
-                        records.filter("to_id IS NULL"), "from_id"
-                    )
-                    if columns_to_remove:
-                        df = df.drop(*columns_to_remove)
-                        pivoted_columns.difference_update(columns_to_remove)
-                    # TODO #197: Do we want operation to be configurable?
-                    operation = "sum"
-                    df, _, _ = map_and_reduce_pivoted_dimension(
-                        df,
-                        records,
-                        pivoted_columns,
-                        operation,
-                        rename=False,
-                    )
-                else:
-                    raise NotImplementedError(
-                        f"Unhandled case: column={column} pivoted_columns={pivoted_columns} "
-                        f"df.columns={df.columns}"
-                    )
-            # else nothing to do
 
         return df
 

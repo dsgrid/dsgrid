@@ -82,11 +82,10 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
     load_data_lookup_df = dataset._handler._load_data_lookup
     mapped_load_data = dataset._handler._remap_dimension_columns(
         load_data_df,
-        True,
         handle_data_skew=True,
         scratch_dir_context=ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir()),
     )
-    mapped_load_data_lookup = dataset._handler._remap_dimension_columns(load_data_lookup_df, False)
+    mapped_load_data_lookup = dataset._handler._remap_dimension_columns(load_data_lookup_df)
 
     # [1] check that mapped tables contain all to_id records from mappings
     for ref in dataset._handler._mapping_references:

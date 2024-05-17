@@ -53,9 +53,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         dim_cols = self._list_dimension_columns(self._load_data)
         df = self._load_data.select("id", *dim_cols).distinct()
         df = df.join(lk_df, on="id").drop("id")
-        df = self._remap_dimension_columns(df, False).drop("fraction")
+        df = self._remap_dimension_columns(df).drop("fraction")
         null_lk_df = (
-            self._remap_dimension_columns(self._load_data_lookup.filter("id is NULL"), False)
+            self._remap_dimension_columns(self._load_data_lookup.filter("id is NULL"))
             .drop("fraction")
             .crossJoin(df.select(*dim_cols).distinct())
         )
@@ -75,8 +75,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._convert_time_dimension(ld_df, project_config)
 
         # TODO: This might need to handle data skew in the future.
-        null_lk_df = self._remap_dimension_columns(null_lk_df, False)
-        ld_df = self._remap_dimension_columns(ld_df, True)
+        null_lk_df = self._remap_dimension_columns(null_lk_df)
+        ld_df = self._remap_dimension_columns(ld_df)
         value_columns = {VALUE_COLUMN}
         if SCALING_FACTOR_COLUMN in ld_df.columns:
             ld_df = apply_scaling_factor(ld_df, value_columns)
@@ -112,7 +112,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         ld_df = self._remap_dimension_columns(
             ld_df,
-            True,
             filtered_records=context.get_record_ids(),
             handle_data_skew=True,
             scratch_dir_context=context.scratch_dir_context,
@@ -127,7 +126,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
         null_lk_df = self._remap_dimension_columns(
-            null_lk_df, False, filtered_records=context.get_record_ids()
+            null_lk_df, filtered_records=context.get_record_ids()
         )
 
         if not convert_time_before_project_mapping:

@@ -1,6 +1,5 @@
 import logging
 import os
-from collections import defaultdict
 
 import pyspark
 from pyspark.sql import DataFrame
@@ -32,84 +31,6 @@ def map_and_reduce_stacked_dimension(df, records, column, drop_column=True, to_c
         *nonfraction_cols, "fraction*from_fraction AS fraction"
     )
     return df
-
-
-@track_timing(timer_stats_collector)
-def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, rename=False):
-    """Maps the pivoted dimension columns as specified by records and operation. The operation
-    is a row-wise aggregation.
-
-    This can be used to:
-        1. Map a dataset's dataframe columns per dataset-to-project mapping records.
-        2. Map a project's dataframe columns per base-to-supplemental mapping records.
-
-    Parameters
-    ----------
-    df : pyspark.sql.DataFrame
-    records : pyspark.sql.DataFrame
-        Dimension mapping records
-    pivoted_columns : set
-        Column names in df that are the pivoted dimension records
-    operation : str
-        Controls how to aggregate the the mapped columns.
-    rename : bool
-        Controls whether to rename the aggregated columns to include the operation name.
-        For example, if the request is to sum the supplemental dimension 'all_electricity,'
-        the column will be renamed to 'all_electricity_sum.'
-
-    Returns
-    -------
-    tuple
-        pyspark.sql.DataFrame, sorted list of pivoted dimension columns in that table, dropped cols
-
-    """
-    diff = pivoted_columns.difference(df.columns)
-    assert not diff, diff
-    nonvalue_cols = list(set(df.columns).difference(pivoted_columns))
-    columns = set(df.columns)
-
-    records_dict = defaultdict(dict)
-    processed = set()
-    for row in records.collect():
-        if row.to_id is not None and row.from_id in columns:
-            records_dict[row.to_id][row.from_id] = row.from_fraction
-            processed.add(row.from_id)
-
-    extra_pivoted_columns_to_keep = set(pivoted_columns).difference(processed)
-
-    if operation == "sum":
-        # This is identical to running F.coalesce(col, F.lit(0.0)) on each column.
-        df = df.fillna(0.0, subset=list(pivoted_columns))
-
-    to_ids = sorted(records_dict)
-    exprs = []
-    final_columns = []
-    dropped = set()
-    for tid in to_ids:
-        column = f"{tid}_{operation}" if rename else tid
-        final_columns.append(column)
-        expr = [f"{from_id}*{fraction}" for from_id, fraction in records_dict[tid].items()]
-        if operation == "sum":
-            val = "+".join(expr)
-            expr = f"{val} AS {column}"
-        elif operation == "max":
-            val = ",".join(expr)
-            expr = f"greatest({val}) AS {column}"
-        elif operation == "min":
-            val = ",".join(expr)
-            expr = f"least({val}) AS {column}"
-        # TODO #208: Need to decide how to handle NULL values. If they should not be included in
-        # the mean, the logic below is incorrect
-        # elif operation in ("avg", "mean"):
-        #    val = "(" + "+".join(expr) + f") / {len(expr)}"
-        #    expr = f"{val} AS {column}"
-        else:
-            raise NotImplementedError(f"Unsupported {operation=}")
-        exprs.append(expr)
-        dropped.update({x for x in records_dict[tid]})
-
-    extra_cols = sorted(extra_pivoted_columns_to_keep)
-    return df.selectExpr(*nonvalue_cols, *extra_cols, *exprs), sorted(final_columns), dropped
 
 
 def add_time_zone(load_data_df, geography_dim):

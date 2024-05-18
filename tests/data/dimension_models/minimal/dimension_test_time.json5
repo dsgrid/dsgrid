@@ -4,9 +4,9 @@
       type: "time",
       class_name: "Time",
       time_type: "datetime",
-      description: "Time dimension, 2012 hourly EST, period-beginning, no DST, no Leap Day Adjustment, total value\n",
+      description: "Time dimension, 2012 hourly EST, period-beginning, otal value\n",
       frequency: "01:00:00",
-      name: "Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total",
+      name: "Time-2012-EST-hourly-periodBeginning-total",
       display_name: "2012 Hourly EST",
       time_interval_type: "period_beginning",
       ranges: [
@@ -42,9 +42,9 @@
       type: "time",
       class_name: "Time",
       time_type: "datetime",
-      description: "Time dimension, 2016 hourly EPT, period-ending, no Leap Day Adjustment, total value\n",
+      description: "Time dimension, 2016 hourly EPT, period-ending, total value\n",
       frequency: "06:00:00",
-      name: "Time-2016-EPT-hourly-periodEnding-noLeapDayAdjustment-total",
+      name: "Time-2016-EPT-hourly-periodEnding-total",
       display_name: "2016 6-Hour Timestep EPT",
       time_interval_type: "period_ending",
       ranges: [
@@ -55,10 +55,28 @@
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
       timezone: "EasternPrevailing",
-      data_adjustment: {leap_day_adjustment: "none"},
       measurement_type: "max",
     },
-    { // #[3]
+    { // #[3] 8760 - local standard
+      type: "time",
+      class_name: "Time",
+      time_type: "datetime",
+      description: "Time dimension, 2012 hourly local standard modeled time, period-ending, total value\n",
+      frequency: "01:00:00",
+      name: "Time-2012-local-standard-model-hourly-periodEnding-total",
+      display_name: "2012 Hourly local standard",
+      time_interval_type: "period_ending",
+      ranges: [
+        {
+          start: "2012-03-11 00:00:00",
+          end: "2012-11-04 23:00:00",
+        },
+      ],
+      str_format: "%Y-%m-%d %H:%M:%S",
+      timezone: "LocalStandard",
+      measurement_type: "total",
+    },
+    { // #[4]
       type: "time",
       class_name: "AnnualTime",
       time_type: "annual",
@@ -76,7 +94,7 @@
       include_leap_day: true,
       measurement_type: "mean",
     },
-    { // #[4]
+    { // #[5]
       "class": "Time",
       type: "time",
       name: "Time of Week by Month",
@@ -93,7 +111,7 @@
       format: "one_week_per_month_by_hour",
       description: "TEMPO Time - Month (representing seasons), day of week, and hour of day.",
     },
-    { // #[5]
+    { // #[6]
       "class": "Time",
       type: "time",
       name: "Local-time-2022-indexed",
@@ -101,15 +119,15 @@
       time_type: "indexed",
       index_ranges: [
 	      {
-          start: 0,
-          end: 8759,
+          start: 1680,
+          end: 7395,
 	        interval: 1,
         },
       ],
       ranges: [
         {
-          start: "2018-01-01 00:00:00",
-          end: "2018-12-31 23:00:00",
+          start: "2012-03-11 00:00:00",
+          end: "2012-11-04 03:00:00",
         },
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
@@ -117,13 +135,13 @@
       timezone: "LocalStandard",
       time_interval_type: "period_ending",
       measurement_type: "total",
-      data_adjustment: {
-        daylight_saving_adjustment:
-          {
-            spring_forward_hour: "drop",
-            fall_back_hour: "interpolate",
-          },
-      },
+      // data_adjustment: {
+      //   daylight_saving_adjustment:
+      //     {
+      //       spring_forward_hour: "drop",
+      //       fall_back_hour: "interpolate",
+      //     },
+      // },
       description: "Industrial time, indexed, stitched from representative diurnal profiles in county local standard time, data and timestamps need adjustment to local prevailing time",
     },
   ],

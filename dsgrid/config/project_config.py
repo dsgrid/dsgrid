@@ -50,6 +50,7 @@ from .dimensions import (
     check_display_name,
     generate_dimension_query_name,
 )
+from dsgrid.dimension.time import DataAdjustmentModel
 
 
 logger = logging.getLogger(__name__)
@@ -564,6 +565,15 @@ class InputDatasetModel(DSGBaseModel):
             title="wrap_time_allowed",
             description="Whether to allow dataset time to be wrapped to project time if different",
             default=False,
+        ),
+    ]
+    data_adjustment: Annotated[
+        DataAdjustmentModel,
+        Field(
+            title="data_adjustment",
+            description="Defines how the rest of the dataframe is adjusted with respect to time. "
+            "E.g., when drop associated data when dropping a leap day timestamp.",
+            default=DataAdjustmentModel(),
         ),
     ]
 

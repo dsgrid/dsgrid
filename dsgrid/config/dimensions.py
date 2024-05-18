@@ -13,14 +13,11 @@ from typing_extensions import Annotated
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.time import (
-    LeapDayAdjustmentType,
     TimeIntervalType,
     MeasurementType,
     TimeZone,
     TimeDimensionType,
     RepresentativePeriodFormat,
-    DaylightSavingSpringForwardType,
-    DaylightSavingFallBackType,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME, REGEX_VALID_REGISTRY_DISPLAY_NAME
 from dsgrid.utils.files import compute_file_hash
@@ -451,67 +448,6 @@ class IndexRangeModel(DSGBaseModel):
     ]
 
 
-class DaylightSavingAdjustmentModel(DSGBaseModel):
-    """Defines how to drop and add data along with timestamps to convert standard time
-    load profiles to clock time"""
-
-    spring_forward_hour: Annotated[
-        DaylightSavingSpringForwardType,
-        Field(
-            title="spring_forward_hour",
-            description="Data adjustment for spring forward hour (a 2AM in March)",
-            default=DaylightSavingSpringForwardType.DROP,
-            json_schema_extra={
-                "options": DaylightSavingSpringForwardType.format_descriptions_for_docs(),
-            },
-        ),
-    ]
-    fall_back_hour: Annotated[
-        DaylightSavingFallBackType,
-        Field(
-            title="fall_back_hour",
-            description="Data adjustment for spring forward hour (a 2AM in November)",
-            default=DaylightSavingFallBackType.INTERPOLATE,
-            json_schema_extra={
-                "options": DaylightSavingFallBackType.format_descriptions_for_docs(),
-            },
-        ),
-    ]
-
-
-class DataAdjustmentModel(DSGBaseModel):
-    """Defines how data needs to be adjusted with respect to time.
-    For leap day adjustment, up to one full day of timestamps and data are dropped.
-    For daylight savings, the dataframe is adjusted alongside the timestamps.
-    This is useful when the load profiles are modeled in standard time and
-    need to be converted to get clock time load profiles.
-    """
-
-    leap_day_adjustment: Annotated[
-        LeapDayAdjustmentType,
-        Field(
-            title="leap_day_adjustment",
-            description="Leap day adjustment method applied to time data",
-            default=LeapDayAdjustmentType.NONE,
-            json_schema_extra={
-                "options": LeapDayAdjustmentType.format_descriptions_for_docs(),
-                "notes": (
-                    "The dsgrid default is None, i.e., no adjustment made to leap years.",
-                    "Adjustments are made to leap years only.",
-                ),
-            },
-        ),
-    ]
-    daylight_saving_adjustment: Annotated[
-        Optional[DaylightSavingAdjustmentModel],
-        Field(
-            title="daylight_saving_adjustment",
-            description="Daylight saving adjustment method applied to time data",
-            default=None,
-        ),
-    ]
-
-
 class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
     """Defines a base model common to all time dimensions."""
 
@@ -585,15 +521,6 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         Field(
             title="time_ranges",
             description="Defines the continuous ranges of time in the data, inclusive of start and end time.",
-        ),
-    ]
-    data_adjustment: Annotated[
-        DataAdjustmentModel,
-        Field(
-            title="data_adjustment",
-            description="Defines how the rest of the dataframe is adjusted with respect to time. "
-            "E.g., when drop associated data when dropping a leap day timestamp.",
-            default=DataAdjustmentModel(),
         ),
     ]
     time_interval_type: Annotated[
@@ -827,15 +754,6 @@ class IndexedTimeDimensionModel(TimeDimensionBaseModel):
                     "Cheatsheet reference: `<https://strftime.org/>`_.",
                 ),
             },
-        ),
-    ]
-    data_adjustment: Annotated[
-        DataAdjustmentModel,
-        Field(
-            title="data_adjustment",
-            description="Defines how the rest of the dataframe is adjusted with respect to time. "
-            "E.g., when drop associated data when dropping a leap day timestamp.",
-            default=DataAdjustmentModel(),
         ),
     ]
     time_interval_type: Annotated[

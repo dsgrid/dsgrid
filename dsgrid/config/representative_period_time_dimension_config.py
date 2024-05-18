@@ -12,7 +12,6 @@ from dsgrid.dimension.time import (
     TimeZone,
     RepresentativePeriodFormat,
     DatetimeRange,
-    LeapDayAdjustmentType,
 )
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import (
@@ -23,6 +22,7 @@ from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
+from dsgrid.dimension.time import DataAdjustmentModel
 
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             time_columns,
         )
 
-    def build_time_dataframe(self, model_years=None):
+    def build_time_dataframe(self, model_years=None, timezone=None, data_adjustment=None):
         time_cols = self.get_load_data_time_columns()
         schema = StructType(
             [StructField(time_col, IntegerType(), False) for time_col in time_cols]
@@ -169,13 +169,18 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return self._format_handler.get_frequency()
 
-    def get_time_ranges(self, model_years=None):
+    def get_time_ranges(self, model_years=None, timezone=None, data_adjustment=None):
+        if data_adjustment is None:
+            data_adjustment = DataAdjustmentModel()
         if model_years is not None:
             # We do not expect to need this.
             raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
 
         return self._format_handler.get_time_ranges(
-            self.model.ranges, self.model.time_interval_type, self.get_tzinfo()
+            self.model.ranges,
+            self.model.time_interval_type,
+            self.get_tzinfo(),
+            data_adjustment=data_adjustment,
         )
 
     def get_load_data_time_columns(self):
@@ -303,9 +308,11 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     def get_frequency(self):
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, time_interval_type, _):
+    def get_time_ranges(self, ranges, time_interval_type, _, data_adjustment=None):
         # TODO: This method may have some problems but is currently unused.
         # How to handle year? Leap year?
+        if data_adjustment is None:
+            data_adjustment = DataAdjustmentModel()
         time_ranges = []
         for model in ranges:
             if model.end == 2:
@@ -316,7 +323,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
                     start=pd.Timestamp(datetime(year=1970, month=model.start, day=1)),
                     end=pd.Timestamp(datetime(year=1970, month=model.end, day=last_day, hour=23)),
                     frequency=timedelta(hours=1),
-                    leap_day_adjustment=LeapDayAdjustmentType.NONE,
+                    data_adjustment=data_adjustment,
                     time_interval_type=time_interval_type,
                 )
             )
@@ -352,7 +359,7 @@ class OneWeekdayDayAndWeekendDayPerMonthByHourHandler(RepresentativeTimeFormatHa
     def get_frequency(self):
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, time_interval_type, _):
+    def get_time_ranges(self, ranges, time_interval_type, _, data_adjustment=None):
         raise NotImplementedError("get_time_ranges")
 
     @staticmethod

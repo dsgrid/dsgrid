@@ -1,6 +1,7 @@
 import abc
 from datetime import datetime, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pyspark.sql.functions as F
@@ -9,6 +10,7 @@ from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import TimeZone, TimeIntervalType
 from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidDimension
 from dsgrid.config.dimensions import TimeRangeModel
+from dsgrid.dimension.time import DataAdjustmentModel
 
 
 class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
@@ -31,7 +33,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def build_time_dataframe(self, model_years: Optional[list[int]] = None):
+    def build_time_dataframe(
+        self,
+        model_years: Optional[list[int]] = None,
+        timezone: Optional[ZoneInfo] = None,
+        data_adjustment: Optional[DataAdjustmentModel] = None,
+    ):
         """Build time dimension as specified in config in a spark dataframe.
 
         Parameters
@@ -139,7 +146,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df.withColumnRenamed(time_cols[0], self.model.dimension_query_name)
 
     @abc.abstractmethod
-    def get_time_ranges(self, model_years: Optional[list[int]] = None):
+    def get_time_ranges(
+        self,
+        model_years: Optional[list[int]] = None,
+        timezone: Optional[ZoneInfo] = None,
+        data_adjustment: Optional[DataAdjustmentModel] = None,
+    ):
         """Return time ranges with timezone applied.
 
         Parameters
@@ -147,6 +159,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         model_years : None | list[int]
             If set, replace the base year in the time ranges with these model years. In this case
             each range must be in the same year.
+        timezone : None | ZoneInfo
+            If set, override the self timezone info when creating the time ranges
 
         Returns
         -------

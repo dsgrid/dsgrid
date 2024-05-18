@@ -1,8 +1,10 @@
 import datetime
+from zoneinfo import ZoneInfo
 import pandas as pd
 import pytest
 from pydantic import ValidationError
 import logging
+import pyspark.sql.functions as F
 
 from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
@@ -13,8 +15,17 @@ from dsgrid.config.representative_period_time_dimension_config import (
     RepresentativePeriodTimeDimensionConfig,
 )
 from dsgrid.config.indexed_time_dimension_config import IndexedTimeDimensionConfig
-from dsgrid.dimension.time import LeapDayAdjustmentType
-
+from dsgrid.dimension.time import (
+    LeapDayAdjustmentType,
+    DaylightSavingSpringForwardType,
+    DaylightSavingFallBackType,
+    TimeZone,
+    DataAdjustmentModel,
+    get_dls_springforward_time_change_by_year,
+    get_dls_springforward_time_change_by_time_range,
+    get_dls_fallback_time_change_by_year,
+    get_dls_fallback_time_change_by_time_range,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -40,7 +51,17 @@ def time_dimension_model2():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[2]  # DateTimeDimensionModel (8760 period-ending)
+    yield model.dimensions[2]  # DateTimeDimensionModel (8760 period-ending, 6-h freq)
+
+
+@pytest.fixture
+def time_dimension_model3():
+    file = DIMENSION_CONFIG_FILE_TIME
+    config_as_dict = load_data(file)
+    model = DimensionsConfigModel(**config_as_dict)
+    yield model.dimensions[
+        3
+    ]  # DateTimeDimensionModel (8760 local standard, for daylight adjustment)
 
 
 @pytest.fixture
@@ -48,7 +69,7 @@ def annual_time_dimension_model():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[3]  # AnnualTimeDimensionModel (annual time, correct format)
+    yield model.dimensions[4]  # AnnualTimeDimensionModel (annual time, correct format)
 
 
 @pytest.fixture
@@ -56,7 +77,7 @@ def representative_time_dimension_model():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[4]  # RepresentativeTimeDimensionModel
+    yield model.dimensions[5]  # RepresentativeTimeDimensionModel
 
 
 @pytest.fixture
@@ -64,19 +85,25 @@ def indexed_time_dimension_model():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[5]  # IndexedTimeDimensionModel
+    yield model.dimensions[6]  # IndexedTimeDimensionModel
 
 
-def check_date_range_creation(time_dimension_model):
+def check_date_range_creation(time_dimension_model, data_adjustment=None):
+    if data_adjustment is None:
+        data_adjustment = DataAdjustmentModel()
     config = DateTimeDimensionConfig(time_dimension_model)  # TimeDimensionConfig
-    time_range = config.get_time_ranges()
+    time_range = config.get_time_ranges(data_adjustment=data_adjustment)
     tz = config.get_tzinfo()
 
     # create date range for time dimension
+    assert len(time_range) == 1, "there are more than one time range."
     df = pd.DataFrame()
     df["dim_dt"] = time_range[0].list_time_range()
+    if tz is None:
+        # if timezone naive, Spark will create timestamps in local system time
+        tz = df.loc[0, "dim_dt"].tzinfo
+        df["dim_dt"] = df["dim_dt"].apply(lambda x: x.astimezone(tz))
 
-    str(time_range)
     logger.info("Date range created: ", time_range[0].show_range(5))  # show first and last 5
 
     # create date range using pandas
@@ -94,54 +121,63 @@ def check_date_range_creation(time_dimension_model):
         freq = f"{int(hours)}h"
     ts = pd.date_range(start, end, freq=freq, tz=tz)
 
-    # make necessary adjustments for leap_day_adjustment
+    # make necessary data adjustments
+    ld_adj = data_adjustment.leap_day_adjustment
+    sf_adj = data_adjustment.daylight_saving_adjustment.spring_forward_hour
+    fb_adj = data_adjustment.daylight_saving_adjustment.fall_back_hour
+
+    ts_to_drop, ts_to_add = [], []
+    if sf_adj == DaylightSavingSpringForwardType.DROP:
+        sf_times = get_dls_springforward_time_change_by_time_range(
+            start.replace(tzinfo=tz),
+            end.replace(tzinfo=tz),
+            frequency=time_dimension_model.frequency,
+        )
+        if not time_dimension_model.timezone.is_standard():
+            assert sf_times != [], "No spring forward time change found."
+        ts_to_drop += sf_times
+    if (
+        fb_adj == DaylightSavingFallBackType.DUPLICATE
+        or fb_adj == DaylightSavingFallBackType.INTERPOLATE
+    ):
+        fb_times = get_dls_fallback_time_change_by_time_range(
+            start.replace(tzinfo=tz),
+            end.replace(tzinfo=tz),
+            frequency=time_dimension_model.frequency,
+        )
+        if not time_dimension_model.timezone.is_standard():
+            assert fb_times != [], "No fall back time change found."
+        ts_to_add += fb_times
+
     years = set(ts.year)
-    ts_to_drop = []
     for yr in years:
-        if time_dimension_model.data_adjustment.leap_day_adjustment == LeapDayAdjustmentType.NONE:
+        if ld_adj == LeapDayAdjustmentType.NONE:
             pass
-        elif (
-            time_dimension_model.data_adjustment.leap_day_adjustment
-            == LeapDayAdjustmentType.DROP_JAN1
-        ):
-            ts_to_drop = (
-                ts_to_drop
-                + pd.date_range(
-                    start=f"{yr}-01-01", freq=freq, periods=24 / hours, tz=tz
-                ).to_list()
-            )
-        elif (
-            time_dimension_model.data_adjustment.leap_day_adjustment
-            == LeapDayAdjustmentType.DROP_DEC31
-        ):
-            ts_to_drop = (
-                ts_to_drop
-                + pd.date_range(
-                    start=f"{yr}-12-31", freq=freq, periods=24 / hours, tz=tz
-                ).to_list()
-            )
-        elif (
-            time_dimension_model.data_adjustment.leap_day_adjustment
-            == LeapDayAdjustmentType.DROP_FEB29
-        ):
+        elif ld_adj == LeapDayAdjustmentType.DROP_JAN1:
+            ts_to_drop += pd.date_range(
+                start=f"{yr}-01-01", freq=freq, periods=24 / hours, tz=tz
+            ).to_list()
+        elif ld_adj == LeapDayAdjustmentType.DROP_DEC31:
+            ts_to_drop += pd.date_range(
+                start=f"{yr}-12-31", freq=freq, periods=24 / hours, tz=tz
+            ).to_list()
+        elif ld_adj == LeapDayAdjustmentType.DROP_FEB29:
             if yr % 4 == 0:
-                ts_to_drop = (
-                    ts_to_drop
-                    + pd.date_range(
-                        start=f"{yr}-02-29", freq=freq, periods=24 / hours, tz=tz
-                    ).to_list()
-                )
+                ts_to_drop += pd.date_range(
+                    start=f"{yr}-02-29", freq=freq, periods=24 / hours, tz=tz
+                ).to_list()
             else:
                 logger.info(f" {yr} is not a leap year, no Feb 29 to drop")
         else:
             assert False
 
-    df["pd_dt"] = ts.drop(ts_to_drop)
-
+    ts = ts.drop(ts_to_drop)
+    ts = ts.append(ts_to_add)
+    df["pd_dt"] = sorted(ts)
     # compare two date range creation
     df["delta"] = df["pd_dt"] - df["dim_dt"]
-    num_ts_diff = (df["delta"] != datetime.timedelta(0)).sum()
-    assert num_ts_diff == 0
+    ts_diff = df.loc[df["delta"] != datetime.timedelta(0)]
+    assert len(ts_diff) == 0, f"ts_diff: {ts_diff}"
 
 
 def check_validation_error_365_days(time_dimension_model):
@@ -158,6 +194,10 @@ def check_register_annual_time(annual_time_dimension_model):
     print(annual_time_dimension_model)
 
 
+def to_utc(time_change):
+    return [x.astimezone(ZoneInfo("UTC")) for x in time_change]
+
+
 # Test funcs:
 def test_time_dimension_model0(time_dimension_model0):
     check_date_range_creation(time_dimension_model0)
@@ -172,11 +212,15 @@ def test_time_dimension_model2(time_dimension_model2):
     check_date_range_creation(time_dimension_model2)
 
 
-def test_time_dimension_model3(annual_time_dimension_model):
+def test_time_dimension_model3(time_dimension_model3):
+    check_date_range_creation(time_dimension_model3)
+
+
+def test_time_dimension_model4(annual_time_dimension_model):
     check_register_annual_time(annual_time_dimension_model)
 
 
-def test_time_dimension_model4(representative_time_dimension_model):
+def test_time_dimension_model5(representative_time_dimension_model):
     config = RepresentativePeriodTimeDimensionConfig(representative_time_dimension_model)
     if config.model.format.value == "one_week_per_month_by_hour":
         n_times = len(config.list_expected_dataset_timestamps())
@@ -186,29 +230,250 @@ def test_time_dimension_model4(representative_time_dimension_model):
     config.get_time_ranges()  # TODO: this is not correct yet in terms of year, maybe this functionality should exist in project instead
 
 
-def test_time_dimension_model_lead_day_adj(time_dimension_model0):
-    time_dimension_model0.data_adjustment.leap_day_adjustment = LeapDayAdjustmentType.DROP_DEC31
-    check_date_range_creation(time_dimension_model0)
-    time_dimension_model0.data_adjustment.leap_day_adjustment = LeapDayAdjustmentType.DROP_JAN1
-    check_date_range_creation(time_dimension_model0)
-    time_dimension_model0.data_adjustment.leap_day_adjustment = LeapDayAdjustmentType.DROP_FEB29
-    check_date_range_creation(time_dimension_model0)
+def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):
+    daylight_saving_adjustment = {
+        "spring_forward_hour": "none",
+        "fall_back_hour": "none",
+    }
+    data_adjustment = DataAdjustmentModel(
+        leap_day_adjustment=LeapDayAdjustmentType.DROP_DEC31,
+        daylight_saving_adjustment=daylight_saving_adjustment,
+    )
+    check_date_range_creation(time_dimension_model0, data_adjustment=data_adjustment)
+
+    data_adjustment = DataAdjustmentModel(
+        leap_day_adjustment=LeapDayAdjustmentType.DROP_JAN1,
+        daylight_saving_adjustment=daylight_saving_adjustment,
+    )
+    check_date_range_creation(time_dimension_model0, data_adjustment=data_adjustment)
+
+    data_adjustment = DataAdjustmentModel(
+        leap_day_adjustment=LeapDayAdjustmentType.DROP_FEB29,
+        daylight_saving_adjustment=daylight_saving_adjustment,
+    )
+    check_date_range_creation(time_dimension_model0, data_adjustment=data_adjustment)
 
 
-def test_time_dimension_model5(
-    time_dimension_model0, indexed_time_dimension_model, representative_time_dimension_model
-):
-    # not done yet
-    model0 = time_dimension_model0
-    config0 = DateTimeDimensionConfig(model0)
+# def test_time_dimension_model_daylight_saving_adjustment(time_dimension_model3):
+#     data_adjustment = DataAdjustmentModel(
+#         leap_day_adjustment=LeapDayAdjustmentType.NONE,
+#         daylight_saving_adjustment={
+#             "spring_forward_hour": "drop",
+#             "fall_back_hour": "none",
+#         })
+#     check_date_range_creation(time_dimension_model3, data_adjustment=data_adjustment)
 
-    model1 = indexed_time_dimension_model
-    config1 = IndexedTimeDimensionConfig(model1)
+#     data_adjustment = DataAdjustmentModel(
+#         leap_day_adjustment=LeapDayAdjustmentType.NONE,
+#         daylight_saving_adjustment={
+#             "spring_forward_hour": "drop",
+#             "fall_back_hour": "duplicate",
+#         })
+#     check_date_range_creation(time_dimension_model3, data_adjustment=data_adjustment)
 
-    model2 = representative_time_dimension_model
-    config2 = RepresentativePeriodTimeDimensionConfig(model2)
+#     data_adjustment = DataAdjustmentModel(
+#         leap_day_adjustment=LeapDayAdjustmentType.NONE,
+#         daylight_saving_adjustment={
+#             "spring_forward_hour": "drop",
+#             "fall_back_hour": "interpolate",
+#         })
+#     check_date_range_creation(time_dimension_model3, data_adjustment=data_adjustment)
 
-    config0.get_time_ranges()
-    config1.get_time_ranges()
-    config2.get_time_ranges()
-    # breakpoint()
+
+def test_daylight_saving_time_changes():
+    """
+    ts = (datetime.datetime(2018, 3, 11, 1, 0, tzinfo=ZoneInfo("US/Eastern")).astimezone(ZoneInfo("UTC"))+datetime.timedelta(hours=0)).astimezone(ZoneInfo("US/Eastern")); ts; ts.strftime("%Y-%m-%d %H:%M:%S %z"); ts.dst();
+    """
+    # Spring forward
+    truth = [datetime.datetime(2018, 3, 11, 2, 0, tzinfo=ZoneInfo(key="US/Eastern"))]
+    time_change = get_dls_springforward_time_change_by_year(2018, TimeZone.EPT)
+    assert to_utc(time_change) == to_utc(truth)
+
+    from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
+    to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
+    time_change = get_dls_springforward_time_change_by_time_range(from_ts, to_ts)
+    assert to_utc(time_change) == to_utc(truth)
+
+    from_ts = datetime.datetime(2018, 3, 11, 1, 55, tzinfo=ZoneInfo(key="US/Eastern"))
+    time_change = get_dls_springforward_time_change_by_time_range(from_ts, to_ts)
+    assert to_utc(time_change) == to_utc(truth)
+
+    from_ts = datetime.datetime(2018, 3, 11, 3, 0, tzinfo=ZoneInfo(key="US/Eastern"))
+    time_change = get_dls_springforward_time_change_by_time_range(from_ts, to_ts)
+    assert time_change == []
+
+    # multiple years
+    truth = [
+        datetime.datetime(2018, 3, 11, 2, 0, tzinfo=ZoneInfo(key="US/Mountain")),
+        datetime.datetime(2019, 3, 10, 2, 0, tzinfo=ZoneInfo(key="US/Mountain")),
+        datetime.datetime(2020, 3, 8, 2, 0, tzinfo=ZoneInfo(key="US/Mountain")),
+    ]
+    time_change = get_dls_springforward_time_change_by_year([2018, 2019, 2020], TimeZone.MPT)
+    assert to_utc(time_change) == to_utc(truth)
+
+    from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
+    to_ts = datetime.datetime(2020, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
+    time_change = get_dls_springforward_time_change_by_time_range(from_ts, to_ts)
+    assert to_utc(time_change) == to_utc(truth)
+
+    # Fall back
+    time_change = get_dls_fallback_time_change_by_year(2018, TimeZone.EPT)
+    truth = [datetime.datetime(2018, 11, 4, 1, 0, tzinfo=ZoneInfo(key="EST"))]
+    assert to_utc(time_change) == to_utc(truth)
+
+    from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
+    to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
+    time_change = get_dls_fallback_time_change_by_time_range(from_ts, to_ts)
+    assert to_utc(time_change) == to_utc(truth)
+
+    from_ts = datetime.datetime(2018, 11, 4, 1, 55, tzinfo=ZoneInfo(key="US/Eastern"))
+    time_change = get_dls_fallback_time_change_by_time_range(from_ts, to_ts)
+    assert to_utc(time_change) == to_utc(truth)
+
+    from_ts = datetime.datetime(2018, 11, 4, 3, 0, tzinfo=ZoneInfo(key="US/Eastern"))
+    time_change = get_dls_fallback_time_change_by_time_range(from_ts, to_ts)
+    assert time_change == []
+
+    # multiple years
+    time_change = get_dls_fallback_time_change_by_year([2018, 2019, 2020], TimeZone.MPT)
+    truth = [
+        datetime.datetime(2018, 11, 4, 1, 0, tzinfo=ZoneInfo(key="MST")),
+        datetime.datetime(2019, 11, 3, 1, 0, tzinfo=ZoneInfo(key="MST")),
+        datetime.datetime(2020, 11, 1, 1, 0, tzinfo=ZoneInfo(key="MST")),
+    ]
+    assert to_utc(time_change) == to_utc(truth)
+
+    from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
+    to_ts = datetime.datetime(2020, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
+    time_change = get_dls_fallback_time_change_by_time_range(from_ts, to_ts)
+    assert to_utc(time_change) == to_utc(truth)
+
+    # Standard Time returns nothing
+    assert get_dls_springforward_time_change_by_year(2020, TimeZone.ARIZONA) == []
+    assert get_dls_fallback_time_change_by_year(2020, TimeZone.ARIZONA) == []
+    assert get_dls_springforward_time_change_by_year([2018, 2024], TimeZone.MST) == []
+    assert get_dls_fallback_time_change_by_year([2018, 2024], TimeZone.MST) == []
+
+    from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="EST"))
+    to_ts = datetime.datetime(2024, 12, 31, 0, 0, tzinfo=ZoneInfo(key="EST"))
+    assert get_dls_springforward_time_change_by_time_range(from_ts, to_ts) == []
+    assert get_dls_fallback_time_change_by_time_range(from_ts, to_ts) == []
+
+    to_ts = datetime.datetime(2024, 12, 31, 0, 0, tzinfo=ZoneInfo(key="Etc/GMT+8"))
+    with pytest.raises(ValueError, match=r"do not have the same time zone"):
+        get_dls_springforward_time_change_by_time_range(from_ts, to_ts)
+
+    with pytest.raises(ValueError, match=r"do not have the same time zone"):
+        get_dls_fallback_time_change_by_time_range(from_ts, to_ts)
+
+
+def test_time_dimension_model6(indexed_time_dimension_model):
+    config1 = IndexedTimeDimensionConfig(indexed_time_dimension_model)
+
+    # [1] Duplicating fallback 1AM
+    data_adjustment = DataAdjustmentModel(
+        daylight_saving_adjustment={
+            "spring_forward_hour": "drop",
+            "fall_back_hour": "duplicate",
+        }
+    )
+
+    # index-time mapping table
+    table1 = config1.build_time_dataframe(
+        timezone=TimeZone.MST.tz, data_adjustment=data_adjustment
+    )
+    # data_adjustment mapping table
+    table2 = config1._create_adjustment_map_from_model_time(data_adjustment, TimeZone.MST)
+    joined_table = table1.join(table2, table1.timestamp == table2.model_time, "right")
+    joined_table.sort([F.col("time_index"), F.col("prevailing_time")]).show()
+    joined_table.sort([F.col("time_index").desc(), F.col("prevailing_time").desc()]).show()
+
+    # check joined_table
+    res = joined_table.select("time_index", "multiplier").collect()
+    indices = [x.time_index for x in res]
+    assert 1682 not in indices, "time_index 1682 is found, expecting it missing."
+    indices_count = {x: indices.count(x) for x in indices}
+    indices_dup = {x: v for x, v in indices_count.items() if v > 1}
+    assert indices_dup == {7393: 2}, f"Unexpected duplicated time_index found, {indices_dup}."
+
+    multipliers = [x.multiplier for x in res]
+    assert multipliers == [1 for x in multipliers], "multiplier column is not all 1."
+
+    timestamps = joined_table.sort(table1.time_index).select("prevailing_time").toPandas()
+    missing_ts = pd.Timestamp("2012-03-11 02:00:00")
+    assert (
+        missing_ts not in timestamps["prevailing_time"]
+    ), f"prevailing_time {missing_ts} is found, expecting it missing."
+    duplicated_ts = pd.Timestamp("2012-11-04 01:00:00")
+    timestamps_count = timestamps["prevailing_time"].value_counts()
+    timestamps_dup = timestamps_count[timestamps_count > 1]
+    assert timestamps_dup.index.to_list() == [
+        duplicated_ts
+    ], f"Unexpected duplicated prevailing_time found, {timestamps_dup.index.to_list()}"
+    assert timestamps_dup.to_list() == [
+        2
+    ], f"prevailing_time {duplicated_ts} is duplicated more than twice."
+
+    # [2] Interpolating fallback between 1 and 2AM
+    data_adjustment = DataAdjustmentModel(
+        daylight_saving_adjustment={
+            "spring_forward_hour": "drop",
+            "fall_back_hour": "interpolate",
+        }
+    )
+
+    ranges = config1.get_time_ranges(timezone=TimeZone.MPT.tz, data_adjustment=data_adjustment)
+    range = ranges[0]
+    freq = config1.model.frequency
+    cur_pt = range.start.to_pydatetime()
+    end_pt = range.end.to_pydatetime()
+    get_dls_fallback_time_change_by_time_range(cur_pt, end_pt, frequency=freq)
+
+    # index-time mapping table
+    table1 = config1.build_time_dataframe(
+        timezone=TimeZone.MST.tz, data_adjustment=data_adjustment
+    )
+    # data_adjustment mapping table
+    table2 = config1._create_adjustment_map_from_model_time(data_adjustment, TimeZone.MST)
+    joined_table = table1.join(table2, table1.timestamp == table2.model_time, "right")
+    joined_table = joined_table.withColumn(
+        "standard_time",
+        F.from_utc_timestamp(
+            F.to_utc_timestamp(F.col("prevailing_time"), TimeZone.MPT.tz_name),
+            TimeZone.MST.tz_name,
+        ),
+    )
+    joined_table.sort([F.col("time_index"), F.col("prevailing_time")]).show()
+    joined_table.sort([F.col("time_index").desc(), F.col("prevailing_time").desc()]).show()
+
+    # check joined_table
+    res = joined_table.select("time_index", "multiplier").collect()
+    indices = [x.time_index for x in res]
+    assert 1682 not in indices, "time_index 1682 is found, expecting it missing."
+    indices_count = {x: indices.count(x) for x in indices}
+    indices_dup = {x: v for x, v in indices_count.items() if v > 1}
+    assert indices_dup == {
+        7393: 2,
+        7394: 2,
+    }, f"Unexpected duplicated time_index found, {indices_dup}."
+
+    res2 = joined_table.select("time_index", "multiplier").where("multiplier < 1").collect()
+    multipliers = [x.multiplier for x in res2]
+    assert multipliers == [0.5, 0.5], "multiplier column does not have exactly two 0.5."
+    indices2 = [x.time_index for x in res2]
+    assert sorted(indices2) == [7393, 7394]
+
+    timestamps = joined_table.sort(table1.time_index).select("prevailing_time").toPandas()
+    missing_ts = pd.Timestamp("2012-03-11 02:00:00")
+    assert (
+        missing_ts not in timestamps["prevailing_time"]
+    ), f"prevailing_time {missing_ts} is found, expecting it missing."
+    duplicated_ts = pd.Timestamp("2012-11-04 01:00:00")
+    timestamps_count = timestamps["prevailing_time"].value_counts()
+    timestamps_dup = timestamps_count[timestamps_count > 1]
+    assert timestamps_dup.index.to_list() == [
+        duplicated_ts
+    ], f"Unexpected duplicated prevailing_time found, {timestamps_dup.index.to_list()}"
+    assert timestamps_dup.to_list() == [
+        3
+    ], f"prevailing_time {duplicated_ts} is duplicated more than twice."

@@ -8,7 +8,7 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
-
+from dsgrid.dimension.time import DataAdjustmentModel
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def build_time_dataframe(self, model_years=None):
+    def build_time_dataframe(self, model_years=None, timezone=None, data_adjustment=None):
         # Note: DF.show() displays time in session time, which may be confusing.
         # But timestamps are stored correctly here
 
@@ -60,7 +60,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         schema = StructType([StructField(time_col, TimestampType(), False)])
-        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
+        model_time = self.list_expected_dataset_timestamps(
+            model_years=model_years, timezone=timezone, data_adjustment=data_adjustment
+        )
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
 
         return df_time
@@ -101,17 +103,21 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return self.model.frequency
 
-    def get_time_ranges(self, model_years=None):
+    def get_time_ranges(self, model_years=None, timezone=None, data_adjustment=None):
+        if timezone is None:
+            timezone = self.get_tzinfo()
+        if data_adjustment is None:
+            data_adjustment = DataAdjustmentModel()
         ranges = []
         for start, end in self._build_time_ranges(
-            self.model.ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
+            self.model.ranges, self.model.str_format, model_years=model_years, tz=timezone
         ):
             ranges.append(
                 make_time_range(
                     start=start,
                     end=end,
                     frequency=self.model.frequency,
-                    leap_day_adjustment=self.model.data_adjustment.leap_day_adjustment,
+                    data_adjustment=data_adjustment,
                     time_interval_type=self.model.time_interval_type,
                 )
             )
@@ -127,8 +133,12 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self, model_years=None):
+    def list_expected_dataset_timestamps(
+        self, model_years=None, timezone=None, data_adjustment=None
+    ):
         timestamps = []
-        for time_range in self.get_time_ranges(model_years=model_years):
+        for time_range in self.get_time_ranges(
+            model_years=model_years, timezone=timezone, data_adjustment=data_adjustment
+        ):
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps

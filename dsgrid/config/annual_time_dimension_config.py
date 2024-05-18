@@ -51,13 +51,15 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def build_time_dataframe(self, model_years=None):
+    def build_time_dataframe(self, model_years=None, timezone=None, data_adjustment=None):
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         schema = StructType([StructField(time_col, IntegerType(), False)])
 
-        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
+        model_time = self.list_expected_dataset_timestamps(
+            model_years=model_years, timezone=timezone, data_adjustment=data_adjustment
+        )
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
         return df_time
 
@@ -118,11 +120,13 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return timedelta(days=365)
 
-    def get_time_ranges(self, model_years=None):
+    def get_time_ranges(self, model_years=None, timezone=None, data_adjustment=None):
+        if timezone is None:
+            timezone = self.get_tzinfo()
         ranges = []
         frequency = self.get_frequency()
         for start, end in self._build_time_ranges(
-            self.model.ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
+            self.model.ranges, self.model.str_format, model_years=model_years, tz=timezone
         ):
             start = pd.Timestamp(start)
             end = pd.Timestamp(end)
@@ -147,7 +151,9 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return None
 
-    def list_expected_dataset_timestamps(self, model_years=None):
+    def list_expected_dataset_timestamps(
+        self, model_years=None, timezone=None, data_adjustment=None
+    ):
         if model_years is not None:
             # We do not expect to need this.
             raise NotImplementedError(

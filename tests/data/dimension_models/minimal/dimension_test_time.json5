@@ -132,7 +132,7 @@
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
       frequency: "P0DT1H0M0.000000S",
-      timezone: "LocalStandard",
+      timezone: "LocalModel",
       time_interval_type: "period_ending",
       measurement_type: "total",
       // data_adjustment: {

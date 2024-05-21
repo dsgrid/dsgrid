@@ -231,6 +231,12 @@ class TimeZone(DSGEnum):
         tz=None,
         tz_name="LocalStandard",
     )
+    LOCAL_MODEL = EnumValue(
+        value="LocalModel",
+        description="Local Model Time. Clock time local to the geography dimension of the dataset but laid out like Standard Time, requires daylight savings adjustment to both time and data",
+        tz=None,
+        tz_name="LocalModel",
+    )
 
     def get_standard_time(self):
         """get equivalent standard time"""
@@ -593,21 +599,6 @@ class DatetimeRange:
         cur = self.start.to_pydatetime().astimezone(ZoneInfo("UTC"))
         end = self.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + self.frequency
 
-        sf_times = []
-        if self.dls_springforward_adjustment == DaylightSavingSpringForwardType.DROP:
-            sf_times = get_dls_springforward_time_change_by_time_range(
-                cur, end, frequency=self.frequency
-            )
-        fb_times = []
-        if (
-            self.dls_fallback_adjustment == DaylightSavingFallBackType.INTERPOLATE
-            or self.dls_fallback_adjustment == DaylightSavingFallBackType.DUPLICATE
-        ):
-            fb_times = get_dls_fallback_time_change_by_time_range(
-                cur, end, frequency=self.frequency
-            )
-        fb_repeats = [0 for x in fb_times]
-
         while cur < end:
             frequency = self.frequency
             cur_tz = cur.astimezone(self.tzinfo)
@@ -628,16 +619,6 @@ class DatetimeRange:
                         and month == 1
                         and day == 1
                     ):
-                        # daylight savings adjustments
-                        for ts in sf_times:
-                            if cur_tz != ts:
-                                yield cur_tz
-                        for i, ts in enumerate(fb_times):
-                            if cur_tz == ts:
-                                if fb_repeats[i] == 0:
-                                    frequency = timedelta(0)
-                                    fb_repeats[i] += 1
-                                yield cur_tz
                         yield cur_tz
 
             cur += frequency
@@ -689,21 +670,6 @@ class IndexTimeRange(DatetimeRange):
             self.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + self.frequency
         )  # to make end time inclusive
 
-        sf_times = []
-        if self.dls_springforward_adjustment == DaylightSavingSpringForwardType.DROP:
-            sf_times = get_dls_springforward_time_change_by_time_range(
-                cur, end, frequency=self.frequency
-            )
-        fb_times = []
-        if (
-            self.dls_fallback_adjustment == DaylightSavingFallBackType.INTERPOLATE
-            or self.dls_fallback_adjustment == DaylightSavingFallBackType.DUPLICATE
-        ):
-            fb_times = get_dls_fallback_time_change_by_time_range(
-                cur, end, frequency=self.frequency
-            )
-        fb_repeats = [0 for x in fb_times]
-
         while cur < end:
             frequency = self.frequency
             step = self.step
@@ -725,17 +691,6 @@ class IndexTimeRange(DatetimeRange):
                         and month == 1
                         and day == 1
                     ):
-                        # daylight savings adjustments
-                        for ts in sf_times:
-                            if cur_tz != ts:
-                                yield cur_idx
-                        for i, ts in enumerate(fb_times):
-                            if cur_tz == ts:
-                                if fb_repeats[i] == 0:
-                                    frequency = timedelta(0)
-                                    step = 0
-                                    fb_repeats[i] += 1
-                                yield cur_idx
                         yield cur_idx
             cur += frequency
             cur_idx += step

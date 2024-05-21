@@ -5,6 +5,14 @@ import pytest
 from pydantic import ValidationError
 import logging
 import pyspark.sql.functions as F
+import numpy as np
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    StringType,
+    IntegerType,
+    DoubleType,
+)
 
 from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
@@ -26,6 +34,7 @@ from dsgrid.dimension.time import (
     get_dls_fallback_time_change_by_year,
     get_dls_fallback_time_change_by_time_range,
 )
+from dsgrid.utils.spark import get_spark_session
 
 logger = logging.getLogger(__name__)
 
@@ -254,36 +263,36 @@ def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):
     check_date_range_creation(time_dimension_model0, data_adjustment=data_adjustment)
 
 
-# def test_time_dimension_model_daylight_saving_adjustment(time_dimension_model3):
-#     data_adjustment = DataAdjustmentModel(
-#         leap_day_adjustment=LeapDayAdjustmentType.NONE,
-#         daylight_saving_adjustment={
-#             "spring_forward_hour": "drop",
-#             "fall_back_hour": "none",
-#         })
-#     check_date_range_creation(time_dimension_model3, data_adjustment=data_adjustment)
+def test_time_dimension_model_daylight_saving_adjustment(time_dimension_model3):
+    data_adjustment = DataAdjustmentModel(
+        leap_day_adjustment=LeapDayAdjustmentType.NONE,
+        daylight_saving_adjustment={
+            "spring_forward_hour": "drop",
+            "fall_back_hour": "none",
+        },
+    )
+    check_date_range_creation(time_dimension_model3, data_adjustment=data_adjustment)
 
-#     data_adjustment = DataAdjustmentModel(
-#         leap_day_adjustment=LeapDayAdjustmentType.NONE,
-#         daylight_saving_adjustment={
-#             "spring_forward_hour": "drop",
-#             "fall_back_hour": "duplicate",
-#         })
-#     check_date_range_creation(time_dimension_model3, data_adjustment=data_adjustment)
+    data_adjustment = DataAdjustmentModel(
+        leap_day_adjustment=LeapDayAdjustmentType.NONE,
+        daylight_saving_adjustment={
+            "spring_forward_hour": "drop",
+            "fall_back_hour": "duplicate",
+        },
+    )
+    check_date_range_creation(time_dimension_model3, data_adjustment=data_adjustment)
 
-#     data_adjustment = DataAdjustmentModel(
-#         leap_day_adjustment=LeapDayAdjustmentType.NONE,
-#         daylight_saving_adjustment={
-#             "spring_forward_hour": "drop",
-#             "fall_back_hour": "interpolate",
-#         })
-#     check_date_range_creation(time_dimension_model3, data_adjustment=data_adjustment)
+    data_adjustment = DataAdjustmentModel(
+        leap_day_adjustment=LeapDayAdjustmentType.NONE,
+        daylight_saving_adjustment={
+            "spring_forward_hour": "drop",
+            "fall_back_hour": "interpolate",
+        },
+    )
+    check_date_range_creation(time_dimension_model3, data_adjustment=data_adjustment)
 
 
 def test_daylight_saving_time_changes():
-    """
-    ts = (datetime.datetime(2018, 3, 11, 1, 0, tzinfo=ZoneInfo("US/Eastern")).astimezone(ZoneInfo("UTC"))+datetime.timedelta(hours=0)).astimezone(ZoneInfo("US/Eastern")); ts; ts.strftime("%Y-%m-%d %H:%M:%S %z"); ts.dst();
-    """
     # Spring forward
     truth = [datetime.datetime(2018, 3, 11, 2, 0, tzinfo=ZoneInfo(key="US/Eastern"))]
     time_change = get_dls_springforward_time_change_by_year(2018, TimeZone.EPT)
@@ -368,7 +377,9 @@ def test_daylight_saving_time_changes():
 
 
 def test_time_dimension_model6(indexed_time_dimension_model):
-    config1 = IndexedTimeDimensionConfig(indexed_time_dimension_model)
+    """Test data_adjustment mapping tables"""
+    time_zone = TimeZone.MST
+    config = IndexedTimeDimensionConfig(indexed_time_dimension_model)
 
     # [1] Duplicating fallback 1AM
     data_adjustment = DataAdjustmentModel(
@@ -379,14 +390,16 @@ def test_time_dimension_model6(indexed_time_dimension_model):
     )
 
     # index-time mapping table
-    table1 = config1.build_time_dataframe(
-        timezone=TimeZone.MST.tz, data_adjustment=data_adjustment
-    )
+    table1 = config.build_time_dataframe(
+        timezone=time_zone.tz, data_adjustment=data_adjustment
+    ).withColumn("time_zone", F.lit(time_zone.value))
     # data_adjustment mapping table
-    table2 = config1._create_adjustment_map_from_model_time(data_adjustment, TimeZone.MST)
-    joined_table = table1.join(table2, table1.timestamp == table2.model_time, "right")
-    joined_table.sort([F.col("time_index"), F.col("prevailing_time")]).show()
-    joined_table.sort([F.col("time_index").desc(), F.col("prevailing_time").desc()]).show()
+    table2 = config._create_adjustment_map_from_model_time(data_adjustment, time_zone)
+    joined_table = table1.selectExpr("time_index", "timestamp as model_time").join(
+        table2, ["model_time"], "right"
+    )
+    # joined_table.sort([F.col("time_index"), F.col("timestamp")]).show()
+    # joined_table.sort([F.col("time_index").desc(), F.col("timestamp").desc()]).show()
 
     # check joined_table
     res = joined_table.select("time_index", "multiplier").collect()
@@ -399,20 +412,20 @@ def test_time_dimension_model6(indexed_time_dimension_model):
     multipliers = [x.multiplier for x in res]
     assert multipliers == [1 for x in multipliers], "multiplier column is not all 1."
 
-    timestamps = joined_table.sort(table1.time_index).select("prevailing_time").toPandas()
+    timestamps = joined_table.sort(table1.time_index).select("timestamp").toPandas()
     missing_ts = pd.Timestamp("2012-03-11 02:00:00")
     assert (
-        missing_ts not in timestamps["prevailing_time"]
-    ), f"prevailing_time {missing_ts} is found, expecting it missing."
+        missing_ts not in timestamps["timestamp"]
+    ), f"timestamp {missing_ts} is found, expecting it missing."
     duplicated_ts = pd.Timestamp("2012-11-04 01:00:00")
-    timestamps_count = timestamps["prevailing_time"].value_counts()
+    timestamps_count = timestamps["timestamp"].value_counts()
     timestamps_dup = timestamps_count[timestamps_count > 1]
     assert timestamps_dup.index.to_list() == [
         duplicated_ts
-    ], f"Unexpected duplicated prevailing_time found, {timestamps_dup.index.to_list()}"
+    ], f"Unexpected duplicated timestamp found, {timestamps_dup.index.to_list()}"
     assert timestamps_dup.to_list() == [
         2
-    ], f"prevailing_time {duplicated_ts} is duplicated more than twice."
+    ], f"timestamp {duplicated_ts} is duplicated more than twice."
 
     # [2] Interpolating fallback between 1 and 2AM
     data_adjustment = DataAdjustmentModel(
@@ -422,29 +435,24 @@ def test_time_dimension_model6(indexed_time_dimension_model):
         }
     )
 
-    ranges = config1.get_time_ranges(timezone=TimeZone.MPT.tz, data_adjustment=data_adjustment)
-    range = ranges[0]
-    freq = config1.model.frequency
-    cur_pt = range.start.to_pydatetime()
-    end_pt = range.end.to_pydatetime()
-    get_dls_fallback_time_change_by_time_range(cur_pt, end_pt, frequency=freq)
-
     # index-time mapping table
-    table1 = config1.build_time_dataframe(
-        timezone=TimeZone.MST.tz, data_adjustment=data_adjustment
-    )
+    table1 = config.build_time_dataframe(
+        timezone=time_zone.tz, data_adjustment=data_adjustment
+    ).withColumn("time_zone", F.lit(time_zone.tz_name))
     # data_adjustment mapping table
-    table2 = config1._create_adjustment_map_from_model_time(data_adjustment, TimeZone.MST)
-    joined_table = table1.join(table2, table1.timestamp == table2.model_time, "right")
+    table2 = config._create_adjustment_map_from_model_time(data_adjustment, time_zone)
+    joined_table = table1.selectExpr("time_index", "timestamp as model_time").join(
+        table2, ["model_time"], "right"
+    )
     joined_table = joined_table.withColumn(
         "standard_time",
         F.from_utc_timestamp(
-            F.to_utc_timestamp(F.col("prevailing_time"), TimeZone.MPT.tz_name),
-            TimeZone.MST.tz_name,
+            F.to_utc_timestamp(F.col("timestamp"), TimeZone.MPT.tz_name),
+            time_zone.tz_name,
         ),
     )
-    joined_table.sort([F.col("time_index"), F.col("prevailing_time")]).show()
-    joined_table.sort([F.col("time_index").desc(), F.col("prevailing_time").desc()]).show()
+    # joined_table.sort([F.col("time_index"), F.col("timestamp")]).show()
+    # joined_table.sort([F.col("time_index").desc(), F.col("timestamp").desc()]).show()
 
     # check joined_table
     res = joined_table.select("time_index", "multiplier").collect()
@@ -461,19 +469,117 @@ def test_time_dimension_model6(indexed_time_dimension_model):
     multipliers = [x.multiplier for x in res2]
     assert multipliers == [0.5, 0.5], "multiplier column does not have exactly two 0.5."
     indices2 = [x.time_index for x in res2]
-    assert sorted(indices2) == [7393, 7394]
+    itpl_indices = [7393, 7394]
+    assert (
+        sorted(indices2) == itpl_indices
+    ), f"Expecting interpolated indices: {itpl_indices} but found {indices2}"
 
-    timestamps = joined_table.sort(table1.time_index).select("prevailing_time").toPandas()
+    timestamps = joined_table.sort(table1.time_index).select("timestamp").toPandas()
     missing_ts = pd.Timestamp("2012-03-11 02:00:00")
     assert (
-        missing_ts not in timestamps["prevailing_time"]
-    ), f"prevailing_time {missing_ts} is found, expecting it missing."
+        missing_ts not in timestamps["timestamp"]
+    ), f"timestamp {missing_ts} is found, expecting it missing."
     duplicated_ts = pd.Timestamp("2012-11-04 01:00:00")
-    timestamps_count = timestamps["prevailing_time"].value_counts()
+    timestamps_count = timestamps["timestamp"].value_counts()
     timestamps_dup = timestamps_count[timestamps_count > 1]
     assert timestamps_dup.index.to_list() == [
         duplicated_ts
-    ], f"Unexpected duplicated prevailing_time found, {timestamps_dup.index.to_list()}"
+    ], f"Unexpected duplicated timestamp found, {timestamps_dup.index.to_list()}"
     assert timestamps_dup.to_list() == [
         3
-    ], f"prevailing_time {duplicated_ts} is duplicated more than twice."
+    ], f"timestamp {duplicated_ts} is duplicated more than twice."
+
+
+def test_indexed_time_conversion(time_dimension_model0, indexed_time_dimension_model):
+    # mock project dataframe
+    schema = StructType(
+        [
+            StructField("geography", StringType(), False),
+            StructField("time_index", IntegerType(), False),
+            StructField("value", DoubleType(), False),
+            StructField("time_zone", StringType(), False),
+        ]
+    )
+    df = get_spark_session().createDataFrame([], schema=schema)
+    geography = ["Colorado", "Wyoming", "Arizona"]
+    time_zones = ["MountainPrevailing", "MountainPrevailing", "USArizona"]
+    indices = np.arange(1680, 7396).tolist()
+    values = np.arange(1680, 7396).tolist()
+    df_tz = get_spark_session().createDataFrame(zip(indices, values), ["time_index", "value"])
+    for geo, tz in zip(geography, time_zones):
+        df = df.union(
+            df_tz.withColumn("geography", F.lit(geo))
+            .withColumn("time_zone", F.lit(tz))
+            .select(schema.names)
+        )
+
+    n_df = df.count()
+
+    project_time_dim = DateTimeDimensionConfig(
+        time_dimension_model0
+    )  # fake, any will do to return time column name
+    config = IndexedTimeDimensionConfig(indexed_time_dimension_model)
+
+    # [1] Duplicating fallback 1AM
+    data_adjustment = DataAdjustmentModel(
+        daylight_saving_adjustment={
+            "spring_forward_hour": "drop",
+            "fall_back_hour": "duplicate",
+        }
+    )
+    df2 = config.convert_dataframe(
+        df,
+        project_time_dim,
+        model_years=None,
+        value_columns=None,
+        wrap_time_allowed=False,
+        data_adjustment=data_adjustment,
+    )
+    # df2.sort(F.col("timestamp"), F.col("geography")).show()
+    # df2.sort(F.col("geography"), F.col("timestamp").desc()).show()
+    # df2.sort(F.col("geography").desc(), F.col("timestamp").desc()).show()
+
+    f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    assert (
+        len(f2) == n_df
+    ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
+    # for AZ, no missing or interpolation
+    f2_filtered = f2.loc[f2["geography"] == "Arizona", "value"].to_list()
+    assert f2_filtered == values, "f2 for AZ has missing or interpolated values."
+    f2_filtered = f2.loc[f2["geography"] == "Colorado", "value"].to_list()
+    assert 1682 not in f2_filtered, "value 1682 is found for CO, expecting it missing."
+    dup_val = 7393
+    assert dup_val in f2_filtered, f"Expecting duplicated value {dup_val} for CO, but not found."
+
+    # [2] Interpolating fallback between 1 and 2AM
+    data_adjustment = DataAdjustmentModel(
+        daylight_saving_adjustment={
+            "spring_forward_hour": "drop",
+            "fall_back_hour": "interpolate",
+        }
+    )
+    df2 = config.convert_dataframe(
+        df,
+        project_time_dim,
+        model_years=None,
+        value_columns=None,
+        wrap_time_allowed=False,
+        data_adjustment=data_adjustment,
+    )
+    # df2.sort(F.col("timestamp"), F.col("geography")).show()
+    # df2.sort(F.col("geography"), F.col("timestamp").desc()).show()
+    # df2.sort(F.col("geography").desc(), F.col("timestamp").desc()).show()
+
+    f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    assert (
+        len(f2) == n_df
+    ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
+    # for AZ, no missing or interpolation
+    f2_filtered = f2.loc[f2["geography"] == "Arizona", "value"].to_list()
+    assert f2_filtered == values, "f2 for AZ has missing or interpolated values."
+    f2_filtered = f2.loc[f2["geography"] == "Colorado", "value"].to_list()
+    assert 1682 not in f2_filtered, "value 1682 is found for CO, expecting it missing."
+    itpl_val = (7393 + 7394) / 2
+    assert (
+        itpl_val in f2_filtered
+    ), f"Expecting interpolated value {itpl_val} for CO, but not found."

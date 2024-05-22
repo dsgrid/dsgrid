@@ -1,3 +1,3 @@
 *********************************************
-How to create project supplemental dimensions
+How to Create Project Supplemental Dimensions
 *********************************************

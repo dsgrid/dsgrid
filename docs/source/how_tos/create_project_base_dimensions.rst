@@ -1,3 +1,3 @@
 *************************************
-How to create project base dimensions
+How to Create Project Base Dimensions
 *************************************

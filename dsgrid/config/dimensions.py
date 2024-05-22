@@ -541,7 +541,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             json_schema_extra={
                 "options": TimeZone.format_descriptions_for_docs(),
                 "notes": (
-                    "LocalPrevailing and LocalStandard are relative to the geography dimension of the dataset"
+                    "Local and LocalModel are relative to the geography dimension of the dataset"
                 ),
             },
         ),
@@ -678,20 +678,6 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
-    # timezone: Annotated[
-    #     TimeZone,
-    #     Field(
-    #         title="timezone",
-    #         description="Time zone of data",
-    #         default=TimeZone.LOCAL_PREVAILING,
-    #         json_schema_extra={
-    #             "options": TimeZone.format_descriptions_for_docs(),
-    #             "notes": (
-    #                 "LocalPrevailing and LocalStandard are relative to the geography dimension of the dataset"
-    #             )
-    #         },
-    #     ),
-    # ]
 
     def is_time_zone_required_in_geography(self):
         return True
@@ -774,7 +760,7 @@ class IndexedTimeDimensionModel(TimeDimensionBaseModel):
             json_schema_extra={
                 "options": TimeZone.format_descriptions_for_docs(),
                 "notes": (
-                    "LocalPrevailing and LocalStandard are relative to the geography dimension of the dataset"
+                    "Local and LocalModel are relative to the geography dimension of the dataset"
                 ),
             },
         ),
@@ -795,7 +781,7 @@ class IndexedTimeDimensionModel(TimeDimensionBaseModel):
         return _check_index_ranges(index_ranges)
 
     def is_time_zone_required_in_geography(self):
-        if self.timezone in [TimeZone.LOCAL_PREVAILING, TimeZone.LOCAL_STANDARD]:
+        if self.timezone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
             return True
         return False
 

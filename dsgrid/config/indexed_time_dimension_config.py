@@ -8,8 +8,6 @@ from pyspark.sql.types import (
     StringType,
 )
 import pyspark.sql.functions as F
-from zoneinfo import ZoneInfo
-from datetime import timedelta
 
 from dsgrid.dimension.time import make_time_range, TimeZone
 from dsgrid.exceptions import DSGInvalidDataset
@@ -18,12 +16,7 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import IndexedTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dimension.time import (
-    DataAdjustmentModel,
-    LeapDayAdjustmentType,
-    DaylightSavingFallBackType,
-    get_dls_fallback_time_change_by_time_range,
-)
+from dsgrid.dimension.time import DataAdjustmentModel
 from dsgrid.common import VALUE_COLUMN
 
 
@@ -121,8 +114,7 @@ class IndexedTimeDimensionConfig(TimeDimensionBaseConfig):
 
         # if single real time zone, convert from index to timestamps
         if self.model.timezone not in [
-            TimeZone.LOCAL_PREVAILING,
-            TimeZone.LOCAL_STANDARD,
+            TimeZone.LOCAL,
             TimeZone.LOCAL_MODEL,
         ]:
             index_map = self.build_time_dataframe(
@@ -138,7 +130,11 @@ class IndexedTimeDimensionConfig(TimeDimensionBaseConfig):
                 TimeZone(row.time_zone) for row in df.select("time_zone").distinct().collect()
             ]
             assert geo_tz
-            geo_tz_std = [tz.get_standard_time() for tz in geo_tz]
+            if self.model.timezone == TimeZone.LOCAL_MODEL:
+                # for LocalModel time, indices correspond to time laid out like Standard Time
+                geo_tz2 = [tz.get_standard_time() for tz in geo_tz]
+            else:
+                geo_tz2 = geo_tz
 
             schema = StructType(
                 [
@@ -149,10 +145,10 @@ class IndexedTimeDimensionConfig(TimeDimensionBaseConfig):
                 ]
             )
             time_map = get_spark_session().createDataFrame([], schema=schema)
-            for tz, tz_std in zip(geo_tz, geo_tz_std):
-                # index-time mapping table - build in standard time, list as prevailing
+            for tz, tz2 in zip(geo_tz, geo_tz2):
+                # for LocalModel time, table is built in standard time but listed as prevailing
                 index_map = self.build_time_dataframe(
-                    model_years=model_years, timezone=tz_std.tz, data_adjustment=data_adjustment
+                    model_years=model_years, timezone=tz2.tz, data_adjustment=data_adjustment
                 )
                 index_map = index_map.withColumn("time_zone", F.lit(tz.value))
 
@@ -175,92 +171,11 @@ class IndexedTimeDimensionConfig(TimeDimensionBaseConfig):
             df = df.groupBy(*groupby).agg(
                 F.sum(F.col(VALUE_COLUMN) * F.col("multiplier")).alias(VALUE_COLUMN)
             )
+        df = self._convert_time_to_project_time_interval(
+            df=df, project_time_dim=project_time_dim, wrap_time=wrap_time_allowed
+        )
 
         return df
-
-    def _create_adjustment_map_from_model_time(
-        self, data_adjustment: DataAdjustmentModel, time_zone: TimeZone, model_years=None
-    ):
-        """Create data adjustment mapping from model_time to prevailing time (timestamp) of input time_zone."""
-        time_col = list(DatetimeTimestampType._fields)
-        assert len(time_col) == 1, time_col
-        time_col = time_col[0]
-
-        ld_adj = data_adjustment.leap_day_adjustment
-        fb_adj = data_adjustment.daylight_saving_adjustment.fall_back_hour
-
-        TZ_st, TZ_pt = time_zone.get_standard_time(), time_zone.get_prevailing_time()
-        ranges = self.get_time_ranges(
-            model_years=model_years, timezone=TZ_pt.tz, data_adjustment=data_adjustment
-        )
-        freq = self.model.frequency
-        model_time, prevailing_time, multipliers = [], [], []
-        for range in ranges:
-            cur_pt = range.start.to_pydatetime()
-            end_pt = range.end.to_pydatetime()
-
-            if fb_adj == DaylightSavingFallBackType.INTERPOLATE:
-                fb_times = get_dls_fallback_time_change_by_time_range(
-                    cur_pt, end_pt, frequency=freq
-                )  # in PT
-                fb_repeats = [0 for x in fb_times]
-                print(fb_times)
-
-            cur = range.start.to_pydatetime().astimezone(ZoneInfo("UTC"))
-            end = range.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + freq
-
-            while cur < end:
-                multiplier = 1.0
-                frequency = freq
-                cur_pt = cur.astimezone(TZ_pt.tz)
-                model_ts = cur_pt.replace(tzinfo=TZ_st.tz)
-                month = cur_pt.month
-                day = cur_pt.day
-                if ld_adj == LeapDayAdjustmentType.DROP_FEB29 and month == 2 and day == 29:
-                    cur += frequency
-                    pass
-                if ld_adj == LeapDayAdjustmentType.DROP_DEC31 and month == 12 and day == 31:
-                    cur += frequency
-                    pass
-                if ld_adj == LeapDayAdjustmentType.DROP_JAN1 and month == 1 and day == 1:
-                    cur += frequency
-                    pass
-
-                if fb_adj == DaylightSavingFallBackType.INTERPOLATE:
-                    for i, ts in enumerate(fb_times):
-                        if cur == ts.astimezone(ZoneInfo("UTC")):
-                            if fb_repeats[i] == 0:
-                                frequency = timedelta(0)
-                                multiplier = 0.5
-                            if fb_repeats[i] == 1:
-                                model_ts = (
-                                    (cur + frequency).astimezone(TZ_pt.tz).replace(tzinfo=TZ_st.tz)
-                                )
-                                multiplier = 0.5
-                            fb_repeats[i] += 1
-
-                model_time.append(model_ts)
-                prevailing_time.append(cur_pt)
-                multipliers.append(multiplier)
-                cur += frequency
-
-        table = get_spark_session().createDataFrame(
-            zip(model_time, prevailing_time, multipliers),
-            ["model_time", time_col, "multiplier"],
-        )
-        return table
-
-    @staticmethod
-    def _convert_time_zone(df, time_col: str, from_tz, to_tz):
-        """convert dataframe from one single time zone to another"""
-        nontime_cols = [col for col in df.columns if col != time_col]
-        df2 = df.select(
-            F.from_utc_timestamp(F.to_utc_timestamp(F.col(time_col), from_tz), to_tz).alias(
-                time_col
-            ),
-            *nontime_cols,
-        )
-        return df2
 
     def get_frequency(self):
         return self.model.frequency

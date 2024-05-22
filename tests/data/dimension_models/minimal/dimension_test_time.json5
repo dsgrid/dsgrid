@@ -24,7 +24,7 @@
       class_name: "Time",
       time_type: "datetime",
       description: "Annual time 2018-2050\n",
-      frequency: "P1D", // #"P365D"
+      frequency: "00:15:00", // "P1D",
       name: "annual_time_2018_to_2020",
       display_name: "Daily",
       time_interval_type: "instantaneous",
@@ -35,7 +35,7 @@
         },
       ],
       str_format: "%Y-%m-%d",
-      timezone: "UTC",
+      timezone: "MountainStandard",
       measurement_type: "total",
     },
     { // #[2]
@@ -57,14 +57,14 @@
       timezone: "EasternPrevailing",
       measurement_type: "max",
     },
-    { // #[3] 8760 - local standard
+    { // #[3] 8760 - local
       type: "time",
       class_name: "Time",
       time_type: "datetime",
-      description: "Time dimension, 2012 hourly local standard modeled time, period-ending, total value\n",
+      description: "Time dimension, 2012 hourly local time, period-ending, total value\n",
       frequency: "01:00:00",
       name: "Time-2012-local-standard-model-hourly-periodEnding-total",
-      display_name: "2012 Hourly local standard",
+      display_name: "2012 Hourly local",
       time_interval_type: "period_ending",
       ranges: [
         {
@@ -73,7 +73,7 @@
         },
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
-      timezone: "LocalStandard",
+      timezone: "Local",
       measurement_type: "total",
     },
     { // #[4]
@@ -114,7 +114,7 @@
     { // #[6]
       "class": "Time",
       type: "time",
-      name: "Local-time-2022-indexed",
+      name: "Local-model-time-2022-indexed",
       display_name: "time",
       time_type: "indexed",
       index_ranges: [
@@ -142,7 +142,7 @@
       //       fall_back_hour: "interpolate",
       //     },
       // },
-      description: "Industrial time, indexed, stitched from representative diurnal profiles in county local standard time, data and timestamps need adjustment to local prevailing time",
+      description: "Industrial time, indexed, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
     },
   ],
 }

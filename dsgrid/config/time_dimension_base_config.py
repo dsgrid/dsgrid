@@ -10,7 +10,14 @@ from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import TimeZone, TimeIntervalType
 from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidDimension
 from dsgrid.config.dimensions import TimeRangeModel
-from dsgrid.dimension.time import DataAdjustmentModel
+from dsgrid.dimension.time import (
+    DataAdjustmentModel,
+    LeapDayAdjustmentType,
+    DaylightSavingFallBackType,
+    get_dls_fallback_time_change_by_time_range,
+)
+from dsgrid.time.types import DatetimeTimestampType
+from dsgrid.utils.spark import get_spark_session
 
 
 class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
@@ -421,9 +428,82 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         ranges.sort(key=lambda x: x[0])
         return ranges
 
+    def _create_adjustment_map_from_model_time(
+        self, data_adjustment: DataAdjustmentModel, time_zone: TimeZone, model_years=None
+    ):
+        """Create data adjustment mapping from model_time to prevailing time (timestamp) of input time_zone."""
+        time_col = list(DatetimeTimestampType._fields)
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+
+        ld_adj = data_adjustment.leap_day_adjustment
+        fb_adj = data_adjustment.daylight_saving_adjustment.fall_back_hour
+
+        TZ_st, TZ_pt = time_zone.get_standard_time(), time_zone.get_prevailing_time()
+        ranges = self.get_time_ranges(
+            model_years=model_years, timezone=TZ_pt.tz, data_adjustment=data_adjustment
+        )
+        freq = self.model.frequency
+        model_time, prevailing_time, multipliers = [], [], []
+        for range in ranges:
+            cur_pt = range.start.to_pydatetime()
+            end_pt = range.end.to_pydatetime()
+
+            if fb_adj == DaylightSavingFallBackType.INTERPOLATE:
+                fb_times = get_dls_fallback_time_change_by_time_range(
+                    cur_pt, end_pt, frequency=freq
+                )  # in PT
+                fb_repeats = [0 for x in fb_times]
+                print(fb_times)
+
+            cur = range.start.to_pydatetime().astimezone(ZoneInfo("UTC"))
+            end = range.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + freq
+
+            while cur < end:
+                multiplier = 1.0
+                frequency = freq
+                cur_pt = cur.astimezone(TZ_pt.tz)
+                model_ts = cur_pt.replace(tzinfo=TZ_st.tz)
+                month = cur_pt.month
+                day = cur_pt.day
+                if ld_adj == LeapDayAdjustmentType.DROP_FEB29 and month == 2 and day == 29:
+                    cur += frequency
+                    pass
+                if ld_adj == LeapDayAdjustmentType.DROP_DEC31 and month == 12 and day == 31:
+                    cur += frequency
+                    pass
+                if ld_adj == LeapDayAdjustmentType.DROP_JAN1 and month == 1 and day == 1:
+                    cur += frequency
+                    pass
+
+                if fb_adj == DaylightSavingFallBackType.INTERPOLATE:
+                    for i, ts in enumerate(fb_times):
+                        if cur == ts.astimezone(ZoneInfo("UTC")):
+                            if fb_repeats[i] == 0:
+                                frequency = timedelta(hours=0)
+                                multiplier = 0.5
+                            if fb_repeats[i] == 1:
+                                model_ts = (
+                                    (cur + timedelta(hours=1))
+                                    .astimezone(TZ_pt.tz)
+                                    .replace(tzinfo=TZ_st.tz)
+                                )
+                                multiplier = 0.5
+                            fb_repeats[i] += 1
+
+                model_time.append(model_ts)
+                prevailing_time.append(cur_pt)
+                multipliers.append(multiplier)
+                cur += frequency
+
+        table = get_spark_session().createDataFrame(
+            zip(model_time, prevailing_time, multipliers), ["model_time", time_col, "multiplier"]
+        )
+        return table
+
     def _get_tzinfo_from_geography(geography_dim):
         """Get tzinfo from time_zone column of geography dimension record"""
-        # TODO assign it to use
+        # TODO not currently in use
         geo_records = geography_dim.get_records_dataframe()
         geo_tz_values = [
             row.time_zone for row in geo_records.select("time_zone").distinct().collect()

@@ -144,96 +144,92 @@ class TimeZone(DSGEnum):
     )
     HST = EnumValue(
         value="HawaiiAleutianStandard",
-        description="Hawaii Standard Time (UTC=-10). Does not include DST shifts.",
+        description="Hawaii Standard Time (UTC=-10). No daylight saving shifts.",
         tz=ZoneInfo("US/Hawaii"),
-        tz_name="HST",
+        tz_name="-10:00",
     )
     AST = EnumValue(
         value="AlaskaStandard",
-        description="Alaskan Standard Time (UTC=-9). Does not include DST shifts.",
+        description="Alaskan Standard Time (UTC=-9). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+9"),
-        tz_name="AST",
+        tz_name="-09:00",
     )
     APT = EnumValue(
         value="AlaskaPrevailing",
-        description="Alaska Prevailing Time. Commonly called Alaska Local Time. Includes DST"
-        " shifts during DST times.",
+        description="Alaska Prevailing Time. Commonly called Alaska Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Alaska"),
         tz_name="US/Alaska",
     )
     PST = EnumValue(
         value="PacificStandard",
-        description="Pacific Standard Time (UTC=-8). Does not include DST shifts.",
+        description="Pacific Standard Time (UTC=-8). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+8"),
-        tz_name="PST",
+        tz_name="-08:00",
     )
     PPT = EnumValue(
         value="PacificPrevailing",
-        description="Pacific Prevailing Time. Commonly called Pacific Local Time. Includes DST"
-        " shifts ,during DST times.",
+        description="Pacific Prevailing Time. Commonly called Pacific Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Pacific"),
         tz_name="US/Pacific",
     )
     MST = EnumValue(
         value="MountainStandard",
-        description="Mountain Standard Time (UTC=-7). Does not include DST shifts.",
+        description="Mountain Standard Time (UTC=-7). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+7"),
-        tz_name="MST",
+        tz_name="-07:00",
     )
     MPT = EnumValue(
         value="MountainPrevailing",
-        description="Mountain Prevailing Time. Commonly called Mountain Local Time. Includes DST"
-        " shifts during DST times.",
+        description="Mountain Prevailing Time. Commonly called Mountain Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Mountain"),
         tz_name="US/Mountain",
     )
     CST = EnumValue(
         value="CentralStandard",
-        description="Central Standard Time (UTC=-6). Does not include DST shifts.",
+        description="Central Standard Time (UTC=-6). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+6"),
-        tz_name="CST",
+        tz_name="-06:00",
     )
     CPT = EnumValue(
         value="CentralPrevailing",
-        description="Central Prevailing Time. Commonly called Central Local Time. Includes DST"
-        " shifts during DST times.",
+        description="Central Prevailing Time. Commonly called Central Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Central"),
         tz_name="US/Central",
     )
     EST = EnumValue(
         value="EasternStandard",
-        description="Eastern Standard Time (UTC=-5). Does not include DST shifts.",
+        description="Eastern Standard Time (UTC=-5). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+5"),
-        tz_name="EST",
+        tz_name="-05:00",
     )
     EPT = EnumValue(
         value="EasternPrevailing",
-        description="Eastern Prevailing Time. Commonly called Eastern Local Time. Includes DST"
-        " shifts during DST times.",
+        description="Eastern Prevailing Time. Commonly called Eastern Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Eastern"),
         tz_name="US/Eastern",
     )
     ARIZONA = EnumValue(
         value="USArizona",
-        description="US/Arizona = Mountain Standard Time (UTC=-7). No DST shifts. For Arizona except Navajo County",
+        description="US/Arizona = Mountain Standard Time (UTC=-7). No daylight saving shifts. "
+        "For Arizona state except Navajo County",
         tz=ZoneInfo("US/Arizona"),
         tz_name="US/Arizona",
     )  # for Arizona except Navajo County
-    LOCAL_PREVAILING = EnumValue(
-        value="LocalPrevailing",
-        description="Local Prevailing Time. Clock time local to the geography dimension of the dataset",
+    LOCAL = EnumValue(
+        value="Local",
+        description="Local Time, where the time zone is defined by a geography dimension.",
         tz=None,
-        tz_name="LocalPrevailing",
-    )
-    LOCAL_STANDARD = EnumValue(
-        value="LocalStandard",
-        description="Local Standard Time. Standard time local to the geography dimension of the dataset",
-        tz=None,
-        tz_name="LocalStandard",
+        tz_name="Local",
     )
     LOCAL_MODEL = EnumValue(
         value="LocalModel",
-        description="Local Model Time. Clock time local to the geography dimension of the dataset but laid out like Standard Time, requires daylight savings adjustment to both time and data",
+        description="Local Model Time. Clock time local to a geography dimension but laid out "
+        "like Standard Time, requires daylight saving adjustment to both time and data.",
         tz=None,
         tz_name="LocalModel",
     )
@@ -256,8 +252,6 @@ class TimeZone(DSGEnum):
             return TimeZone.EST
         if self == TimeZone.ARIZONA:
             return TimeZone.ARIZONA
-        if self in [TimeZone.LOCAL_STANDARD, TimeZone.LOCAL_PREVAILING]:
-            return TimeZone.LOCAL_STANDARD
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def get_prevailing_time(self):
@@ -278,8 +272,6 @@ class TimeZone(DSGEnum):
             return TimeZone.EPT
         if self == TimeZone.ARIZONA:
             return TimeZone.ARIZONA
-        if self in [TimeZone.LOCAL_STANDARD, TimeZone.LOCAL_PREVAILING]:
-            return TimeZone.LOCAL_PREVAILING
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def is_standard(self):
@@ -291,7 +283,6 @@ class TimeZone(DSGEnum):
             TimeZone.MST,
             TimeZone.CST,
             TimeZone.EST,
-            TimeZone.LOCAL_STANDARD,
             TimeZone.ARIZONA,
         ]
         if self in lst:
@@ -305,7 +296,6 @@ class TimeZone(DSGEnum):
             TimeZone.MPT,
             TimeZone.CPT,
             TimeZone.EPT,
-            TimeZone.LOCAL_PREVAILING,
             TimeZone.ARIZONA,
         ]
         if self in lst:
@@ -319,7 +309,7 @@ def get_dls_springforward_time_change_by_year(
     """Return the start of daylight savings based on year,
     i.e., the spring forward timestamp (2AM in ST or 3AM in DT)."""
 
-    if time_zone in [TimeZone.LOCAL_PREVAILING, TimeZone.LOCAL_STANDARD]:
+    if time_zone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
         raise ValueError(f"{time_zone=} cannot be local.")
     if time_zone.is_standard():
         # no daylight saving
@@ -382,10 +372,15 @@ def get_dls_springforward_time_change_by_time_range(
 
     timestamps = []
     prev_utc = cur_utc
+    sf_start = None
     while cur_utc < end_utc:
         cur, prev = cur_utc.astimezone(tz), prev_utc.astimezone(tz)
-        if cur.month == 3 and cur.dst() == timedelta(hours=1) and prev.dst() == timedelta(hours=0):
-            timestamps.append(cur)
+        if cur.month == 3 and cur.hour == 3:
+            if cur.dst() == timedelta(hours=1) and prev.dst() == timedelta(hours=0):
+                sf_start = cur
+                timestamps.append(cur)
+            elif sf_start is not None and sf_start.day == cur.day:
+                timestamps.append(cur)
         prev_utc = cur_utc
         cur_utc += frequency
 
@@ -401,7 +396,7 @@ def get_dls_fallback_time_change_by_year(
     """Return the end of daylight savings based on year,
     i.e., fall back timestamp (1AM in ST)."""
 
-    if time_zone in [TimeZone.LOCAL_PREVAILING, TimeZone.LOCAL_STANDARD]:
+    if time_zone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
         raise ValueError(f"{time_zone=} cannot be local.")
     if time_zone.is_standard():
         # no daylight saving
@@ -465,14 +460,15 @@ def get_dls_fallback_time_change_by_time_range(
 
     timestamps = []
     prev_utc = cur_utc - frequency
+    fb_start = None
     while cur_utc < end_utc:
         cur, prev = cur_utc.astimezone(tz), prev_utc.astimezone(tz)
-        if (
-            cur.month == 11
-            and cur.dst() == timedelta(hours=0)
-            and prev.dst() == timedelta(hours=1)
-        ):
-            timestamps.append(cur)
+        if cur.month == 11 and cur.hour == 1:
+            if cur.dst() == timedelta(hours=0) and prev.dst() == timedelta(hours=1):
+                fb_start = cur
+                timestamps.append(cur)
+            elif fb_start is not None and fb_start.day == cur.day:
+                timestamps.append(cur)
         prev_utc = cur_utc
         cur_utc += frequency
 

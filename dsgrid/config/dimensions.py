@@ -489,12 +489,27 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
+    data_str_format: Annotated[
+        Optional[str],
+        Field(
+            title="data_str_format",
+            default="",
+            description="Timestamp string format (for parsing the time column of the dataframe)",
+            json_schema_extra={
+                "notes": (
+                    "The string format is used to parse the timestamps in the dataframe while in Spark, "
+                    "(e.g., yyyy-MM-dd HH:mm:ssZZZZZ). "
+                    "Cheatsheet reference: `<https://spark.apache.org/docs/latest/sql-ref-datetime-pattern.html>`_.",
+                ),
+            },
+        ),
+    ]
     str_format: Annotated[
         Optional[str],
         Field(
             title="str_format",
             default="%Y-%m-%d %H:%M:%s",
-            description="Timestamp string format",
+            description="Timestamp string format (for parsing the time ranges)",
             json_schema_extra={
                 "notes": (
                     "The string format is used to parse the timestamps provided in the time ranges."
@@ -554,6 +569,18 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             if values["leap_day_adjustment"] != "none":
                 raise ValueError(f"Unknown data_schema format: {values=}")
             values.pop("leap_day_adjustment")
+
+        return values
+
+    @model_validator(mode="before")
+    @classmethod
+    def check_time_zone(cls, values):
+        # if time_zone is Local or LocalModel, use string and specify data_str_format
+        if values["timezone"] in ["Local", "LocalModel"]:
+            if values["time_type"] != "string":
+                raise ValueError(f'timezone={values["timezone"]} must use time_type=string')
+            if values["data_str_format"] == "":
+                raise ValueError(f'timezone={values["timezone"]} must specify data_str_format')
 
         return values
 
@@ -871,7 +898,10 @@ def handle_dimension_union(values):
             dim_type = value["dimension_type"]
         # NOTE: Errors inside DimensionModel or DateTimeDimensionModel will be duplicated by Pydantic
         if dim_type == DimensionType.TIME.value:
-            if value["time_type"] == TimeDimensionType.DATETIME.value:
+            if value["time_type"] in [
+                TimeDimensionType.DATETIME.value,
+                TimeDimensionType.STRING.value,
+            ]:
                 values[i] = DateTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.ANNUAL.value:
                 values[i] = AnnualTimeDimensionModel(**value)

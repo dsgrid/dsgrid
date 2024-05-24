@@ -50,7 +50,11 @@ from .dimensions import (
     check_display_name,
     generate_dimension_query_name,
 )
-from dsgrid.dimension.time import DataAdjustmentModel
+from dsgrid.dimension.time import (
+    DataAdjustmentModel,
+    DaylightSavingSpringForwardType,
+    DaylightSavingFallBackType,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -576,6 +580,24 @@ class InputDatasetModel(DSGBaseModel):
             default=DataAdjustmentModel(),
         ),
     ]
+
+    @field_validator("data_adjustment")
+    @classmethod
+    def check_data_adjustment(cls, data_adjustment):
+        """Check daylight saving adjustment"""
+        sfh = data_adjustment.daylight_saving_adjustment.spring_forward_hour
+        fbh = data_adjustment.daylight_saving_adjustment.fall_back_hour
+        if fbh == DaylightSavingFallBackType.NONE and sfh == DaylightSavingSpringForwardType.NONE:
+            if (
+                fbh != DaylightSavingFallBackType.NONE
+                and sfh != DaylightSavingSpringForwardType.NONE
+            ):
+                return data_adjustment
+        raise ValueError(
+            "mismatch between daylight_saving_adjustment spring_forward_hour and fall_back_hour."
+        )
+
+    #  TODO: write validation that if daylight_saving_adjustment is specified, time zone needs to be LocalModel
 
 
 class DimensionMappingsModel(DSGBaseModel):

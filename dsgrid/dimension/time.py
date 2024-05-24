@@ -19,6 +19,7 @@ class TimeDimensionType(DSGEnum):
     REPRESENTATIVE_PERIOD = "representative_period"
     INDEXED = "indexed"
     NOOP = "noop"
+    STRING = "string"
 
 
 class RepresentativePeriodFormat(DSGEnum):

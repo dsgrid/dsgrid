@@ -5,6 +5,12 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import pyspark.sql.functions as F
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    TimestampType,
+    DoubleType,
+)
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import TimeZone, TimeIntervalType
@@ -230,7 +236,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         df = self._align_time_interval_type(df, project_time_dim)
 
         if wrap_time:
-            diff = self._time_difference(df, project_time_dim, difference="left")
+            diff = self._time_difference(df, project_time_dim, difference="symmetric")
             df = self._apply_time_wrap(df, project_time_dim, diff)
 
         return df
@@ -253,8 +259,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         df = self._shift_time_interval(
             df, time_col, dtime_interval, ptime_interval, self.get_frequency()
         )
-
-        diff = self._time_difference(df, project_time_dim, difference="left")
+        breakpoint()
+        diff = self._time_difference(df, project_time_dim, difference="symmetric")
+        breakpoint()
         if diff:
             df = self._apply_time_wrap(df, project_time_dim, diff)
 
@@ -320,7 +327,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             row[0]
             for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
         }
-
+        breakpoint()
         if difference == "left":
             return dataset_time.difference(project_time)
 
@@ -375,9 +382,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         if dataset_time.symmetric_difference(project_time):
             left_msg, right_msg = "", ""
             if left_diff := dataset_time.difference(project_time):
-                left_msg = f"\nProcessed dataset time contains {len(left_diff)} extra timestamp(s): {left_diff}"
+                left_msg = f"\nProcessed dataset time contains {len(left_diff)} extra timestamp(s): {left_diff[:min(5,len(left_diff))]}"
             if right_diff := project_time.difference(dataset_time):
-                right_msg = f"\nProcessed dataset time is missing {len(right_diff)} timestamp(s): {right_diff}"
+                right_msg = f"\nProcessed dataset time is missing {len(right_diff)} timestamp(s): {right_diff[:min(5,len(right_diff))]}"
             raise DSGInvalidOperation(
                 f"Dataset time cannot be processed to match project time. {left_msg}{right_msg}"
             )
@@ -496,8 +503,15 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                 multipliers.append(multiplier)
                 cur += frequency
 
+        schema = StructType(
+            [
+                StructField("model_time", TimestampType(), False),
+                StructField(time_col, TimestampType(), False),
+                StructField("multiplier", DoubleType(), False),
+            ]
+        )
         table = get_spark_session().createDataFrame(
-            zip(model_time, prevailing_time, multipliers), ["model_time", time_col, "multiplier"]
+            zip(model_time, prevailing_time, multipliers), schema=schema
         )
         return table
 

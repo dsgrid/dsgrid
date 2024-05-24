@@ -1,10 +1,10 @@
 {
   dimensions: [
-    { // #[0] 8760
+    { // #[0] 8784
       type: "time",
       class_name: "Time",
       time_type: "datetime",
-      description: "Time dimension, 2012 hourly EST, period-beginning, otal value\n",
+      description: "Time dimension, 2012 hourly EST, period-beginning, total value\n",
       frequency: "01:00:00",
       name: "Time-2012-EST-hourly-periodBeginning-total",
       display_name: "2012 Hourly EST",
@@ -57,14 +57,14 @@
       timezone: "EasternPrevailing",
       measurement_type: "max",
     },
-    { // #[3] 8760 - local
+    { // #[3] 8760 - UTC
       type: "time",
       class_name: "Time",
       time_type: "datetime",
-      description: "Time dimension, 2012 hourly local time, period-ending, total value\n",
+      description: "Time dimension, 2012 hourly UTC, period-ending, total value\n",
       frequency: "01:00:00",
-      name: "Time-2012-local-standard-model-hourly-periodEnding-total",
-      display_name: "2012 Hourly local",
+      name: "Time-2012-UTC-model-hourly-periodEnding-total",
+      display_name: "2012 Hourly UTC",
       time_interval_type: "period_ending",
       ranges: [
         {
@@ -73,7 +73,7 @@
         },
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
-      timezone: "Local",
+      timezone: "UTC",
       measurement_type: "total",
     },
     { // #[4]
@@ -114,20 +114,20 @@
     { // #[6]
       "class": "Time",
       type: "time",
-      name: "Local-model-time-2022-indexed",
+      name: "Local-model-time-2012-indexed",
       display_name: "time",
       time_type: "indexed",
       index_ranges: [
 	      {
-          start: 1680,
-          end: 7395,
+          start: 1, // start: 1680,
+          end: 8784, // end: 7395,
 	        interval: 1,
         },
       ],
       ranges: [
         {
-          start: "2012-03-11 00:00:00",
-          end: "2012-11-04 03:00:00",
+          start: "2012-01-01 00:00:00", // start: "2012-03-11 00:00:00",
+          end: "2012-12-31 23:00:00", // end: "2012-11-04 03:00:00",
         },
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
@@ -135,14 +135,27 @@
       timezone: "LocalModel",
       time_interval_type: "period_ending",
       measurement_type: "total",
-      // data_adjustment: {
-      //   daylight_saving_adjustment:
-      //     {
-      //       spring_forward_hour: "drop",
-      //       fall_back_hour: "interpolate",
-      //     },
-      // },
       description: "Industrial time, indexed, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
+    },
+    { // #[7] - datetime form of [6]
+      type: "time",
+      class_name: "Time",
+      time_type: "string",
+      description: "Industrial time, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
+      frequency: "01:00:00",
+      name: "Local-model-time-2012",
+      display_name: "time",
+      time_interval_type: "period_ending",
+      ranges: [
+        {
+          start: "2012-01-01 00:00:00", // start: "2012-03-11 00:00:00",
+          end: "2012-12-31 23:00:00", // end: "2012-11-04 03:00:00",
+        },
+      ],
+      str_format: "%Y-%m-%d %H:%M:%S",
+      data_str_format: "yyyy-MM-dd HH:mm:ssZZZZZ",
+      timezone: "LocalModel",
+      measurement_type: "total",
     },
   ],
 }

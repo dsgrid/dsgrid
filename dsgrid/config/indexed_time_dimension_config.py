@@ -9,14 +9,13 @@ from pyspark.sql.types import (
 )
 import pyspark.sql.functions as F
 
-from dsgrid.dimension.time import make_time_range, TimeZone
+from dsgrid.dimension.time import make_time_range, TimeZone, DataAdjustmentModel
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import DatetimeTimestampType, IndexedTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import IndexedTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dimension.time import DataAdjustmentModel
 from dsgrid.common import VALUE_COLUMN
 
 
@@ -104,9 +103,7 @@ class IndexedTimeDimensionConfig(TimeDimensionBaseConfig):
         assert len(idx_col) == 1, idx_col
         idx_col = idx_col[0]
 
-        time_col = list(DatetimeTimestampType._fields)
-        assert len(time_col) == 1, time_col
-        time_col = time_col[0]
+        time_col = DatetimeTimestampType._fields[0]
 
         ptime_col = project_time_dim.get_load_data_time_columns()
         assert len(ptime_col) == 1, ptime_col
@@ -131,7 +128,7 @@ class IndexedTimeDimensionConfig(TimeDimensionBaseConfig):
             ]
             assert geo_tz
             if self.model.timezone == TimeZone.LOCAL_MODEL:
-                # for LocalModel time, indices correspond to time laid out like Standard Time
+                # for LocalModel time, indices correspond to clock time laid out like Standard Time
                 geo_tz2 = [tz.get_standard_time() for tz in geo_tz]
             else:
                 geo_tz2 = geo_tz
@@ -171,6 +168,7 @@ class IndexedTimeDimensionConfig(TimeDimensionBaseConfig):
             df = df.groupBy(*groupby).agg(
                 F.sum(F.col(VALUE_COLUMN) * F.col("multiplier")).alias(VALUE_COLUMN)
             )
+
         df = self._convert_time_to_project_time_interval(
             df=df, project_time_dim=project_time_dim, wrap_time=wrap_time_allowed
         )

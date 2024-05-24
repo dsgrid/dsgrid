@@ -59,3 +59,9 @@ class IndexedTimestampType(NamedTuple):
     """Single column with numerical indices."""
 
     time_index: int
+
+
+class StringTimestampType(NamedTuple):
+    """Single column with time (must include offset) as str."""
+
+    timestamp: str

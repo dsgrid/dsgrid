@@ -236,8 +236,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         df = self._align_time_interval_type(df, project_time_dim)
 
         if wrap_time:
-            diff = self._time_difference(df, project_time_dim, difference="symmetric")
-            df = self._apply_time_wrap(df, project_time_dim, diff)
+            diff = self._time_difference(df, project_time_dim, difference="left")
+            if diff:
+                df = self._apply_time_wrap(df, project_time_dim, diff)
 
         return df
 
@@ -259,9 +260,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         df = self._shift_time_interval(
             df, time_col, dtime_interval, ptime_interval, self.get_frequency()
         )
-        breakpoint()
-        diff = self._time_difference(df, project_time_dim, difference="symmetric")
-        breakpoint()
+        diff = self._time_difference(df, project_time_dim, difference="left")
         if diff:
             df = self._apply_time_wrap(df, project_time_dim, diff)
 
@@ -327,7 +326,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             row[0]
             for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
         }
-        breakpoint()
         if difference == "left":
             return dataset_time.difference(project_time)
 
@@ -377,13 +375,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             row[0]
             for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
         }
-
         # check
         if dataset_time.symmetric_difference(project_time):
             left_msg, right_msg = "", ""
-            if left_diff := dataset_time.difference(project_time):
+            if left_diff := sorted(dataset_time.difference(project_time)):
                 left_msg = f"\nProcessed dataset time contains {len(left_diff)} extra timestamp(s): {left_diff[:min(5,len(left_diff))]}"
-            if right_diff := project_time.difference(dataset_time):
+            if right_diff := sorted(project_time.difference(dataset_time)):
                 right_msg = f"\nProcessed dataset time is missing {len(right_diff)} timestamp(s): {right_diff[:min(5,len(right_diff))]}"
             raise DSGInvalidOperation(
                 f"Dataset time cannot be processed to match project time. {left_msg}{right_msg}"

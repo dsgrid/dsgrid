@@ -168,7 +168,6 @@ class IndexedTimeDimensionConfig(TimeDimensionBaseConfig):
             df = df.groupBy(*groupby).agg(
                 F.sum(F.col(VALUE_COLUMN) * F.col("multiplier")).alias(VALUE_COLUMN)
             )
-
         df = self._convert_time_to_project_time_interval(
             df=df, project_time_dim=project_time_dim, wrap_time=wrap_time_allowed
         )

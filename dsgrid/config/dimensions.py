@@ -581,6 +581,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
                 raise ValueError(f'timezone={values["timezone"]} must use time_type=string')
             if values["data_str_format"] == "":
                 raise ValueError(f'timezone={values["timezone"]} must specify data_str_format')
+            # TODO: str must include UTC offsets
 
         return values
 

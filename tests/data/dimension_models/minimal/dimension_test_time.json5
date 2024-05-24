@@ -4,10 +4,10 @@
       type: "time",
       class_name: "Time",
       time_type: "datetime",
-      description: "Time dimension, 2012 hourly EST, period-beginning, total value\n",
+      description: "Time dimension, 2012 hourly MST, period-beginning, total value\n",
       frequency: "01:00:00",
       name: "Time-2012-EST-hourly-periodBeginning-total",
-      display_name: "2012 Hourly EST",
+      display_name: "2012 Hourly MST",
       time_interval_type: "period_beginning",
       ranges: [
         {
@@ -16,7 +16,7 @@
         },
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
-      timezone: "EasternStandard",
+      timezone: "MountainStandard",
       measurement_type: "total",
     },
     { // #[1] # daily
@@ -119,8 +119,8 @@
       time_type: "indexed",
       index_ranges: [
 	      {
-          start: 1, // start: 1680,
-          end: 8784, // end: 7395,
+          start: 0, // start: 1680,
+          end: 8783, // end: 7395,
 	        interval: 1,
         },
       ],
@@ -133,7 +133,7 @@
       str_format: "%Y-%m-%d %H:%M:%S",
       frequency: "P0DT1H0M0.000000S",
       timezone: "LocalModel",
-      time_interval_type: "period_ending",
+      time_interval_type: "period_beginning",
       measurement_type: "total",
       description: "Industrial time, indexed, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
     },
@@ -145,7 +145,7 @@
       frequency: "01:00:00",
       name: "Local-model-time-2012",
       display_name: "time",
-      time_interval_type: "period_ending",
+      time_interval_type: "period_beginning",
       ranges: [
         {
           start: "2012-01-01 00:00:00", // start: "2012-03-11 00:00:00",

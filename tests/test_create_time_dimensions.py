@@ -650,7 +650,6 @@ def test_data_adjustment_mapping_table(indexed_time_dimension_model):
         table2, ["model_time"], "right"
     )
     # joined_table.sort([F.col("time_index"), F.col("timestamp")]).show()
-    # joined_table.sort([F.col("time_index").desc(), F.col("timestamp").desc()]).show()
 
     # check joined_table
     res = joined_table.select("time_index", "multiplier").collect()
@@ -703,7 +702,6 @@ def test_data_adjustment_mapping_table(indexed_time_dimension_model):
         ),
     )
     # joined_table.sort([F.col("time_index"), F.col("timestamp")]).show()
-    # joined_table.sort([F.col("time_index").desc(), F.col("timestamp").desc()]).show()
 
     # check joined_table
     res = joined_table.select("time_index", "multiplier").collect()
@@ -748,10 +746,10 @@ def test_indexed_time_conversion_for_local_model_time(
     data_adjustment where drop spring_forward and duplicate fall_back
     """
     df = df_indexed_time
-    project_time_dim = DateTimeDimensionConfig(
-        time_dimension_model0
-    )  # fake, any will do to return time column name
+    project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
     config = IndexedTimeDimensionConfig(indexed_time_dimension_model)
+    time_cols = config.get_load_data_time_columns()
+    config.check_dataset_time_consistency(df, time_cols)
     local_model_time_conversion_tests(config, project_time_dim, df)
 
 
@@ -760,9 +758,7 @@ def test_indexed_time_conversion_for_local_time(
 ):
     """When time.timezone is Local (as opposed to LocalModel), no impact to value from data_adjustment.daylight_saving_adjustment"""
     df = df_indexed_time
-    project_time_dim = DateTimeDimensionConfig(
-        time_dimension_model0
-    )  # fake, any will do to return time column name
+    project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
     config = IndexedTimeDimensionConfig(indexed_time_dimension_model2)
     local_time_conversion_tests(config, project_time_dim, df)
 

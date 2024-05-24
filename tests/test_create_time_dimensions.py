@@ -132,6 +132,16 @@ def time_dimension_model6():
 
 
 @pytest.fixture
+def time_dimension_model7():
+    file = DIMENSION_CONFIG_FILE_TIME
+    config_as_dict = load_data(file)
+    model = DimensionsConfigModel(**config_as_dict)
+    # change freq to 30-min
+    model.dimensions[0].frequency = datetime.timedelta(minutes=30)
+    yield model.dimensions[0]  # 30-min freq version of time model 0
+
+
+@pytest.fixture
 def df_indexed_time():
     # mock project dataframe - for testing indexed Local and LocalModel conversion
     schema = StructType(
@@ -228,7 +238,7 @@ def df_date_time2():
     )
     ts_st = [str(ts) for ts in ts_st]
     timestamps = [ts_pt, ts_pt, ts_st]
-    values = np.arange(0.0, 8784.0, 0.5).tolist()  # np.arange(1680.0, 7396.0).tolist()
+    values = np.arange(0.0, 8783.5, 0.5).tolist()  # np.arange(1680.0, 7396.0).tolist()
     sch = StructType(
         [
             StructField("timestamp", StringType(), False),
@@ -352,8 +362,6 @@ def local_model_time_conversion_tests(config, project_time_dim, df):
         data_adjustment=data_adjustment,
     )
     # df2.sort(F.col("timestamp"), F.col("geography")).show()
-    # df2.sort(F.col("geography"), F.col("timestamp").desc()).show()
-    # df2.sort(F.col("geography").desc(), F.col("timestamp").desc()).show()
 
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
     assert (
@@ -396,8 +404,6 @@ def local_model_time_conversion_tests(config, project_time_dim, df):
         data_adjustment=data_adjustment,
     )
     # df2.sort(F.col("timestamp"), F.col("geography")).show()
-    # df2.sort(F.col("geography"), F.col("timestamp").desc()).show()
-    # df2.sort(F.col("geography").desc(), F.col("timestamp").desc()).show()
 
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
     assert (
@@ -782,105 +788,99 @@ def test_date_time_conversion_for_local_time(
     """When time.timezone is Local (as opposed to LocalModel), no impact to value from data_adjustment.daylight_saving_adjustment"""
     df = df_date_time
 
-    project_time_dim = DateTimeDimensionConfig(
-        time_dimension_model0
-    )  # fake, any will do to return time column name
+    project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
     config = DateTimeDimensionConfig(time_dimension_model5)
     local_time_conversion_tests(config, project_time_dim, df)
 
 
-# def test_date_time_conversion_for_local_model_time_subhourly(
-#     time_dimension_model6, time_dimension_model0, df_date_time2
-# ):
-#     """When time.timezone is LocalModel (as opposed to Local), data_adjustment=None has the same behavior as
-#     data_adjustment where drop spring_forward and duplicate fall_back
-#     """
-#     df = df_date_time2
+def test_date_time_conversion_for_local_model_time_subhourly(
+    time_dimension_model6, time_dimension_model7, df_date_time2
+):
+    """When time.timezone is LocalModel (as opposed to Local), data_adjustment=None has the same behavior as
+    data_adjustment where drop spring_forward and duplicate fall_back
+    """
+    df = df_date_time2
 
-#     project_time_dim = DateTimeDimensionConfig(
-#         time_dimension_model0
-#     )  # fake, any will do to return time column name
-#     config = DateTimeDimensionConfig(time_dimension_model6)
+    project_time_dim = DateTimeDimensionConfig(time_dimension_model7)
+    config = DateTimeDimensionConfig(time_dimension_model6)
 
-#     # -- test --
-#     values = np.arange(0.0, 8784.0).tolist()  # np.arange(1680.0, 7396.0).tolist()
-#     n_df = df.count()
+    # -- test --
+    values = np.arange(0.0, 8783.5, 0.5).tolist()  # np.arange(1680.0, 7396.0, 0.5).tolist()
+    n_df = df.count()
 
-#     # [1] Duplicating fallback 1AM
-#     # This has the same behavior as data_adjustment = None
-#     data_adjustment = DataAdjustmentModel(
-#         daylight_saving_adjustment={
-#             "spring_forward_hour": "drop",
-#             "fall_back_hour": "duplicate",
-#         }
-#     )
-#     breakpoint()
-#     df2 = config.convert_dataframe(
-#         df,
-#         project_time_dim,
-#         model_years=None,
-#         value_columns=None,
-#         wrap_time_allowed=True,
-#         data_adjustment=data_adjustment,
-#     )
-#     # df2.sort(F.col("timestamp"), F.col("geography")).show()
-#     # df2.sort(F.col("geography"), F.col("timestamp").desc()).show()
-#     # df2.sort(F.col("geography").desc(), F.col("timestamp").desc()).show()
+    # [1] Duplicating fallback 1AM
+    # This has the same behavior as data_adjustment = None
+    data_adjustment = DataAdjustmentModel(
+        daylight_saving_adjustment={
+            "spring_forward_hour": "drop",
+            "fall_back_hour": "duplicate",
+        }
+    )
+    df2 = config.convert_dataframe(
+        df,
+        project_time_dim,
+        model_years=None,
+        value_columns=None,
+        wrap_time_allowed=True,
+        data_adjustment=data_adjustment,
+    )
+    # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
-#     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
-#     assert (
-#         len(f2) == n_df
-#     ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
-#     # for AZ, no missing or interpolation
-#     f2_filtered = f2.loc[f2["geography"] == "Arizona", "value"].to_list()
-#     assert f2_filtered == values, "f2 for AZ has missing or interpolated values."
-#     f2_filtered = f2.loc[f2["geography"] == "Colorado", "value"].to_list()
-#     assert 1682 not in f2_filtered, "value 1682 is found for CO, expecting it missing."
-#     dup_val = 7393
-#     assert dup_val in f2_filtered, f"Expecting duplicated value {dup_val} for CO, but not found."
+    f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    assert (
+        len(f2) == n_df
+    ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
+    # for AZ, no missing or interpolation
+    f2_filtered = f2.loc[f2["geography"] == "Arizona", "value"].to_list()
+    assert f2_filtered == values, "f2 for AZ has missing or interpolated values."
+    f2_filtered = f2.loc[f2["geography"] == "Colorado", "value"].to_list()
+    for val in [1682, 1682.5]:
+        assert val not in f2_filtered, f"value {val} is found for CO, expecting it missing."
+    for dup_val in [7393, 7393.5]:
+        assert (
+            dup_val in f2_filtered
+        ), f"Expecting duplicated value {dup_val} for CO, but not found."
 
-#     df3 = config.convert_dataframe(
-#         df,
-#         project_time_dim,
-#         model_years=None,
-#         value_columns=None,
-#         wrap_time_allowed=True,
-#         data_adjustment=None,
-#     )
-#     f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
-#     assert (
-#         len(f2.compare(f3)) == 0
-#     ), f"LocalModel_time.convert_dataframe() with data_adjustment=None should have the same behavior as with {data_adjustment=}"
+    df3 = config.convert_dataframe(
+        df,
+        project_time_dim,
+        model_years=None,
+        value_columns=None,
+        wrap_time_allowed=True,
+        data_adjustment=None,
+    )
+    f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    assert (
+        len(f2.compare(f3)) == 0
+    ), f"LocalModel_time.convert_dataframe() with data_adjustment=None should have the same behavior as with {data_adjustment=}"
 
-#     # [2] Interpolating fallback between 1 and 2AM
-#     data_adjustment = DataAdjustmentModel(
-#         daylight_saving_adjustment={
-#             "spring_forward_hour": "drop",
-#             "fall_back_hour": "interpolate",
-#         }
-#     )
-#     df2 = config.convert_dataframe(
-#         df,
-#         project_time_dim,
-#         model_years=None,
-#         value_columns=None,
-#         wrap_time_allowed=True,
-#         data_adjustment=data_adjustment,
-#     )
-#     # df2.sort(F.col("timestamp"), F.col("geography")).show()
-#     # df2.sort(F.col("geography"), F.col("timestamp").desc()).show()
-#     # df2.sort(F.col("geography").desc(), F.col("timestamp").desc()).show()
+    # [2] Interpolating fallback between 1 and 2AM
+    data_adjustment = DataAdjustmentModel(
+        daylight_saving_adjustment={
+            "spring_forward_hour": "drop",
+            "fall_back_hour": "interpolate",
+        }
+    )
+    df2 = config.convert_dataframe(
+        df,
+        project_time_dim,
+        model_years=None,
+        value_columns=None,
+        wrap_time_allowed=True,
+        data_adjustment=data_adjustment,
+    )
+    # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
-#     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
-#     assert (
-#         len(f2) == n_df
-#     ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
-#     # for AZ, no missing or interpolation
-#     f2_filtered = f2.loc[f2["geography"] == "Arizona", "value"].to_list()
-#     assert f2_filtered == values, "f2 for AZ has missing or interpolated values."
-#     f2_filtered = f2.loc[f2["geography"] == "Colorado", "value"].to_list()
-#     assert 1682 not in f2_filtered, "value 1682 is found for CO, expecting it missing."
-#     itpl_val = (7393 + 7394) / 2
-#     assert (
-#         itpl_val in f2_filtered
-#     ), f"Expecting interpolated value {itpl_val} for CO, but not found."
+    f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    assert (
+        len(f2) == n_df
+    ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
+    # for AZ, no missing or interpolation
+    f2_filtered = f2.loc[f2["geography"] == "Arizona", "value"].to_list()
+    assert f2_filtered == values, "f2 for AZ has missing or interpolated values."
+    f2_filtered = f2.loc[f2["geography"] == "Colorado", "value"].to_list()
+    for val in [1682, 1682.5]:
+        assert val not in f2_filtered, f"value {val} is found for CO, expecting it missing."
+    itpl_val = (7393 + 7394) / 2
+    for val in [itpl_val, itpl_val + 0.5]:
+        assert val in f2_filtered, f"Expecting interpolated value {val} for CO, but not found."

@@ -24,6 +24,7 @@ from dsgrid.utils.spark import (
     write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @classmethod
     def load(cls, config: DatasetConfig, *args, **kwargs):
         load_data_df = read_dataframe(config.load_data_path)
+        time_dim = config.get_dimension(DimensionType.TIME)
+        if isinstance(time_dim, DateTimeDimensionConfig):
+            load_data_df = time_dim._convert_dataset_time_to_datetime(load_data_df)
         load_data_lookup = read_dataframe(config.load_data_lookup_path)
         load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)

@@ -58,9 +58,10 @@ def tempo(project):
 
 def test_no_unexpected_timezone():
     for tzo in TimeZone:
-        assert (
-            tzo.is_standard() + tzo.is_prevailing() == 1
-        ), f"{tzo} can either be prevailing or standard"
+        if tzo not in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
+            assert (
+                tzo.is_standard() + tzo.is_prevailing() == 1
+            ), f"{tzo} can either be prevailing or standard"
 
 
 def test_build_time_dataframe(project, resstock, comstock):

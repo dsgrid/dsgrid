@@ -47,9 +47,9 @@ class IndexedTimeDimensionConfig(TimeDimensionBaseConfig):
         expected_indices = index_range.list_time_range()
         actual_indices = [
             x[time_col]
-            for x in load_data_df.select(time_col)
+            for x in load_data_df.filter(f"{time_col} is not null")
+            .select(time_col)
             .distinct()
-            .filter(f"{time_col} is not null")
             .sort(time_col)
             .collect()
         ]

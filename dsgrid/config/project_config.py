@@ -588,11 +588,9 @@ class InputDatasetModel(DSGBaseModel):
         sfh = data_adjustment.daylight_saving_adjustment.spring_forward_hour
         fbh = data_adjustment.daylight_saving_adjustment.fall_back_hour
         if fbh == DaylightSavingFallBackType.NONE and sfh == DaylightSavingSpringForwardType.NONE:
-            if (
-                fbh != DaylightSavingFallBackType.NONE
-                and sfh != DaylightSavingSpringForwardType.NONE
-            ):
-                return data_adjustment
+            return data_adjustment
+        if fbh != DaylightSavingFallBackType.NONE and sfh != DaylightSavingSpringForwardType.NONE:
+            return data_adjustment
         raise ValueError(
             "mismatch between daylight_saving_adjustment spring_forward_hour and fall_back_hour."
         )

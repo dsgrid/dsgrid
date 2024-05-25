@@ -770,11 +770,13 @@ def test_date_time_conversion_for_local_model_time(
     data_adjustment where drop spring_forward and duplicate fall_back
     """
     df = df_date_time
-
     project_time_dim = DateTimeDimensionConfig(
         time_dimension_model0
     )  # fake, any will do to return time column name
     config = DateTimeDimensionConfig(time_dimension_model4)
+    df = config._convert_dataset_time_to_datetime(df)
+    time_cols = config.get_load_data_time_columns()
+    config.check_dataset_time_consistency(df, time_cols)
     local_model_time_conversion_tests(config, project_time_dim, df)
 
 
@@ -783,9 +785,9 @@ def test_date_time_conversion_for_local_time(
 ):
     """When time.timezone is Local (as opposed to LocalModel), no impact to value from data_adjustment.daylight_saving_adjustment"""
     df = df_date_time
-
     project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
     config = DateTimeDimensionConfig(time_dimension_model5)
+    df = config._convert_dataset_time_to_datetime(df)
     local_time_conversion_tests(config, project_time_dim, df)
 
 
@@ -796,9 +798,9 @@ def test_date_time_conversion_for_local_model_time_subhourly(
     data_adjustment where drop spring_forward and duplicate fall_back
     """
     df = df_date_time2
-
     project_time_dim = DateTimeDimensionConfig(time_dimension_model7)
     config = DateTimeDimensionConfig(time_dimension_model6)
+    df = config._convert_dataset_time_to_datetime(df)
 
     # -- test --
     values = np.arange(0.0, 8783.5, 0.5).tolist()  # np.arange(1680.0, 7396.0, 0.5).tolist()

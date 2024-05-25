@@ -1,5 +1,12 @@
 import logging
-from pyspark.sql.types import StructType, StructField, TimestampType, DoubleType, StringType
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    TimestampType,
+    DoubleType,
+    StringType,
+    TimestampNTZType,
+)
 import pyspark.sql.functions as F
 
 from dsgrid.dimension.time import make_time_range, TimeZone
@@ -37,12 +44,53 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         time_range = time_ranges[0]
         # TODO: need to support validation of multiple time ranges: DSGRID-173
 
+        assert (
+            load_data_df.schema[time_col].dataType != TimestampNTZType()
+        ), f"datetime {time_col} column cannot be TimestampNTZType"
+
         expected_timestamps = time_range.list_time_range()
+        if self.model.timezone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
+            if self.model.data_str_format != "":
+                if "id" in load_data_df.columns:
+                    groupby = ["id"]
+                else:
+                    groupby = [
+                        x for x in load_data_df.columns if x not in [time_col, VALUE_COLUMN]
+                    ]
+                start_times = load_data_df.groupBy(*groupby).agg(F.min(time_col).alias(time_col))
+                min_ts = start_times.select(F.min(time_col).alias(time_col)).collect()[0][time_col]
+                start_times = start_times.withColumn("min_ts", F.lit(min_ts))
+                time_deltas = start_times.select(
+                    *groupby, (F.col(time_col) - F.col("min_ts")).alias("time_delta")
+                )
+                timestamps = load_data_df.select(*groupby, time_col).join(
+                    time_deltas, groupby, "left"
+                )
+                timestamps = timestamps.select(
+                    *groupby, (F.col(time_col) - F.col("time_delta")).alias("aligned_time")
+                )
+                timestamp_counts = [
+                    x["count"] for x in timestamps.groupBy("aligned_time").count().collect()
+                ]
+                if len(set(timestamp_counts)) != 1:
+                    raise DSGInvalidDataset(
+                        f"load_data {time_col}s do not have the same time range when adjusting for offsets."
+                    )
+                if len(timestamp_counts) != len(expected_timestamps):
+                    raise DSGInvalidDataset(
+                        f"load_data {time_col}s do not have the expected number of timestamps when adjusting for offsets."
+                    )
+                return
+            else:
+                raise NotImplementedError(
+                    f"Cannot check load_data {time_col}s with Local or LocalModel timezone that relies on geography dimension."
+                )
+
         actual_timestamps = [
             x[time_col].astimezone().astimezone(tz)
-            for x in load_data_df.select(time_col)
+            for x in load_data_df.filter(f"{time_col} is not null")
+            .select(time_col)
             .distinct()
-            .filter(f"{time_col} is not null")
             .sort(time_col)
             .collect()
         ]
@@ -112,13 +160,6 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         ptime_col = project_time_dim.get_load_data_time_columns()
         assert len(ptime_col) == 1, ptime_col
         ptime_col = ptime_col[0]
-
-        if self.model.timezone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
-            nontime_cols = [x for x in df.columns if x != ptime_col]
-            df = df.select(
-                F.to_timestamp(ptime_col, self.model.data_str_format).alias(ptime_col),
-                *nontime_cols,
-            )
 
         if self.model.timezone == TimeZone.LOCAL_MODEL:
             # if local time zones, create time zone map to covert
@@ -213,3 +254,16 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         ):
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps
+
+    def _convert_dataset_time_to_datetime(self, load_data_df):
+        if self.model.data_str_format == "":
+            return load_data_df
+        time_col = self.get_load_data_time_columns()
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+        nontime_cols = [x for x in load_data_df.columns if x != time_col]
+        load_data_df = load_data_df.select(
+            F.to_timestamp(time_col, self.model.data_str_format).alias(time_col),
+            *nontime_cols,
+        )
+        return load_data_df

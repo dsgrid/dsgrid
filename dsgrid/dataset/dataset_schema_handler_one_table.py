@@ -20,6 +20,7 @@ from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +35,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @classmethod
     def load(cls, config: DatasetConfig, *args, **kwargs):
         load_data_df = config.add_trivial_dimensions(read_dataframe(config.load_data_path))
+        time_dim = config.get_dimension(DimensionType.TIME)
+        if isinstance(time_dim, DateTimeDimensionConfig):
+            load_data_df = time_dim._convert_dataset_time_to_datetime(load_data_df)
         return cls(load_data_df, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)

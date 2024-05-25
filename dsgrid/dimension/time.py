@@ -19,7 +19,6 @@ class TimeDimensionType(DSGEnum):
     REPRESENTATIVE_PERIOD = "representative_period"
     INDEXED = "indexed"
     NOOP = "noop"
-    STRING = "string"
 
 
 class RepresentativePeriodFormat(DSGEnum):
@@ -223,7 +222,8 @@ class TimeZone(DSGEnum):
     )  # for Arizona except Navajo County
     LOCAL = EnumValue(
         value="Local",
-        description="Local Time, where the time zone is defined by a geography dimension.",
+        description="Local Time, where the time zone is local to a geography dimension or "
+        "is given by the offset of the timestamps.",
         tz=None,
         tz_name="Local",
     )

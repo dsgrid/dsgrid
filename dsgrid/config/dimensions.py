@@ -572,18 +572,30 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
         return values
 
-    @model_validator(mode="before")
-    @classmethod
-    def check_time_zone(cls, values):
-        # if time_zone is Local or LocalModel, use string and specify data_str_format
-        if values["timezone"] in ["Local", "LocalModel"]:
-            if values["time_type"] != "string":
-                raise ValueError(f'timezone={values["timezone"]} must use time_type=string')
-            if values["data_str_format"] == "":
-                raise ValueError(f'timezone={values["timezone"]} must specify data_str_format')
-            # TODO: str must include UTC offsets
+    @model_validator(mode="after")
+    def check_time_zone(self) -> "DateTimeDimensionModel":
+        if self.timezone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
+            dsf = self.data_str_format
+            if dsf == "":
+                raise ValueError(f"timezone={self.timezone} must specify data_str_format")
+            if "x" not in dsf and "X" not in dsf and "Z" not in dsf:
+                raise ValueError(
+                    f"data_str_format for timezone={self.timezone} must specify zone-offset."
+                )
+        return self
 
-        return values
+    @model_validator(mode="after")
+    def check_data_str_format(self) -> "DateTimeDimensionModel":
+        dsf = self.data_str_format
+        if (
+            dsf != ""
+            and ("x" not in dsf and "X" not in dsf and "Z" not in dsf)
+            and self.timezone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]
+        ):
+            raise ValueError(
+                "data_str_format that does not provide zone-offset must specify a real timezone."
+            )
+        return self
 
     @model_validator(mode="after")
     def check_frequency(self) -> "DateTimeDimensionModel":
@@ -899,10 +911,7 @@ def handle_dimension_union(values):
             dim_type = value["dimension_type"]
         # NOTE: Errors inside DimensionModel or DateTimeDimensionModel will be duplicated by Pydantic
         if dim_type == DimensionType.TIME.value:
-            if value["time_type"] in [
-                TimeDimensionType.DATETIME.value,
-                TimeDimensionType.STRING.value,
-            ]:
+            if value["time_type"] == TimeDimensionType.DATETIME.value:
                 values[i] = DateTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.ANNUAL.value:
                 values[i] = AnnualTimeDimensionModel(**value)

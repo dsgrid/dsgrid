@@ -140,7 +140,7 @@
     { // #[7] - datetime form of [6]
       type: "time",
       class_name: "Time",
-      time_type: "string",
+      time_type: "datetime",
       description: "Industrial time, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
       frequency: "01:00:00",
       name: "Local-model-time-2012",

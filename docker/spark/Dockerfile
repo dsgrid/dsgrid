@@ -3,31 +3,31 @@
 
 # USAGE:
 # Do not run this while connected to the VPN. You may get a certificate error while downloading spark.
-# docker build --tag spark_py311 --build-arg VERSION=x.y.z .
+# docker build --tag spark_py312 --build-arg VERSION=x.y.z .
 
 # This container can be converted to an Apptainer container on Kestrel with these commands:
 # Save and upload the docker image to Kestrel.
-# $ docker save -o spark_py311_vx.y.z.tar spark_py311
-# $ scp spark_py311_vx.y.z.tar <username>@kestrel.hpc.nrel.gov:/projects/dsgrid/containers
+# $ docker save -o spark_py312_vx.y.z.tar spark_py312
+# $ scp spark_py312_vx.y.z.tar <username>@kestrel.hpc.nrel.gov:/projects/dsgrid/containers
 # Acquire a compute node with local storage (salloc --tmp=1600G).
-# $ export APPTAINER_CACHEDIR=/tmp/scratch
+# $ export APPTAINER_CACHEDIR=$TMPDIR
 # $ module load apptainer
 # Create writable image for testing and development or read-only image for production.
 # Writable
-# $ apptainer build --sandbox spark_py311 docker-archive://spark_py311_v0.1.0.tar
+# $ apptainer build --sandbox spark_py312 docker-archive://spark_py312_v0.1.0.tar
 # Read-only
-# $ apptainer build spark_py311_v0.1.0.sif docker-archive://spark_py311_v0.1.0.tar
+# $ apptainer build spark_py312_v0.1.0.sif docker-archive://spark_py312_v0.1.0.tar
 
 # Note: Apache provides a container with Spark and Python installed, but as of now it is Python 3.9
 # and dsgrid requires 3.10+. Whenever they have a newer Python, we can simplify this.
 # The Apache container is
 # FROM apache/spark-py
 
-FROM python:3.11-slim
+FROM python:3.12-slim
 USER root
 
 ARG VERSION
-ARG SPARK_VERSION=3.5.0
+ARG SPARK_VERSION=3.5.1
 ARG HADOOP_VERSION=3
 ARG FULL_STR=spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}
 
@@ -37,7 +37,7 @@ ENV CONTAINER_VERSION ${VERSION}
 # Install OpenSSH to communicate between containers, and dropbear SSH server
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates jq git nano default-jdk procps sysstat \
+    && apt-get install -y ca-certificates jq git nano default-jdk procps sysstat build-essential \
     tini tmux tree vim wget openssh-client dropbear locales \
     && rm -rf /var/lib/apt/lists/*
 

@@ -6,13 +6,13 @@ from typing import List, Optional, Union
 from pydantic import field_validator, Field, ValidationInfo, field_serializer
 from typing_extensions import Annotated
 
+from dsgrid.config.common import compute_hash_from_model_records
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingBaseModel,
     DimensionMappingDatasetToProjectBaseModel,
     DimensionMappingPreRegisteredBaseModel,
 )
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
 from .config_base import ConfigWithRecordFileBase
 
@@ -61,11 +61,20 @@ class MappingTableByNameModel(DimensionMappingPreRegisteredBaseModel):
     """
 
     filename: Annotated[
-        str,
+        Optional[str],
         Field(
+            default=None,
             title="filename",
             alias="file",
             description="Filename containing association table records.",
+        ),
+    ]
+    records: Annotated[
+        List,
+        Field(
+            title="records",
+            description="Dimension mapping records in filename that get loaded at runtime",
+            default=[],
         ),
     ]
 
@@ -82,6 +91,14 @@ class DatasetBaseToProjectMappingTableModel(DimensionMappingDatasetToProjectBase
             title="filename",
             alias="file",
             description="Filename containing association table records.",
+        ),
+    ]
+    records: Annotated[
+        List,
+        Field(
+            title="records",
+            description="Dimension mapping records in filename that get loaded at runtime",
+            default=[],
         ),
     ]
 
@@ -105,17 +122,6 @@ class MappingTableModel(DimensionMappingBaseModel):
             "and output purposes. The registry database stores records in the mapping JSON document.",
         ),
     ]
-    file_hash: Annotated[
-        Optional[str],
-        Field(
-            title="file_hash",
-            description="Hash of the contents of the file, computed by dsgrid.",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-            default=None,
-        ),
-    ]
     records: Annotated[
         List,
         Field(
@@ -125,6 +131,17 @@ class MappingTableModel(DimensionMappingBaseModel):
                 "dsgrid_internal": True,
             },
             default=[],
+        ),
+    ]
+    file_hash: Annotated[
+        Optional[str],
+        Field(
+            title="file_hash",
+            description="Hash of the contents of the file, computed by dsgrid.",
+            json_schema_extra={
+                "dsgrid_internal": True,
+            },
+            default=None,
         ),
     ]
 
@@ -139,31 +156,27 @@ class MappingTableModel(DimensionMappingBaseModel):
                 raise ValueError(f"only CSV is supported: {filename}")
         return filename
 
-    @field_validator("file_hash")
-    @classmethod
-    def compute_file_hash(cls, file_hash, info: ValidationInfo):
-        """Compute file hash."""
-        if "filename" not in info.data:
-            return file_hash
-
-        if not file_hash:
-            file_hash = compute_file_hash(info.data["filename"])
-        return file_hash
-
     @field_validator("records")
     @classmethod
     def add_records(cls, records, info: ValidationInfo):
         """Add records from the file."""
-        if "filename" not in info.data:
-            return records
-
         if records:
             if isinstance(records[0], dict):
                 records = convert_record_dicts_to_classes(records, MappingTableRecordModel)
             return records
 
+        if "filename" not in info.data:
+            msg = "Bug: filename can't be None if records is empty."
+            raise ValueError(msg)
+
         with open(info.data["filename"], encoding="utf8") as f_in:
             return convert_record_dicts_to_classes(csv.DictReader(f_in), MappingTableRecordModel)
+
+    @field_validator("file_hash")
+    @classmethod
+    def compute_file_hash(cls, file_hash, info: ValidationInfo):
+        """Compute file hash."""
+        return compute_hash_from_model_records(file_hash, info)
 
     @field_serializer("filename")
     def serialize_cls(self, val, _):
@@ -180,6 +193,7 @@ class MappingTableModel(DimensionMappingBaseModel):
             to_dimension=to_dimension,
             description=model.description,
             filename=model.filename,
+            records=model.records,
             from_fraction_tolerance=model.from_fraction_tolerance,
             to_fraction_tolerance=model.to_fraction_tolerance,
         )

@@ -69,11 +69,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         ld_df = ld_df.join(lk_df, on="id").drop("id")
 
-        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
-        if convert_time_before_project_mapping:
-            # There is currently no case that needs model years or value columns.
-            ld_df = self._convert_time_dimension(ld_df, project_config)
-
         # TODO: This might need to handle data skew in the future.
         null_lk_df = self._remap_dimension_columns(null_lk_df)
         ld_df = self._remap_dimension_columns(ld_df)
@@ -85,13 +80,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-        if not convert_time_before_project_mapping:
-            model_year_dim = project_config.get_base_dimension(DimensionType.MODEL_YEAR)
-            model_years = get_unique_values(model_year_dim.get_records_dataframe(), "id")
-            ld_df = self._convert_time_dimension(
-                ld_df, project_config, model_years=model_years, value_columns=value_columns
-            )
-
+        ld_df = self._convert_time_dimension(ld_df, project_config, value_columns=value_columns)
         return self._add_null_values(ld_df, null_lk_df)
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
@@ -104,11 +93,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         lk_df = lk_df.filter("id is not NULL")
         ld_df = self._prefilter_time_dimension(context, ld_df)
         ld_df = ld_df.join(lk_df, on="id").drop("id")
-
-        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
-        if convert_time_before_project_mapping:
-            # There is currently no case that needs model years or value columns.
-            ld_df = self._convert_time_dimension(ld_df, project_config)
 
         ld_df = self._remap_dimension_columns(
             ld_df,
@@ -128,19 +112,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         null_lk_df = self._remap_dimension_columns(
             null_lk_df, filtered_records=context.get_record_ids()
         )
-
-        if not convert_time_before_project_mapping:
-            m_year_df = context.try_get_record_ids_by_dimension_type(DimensionType.MODEL_YEAR)
-            if m_year_df is None:
-                model_years = project_config.get_base_dimension(
-                    DimensionType.MODEL_YEAR
-                ).get_unique_ids()
-            else:
-                model_years = get_unique_values(m_year_df, "id")
-            ld_df = self._convert_time_dimension(
-                ld_df, project_config, model_years=model_years, value_columns=value_columns
-            )
-
+        ld_df = self._convert_time_dimension(ld_df, project_config, value_columns=value_columns)
         ld_df = self._add_null_values(ld_df, null_lk_df)
         return self._finalize_table(context, ld_df, project_config)
 

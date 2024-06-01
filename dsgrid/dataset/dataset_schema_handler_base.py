@@ -174,6 +174,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         ta_counts = load_data_df.groupBy(*unique_array_cols).count().select("count")
         distinct_ta_counts = ta_counts.select("count").distinct().collect()
         if len(distinct_ta_counts) != 1:
+            # TODO: This doesn't support the case where a dataset has multiple years spanning
+            # leap data / no leap data (8760 / 8784).
             raise DSGInvalidDataset(
                 "All combinations of non-time dimensions must have the same time array length: "
                 f"unique time array lengths = {len(distinct_ta_counts)}"
@@ -396,9 +398,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return val
 
     @track_timing(timer_stats_collector)
-    def _convert_time_dimension(
-        self, load_data_df, project_config, model_years=None, value_columns=None
-    ):
+    def _convert_time_dimension(self, load_data_df, project_config, value_columns=None):
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
         time_dim = self._config.get_dimension(DimensionType.TIME)
@@ -409,12 +409,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
             load_data_df = add_time_zone(load_data_df, geography_dim)
 
-        if model_years is not None:
-            model_years = sorted(int(x) for x in model_years)
         load_data_df = time_dim.convert_dataframe(
             load_data_df,
             self._project_time_dim,
-            model_years=model_years,
             value_columns=value_columns,
             wrap_time_allowed=wrap_time_allowed,
         )

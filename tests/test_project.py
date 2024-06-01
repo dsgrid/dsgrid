@@ -131,8 +131,6 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
     #    column = ref.from_dimension_type.value
 
     #    if column in mapped_load_data.columns:
-    #        # TODO DT
-    #        breakpoint()
     #        assert "fraction" not in mapped_load_data.columns
 
     #        mapping_config = dataset._handler._dimension_mapping_mgr.get_by_id(ref.mapping_id)

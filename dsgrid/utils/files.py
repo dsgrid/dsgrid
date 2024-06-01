@@ -29,7 +29,8 @@ def compute_file_hash(filename):
     return compute_hash(Path(filename).read_bytes())
 
 
-def compute_hash(text: str):
+def compute_hash(text: bytes):
+    """Compute a hash of byte array."""
     hash_obj = hashlib.sha256()
     hash_obj.update(text)
     return hash_obj.hexdigest()

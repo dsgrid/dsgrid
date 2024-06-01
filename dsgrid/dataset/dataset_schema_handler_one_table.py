@@ -124,9 +124,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel]):
         load_df = self._load_data
-        time_columns = set(
-            self._config.get_dimension(DimensionType.TIME).get_load_data_time_columns()
-        )
         df_columns = set(load_df.columns)
         stacked_columns = set()
         for dim in dimensions:
@@ -134,14 +131,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if column in df_columns:
                 load_df = load_df.filter(load_df[column].isin(dim.record_ids))
                 stacked_columns.add(column)
-
-        pivoted_columns_to_remove = set()
-        pivoted_dimension_type = self._config.get_pivoted_dimension_type()
-        if pivoted_dimension_type is not None:
-            pivoted_columns = set(load_df.columns) - time_columns - stacked_columns
-            for dim in dimensions:
-                if dim.dimension_type == pivoted_dimension_type:
-                    pivoted_columns_to_remove = pivoted_columns.difference(dim.record_ids)
 
         drop_columns = []
         for dim in self._config.model.trivial_dimensions:
@@ -151,7 +140,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             drop_columns.append(col)
         load_df = load_df.drop(*drop_columns)
 
-        load_df = load_df.drop(*pivoted_columns_to_remove)
         path = Path(self._config.load_data_path)
         if path.suffix == ".csv":
             # write_dataframe_and_auto_partition doesn't support CSV yet
@@ -162,11 +150,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def make_project_dataframe(self, project_config):
         ld_df = self._load_data
-        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
-        if convert_time_before_project_mapping:
-            # There is currently no case that needs model years or value columns.
-            ld_df = self._convert_time_dimension(ld_df, project_config)
-
         # TODO: This might need to handle data skew in the future.
         ld_df = self._remap_dimension_columns(ld_df)
         value_columns = {VALUE_COLUMN}
@@ -175,25 +158,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-
-        if not convert_time_before_project_mapping:
-            model_year_dim = project_config.get_base_dimension(DimensionType.MODEL_YEAR)
-            model_years = get_unique_values(model_year_dim.get_records_dataframe(), "id")
-            ld_df = self._convert_time_dimension(
-                ld_df, project_config, model_years=model_years, value_columns=value_columns
-            )
-
-        return ld_df
+        return self._convert_time_dimension(ld_df, project_config, value_columns=value_columns)
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
         ld_df = self._load_data
         ld_df = self._prefilter_stacked_dimensions(context, ld_df)
         ld_df = self._prefilter_time_dimension(context, ld_df)
-
-        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
-        if convert_time_before_project_mapping:
-            # There is currently no case that needs model years or value columns.
-            ld_df = self._convert_time_dimension(ld_df, project_config)
 
         ld_df = self._remap_dimension_columns(
             ld_df,
@@ -207,16 +177,5 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-        if not convert_time_before_project_mapping:
-            m_year_df = context.try_get_record_ids_by_dimension_type(DimensionType.MODEL_YEAR)
-            if m_year_df is None:
-                model_years = project_config.get_base_dimension(
-                    DimensionType.MODEL_YEAR
-                ).get_unique_ids()
-            else:
-                model_years = get_unique_values(m_year_df, "id")
-            ld_df = self._convert_time_dimension(
-                ld_df, project_config, model_years=model_years, value_columns=value_columns
-            )
-
+        ld_df = self._convert_time_dimension(ld_df, project_config, value_columns=value_columns)
         return self._finalize_table(context, ld_df, project_config)

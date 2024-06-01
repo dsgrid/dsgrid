@@ -65,6 +65,7 @@ class FilterRegistryManager(RegistryManager):
                     if dim.model.dimension_query_name == simple_dim.dimension_query_name:
                         dim.model.records = handle_dimension(simple_dim, dim)
                         self.dimension_manager.db.replace(dim.model, check_rev=False)
+            # TODO: filter subset dimensions
             if changed_project:
                 self.project_manager.db.replace(project_config.model)
 

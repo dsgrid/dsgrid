@@ -185,6 +185,15 @@ def check_timezone_in_geography(dimension, err_msg=None):
             "Can only check timezone for Geography."
         )
 
+    # record = dimension.records[0]
+    # if isinstance(record, dict):
+    #    valid = "time_zone" in record
+    # else:
+    #    valid = hasattr(record, "time_zone")
+    # if not valid:
+    #    if err_msg is None:
+    #        err_msg = "These geography dimension records must include a time_zone column."
+    #    raise ValueError(err_msg)
     if not hasattr(dimension.records[0], "time_zone"):
         if err_msg is None:
             err_msg = "These geography dimension records must include a time_zone column."

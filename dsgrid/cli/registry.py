@@ -9,6 +9,7 @@ import click
 from semver import VersionInfo
 
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
+from dsgrid.cli.serialize_configs import serialize_configs
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.common import VersionUpdateType
@@ -931,3 +932,5 @@ registry.add_command(dimension_mappings)
 registry.add_command(projects)
 registry.add_command(datasets)
 registry.add_command(data_sync)
+
+registry.add_command(serialize_configs)

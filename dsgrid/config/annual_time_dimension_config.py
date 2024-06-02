@@ -5,7 +5,7 @@ import pandas as pd
 import pyspark.sql.functions as F
 from pyspark.sql.types import StructType, StructField, IntegerType
 
-from dsgrid.dimension.time import MeasurementType, make_time_range
+from dsgrid.dimension.time import MeasurementType, make_time_range, TimeDimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -51,14 +51,14 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def build_time_dataframe(self, model_years=None, timezone=None, data_adjustment=None):
+    def build_time_dataframe(self, model_years=None, data_adjustment=None):
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         schema = StructType([StructField(time_col, IntegerType(), False)])
 
         model_time = self.list_expected_dataset_timestamps(
-            model_years=model_years, timezone=timezone, data_adjustment=data_adjustment
+            model_years=model_years, data_adjustment=data_adjustment
         )
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
         return df_time
@@ -67,7 +67,13 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     #     return self.build_time_dataframe()
 
     def convert_dataframe(
-        self, df, project_time_dim, model_years=None, value_columns=None, wrap_time_allowed=False
+        self,
+        df,
+        project_time_dim,
+        model_years=None,
+        value_columns=None,
+        wrap_time_allowed=False,
+        data_adjustment=None,
     ):
         assert model_years is not None
         assert value_columns is not None
@@ -92,6 +98,9 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def map_annual_total_to_datetime(self, annual_df, dt_dim, model_years, value_columns):
         """Map a dataframe with MeasuredType.TOTAL to DateTime."""
+        assert (
+            dt_dim.model.time_type == TimeDimensionType.DATETIME
+        ), "dt_dim must be datetime type."
         frequency = dt_dim.model.frequency
         time_col = self.get_load_data_time_columns()[0]
         dfs = []
@@ -105,7 +114,10 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
             with custom_spark_conf({"spark.sql.session.timeZone": "UTC"}):
                 tmp_col = f"{dt_time_col}_utc"
                 df = df.withColumn(
-                    tmp_col, F.from_utc_timestamp(dt_time_col, dt_dim.model.timezone.tz_name)
+                    tmp_col,
+                    F.from_utc_timestamp(
+                        dt_time_col, dt_dim.model.datetime_format.timezone.tz_name
+                    ),
                 )
                 df = df.join(annual_df, on=F.year(df[tmp_col]) == annual_df[time_col]).drop(
                     time_col, tmp_col
@@ -120,13 +132,11 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return timedelta(days=365)
 
-    def get_time_ranges(self, model_years=None, timezone=None, data_adjustment=None):
-        if timezone is None:
-            timezone = self.get_tzinfo()
+    def get_time_ranges(self, model_years=None, data_adjustment=None):
         ranges = []
         frequency = self.get_frequency()
         for start, end in self._build_time_ranges(
-            self.model.ranges, self.model.str_format, model_years=model_years, tz=timezone
+            self.model.ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
         ):
             start = pd.Timestamp(start)
             end = pd.Timestamp(end)
@@ -135,7 +145,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                     start=start,
                     end=end,
                     frequency=frequency,
-                    leap_day_adjustment=None,
+                    data_adjustment=data_adjustment,
                     time_interval_type=None,
                 )
             )
@@ -151,9 +161,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return None
 
-    def list_expected_dataset_timestamps(
-        self, model_years=None, timezone=None, data_adjustment=None
-    ):
+    def list_expected_dataset_timestamps(self, model_years=None, data_adjustment=None):
         if model_years is not None:
             # We do not expect to need this.
             raise NotImplementedError(

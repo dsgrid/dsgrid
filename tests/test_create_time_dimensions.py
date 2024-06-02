@@ -17,20 +17,24 @@ from pyspark.sql.types import (
 from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE_TIME
-from dsgrid.config.dimensions import DateTimeDimensionModel
+from dsgrid.config.dimensions import DateTimeDimensionModel, IndexRangeModel
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.representative_period_time_dimension_config import (
     RepresentativePeriodTimeDimensionConfig,
 )
-from dsgrid.config.indexed_time_dimension_config import IndexedTimeDimensionConfig
+from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeZone,
     DataAdjustmentModel,
+)
+from dsgrid.dimension.time_utils import (
     get_dls_springforward_time_change_by_year,
     get_dls_springforward_time_change_by_time_range,
     get_dls_fallback_time_change_by_year,
     get_dls_fallback_time_change_by_time_range,
+    create_adjustment_map_from_model_time,
+    build_index_time_map,
 )
 from dsgrid.utils.spark import get_spark_session
 
@@ -86,21 +90,11 @@ def representative_time_dimension_model():
 
 
 @pytest.fixture
-def indexed_time_dimension_model():
+def index_time_dimension_model():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[6]  # IndexedTimeDimensionModel (LocalModel time)
-
-
-@pytest.fixture
-def indexed_time_dimension_model2():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    # change time_zone to local
-    model.dimensions[6].timezone = TimeZone.LOCAL
-    yield model.dimensions[6]  # Local time version of indexed_time model
+    yield model.dimensions[6]  # IndexTimeDimensionModel (industrial time)
 
 
 @pytest.fixture
@@ -108,7 +102,17 @@ def time_dimension_model4():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[7]  # DateTime version of indexed_time model 1
+    yield model.dimensions[7]  # DateTime version of index_time model 1
+
+
+@pytest.fixture
+def index_time_dimension_model2():
+    file = DIMENSION_CONFIG_FILE_TIME
+    config_as_dict = load_data(file)
+    model = DimensionsConfigModel(**config_as_dict)
+    model.dimensions[6].frequency = datetime.timedelta(minutes=30)
+    model.dimensions[6].index_ranges = [IndexRangeModel(start=0, end=8784 * 2 - 1)]
+    yield model.dimensions[6]  # 30-min freq version of index_time model 1
 
 
 @pytest.fixture
@@ -116,34 +120,12 @@ def time_dimension_model5():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    # change time_zone to local
-    model.dimensions[7].timezone = TimeZone.LOCAL
-    yield model.dimensions[7]  # Local time version of time model 4
-
-
-@pytest.fixture
-def time_dimension_model6():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    # change freq to 30-min
-    model.dimensions[7].frequency = datetime.timedelta(minutes=30)
-    yield model.dimensions[7]  # 30-min freq version of time model 4
-
-
-@pytest.fixture
-def time_dimension_model7():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    # change freq to 30-min
     model.dimensions[0].frequency = datetime.timedelta(minutes=30)
     yield model.dimensions[0]  # 30-min freq version of time model 0
 
 
-@pytest.fixture
-def df_indexed_time():
-    # mock project dataframe - for testing indexed Local and LocalModel conversion
+def create_index_time_dataframe(interval="1h"):
+    # mock index time dataframe
     schema = StructType(
         [
             StructField("geography", StringType(), False),
@@ -155,8 +137,14 @@ def df_indexed_time():
     df = get_spark_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "Wyoming", "Arizona"]
     time_zones = ["MountainPrevailing", "MountainPrevailing", "USArizona"]
-    indices = np.arange(0, 8784).tolist()  # np.arange(1680, 7396).tolist()
-    values = np.arange(0.0, 8784.0).tolist()  # np.arange(1680.0, 7396.0).tolist()
+    if interval == "1h":
+        indices = np.arange(0, 8784).tolist()  # np.arange(1680, 7396).tolist()
+        values = np.arange(0.0, 8784.0).tolist()  # np.arange(1680.0, 7396.0).tolist()
+    elif interval == "30min":
+        indices = np.arange(0, 8784 * 2 - 1).tolist()
+        values = np.arange(0.0, 8783.5, 0.5).tolist()
+    else:
+        raise ValueError("Unsupported {interval=}")
     df_tz = get_spark_session().createDataFrame(zip(indices, values), ["time_index", "value"])
     for geo, tz in zip(geography, time_zones):
         df = df.union(
@@ -164,13 +152,22 @@ def df_indexed_time():
             .withColumn("time_zone", F.lit(tz))
             .select(schema.names)
         )
-    yield df
+    return df
+
+
+@pytest.fixture
+def df_index_time():
+    yield create_index_time_dataframe(interval="1h")
+
+
+@pytest.fixture
+def df_index_time2():
+    yield create_index_time_dataframe(interval="30min")
 
 
 @pytest.fixture
 def df_date_time():
-    # mock project dataframe - datetime version of df_indexed_time
-    # timestamp is in str since timezone is local
+    # datetime version of df_index_time
     schema = StructType(
         [
             StructField("geography", StringType(), False),
@@ -195,50 +192,6 @@ def df_date_time():
     ts_st = [str(ts) for ts in ts_st]
     timestamps = [ts_pt, ts_pt, ts_st]
     values = np.arange(0.0, 8784.0).tolist()  # np.arange(1680.0, 7396.0).tolist()
-    sch = StructType(
-        [
-            StructField("timestamp", StringType(), False),
-            StructField("value", DoubleType(), False),
-        ]
-    )
-    for geo, tz, ts in zip(geography, time_zones, timestamps):
-        df_tz = get_spark_session().createDataFrame(zip(ts, values), schema=sch)
-        df = df.union(
-            df_tz.withColumn("geography", F.lit(geo))
-            .withColumn("time_zone", F.lit(tz))
-            .select(schema.names)
-        )
-    yield df
-
-
-@pytest.fixture
-def df_date_time2():
-    # mock project dataframe - 30-min freq version of df_date_time
-    # timestamp is in str since timezone is local
-    schema = StructType(
-        [
-            StructField("geography", StringType(), False),
-            StructField("timestamp", StringType(), False),
-            StructField("value", DoubleType(), False),
-            StructField("time_zone", StringType(), False),
-        ]
-    )
-    df = get_spark_session().createDataFrame([], schema=schema)
-    geography = ["Colorado", "Wyoming", "Arizona"]
-    time_zones = ["MountainPrevailing", "MountainPrevailing", "USArizona"]
-    # if local timezones, df timestamps must be serialized as string with offset info (e.g., '2012-03-11 00:00:00-07:00')
-    # ts_pt = pd.date_range("2012-03-11", "2012-11-04 03:00:00", freq="30min", tz=ZoneInfo("US/Mountain"))
-    ts_pt = pd.date_range(
-        "2012-01-01", "2012-12-31 23:00:00", freq="30min", tz=ZoneInfo("US/Mountain")
-    )
-    ts_pt = [str(ts) for ts in ts_pt]
-    # ts_st = pd.date_range("2012-03-11", "2012-11-04 03:00:00", freq="30min", tz=ZoneInfo("US/Arizona"))
-    ts_st = pd.date_range(
-        "2012-01-01", "2012-12-31 23:00:00", freq="30min", tz=ZoneInfo("US/Mountain")
-    )
-    ts_st = [str(ts) for ts in ts_st]
-    timestamps = [ts_pt, ts_pt, ts_st]
-    values = np.arange(0.0, 8783.5, 0.5).tolist()  # np.arange(1680.0, 7396.0).tolist()
     sch = StructType(
         [
             StructField("timestamp", StringType(), False),
@@ -341,7 +294,7 @@ def to_utc(time_change):
     return [x.astimezone(ZoneInfo("UTC")) for x in time_change]
 
 
-def local_model_time_conversion_tests(config, project_time_dim, df):
+def industrial_model_time_conversion_tests(config, project_time_dim, df):
     values = np.arange(0.0, 8784.0).tolist()  # np.arange(1680.0, 7396.0).tolist()
     n_df = df.count()
 
@@ -444,7 +397,6 @@ def local_time_conversion_tests(config, project_time_dim, df):
         assert (
             f2.loc[f2["geography"] == geo, "value"].to_list() == values
         ), f"Expecting no change in 'value' column for {geo=}"
-
     df3 = config.convert_dataframe(
         df,
         project_time_dim,
@@ -596,12 +548,6 @@ def test_daylight_saving_time_changes():
     with pytest.raises(ValueError, match=r"do not have the same time zone"):
         get_dls_fallback_time_change_by_time_range(from_ts, to_ts)
 
-    with pytest.raises(ValueError, match=r"cannot be local"):
-        get_dls_springforward_time_change_by_year(2020, TimeZone.LOCAL_MODEL)
-
-    with pytest.raises(ValueError, match=r"cannot be local"):
-        get_dls_fallback_time_change_by_year(2020, TimeZone.LOCAL)
-
 
 def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):
     daylight_saving_adjustment = {
@@ -627,10 +573,10 @@ def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):
     check_date_range_creation(time_dimension_model0, data_adjustment=data_adjustment)
 
 
-def test_data_adjustment_mapping_table(indexed_time_dimension_model):
+def test_data_adjustment_mapping_table(index_time_dimension_model):
     """Test data_adjustment mapping tables"""
     time_zone = TimeZone.MST
-    config = IndexedTimeDimensionConfig(indexed_time_dimension_model)
+    config = IndexTimeDimensionConfig(index_time_dimension_model)
 
     # [1] Duplicating fallback 1AM
     data_adjustment = DataAdjustmentModel(
@@ -641,11 +587,13 @@ def test_data_adjustment_mapping_table(indexed_time_dimension_model):
     )
 
     # index-time mapping table
-    table1 = config.build_time_dataframe(
-        timezone=time_zone.tz, data_adjustment=data_adjustment
+    table1 = build_index_time_map(
+        config, timezone=time_zone.tz, data_adjustment=data_adjustment
     ).withColumn("time_zone", F.lit(time_zone.value))
     # data_adjustment mapping table
-    table2 = config._create_adjustment_map_from_model_time(data_adjustment, time_zone)
+    table2 = create_adjustment_map_from_model_time(
+        config, data_adjustment=data_adjustment, time_zone=time_zone
+    )
     joined_table = table1.selectExpr("time_index", "timestamp as model_time").join(
         table2, ["model_time"], "right"
     )
@@ -686,11 +634,13 @@ def test_data_adjustment_mapping_table(indexed_time_dimension_model):
     )
 
     # index-time mapping table
-    table1 = config.build_time_dataframe(
-        timezone=time_zone.tz, data_adjustment=data_adjustment
+    table1 = build_index_time_map(
+        config, timezone=time_zone.tz, data_adjustment=data_adjustment
     ).withColumn("time_zone", F.lit(time_zone.tz_name))
     # data_adjustment mapping table
-    table2 = config._create_adjustment_map_from_model_time(data_adjustment, time_zone)
+    table2 = create_adjustment_map_from_model_time(
+        config, data_adjustment=data_adjustment, time_zone=time_zone
+    )
     joined_table = table1.selectExpr("time_index", "timestamp as model_time").join(
         table2, ["model_time"], "right"
     )
@@ -739,68 +689,38 @@ def test_data_adjustment_mapping_table(indexed_time_dimension_model):
     ], f"timestamp {duplicated_ts} is duplicated more than twice."
 
 
-def test_indexed_time_conversion_for_local_model_time(
-    indexed_time_dimension_model, time_dimension_model0, df_indexed_time
-):
-    """When time.timezone is LocalModel (as opposed to Local), data_adjustment=None has the same behavior as
+def test_index_time_conversion(index_time_dimension_model, time_dimension_model0, df_index_time):
+    """data_adjustment=None has the same behavior as
     data_adjustment where drop spring_forward and duplicate fall_back
     """
-    df = df_indexed_time
+    df = df_index_time
     project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
-    config = IndexedTimeDimensionConfig(indexed_time_dimension_model)
+    config = IndexTimeDimensionConfig(index_time_dimension_model)
     time_cols = config.get_load_data_time_columns()
     config.check_dataset_time_consistency(df, time_cols)
-    local_model_time_conversion_tests(config, project_time_dim, df)
+    industrial_model_time_conversion_tests(config, project_time_dim, df)
 
 
-def test_indexed_time_conversion_for_local_time(
-    indexed_time_dimension_model2, time_dimension_model0, df_indexed_time
-):
+def test_datetime_conversion(time_dimension_model4, time_dimension_model0, df_date_time):
     """When time.timezone is Local (as opposed to LocalModel), no impact to value from data_adjustment.daylight_saving_adjustment"""
-    df = df_indexed_time
-    project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
-    config = IndexedTimeDimensionConfig(indexed_time_dimension_model2)
-    local_time_conversion_tests(config, project_time_dim, df)
-
-
-def test_date_time_conversion_for_local_model_time(
-    time_dimension_model4, time_dimension_model0, df_date_time
-):
-    """When time.timezone is LocalModel (as opposed to Local), data_adjustment=None has the same behavior as
-    data_adjustment where drop spring_forward and duplicate fall_back
-    """
     df = df_date_time
-    project_time_dim = DateTimeDimensionConfig(
-        time_dimension_model0
-    )  # fake, any will do to return time column name
+    project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
     config = DateTimeDimensionConfig(time_dimension_model4)
     df = config._convert_dataset_time_to_datetime(df)
     time_cols = config.get_load_data_time_columns()
     config.check_dataset_time_consistency(df, time_cols)
-    local_model_time_conversion_tests(config, project_time_dim, df)
-
-
-def test_date_time_conversion_for_local_time(
-    time_dimension_model5, time_dimension_model0, df_date_time
-):
-    """When time.timezone is Local (as opposed to LocalModel), no impact to value from data_adjustment.daylight_saving_adjustment"""
-    df = df_date_time
-    project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
-    config = DateTimeDimensionConfig(time_dimension_model5)
-    df = config._convert_dataset_time_to_datetime(df)
     local_time_conversion_tests(config, project_time_dim, df)
 
 
-def test_date_time_conversion_for_local_model_time_subhourly(
-    time_dimension_model6, time_dimension_model7, df_date_time2
+def test_index_time_conversion_subhourly(
+    index_time_dimension_model2, time_dimension_model5, df_index_time2
 ):
     """When time.timezone is LocalModel (as opposed to Local), data_adjustment=None has the same behavior as
     data_adjustment where drop spring_forward and duplicate fall_back
     """
-    df = df_date_time2
-    project_time_dim = DateTimeDimensionConfig(time_dimension_model7)
-    config = DateTimeDimensionConfig(time_dimension_model6)
-    df = config._convert_dataset_time_to_datetime(df)
+    df = df_index_time2
+    project_time_dim = DateTimeDimensionConfig(time_dimension_model5)
+    config = IndexTimeDimensionConfig(index_time_dimension_model2)
 
     # -- test --
     values = np.arange(0.0, 8783.5, 0.5).tolist()  # np.arange(1680.0, 7396.0, 0.5).tolist()

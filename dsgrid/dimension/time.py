@@ -3,8 +3,8 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import logging
 from typing_extensions import Annotated
-from typing import Union, Optional
 from pydantic import Field
+from enum import Enum
 
 from dsgrid.data_models import DSGEnum, EnumValue, DSGBaseModel
 
@@ -17,8 +17,16 @@ class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
-    INDEXED = "indexed"
+    INDEX = "index"
     NOOP = "noop"
+
+
+class DatetimeFormat(str, Enum):
+    """Defines the time format of the datetime config model"""
+
+    ALIGNED = "aligned"
+    LOCAL = "local"
+    LOCAL_AS_STRINGS = "local_as_strings"
 
 
 class RepresentativePeriodFormat(DSGEnum):
@@ -220,20 +228,6 @@ class TimeZone(DSGEnum):
         tz=ZoneInfo("US/Arizona"),
         tz_name="US/Arizona",
     )  # for Arizona except Navajo County
-    LOCAL = EnumValue(
-        value="Local",
-        description="Local Time, where the time zone is local to a geography dimension or "
-        "is given by the offset of the timestamps.",
-        tz=None,
-        tz_name="Local",
-    )
-    LOCAL_MODEL = EnumValue(
-        value="LocalModel",
-        description="Local Model Time. Clock time local to a geography dimension but laid out "
-        "like Standard Time, requires daylight saving adjustment to both time and data.",
-        tz=None,
-        tz_name="LocalModel",
-    )
 
     def get_standard_time(self):
         """get equivalent standard time"""
@@ -304,180 +298,6 @@ class TimeZone(DSGEnum):
         return False
 
 
-def get_dls_springforward_time_change_by_year(
-    year: Union[int, list[int]], time_zone: TimeZone
-) -> list[datetime]:
-    """Return the start of daylight savings based on year,
-    i.e., the spring forward timestamp (2AM in ST or 3AM in DT)."""
-
-    if time_zone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
-        raise ValueError(f"{time_zone=} cannot be local.")
-    if time_zone.is_standard():
-        # no daylight saving
-        return []
-    time_zone_st = time_zone.get_standard_time()
-
-    if isinstance(year, int):
-        year = [year]
-
-    # Spring forward time - the missing hour
-    timestamps = []
-    for yr in year:
-        cur_st = datetime(yr, 2, 28, 3, 0, 0, tzinfo=time_zone.tz).astimezone(time_zone_st.tz)
-        end_st = datetime(yr, 3, 31, 3, 0, 0, tzinfo=time_zone.tz).astimezone(time_zone_st.tz)
-        prev_st = cur_st - timedelta(days=1)
-        while cur_st < end_st:
-            cur = cur_st.astimezone(time_zone.tz)
-            prev = prev_st.astimezone(time_zone.tz)
-            if cur.dst() == timedelta(hours=1) and prev.dst() == timedelta(hours=0):
-                spring_forward_hour = cur - timedelta(hours=1)  # 2AM in standard time
-                timestamps.append(spring_forward_hour)
-            prev_st = cur_st
-            cur_st += timedelta(days=1)
-
-    return timestamps
-
-
-def get_dls_springforward_time_change_by_time_range(
-    from_timestamp: datetime,
-    to_timestamp: datetime,
-    frequency: Optional[timedelta] = None,
-) -> list[datetime]:
-    """Return the start of daylight savings based on time range,
-    i.e., the spring forward timestamp (2AM in ST or 3AM in DT).
-    Note:
-        1. Time range is inclusive of both edges.
-        2. If frequency is None, return the 3AM DT (2AM ST), else, return timestamp based on frequency.
-        3. If timestamps are not tz_aware, use EPT to extract time change.
-        4. Returns [] if inputs are in standard time.
-    """
-
-    if from_timestamp.tzinfo != to_timestamp.tzinfo:
-        raise ValueError(f"{from_timestamp=} and {to_timestamp=} do not have the same time zone.")
-    tz = from_timestamp.tzinfo
-
-    tz_aware = True
-    if from_timestamp.tzinfo is None:
-        tz_aware = False
-        from_timestamp = from_timestamp.replace(tzinfo=TimeZone.EPT.tz)
-        to_timestamp = to_timestamp.replace(tzinfo=TimeZone.EPT.tz)
-
-    cur_utc = from_timestamp.astimezone(ZoneInfo("UTC"))
-    end_utc = to_timestamp.astimezone(ZoneInfo("UTC"))
-    assert cur_utc < end_utc, "Invalid time range"
-    if frequency is None:
-        frequency = timedelta(hours=1)
-        if cur_utc.minute > 0 or cur_utc.second > 0 or cur_utc.microsecond > 0:
-            # round down to the nearest hour
-            cur_utc = cur_utc.replace(minute=0, second=0, microsecond=0)
-
-    timestamps = []
-    prev_utc = cur_utc
-    sf_start = None
-    while cur_utc < end_utc:
-        cur, prev = cur_utc.astimezone(tz), prev_utc.astimezone(tz)
-        if cur.month == 3 and cur.hour == 3:
-            if cur.dst() == timedelta(hours=1) and prev.dst() == timedelta(hours=0):
-                sf_start = cur
-                timestamps.append(cur)
-            elif sf_start is not None and sf_start.day == cur.day:
-                timestamps.append(cur)
-        prev_utc = cur_utc
-        cur_utc += frequency
-
-    if not tz_aware:
-        timestamps = [ts.replace(tzinfo=None) for ts in timestamps]
-
-    return timestamps
-
-
-def get_dls_fallback_time_change_by_year(
-    year: Union[int, list[int]], time_zone: TimeZone
-) -> list[datetime]:
-    """Return the end of daylight savings based on year,
-    i.e., fall back timestamp (1AM in ST)."""
-
-    if time_zone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
-        raise ValueError(f"{time_zone=} cannot be local.")
-    if time_zone.is_standard():
-        # no daylight saving
-        return []
-    time_zone_st = time_zone.get_standard_time()
-
-    if isinstance(year, int):
-        year = [year]
-
-    # Fall back time - the duplicated hour (1AM)
-    timestamps = []
-    for yr in year:
-        cur_st = datetime(yr, 10, 31, 2, 0, 0, tzinfo=time_zone.tz).astimezone(time_zone_st.tz)
-        end_st = datetime(yr, 11, 30, 2, 0, 0, tzinfo=time_zone.tz).astimezone(time_zone_st.tz)
-        prev_st = cur_st - timedelta(days=1)
-        while cur_st < end_st:
-            cur = cur_st.astimezone(time_zone.tz)
-            prev = prev_st.astimezone(time_zone.tz)
-            if cur.dst() == timedelta(hours=0) and prev.dst() == timedelta(hours=1):
-                fall_back_hour = cur  # 1AM in standard time
-                timestamps.append(fall_back_hour)
-            prev_st = cur_st
-            cur_st += timedelta(days=1)
-
-    return timestamps
-
-
-def get_dls_fallback_time_change_by_time_range(
-    from_timestamp: datetime,
-    to_timestamp: datetime,
-    frequency: Optional[timedelta] = None,
-) -> list[datetime]:
-    """Return the end of daylight savings based on year,
-    i.e., fall back timestamp (1AM in ST).
-    Note:
-        1. Time range is inclusive of both edges.
-        2. If frequency is None, return the 1AM (in ST) timestamp, else, return timestamp based on frequency.
-        3. If timestamps are not tz_aware, use EPT to extract time change.
-        4. Returns [] if inputs are in standard time.
-    """
-
-    if from_timestamp.tzinfo != to_timestamp.tzinfo:
-        raise ValueError(f"{from_timestamp=} and {to_timestamp=} do not have the same time zone.")
-    tz = from_timestamp.tzinfo
-
-    tz_aware = True
-    if from_timestamp.tzinfo is None:
-        tz_aware = False
-        from_timestamp = from_timestamp.replace(tzinfo=TimeZone.EPT.tz)
-        to_timestamp = to_timestamp.replace(tzinfo=TimeZone.EPT.tz)
-
-    # Format time range
-    cur_utc = from_timestamp.astimezone(ZoneInfo("UTC"))
-    end_utc = to_timestamp.astimezone(ZoneInfo("UTC"))
-    assert cur_utc < end_utc, "Invalid time range"
-    if frequency is None:
-        frequency = timedelta(hours=1)
-        if cur_utc.minute > 0 or cur_utc.second > 0 or cur_utc.microsecond > 0:
-            # round down to the nearest hour
-            cur_utc = cur_utc.replace(minute=0, second=0, microsecond=0)
-
-    timestamps = []
-    prev_utc = cur_utc - frequency
-    fb_start = None
-    while cur_utc < end_utc:
-        cur, prev = cur_utc.astimezone(tz), prev_utc.astimezone(tz)
-        if cur.month == 11 and cur.hour == 1:
-            if cur.dst() == timedelta(hours=0) and prev.dst() == timedelta(hours=1):
-                fb_start = cur
-                timestamps.append(cur)
-            elif fb_start is not None and fb_start.day == cur.day:
-                timestamps.append(cur)
-        prev_utc = cur_utc
-        cur_utc += frequency
-
-    if not tz_aware:
-        timestamps = [ts.replace(tzinfo=None) for ts in timestamps]
-    return timestamps
-
-
 class DaylightSavingAdjustmentModel(DSGBaseModel):
     """Defines how to drop and add data along with timestamps to convert standard time
     load profiles to clock time"""
@@ -493,6 +313,7 @@ class DaylightSavingAdjustmentModel(DSGBaseModel):
             },
         ),
     ]
+
     fall_back_hour: Annotated[
         DaylightSavingFallBackType,
         Field(
@@ -651,14 +472,12 @@ class IndexTimeRange(DatetimeRange):
         start,
         end,
         frequency,
-        leap_day_adjustment: LeapDayAdjustmentType,
+        data_adjustment: DataAdjustmentModel,
         time_interval_type: TimeIntervalType,
         start_index,
-        step,
     ):
-        super().__init__(start, end, frequency, leap_day_adjustment, time_interval_type)
+        super().__init__(start, end, frequency, data_adjustment, time_interval_type)
         self.start_index = start_index
-        self.step = step
 
     def _iter_timestamps(self):
         cur = self.start.to_pydatetime().astimezone(ZoneInfo("UTC"))
@@ -669,7 +488,6 @@ class IndexTimeRange(DatetimeRange):
 
         while cur < end:
             frequency = self.frequency
-            step = self.step
             cur_tz = cur.astimezone(self.tzinfo)
             month = cur_tz.month
             day = cur_tz.day
@@ -690,7 +508,7 @@ class IndexTimeRange(DatetimeRange):
                     ):
                         yield cur_idx
             cur += frequency
-            cur_idx += step
+            cur_idx += 1
 
 
 class NoOpTimeRange(DatetimeRange):
@@ -698,15 +516,15 @@ class NoOpTimeRange(DatetimeRange):
         yield None
 
 
-def make_time_range(
-    start, end, frequency, data_adjustment, time_interval_type, start_index=None, step=None
-):
+def make_time_range(start, end, frequency, data_adjustment, time_interval_type, start_index=None):
     """
     factory function that decides which TimeRange func to use based on frequency
     """
-    if start_index is not None or step is not None:
+    if data_adjustment is None:
+        data_adjustment = DataAdjustmentModel()
+    if start_index is not None:
         return IndexTimeRange(
-            start, end, frequency, data_adjustment, time_interval_type, start_index, step
+            start, end, frequency, data_adjustment, time_interval_type, start_index
         )
     if frequency == timedelta(days=365):
         return AnnualTimeRange(start, end, frequency, data_adjustment, time_interval_type)

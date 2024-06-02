@@ -16,7 +16,10 @@
         },
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
-      timezone: "MountainStandard",
+      datetime_format: {
+        format_type: "aligned",
+        timezone: "MountainStandard",
+        },
       measurement_type: "total",
     },
     { // #[1] # daily
@@ -35,7 +38,10 @@
         },
       ],
       str_format: "%Y-%m-%d",
-      timezone: "MountainStandard",
+      datetime_format: {
+        format_type: "aligned",
+        timezone: "MountainPrevailing",
+        },
       measurement_type: "total",
     },
     { // #[2]
@@ -54,7 +60,10 @@
         },
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
-      timezone: "EasternPrevailing",
+      datetime_format: {
+        format_type: "aligned",
+        timezone: "EasternPrevailing",
+        },
       measurement_type: "max",
     },
     { // #[3] 8760 - UTC
@@ -73,7 +82,10 @@
         },
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
-      timezone: "UTC",
+      datetime_format: {
+        format_type: "aligned",
+        timezone: "UTC",
+        },
       measurement_type: "total",
     },
     { // #[4]
@@ -114,14 +126,13 @@
     { // #[6]
       "class": "Time",
       type: "time",
-      name: "Local-model-time-2012-indexed",
+      name: "Local-model-time-2012-index",
       display_name: "time",
-      time_type: "indexed",
+      time_type: "index",
       index_ranges: [
 	      {
           start: 0, // start: 1680,
           end: 8783, // end: 7395,
-	        interval: 1,
         },
       ],
       ranges: [
@@ -132,10 +143,9 @@
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
       frequency: "P0DT1H0M0.000000S",
-      timezone: "LocalModel",
       time_interval_type: "period_beginning",
       measurement_type: "total",
-      description: "Industrial time, indexed, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
+      description: "Industrial time, index, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
     },
     { // #[7] - datetime form of [6]
       type: "time",
@@ -153,8 +163,10 @@
         },
       ],
       str_format: "%Y-%m-%d %H:%M:%S",
-      data_str_format: "yyyy-MM-dd HH:mm:ssZZZZZ",
-      timezone: "LocalModel",
+      datetime_format: {
+        format_type: "local_as_strings",
+        data_str_format: "yyyy-MM-dd HH:mm:ssZZZZZ",
+        },
       measurement_type: "total",
     },
   ],

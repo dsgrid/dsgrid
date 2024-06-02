@@ -4,7 +4,8 @@ import importlib
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Union, Literal
+import copy
 
 from pydantic import field_serializer, field_validator, model_validator, Field, ValidationInfo
 from pydantic.functional_validators import BeforeValidator
@@ -18,6 +19,7 @@ from dsgrid.dimension.time import (
     TimeZone,
     TimeDimensionType,
     RepresentativePeriodFormat,
+    DatetimeFormat,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME, REGEX_VALID_REGISTRY_DISPLAY_NAME
 from dsgrid.utils.files import compute_file_hash
@@ -439,13 +441,6 @@ class IndexRangeModel(DSGBaseModel):
             description="Last of indices (inclusive)",
         ),
     ]
-    interval: Annotated[
-        int,
-        Field(
-            title="interval",
-            description="Interval between indices",
-        ),
-    ]
 
 
 class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
@@ -472,8 +467,61 @@ class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
         """Returns True if the geography dimension records must contain a time_zone column."""
 
 
+class AlignedTime(DSGBaseModel):
+    """Data has absolute timestamps that are aligned with the same start and end
+    for each geography."""
+
+    format_type: Literal[DatetimeFormat.ALIGNED] = DatetimeFormat.ALIGNED
+    timezone: Annotated[
+        TimeZone,
+        Field(
+            title="timezone",
+            description="Time zone of data",
+            json_schema_extra={
+                "options": TimeZone.format_descriptions_for_docs(),
+            },
+        ),
+    ]
+
+
+class LocalTimeAsStrings(DSGBaseModel):
+    """Data has absolute timestamps formatted as strings with offsets from UTC.
+    They are aligned for each geography when adjusted for time zone but staggered
+    in an absolute time scale."""
+
+    format_type: Literal[DatetimeFormat.LOCAL_AS_STRINGS] = DatetimeFormat.LOCAL_AS_STRINGS
+
+    data_str_format: Annotated[
+        Optional[str],
+        Field(
+            title="data_str_format",
+            default="yyyy-MM-dd HH:mm:ssZZZZZ",
+            description="Timestamp string format (for parsing the time column of the dataframe)",
+            json_schema_extra={
+                "notes": (
+                    "The string format is used to parse the timestamps in the dataframe while in Spark, "
+                    "(e.g., yyyy-MM-dd HH:mm:ssZZZZZ). "
+                    "Cheatsheet reference: `<https://spark.apache.org/docs/latest/sql-ref-datetime-pattern.html>`_.",
+                ),
+            },
+        ),
+    ]
+
+
 class DateTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps translate to datetime objects."""
+
+    datetime_format: Annotated[
+        Union[AlignedTime, LocalTimeAsStrings],
+        Field(
+            title="datetime_format",
+            discriminator="format_type",
+            description="""
+        Format of the datetime used to define the data format, alignment between geography,
+        and time zone information.
+        """,
+        ),
+    ]
 
     measurement_type: Annotated[
         MeasurementType,
@@ -489,21 +537,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
-    data_str_format: Annotated[
-        Optional[str],
-        Field(
-            title="data_str_format",
-            default="",
-            description="Timestamp string format (for parsing the time column of the dataframe)",
-            json_schema_extra={
-                "notes": (
-                    "The string format is used to parse the timestamps in the dataframe while in Spark, "
-                    "(e.g., yyyy-MM-dd HH:mm:ssZZZZZ). "
-                    "Cheatsheet reference: `<https://spark.apache.org/docs/latest/sql-ref-datetime-pattern.html>`_.",
-                ),
-            },
-        ),
-    ]
+
     str_format: Annotated[
         Optional[str],
         Field(
@@ -548,53 +582,31 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
-    timezone: Annotated[
-        TimeZone,
-        Field(
-            title="timezone",
-            description="Time zone of data",
-            json_schema_extra={
-                "options": TimeZone.format_descriptions_for_docs(),
-                "notes": (
-                    "Local and LocalModel are relative to the geography dimension of the dataset"
-                ),
-            },
-        ),
-    ]
 
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
         if "leap_day_adjustment" in values:
             if values["leap_day_adjustment"] != "none":
-                raise ValueError(f"Unknown data_schema format: {values=}")
+                msg = f"Unknown data_schema format: {values=}"
+                raise ValueError(msg)
             values.pop("leap_day_adjustment")
+
+        if "timezone" in values:
+            values["datetime_format"] = {
+                "format_type": DatetimeFormat.ALIGNED.value,
+                "timezone": values["timezone"],
+            }
+            values.pop("timezone")
 
         return values
 
     @model_validator(mode="after")
-    def check_time_zone(self) -> "DateTimeDimensionModel":
-        if self.timezone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
-            dsf = self.data_str_format
-            if dsf == "":
-                raise ValueError(f"timezone={self.timezone} must specify data_str_format")
-            if "x" not in dsf and "X" not in dsf and "Z" not in dsf:
-                raise ValueError(
-                    f"data_str_format for timezone={self.timezone} must specify zone-offset."
-                )
-        return self
-
-    @model_validator(mode="after")
     def check_data_str_format(self) -> "DateTimeDimensionModel":
-        dsf = self.data_str_format
-        if (
-            dsf != ""
-            and ("x" not in dsf and "X" not in dsf and "Z" not in dsf)
-            and self.timezone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]
-        ):
-            raise ValueError(
-                "data_str_format that does not provide zone-offset must specify a real timezone."
-            )
+        if self.datetime_format.format_type == DatetimeFormat.LOCAL_AS_STRINGS:
+            dsf = self.datetime_format.data_str_format
+            if "x" not in dsf and "X" not in dsf and "Z" not in dsf:
+                raise ValueError("data_str_format must provide zone-offset.")
         return self
 
     @model_validator(mode="after")
@@ -723,10 +735,10 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         return True
 
 
-class IndexedTimeDimensionModel(TimeDimensionBaseModel):
+class IndexTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps are indices."""
 
-    time_type: Annotated[TimeDimensionType, Field(default=TimeDimensionType.INDEXED)]
+    time_type: Annotated[TimeDimensionType, Field(default=TimeDimensionType.INDEX)]
     measurement_type: Annotated[
         MeasurementType,
         Field(
@@ -792,19 +804,6 @@ class IndexedTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
-    timezone: Annotated[
-        TimeZone,
-        Field(
-            title="timezone",
-            description="Time zone of data",
-            json_schema_extra={
-                "options": TimeZone.format_descriptions_for_docs(),
-                "notes": (
-                    "Local and LocalModel are relative to the geography dimension of the dataset"
-                ),
-            },
-        ),
-    ]
 
     @field_validator("ranges")
     @classmethod
@@ -821,9 +820,7 @@ class IndexedTimeDimensionModel(TimeDimensionBaseModel):
         return _check_index_ranges(index_ranges)
 
     def is_time_zone_required_in_geography(self):
-        if self.timezone in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
-            return True
-        return False
+        return True
 
 
 class NoOpTimeDimensionModel(TimeDimensionBaseModel):
@@ -902,6 +899,7 @@ class DimensionReferenceByNameModel(DSGBaseModel):
 
 
 def handle_dimension_union(values):
+    values = copy.deepcopy(values)
     for i, value in enumerate(values):
         if isinstance(value, DimensionBaseModel):
             continue
@@ -917,8 +915,8 @@ def handle_dimension_union(values):
                 values[i] = AnnualTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
                 values[i] = RepresentativePeriodTimeDimensionModel(**value)
-            elif value["time_type"] == TimeDimensionType.INDEXED.value:
-                values[i] = IndexedTimeDimensionModel(**value)
+            elif value["time_type"] == TimeDimensionType.INDEX.value:
+                values[i] = IndexTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.NOOP.value:
                 values[i] = NoOpTimeDimensionModel(**value)
             else:
@@ -936,7 +934,7 @@ DimensionsListModel = Annotated[
             DateTimeDimensionModel,
             AnnualTimeDimensionModel,
             RepresentativePeriodTimeDimensionModel,
-            IndexedTimeDimensionModel,
+            IndexTimeDimensionModel,
             NoOpTimeDimensionModel,
         ]
     ],
@@ -962,12 +960,9 @@ def _check_time_ranges(ranges: list[TimeRangeModel], str_format: str, frequency:
 
 def _check_index_ranges(index_ranges: list[IndexRangeModel]):
     for range in index_ranges:
-        n_less_1 = (range.end - range.start) / range.interval  # number of intervals less 1
-        if n_less_1 % 1 != 0:
+        if range.end <= range.start:
             # not whole number
-            raise ValueError(
-                f"index range {range} end point is inconsistent with start and interval."
-            )
+            raise ValueError(f"index range {range} end point must be greater than start point.")
 
     return index_ranges
 

@@ -58,7 +58,7 @@ def tempo(project):
 
 def test_no_unexpected_timezone():
     for tzo in TimeZone:
-        if tzo not in [TimeZone.LOCAL, TimeZone.LOCAL_MODEL]:
+        if tzo != TimeZone.ARIZONA:
             assert (
                 tzo.is_standard() + tzo.is_prevailing() == 1
             ), f"{tzo} can either be prevailing or standard"
@@ -143,7 +143,7 @@ def test_convert_to_project_time_2(project, resstock, comstock, tempo):
     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
     resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
 
-    resstock_time_dim.model.timezone = TimeZone.UTC
+    resstock_time_dim.model.datetime_format.timezone = TimeZone.UTC
     # no error expected because time is being wrapped from time_interval_type alignment
     compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=False)
 
@@ -158,7 +158,7 @@ def test_convert_to_project_time_2(project, resstock, comstock, tempo):
     compare_time_conversion(
         resstock_time_dim, project_time_dim, wrap_time=True, expect_error=False
     )
-    project_time_dim.model.timezone = TimeZone.PST
+    project_time_dim.model.datetime_format.timezone = TimeZone.PST
     compare_time_conversion(
         resstock_time_dim, project_time_dim, wrap_time=True, expect_error=False
     )

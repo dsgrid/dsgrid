@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 def get_dls_springforward_time_change_by_year(
     year: Union[int, list[int]], time_zone: TimeZone
 ) -> list[datetime]:
-    """Return the start of daylight savings based on year,
+    """Return the starting hour of daylight savings based on year(s),
     i.e., the spring forward timestamp (2AM in ST or 3AM in DT)."""
 
     if time_zone.is_standard():
@@ -65,8 +65,8 @@ def get_dls_springforward_time_change_by_time_range(
     to_timestamp: datetime,
     frequency: Optional[timedelta] = None,
 ) -> list[datetime]:
-    """Return the start of daylight savings based on time range,
-    i.e., the spring forward timestamp (2AM in ST or 3AM in DT).
+    """Return all timestamps within the starting hour of daylight savings based on time range,
+    e.g., the spring forward timestamp (2AM in ST or 3AM in DT).
     Note:
         1. Time range is inclusive of both edges.
         2. If frequency is None, return the 3AM DT (2AM ST), else, return timestamp based on frequency.
@@ -89,12 +89,9 @@ def get_dls_springforward_time_change_by_time_range(
     assert cur_utc < end_utc, "Invalid time range"
     if frequency is None:
         frequency = timedelta(hours=1)
-        if cur_utc.minute > 0 or cur_utc.second > 0 or cur_utc.microsecond > 0:
-            # round down to the nearest hour
-            cur_utc = cur_utc.replace(minute=0, second=0, microsecond=0)
 
     timestamps = []
-    prev_utc = cur_utc
+    prev_utc = cur_utc - frequency
     sf_start = None
     while cur_utc < end_utc:
         cur, prev = cur_utc.astimezone(tz), prev_utc.astimezone(tz)
@@ -116,7 +113,7 @@ def get_dls_springforward_time_change_by_time_range(
 def get_dls_fallback_time_change_by_year(
     year: Union[int, list[int]], time_zone: TimeZone
 ) -> list[datetime]:
-    """Return the end of daylight savings based on year,
+    """Return the ending hour of daylight savings based on year(s),
     i.e., fall back timestamp (1AM in ST)."""
 
     if time_zone.is_standard():
@@ -150,8 +147,8 @@ def get_dls_fallback_time_change_by_time_range(
     to_timestamp: datetime,
     frequency: Optional[timedelta] = None,
 ) -> list[datetime]:
-    """Return the end of daylight savings based on year,
-    i.e., fall back timestamp (1AM in ST).
+    """Return all timestamps within the ending hour of daylight savings based on time range,
+    e.g., fall back timestamp (1AM in ST).
     Note:
         1. Time range is inclusive of both edges.
         2. If frequency is None, return the 1AM (in ST) timestamp, else, return timestamp based on frequency.
@@ -175,9 +172,6 @@ def get_dls_fallback_time_change_by_time_range(
     assert cur_utc < end_utc, "Invalid time range"
     if frequency is None:
         frequency = timedelta(hours=1)
-        if cur_utc.minute > 0 or cur_utc.second > 0 or cur_utc.microsecond > 0:
-            # round down to the nearest hour
-            cur_utc = cur_utc.replace(minute=0, second=0, microsecond=0)
 
     timestamps = []
     prev_utc = cur_utc - frequency

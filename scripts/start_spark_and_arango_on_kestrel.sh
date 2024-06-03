@@ -25,7 +25,7 @@ else
 fi
 
 SCRIPT_DIR=${HPC_REPO_DIR}/applications/spark/spark_scripts
-${SCRIPT_DIR}/configure_and_start_spark.sh -c /datasets/images/apache_spark/spark351_py312.sif
+${SCRIPT_DIR}/configure_and_start_spark.sh -M 10 -c /datasets/images/apache_spark/spark351_py312.sif
 
 printf "\nThe Spark cluster is running at spark://$(hostname):7077 from a configuration at $(pwd)/conf\n\n"
 printf "Run this command in your environment to use the same configuration:\n\n"

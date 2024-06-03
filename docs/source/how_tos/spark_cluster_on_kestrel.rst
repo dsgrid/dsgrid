@@ -13,7 +13,7 @@ Spark works best with fast local storage. The standard Kestrel nodes do not have
 The best candidates are the 256 standard nodes (no GPUs) with 1.92 TB NVMe M.2 drives. Please refer
 to the `Kestrel system configuration page
 <https://www.nrel.gov/hpc/kestrel-system-configuration.html>`_ for specific hardware information.
-The GPU nodes will work well, but at a greater cost in AUs.
+The GPU nodes will work as well, but at a greater cost in AUs.
 
 If those nodes are not available, you may be able to complete your queries by using the standard
 nodes and specifying a path on the Lustre filesystem in the Spark configuration file
@@ -39,7 +39,7 @@ Steps
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -c /datasets/images/apache_spark/spark351_py312.sif
+    $ configure_and_start_spark.sh -M 10 -c /datasets/images/apache_spark/spark351_py312.sif
 
 5. Set the Spark configuration environment variable.
 

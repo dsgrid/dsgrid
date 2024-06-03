@@ -312,15 +312,19 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 - If the debug partition is not too full, you can append ``--qos=standby`` to the command above
   and not be charged any AUs.
 
-3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.4.1 and
-   Python 3.11. The team has validated the container below. It was created with this Dockerfile
+3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.5.1 and
+   Python 3.12. The team has validated the container below. It was created with this Dockerfile
    in dsgrid: ``docker/spark/Dockerfile``. The container includes ipython, jupyter, pyspark, pandas,
    and pyarrow, but not dsgrid.
 
-   ``/projects/dsgrid/containers/spark350_py311.sif``
+   ``/datasets/images/apache_spark/spark351_py312.sif``
 
-4. Configure Spark parameters based on the amount of memory and CPU in each compute node. dsgrid
-   jobs on Kestrel seem to work better with dynamic allocation enabled.
+4. Configure Spark parameters based on the amount of memory and CPU in each compute node.
+
+   Set the driver memory (``-M``) to a size sufficient for data transfer between the driver and
+   cluster. For example, if you will convert a 4 GB dataframe to Pandas (``df.toPandas()``),
+   set the value to 4. Some online sources recommend setting it to a size at least as big as the
+   executor memory. It defaults to 1 GB.
 
    This command must be run on a compute node. The script will check for the environment variable
    ``SLURM_JOB_ID``, which is set by ``SLURM``. If you ssh'd into the compute node, it won't be set and
@@ -328,17 +332,20 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
    Choose the option that is appropriate for your environment.
 
-.. code-block:: console
-
-    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark350_py311.sif
-
-.. code-block:: console
-
-    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark350_py311.sif <SLURM_JOB_ID>
+   **Note**: Please don't run this command in ``/projects/dsgrid``. It creates runtime files
+   that others may not be able to delete. Run in ``/scratch/$USER`` instead.
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark350_py311.sif <SLURM_JOB_ID1> <SLURM_JOB_ID2>
+    $ configure_and_start_spark.sh -M 10 -c /datasets/images/apache_spark/spark351_py312.sif
+
+.. code-block:: console
+
+    $ configure_and_start_spark.sh -M 10 -c /datasets/images/apache_spark/spark351_py312.sif <SLURM_JOB_ID>
+
+.. code-block:: console
+
+    $ configure_and_start_spark.sh -M 10 -c /datasets/images/apache_spark/spark351_py312.sif <SLURM_JOB_ID1> <SLURM_JOB_ID2>
 
 Run ``configure_and_start_spark.sh --help`` to see all options.
 

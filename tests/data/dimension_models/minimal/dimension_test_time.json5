@@ -40,7 +40,7 @@
       str_format: "%Y-%m-%d",
       datetime_format: {
         format_type: "aligned",
-        timezone: "MountainStandard",
+        timezone: "MountainPrevailing",
         },
       measurement_type: "total",
     },

@@ -35,7 +35,7 @@ def get_dls_springforward_time_change_by_year(years: list[int], time_zone: TimeZ
 
     if time_zone.is_standard():
         # no daylight saving
-        return []
+        return {}
     time_zone_st = time_zone.get_standard_time()
 
     # Spring forward time - the missing hour
@@ -116,7 +116,7 @@ def get_dls_fallback_time_change_by_year(years: list[int], time_zone: TimeZone) 
 
     if time_zone.is_standard():
         # no daylight saving
-        return []
+        return {}
     time_zone_st = time_zone.get_standard_time()
 
     # Fall back time - the duplicated hour (1AM)

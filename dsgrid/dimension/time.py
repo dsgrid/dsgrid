@@ -419,6 +419,8 @@ class DatetimeRange:
 
         while cur < end:
             cur_tz = cur.astimezone(self.tzinfo)
+            if self.frequency == timedelta(hours=24):
+                cur_tz -= cur_tz.dst()
             month = cur_tz.month
             day = cur_tz.day
             if not (

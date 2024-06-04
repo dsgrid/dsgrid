@@ -450,7 +450,7 @@ def test_daylight_saving_time_changes():
     # Spring forward
     truth = [datetime.datetime(2018, 3, 11, 2, 0, tzinfo=ZoneInfo(key="US/Eastern"))]
     time_change = get_dls_springforward_time_change(2018, TimeZone.EPT)
-    assert to_utc(time_change.values) == to_utc(truth)
+    assert to_utc(time_change.values()) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
@@ -481,7 +481,7 @@ def test_daylight_saving_time_changes():
         datetime.datetime(2020, 3, 8, 2, 0, tzinfo=ZoneInfo(key="US/Mountain")),
     ]
     time_change = get_dls_springforward_time_change_by_year([2018, 2019, 2020], TimeZone.MPT)
-    assert to_utc(time_change.values) == to_utc(truth)
+    assert to_utc(time_change.values()) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
     to_ts = datetime.datetime(2020, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
@@ -491,7 +491,7 @@ def test_daylight_saving_time_changes():
     # Fall back
     time_change = get_dls_fallback_time_change(2018, TimeZone.EPT)
     truth = [datetime.datetime(2018, 11, 4, 1, 0, tzinfo=ZoneInfo(key="EST"))]
-    assert to_utc(time_change.values) == to_utc(truth)
+    assert to_utc(time_change.values()) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
@@ -520,7 +520,7 @@ def test_daylight_saving_time_changes():
         datetime.datetime(2019, 11, 3, 1, 0, tzinfo=ZoneInfo(key="MST")),
         datetime.datetime(2020, 11, 1, 1, 0, tzinfo=ZoneInfo(key="MST")),
     ]
-    assert to_utc(time_change.values) == to_utc(truth)
+    assert to_utc(time_change.values()) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
     to_ts = datetime.datetime(2020, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))

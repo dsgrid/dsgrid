@@ -492,7 +492,7 @@ class LocalTimeAsStrings(DSGBaseModel):
     format_type: Literal[DatetimeFormat.LOCAL_AS_STRINGS] = DatetimeFormat.LOCAL_AS_STRINGS
 
     data_str_format: Annotated[
-        Optional[str],
+        str,
         Field(
             title="data_str_format",
             default="yyyy-MM-dd HH:mm:ssZZZZZ",
@@ -601,26 +601,35 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
         return values
 
-    @model_validator(mode="after")
-    def check_data_str_format(self) -> "DateTimeDimensionModel":
-        if self.datetime_format.format_type == DatetimeFormat.LOCAL_AS_STRINGS:
-            dsf = self.datetime_format.data_str_format
-            if "x" not in dsf and "X" not in dsf and "Z" not in dsf:
-                raise ValueError("data_str_format must provide zone-offset.")
-        return self
+    @field_validator("datetime_format")
+    def check_data_str_format(cls, datetime_format):
+        if datetime_format.format_type == DatetimeFormat.LOCAL_AS_STRINGS:
+            dsf = datetime_format.data_str_format
+            if (
+                "x" not in dsf
+                and "X" not in dsf
+                and "Z" not in dsf
+                and "z" not in dsf
+                and "V" not in dsf
+                and "O" not in dsf
+            ):
+                raise ValueError("data_str_format must provide time zone or zone offset.")
+        return datetime_format
 
     @model_validator(mode="after")
     def check_frequency(self) -> "DateTimeDimensionModel":
         if self.frequency in [timedelta(days=365), timedelta(days=366)]:
             raise ValueError(
-                f"frequency={self.frequency}, 365 or 366 days not allowed, "
+                f"frequency={self.frequency}, datetime config does not allow 365 or 366 days frequency, "
                 "use class=AnnualTime, time_type=annual to specify a year series."
             )
         return self
 
     @field_validator("ranges")
     @classmethod
-    def check_times(cls, ranges, info: ValidationInfo):
+    def check_times(
+        cls, ranges: List[TimeRangeModel], info: ValidationInfo
+    ) -> List[TimeRangeModel]:
         if "str_format" not in info.data or "frequency" not in info.data:
             return ranges
         return _check_time_ranges(ranges, info.data["str_format"], info.data["frequency"])
@@ -679,7 +688,9 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
 
     @field_validator("ranges")
     @classmethod
-    def check_times(cls, ranges, info: ValidationInfo):
+    def check_times(
+        cls, ranges: List[TimeRangeModel], info: ValidationInfo
+    ) -> List[TimeRangeModel]:
         if "str_format" not in info.data or "frequency" not in info.data:
             return ranges
         return _check_time_ranges(ranges, info.data["str_format"], timedelta(days=365))
@@ -753,18 +764,18 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
-    index_ranges: Annotated[
+    ranges: Annotated[
         List[IndexRangeModel],
         Field(
-            title="index_ranges",
-            description="Defines the continuous ranges of indices of the data, inclusive of start and end index",
+            title="ranges",
+            description="Defines the continuous ranges of indices of the data, inclusive of start and end index.",
         ),
     ]
     frequency: Annotated[
         timedelta,
         Field(
             title="frequency",
-            description="Resolution of the timestamps defined in the time_ranges",
+            description="Resolution of the timestamps for which the ranges represent.",
             json_schema_extra={
                 "notes": (
                     "Reference: `Datetime timedelta objects"
@@ -773,11 +784,11 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
-    ranges: Annotated[
-        List[TimeRangeModel],
+    starting_timestamps: Annotated[
+        List[str],
         Field(
-            title="time_ranges",
-            description="Defines the continuous ranges of time the indices represent, inclusive of start and end time.",
+            title="starting timestamps",
+            description="Starting timestamp for for each of the ranges.",
         ),
     ]
     str_format: Annotated[
@@ -788,7 +799,7 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
             description="Timestamp string format",
             json_schema_extra={
                 "notes": (
-                    "The string format is used to parse the timestamps provided in the time ranges."
+                    "The string format is used to parse the starting timestamp provided."
                     "Cheatsheet reference: `<https://strftime.org/>`_.",
                 ),
             },
@@ -805,19 +816,18 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
         ),
     ]
 
+    @field_validator("starting_timestamps")
+    @classmethod
+    def check_timestamps(cls, starting_timestamps, info: ValidationInfo) -> list[str]:
+        if len(starting_timestamps) != len(info.data["ranges"]):
+            msg = f"{starting_timestamps=} must match the number of ranges."
+            raise ValueError(msg)
+        return starting_timestamps
+
     @field_validator("ranges")
     @classmethod
-    def check_times(
-        cls, ranges: list[TimeRangeModel], info: ValidationInfo
-    ) -> list[TimeRangeModel]:
-        if "str_format" not in info.data or "frequency" not in info.data:
-            return ranges
-        return _check_time_ranges(ranges, info.data["str_format"], info.data["frequency"])
-
-    @field_validator("index_ranges")
-    @classmethod
-    def check_indices(cls, index_ranges: list[IndexRangeModel]) -> list[IndexRangeModel]:
-        return _check_index_ranges(index_ranges)
+    def check_indices(cls, ranges: list[IndexRangeModel]) -> list[IndexRangeModel]:
+        return _check_index_ranges(ranges)
 
     def is_time_zone_required_in_geography(self):
         return True
@@ -958,13 +968,13 @@ def _check_time_ranges(ranges: list[TimeRangeModel], str_format: str, frequency:
     return ranges
 
 
-def _check_index_ranges(index_ranges: list[IndexRangeModel]):
-    for range in index_ranges:
+def _check_index_ranges(ranges: list[IndexRangeModel]):
+    for range in ranges:
         if range.end <= range.start:
             # not whole number
             raise ValueError(f"index range {range} end point must be greater than start point.")
 
-    return index_ranges
+    return ranges
 
 
 class DimensionCommonModel(DSGBaseModel):

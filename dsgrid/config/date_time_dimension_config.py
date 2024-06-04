@@ -45,39 +45,14 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             load_data_df.schema[time_col].dataType == TimestampType()
         ), f"datetime {time_col} column must be TimestampType"
 
-        expected_timestamps = time_range.list_time_range()
         if self.model.datetime_format.format_type in [DatetimeFormat.LOCAL_AS_STRINGS]:
-            if "id" in load_data_df.columns:
-                groupby = ["id"]
-            else:
-                groupby = [x for x in load_data_df.columns if x not in [time_col, VALUE_COLUMN]]
-            start_times = load_data_df.groupBy(*groupby).agg(F.min(time_col).alias(time_col))
-            min_ts = start_times.select(F.min(time_col).alias(time_col)).collect()[0][time_col]
-            start_times = start_times.withColumn("min_ts", F.lit(min_ts))
-            time_deltas = start_times.select(
-                *groupby, (F.col(time_col) - F.col("min_ts")).alias("time_delta")
-            )
-            timestamps = load_data_df.select(*groupby, time_col).join(time_deltas, groupby, "left")
-            timestamps = timestamps.select(
-                *groupby, (F.col(time_col) - F.col("time_delta")).alias("aligned_time")
-            )
-            timestamp_counts = [
-                x["count"] for x in timestamps.groupBy("aligned_time").count().collect()
-            ]
-            if len(set(timestamp_counts)) != 1:
-                raise DSGInvalidDataset(
-                    f"load_data {time_col}s do not have the same time range when adjusting for offsets."
-                )
-            if len(timestamp_counts) != len(expected_timestamps):
-                raise DSGInvalidDataset(
-                    f"load_data {time_col}s do not have the expected number of timestamps when adjusting for offsets."
-                )
-            return
+            self._check_local_time_for_alignment(load_data_df, time_col)
 
+        expected_timestamps = time_range.list_time_range()
         actual_timestamps = [
             x[time_col].astimezone().astimezone(tz)
-            for x in load_data_df.filter(f"{time_col} is not null")
-            .select(time_col)
+            for x in load_data_df.select(time_col)
+            .filter(f"{time_col} is not null")
             .distinct()
             .sort(time_col)
             .collect()
@@ -89,6 +64,39 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             raise DSGInvalidDataset(
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
+
+    def _check_local_time_for_alignment(self, load_data_df, time_col):
+        time_ranges = self.get_time_ranges()
+        assert len(time_ranges) == 1, len(time_ranges)
+        time_range = time_ranges[0]
+        expected_timestamps = time_range.list_time_range()
+
+        if "id" in load_data_df.columns:
+            groupby = ["id"]
+        else:
+            groupby = [x for x in load_data_df.columns if x not in [time_col, VALUE_COLUMN]]
+        start_times = load_data_df.groupBy(*groupby).agg(F.min(time_col).alias(time_col))
+        min_ts = start_times.select(F.min(time_col).alias(time_col)).collect()[0][time_col]
+        start_times = start_times.withColumn("min_ts", F.lit(min_ts))
+        time_deltas = start_times.select(
+            *groupby, (F.col(time_col) - F.col("min_ts")).alias("time_delta")
+        )
+        timestamps = load_data_df.select(*groupby, time_col).join(time_deltas, groupby, "left")
+        timestamps = timestamps.select(
+            *groupby, (F.col(time_col) - F.col("time_delta")).alias("aligned_time")
+        )
+        timestamp_counts = [
+            x["count"] for x in timestamps.groupBy("aligned_time").count().collect()
+        ]
+        if len(set(timestamp_counts)) != 1:
+            raise DSGInvalidDataset(
+                f"load_data {time_col}s do not have the same time range when adjusting for offsets."
+            )
+        if len(timestamp_counts) != len(expected_timestamps):
+            raise DSGInvalidDataset(
+                f"load_data {time_col}s do not have the expected number of timestamps when adjusting for offsets."
+            )
+        return
 
     def build_time_dataframe(self, model_years=None, data_adjustment=None):
         # Note: DF.show() displays time in session time, which may be confusing.
@@ -200,14 +208,14 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps
 
-    def _convert_dataset_time_to_datetime(self, load_data_df):
+    def convert_time_format(self, df):
         if self.model.datetime_format.format_type != DatetimeFormat.LOCAL_AS_STRINGS:
-            return load_data_df
+            return df
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
-        load_data_df = load_data_df.withColumn(
+        df = df.withColumn(
             time_col,
             F.to_timestamp(time_col, self.model.datetime_format.data_str_format),
         )
-        return load_data_df
+        return df

@@ -214,6 +214,10 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         """
 
+    def convert_time_format(self, df):
+        """Convert time from str format to datetime if exists."""
+        return df
+
     def _convert_time_to_project_time_interval(
         self, df, project_time_dim=None, wrap_time: bool = False
     ):

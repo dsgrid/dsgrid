@@ -29,8 +29,10 @@ from dsgrid.dimension.time import (
     DataAdjustmentModel,
 )
 from dsgrid.dimension.time_utils import (
+    get_dls_springforward_time_change,
     get_dls_springforward_time_change_by_year,
     get_dls_springforward_time_change_by_time_range,
+    get_dls_fallback_time_change,
     get_dls_fallback_time_change_by_year,
     get_dls_fallback_time_change_by_time_range,
     create_adjustment_map_from_model_time,
@@ -54,7 +56,7 @@ def time_dimension_model1():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[1]  # DateTimeDimensionModel (15-min)
+    yield model.dimensions[1]  # DateTimeDimensionModel (annual)
 
 
 @pytest.fixture
@@ -70,7 +72,7 @@ def time_dimension_model3():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[3]  # DateTimeDimensionModel (8760 local, for daylight adjustment)
+    yield model.dimensions[3]  # DateTimeDimensionModel (8760 UTC, 15-min)
 
 
 @pytest.fixture
@@ -98,7 +100,7 @@ def index_time_dimension_model():
 
 
 @pytest.fixture
-def time_dimension_model4():
+def datetime_eq_index_time_model():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
@@ -106,17 +108,17 @@ def time_dimension_model4():
 
 
 @pytest.fixture
-def index_time_dimension_model2():
+def index_time_dimension_model_subhourly():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
     model.dimensions[6].frequency = datetime.timedelta(minutes=30)
-    model.dimensions[6].index_ranges = [IndexRangeModel(start=0, end=8784 * 2 - 1)]
+    model.dimensions[6].ranges = [IndexRangeModel(start=0, end=8784 * 2 - 1)]
     yield model.dimensions[6]  # 30-min freq version of index_time model 1
 
 
 @pytest.fixture
-def time_dimension_model5():
+def datetime_eq_index_time_model_subhourly():
     file = DIMENSION_CONFIG_FILE_TIME
     config_as_dict = load_data(file)
     model = DimensionsConfigModel(**config_as_dict)
@@ -161,7 +163,7 @@ def df_index_time():
 
 
 @pytest.fixture
-def df_index_time2():
+def df_index_time_subhourly():
     yield create_index_time_dataframe(interval="30min")
 
 
@@ -179,7 +181,6 @@ def df_date_time():
     df = get_spark_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "Wyoming", "Arizona"]
     time_zones = ["MountainPrevailing", "MountainPrevailing", "USArizona"]
-    # if local timezones, df timestamps must be serialized as string with offset info (e.g., '2012-03-11 00:00:00-07:00')
     # ts_pt = pd.date_range("2012-03-11", "2012-11-04 03:00:00", freq="1h", tz=ZoneInfo("US/Mountain"))
     ts_pt = pd.date_range(
         "2012-01-01", "2012-12-31 23:00:00", freq="1h", tz=ZoneInfo("US/Mountain")
@@ -277,7 +278,9 @@ def check_date_range_creation(time_dimension_model, data_adjustment=None):
 
 
 def check_validation_error_365_days(time_dimension_model):
-    with pytest.raises(ValidationError):
+    with pytest.raises(
+        ValidationError, match="use class=AnnualTime, time_type=annual to specify a year series"
+    ):
         data = time_dimension_model.model_dump()
         data["ranges"][0]["start"] = "2018"
         data["ranges"][0]["end"] = "2050"
@@ -310,7 +313,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         model_years=None,
-        value_columns=None,
+        value_columns=["value"],
         wrap_time_allowed=True,
         data_adjustment=data_adjustment,
     )
@@ -332,7 +335,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         model_years=None,
-        value_columns=None,
+        value_columns=["value"],
         wrap_time_allowed=True,
         data_adjustment=None,
     )
@@ -352,7 +355,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         model_years=None,
-        value_columns=None,
+        value_columns=["value"],
         wrap_time_allowed=True,
         data_adjustment=data_adjustment,
     )
@@ -388,7 +391,7 @@ def local_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         model_years=None,
-        value_columns=None,
+        value_columns=["value"],
         wrap_time_allowed=True,
         data_adjustment=data_adjustment,
     )
@@ -401,7 +404,7 @@ def local_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         model_years=None,
-        value_columns=None,
+        value_columns=["value"],
         wrap_time_allowed=True,
         data_adjustment=None,
     )
@@ -446,8 +449,8 @@ def test_time_dimension_model5(representative_time_dimension_model):
 def test_daylight_saving_time_changes():
     # Spring forward
     truth = [datetime.datetime(2018, 3, 11, 2, 0, tzinfo=ZoneInfo(key="US/Eastern"))]
-    time_change = get_dls_springforward_time_change_by_year(2018, TimeZone.EPT)
-    assert to_utc(time_change) == to_utc(truth)
+    time_change = get_dls_springforward_time_change(2018, TimeZone.EPT)
+    assert to_utc(time_change.values) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
@@ -465,13 +468,11 @@ def test_daylight_saving_time_changes():
     truth2 = [truth[0] + datetime.timedelta(minutes=15) * x for x in range(4)]
     assert to_utc(time_change) == to_utc(truth2)
 
-    from_ts = datetime.datetime(2018, 3, 11, 1, 55, tzinfo=ZoneInfo(key="US/Eastern"))
-    time_change = get_dls_springforward_time_change_by_time_range(from_ts, to_ts)
-    assert to_utc(time_change) == to_utc(truth)
-
     from_ts = datetime.datetime(2018, 3, 11, 3, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     time_change = get_dls_springforward_time_change_by_time_range(from_ts, to_ts)
-    assert time_change == []
+    assert to_utc(time_change) == to_utc(
+        [from_ts]
+    )  # In prevailing time, 2018-03-11 03:00 == 2018-03-11 02:00
 
     # multiple years
     truth = [
@@ -480,7 +481,7 @@ def test_daylight_saving_time_changes():
         datetime.datetime(2020, 3, 8, 2, 0, tzinfo=ZoneInfo(key="US/Mountain")),
     ]
     time_change = get_dls_springforward_time_change_by_year([2018, 2019, 2020], TimeZone.MPT)
-    assert to_utc(time_change) == to_utc(truth)
+    assert to_utc(time_change.values) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
     to_ts = datetime.datetime(2020, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
@@ -488,9 +489,9 @@ def test_daylight_saving_time_changes():
     assert to_utc(time_change) == to_utc(truth)
 
     # Fall back
-    time_change = get_dls_fallback_time_change_by_year(2018, TimeZone.EPT)
+    time_change = get_dls_fallback_time_change(2018, TimeZone.EPT)
     truth = [datetime.datetime(2018, 11, 4, 1, 0, tzinfo=ZoneInfo(key="EST"))]
-    assert to_utc(time_change) == to_utc(truth)
+    assert to_utc(time_change.values) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
@@ -507,10 +508,6 @@ def test_daylight_saving_time_changes():
     )
     truth2 = [truth[0] + datetime.timedelta(minutes=15) * x for x in range(4)]
     assert to_utc(time_change) == to_utc(truth2)
-
-    from_ts = datetime.datetime(2018, 11, 4, 1, 55, tzinfo=ZoneInfo(key="US/Eastern"))
-    time_change = get_dls_fallback_time_change_by_time_range(from_ts, to_ts)
-    assert to_utc(time_change) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 11, 4, 3, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     time_change = get_dls_fallback_time_change_by_time_range(from_ts, to_ts)
@@ -523,7 +520,7 @@ def test_daylight_saving_time_changes():
         datetime.datetime(2019, 11, 3, 1, 0, tzinfo=ZoneInfo(key="MST")),
         datetime.datetime(2020, 11, 1, 1, 0, tzinfo=ZoneInfo(key="MST")),
     ]
-    assert to_utc(time_change) == to_utc(truth)
+    assert to_utc(time_change.values) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
     to_ts = datetime.datetime(2020, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Mountain"))
@@ -531,10 +528,10 @@ def test_daylight_saving_time_changes():
     assert to_utc(time_change) == to_utc(truth)
 
     # Standard Time returns nothing
-    assert get_dls_springforward_time_change_by_year(2020, TimeZone.ARIZONA) == []
-    assert get_dls_fallback_time_change_by_year(2020, TimeZone.ARIZONA) == []
-    assert get_dls_springforward_time_change_by_year([2018, 2024], TimeZone.MST) == []
-    assert get_dls_fallback_time_change_by_year([2018, 2024], TimeZone.MST) == []
+    assert get_dls_springforward_time_change(2020, TimeZone.ARIZONA) == {}
+    assert get_dls_fallback_time_change(2020, TimeZone.ARIZONA) == {}
+    assert get_dls_springforward_time_change_by_year([2018, 2024], TimeZone.MST) == {}
+    assert get_dls_fallback_time_change_by_year([2018, 2024], TimeZone.MST) == {}
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="EST"))
     to_ts = datetime.datetime(2024, 12, 31, 0, 0, tzinfo=ZoneInfo(key="EST"))
@@ -701,26 +698,28 @@ def test_index_time_conversion(index_time_dimension_model, time_dimension_model0
     industrial_model_time_conversion_tests(config, project_time_dim, df)
 
 
-def test_datetime_conversion(time_dimension_model4, time_dimension_model0, df_date_time):
+def test_datetime_conversion(datetime_eq_index_time_model, time_dimension_model0, df_date_time):
     """When time.timezone is Local (as opposed to LocalModel), no impact to value from data_adjustment.daylight_saving_adjustment"""
     df = df_date_time
     project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
-    config = DateTimeDimensionConfig(time_dimension_model4)
-    df = config._convert_dataset_time_to_datetime(df)
+    config = DateTimeDimensionConfig(datetime_eq_index_time_model)
+    df = config.convert_time_format(df)
     time_cols = config.get_load_data_time_columns()
     config.check_dataset_time_consistency(df, time_cols)
     local_time_conversion_tests(config, project_time_dim, df)
 
 
 def test_index_time_conversion_subhourly(
-    index_time_dimension_model2, time_dimension_model5, df_index_time2
+    index_time_dimension_model_subhourly,
+    datetime_eq_index_time_model_subhourly,
+    df_index_time_subhourly,
 ):
     """When time.timezone is LocalModel (as opposed to Local), data_adjustment=None has the same behavior as
     data_adjustment where drop spring_forward and duplicate fall_back
     """
-    df = df_index_time2
-    project_time_dim = DateTimeDimensionConfig(time_dimension_model5)
-    config = IndexTimeDimensionConfig(index_time_dimension_model2)
+    df = df_index_time_subhourly
+    project_time_dim = DateTimeDimensionConfig(datetime_eq_index_time_model_subhourly)
+    config = IndexTimeDimensionConfig(index_time_dimension_model_subhourly)
 
     # -- test --
     values = np.arange(0.0, 8783.5, 0.5).tolist()  # np.arange(1680.0, 7396.0, 0.5).tolist()
@@ -738,7 +737,7 @@ def test_index_time_conversion_subhourly(
         df,
         project_time_dim,
         model_years=None,
-        value_columns=None,
+        value_columns=["value"],
         wrap_time_allowed=True,
         data_adjustment=data_adjustment,
     )
@@ -763,7 +762,7 @@ def test_index_time_conversion_subhourly(
         df,
         project_time_dim,
         model_years=None,
-        value_columns=None,
+        value_columns=["value"],
         wrap_time_allowed=True,
         data_adjustment=None,
     )
@@ -783,7 +782,7 @@ def test_index_time_conversion_subhourly(
         df,
         project_time_dim,
         model_years=None,
-        value_columns=None,
+        value_columns=["value"],
         wrap_time_allowed=True,
         data_adjustment=data_adjustment,
     )

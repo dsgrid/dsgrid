@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import logging
-from typing import Union, Optional
+from typing import Optional
 from pyspark.sql.types import (
     StructType,
     StructField,
@@ -19,6 +19,7 @@ from dsgrid.dimension.time import (
     DataAdjustmentModel,
     DaylightSavingFallBackType,
     LeapDayAdjustmentType,
+    TimeDimensionType,
 )
 from dsgrid.config.dimensions import TimeRangeModel
 from dsgrid.exceptions import DSGInvalidDimension
@@ -28,9 +29,7 @@ from dsgrid.utils.spark import get_spark_session
 logger = logging.getLogger(__name__)
 
 
-def get_dls_springforward_time_change_by_year(
-    year: Union[int, list[int]], time_zone: TimeZone
-) -> list[datetime]:
+def get_dls_springforward_time_change_by_year(years: list[int], time_zone: TimeZone) -> dict:
     """Return the starting hour of daylight savings based on year(s),
     i.e., the spring forward timestamp (2AM in ST or 3AM in DT)."""
 
@@ -39,12 +38,9 @@ def get_dls_springforward_time_change_by_year(
         return []
     time_zone_st = time_zone.get_standard_time()
 
-    if isinstance(year, int):
-        year = [year]
-
     # Spring forward time - the missing hour
     timestamps = []
-    for yr in year:
+    for yr in years:
         cur_st = datetime(yr, 2, 28, 3, 0, 0, tzinfo=time_zone.tz).astimezone(time_zone_st.tz)
         end_st = datetime(yr, 3, 31, 3, 0, 0, tzinfo=time_zone.tz).astimezone(time_zone_st.tz)
         prev_st = cur_st - timedelta(days=1)
@@ -57,13 +53,17 @@ def get_dls_springforward_time_change_by_year(
             prev_st = cur_st
             cur_st += timedelta(days=1)
 
-    return timestamps
+    return dict(zip(years, timestamps))
+
+
+def get_dls_springforward_time_change(year: int, time_zone: TimeZone) -> dict:
+    return get_dls_springforward_time_change_by_year([year], time_zone)
 
 
 def get_dls_springforward_time_change_by_time_range(
     from_timestamp: datetime,
     to_timestamp: datetime,
-    frequency: Optional[timedelta] = None,
+    frequency: timedelta = timedelta(hours=1),
 ) -> list[datetime]:
     """Return all timestamps within the starting hour of daylight savings based on time range,
     e.g., the spring forward timestamp (2AM in ST or 3AM in DT).
@@ -110,9 +110,7 @@ def get_dls_springforward_time_change_by_time_range(
     return timestamps
 
 
-def get_dls_fallback_time_change_by_year(
-    year: Union[int, list[int]], time_zone: TimeZone
-) -> list[datetime]:
+def get_dls_fallback_time_change_by_year(years: list[int], time_zone: TimeZone) -> dict:
     """Return the ending hour of daylight savings based on year(s),
     i.e., fall back timestamp (1AM in ST)."""
 
@@ -121,12 +119,9 @@ def get_dls_fallback_time_change_by_year(
         return []
     time_zone_st = time_zone.get_standard_time()
 
-    if isinstance(year, int):
-        year = [year]
-
     # Fall back time - the duplicated hour (1AM)
     timestamps = []
-    for yr in year:
+    for yr in years:
         cur_st = datetime(yr, 10, 31, 2, 0, 0, tzinfo=time_zone.tz).astimezone(time_zone_st.tz)
         end_st = datetime(yr, 11, 30, 2, 0, 0, tzinfo=time_zone.tz).astimezone(time_zone_st.tz)
         prev_st = cur_st - timedelta(days=1)
@@ -139,13 +134,17 @@ def get_dls_fallback_time_change_by_year(
             prev_st = cur_st
             cur_st += timedelta(days=1)
 
-    return timestamps
+    return dict(zip(years, timestamps))
+
+
+def get_dls_fallback_time_change(year: int, time_zone: TimeZone) -> dict:
+    return get_dls_fallback_time_change_by_year([year], time_zone)
 
 
 def get_dls_fallback_time_change_by_time_range(
     from_timestamp: datetime,
     to_timestamp: datetime,
-    frequency: Optional[timedelta] = None,
+    frequency: timedelta = timedelta(hours=1),
 ) -> list[datetime]:
     """Return all timestamps within the ending hour of daylight savings based on time range,
     e.g., fall back timestamp (1AM in ST).
@@ -245,9 +244,18 @@ def get_time_ranges(
         timezone = time_dimension_config.get_tzinfo()
     if data_adjustment is None:
         data_adjustment = DataAdjustmentModel()
+
+    if dim_model.time_type == TimeDimensionType.DATETIME:
+        dt_ranges = dim_model.ranges
+    elif dim_model.time_type == TimeDimensionType.INDEX:
+        dt_ranges = time_dimension_config._create_represented_time_ranges()
+    else:
+        msg = f"Cannot support time_dimension_config model of time_typ {dim_model.time_type}."
+        raise ValueError(msg)
+
     ranges = []
     for start, end in build_time_ranges(
-        dim_model.ranges, dim_model.str_format, model_years=model_years, tz=timezone
+        dt_ranges, dim_model.str_format, model_years=model_years, tz=timezone
     ):
         ranges.append(
             make_time_range(
@@ -273,11 +281,12 @@ def get_index_ranges(
         timezone = dim_model.get_tzinfo()
     if data_adjustment is None:
         data_adjustment = DataAdjustmentModel()
+    dt_ranges = time_dimension_config._create_represented_time_ranges()
     ranges = []
     time_ranges = build_time_ranges(
-        dim_model.ranges, dim_model.str_format, model_years=model_years, tz=timezone
+        dt_ranges, dim_model.str_format, model_years=model_years, tz=timezone
     )
-    for index_range, time_range in zip(dim_model.index_ranges, time_ranges):
+    for index_range, time_range in zip(dim_model.ranges, time_ranges):
         ranges.append(
             make_time_range(
                 start=time_range[0],

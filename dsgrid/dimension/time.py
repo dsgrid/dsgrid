@@ -418,7 +418,6 @@ class DatetimeRange:
         end = self.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + self.frequency
 
         while cur < end:
-            frequency = self.frequency
             cur_tz = cur.astimezone(self.tzinfo)
             month = cur_tz.month
             day = cur_tz.day
@@ -439,7 +438,7 @@ class DatetimeRange:
                     ):
                         yield cur_tz
 
-            cur += frequency
+            cur += self.frequency
 
     def list_time_range(self):
         """Return a list of timestamps for a time range.

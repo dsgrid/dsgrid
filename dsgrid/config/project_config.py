@@ -591,11 +591,10 @@ class InputDatasetModel(DSGBaseModel):
             return data_adjustment
         if fbh != DaylightSavingFallBackType.NONE and sfh != DaylightSavingSpringForwardType.NONE:
             return data_adjustment
-        raise ValueError(
-            "mismatch between daylight_saving_adjustment spring_forward_hour and fall_back_hour."
-        )
+        msg = f"mismatch between spring_forward_hour and fall_back_hour, {data_adjustment=}."
+        raise ValueError(msg)
 
-    #  TODO: write validation that if daylight_saving_adjustment is specified, time zone needs to be LocalModel
+    #  TODO: write validation that if daylight_saving_adjustment is specified, dataset time config must be IndexTimeDimensionConfig
 
 
 class DimensionMappingsModel(DSGBaseModel):

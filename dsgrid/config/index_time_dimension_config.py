@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 from pyspark.sql.types import (
     StructType,
     StructField,
@@ -20,7 +21,7 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import IndexTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.dimensions import TimeRangeModel
 
 
 logger = logging.getLogger(__name__)
@@ -43,8 +44,8 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
             )
         time_col = time_columns[0]
 
-        # check indices are consistent with index_ranges
-        index_ranges = self._get_index_ranges()
+        # check indices are consistent with ranges
+        index_ranges = self.get_time_ranges()
         assert len(index_ranges) == 1, len(index_ranges)
         index_range = index_ranges[0]
 
@@ -94,6 +95,8 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     ):
         if data_adjustment is None:
             data_adjustment = DataAdjustmentModel()
+        if value_columns is None:
+            value_columns = []
 
         idx_col = self.get_load_data_time_columns()
         assert len(idx_col) == 1, idx_col
@@ -137,9 +140,9 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
             )
             time_map = time_map.union(index_map.select(schema.names))
         df = df.join(time_map, on=[idx_col, "time_zone"], how="inner").drop(idx_col, "time_zone")
-        groupby = [x for x in df.columns if x not in [VALUE_COLUMN, "multiplier"]]
+        groupby = [x for x in df.columns if x not in value_columns + ["multiplier"]]
         df = df.groupBy(*groupby).agg(
-            F.sum(F.col(VALUE_COLUMN) * F.col("multiplier")).alias(VALUE_COLUMN)
+            *[F.sum(F.col(col) * F.col("multiplier")).alias(col) for col in value_columns]
         )
         df = self._convert_time_to_project_time_interval(
             df=df, project_time_dim=project_time_dim, wrap_time=wrap_time_allowed
@@ -151,28 +154,12 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         return self.model.frequency
 
     def get_time_ranges(self, model_years=None, data_adjustment=None):
-        ranges = []
-        for start, end in self._build_time_ranges(
-            self.model.ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
-        ):
-            ranges.append(
-                make_time_range(
-                    start=start,
-                    end=end,
-                    frequency=self.model.frequency,
-                    data_adjustment=data_adjustment,
-                    time_interval_type=self.model.time_interval_type,
-                )
-            )
-
-        return ranges
-
-    def _get_index_ranges(self, model_years=None, data_adjustment=None):
+        dt_ranges = self._create_represented_time_ranges()
         ranges = []
         time_ranges = self._build_time_ranges(
-            self.model.ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
+            dt_ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
         )
-        for index_range, time_range in zip(self.model.index_ranges, time_ranges):
+        for index_range, time_range in zip(self.model.ranges, time_ranges):
             ranges.append(
                 make_time_range(
                     start=time_range[0],
@@ -181,6 +168,24 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
                     data_adjustment=data_adjustment,
                     time_interval_type=self.model.time_interval_type,
                     start_index=index_range.start,
+                )
+            )
+
+        return ranges
+
+    def _get_represented_time_ranges(self, model_years=None, data_adjustment=None):
+        dt_ranges = self._create_represented_time_ranges()
+        ranges = []
+        for start, end in self._build_time_ranges(
+            dt_ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
+        ):
+            ranges.append(
+                make_time_range(
+                    start=start,
+                    end=end,
+                    frequency=self.model.frequency,
+                    data_adjustment=data_adjustment,
+                    time_interval_type=self.model.time_interval_type,
                 )
             )
 
@@ -198,7 +203,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     def list_expected_dataset_timestamps(self, model_years=None, data_adjustment=None):
         # list timestamps as indices
         indices = []
-        for index_range in self._get_index_ranges(
+        for index_range in self.get_time_ranges(
             model_years=model_years, data_adjustment=data_adjustment
         ):
             indices += [IndexTimestampType(x) for x in index_range.list_time_range()]
@@ -211,3 +216,14 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         ):
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps
+
+    def _create_represented_time_ranges(self):
+        """create datetime ranges from index ranges."""
+        ranges = []
+        for ts, range in zip(self.model.starting_timestamps, self.model.ranges):
+            start = datetime.strptime(ts, self.model.str_format)
+            steps = range.end - range.start
+            end = start + self.model.frequency * steps
+            ts_range = TimeRangeModel(start=str(start), end=str(end))
+            ranges.append(ts_range)
+        return ranges

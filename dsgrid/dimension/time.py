@@ -488,8 +488,9 @@ class IndexTimeRange(DatetimeRange):
         )  # to make end time inclusive
 
         while cur < end:
-            frequency = self.frequency
             cur_tz = cur.astimezone(self.tzinfo)
+            if self.frequency == timedelta(hours=24):
+                cur_tz -= cur_tz.dst()
             month = cur_tz.month
             day = cur_tz.day
             if not (
@@ -508,7 +509,7 @@ class IndexTimeRange(DatetimeRange):
                         and day == 1
                     ):
                         yield cur_idx
-            cur += frequency
+            cur += self.frequency
             cur_idx += 1
 
 

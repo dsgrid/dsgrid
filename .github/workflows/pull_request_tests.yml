@@ -15,13 +15,13 @@ jobs:
             python-version: "3.10"
 
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Setup ArangoDB
       uses: rhizomenetwork/arangodb-action@v1
       with:
         arangodb version: "3.11.7"
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -38,8 +38,9 @@ jobs:
         python dsgrid/tests/restore_simple_standard_scenarios_db.py
         python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4.2
       with:
+        token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml
         flags: unittests
         env_vars: OS,PYTHON

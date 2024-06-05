@@ -38,7 +38,7 @@ jobs:
         python dsgrid/tests/restore_simple_standard_scenarios_db.py
         python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4.2
+      uses: codecov/codecov-action@v4.2.0
       with:
         token: ${{ secrets.CODECOV_TOKEN }}
         file: ./coverage.xml

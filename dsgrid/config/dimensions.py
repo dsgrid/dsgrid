@@ -972,7 +972,6 @@ def _check_time_ranges(ranges: list[TimeRangeModel], str_format: str, frequency:
 def _check_index_ranges(ranges: list[IndexRangeModel]):
     for range in ranges:
         if range.end <= range.start:
-            # not whole number
             raise ValueError(f"index range {range} end point must be greater than start point.")
 
     return ranges

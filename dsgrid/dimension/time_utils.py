@@ -49,16 +49,22 @@ def get_dls_springforward_time_change_by_year(years: list[int], time_zone: TimeZ
             cur = cur_st.astimezone(time_zone.tz)
             prev = prev_st.astimezone(time_zone.tz)
             if cur.dst() == timedelta(hours=1) and prev.dst() == timedelta(hours=0):
-                spring_forward_hour = cur - timedelta(hours=1)  # 2AM in standard time
+                spring_forward_hour = cur - cur.dst()  # 2AM in standard time
                 timestamps.append(spring_forward_hour)
+                break
             prev_st = cur_st
             cur_st += timedelta(days=1)
 
     return dict(zip(years, timestamps))
 
 
-def get_dls_springforward_time_change(year: int, time_zone: TimeZone) -> dict:
-    return get_dls_springforward_time_change_by_year([year], time_zone)
+def get_dls_springforward_time_change(year: int, time_zone: TimeZone) -> Optional[datetime]:
+    dct = get_dls_springforward_time_change_by_year([year], time_zone)
+    if dct:
+        val = list(dct.values())
+        assert len(val) == 1
+        return val[0]
+    return
 
 
 def get_dls_springforward_time_change_by_time_range(
@@ -88,8 +94,6 @@ def get_dls_springforward_time_change_by_time_range(
     cur_utc = from_timestamp.astimezone(ZoneInfo("UTC"))
     end_utc = to_timestamp.astimezone(ZoneInfo("UTC"))
     assert cur_utc < end_utc, "Invalid time range"
-    if frequency is None:
-        frequency = timedelta(hours=1)
 
     timestamps = []
     prev_utc = cur_utc - frequency
@@ -132,14 +136,20 @@ def get_dls_fallback_time_change_by_year(years: list[int], time_zone: TimeZone) 
             if cur.dst() == timedelta(hours=0) and prev.dst() == timedelta(hours=1):
                 fall_back_hour = cur  # 1AM in standard time
                 timestamps.append(fall_back_hour)
+                break
             prev_st = cur_st
             cur_st += timedelta(days=1)
 
     return dict(zip(years, timestamps))
 
 
-def get_dls_fallback_time_change(year: int, time_zone: TimeZone) -> dict:
-    return get_dls_fallback_time_change_by_year([year], time_zone)
+def get_dls_fallback_time_change(year: int, time_zone: TimeZone) -> Optional[datetime]:
+    dct = get_dls_fallback_time_change_by_year([year], time_zone)
+    if dct:
+        val = list(dct.values())
+        assert len(val) == 1
+        return val[0]
+    return
 
 
 def get_dls_fallback_time_change_by_time_range(
@@ -170,8 +180,6 @@ def get_dls_fallback_time_change_by_time_range(
     cur_utc = from_timestamp.astimezone(ZoneInfo("UTC"))
     end_utc = to_timestamp.astimezone(ZoneInfo("UTC"))
     assert cur_utc < end_utc, "Invalid time range"
-    if frequency is None:
-        frequency = timedelta(hours=1)
 
     timestamps = []
     prev_utc = cur_utc - frequency

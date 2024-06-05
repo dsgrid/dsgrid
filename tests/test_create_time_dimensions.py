@@ -453,7 +453,7 @@ def test_daylight_saving_time_changes():
     # Spring forward
     truth = [datetime.datetime(2018, 3, 11, 2, 0, tzinfo=ZoneInfo(key="US/Eastern"))]
     time_change = get_dls_springforward_time_change(2018, TimeZone.EPT)
-    assert to_utc(time_change.values()) == to_utc(truth)
+    assert to_utc([time_change]) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
@@ -494,7 +494,7 @@ def test_daylight_saving_time_changes():
     # Fall back
     time_change = get_dls_fallback_time_change(2018, TimeZone.EPT)
     truth = [datetime.datetime(2018, 11, 4, 1, 0, tzinfo=ZoneInfo(key="EST"))]
-    assert to_utc(time_change.values()) == to_utc(truth)
+    assert to_utc([time_change]) == to_utc(truth)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
@@ -531,8 +531,8 @@ def test_daylight_saving_time_changes():
     assert to_utc(time_change) == to_utc(truth)
 
     # Standard Time returns nothing
-    assert get_dls_springforward_time_change(2020, TimeZone.ARIZONA) == {}
-    assert get_dls_fallback_time_change(2020, TimeZone.ARIZONA) == {}
+    assert get_dls_springforward_time_change(2020, TimeZone.ARIZONA) is None
+    assert get_dls_fallback_time_change(2020, TimeZone.ARIZONA) is None
     assert get_dls_springforward_time_change_by_year([2018, 2024], TimeZone.MST) == {}
     assert get_dls_fallback_time_change_by_year([2018, 2024], TimeZone.MST) == {}
 
@@ -610,23 +610,6 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     multipliers = [x.multiplier for x in res]
     assert multipliers == [1 for x in multipliers], "multiplier column is not all 1."
 
-    # check timestamps - Git Action (UTC) has different timestamp generation
-    # timestamps = joined_table.sort(table1.time_index).select("timestamp").collect()
-    # timestamps = pd.DataFrame(timestamps, columns=["timestamp"])
-    # missing_ts = pd.Timestamp("2012-03-11 02:00:00")
-    # assert (
-    #     missing_ts not in timestamps["timestamp"]
-    # ), f"timestamp {missing_ts} is found, expecting it missing."
-    # duplicated_ts = pd.Timestamp("2012-11-04 01:00:00")
-    # timestamps_count = timestamps["timestamp"].value_counts()
-    # timestamps_dup = timestamps_count[timestamps_count > 1]
-    # assert timestamps_dup.index.to_list() == [
-    #     duplicated_ts
-    # ], f"Unexpected duplicated timestamp found, {timestamps_dup.index.to_list()}\n{timestamps}"
-    # assert timestamps_dup.to_list() == [
-    #     2
-    # ], f"timestamp {duplicated_ts} is duplicated more than twice."
-
     # [2] Interpolating fallback between 1 and 2AM
     data_adjustment = DataAdjustmentModel(
         daylight_saving_adjustment={
@@ -674,22 +657,6 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     assert (
         sorted(indices2) == itpl_indices
     ), f"Expecting interpolated indices: {itpl_indices} but found {indices2}"
-
-    # check timestamps - Git Action (UTC) has different timestamp generation
-    # timestamps = joined_table.sort(table1.time_index).select("timestamp").toPandas()
-    # missing_ts = pd.Timestamp("2012-03-11 02:00:00")
-    # assert (
-    #     missing_ts not in timestamps["timestamp"]
-    # ), f"timestamp {missing_ts} is found, expecting it missing."
-    # duplicated_ts = pd.Timestamp("2012-11-04 01:00:00")
-    # timestamps_count = timestamps["timestamp"].value_counts()
-    # timestamps_dup = timestamps_count[timestamps_count > 1]
-    # assert timestamps_dup.index.to_list() == [
-    #     duplicated_ts
-    # ], f"Unexpected duplicated timestamp found, {timestamps_dup.index.to_list()}"
-    # assert timestamps_dup.to_list() == [
-    #     3
-    # ], f"timestamp {duplicated_ts} is duplicated more than twice."
 
 
 def test_index_time_conversion(index_time_dimension_model, time_dimension_model0, df_index_time):

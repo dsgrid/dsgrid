@@ -45,85 +45,85 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture
 def time_dimension_model0():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[0]  # DateTimeDimensionModel (8760 period-beginning)
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][0]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # DateTimeDimensionModel (8760 period-beginning)
 
 
 @pytest.fixture
 def time_dimension_model1():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[1]  # DateTimeDimensionModel (annual)
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][1]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # DateTimeDimensionModel (annual)
 
 
 @pytest.fixture
 def time_dimension_model2():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[2]  # DateTimeDimensionModel (8760 period-ending, 6-h freq)
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][2]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # DateTimeDimensionModel (8760 period-ending, 6-h freq)
 
 
 @pytest.fixture
 def time_dimension_model3():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[3]  # DateTimeDimensionModel (8760 UTC, 15-min)
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][3]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # DateTimeDimensionModel (8760 UTC, 15-min)
 
 
 @pytest.fixture
 def annual_time_dimension_model():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[4]  # AnnualTimeDimensionModel (annual time, correct format)
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][4]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # AnnualTimeDimensionModel (annual time, correct format)
 
 
 @pytest.fixture
 def representative_time_dimension_model():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[5]  # RepresentativeTimeDimensionModel
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][5]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # RepresentativeTimeDimensionModel
 
 
 @pytest.fixture
 def index_time_dimension_model():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[6]  # IndexTimeDimensionModel (industrial time)
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][6]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # IndexTimeDimensionModel (industrial time)
 
 
 @pytest.fixture
 def datetime_eq_index_time_model():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    yield model.dimensions[7]  # DateTime version of index_time model 1
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][7]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    yield model  # DateTime version of index_time model 1
 
 
 @pytest.fixture
 def index_time_dimension_model_subhourly():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    model.dimensions[6].frequency = datetime.timedelta(minutes=30)
-    model.dimensions[6].ranges = [IndexRangeModel(start=0, end=8784 * 2 - 1)]
-    yield model.dimensions[6]  # 30-min freq version of index_time model 1
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][6]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    model.frequency = datetime.timedelta(minutes=30)
+    model.ranges = [IndexRangeModel(start=0, end=8784 * 2 - 1)]
+    yield model
 
 
 @pytest.fixture
 def datetime_eq_index_time_model_subhourly():
-    file = DIMENSION_CONFIG_FILE_TIME
-    config_as_dict = load_data(file)
-    model = DimensionsConfigModel(**config_as_dict)
-    model.dimensions[0].frequency = datetime.timedelta(minutes=30)
-    yield model.dimensions[0]  # 30-min freq version of time model 0
+    config_as_dict = load_data(DIMENSION_CONFIG_FILE_TIME)
+    config_as_dict["dimensions"] = [config_as_dict["dimensions"][0]]
+    model = DimensionsConfigModel(**config_as_dict).dimensions[0]
+    model.frequency = datetime.timedelta(minutes=30)
+    yield model  # 30-min freq version of time model 0
 
 
 def create_index_time_dataframe(interval="1h"):
@@ -140,8 +140,8 @@ def create_index_time_dataframe(interval="1h"):
     geography = ["Colorado", "Wyoming", "Arizona"]
     time_zones = ["MountainPrevailing", "MountainPrevailing", "USArizona"]
     if interval == "1h":
-        indices = np.arange(0, 8784).tolist()  # np.arange(1680, 7396).tolist()
-        values = np.arange(0.0, 8784.0).tolist()  # np.arange(1680.0, 7396.0).tolist()
+        indices = np.arange(0, 8784).tolist()
+        values = np.arange(0.0, 8784.0).tolist()
     elif interval == "30min":
         indices = np.arange(0, 8784 * 2 - 1).tolist()
         values = np.arange(0.0, 8783.5, 0.5).tolist()
@@ -181,18 +181,16 @@ def df_date_time():
     df = get_spark_session().createDataFrame([], schema=schema)
     geography = ["Colorado", "Wyoming", "Arizona"]
     time_zones = ["MountainPrevailing", "MountainPrevailing", "USArizona"]
-    # ts_pt = pd.date_range("2012-03-11", "2012-11-04 03:00:00", freq="1h", tz=ZoneInfo("US/Mountain"))
     ts_pt = pd.date_range(
         "2012-01-01", "2012-12-31 23:00:00", freq="1h", tz=ZoneInfo("US/Mountain")
     )
     ts_pt = [str(ts) for ts in ts_pt]
-    # ts_st = pd.date_range("2012-03-11", "2012-11-04 03:00:00", freq="1h", tz=ZoneInfo("US/Arizona"))
     ts_st = pd.date_range(
         "2012-01-01", "2012-12-31 23:00:00", freq="1h", tz=ZoneInfo("US/Mountain")
     )
     ts_st = [str(ts) for ts in ts_st]
     timestamps = [ts_pt, ts_pt, ts_st]
-    values = np.arange(0.0, 8784.0).tolist()  # np.arange(1680.0, 7396.0).tolist()
+    values = np.arange(0.0, 8784.0).tolist()
     sch = StructType(
         [
             StructField("timestamp", StringType(), False),
@@ -298,7 +296,7 @@ def to_utc(time_change):
 
 
 def industrial_model_time_conversion_tests(config, project_time_dim, df):
-    values = np.arange(0.0, 8784.0).tolist()  # np.arange(1680.0, 7396.0).tolist()
+    values = np.arange(0.0, 8784.0).tolist()
     n_df = df.count()
 
     # [1] Duplicating fallback 1AM
@@ -320,6 +318,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
     # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    print(f2.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2) == n_df
     ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
@@ -340,6 +339,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         data_adjustment=None,
     )
     f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    print(f3.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2.compare(f3)) == 0
     ), f"LocalModel_time.convert_dataframe() with data_adjustment=None should have the same behavior as with {data_adjustment=}"
@@ -362,6 +362,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
     # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    print(f2.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2) == n_df
     ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
@@ -377,7 +378,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
 
 
 def local_time_conversion_tests(config, project_time_dim, df):
-    values = np.arange(0.0, 8784.0).tolist()  # np.arange(1680.0, 7396.0).tolist()
+    values = np.arange(0.0, 8784.0).tolist()
 
     # [1] Duplicating fallback 1AM
     # This has the same behavior as data_adjustment = None
@@ -396,6 +397,7 @@ def local_time_conversion_tests(config, project_time_dim, df):
         data_adjustment=data_adjustment,
     )
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    print(f2.loc[1680:7396])  # daylight saving transition
     for geo in sorted(f2["geography"].unique()):
         assert (
             f2.loc[f2["geography"] == geo, "value"].to_list() == values
@@ -409,6 +411,7 @@ def local_time_conversion_tests(config, project_time_dim, df):
         data_adjustment=None,
     )
     f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    print(f3.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2.compare(f3)) == 0
     ), f"Local_time.convert_dataframe() with data_adjustment=None should have the same behavior as with {data_adjustment=}"
@@ -687,9 +690,7 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
 
 
 def test_index_time_conversion(index_time_dimension_model, time_dimension_model0, df_index_time):
-    """data_adjustment=None has the same behavior as
-    data_adjustment where drop spring_forward and duplicate fall_back
-    """
+    """test industrial time with data_adjustment"""
     df = df_index_time
     project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
     config = IndexTimeDimensionConfig(index_time_dimension_model)
@@ -698,8 +699,9 @@ def test_index_time_conversion(index_time_dimension_model, time_dimension_model0
     industrial_model_time_conversion_tests(config, project_time_dim, df)
 
 
+@pytest.mark.skip
 def test_datetime_conversion(datetime_eq_index_time_model, time_dimension_model0, df_date_time):
-    """When time.timezone is Local (as opposed to LocalModel), no impact to value from data_adjustment.daylight_saving_adjustment"""
+    """test datetime_format.LOCAL_AS_STRINGS"""
     df = df_date_time
     project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
     config = DateTimeDimensionConfig(datetime_eq_index_time_model)
@@ -714,15 +716,13 @@ def test_index_time_conversion_subhourly(
     datetime_eq_index_time_model_subhourly,
     df_index_time_subhourly,
 ):
-    """When time.timezone is LocalModel (as opposed to Local), data_adjustment=None has the same behavior as
-    data_adjustment where drop spring_forward and duplicate fall_back
-    """
+    """test subhourly industrial time with data_adjustment"""
     df = df_index_time_subhourly
     project_time_dim = DateTimeDimensionConfig(datetime_eq_index_time_model_subhourly)
     config = IndexTimeDimensionConfig(index_time_dimension_model_subhourly)
 
     # -- test --
-    values = np.arange(0.0, 8783.5, 0.5).tolist()  # np.arange(1680.0, 7396.0, 0.5).tolist()
+    values = np.arange(0.0, 8783.5, 0.5).tolist()
     n_df = df.count()
 
     # [1] Duplicating fallback 1AM

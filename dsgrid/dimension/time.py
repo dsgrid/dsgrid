@@ -307,7 +307,7 @@ class DaylightSavingAdjustmentModel(DSGBaseModel):
         Field(
             title="spring_forward_hour",
             description="Data adjustment for spring forward hour (a 2AM in March)",
-            default=DaylightSavingSpringForwardType.DROP,
+            default=DaylightSavingSpringForwardType.NONE,
             json_schema_extra={
                 "options": DaylightSavingSpringForwardType.format_descriptions_for_docs(),
             },
@@ -319,7 +319,7 @@ class DaylightSavingAdjustmentModel(DSGBaseModel):
         Field(
             title="fall_back_hour",
             description="Data adjustment for spring forward hour (a 2AM in November)",
-            default=DaylightSavingFallBackType.INTERPOLATE,
+            default=DaylightSavingFallBackType.NONE,
             json_schema_extra={
                 "options": DaylightSavingFallBackType.format_descriptions_for_docs(),
             },
@@ -419,8 +419,7 @@ class DatetimeRange:
 
         while cur < end:
             cur_tz = cur.astimezone(self.tzinfo)
-            if self.frequency == timedelta(hours=24):
-                cur_tz -= cur_tz.dst()
+            cur_tz = adjust_timestamp_by_dst_offset(cur_tz, self.frequency)
             month = cur_tz.month
             day = cur_tz.day
             if not (
@@ -489,8 +488,7 @@ class IndexTimeRange(DatetimeRange):
 
         while cur < end:
             cur_tz = cur.astimezone(self.tzinfo)
-            if self.frequency == timedelta(hours=24):
-                cur_tz -= cur_tz.dst()
+            cur_tz = adjust_timestamp_by_dst_offset(cur_tz, self.frequency)
             month = cur_tz.month
             day = cur_tz.day
             if not (
@@ -533,3 +531,18 @@ def make_time_range(start, end, frequency, data_adjustment, time_interval_type, 
     elif frequency == timedelta(days=0):
         return NoOpTimeRange(start, end, frequency, data_adjustment, time_interval_type)
     return DatetimeRange(start, end, frequency, data_adjustment, time_interval_type)
+
+
+def adjust_timestamp_by_dst_offset(timestamp, frequency):
+    """Reduce the timestamps within the daylight saving range by 1 hour.
+    Used to ensure that a time series at daily (or lower) frequency returns each day at the
+    same timestamp in prevailing time, an expected behavior in most standard libraries.
+    (e.g., ensure a time series can return 2018-03-11 00:00, 2018-03-12 00:00...
+    instead of 2018-03-11 00:00, 2018-03-12 01:00...)
+
+    """
+    if frequency < timedelta(hours=24):
+        return timestamp
+
+    offset = timestamp.dst() or timedelta(hours=0)
+    return timestamp - offset

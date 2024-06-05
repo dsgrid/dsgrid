@@ -20,6 +20,7 @@ from dsgrid.dimension.time import (
     DaylightSavingFallBackType,
     LeapDayAdjustmentType,
     TimeDimensionType,
+    adjust_timestamp_by_dst_offset,
 )
 from dsgrid.config.dimensions import TimeRangeModel
 from dsgrid.exceptions import DSGInvalidDimension
@@ -448,8 +449,7 @@ def create_adjustment_map_from_model_time(
             multiplier = 1.0
             frequency = freq
             cur_pt = cur.astimezone(TZ_pt.tz)
-            if freq == timedelta(hours=24):
-                cur_pt -= cur_pt.dst()
+            cur_pt = adjust_timestamp_by_dst_offset(cur_pt, freq)
             model_ts = cur_pt.replace(tzinfo=TZ_st.tz)
             month = cur_pt.month
             day = cur_pt.day

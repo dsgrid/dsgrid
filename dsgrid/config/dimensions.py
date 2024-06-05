@@ -604,6 +604,7 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
     @field_validator("datetime_format")
     def check_data_str_format(cls, datetime_format):
         if datetime_format.format_type == DatetimeFormat.LOCAL_AS_STRINGS:
+            raise NotImplementedError("DatetimeFormat.LOCAL_AS_STRINGS is not fully implemented.")
             dsf = datetime_format.data_str_format
             if (
                 "x" not in dsf

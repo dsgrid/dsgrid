@@ -17,7 +17,7 @@ from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
-from dsgrid.dimension.time import TimeDimensionType
+from dsgrid.dimension.time import TimeDimensionType, DaylightSavingAdjustmentModel
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.utils.dataset import (
@@ -544,10 +544,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(
-        self, load_data_df, project_config, model_years=None, value_columns=None
+        self,
+        load_data_df,
+        project_config,
+        model_years=None,
+        value_columns=None,
     ):
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
+        data_adjustment = input_dataset_model.data_adjustment
+        self._validate_daylight_saving_adjustment(data_adjustment)
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if time_dim.model.is_time_zone_required_in_geography():
             if self._config.model.use_project_geography_time_zone:
@@ -564,12 +570,21 @@ class DatasetSchemaHandlerBase(abc.ABC):
             model_years=model_years,
             value_columns=value_columns,
             wrap_time_allowed=wrap_time_allowed,
+            data_adjustment=data_adjustment,
         )
 
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")
 
         return load_data_df
+
+    def _validate_daylight_saving_adjustment(self, data_adjustment):
+        if data_adjustment.daylight_saving_adjustment == DaylightSavingAdjustmentModel():
+            return
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        if time_dim.model.time_type != TimeDimensionType.INDEX:
+            msg = f"data_adjustment.daylight_saving_adjustment does not apply to {time_dim.time_dim.model.time_type=} time type, it applies to INDEX time type only."
+            logger.warning(msg)
 
     def _remove_non_dimension_columns(self, df: DataFrame) -> DataFrame:
         allowed_columns = {x.value for x in DimensionType}

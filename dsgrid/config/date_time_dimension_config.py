@@ -46,6 +46,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         ), f"datetime {time_col} column must be TimestampType"
 
         if self.model.datetime_format.format_type in [DatetimeFormat.LOCAL_AS_STRINGS]:
+            logger.warning(
+                "DatetimeFormat.LOCAL_AS_STRINGS has incomplete time check on load_data_df"
+            )
             self._check_local_time_for_alignment(load_data_df, time_col)
 
         expected_timestamps = time_range.list_time_range()

@@ -620,7 +620,7 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     timestamps_dup = timestamps_count[timestamps_count > 1]
     assert timestamps_dup.index.to_list() == [
         duplicated_ts
-    ], f"Unexpected duplicated timestamp found, {timestamps_dup.index.to_list()}"
+    ], f"Unexpected duplicated timestamp found, {timestamps_dup.index.to_list()}\n{timestamps}\n{timestamps_count}"
     assert timestamps_dup.to_list() == [
         2
     ], f"timestamp {duplicated_ts} is duplicated more than twice."

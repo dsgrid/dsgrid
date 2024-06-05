@@ -610,7 +610,9 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     multipliers = [x.multiplier for x in res]
     assert multipliers == [1 for x in multipliers], "multiplier column is not all 1."
 
-    timestamps = joined_table.sort(table1.time_index).select("timestamp").toPandas()
+    timestamps = joined_table.sort(table1.time_index).select("timestamp").collect()
+    timestamps = pd.DataFrame(timestamps, columns=["timestamp"])
+    print(timestamps)
     missing_ts = pd.Timestamp("2012-03-11 02:00:00")
     assert (
         missing_ts not in timestamps["timestamp"]
@@ -620,7 +622,7 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     timestamps_dup = timestamps_count[timestamps_count > 1]
     assert timestamps_dup.index.to_list() == [
         duplicated_ts
-    ], f"Unexpected duplicated timestamp found, {timestamps_dup.index.to_list()}\n{timestamps}\n{timestamps_count}"
+    ], f"Unexpected duplicated timestamp found, {timestamps_dup.index.to_list()}\n{timestamps}"
     assert timestamps_dup.to_list() == [
         2
     ], f"timestamp {duplicated_ts} is duplicated more than twice."

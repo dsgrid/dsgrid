@@ -1,2 +1,2 @@
 ignore:
-	- "tests/simple_standard_scenarios_datasets.py"
+  - "tests/simple_standard_scenarios_datasets.py"

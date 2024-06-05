@@ -9,11 +9,11 @@ jobs:
     name: Codecov
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v4
     - name: Setup ArangoDB
       uses: rhizomenetwork/arangodb-action@v1
     - name: Setup Python
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v5
       with:
         python-version: "3.10"
     - name: Install dependencies
@@ -30,11 +30,9 @@ jobs:
         python dsgrid/tests/restore_simple_standard_scenarios_db.py
         python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4.2.0
       with:
-        file: ./coverage.xml
-        flags: unittests
-        env_vars: OS,PYTHON
+        token: ${{ secrets.CODECOV_TOKEN }}
         name: codecov-umbrella
         fail_ci_if_error: false
         verbose: true

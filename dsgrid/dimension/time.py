@@ -227,7 +227,7 @@ class TimeZone(DSGEnum):
         "For Arizona state except Navajo County",
         tz=ZoneInfo("US/Arizona"),
         tz_name="US/Arizona",
-    )  # for Arizona except Navajo County
+    )
 
     def get_standard_time(self):
         """get equivalent standard time"""
@@ -449,7 +449,6 @@ class DatetimeRange:
         list[datetime]
         """
         return list(self._iter_timestamps())
-        # return sorted(set(self._iter_timestamps()))
 
 
 class AnnualTimeRange(DatetimeRange):

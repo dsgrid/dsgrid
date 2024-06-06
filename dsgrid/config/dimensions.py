@@ -507,6 +507,22 @@ class LocalTimeAsStrings(DSGBaseModel):
         ),
     ]
 
+    @field_validator("data_str_format")
+    @classmethod
+    def check_data_str_format(cls, data_str_format):
+        raise NotImplementedError("DatetimeFormat.LOCAL_AS_STRINGS is not fully implemented.")
+        dsf = data_str_format
+        if (
+            "x" not in dsf
+            and "X" not in dsf
+            and "Z" not in dsf
+            and "z" not in dsf
+            and "V" not in dsf
+            and "O" not in dsf
+        ):
+            raise ValueError("data_str_format must provide time zone or zone offset.")
+        return data_str_format
+
 
 class DateTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps translate to datetime objects."""
@@ -600,22 +616,6 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             values.pop("timezone")
 
         return values
-
-    @field_validator("datetime_format")
-    def check_data_str_format(cls, datetime_format):
-        if datetime_format.format_type == DatetimeFormat.LOCAL_AS_STRINGS:
-            raise NotImplementedError("DatetimeFormat.LOCAL_AS_STRINGS is not fully implemented.")
-            dsf = datetime_format.data_str_format
-            if (
-                "x" not in dsf
-                and "X" not in dsf
-                and "Z" not in dsf
-                and "z" not in dsf
-                and "V" not in dsf
-                and "O" not in dsf
-            ):
-                raise ValueError("data_str_format must provide time zone or zone offset.")
-        return datetime_format
 
     @model_validator(mode="after")
     def check_frequency(self) -> "DateTimeDimensionModel":

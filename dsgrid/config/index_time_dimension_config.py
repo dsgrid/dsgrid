@@ -15,7 +15,7 @@ from dsgrid.dimension.time_utils import (
     create_adjustment_map_from_model_time,
     build_index_time_map,
 )
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.time.types import DatetimeTimestampType, IndexTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.spark import get_spark_session
@@ -38,10 +38,8 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     def check_dataset_time_consistency(self, load_data_df, time_columns):
         logger.info("Check IndexTimeDimensionConfig dataset time consistency.")
         if len(time_columns) > 1:
-            raise ValueError(
-                "IndexTimeDimensionConfig expects only one column from "
-                f"get_load_data_time_columns, but has {time_columns}"
-            )
+            msg = f"IndexTimeDimensionConfig expects only one time column, but has {time_columns=}"
+            raise DSGInvalidParameter(msg)
         time_col = time_columns[0]
 
         # check indices are consistent with ranges

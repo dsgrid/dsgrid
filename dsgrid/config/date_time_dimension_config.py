@@ -7,7 +7,7 @@ from pyspark.sql.types import (
 import pyspark.sql.functions as F
 
 from dsgrid.dimension.time import make_time_range, DatetimeFormat, LeapDayAdjustmentType
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.spark import get_spark_session
@@ -30,10 +30,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def check_dataset_time_consistency(self, load_data_df, time_columns):
         logger.info("Check DateTimeDimensionConfig dataset time consistency.")
         if len(time_columns) > 1:
-            raise ValueError(
-                "DateTimeDimensionConfig expects only one column from "
-                f"get_load_data_time_columns, but has {time_columns}"
-            )
+            msg = f"DateTimeDimensionConfig expects only one time column, but has {time_columns=}"
+            raise DSGInvalidParameter(msg)
+
         time_col = time_columns[0]
         tz = self.get_tzinfo()
         time_ranges = self.get_time_ranges()
@@ -160,7 +159,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         assert len(ptime_col) == 1, ptime_col
         ptime_col = ptime_col[0]
 
-        if data_adjustment.leap_day_adjustment != LeapDayAdjustmentType.NONE:
+        if (data_adjustment.leap_day_adjustment != LeapDayAdjustmentType.NONE) or (
+            model_years is not None
+        ):
             df_ptime = project_time_dim.build_time_dataframe(
                 model_years=model_years, data_adjustment=data_adjustment
             )
@@ -199,6 +200,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             return self.model.datetime_format.timezone.tz
         if self.model.datetime_format.format_type in [DatetimeFormat.LOCAL_AS_STRINGS]:
             return None
+        msg = f"Undefined tzinfo for {self.model.datetime_format.format_type=}"
+        raise NotImplementedError(msg)
 
     def get_time_interval_type(self):
         return self.model.time_interval_type

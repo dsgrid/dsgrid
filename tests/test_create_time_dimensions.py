@@ -451,14 +451,22 @@ def test_time_dimension_model5(representative_time_dimension_model):
 
 def test_daylight_saving_time_changes():
     # Spring forward
-    truth = [datetime.datetime(2018, 3, 11, 2, 0, tzinfo=ZoneInfo(key="US/Eastern"))]
+    truth = [datetime.datetime(2018, 3, 11, 3, 0, tzinfo=ZoneInfo(key="US/Eastern"))]
     time_change = get_dls_springforward_time_change(2018, TimeZone.EPT)
     assert to_utc([time_change]) == to_utc(truth)
+
+    time_change = get_dls_springforward_time_change(2018, None)
+    assert time_change == truth[0].replace(tzinfo=None)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     time_change = get_dls_springforward_time_change_by_time_range(from_ts, to_ts)
     assert to_utc(time_change) == to_utc(truth)
+
+    time_change = get_dls_springforward_time_change_by_time_range(
+        from_ts.replace(tzinfo=None), to_ts.replace(tzinfo=None)
+    )
+    assert time_change == [truth[0].replace(tzinfo=None)]
 
     time_change = get_dls_springforward_time_change_by_time_range(
         from_ts, to_ts, frequency=datetime.timedelta(hours=6)
@@ -479,9 +487,9 @@ def test_daylight_saving_time_changes():
 
     # multiple years
     truth = [
-        datetime.datetime(2018, 3, 11, 2, 0, tzinfo=ZoneInfo(key="US/Mountain")),
-        datetime.datetime(2019, 3, 10, 2, 0, tzinfo=ZoneInfo(key="US/Mountain")),
-        datetime.datetime(2020, 3, 8, 2, 0, tzinfo=ZoneInfo(key="US/Mountain")),
+        datetime.datetime(2018, 3, 11, 3, 0, tzinfo=ZoneInfo(key="US/Mountain")),
+        datetime.datetime(2019, 3, 10, 3, 0, tzinfo=ZoneInfo(key="US/Mountain")),
+        datetime.datetime(2020, 3, 8, 3, 0, tzinfo=ZoneInfo(key="US/Mountain")),
     ]
     time_change = get_dls_springforward_time_change_by_year([2018, 2019, 2020], TimeZone.MPT)
     assert to_utc(time_change.values()) == to_utc(truth)
@@ -492,14 +500,22 @@ def test_daylight_saving_time_changes():
     assert to_utc(time_change) == to_utc(truth)
 
     # Fall back
-    time_change = get_dls_fallback_time_change(2018, TimeZone.EPT)
     truth = [datetime.datetime(2018, 11, 4, 1, 0, tzinfo=ZoneInfo(key="EST"))]
+    time_change = get_dls_fallback_time_change(2018, TimeZone.EPT)
     assert to_utc([time_change]) == to_utc(truth)
+
+    time_change = get_dls_fallback_time_change(2018, None)
+    assert time_change == truth[0].replace(tzinfo=None)
 
     from_ts = datetime.datetime(2018, 1, 1, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     to_ts = datetime.datetime(2018, 12, 31, 0, 0, tzinfo=ZoneInfo(key="US/Eastern"))
     time_change = get_dls_fallback_time_change_by_time_range(from_ts, to_ts)
     assert to_utc(time_change) == to_utc(truth)
+
+    time_change = get_dls_fallback_time_change_by_time_range(
+        from_ts.replace(tzinfo=None), to_ts.replace(tzinfo=None)
+    )
+    assert time_change == [truth[0].replace(tzinfo=None)]
 
     time_change = get_dls_fallback_time_change_by_time_range(
         from_ts, to_ts, frequency=datetime.timedelta(hours=6)

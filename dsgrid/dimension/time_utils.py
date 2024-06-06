@@ -30,11 +30,17 @@ from dsgrid.utils.spark import get_spark_session
 logger = logging.getLogger(__name__)
 
 
-def get_dls_springforward_time_change_by_year(years: list[int], time_zone: TimeZone) -> dict:
+def get_dls_springforward_time_change_by_year(
+    years: list[int], time_zone: Optional[TimeZone] = None
+) -> dict:
     """Return the starting hour of daylight savings based on year(s),
     i.e., the spring forward timestamp (2AM in ST or 3AM in DT)."""
 
-    if time_zone.is_standard():
+    tz_aware = True
+    if time_zone is None:
+        tz_aware = False
+        time_zone = TimeZone.EPT
+    elif time_zone.is_standard():
         # no daylight saving
         return {}
     time_zone_st = time_zone.get_standard_time()
@@ -55,11 +61,16 @@ def get_dls_springforward_time_change_by_year(years: list[int], time_zone: TimeZ
             prev_st = cur_st
             cur_st += timedelta(days=1)
 
+    if not tz_aware:
+        timestamps = [ts.replace(tzinfo=None) for ts in timestamps]
+
     return dict(zip(years, timestamps))
 
 
-def get_dls_springforward_time_change(year: int, time_zone: TimeZone) -> Optional[datetime]:
-    dct = get_dls_springforward_time_change_by_year([year], time_zone)
+def get_dls_springforward_time_change(
+    year: int, time_zone: Optional[TimeZone] = None
+) -> Optional[datetime]:
+    dct = get_dls_springforward_time_change_by_year([year], time_zone=time_zone)
     if dct:
         val = list(dct.values())
         assert len(val) == 1
@@ -83,13 +94,13 @@ def get_dls_springforward_time_change_by_time_range(
 
     if from_timestamp.tzinfo != to_timestamp.tzinfo:
         raise ValueError(f"{from_timestamp=} and {to_timestamp=} do not have the same time zone.")
-    tz = from_timestamp.tzinfo
 
     tz_aware = True
     if from_timestamp.tzinfo is None:
         tz_aware = False
         from_timestamp = from_timestamp.replace(tzinfo=TimeZone.EPT.tz)
         to_timestamp = to_timestamp.replace(tzinfo=TimeZone.EPT.tz)
+    tz = from_timestamp.tzinfo
 
     cur_utc = from_timestamp.astimezone(ZoneInfo("UTC"))
     end_utc = to_timestamp.astimezone(ZoneInfo("UTC"))
@@ -115,11 +126,17 @@ def get_dls_springforward_time_change_by_time_range(
     return timestamps
 
 
-def get_dls_fallback_time_change_by_year(years: list[int], time_zone: TimeZone) -> dict:
+def get_dls_fallback_time_change_by_year(
+    years: list[int], time_zone: Optional[TimeZone] = None
+) -> dict:
     """Return the ending hour of daylight savings based on year(s),
     i.e., fall back timestamp (1AM in ST)."""
 
-    if time_zone.is_standard():
+    tz_aware = True
+    if time_zone is None:
+        tz_aware = False
+        time_zone = TimeZone.EPT
+    elif time_zone.is_standard():
         # no daylight saving
         return {}
     time_zone_st = time_zone.get_standard_time()
@@ -140,11 +157,16 @@ def get_dls_fallback_time_change_by_year(years: list[int], time_zone: TimeZone) 
             prev_st = cur_st
             cur_st += timedelta(days=1)
 
+    if not tz_aware:
+        timestamps = [ts.replace(tzinfo=None) for ts in timestamps]
+
     return dict(zip(years, timestamps))
 
 
-def get_dls_fallback_time_change(year: int, time_zone: TimeZone) -> Optional[datetime]:
-    dct = get_dls_fallback_time_change_by_year([year], time_zone)
+def get_dls_fallback_time_change(
+    year: int, time_zone: Optional[TimeZone] = None
+) -> Optional[datetime]:
+    dct = get_dls_fallback_time_change_by_year([year], time_zone=time_zone)
     if dct:
         val = list(dct.values())
         assert len(val) == 1
@@ -168,13 +190,14 @@ def get_dls_fallback_time_change_by_time_range(
 
     if from_timestamp.tzinfo != to_timestamp.tzinfo:
         raise ValueError(f"{from_timestamp=} and {to_timestamp=} do not have the same time zone.")
-    tz = from_timestamp.tzinfo
 
     tz_aware = True
     if from_timestamp.tzinfo is None:
         tz_aware = False
         from_timestamp = from_timestamp.replace(tzinfo=TimeZone.EPT.tz)
         to_timestamp = to_timestamp.replace(tzinfo=TimeZone.EPT.tz)
+
+    tz = from_timestamp.tzinfo
 
     # Format time range
     cur_utc = from_timestamp.astimezone(ZoneInfo("UTC"))
@@ -440,9 +463,9 @@ def create_adjustment_map_from_model_time(
     )
     freq = time_dimension_config.model.frequency
     model_time, prevailing_time, multipliers = [], [], []
-    for range in ranges:
-        cur_pt = range.start.to_pydatetime()
-        end_pt = range.end.to_pydatetime()
+    for rg in ranges:
+        cur_pt = rg.start.to_pydatetime()
+        end_pt = rg.end.to_pydatetime()
 
         if fb_adj == DaylightSavingFallBackType.INTERPOLATE:
             fb_times = get_dls_fallback_time_change_by_time_range(
@@ -450,8 +473,8 @@ def create_adjustment_map_from_model_time(
             )  # in PT
             fb_repeats = [0 for x in fb_times]
 
-        cur = range.start.to_pydatetime().astimezone(ZoneInfo("UTC"))
-        end = range.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + freq
+        cur = rg.start.to_pydatetime().astimezone(ZoneInfo("UTC"))
+        end = rg.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + freq
 
         while cur < end:
             multiplier = 1.0
@@ -477,7 +500,7 @@ def create_adjustment_map_from_model_time(
                         if fb_repeats[i] == 0:
                             frequency = timedelta(hours=0)
                             multiplier = 0.5
-                        if fb_repeats[i] == 1:
+                        elif fb_repeats[i] == 1:
                             model_ts = (
                                 (cur + timedelta(hours=1))
                                 .astimezone(TZ_pt.tz)

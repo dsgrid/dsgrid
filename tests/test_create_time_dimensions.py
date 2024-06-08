@@ -14,6 +14,7 @@ from pyspark.sql.types import (
     DoubleType,
 )
 
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dimensions_config import DimensionsConfigModel
 from dsgrid.utils.files import load_data
 from tests.data.dimension_models.minimal.models import DIMENSION_CONFIG_FILE_TIME
@@ -308,11 +309,11 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
             "fall_back_hour": "duplicate",
         }
     )
+    value_columns = {VALUE_COLUMN}
     df2 = config.convert_dataframe(
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=["value"],
+        value_columns,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -334,8 +335,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
     df3 = config.convert_dataframe(
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=["value"],
+        value_columns,
         wrap_time_allowed=True,
         time_based_data_adjustment=None,
     )
@@ -355,8 +355,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
     df2 = config.convert_dataframe(
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=["value"],
+        value_columns,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -389,11 +388,11 @@ def local_time_conversion_tests(config, project_time_dim, df):
             "fall_back_hour": "duplicate",
         }
     )
+    value_columns = {VALUE_COLUMN}
     df2 = config.convert_dataframe(
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=["value"],
+        value_columns,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -406,8 +405,7 @@ def local_time_conversion_tests(config, project_time_dim, df):
     df3 = config.convert_dataframe(
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=["value"],
+        value_columns,
         wrap_time_allowed=True,
         time_based_data_adjustment=None,
     )
@@ -726,11 +724,11 @@ def test_index_time_conversion_subhourly(
             "fall_back_hour": "duplicate",
         }
     )
+    value_columns = {VALUE_COLUMN}
     df2 = config.convert_dataframe(
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=["value"],
+        value_columns,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -754,8 +752,7 @@ def test_index_time_conversion_subhourly(
     df3 = config.convert_dataframe(
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=["value"],
+        value_columns,
         wrap_time_allowed=True,
         time_based_data_adjustment=None,
     )
@@ -774,8 +771,7 @@ def test_index_time_conversion_subhourly(
     df2 = config.convert_dataframe(
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=["value"],
+        value_columns,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )

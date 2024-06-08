@@ -58,12 +58,12 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             time_columns,
         )
 
-    def build_time_dataframe(self, model_years=None):
+    def build_time_dataframe(self):
         time_cols = self.get_load_data_time_columns()
         schema = StructType(
             [StructField(time_col, IntegerType(), False) for time_col in time_cols]
         )
-        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
+        model_time = self.list_expected_dataset_timestamps()
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
 
         return df_time
@@ -75,8 +75,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         self,
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=None,
+        value_columns: set[str],
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):
@@ -116,7 +115,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
         time_df = None
         try:
-            project_time_df = project_time_dim.build_time_dataframe(model_years=model_years)
+            project_time_df = project_time_dim.build_time_dataframe()
             map_time = "timestamp_to_map"
             project_time_df = shift_time_interval(
                 project_time_df,
@@ -165,11 +164,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return self._format_handler.get_frequency()
 
-    def get_time_ranges(self, model_years=None):
-        if model_years is not None:
-            # We do not expect to need this.
-            raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
-
+    def get_time_ranges(self):
         return self._format_handler.get_time_ranges(
             self.model.ranges,
             self.model.time_interval_type,
@@ -185,10 +180,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self, model_years=None):
-        if model_years is not None:
-            # We do not expect to need this.
-            raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
+    def list_expected_dataset_timestamps(self):
         return self._format_handler.list_expected_dataset_timestamps(self.model.ranges)
 
 

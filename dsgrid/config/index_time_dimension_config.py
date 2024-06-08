@@ -69,13 +69,13 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def build_time_dataframe(self, model_years=None):
+    def build_time_dataframe(self):
         # shows time as indices
 
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
-        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
+        model_time = self.list_expected_dataset_timestamps()
         schema = StructType(
             [
                 StructField(time_col, IntegerType(), False),
@@ -89,11 +89,12 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         self,
         df,
         project_time_dim,
-        value_columns,
-        model_years=None,
+        value_columns: set[str],
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):
+        if not value_columns:
+            raise Exception("convert_dataframe requires value_columns to be populated")
         df = self._map_index_time_to_datetime(
             df,
             project_time_dim,
@@ -155,7 +156,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
             )
             time_map = time_map.union(index_map.select(schema.names))
         df = df.join(time_map, on=[idx_col, "time_zone"], how="inner").drop(idx_col, "time_zone")
-        groupby = [x for x in df.columns if x not in value_columns + ["multiplier"]]
+        groupby = [x for x in df.columns if x not in value_columns.union({"multiplier"})]
         df = df.groupBy(*groupby).agg(
             *[F.sum(F.col(col) * F.col("multiplier")).alias(col) for col in value_columns]
         )
@@ -164,11 +165,11 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return self.model.frequency
 
-    def get_time_ranges(self, model_years=None):
+    def get_time_ranges(self):
         dt_ranges = self._create_represented_time_ranges()
         ranges = []
         time_ranges = self._build_time_ranges(
-            dt_ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
+            dt_ranges, self.model.str_format, tz=self.get_tzinfo()
         )
         for index_range, time_range in zip(self.model.ranges, time_ranges):
             ranges.append(
@@ -182,11 +183,11 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return ranges
 
-    def _get_represented_time_ranges(self, model_years=None):
+    def _get_represented_time_ranges(self):
         dt_ranges = self._create_represented_time_ranges()
         ranges = []
         for start, end in self._build_time_ranges(
-            dt_ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
+            dt_ranges, self.model.str_format, tz=self.get_tzinfo()
         ):
             ranges.append(
                 DatetimeRange(
@@ -207,16 +208,16 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self, model_years=None):
+    def list_expected_dataset_timestamps(self):
         # list timestamps as indices
         indices = []
-        for index_range in self.get_time_ranges(model_years=model_years):
+        for index_range in self.get_time_ranges():
             indices += [IndexTimestampType(x) for x in index_range.list_time_range()]
         return indices
 
-    def _list_represented_dataset_timestamps(self, model_years=None):
+    def _list_represented_dataset_timestamps(self):
         timestamps = []
-        for time_range in self.get_time_ranges(model_years=model_years):
+        for time_range in self.get_time_ranges():
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps
 

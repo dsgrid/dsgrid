@@ -14,7 +14,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def check_dataset_time_consistency(self, load_data_df, time_columns):
         pass
 
-    def build_time_dataframe(self, model_years=None):
+    def build_time_dataframe(self):
         raise NotImplementedError(f"Cannot build a time dataframe for a {type(self)}")
 
     # def build_time_dataframe_with_time_zone(self):
@@ -24,8 +24,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
         self,
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=None,
+        value_columns: set[str],
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):
@@ -34,7 +33,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return timedelta(days=0)
 
-    def get_time_ranges(self, model_years=None):
+    def get_time_ranges(self):
         return []
 
     def get_load_data_time_columns(self):
@@ -46,5 +45,5 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return None
 
-    def list_expected_dataset_timestamps(self, model_years=None):
+    def list_expected_dataset_timestamps(self):
         return []

@@ -534,21 +534,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         df = df.groupBy(*ordered_subset_columns(df, gcols)).agg(*agg_ops)
         return df.drop("fraction")
 
-    def _convert_time_before_project_mapping(self):
-        time_dim = self._config.get_dimension(DimensionType.TIME)
-        val = (
-            time_dim.model.is_time_zone_required_in_geography()
-            and not self._config.model.use_project_geography_time_zone
-        )
-        return val
-
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(
         self,
         load_data_df,
         project_config,
-        model_years=None,
-        value_columns=None,
+        value_columns: set[str],
     ):
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
@@ -562,13 +553,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
             load_data_df = add_time_zone(load_data_df, geography_dim)
 
-        if model_years is not None:
-            model_years = sorted(int(x) for x in model_years)
         load_data_df = time_dim.convert_dataframe(
             load_data_df,
             self._project_time_dim,
-            model_years=model_years,
-            value_columns=value_columns,
+            value_columns,
             wrap_time_allowed=wrap_time_allowed,
             time_based_data_adjustment=time_based_data_adjustment,
         )

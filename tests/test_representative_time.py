@@ -126,7 +126,8 @@ def test_time_mapping(
     df = df.withColumn("time_zone", F.lit("PacificPrevailing"))
     config = make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config()
     project_time_config = make_date_time_config()
-    mapped_df = config.convert_dataframe(df, project_time_config)
+    value_columns = {VALUE_COLUMN}
+    mapped_df = config.convert_dataframe(df, project_time_config, value_columns)
     timestamps = mapped_df.select("timestamp").distinct().sort("timestamp").collect()
     zi = ZoneInfo("EST")
     est_timestamps = [x.timestamp.astimezone(zi) for x in timestamps]

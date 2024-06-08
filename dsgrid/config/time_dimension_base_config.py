@@ -46,16 +46,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def build_time_dataframe(
-        self,
-        model_years: Optional[list[int]] = None,
-    ):
+    def build_time_dataframe(self):
         """Build time dimension as specified in config in a spark dataframe.
-
-        Parameters
-        ----------
-        model_years : None | list[int]
-            If specified, repeat the timestamps for each model year.
 
         Returns
         -------
@@ -80,8 +72,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         self,
         df,
         project_time_dim,
-        model_years: Optional[list[int]] = None,
-        value_columns: Optional[set[str]] = None,
+        value_columns: set[str],
         wrap_time_allowed: bool = False,
         time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
     ):
@@ -91,11 +82,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         ----------
         df : pyspark.sql.DataFrame
         project_time_dim : TimeDimensionBaseConfig
-        model_years : None | list[int]
-            Model years required by the project. Not required for all time dimension types.
-        value_columns : None | set[str]
-            Columns in the dataframe that represent load values. Not required for all time
-            dimension types.
+        value_columns : set[str]
+            Columns in the dataframe that represent load values.
         wrapped_time_allowed : bool
             Whether to allow time-wrapping to align time zone
         time_based_data_adjustment : None | TimeBasedDataAdjustmentModel
@@ -160,17 +148,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df.withColumnRenamed(time_cols[0], self.model.dimension_query_name)
 
     @abc.abstractmethod
-    def get_time_ranges(
-        self,
-        model_years: Optional[list[int]] = None,
-    ):
+    def get_time_ranges(self):
         """Return time ranges with timezone applied.
-
-        Parameters
-        ----------
-        model_years : None | list[int]
-            If set, replace the base year in the time ranges with these model years. In this case
-            each range must be in the same year.
 
         Returns
         -------
@@ -200,17 +179,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def list_expected_dataset_timestamps(
-        self,
-        model_years: Optional[list[int]] = None,
-    ):
+    def list_expected_dataset_timestamps(self):
         """Return a list of the timestamps expected in the load_data table.
-
-        Parameters
-        ----------
-        model_years : None | list[int]
-            If set, replace the base year in the time ranges with these model years. In this case
-            each range must be in the same year.
 
         Returns
         -------
@@ -321,7 +291,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         self,
         time_ranges: TimeRangeModel,
         str_format: str,
-        model_years: Optional[list[int]] = None,
         tz: Optional[TimeZone] = None,
     ):
-        return build_time_ranges(time_ranges, str_format, model_years=model_years, tz=tz)
+        return build_time_ranges(time_ranges, str_format, tz=tz)

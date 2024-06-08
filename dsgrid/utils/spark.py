@@ -8,7 +8,7 @@ import os
 import shutil
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterable, Type, Union, get_origin, get_args
+from typing import Any, Iterable, Type, Union, get_origin, get_args
 
 import pandas as pd
 import pyspark
@@ -25,7 +25,7 @@ from pyspark.sql.types import (
 from pyspark import SparkConf
 
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile, DSGInvalidParameter
 from dsgrid.loggers import disable_console_logging
 from dsgrid.utils.files import load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -156,6 +156,20 @@ def create_dataframe_from_ids(ids: Iterable[str], column: str) -> DataFrame:
 def create_dataframe_from_pandas(df):
     """Create a spark DataFrame from a pandas DataFrame."""
     return get_spark_session().createDataFrame(df)
+
+
+def create_dataframe_from_dicts(records: list[dict[str, Any]]) -> DataFrame:
+    """Create a spark DataFrame from a list of dictionaries.
+
+    The only purpose is to avoid pyright complaints about the type of the input to
+    spark.createDataFrame. This can be removed if pyspark fixes the type annotations.
+    """
+    if not records:
+        raise DSGInvalidParameter("records cannot be empty in create_dataframe_from_dicts")
+
+    data = [tuple(row.values()) for row in records]
+    columns = list(records[0].keys())
+    return get_spark_session().createDataFrame(data, columns)
 
 
 def try_read_dataframe(filename: Path, delete_if_invalid=True, **kwargs):

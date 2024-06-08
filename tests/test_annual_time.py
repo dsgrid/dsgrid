@@ -16,37 +16,34 @@ from dsgrid.dimension.time import (
     TimeIntervalType,
     TimeZone,
 )
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import create_dataframe_from_dicts
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def annual_dataframe():
-    spark = get_spark_session()
-    df = spark.createDataFrame(
-        [
-            {
-                "time_year": "2019",
-                "geography": "CO",
-                "electricity_sales": 602872.1,
-            },
-            {
-                "time_year": "2020",
-                "geography": "CO",
-                "electricity_sales": 702872.1,
-            },
-            {
-                "time_year": "2021",
-                "geography": "CO",
-                "electricity_sales": 802872.1,
-            },
-            {
-                "time_year": "2022",
-                "geography": "CO",
-                "electricity_sales": 902872.1,
-            },
-        ]
-    )
-    yield df
+    data = [
+        {
+            "time_year": 2019,
+            "geography": "CO",
+            "electricity_sales": 602872.1,
+        },
+        {
+            "time_year": 2020,
+            "geography": "CO",
+            "electricity_sales": 702872.1,
+        },
+        {
+            "time_year": 2021,
+            "geography": "CO",
+            "electricity_sales": 802872.1,
+        },
+        {
+            "time_year": 2022,
+            "geography": "CO",
+            "electricity_sales": 902872.1,
+        },
+    ]
+    yield create_dataframe_from_dicts(data).cache()
 
 
 @pytest.fixture
@@ -95,46 +92,45 @@ def test_map_annual_time_measured_to_datetime(
     annual_dataframe, annual_time_dimension, date_time_dimension
 ):
     annual_time_dimension.model.measurement_type = MeasurementType.MEASURED
-    model_years = [2020, 2024]
     df = annual_time_dimension.map_annual_time_measured_to_datetime(
-        annual_dataframe, date_time_dimension, model_years
+        annual_dataframe, date_time_dimension
     )
-    assert df.count() == 168
-    values = df.select("electricity_sales").distinct().collect()
-    assert len(values) == 1
-    assert (
-        values[0].electricity_sales
-        == annual_dataframe.filter("time_year == 2020").collect()[0].electricity_sales
-    )
-    mapped_model_years = (
-        df.withColumn("year", F.year(df.timestamp)).select("year").distinct().collect()
-    )
-    assert len(mapped_model_years) == 1
-    assert mapped_model_years[0].year == 2020
+    expected_by_year = {x.time_year: x.electricity_sales for x in annual_dataframe.collect()}
+    _check_values(annual_dataframe, date_time_dimension, df, expected_by_year)
 
 
 def test_map_annual_time_total_to_datetime(
     annual_dataframe, annual_time_dimension, date_time_dimension
 ):
     annual_time_dimension.model.measurement_type = MeasurementType.TOTAL
-    model_years = [2020, 2024]
     value_columns = ["electricity_sales"]
     df = annual_time_dimension.map_annual_total_to_datetime(
-        annual_dataframe, date_time_dimension, model_years, value_columns
+        annual_dataframe, date_time_dimension, value_columns
     )
-    assert df.count() == 168
-    values = df.select("electricity_sales").distinct().collect()
-    assert len(values) == 1
-    num_intervals_2020 = (
-        366 * 24 / (date_time_dimension.model.frequency.total_seconds() / (60 * 60))
+    expected_by_year = {
+        x.time_year: x.electricity_sales / (366 * 24) for x in annual_dataframe.collect()
+    }
+    _check_values(annual_dataframe, date_time_dimension, df, expected_by_year)
+
+
+def _check_values(annual_dataframe, date_time_dimension, df, expected_by_year):
+    num_rows = annual_dataframe.count()
+    num_timestamps = 24 * 7
+    assert df.count() == num_rows * num_timestamps
+    values = df.select("time_year", "electricity_sales").distinct().collect()
+    assert len(values) == num_rows
+    by_year = {x.time_year: x.electricity_sales for x in values}
+    assert len(by_year) == len(expected_by_year)
+    for year in by_year:
+        assert by_year[year] == expected_by_year[year]
+
+    time_col = date_time_dimension.get_load_data_time_columns()[0]
+    timestamps = (
+        df.groupBy("time_year")
+        .agg(F.count(time_col).alias("count_timestamps"))
+        .select("count_timestamps")
+        .distinct()
+        .collect()
     )
-    assert (
-        values[0].electricity_sales
-        == annual_dataframe.filter("time_year == 2020").collect()[0].electricity_sales
-        / num_intervals_2020
-    )
-    mapped_model_years = (
-        df.withColumn("year", F.year(df.timestamp)).select("year").distinct().collect()
-    )
-    assert len(mapped_model_years) == 1
-    assert mapped_model_years[0].year == 2020
+    assert len(timestamps) == 1
+    assert timestamps[0]["count_timestamps"] == num_timestamps

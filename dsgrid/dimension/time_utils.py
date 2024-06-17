@@ -14,9 +14,10 @@ from pyspark.sql.types import (
 import pandas as pd
 
 from dsgrid.dimension.time import (
-    make_time_range,
+    DatetimeRange,
+    IndexTimeRange,
     TimeZone,
-    DataAdjustmentModel,
+    TimeBasedDataAdjustmentModel,
     DaylightSavingFallBackType,
     LeapDayAdjustmentType,
     TimeDimensionType,
@@ -269,13 +270,11 @@ def get_time_ranges(
     time_dimension_config,  #: DateTimeDimensionConfig,
     model_years: Optional[list[int]] = None,
     timezone: TimeZone = None,
-    data_adjustment: DataAdjustmentModel = None,
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
     dim_model = time_dimension_config.model
     if timezone is None:
         timezone = time_dimension_config.get_tzinfo()
-    if data_adjustment is None:
-        data_adjustment = DataAdjustmentModel()
 
     if dim_model.time_type == TimeDimensionType.DATETIME:
         dt_ranges = dim_model.ranges
@@ -290,12 +289,11 @@ def get_time_ranges(
         dt_ranges, dim_model.str_format, model_years=model_years, tz=timezone
     ):
         ranges.append(
-            make_time_range(
+            DatetimeRange(
                 start=start,
                 end=end,
                 frequency=dim_model.frequency,
-                data_adjustment=data_adjustment,
-                time_interval_type=dim_model.time_interval_type,
+                time_based_data_adjustment=time_based_data_adjustment,
             )
         )
 
@@ -306,13 +304,11 @@ def get_index_ranges(
     time_dimension_config,  #: IndexTimeDimensionConfig,
     model_years: Optional[list[int]] = None,
     timezone: TimeZone = None,
-    data_adjustment: DataAdjustmentModel = None,
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
     dim_model = time_dimension_config.model
     if timezone is None:
         timezone = dim_model.get_tzinfo()
-    if data_adjustment is None:
-        data_adjustment = DataAdjustmentModel()
     dt_ranges = time_dimension_config._create_represented_time_ranges()
     ranges = []
     time_ranges = build_time_ranges(
@@ -320,12 +316,11 @@ def get_index_ranges(
     )
     for index_range, time_range in zip(dim_model.ranges, time_ranges):
         ranges.append(
-            make_time_range(
+            IndexTimeRange(
                 start=time_range[0],
                 end=time_range[1],
                 frequency=dim_model.frequency,
-                data_adjustment=data_adjustment,
-                time_interval_type=dim_model.time_interval_type,
+                time_based_data_adjustment=time_based_data_adjustment,
                 start_index=index_range.start,
             )
         )
@@ -337,14 +332,14 @@ def list_timestamps(
     time_dimension_config,  #: DateTimeDimensionConfig,
     model_years: Optional[list[int]] = None,
     timezone: TimeZone = None,
-    data_adjustment: DataAdjustmentModel = None,
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
     timestamps = []
     for time_range in get_time_ranges(
         time_dimension_config,
         model_years=model_years,
         timezone=timezone,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     ):
         timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
     return timestamps
@@ -354,14 +349,14 @@ def list_time_indices(
     time_dimension_config,  #: IndexTimeDimensionConfig,
     model_years: Optional[list[int]] = None,
     timezone: TimeZone = None,
-    data_adjustment: DataAdjustmentModel = None,
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
     indices = []
     for index_range in get_index_ranges(
         time_dimension_config,
         model_years=model_years,
         timezone=timezone,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     ):
         indices += [IndexTimestampType(x) for x in index_range.list_time_range()]
     return indices
@@ -371,9 +366,8 @@ def build_index_time_map(
     time_dimension_config,  #: IndexTimeDimensionConfig,
     model_years=None,
     timezone=None,
-    data_adjustment=None,
+    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
 ):
-
     time_col = time_dimension_config.get_load_data_time_columns()
     assert len(time_col) == 1, time_col
     time_col = time_col[0]
@@ -381,13 +375,13 @@ def build_index_time_map(
         time_dimension_config,
         model_years=model_years,
         timezone=timezone,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     timestamps = list_timestamps(
         time_dimension_config,
         model_years=model_years,
         timezone=timezone,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     ts_time_col = timestamps[0]._fields[0]
     schema = StructType(
@@ -405,7 +399,7 @@ def build_index_time_map(
 
 
 def build_datetime_dataframe(
-    time_dimension_config, model_years=None, timezone=None, data_adjustment=None
+    time_dimension_config, model_years=None, timezone=None, time_based_data_adjustment=None
 ):
 
     time_col = time_dimension_config.get_load_data_time_columns()
@@ -415,7 +409,7 @@ def build_datetime_dataframe(
         time_dimension_config,
         model_years=model_years,
         timezone=timezone,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     schema = StructType([StructField(time_col, TimestampType(), False)])
     df_time = get_spark_session().createDataFrame(model_time, schema=schema)
@@ -423,7 +417,7 @@ def build_datetime_dataframe(
 
 
 def build_index_time_dataframe(
-    time_dimension_config, model_years=None, timezone=None, data_adjustment=None
+    time_dimension_config, model_years=None, timezone=None, time_based_data_adjustment=None
 ):
 
     time_col = time_dimension_config.get_load_data_time_columns()
@@ -433,7 +427,7 @@ def build_index_time_dataframe(
         time_dimension_config,
         model_years=model_years,
         timezone=timezone,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     schema = StructType([StructField(time_col, IntegerType(), False)])
     df_time = get_spark_session().createDataFrame(model_time, schema=schema)
@@ -442,7 +436,7 @@ def build_index_time_dataframe(
 
 def create_adjustment_map_from_model_time(
     time_dimension_config,  #: IndexTimeDimensionConfig,
-    data_adjustment: DataAdjustmentModel,
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel,
     time_zone: TimeZone,
     model_years: Optional[list[int]] = None,
 ):
@@ -450,16 +444,15 @@ def create_adjustment_map_from_model_time(
     time_col = list(DatetimeTimestampType._fields)
     assert len(time_col) == 1, time_col
     time_col = time_col[0]
-
-    ld_adj = data_adjustment.leap_day_adjustment
-    fb_adj = data_adjustment.daylight_saving_adjustment.fall_back_hour
+    ld_adj = time_based_data_adjustment.leap_day_adjustment
+    fb_adj = time_based_data_adjustment.daylight_saving_adjustment.fall_back_hour
 
     TZ_st, TZ_pt = time_zone.get_standard_time(), time_zone.get_prevailing_time()
     ranges = get_time_ranges(
         time_dimension_config,
         model_years=model_years,
         timezone=TZ_pt.tz,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     freq = time_dimension_config.model.frequency
     model_time, prevailing_time, multipliers = [], [], []

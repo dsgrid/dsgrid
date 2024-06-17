@@ -10,7 +10,12 @@ from pyspark.sql.types import (
 )
 import pyspark.sql.functions as F
 
-from dsgrid.dimension.time import make_time_range, TimeZone, DataAdjustmentModel
+from dsgrid.dimension.time import (
+    IndexTimeRange,
+    DatetimeRange,
+    TimeZone,
+    TimeBasedDataAdjustmentModel,
+)
 from dsgrid.dimension.time_utils import (
     create_adjustment_map_from_model_time,
     build_index_time_map,
@@ -64,15 +69,13 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def build_time_dataframe(self, model_years=None, data_adjustment=None):
+    def build_time_dataframe(self, model_years=None):
         # shows time as indices
 
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
-        model_time = self.list_expected_dataset_timestamps(
-            model_years=model_years, data_adjustment=data_adjustment
-        )
+        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
         schema = StructType(
             [
                 StructField(time_col, IntegerType(), False),
@@ -86,16 +89,30 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         self,
         df,
         project_time_dim,
+        value_columns,
         model_years=None,
-        value_columns=None,
         wrap_time_allowed=False,
-        data_adjustment=None,
+        time_based_data_adjustment=None,
     ):
-        if data_adjustment is None:
-            data_adjustment = DataAdjustmentModel()
-        if value_columns is None:
-            value_columns = []
+        df = self._map_index_time_to_datetime(
+            df,
+            project_time_dim,
+            value_columns,
+            time_based_data_adjustment=time_based_data_adjustment,
+        )
+        df = self._convert_time_to_project_time(
+            df,
+            project_time_dim=project_time_dim,
+            wrap_time=wrap_time_allowed,
+        )
 
+        return df
+
+    def _map_index_time_to_datetime(
+        self, df, project_time_dim, value_columns, time_based_data_adjustment=None
+    ):
+        if time_based_data_adjustment is None:
+            time_based_data_adjustment = TimeBasedDataAdjustmentModel()
         idx_col = self.get_load_data_time_columns()
         assert len(idx_col) == 1, idx_col
         idx_col = idx_col[0]
@@ -125,12 +142,12 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         for tz, tz2 in zip(geo_tz, geo_tz2):
             # table is built in standard time but listed as prevailing
             index_map = build_index_time_map(
-                self, model_years=model_years, timezone=tz2.tz, data_adjustment=data_adjustment
+                self, timezone=tz2.tz, time_based_data_adjustment=time_based_data_adjustment
             )
             index_map = index_map.withColumn("time_zone", F.lit(tz.value))
 
-            # data_adjustment mapping table
-            table = create_adjustment_map_from_model_time(self, data_adjustment, tz)
+            # time_based_data_adjustment mapping table
+            table = create_adjustment_map_from_model_time(self, time_based_data_adjustment, tz)
             index_map = (
                 index_map.selectExpr(idx_col, "time_zone", f"{time_col} AS model_time")
                 .join(table, ["model_time"], "right")
@@ -142,16 +159,12 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         df = df.groupBy(*groupby).agg(
             *[F.sum(F.col(col) * F.col("multiplier")).alias(col) for col in value_columns]
         )
-        df = self._convert_time_to_project_time_interval(
-            df=df, project_time_dim=project_time_dim, wrap_time=wrap_time_allowed
-        )
-
         return df
 
     def get_frequency(self):
         return self.model.frequency
 
-    def get_time_ranges(self, model_years=None, data_adjustment=None):
+    def get_time_ranges(self, model_years=None):
         dt_ranges = self._create_represented_time_ranges()
         ranges = []
         time_ranges = self._build_time_ranges(
@@ -159,31 +172,27 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         )
         for index_range, time_range in zip(self.model.ranges, time_ranges):
             ranges.append(
-                make_time_range(
+                IndexTimeRange(
                     start=time_range[0],
                     end=time_range[1],
                     frequency=self.model.frequency,
-                    data_adjustment=data_adjustment,
-                    time_interval_type=self.model.time_interval_type,
                     start_index=index_range.start,
                 )
             )
 
         return ranges
 
-    def _get_represented_time_ranges(self, model_years=None, data_adjustment=None):
+    def _get_represented_time_ranges(self, model_years=None):
         dt_ranges = self._create_represented_time_ranges()
         ranges = []
         for start, end in self._build_time_ranges(
             dt_ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
         ):
             ranges.append(
-                make_time_range(
+                DatetimeRange(
                     start=start,
                     end=end,
                     frequency=self.model.frequency,
-                    data_adjustment=data_adjustment,
-                    time_interval_type=self.model.time_interval_type,
                 )
             )
 
@@ -198,20 +207,16 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self, model_years=None, data_adjustment=None):
+    def list_expected_dataset_timestamps(self, model_years=None):
         # list timestamps as indices
         indices = []
-        for index_range in self.get_time_ranges(
-            model_years=model_years, data_adjustment=data_adjustment
-        ):
+        for index_range in self.get_time_ranges(model_years=model_years):
             indices += [IndexTimestampType(x) for x in index_range.list_time_range()]
         return indices
 
-    def _list_represented_dataset_timestamps(self, model_years=None, data_adjustment=None):
+    def _list_represented_dataset_timestamps(self, model_years=None):
         timestamps = []
-        for time_range in self.get_time_ranges(
-            model_years=model_years, data_adjustment=data_adjustment
-        ):
+        for time_range in self.get_time_ranges(model_years=model_years):
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps
 

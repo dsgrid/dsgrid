@@ -22,7 +22,6 @@ from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dimension.time import DataAdjustmentModel
 
 
 logger = logging.getLogger(__name__)
@@ -58,14 +57,12 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             time_columns,
         )
 
-    def build_time_dataframe(self, model_years=None, data_adjustment=None):
+    def build_time_dataframe(self, model_years=None):
         time_cols = self.get_load_data_time_columns()
         schema = StructType(
             [StructField(time_col, IntegerType(), False) for time_col in time_cols]
         )
-        model_time = self.list_expected_dataset_timestamps(
-            model_years=model_years, data_adjustment=data_adjustment
-        )
+        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
 
         return df_time
@@ -80,8 +77,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         model_years=None,
         value_columns=None,
         wrap_time_allowed=False,
-        data_adjustment=None,
+        time_based_data_adjustment=None,
     ):
+        """Time interval type alignment is done in the mapping process."""
         if project_time_dim is None:
             return df
         if (
@@ -117,9 +115,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
         time_df = None
         try:
-            project_time_df = project_time_dim.build_time_dataframe(
-                model_years=model_years, data_adjustment=data_adjustment
-            )
+            project_time_df = project_time_dim.build_time_dataframe(model_years=model_years)
             map_time = "timestamp_to_map"
             project_time_df = self._shift_time_interval(
                 project_time_df,
@@ -168,7 +164,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return self._format_handler.get_frequency()
 
-    def get_time_ranges(self, model_years=None, data_adjustment=None):
+    def get_time_ranges(self, model_years=None):
         if model_years is not None:
             # We do not expect to need this.
             raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
@@ -177,7 +173,6 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             self.model.ranges,
             self.model.time_interval_type,
             self.get_tzinfo(),
-            data_adjustment=data_adjustment,
         )
 
     def get_load_data_time_columns(self):
@@ -189,7 +184,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self, model_years=None, data_adjustment=None):
+    def list_expected_dataset_timestamps(self, model_years=None):
         if model_years is not None:
             # We do not expect to need this.
             raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
@@ -305,11 +300,9 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     def get_frequency(self):
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, time_interval_type, _, data_adjustment=None):
+    def get_time_ranges(self, ranges, time_interval_type, _):
         # TODO: This method may have some problems but is currently unused.
         # How to handle year? Leap year?
-        if data_adjustment is None:
-            data_adjustment = DataAdjustmentModel()
         time_ranges = []
         for model in ranges:
             if model.end == 2:
@@ -320,8 +313,6 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
                     start=pd.Timestamp(datetime(year=1970, month=model.start, day=1)),
                     end=pd.Timestamp(datetime(year=1970, month=model.end, day=last_day, hour=23)),
                     frequency=timedelta(hours=1),
-                    data_adjustment=data_adjustment,
-                    time_interval_type=time_interval_type,
                 )
             )
 
@@ -356,7 +347,7 @@ class OneWeekdayDayAndWeekendDayPerMonthByHourHandler(RepresentativeTimeFormatHa
     def get_frequency(self):
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, time_interval_type, _, data_adjustment=None):
+    def get_time_ranges(self, ranges, time_interval_type, _):
         raise NotImplementedError("get_time_ranges")
 
     @staticmethod

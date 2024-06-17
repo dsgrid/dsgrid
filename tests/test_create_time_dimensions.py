@@ -26,7 +26,7 @@ from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
     TimeZone,
-    DataAdjustmentModel,
+    TimeBasedDataAdjustmentModel,
 )
 from dsgrid.dimension.time_utils import (
     get_dls_springforward_time_change,
@@ -37,6 +37,7 @@ from dsgrid.dimension.time_utils import (
     get_dls_fallback_time_change_by_time_range,
     create_adjustment_map_from_model_time,
     build_index_time_map,
+    get_time_ranges,
 )
 from dsgrid.utils.spark import get_spark_session
 
@@ -207,11 +208,11 @@ def df_date_time():
     yield df
 
 
-def check_date_range_creation(time_dimension_model, data_adjustment=None):
-    if data_adjustment is None:
-        data_adjustment = DataAdjustmentModel()
+def check_date_range_creation(time_dimension_model, time_based_data_adjustment=None):
+    if time_based_data_adjustment is None:
+        time_based_data_adjustment = TimeBasedDataAdjustmentModel()
     config = DateTimeDimensionConfig(time_dimension_model)  # TimeDimensionConfig
-    time_range = config.get_time_ranges(data_adjustment=data_adjustment)
+    time_range = get_time_ranges(config, time_based_data_adjustment=time_based_data_adjustment)
     tz = config.get_tzinfo()
 
     # create date range for time dimension
@@ -241,7 +242,7 @@ def check_date_range_creation(time_dimension_model, data_adjustment=None):
     ts = pd.date_range(start, end, freq=freq, tz=tz).to_list()
 
     # make necessary data adjustments
-    ld_adj = data_adjustment.leap_day_adjustment
+    ld_adj = time_based_data_adjustment.leap_day_adjustment
     ts_to_drop, ts_to_add = [], []
 
     years = set([t.year for t in ts])
@@ -300,8 +301,8 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
     n_df = df.count()
 
     # [1] Duplicating fallback 1AM
-    # This has the same behavior as data_adjustment = None
-    data_adjustment = DataAdjustmentModel(
+    # This has the same behavior as time_based_data_adjustment = None
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
             "fall_back_hour": "duplicate",
@@ -313,7 +314,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         model_years=None,
         value_columns=["value"],
         wrap_time_allowed=True,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
@@ -336,16 +337,16 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         model_years=None,
         value_columns=["value"],
         wrap_time_allowed=True,
-        data_adjustment=None,
+        time_based_data_adjustment=None,
     )
     f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
     print(f3.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2.compare(f3)) == 0
-    ), f"LocalModel_time.convert_dataframe() with data_adjustment=None should have the same behavior as with {data_adjustment=}"
+    ), f"LocalModel_time.convert_dataframe() with time_based_data_adjustment=None should have the same behavior as with {time_based_data_adjustment=}"
 
     # [2] Interpolating fallback between 1 and 2AM
-    data_adjustment = DataAdjustmentModel(
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
             "fall_back_hour": "interpolate",
@@ -357,7 +358,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         model_years=None,
         value_columns=["value"],
         wrap_time_allowed=True,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
@@ -381,8 +382,8 @@ def local_time_conversion_tests(config, project_time_dim, df):
     values = np.arange(0.0, 8784.0).tolist()
 
     # [1] Duplicating fallback 1AM
-    # This has the same behavior as data_adjustment = None
-    data_adjustment = DataAdjustmentModel(
+    # This has the same behavior as time_based_data_adjustment = None
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
             "fall_back_hour": "duplicate",
@@ -394,7 +395,7 @@ def local_time_conversion_tests(config, project_time_dim, df):
         model_years=None,
         value_columns=["value"],
         wrap_time_allowed=True,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
     print(f2.loc[1680:7396])  # daylight saving transition
@@ -408,13 +409,13 @@ def local_time_conversion_tests(config, project_time_dim, df):
         model_years=None,
         value_columns=["value"],
         wrap_time_allowed=True,
-        data_adjustment=None,
+        time_based_data_adjustment=None,
     )
     f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
     print(f3.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2.compare(f3)) == 0
-    ), f"Local_time.convert_dataframe() with data_adjustment=None should have the same behavior as with {data_adjustment=}"
+    ), f"Local_time.convert_dataframe() with time_based_data_adjustment=None should have the same behavior as with {time_based_data_adjustment=}"
 
 
 # -- Test funcs --
@@ -570,32 +571,38 @@ def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):
         "spring_forward_hour": "none",
         "fall_back_hour": "none",
     }
-    data_adjustment = DataAdjustmentModel(
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         leap_day_adjustment=LeapDayAdjustmentType.DROP_DEC31,
         daylight_saving_adjustment=daylight_saving_adjustment,
     )
-    check_date_range_creation(time_dimension_model0, data_adjustment=data_adjustment)
+    check_date_range_creation(
+        time_dimension_model0, time_based_data_adjustment=time_based_data_adjustment
+    )
 
-    data_adjustment = DataAdjustmentModel(
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         leap_day_adjustment=LeapDayAdjustmentType.DROP_JAN1,
         daylight_saving_adjustment=daylight_saving_adjustment,
     )
-    check_date_range_creation(time_dimension_model0, data_adjustment=data_adjustment)
+    check_date_range_creation(
+        time_dimension_model0, time_based_data_adjustment=time_based_data_adjustment
+    )
 
-    data_adjustment = DataAdjustmentModel(
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         leap_day_adjustment=LeapDayAdjustmentType.DROP_FEB29,
         daylight_saving_adjustment=daylight_saving_adjustment,
     )
-    check_date_range_creation(time_dimension_model0, data_adjustment=data_adjustment)
+    check_date_range_creation(
+        time_dimension_model0, time_based_data_adjustment=time_based_data_adjustment
+    )
 
 
 def test_data_adjustment_mapping_table(index_time_dimension_model):
-    """Test data_adjustment mapping tables"""
+    """Test time_based_data_adjustment mapping tables"""
     time_zone = TimeZone.MST
     config = IndexTimeDimensionConfig(index_time_dimension_model)
 
     # [1] Duplicating fallback 1AM
-    data_adjustment = DataAdjustmentModel(
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
             "fall_back_hour": "duplicate",
@@ -604,11 +611,11 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
 
     # index-time mapping table
     table1 = build_index_time_map(
-        config, timezone=time_zone.tz, data_adjustment=data_adjustment
+        config, timezone=time_zone.tz, time_based_data_adjustment=time_based_data_adjustment
     ).withColumn("time_zone", F.lit(time_zone.value))
-    # data_adjustment mapping table
+    # time_based_data_adjustment mapping table
     table2 = create_adjustment_map_from_model_time(
-        config, data_adjustment=data_adjustment, time_zone=time_zone
+        config, time_based_data_adjustment=time_based_data_adjustment, time_zone=time_zone
     )
     joined_table = table1.selectExpr("time_index", "timestamp as model_time").join(
         table2, ["model_time"], "right"
@@ -627,7 +634,7 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     assert multipliers == [1 for x in multipliers], "multiplier column is not all 1."
 
     # [2] Interpolating fallback between 1 and 2AM
-    data_adjustment = DataAdjustmentModel(
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
             "fall_back_hour": "interpolate",
@@ -636,11 +643,11 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
 
     # index-time mapping table
     table1 = build_index_time_map(
-        config, timezone=time_zone.tz, data_adjustment=data_adjustment
+        config, timezone=time_zone.tz, time_based_data_adjustment=time_based_data_adjustment
     ).withColumn("time_zone", F.lit(time_zone.tz_name))
-    # data_adjustment mapping table
+    # time_based_data_adjustment mapping table
     table2 = create_adjustment_map_from_model_time(
-        config, data_adjustment=data_adjustment, time_zone=time_zone
+        config, time_based_data_adjustment=time_based_data_adjustment, time_zone=time_zone
     )
     joined_table = table1.selectExpr("time_index", "timestamp as model_time").join(
         table2, ["model_time"], "right"
@@ -676,7 +683,7 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
 
 
 def test_index_time_conversion(index_time_dimension_model, time_dimension_model0, df_index_time):
-    """test industrial time with data_adjustment"""
+    """test industrial time with time_based_data_adjustment"""
     df = df_index_time
     project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
     config = IndexTimeDimensionConfig(index_time_dimension_model)
@@ -702,7 +709,7 @@ def test_index_time_conversion_subhourly(
     datetime_eq_index_time_model_subhourly,
     df_index_time_subhourly,
 ):
-    """test subhourly industrial time with data_adjustment"""
+    """test subhourly industrial time with time_based_data_adjustment"""
     df = df_index_time_subhourly
     project_time_dim = DateTimeDimensionConfig(datetime_eq_index_time_model_subhourly)
     config = IndexTimeDimensionConfig(index_time_dimension_model_subhourly)
@@ -712,8 +719,8 @@ def test_index_time_conversion_subhourly(
     n_df = df.count()
 
     # [1] Duplicating fallback 1AM
-    # This has the same behavior as data_adjustment = None
-    data_adjustment = DataAdjustmentModel(
+    # This has the same behavior as time_based_data_adjustment = None
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
             "fall_back_hour": "duplicate",
@@ -725,7 +732,7 @@ def test_index_time_conversion_subhourly(
         model_years=None,
         value_columns=["value"],
         wrap_time_allowed=True,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
@@ -750,15 +757,15 @@ def test_index_time_conversion_subhourly(
         model_years=None,
         value_columns=["value"],
         wrap_time_allowed=True,
-        data_adjustment=None,
+        time_based_data_adjustment=None,
     )
     f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
     assert (
         len(f2.compare(f3)) == 0
-    ), f"LocalModel_time.convert_dataframe() with data_adjustment=None should have the same behavior as with {data_adjustment=}"
+    ), f"LocalModel_time.convert_dataframe() with time_based_data_adjustment=None should have the same behavior as with {time_based_data_adjustment=}"
 
     # [2] Interpolating fallback between 1 and 2AM
-    data_adjustment = DataAdjustmentModel(
+    time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
             "fall_back_hour": "interpolate",
@@ -770,7 +777,7 @@ def test_index_time_conversion_subhourly(
         model_years=None,
         value_columns=["value"],
         wrap_time_allowed=True,
-        data_adjustment=data_adjustment,
+        time_based_data_adjustment=time_based_data_adjustment,
     )
     # df2.sort(F.col("timestamp"), F.col("geography")).show()
 

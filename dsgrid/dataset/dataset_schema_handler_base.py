@@ -552,8 +552,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
     ):
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
-        data_adjustment = input_dataset_model.data_adjustment
-        self._validate_daylight_saving_adjustment(data_adjustment)
+        time_based_data_adjustment = input_dataset_model.time_based_data_adjustment
+        self._validate_daylight_saving_adjustment(time_based_data_adjustment)
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if time_dim.model.is_time_zone_required_in_geography():
             if self._config.model.use_project_geography_time_zone:
@@ -570,7 +570,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             model_years=model_years,
             value_columns=value_columns,
             wrap_time_allowed=wrap_time_allowed,
-            data_adjustment=data_adjustment,
+            time_based_data_adjustment=time_based_data_adjustment,
         )
 
         if time_dim.model.is_time_zone_required_in_geography():
@@ -578,12 +578,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         return load_data_df
 
-    def _validate_daylight_saving_adjustment(self, data_adjustment):
-        if data_adjustment.daylight_saving_adjustment == DaylightSavingAdjustmentModel():
+    def _validate_daylight_saving_adjustment(self, time_based_data_adjustment):
+        if (
+            time_based_data_adjustment.daylight_saving_adjustment
+            == DaylightSavingAdjustmentModel()
+        ):
             return
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if time_dim.model.time_type != TimeDimensionType.INDEX:
-            msg = f"data_adjustment.daylight_saving_adjustment does not apply to {time_dim.time_dim.model.time_type=} time type, it applies to INDEX time type only."
+            msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.time_dim.model.time_type=} time type, it applies to INDEX time type only."
             logger.warning(msg)
 
     def _remove_non_dimension_columns(self, df: DataFrame) -> DataFrame:

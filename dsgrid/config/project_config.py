@@ -51,7 +51,7 @@ from .dimensions import (
     generate_dimension_query_name,
 )
 from dsgrid.dimension.time import (
-    DataAdjustmentModel,
+    TimeBasedDataAdjustmentModel,
     DaylightSavingSpringForwardType,
     DaylightSavingFallBackType,
 )
@@ -571,27 +571,27 @@ class InputDatasetModel(DSGBaseModel):
             default=False,
         ),
     ]
-    data_adjustment: Annotated[
-        DataAdjustmentModel,
+    time_based_data_adjustment: Annotated[
+        TimeBasedDataAdjustmentModel,
         Field(
-            title="data_adjustment",
+            title="time_based_data_adjustment",
             description="Defines how the rest of the dataframe is adjusted with respect to time. "
             "E.g., when drop associated data when dropping a leap day timestamp.",
-            default=DataAdjustmentModel(),
+            default=TimeBasedDataAdjustmentModel(),
         ),
     ]
 
-    @field_validator("data_adjustment")
+    @field_validator("time_based_data_adjustment")
     @classmethod
-    def check_data_adjustment(cls, data_adjustment):
+    def check_data_adjustment(cls, time_based_data_adjustment):
         """Check daylight saving adjustment"""
-        sfh = data_adjustment.daylight_saving_adjustment.spring_forward_hour
-        fbh = data_adjustment.daylight_saving_adjustment.fall_back_hour
+        sfh = time_based_data_adjustment.daylight_saving_adjustment.spring_forward_hour
+        fbh = time_based_data_adjustment.daylight_saving_adjustment.fall_back_hour
         if fbh == DaylightSavingFallBackType.NONE and sfh == DaylightSavingSpringForwardType.NONE:
-            return data_adjustment
+            return time_based_data_adjustment
         if fbh != DaylightSavingFallBackType.NONE and sfh != DaylightSavingSpringForwardType.NONE:
-            return data_adjustment
-        msg = f"mismatch between spring_forward_hour and fall_back_hour, {data_adjustment=}."
+            return time_based_data_adjustment
+        msg = f"mismatch between spring_forward_hour and fall_back_hour, {time_based_data_adjustment=}."
         raise ValueError(msg)
 
     #  TODO: write validation that if daylight_saving_adjustment is specified, dataset time config must be IndexTimeDimensionConfig

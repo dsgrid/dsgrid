@@ -5,6 +5,7 @@ import logging
 from typing_extensions import Annotated
 from pydantic import Field
 from enum import Enum
+from typing import Optional
 
 from dsgrid.data_models import DSGEnum, EnumValue, DSGBaseModel
 
@@ -327,7 +328,7 @@ class DaylightSavingAdjustmentModel(DSGBaseModel):
     ]
 
 
-class DataAdjustmentModel(DSGBaseModel):
+class TimeBasedDataAdjustmentModel(DSGBaseModel):
     """Defines how data needs to be adjusted with respect to time.
     For leap day adjustment, up to one full day of timestamps and data are dropped.
     For daylight savings, the dataframe is adjusted alongside the timestamps.
@@ -369,19 +370,21 @@ class DatetimeRange:
         start,
         end,
         frequency,
-        data_adjustment: DataAdjustmentModel,
-        time_interval_type: TimeIntervalType,
+        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
     ):
+        if time_based_data_adjustment is None:
+            time_based_data_adjustment = TimeBasedDataAdjustmentModel()
         self.start = start
         self.end = end
         self.tzinfo = start.tzinfo
         self.frequency = frequency
-        self.leap_day_adjustment = data_adjustment.leap_day_adjustment
+        self.leap_day_adjustment = time_based_data_adjustment.leap_day_adjustment
         self.dls_springforward_adjustment = (
-            data_adjustment.daylight_saving_adjustment.spring_forward_hour
+            time_based_data_adjustment.daylight_saving_adjustment.spring_forward_hour
         )
-        self.dls_fallback_adjustment = data_adjustment.daylight_saving_adjustment.fall_back_hour
-        self.time_interval_type = time_interval_type
+        self.dls_fallback_adjustment = (
+            time_based_data_adjustment.daylight_saving_adjustment.fall_back_hour
+        )
 
     def __repr__(self):
         return (
@@ -389,8 +392,7 @@ class DatetimeRange:
             + f"(start={self.start}, end={self.end}, frequency={self.frequency}, "
             + f"leap_day_adjustment={self.leap_day_adjustment}, "
             + f"dls_springforward_adjustment={self.dls_springforward_adjustment}, "
-            + f"dls_fallback_adjustment={self.dls_fallback_adjustment}, "
-            + f"time_interval_type={self.time_interval_type})"
+            + f"dls_fallback_adjustment={self.dls_fallback_adjustment}."
         )
 
     def __str__(self):
@@ -471,11 +473,12 @@ class IndexTimeRange(DatetimeRange):
         start,
         end,
         frequency,
-        data_adjustment: DataAdjustmentModel,
-        time_interval_type: TimeIntervalType,
         start_index,
+        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
     ):
-        super().__init__(start, end, frequency, data_adjustment, time_interval_type)
+        super().__init__(
+            start, end, frequency, time_based_data_adjustment=time_based_data_adjustment
+        )
         self.start_index = start_index
 
     def _iter_timestamps(self):
@@ -508,28 +511,6 @@ class IndexTimeRange(DatetimeRange):
                         yield cur_idx
             cur += self.frequency
             cur_idx += 1
-
-
-class NoOpTimeRange(DatetimeRange):
-    def _iter_timestamps(self):
-        yield None
-
-
-def make_time_range(start, end, frequency, data_adjustment, time_interval_type, start_index=None):
-    """
-    factory function that decides which TimeRange func to use based on frequency
-    """
-    if data_adjustment is None:
-        data_adjustment = DataAdjustmentModel()
-    if start_index is not None:
-        return IndexTimeRange(
-            start, end, frequency, data_adjustment, time_interval_type, start_index
-        )
-    if frequency == timedelta(days=365):
-        return AnnualTimeRange(start, end, frequency, data_adjustment, time_interval_type)
-    elif frequency == timedelta(days=0):
-        return NoOpTimeRange(start, end, frequency, data_adjustment, time_interval_type)
-    return DatetimeRange(start, end, frequency, data_adjustment, time_interval_type)
 
 
 def adjust_timestamp_by_dst_offset(timestamp, frequency):

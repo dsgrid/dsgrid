@@ -6,14 +6,13 @@ from pyspark.sql.types import (
 )
 import pyspark.sql.functions as F
 
-from dsgrid.dimension.time import make_time_range, DatetimeFormat, LeapDayAdjustmentType
+from dsgrid.dimension.time import DatetimeRange, DatetimeFormat
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dimension.time import DataAdjustmentModel
 from dsgrid.common import VALUE_COLUMN
 
 logger = logging.getLogger(__name__)
@@ -100,16 +99,14 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             )
         return
 
-    def build_time_dataframe(self, model_years=None, data_adjustment=None):
+    def build_time_dataframe(self, model_years=None):
         # Note: DF.show() displays time in session time, which may be confusing.
         # But timestamps are stored correctly here
 
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
-        model_time = self.list_expected_dataset_timestamps(
-            model_years=model_years, data_adjustment=data_adjustment
-        )
+        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
         schema = StructType([StructField(time_col, TimestampType(), False)])
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
         return df_time
@@ -146,11 +143,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         model_years=None,
         value_columns=None,
         wrap_time_allowed=False,
-        data_adjustment=None,
+        time_based_data_adjustment=None,
     ):
-        if data_adjustment is None:
-            data_adjustment = DataAdjustmentModel()
-
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
@@ -159,34 +153,27 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         assert len(ptime_col) == 1, ptime_col
         ptime_col = ptime_col[0]
 
-        if (data_adjustment.leap_day_adjustment != LeapDayAdjustmentType.NONE) or (
-            model_years is not None
-        ):
-            df_ptime = project_time_dim.build_time_dataframe(
-                model_years=model_years, data_adjustment=data_adjustment
-            )
-            df = df_ptime.join(df, ptime_col, "inner")
-
-        df = self._convert_time_to_project_time_interval(
-            df=df, project_time_dim=project_time_dim, wrap_time=wrap_time_allowed
+        df = self._convert_time_to_project_time(
+            df,
+            project_time_dim=project_time_dim,
+            wrap_time=wrap_time_allowed,
+            time_based_data_adjustment=time_based_data_adjustment,
         )
         return df
 
     def get_frequency(self):
         return self.model.frequency
 
-    def get_time_ranges(self, model_years=None, data_adjustment=None):
+    def get_time_ranges(self, model_years=None):
         ranges = []
         for start, end in self._build_time_ranges(
             self.model.ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
         ):
             ranges.append(
-                make_time_range(
+                DatetimeRange(
                     start=start,
                     end=end,
                     frequency=self.model.frequency,
-                    data_adjustment=data_adjustment,
-                    time_interval_type=self.model.time_interval_type,
                 )
             )
 
@@ -206,11 +193,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self, model_years=None, data_adjustment=None):
+    def list_expected_dataset_timestamps(self, model_years=None):
         timestamps = []
-        for time_range in self.get_time_ranges(
-            model_years=model_years, data_adjustment=data_adjustment
-        ):
+        for time_range in self.get_time_ranges(model_years=model_years):
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps
 

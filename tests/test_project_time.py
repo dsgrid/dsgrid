@@ -144,8 +144,8 @@ def test_convert_to_project_time_2(project, resstock, comstock, tempo):
     resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
 
     resstock_time_dim.model.datetime_format.timezone = TimeZone.UTC
-    # no error expected because time is being wrapped from time_interval_type alignment
-    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=False)
+    # error b/c time wrap from time_interval_type alignment is applied differently than wrap_time_allowed
+    compare_time_conversion(resstock_time_dim, project_time_dim, expect_error=True)
 
     # project, dataset same time range and time interval type but different time zone, wrap_time is needed
     resstock_time_dim.model.time_interval_type = project_time_dim.model.time_interval_type
@@ -173,7 +173,7 @@ def test_make_project_dataframe(project, resstock, comstock, tempo):
 def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None, wrap_time=False):
     project_time = project_time_dim.build_time_dataframe()
     if df is None:
-        converted_dataset_time = dataset_time_dim._convert_time_to_project_time_interval(
+        converted_dataset_time = dataset_time_dim._convert_time_to_project_time(
             dataset_time_dim.build_time_dataframe(),
             project_time_dim=project_time_dim,
             wrap_time=wrap_time,
@@ -183,7 +183,6 @@ def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None, wrap_t
     ptime_col = project_time_dim.get_load_data_time_columns()
     dfp = set(project_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
     dfd = set(converted_dataset_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
-
     if dfp != dfd:
         raise DSGDatasetConfigError(
             "dataset time dimension converted to project requirement does not match project time dimension. \n{delta}"

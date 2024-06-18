@@ -12,6 +12,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone, TimeIntervalType
+from dsgrid.dimension.time_utils import shift_time_interval
 from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.spark import get_spark_session
 from dsgrid.exceptions import DSGDatasetConfigError
@@ -175,7 +176,7 @@ def _compare_time_conversion(dataset_time_dim, project_time_dim, df=None, wrap_t
     if df is None:
         converted_dataset_time = dataset_time_dim._convert_time_to_project_time(
             dataset_time_dim.build_time_dataframe(),
-            project_time_dim=project_time_dim,
+            project_time_dim,
             wrap_time=wrap_time,
         )
     else:
@@ -304,7 +305,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
     try:
         project_time_df = project_time_dim.build_time_dataframe()
-        project_time_df = project_time_dim._shift_time_interval(
+        project_time_df = shift_time_interval(
             project_time_df,
             ptime_col,
             ptime_int,

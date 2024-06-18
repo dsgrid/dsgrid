@@ -102,7 +102,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         )
         df = self._convert_time_to_project_time(
             df,
-            project_time_dim=project_time_dim,
+            project_time_dim,
             wrap_time=wrap_time_allowed,
         )
 

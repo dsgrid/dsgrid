@@ -13,6 +13,7 @@ from dsgrid.dimension.time import (
     RepresentativePeriodFormat,
     DatetimeRange,
 )
+from dsgrid.dimension.time_utils import shift_time_interval
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import (
     OneWeekPerMonthByHourType,
@@ -117,7 +118,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         try:
             project_time_df = project_time_dim.build_time_dataframe(model_years=model_years)
             map_time = "timestamp_to_map"
-            project_time_df = self._shift_time_interval(
+            project_time_df = shift_time_interval(
                 project_time_df,
                 ptime_col,
                 project_time_dim.get_time_interval_type(),

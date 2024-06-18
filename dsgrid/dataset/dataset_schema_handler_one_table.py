@@ -20,6 +20,7 @@ from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 logger = logging.getLogger(__name__)
 
@@ -175,17 +176,19 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             write_dataframe_and_auto_partition(load_df, path)
         logger.info("Rewrote simplified %s", self._config.load_data_path)
 
-    def make_project_dataframe(self, project_config):
+    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         ld_df = self._load_data
         # TODO: This might need to handle data skew in the future.
-        ld_df = self._remap_dimension_columns(ld_df, True)
+        ld_df = self._remap_dimension_columns(ld_df, True, scratch_dir_context=scratch_dir_context)
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
         ld_df = self._apply_fraction(ld_df, value_columns)
         project_metric_records = project_config.get_base_dimension(
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-        ld_df = self._convert_time_dimension(ld_df, project_config, value_columns)
+        ld_df = self._convert_time_dimension(
+            ld_df, project_config, value_columns, scratch_dir_context
+        )
         return self._handle_unpivot_column_rename(ld_df)
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
@@ -209,5 +212,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-        ld_df = self._convert_time_dimension(ld_df, project_config, value_columns)
+        ld_df = self._convert_time_dimension(
+            ld_df, project_config, value_columns, context.scratch_dir_context
+        )
         return self._finalize_table(context, ld_df, value_columns, project_config)

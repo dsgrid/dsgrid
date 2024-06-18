@@ -370,9 +370,9 @@ def test_dimension_query_names_model():
     assert not diff
 
 
-def test_transform_unpivoted_dataset():
+def test_transform_unpivoted_dataset(tmp_path):
     project = get_project(QueryTestBase.get_database_name(), QueryTestBase.get_project_id())
-    df = project.transform_dataset("comstock_conus_2022_projected")
+    df = project.transform_dataset("comstock_conus_2022_projected", tmp_path)
     actual = (
         df.filter("geography == '06037'")
         .filter(F.col("metric").isin(["electricity_cooling", "electricity_heating"]))
@@ -385,9 +385,11 @@ def test_transform_unpivoted_dataset():
     )
 
 
-def test_transform_pivoted_dataset():
+def test_transform_pivoted_dataset(tmp_path):
     project = get_project(QueryTestBase.get_database_name(), QueryTestBase.get_project_id())
-    df = project.transform_dataset("resstock_conus_2022_projected").filter("geography == '06037'")
+    df = project.transform_dataset("resstock_conus_2022_projected", tmp_path).filter(
+        "geography == '06037'"
+    )
     cooling = (
         df.select("electricity_cooling")
         .agg(F.sum("electricity_cooling").alias("cooling"))

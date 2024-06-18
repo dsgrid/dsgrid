@@ -4,17 +4,15 @@ from datetime import timedelta
 import pandas as pd
 import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
-from pyspark.sql.types import StructType, StructField, IntegerType
+from pyspark.sql.types import StructType, StructField, IntegerType, StringType
 
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
-from dsgrid.dimension.time import (
-    MeasurementType,
-    AnnualTimeRange,
-    TimeDimensionType,
-)
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.time import AnnualTimeRange
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_spark_session, custom_spark_conf
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -75,61 +73,12 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         df,
         project_time_dim,
         value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):
-        assert value_columns is not None
-        match self.model.measurement_type:
-            case MeasurementType.MEASURED:
-                df = self.map_annual_time_measured_to_datetime(df, project_time_dim)
-            case MeasurementType.TOTAL:
-                df = self.map_annual_total_to_datetime(df, project_time_dim, value_columns)
-            case _:
-                raise NotImplementedError(f"Unhandled: {self.model.measurement_type}")
-
-        return df
-
-    def map_annual_time_measured_to_datetime(
-        self, annual_df: DataFrame, dt_dim: DateTimeDimensionConfig
-    ):
-        """Map a dataframe with MeasuredType.MEASURED to DateTime."""
-        # Does this category even make sense? Why would someone report
-        # something other than total for annual?
-        dt_time_col = dt_dim.get_load_data_time_columns()[0]
-        df = dt_dim.build_time_dataframe()
-        with custom_spark_conf(
-            {"spark.sql.session.timeZone": dt_dim.model.datetime_format.timezone.tz_name}
-        ):
-            years = df.withColumn("year", F.year(dt_time_col)).select("year").distinct().collect()
-            if len(years) != 1:
-                raise Exception("Bug: project time has more than one year: {years=}")
-        return df.crossJoin(annual_df)
-
-    def map_annual_total_to_datetime(
-        self, annual_df: DataFrame, dt_dim: DateTimeDimensionConfig, value_columns: set[str]
-    ):
-        """Map a dataframe with MeasuredType.TOTAL to DateTime."""
-        assert (
-            dt_dim.model.time_type == TimeDimensionType.DATETIME
-        ), "dt_dim must be datetime type."
-        frequency = dt_dim.model.frequency
-        df = dt_dim.build_time_dataframe()
-        dt_time_col = dt_dim.get_load_data_time_columns()[0]
-        with custom_spark_conf(
-            {"spark.sql.session.timeZone": dt_dim.model.datetime_format.timezone.tz_name}
-        ):
-            years = df.withColumn("year", F.year(dt_time_col)).select("year").distinct().collect()
-            if len(years) != 1:
-                raise Exception("Bug: project time has more than one year: {years=}")
-            year = years[0].year
-            if self.model.include_leap_day and year % 4 == 0:
-                measured_duration = timedelta(days=366)
-            else:
-                measured_duration = timedelta(days=365)
-        df2 = df.crossJoin(annual_df)
-        for column in value_columns:
-            df2 = df2.withColumn(column, F.col(column) / (measured_duration / frequency))
-        return df2
+        # Currently, only map_annual_historical_time_to_date_time is supported.
+        raise NotImplementedError("AnnualTimeDimensionConfig.convert_dataframe")
 
     def get_frequency(self):
         return timedelta(days=365)
@@ -167,3 +116,39 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
             start, end = (int(time_range.start), int(time_range.end))
             timestamps += [AnnualTimestampType(x) for x in range(start, end + 1)]
         return timestamps
+
+
+def map_annual_historical_time_to_date_time(
+    df: DataFrame,
+    annual_dim: AnnualTimeDimensionConfig,
+    dt_dim: DateTimeDimensionConfig,
+    value_columns: set[str],
+) -> DataFrame:
+    """Map a DataFrame with an annual/historical time dimension to a DateTime time dimension."""
+    annual_col = annual_dim.get_load_data_time_columns()[0]
+    dt_df = dt_dim.build_time_dataframe()
+    myear_column = DimensionType.MODEL_YEAR.value
+    dt_col = dt_dim.get_load_data_time_columns()[0]
+
+    # Note that MeasurementType.TOTAL has already been verified.
+    with custom_spark_conf(
+        {"spark.sql.session.timeZone": dt_dim.model.datetime_format.timezone.tz_name}
+    ):
+        years = dt_df.withColumn("year", F.year(dt_col)).select("year").distinct().collect()
+        if len(years) != 1:
+            msg = "DateTime dimension has more than one year: {years=}"
+            raise NotImplementedError(msg)
+        if annual_dim.model.include_leap_day and years[0].year % 4 == 0:
+            measured_duration = timedelta(days=366)
+        else:
+            measured_duration = timedelta(days=365)
+
+    df2 = (
+        df.crossJoin(dt_df)
+        .withColumn(myear_column, F.col(annual_col).cast(StringType()))
+        .drop(annual_col)
+    )
+    frequency = dt_dim.model.frequency
+    for column in value_columns:
+        df2 = df2.withColumn(column, F.col(column) / (measured_duration / frequency))
+    return df2

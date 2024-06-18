@@ -5,6 +5,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     AnnualTimeDimensionModel,
+    map_annual_historical_time_to_date_time,
 )
 from dsgrid.config.date_time_dimension_config import (
     DateTimeDimensionConfig,
@@ -88,24 +89,16 @@ def date_time_dimension():
     )
 
 
-def test_map_annual_time_measured_to_datetime(
-    annual_dataframe, annual_time_dimension, date_time_dimension
-):
-    annual_time_dimension.model.measurement_type = MeasurementType.MEASURED
-    df = annual_time_dimension.map_annual_time_measured_to_datetime(
-        annual_dataframe, date_time_dimension
-    )
-    expected_by_year = {x.time_year: x.electricity_sales for x in annual_dataframe.collect()}
-    _check_values(annual_dataframe, date_time_dimension, df, expected_by_year)
-
-
 def test_map_annual_time_total_to_datetime(
     annual_dataframe, annual_time_dimension, date_time_dimension
 ):
     annual_time_dimension.model.measurement_type = MeasurementType.TOTAL
-    value_columns = ["electricity_sales"]
-    df = annual_time_dimension.map_annual_total_to_datetime(
-        annual_dataframe, date_time_dimension, value_columns
+    value_columns = {"electricity_sales"}
+    df = map_annual_historical_time_to_date_time(
+        annual_dataframe,
+        annual_time_dimension,
+        date_time_dimension,
+        value_columns,
     )
     expected_by_year = {
         x.time_year: x.electricity_sales / (366 * 24) for x in annual_dataframe.collect()
@@ -117,16 +110,16 @@ def _check_values(annual_dataframe, date_time_dimension, df, expected_by_year):
     num_rows = annual_dataframe.count()
     num_timestamps = 24 * 7
     assert df.count() == num_rows * num_timestamps
-    values = df.select("time_year", "electricity_sales").distinct().collect()
+    values = df.select("model_year", "electricity_sales").distinct().collect()
     assert len(values) == num_rows
-    by_year = {x.time_year: x.electricity_sales for x in values}
+    by_year = {x.model_year: x.electricity_sales for x in values}
     assert len(by_year) == len(expected_by_year)
     for year in by_year:
-        assert by_year[year] == expected_by_year[year]
+        assert by_year[year] == expected_by_year[int(year)]
 
     time_col = date_time_dimension.get_load_data_time_columns()[0]
     timestamps = (
-        df.groupBy("time_year")
+        df.groupBy("model_year")
         .agg(F.count(time_col).alias("count_timestamps"))
         .select("count_timestamps")
         .distinct()

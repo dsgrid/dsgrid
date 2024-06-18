@@ -20,6 +20,7 @@ from dsgrid.time.types import (
     OneWeekdayDayAndOneWeekendDayPerMonthByHourType,
 )
 from dsgrid.utils.timing import track_timing, timer_stats_collector
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -76,6 +77,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         df,
         project_time_dim,
         value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):

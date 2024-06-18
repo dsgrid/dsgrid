@@ -1,10 +1,11 @@
 import abc
+import logging
 from datetime import timedelta
 from typing import Optional
-import logging
 
 import pyspark.sql.functions as F
 from pyspark.sql import Row
+from pyspark.sql import DataFrame
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import (
@@ -23,6 +24,10 @@ from dsgrid.dimension.time_utils import (
 from dsgrid.config.dimensions import TimeRangeModel
 
 
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.utils.spark import persist_intermediate_table
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +35,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     """Base class for all time dimension configs"""
 
     @abc.abstractmethod
-    def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]):
+    def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]) -> None:
         """Check consistency of the load data with the time dimension.
 
         Parameters
@@ -46,13 +51,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def build_time_dataframe(self):
+    def build_time_dataframe(self) -> DataFrame:
         """Build time dimension as specified in config in a spark dataframe.
 
         Returns
         -------
         pyspark.sql.DataFrame
-
         """
 
     # @abc.abstractmethod
@@ -73,9 +77,10 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         df,
         project_time_dim,
         value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
         wrap_time_allowed: bool = False,
-        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
-    ):
+        data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    ) -> DataFrame:
         """Convert input df to use project's time format and time zone.
 
         Parameters
@@ -84,6 +89,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         project_time_dim : TimeDimensionBaseConfig
         value_columns : set[str]
             Columns in the dataframe that represent load values.
+        scratch_dir_context
+            Used to persist intermediate tables.
         wrapped_time_allowed : bool
             Whether to allow time-wrapping to align time zone
         time_based_data_adjustment : None | TimeBasedDataAdjustmentModel
@@ -92,17 +99,15 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         pyspark.sql.DataFrame
-
         """
 
     @abc.abstractmethod
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         """Return the frequency.
 
         Returns
         -------
         timedelta
-
         """
 
     @abc.abstractmethod
@@ -112,7 +117,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         list
-
         """
 
     def list_load_data_columns_for_query_name(self) -> list[str]:
@@ -121,12 +125,11 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         list[str]
-
         """
         # This may need to be re-implemented by child classes.
         return [self.model.dimension_query_name]
 
-    def map_timestamp_load_data_columns_for_query_name(self, df):
+    def map_timestamp_load_data_columns_for_query_name(self, df) -> DataFrame:
         """Map the timestamp columns in the load data table to those specified by the query name.
 
         Parameters
@@ -136,7 +139,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         pyspark.sql.DataFrame
-
         """
         time_cols = self.get_load_data_time_columns()
         if len(time_cols) > 1:
@@ -155,7 +157,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         -------
         list
             list of DatetimeRange
-
         """
 
     @abc.abstractmethod
@@ -165,21 +166,22 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         tzinfo | None
-
         """
 
     @abc.abstractmethod
-    def get_time_interval_type(self):
+    def get_time_interval_type(self) -> TimeIntervalType:
         """Return the time interval type for this dimension.
 
         Returns
         -------
-        TimeIntervalType | None
-
+        TimeIntervalType
         """
 
     @abc.abstractmethod
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(
+        self,
+        data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    ) -> list[tuple]:
         """Return a list of the timestamps expected in the load_data table.
 
         Returns
@@ -189,17 +191,18 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         """
 
-    def convert_time_format(self, df):
+    def convert_time_format(self, df: DataFrame) -> DataFrame:
         """Convert time from str format to datetime if exists."""
         return df
 
     def _convert_time_to_project_time(
         self,
-        df,
-        project_time_dim,
+        df: DataFrame,
+        project_time_dim: "TimeDimensionBaseConfig",
+        context: ScratchDirContext,
         wrap_time: bool = False,
         time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
-    ):
+    ) -> DataFrame:
         """
         Shift time to match project time based on TimeIntervalType, time zone,
         and other attributes.
@@ -207,6 +210,10 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         - wrap_time_allowed from InputDatasetModel is used to align time due to
         time_zone differences
         """
+        # Persist the table because the code below will need to evaluate the query multiple times.
+        # TODO: Do we still need this after Lixi's improvements?
+        df = persist_intermediate_table(df, context)
+
         if time_based_data_adjustment is None:
             time_based_data_adjustment = TimeBasedDataAdjustmentModel()
 

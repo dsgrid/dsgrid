@@ -116,7 +116,9 @@ def test_time_consistency(one_weekday_day_and_one_weekend_day_per_month_by_hour_
 
 @pytest.mark.parametrize("spark_time_zone", ["America/Los_Angeles"], indirect=True)
 def test_time_mapping(
-    one_weekday_day_and_one_weekend_day_per_month_by_hour_table, spark_time_zone
+    one_weekday_day_and_one_weekend_day_per_month_by_hour_table,
+    spark_time_zone,
+    scratch_dir_context,
 ):
     # This test sets the Spark session time zone so that it can check times consistently
     # across computers.
@@ -127,7 +129,9 @@ def test_time_mapping(
     config = make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config()
     project_time_config = make_date_time_config()
     value_columns = {VALUE_COLUMN}
-    mapped_df = config.convert_dataframe(df, project_time_config, value_columns)
+    mapped_df = config.convert_dataframe(
+        df, project_time_config, value_columns, scratch_dir_context
+    )
     timestamps = mapped_df.select("timestamp").distinct().sort("timestamp").collect()
     zi = ZoneInfo("EST")
     est_timestamps = [x.timestamp.astimezone(zi) for x in timestamps]

@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from .dimensions import NoOpTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -25,6 +26,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
         df,
         project_time_dim,
         value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):

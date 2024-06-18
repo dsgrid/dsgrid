@@ -16,6 +16,7 @@ from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import (
     apply_scaling_factor,
 )
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     create_dataframe_from_ids,
     read_dataframe,
@@ -63,7 +64,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         return df
 
-    def make_project_dataframe(self, project_config):
+    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         # TODO: Can we remove NULLs at registration time?
         null_lk_df = self._load_data_lookup.filter("id is NULL")
         lk_df = self._load_data_lookup.filter("id is not NULL")
@@ -72,7 +73,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         # TODO: This might need to handle data skew in the future.
         null_lk_df = self._remap_dimension_columns(null_lk_df, False)
-        ld_df = self._remap_dimension_columns(ld_df, True)
+        ld_df = self._remap_dimension_columns(ld_df, True, scratch_dir_context=scratch_dir_context)
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
         if SCALING_FACTOR_COLUMN in ld_df.columns:
             ld_df = apply_scaling_factor(ld_df, value_columns)
@@ -81,7 +82,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-        ld_df = self._convert_time_dimension(ld_df, project_config, value_columns)
+        ld_df = self._convert_time_dimension(
+            ld_df, project_config, value_columns, scratch_dir_context
+        )
         ld_df = self._handle_unpivot_column_rename(ld_df)
         return self._add_null_values(ld_df, null_lk_df)
 
@@ -117,7 +120,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         null_lk_df = self._remap_dimension_columns(
             null_lk_df, False, filtered_records=context.get_record_ids()
         )
-        ld_df = self._convert_time_dimension(ld_df, project_config, value_columns)
+        ld_df = self._convert_time_dimension(
+            ld_df, project_config, value_columns, context.scratch_dir_context
+        )
         ld_df = self._add_null_values(ld_df, null_lk_df)
         return self._finalize_table(context, ld_df, value_columns, project_config)
 

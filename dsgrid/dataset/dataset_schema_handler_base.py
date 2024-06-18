@@ -5,10 +5,15 @@ from typing import Optional, Union
 
 from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
+from dsgrid.config.annual_time_dimension_config import (
+    AnnualTimeDimensionConfig,
+    map_annual_historical_time_to_date_time,
+)
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 
 import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dataset_config import DatasetConfig, InputDatasetType
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
 )
@@ -17,7 +22,10 @@ from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
-from dsgrid.dimension.time import TimeDimensionType, DaylightSavingAdjustmentModel
+from dsgrid.dimension.time import (
+    TimeDimensionType,
+    DaylightSavingAdjustmentModel,
+)
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.utils.dataset import (
@@ -153,12 +161,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return list(set(load_data_df.columns).difference(set(value_cols + time_cols)))
 
     @abc.abstractmethod
-    def make_project_dataframe(self, project_config):
+    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         """Return a load_data dataframe with dimensions mapped to the project's.
 
         Parameters
         ----------
         project_config: ProjectConfig
+        scratch_dir_context: ScratchDirContext
 
         Returns
         -------
@@ -540,6 +549,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         load_data_df,
         project_config,
         value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
     ):
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
@@ -553,10 +563,26 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
             load_data_df = add_time_zone(load_data_df, geography_dim)
 
+        if isinstance(time_dim, AnnualTimeDimensionConfig):
+            project_time_dim = project_config.get_base_dimension(DimensionType.TIME)
+            if not isinstance(project_time_dim, DateTimeDimensionConfig):
+                msg = f"annual time can only be mapped to DateTime: {project_time_dim.model.time_type}"
+                raise NotImplementedError(msg)
+            if self._config.model.dataset_type == InputDatasetType.HISTORICAL:
+                return map_annual_historical_time_to_date_time(
+                    load_data_df,
+                    time_dim,
+                    project_time_dim,
+                    value_columns,
+                )
+            msg = f"Cannot map AnnualTime / {self._config.model.dataset_type}"
+            raise NotImplementedError(msg)
+
         load_data_df = time_dim.convert_dataframe(
             load_data_df,
             self._project_time_dim,
             value_columns,
+            scratch_dir_context,
             wrap_time_allowed=wrap_time_allowed,
             time_based_data_adjustment=time_based_data_adjustment,
         )

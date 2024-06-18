@@ -5,6 +5,7 @@ import logging
 
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.query.query_context import QueryContext
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +61,8 @@ class Dataset(DatasetBase):
             )
         )
 
-    def make_project_dataframe(self, project_config):
-        return self._handler.make_project_dataframe(project_config)
+    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
+        return self._handler.make_project_dataframe(project_config, scratch_dir_context)
 
     def make_project_dataframe_from_query(self, query: QueryContext, project_config):
         return self._handler.make_project_dataframe_from_query(query, project_config)

@@ -297,7 +297,7 @@ def to_utc(time_change):
     return [x.astimezone(ZoneInfo("UTC")) for x in time_change]
 
 
-def industrial_model_time_conversion_tests(config, project_time_dim, df):
+def industrial_model_time_conversion_tests(config, project_time_dim, df, scratch_dir_context):
     values = np.arange(0.0, 8784.0).tolist()
     n_df = df.count()
 
@@ -314,6 +314,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         value_columns,
+        scratch_dir_context,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -336,6 +337,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         value_columns,
+        scratch_dir_context,
         wrap_time_allowed=True,
         time_based_data_adjustment=None,
     )
@@ -356,6 +358,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         value_columns,
+        scratch_dir_context,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -377,7 +380,7 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df):
     ), f"Expecting interpolated value {itpl_val} for CO, but not found."
 
 
-def local_time_conversion_tests(config, project_time_dim, df):
+def local_time_conversion_tests(config, project_time_dim, df, scratch_dir_context):
     values = np.arange(0.0, 8784.0).tolist()
 
     # [1] Duplicating fallback 1AM
@@ -393,6 +396,7 @@ def local_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         value_columns,
+        scratch_dir_context,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -406,6 +410,7 @@ def local_time_conversion_tests(config, project_time_dim, df):
         df,
         project_time_dim,
         value_columns,
+        scratch_dir_context,
         wrap_time_allowed=True,
         time_based_data_adjustment=None,
     )
@@ -680,18 +685,22 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     ), f"Expecting interpolated indices: {itpl_indices} but found {indices2}"
 
 
-def test_index_time_conversion(index_time_dimension_model, time_dimension_model0, df_index_time):
-    """test industrial time with time_based_data_adjustment"""
+def test_index_time_conversion(
+    index_time_dimension_model, time_dimension_model0, df_index_time, scratch_dir_context
+):
+    """test industrial time with data_adjustment"""
     df = df_index_time
     project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
     config = IndexTimeDimensionConfig(index_time_dimension_model)
     time_cols = config.get_load_data_time_columns()
     config.check_dataset_time_consistency(df, time_cols)
-    industrial_model_time_conversion_tests(config, project_time_dim, df)
+    industrial_model_time_conversion_tests(config, project_time_dim, df, scratch_dir_context)
 
 
 @pytest.mark.skip
-def test_datetime_conversion(datetime_eq_index_time_model, time_dimension_model0, df_date_time):
+def test_datetime_conversion(
+    datetime_eq_index_time_model, time_dimension_model0, df_date_time, scratch_dir_context
+):
     """test datetime_format.LOCAL_AS_STRINGS"""
     df = df_date_time
     project_time_dim = DateTimeDimensionConfig(time_dimension_model0)
@@ -699,13 +708,14 @@ def test_datetime_conversion(datetime_eq_index_time_model, time_dimension_model0
     df = config.convert_time_format(df)
     time_cols = config.get_load_data_time_columns()
     config.check_dataset_time_consistency(df, time_cols)
-    local_time_conversion_tests(config, project_time_dim, df)
+    local_time_conversion_tests(config, project_time_dim, df, scratch_dir_context)
 
 
 def test_index_time_conversion_subhourly(
     index_time_dimension_model_subhourly,
     datetime_eq_index_time_model_subhourly,
     df_index_time_subhourly,
+    scratch_dir_context,
 ):
     """test subhourly industrial time with time_based_data_adjustment"""
     df = df_index_time_subhourly
@@ -729,6 +739,7 @@ def test_index_time_conversion_subhourly(
         df,
         project_time_dim,
         value_columns,
+        scratch_dir_context,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -753,6 +764,7 @@ def test_index_time_conversion_subhourly(
         df,
         project_time_dim,
         value_columns,
+        scratch_dir_context,
         wrap_time_allowed=True,
         time_based_data_adjustment=None,
     )
@@ -772,6 +784,7 @@ def test_index_time_conversion_subhourly(
         df,
         project_time_dim,
         value_columns,
+        scratch_dir_context,
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )

@@ -7,14 +7,19 @@ from pathlib import Path
 from typing import Type, Union
 
 from prettytable import PrettyTable
+from dsgrid.config.annual_time_dimension_config import AnnualTimeDimensionConfig
 
 from dsgrid.config.dataset_config import (
     DatasetConfig,
+    InputDatasetType,
     ALLOWED_DATA_FILES,
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
-from dsgrid.dimension.base_models import check_required_dimensions
+from dsgrid.config.dimensions_config import (
+    DimensionsConfig,
+    DimensionsConfigModel,
+)
+from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
@@ -97,7 +102,25 @@ class DatasetRegistryManager(RegistryManagerBase):
         schema_handler = make_dataset_schema_handler(
             config, self._dimension_mgr, self._dimension_mapping_mgr
         )
+        self._check_model_year_time_consistency(config)
         schema_handler.check_consistency()
+
+    def _check_model_year_time_consistency(self, config):
+        model_year_dim = config.get_dimension(DimensionType.MODEL_YEAR)
+        time_dim = config.get_dimension(DimensionType.TIME)
+        if config.model.dataset_type == InputDatasetType.HISTORICAL and isinstance(
+            time_dim, AnnualTimeDimensionConfig
+        ):
+            annual_col = time_dim.get_load_data_time_columns()[0]
+            model_years = [int(x) for x in model_year_dim.get_unique_ids()]
+            model_years.sort()
+            years = sorted((x[annual_col] for x in time_dim.list_expected_dataset_timestamps()))
+            if years != model_years:
+                msg = (
+                    "Cannot map annual time to date time unless the dataset model years "
+                    f"match the time dimension: {years=} {model_years=}"
+                )
+                raise DSGInvalidDataset(msg)
 
     @property
     def dimension_manager(self) -> DimensionRegistryManager:

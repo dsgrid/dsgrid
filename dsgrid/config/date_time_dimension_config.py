@@ -1,4 +1,5 @@
 import logging
+
 from pyspark.sql.types import (
     StructType,
     StructField,
@@ -10,6 +11,7 @@ from dsgrid.dimension.time import DatetimeRange, DatetimeFormat
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -141,6 +143,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         df,
         project_time_dim,
         value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):
@@ -155,6 +158,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         df = self._convert_time_to_project_time(
             df,
             project_time_dim,
+            scratch_dir_context,
             wrap_time=wrap_time_allowed,
             time_based_data_adjustment=time_based_data_adjustment,
         )

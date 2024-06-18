@@ -561,6 +561,17 @@ def write_dataframe(df: DataFrame, filename: str | Path) -> None:
         df.write.json(name)
 
 
+def persist_intermediate_table(df: DataFrame, context: ScratchDirContext) -> DataFrame:
+    """Persist a table to the scratch directory. This can be helpful to avoid multiple
+    evaluations of the same query.
+    """
+    # Note: This does not use the Spark warehouse because we are not properly configuring or
+    # managing it across sessions. And, we are already using the scratch dir for our own files.
+    path = context.get_temp_filename(suffix=".parquet")
+    write_dataframe(df, path)
+    return read_dataframe(path)
+
+
 def sql(query: str) -> DataFrame:
     """Run a SQL query with Spark."""
     logger.debug("Run SQL query [%s]", query)
@@ -625,7 +636,7 @@ def create_dataframe_from_product(
     columns = list(data.keys())
     schema = StructType([StructField(x, StringType()) for x in columns])
 
-    with CsvPartitionWriter(csv_dir) as writer:
+    with CsvPartitionWriter(csv_dir, max_partition_size_mb=max_partition_size_mb) as writer:
         for row in itertools.product(*(data.values())):
             writer.add_row(row)
 

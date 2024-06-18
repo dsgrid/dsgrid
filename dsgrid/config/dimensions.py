@@ -369,7 +369,7 @@ class DimensionModel(DimensionBaseModel):
                 )
             return records
 
-        with open(info.data["filename"], encoding="utf-8") as f_in:
+        with open(info.data["filename"], encoding="utf-8-sig") as f_in:
             records = convert_record_dicts_to_classes(
                 csv.DictReader(f_in), dim_class, check_duplicates=["id"]
             )

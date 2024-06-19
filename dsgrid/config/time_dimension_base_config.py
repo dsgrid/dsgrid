@@ -259,7 +259,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                 logger.warning("wrap_time is not required, no time misalignment found.")
 
         time_map_diff = (
-            time_map.select((F.col("timestamp") - F.col("orig_ts")).alias("diff"))
+            time_map.select((F.col(time_col) - F.col("orig_ts")).alias("diff"))
             .distinct()
             .collect()
         )

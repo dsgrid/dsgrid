@@ -190,7 +190,7 @@ class DimensionMappingBaseModel(DSGBaseModel):
         Field(
             title="from_fraction_tolerance",
             description="Tolerance to apply when checking from_fraction column sums",
-            default=1e-9,
+            default=1e-6,
         ),
     ]
     to_fraction_tolerance: Annotated[
@@ -198,7 +198,7 @@ class DimensionMappingBaseModel(DSGBaseModel):
         Field(
             title="to_fraction_tolerance",
             description="Tolerance to apply when checking to_fraction column sums",
-            default=1e-9,
+            default=1e-6,
         ),
     ]
     description: Annotated[
@@ -347,7 +347,7 @@ class DimensionMappingPreRegisteredBaseModel(DSGBaseModel):
         Field(
             title="from_fraction_tolerance",
             description="Tolerance value to apply to the from_fraction column",
-            default=1e-9,
+            default=1e-6,
         ),
     ]
     to_fraction_tolerance: Annotated[
@@ -355,7 +355,7 @@ class DimensionMappingPreRegisteredBaseModel(DSGBaseModel):
         Field(
             title="to_fraction_tolerance",
             description="Tolerance value to apply to the to_fraction column",
-            default=1e-9,
+            default=1e-6,
         ),
     ]
 

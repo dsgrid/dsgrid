@@ -6,6 +6,7 @@ import logging
 import math
 import os
 import shutil
+import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Iterable, Type, Union, get_origin, get_args
@@ -514,36 +515,62 @@ def write_dataframe_and_auto_partition(
     DSGInvalidParameter
         Raised if a non-Parquet file is passed
     """
+    suffix = Path(filename).suffix
+    if suffix != ".parquet":
+        msg = "write_dataframe_and_auto_partition only supports Parquet files: {filename=}"
+        raise DSGInvalidParameter(msg)
+
     spark = get_spark_session()
+    start_initial_write = time.time()
     if filename.exists():
         df = overwrite_dataframe_file(filename, df)
     else:
         df.write.parquet(str(filename))
         df = spark.read.parquet(str(filename))
+    end_initial_write = time.time()
+    duration_first_write = end_initial_write - start_initial_write
     partition_size_bytes = partition_size_mb * 1024 * 1024
     total_size = sum((x.stat().st_size for x in filename.glob("*.parquet")))
     desired = math.ceil(total_size / partition_size_bytes)
-    actual = df.rdd.getNumPartitions()
+    actual = len(list(filename.glob("*.parquet")))
     if abs(actual - desired) / desired * 100 < rtol_pct:
-        logger.debug("No change in number of partitions is needed for %s.", filename)
+        logger.info("No change in number of partitions is needed for %s.", filename)
     elif actual > desired:
         df = df.coalesce(desired)
         df = overwrite_dataframe_file(filename, df)
-        logger.debug("Coalesced %s to partition count %s", filename, desired)
+        duration_second_write = time.time() - end_initial_write
+        logger.info(
+            "Coalesced %s from partition count %s to %s. "
+            "duration_first_write=%s duration_second_write=%s",
+            filename,
+            actual,
+            desired,
+            duration_first_write,
+            duration_second_write,
+        )
     else:
         if columns is None:
             df = df.repartition(desired)
         else:
             df = df.repartition(desired, *columns)
         df = overwrite_dataframe_file(filename, df)
-        logger.debug("Repartitioned %s to partition count", filename, desired)
+        duration_second_write = time.time() - end_initial_write
+        logger.info(
+            "Repartitioned %s from partition count %s to %s. "
+            "duration_first_write=%s duration_second_write=%s",
+            filename,
+            actual,
+            desired,
+            duration_first_write,
+            duration_second_write,
+        )
 
     logger.info("Wrote dataframe to %s", filename)
     return df
 
 
 @track_timing(timer_stats_collector)
-def write_dataframe(df: DataFrame, filename: str | Path) -> None:
+def write_dataframe(df: DataFrame, filename: str | Path, overwrite: bool = False) -> None:
     """Write a Spark DataFrame, accounting for different file types.
 
     Parameters
@@ -551,7 +578,14 @@ def write_dataframe(df: DataFrame, filename: str | Path) -> None:
     filename : str
     df : pyspark.sql.DataFrame
     """
-    suffix = Path(filename).suffix
+    path = Path(filename)
+    if overwrite and path.exists():
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
+
+    suffix = path.suffix
     name = str(filename)
     if suffix == ".parquet":
         df.write.parquet(name)

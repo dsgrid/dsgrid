@@ -79,7 +79,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         value_columns: set[str],
         scratch_dir_context: ScratchDirContext,
         wrap_time_allowed: bool = False,
-        data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
     ) -> DataFrame:
         """Convert input df to use project's time format and time zone.
 

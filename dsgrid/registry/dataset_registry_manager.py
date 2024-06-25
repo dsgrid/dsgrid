@@ -283,7 +283,9 @@ class DatasetRegistryManager(RegistryManagerBase):
                 dst = dataset_path / filename
                 # Writing with Spark is much faster than copying or rsync if there are
                 # multiple nodes in the cluster - much more parallelism.
-                write_dataframe(read_dataframe(path), dst)
+                # We set overwrite=True because if the path exists, it's only because a previous
+                # attempt failed.
+                write_dataframe(read_dataframe(path), dst, overwrite=True)
                 found_files = True
         if not found_files:
             msg = f"Did not find any data files in {config.dataset_path}"

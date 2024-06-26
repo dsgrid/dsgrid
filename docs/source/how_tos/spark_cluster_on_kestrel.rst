@@ -7,6 +7,9 @@ This section assumes that you have cloned the HPC Spark setup scripts from this 
 <https://github.com/NREL/HPC.git>`_. If you are unfamiliar with that, please read the full details
 at :ref:`spark-on-hpc`.
 
+.. note:: The latest scripts currently supporting Kestrel are at this branch:
+   https://github.com/daniel-thom/HPC/tree/kestrel-update
+
 Compute Node Types
 ==================
 Spark works best with fast local storage. The standard Kestrel nodes do not have any local storage.
@@ -39,7 +42,7 @@ Steps
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -M 10 -c /datasets/images/apache_spark/spark351_py312.sif
+    $ configure_and_start_spark.sh
 
 5. Set the Spark configuration environment variable.
 

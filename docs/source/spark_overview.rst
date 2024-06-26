@@ -295,6 +295,9 @@ The [README](https://github.com/NREL/HPC/blob/master/applications/spark/README.m
 repository has generic instructions to run Spark in a variety of ways. The rest of this section
 calls out choices that you should make to run Spark jobs with dsgrid.
 
+.. note:: The latest scripts currently supporting Kestrel are at this branch:
+   https://github.com/daniel-thom/HPC/tree/kestrel-update. Please follow its README instead.
+
 1. Clone the repository.
 
 .. code-block:: console
@@ -312,12 +315,17 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 - If the debug partition is not too full, you can append ``--qos=standby`` to the command above
   and not be charged any AUs.
 
-3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.5.1 and
-   Python 3.12. The team has validated the container below. It was created with this Dockerfile
-   in dsgrid: ``docker/spark/Dockerfile``. The container includes ipython, jupyter, pyspark, pandas,
-   and pyarrow, but not dsgrid.
+3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.5.1.
+   The team has validated the container ``/datasets/images/apache_spark/spark351_py311.sif``. It
+   was created with this Dockerfile in dsgrid: ``docker/spark/Dockerfile``. The container includes
+   ipython, jupyter, pyspark, pandas, duckdb, and pyarrow, but not dsgrid. The
+   ``configure_and_start_spark.sh`` will normally be updated to use the currently-supported dsgrid
+   container by default, but there may be some cases where you need to specify it manually with the
+   ``-c`` option.
 
-   ``/datasets/images/apache_spark/spark351_py312.sif``
+.. code-block:: console
+
+   $ configure_and_start_spark.sh -c <path_to_custom_container.sif>
 
 4. Configure Spark parameters based on the amount of memory and CPU in each compute node.
 
@@ -337,15 +345,15 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -M 10 -c /datasets/images/apache_spark/spark351_py312.sif
+    $ configure_and_start_spark.sh
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -M 10 -c /datasets/images/apache_spark/spark351_py312.sif <SLURM_JOB_ID>
+    $ configure_and_start_spark.sh <SLURM_JOB_ID>
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -M 10 -c /datasets/images/apache_spark/spark351_py312.sif <SLURM_JOB_ID1> <SLURM_JOB_ID2>
+    $ configure_and_start_spark.sh <SLURM_JOB_ID1> <SLURM_JOB_ID2>
 
 Run ``configure_and_start_spark.sh --help`` to see all options.
 

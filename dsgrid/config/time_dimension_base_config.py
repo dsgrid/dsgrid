@@ -22,11 +22,8 @@ from dsgrid.dimension.time_utils import (
     apply_time_wrap,
 )
 from dsgrid.config.dimensions import TimeRangeModel
-
-
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-
-# from dsgrid.utils.spark import persist_intermediate_table
+from dsgrid.utils.spark import persist_intermediate_table
 
 
 logger = logging.getLogger(__name__)
@@ -214,9 +211,11 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         if time_based_data_adjustment is None:
             time_based_data_adjustment = TimeBasedDataAdjustmentModel()
 
-        # It's possible that we will want to enable this in some cases.
-        # Current results show about the same timings with and without.
-        # df = persist_intermediate_table(df, context)
+        # At least in the case of DECARB-industrial, this is required to get through
+        # dataset-to-project mapping on one Kestrel node.
+        # That might not be true for other datasets, and so more customization might be
+        # required.
+        df = persist_intermediate_table(df, context)
 
         time_col = project_time_dim.get_load_data_time_columns()
         assert len(time_col) == 1, time_col

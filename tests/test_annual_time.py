@@ -155,23 +155,6 @@ def test_map_annual_time_total_to_datetime(
     expected_by_year = {
         x.time_year: x.electricity_sales / (366 * 24) for x in annual_dataframe.collect()
     }
-    _check_values(annual_dataframe, date_time_dimension, df, expected_by_year)
-
-
-def test_historical_annual_model_year_consistency_valid(annual_dataframe_with_model_year_valid):
-    df, time_col, model_year_col = annual_dataframe_with_model_year_valid
-    check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)
-
-
-def test_historical_annual_model_year_consistency_invalid(
-    annual_dataframe_with_model_year_invalid,
-):
-    df, time_col, model_year_col = annual_dataframe_with_model_year_invalid
-    with pytest.raises(DSGInvalidDataset):
-        check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)
-
-
-def _check_values(annual_dataframe, date_time_dimension, df, expected_by_year):
     num_rows = annual_dataframe.count()
     num_timestamps = 24 * 7
     assert df.count() == num_rows * num_timestamps
@@ -192,3 +175,16 @@ def _check_values(annual_dataframe, date_time_dimension, df, expected_by_year):
     )
     assert len(count_timestamps_per_model_year) == 1
     assert count_timestamps_per_model_year[0]["count_timestamps"] == num_timestamps
+
+
+def test_historical_annual_model_year_consistency_valid(annual_dataframe_with_model_year_valid):
+    df, time_col, model_year_col = annual_dataframe_with_model_year_valid
+    check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)
+
+
+def test_historical_annual_model_year_consistency_invalid(
+    annual_dataframe_with_model_year_invalid,
+):
+    df, time_col, model_year_col = annual_dataframe_with_model_year_invalid
+    with pytest.raises(DSGInvalidDataset):
+        check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)

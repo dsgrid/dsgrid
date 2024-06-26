@@ -316,13 +316,16 @@ calls out choices that you should make to run Spark jobs with dsgrid.
   and not be charged any AUs.
 
 3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.5.1.
-   The team has validated the container below. It was created with this Dockerfile
-   in dsgrid: ``docker/spark/Dockerfile``. The container includes ipython, jupyter, pyspark, pandas,
-   duckdb, and pyarrow, but not dsgrid. The ``configure_and_start_spark.sh`` will normally be
-   updated to use the currently-supported dsgrid container, but there may be some cases where
-   you need to specify it manually with the ``-c`` option.
+   The team has validated the container ``/datasets/images/apache_spark/spark351_py311.sif``. It
+   was created with this Dockerfile in dsgrid: ``docker/spark/Dockerfile``. The container includes
+   ipython, jupyter, pyspark, pandas, duckdb, and pyarrow, but not dsgrid. The
+   ``configure_and_start_spark.sh`` will normally be updated to use the currently-supported dsgrid
+   container by default, but there may be some cases where you need to specify it manually with the
+   ``-c`` option.
 
-   ``/datasets/images/apache_spark/spark351_py311.sif``
+.. code-block:: console
+
+   $ configure_and_start_spark.sh -c <path_to_custom_container.sif>
 
 4. Configure Spark parameters based on the amount of memory and CPU in each compute node.
 

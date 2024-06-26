@@ -624,3 +624,8 @@ def apply_time_wrap(df, project_time_dim, diff: set):
         )
 
     return df
+
+
+def is_leap_year(year: int) -> bool:
+    """Return True if the year is a leap year."""
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)

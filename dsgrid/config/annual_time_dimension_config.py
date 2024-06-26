@@ -11,6 +11,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import AnnualTimeRange
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
+from dsgrid.dimension.time_utils import is_leap_year
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_spark_session, custom_spark_conf
@@ -138,7 +139,7 @@ def map_annual_historical_time_to_date_time(
         if len(years) != 1:
             msg = "DateTime dimension has more than one year: {years=}"
             raise NotImplementedError(msg)
-        if annual_dim.model.include_leap_day and years[0].year % 4 == 0:
+        if annual_dim.model.include_leap_day and is_leap_year(years[0].year):
             measured_duration = timedelta(days=366)
         else:
             measured_duration = timedelta(days=365)

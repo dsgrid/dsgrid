@@ -80,9 +80,8 @@ def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     tempo_data = tempo._handler._load_data.join(tempo._handler._load_data_lookup, on="id").drop(
         "id"
     )
-    value_columns = tempo._handler.config.get_value_columns()
     tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-        tempo_data, project.config, value_columns, scratch_dir_context
+        tempo_data, project.config, tempo._handler.config.get_value_columns(), scratch_dir_context
     )
     tempo_data_with_tz = add_time_zone(
         tempo_data, project.config.get_base_dimension(DimensionType.GEOGRAPHY)
@@ -103,11 +102,10 @@ def test_convert_time_for_comstock(project, comstock, scratch_dir_context):
     comstock_data_with_tz = add_time_zone(
         comstock_data, comstock._handler.config.get_dimension(DimensionType.GEOGRAPHY)
     )
-    value_columns = comstock._handler.config.get_value_columns()
     comstock_time_dim.convert_dataframe(
         comstock_data_with_tz,
         project.config.get_base_dimension(DimensionType.TIME),
-        value_columns,
+        comstock._handler.config.get_value_columns(),
         scratch_dir_context,
     )
 
@@ -121,9 +119,8 @@ def test_convert_to_project_time_1(project, resstock, comstock, tempo, scratch_d
     tempo_data = tempo._handler._load_data.join(tempo._handler._load_data_lookup, on="id").drop(
         "id"
     )
-    value_columns = tempo._handler.config.get_value_columns()
     tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-        tempo_data, project.config, value_columns, scratch_dir_context
+        tempo_data, project.config, tempo._handler.config.get_value_columns(), scratch_dir_context
     )
 
     # project: period-beginning, dataset: period-ending, same time range

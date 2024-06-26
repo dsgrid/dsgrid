@@ -25,7 +25,8 @@ from dsgrid.config.dimensions import TimeRangeModel
 
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import persist_intermediate_table
+
+# from dsgrid.utils.spark import persist_intermediate_table
 
 
 logger = logging.getLogger(__name__)
@@ -210,19 +211,20 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         - wrap_time_allowed from InputDatasetModel is used to align time due to
         time_zone differences
         """
-        # Persist the table because the code below will need to evaluate the query multiple times.
-        # TODO: Do we still need this after Lixi's improvements?
-        df = persist_intermediate_table(df, context)
-
         if time_based_data_adjustment is None:
             time_based_data_adjustment = TimeBasedDataAdjustmentModel()
+
+        # It's possible that we will want to enable this in some cases.
+        # Current results show about the same timings with and without.
+        # df = persist_intermediate_table(df, context)
 
         time_col = project_time_dim.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         time_map = (
             df.select(time_col).distinct().select(time_col, F.col(time_col).alias("orig_ts"))
-        )
+        ).cache()
+        time_map.count()
 
         time_map = self._align_time_interval_type(time_map, project_time_dim)
         if time_based_data_adjustment.leap_day_adjustment != LeapDayAdjustmentType.NONE:
@@ -248,6 +250,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                 .drop("orig_ts")
             )
 
+        time_map.unpersist()
         return df
 
     def _align_time_interval_type(self, df, project_time_dim):

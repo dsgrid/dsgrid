@@ -17,6 +17,8 @@ from dsgrid.dimension.time import (
     TimeIntervalType,
     TimeZone,
 )
+from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
 from dsgrid.utils.spark import create_dataframe_from_dicts
 
 
@@ -45,6 +47,56 @@ def annual_dataframe():
         },
     ]
     yield create_dataframe_from_dicts(data).cache()
+
+
+@pytest.fixture
+def annual_dataframe_with_model_year_values():
+    yield [
+        {
+            "time_year": 2019,
+            "model_year": 2019,
+            "geography": "CO",
+            "electricity_sales": 602872.1,
+        },
+        {
+            "time_year": 2020,
+            "model_year": 2020,
+            "geography": "CO",
+            "electricity_sales": 702872.1,
+        },
+        {
+            "time_year": 2021,
+            "model_year": 2021,
+            "geography": "CO",
+            "electricity_sales": 802872.1,
+        },
+        {
+            "time_year": None,
+            "model_year": 2022,
+            "geography": "CO",
+            "electricity_sales": 902872.1,
+        },
+    ]
+
+
+@pytest.fixture
+def annual_dataframe_with_model_year_valid(annual_dataframe_with_model_year_values):
+    data = annual_dataframe_with_model_year_values
+    yield create_dataframe_from_dicts(data).cache(), "time_year", "model_year"
+
+
+@pytest.fixture
+def annual_dataframe_with_model_year_invalid(annual_dataframe_with_model_year_values):
+    data = annual_dataframe_with_model_year_values
+    data.append(
+        {
+            "time_year": 2023,
+            "model_year": 2019,
+            "geography": "CO",
+            "electricity_sales": 702872.1,
+        },
+    )
+    yield create_dataframe_from_dicts(data).cache(), "time_year", "model_year"
 
 
 @pytest.fixture
@@ -106,6 +158,19 @@ def test_map_annual_time_total_to_datetime(
     _check_values(annual_dataframe, date_time_dimension, df, expected_by_year)
 
 
+def test_historical_annual_model_year_consistency_valid(annual_dataframe_with_model_year_valid):
+    df, time_col, model_year_col = annual_dataframe_with_model_year_valid
+    check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)
+
+
+def test_historical_annual_model_year_consistency_invalid(
+    annual_dataframe_with_model_year_invalid,
+):
+    df, time_col, model_year_col = annual_dataframe_with_model_year_invalid
+    with pytest.raises(DSGInvalidDataset):
+        check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)
+
+
 def _check_values(annual_dataframe, date_time_dimension, df, expected_by_year):
     num_rows = annual_dataframe.count()
     num_timestamps = 24 * 7
@@ -118,12 +183,12 @@ def _check_values(annual_dataframe, date_time_dimension, df, expected_by_year):
         assert by_year[year] == expected_by_year[int(year)]
 
     time_col = date_time_dimension.get_load_data_time_columns()[0]
-    timestamps = (
+    count_timestamps_per_model_year = (
         df.groupBy("model_year")
         .agg(F.count(time_col).alias("count_timestamps"))
         .select("count_timestamps")
         .distinct()
         .collect()
     )
-    assert len(timestamps) == 1
-    assert timestamps[0]["count_timestamps"] == num_timestamps
+    assert len(count_timestamps_per_model_year) == 1
+    assert count_timestamps_per_model_year[0]["count_timestamps"] == num_timestamps

@@ -49,7 +49,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(self):
         self._check_lookup_data_consistency()
-        self._check_dataset_time_consistency(self._load_data)
+        self._check_dataset_time_consistency(self._load_data.join(self._load_data_lookup, on="id"))
         self._check_dataset_internal_consistency()
 
     def make_dimension_association_table(self) -> DataFrame:

@@ -29,6 +29,7 @@ from dsgrid.dimension.time import (
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.utils.dataset import (
+    check_historical_annual_time_model_year_consistency,
     is_noop_mapping,
     map_and_reduce_stacked_dimension,
     map_and_reduce_pivoted_dimension,
@@ -218,6 +219,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
         time_dim.check_dataset_time_consistency(load_data_df, time_cols)
         if time_dim.model.time_type != TimeDimensionType.NOOP:
             self._check_dataset_time_consistency_by_time_array(time_cols, load_data_df)
+        self._check_model_year_time_consistency(load_data_df)
+
+    def _check_model_year_time_consistency(self, df: DataFrame):
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        if self._config.model.dataset_type == InputDatasetType.HISTORICAL and isinstance(
+            time_dim, AnnualTimeDimensionConfig
+        ):
+            annual_cols = time_dim.get_load_data_time_columns()
+            assert len(annual_cols) == 1
+            annual_col = annual_cols[0]
+            check_historical_annual_time_model_year_consistency(
+                df, annual_col, DimensionType.MODEL_YEAR.value
+            )
 
     @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency_by_time_array(self, time_cols, load_data_df):
@@ -566,7 +580,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if isinstance(time_dim, AnnualTimeDimensionConfig):
             project_time_dim = project_config.get_base_dimension(DimensionType.TIME)
             if not isinstance(project_time_dim, DateTimeDimensionConfig):
-                msg = f"annual time can only be mapped to DateTime: {project_time_dim.model.time_type}"
+                msg = f"Annual time can only be mapped to DateTime: {project_time_dim.model.time_type}"
                 raise NotImplementedError(msg)
             if self._config.model.dataset_type == InputDatasetType.HISTORICAL:
                 return map_annual_historical_time_to_date_time(
@@ -575,7 +589,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     project_time_dim,
                     value_columns,
                 )
-            msg = f"Cannot map AnnualTime / {self._config.model.dataset_type}"
+            msg = f"Cannot map AnnualTime for a dataset of type {self._config.model.dataset_type}"
             raise NotImplementedError(msg)
 
         load_data_df = time_dim.convert_dataframe(

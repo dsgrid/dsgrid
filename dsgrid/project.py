@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Optional
 
 import pyspark.sql.functions as F
-from pyspark.sql import SparkSession, DataFrame
+from pyspark.sql import SparkSession
 from pyspark.sql.types import DoubleType
 
 from dsgrid.common import VALUE_COLUMN
@@ -165,7 +165,7 @@ class Project:
         output_dir: Path,
         overwrite=False,
         scratch_dir: Optional[Path] = None,
-    ) -> DataFrame:
+    ) -> Path:
         """Transform a dataset by mapping its dimensions to the project's dimensions and write it
         to the filesystem.
         """
@@ -181,7 +181,8 @@ class Project:
         dataset = self.get_dataset(dataset_id)
         with ScratchDirContext(scratch_dir) as context:
             df = dataset.make_project_dataframe(self._config, context)
-            return write_dataframe_and_auto_partition(df, output_file)
+            write_dataframe_and_auto_partition(df, output_file)
+            return output_file
 
     def _iter_datasets(self):
         for dataset in self.config.model.datasets:

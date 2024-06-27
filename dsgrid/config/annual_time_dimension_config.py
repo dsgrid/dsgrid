@@ -3,17 +3,18 @@ from datetime import timedelta
 
 import pandas as pd
 import pyspark.sql.functions as F
-from pyspark.sql.types import StructType, StructField, IntegerType
+from pyspark.sql import DataFrame
+from pyspark.sql.types import StructType, StructField, IntegerType, StringType
 
-from dsgrid.dimension.time import (
-    MeasurementType,
-    AnnualTimeRange,
-    TimeDimensionType,
-)
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.time import AnnualTimeRange
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
+from dsgrid.dimension.time_utils import is_leap_year
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.spark import get_spark_session, custom_spark_conf, union
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.utils.spark import get_spark_session, custom_spark_conf
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -55,13 +56,13 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def build_time_dataframe(self, model_years=None):
+    def build_time_dataframe(self):
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         schema = StructType([StructField(time_col, IntegerType(), False)])
 
-        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
+        model_time = self.list_expected_dataset_timestamps()
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
         return df_time
 
@@ -72,73 +73,22 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         self,
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=None,
+        value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):
-        assert model_years is not None
-        assert value_columns is not None
-        match self.model.measurement_type:
-            case MeasurementType.MEASURED:
-                df = self.map_annual_time_measured_to_datetime(df, project_time_dim, model_years)
-            case MeasurementType.TOTAL:
-                df = self.map_annual_total_to_datetime(
-                    df, project_time_dim, model_years, value_columns
-                )
-            case _:
-                raise NotImplementedError(f"Unhandled: {self.model.measurement_type}")
-
-        return df
-
-    def map_annual_time_measured_to_datetime(self, annual_df, dt_dim, model_years):
-        """Map a dataframe with MeasuredType.MEASURED to DateTime."""
-        time_col = self.get_load_data_time_columns()[0]
-        df = dt_dim.build_time_dataframe(model_years=model_years)
-        dt_time_col = dt_dim.get_load_data_time_columns()[0]
-        return df.join(annual_df, on=F.year(dt_time_col) == annual_df[time_col]).drop(time_col)
-
-    def map_annual_total_to_datetime(self, annual_df, dt_dim, model_years, value_columns):
-        """Map a dataframe with MeasuredType.TOTAL to DateTime."""
-        assert (
-            dt_dim.model.time_type == TimeDimensionType.DATETIME
-        ), "dt_dim must be datetime type."
-        frequency = dt_dim.model.frequency
-        time_col = self.get_load_data_time_columns()[0]
-        dfs = []
-        for model_year in model_years:
-            if self.model.include_leap_day and model_year % 4 == 0:
-                measured_duration = timedelta(days=366)
-            else:
-                measured_duration = timedelta(days=365)
-            df = dt_dim.build_time_dataframe(model_years=[model_year])
-            dt_time_col = dt_dim.get_load_data_time_columns()[0]
-            with custom_spark_conf({"spark.sql.session.timeZone": "UTC"}):
-                tmp_col = f"{dt_time_col}_utc"
-                df = df.withColumn(
-                    tmp_col,
-                    F.from_utc_timestamp(
-                        dt_time_col, dt_dim.model.datetime_format.timezone.tz_name
-                    ),
-                )
-                df = df.join(annual_df, on=F.year(df[tmp_col]) == annual_df[time_col]).drop(
-                    time_col, tmp_col
-                )
-            for column in value_columns:
-                df = df.withColumn(column, F.col(column) / (measured_duration / frequency))
-            if not df.rdd.isEmpty():
-                dfs.append(df)
-
-        return union(dfs)
+        # Currently, only map_annual_historical_time_to_date_time is supported.
+        raise NotImplementedError("AnnualTimeDimensionConfig.convert_dataframe")
 
     def get_frequency(self):
         return timedelta(days=365)
 
-    def get_time_ranges(self, model_years=None):
+    def get_time_ranges(self):
         ranges = []
         frequency = self.get_frequency()
         for start, end in self._build_time_ranges(
-            self.model.ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
+            self.model.ranges, self.model.str_format, tz=self.get_tzinfo()
         ):
             start = pd.Timestamp(start)
             end = pd.Timestamp(end)
@@ -161,15 +111,45 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return None
 
-    def list_expected_dataset_timestamps(self, model_years=None):
-        if model_years is not None:
-            # We do not expect to need this.
-            raise NotImplementedError(
-                f"No support for {model_years=} in {type(self)}.list_expected_dataset_timestamps"
-            )
-
+    def list_expected_dataset_timestamps(self):
         timestamps = []
         for time_range in self.model.ranges:
             start, end = (int(time_range.start), int(time_range.end))
             timestamps += [AnnualTimestampType(x) for x in range(start, end + 1)]
         return timestamps
+
+
+def map_annual_historical_time_to_date_time(
+    df: DataFrame,
+    annual_dim: AnnualTimeDimensionConfig,
+    dt_dim: DateTimeDimensionConfig,
+    value_columns: set[str],
+) -> DataFrame:
+    """Map a DataFrame with an annual/historical time dimension to a DateTime time dimension."""
+    annual_col = annual_dim.get_load_data_time_columns()[0]
+    dt_df = dt_dim.build_time_dataframe()
+    myear_column = DimensionType.MODEL_YEAR.value
+    dt_col = dt_dim.get_load_data_time_columns()[0]
+
+    # Note that MeasurementType.TOTAL has already been verified.
+    with custom_spark_conf(
+        {"spark.sql.session.timeZone": dt_dim.model.datetime_format.timezone.tz_name}
+    ):
+        years = dt_df.withColumn("year", F.year(dt_col)).select("year").distinct().collect()
+        if len(years) != 1:
+            msg = "DateTime dimension has more than one year: {years=}"
+            raise NotImplementedError(msg)
+        if annual_dim.model.include_leap_day and is_leap_year(years[0].year):
+            measured_duration = timedelta(days=366)
+        else:
+            measured_duration = timedelta(days=365)
+
+    df2 = (
+        df.crossJoin(dt_df)
+        .withColumn(myear_column, F.col(annual_col).cast(StringType()))
+        .drop(annual_col)
+    )
+    frequency = dt_dim.model.frequency
+    for column in value_columns:
+        df2 = df2.withColumn(column, F.col(column) / (measured_duration / frequency))
+    return df2

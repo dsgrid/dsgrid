@@ -1,10 +1,11 @@
 import abc
+import logging
 from datetime import timedelta
 from typing import Optional
-import logging
 
 import pyspark.sql.functions as F
 from pyspark.sql import Row
+from pyspark.sql import DataFrame
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import (
@@ -21,6 +22,8 @@ from dsgrid.dimension.time_utils import (
     apply_time_wrap,
 )
 from dsgrid.config.dimensions import TimeRangeModel
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.utils.spark import persist_intermediate_table
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +33,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     """Base class for all time dimension configs"""
 
     @abc.abstractmethod
-    def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]):
+    def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]) -> None:
         """Check consistency of the load data with the time dimension.
 
         Parameters
@@ -46,21 +49,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def build_time_dataframe(
-        self,
-        model_years: Optional[list[int]] = None,
-    ):
+    def build_time_dataframe(self) -> DataFrame:
         """Build time dimension as specified in config in a spark dataframe.
-
-        Parameters
-        ----------
-        model_years : None | list[int]
-            If specified, repeat the timestamps for each model year.
 
         Returns
         -------
         pyspark.sql.DataFrame
-
         """
 
     # @abc.abstractmethod
@@ -80,22 +74,21 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         self,
         df,
         project_time_dim,
-        model_years: Optional[list[int]] = None,
-        value_columns: Optional[set[str]] = None,
+        value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
         wrap_time_allowed: bool = False,
         time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
-    ):
+    ) -> DataFrame:
         """Convert input df to use project's time format and time zone.
 
         Parameters
         ----------
         df : pyspark.sql.DataFrame
         project_time_dim : TimeDimensionBaseConfig
-        model_years : None | list[int]
-            Model years required by the project. Not required for all time dimension types.
-        value_columns : None | set[str]
-            Columns in the dataframe that represent load values. Not required for all time
-            dimension types.
+        value_columns : set[str]
+            Columns in the dataframe that represent load values.
+        scratch_dir_context
+            Used to persist intermediate tables.
         wrapped_time_allowed : bool
             Whether to allow time-wrapping to align time zone
         time_based_data_adjustment : None | TimeBasedDataAdjustmentModel
@@ -104,17 +97,15 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         pyspark.sql.DataFrame
-
         """
 
     @abc.abstractmethod
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         """Return the frequency.
 
         Returns
         -------
         timedelta
-
         """
 
     @abc.abstractmethod
@@ -124,7 +115,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         list
-
         """
 
     def list_load_data_columns_for_query_name(self) -> list[str]:
@@ -133,12 +123,11 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         list[str]
-
         """
         # This may need to be re-implemented by child classes.
         return [self.model.dimension_query_name]
 
-    def map_timestamp_load_data_columns_for_query_name(self, df):
+    def map_timestamp_load_data_columns_for_query_name(self, df) -> DataFrame:
         """Map the timestamp columns in the load data table to those specified by the query name.
 
         Parameters
@@ -148,7 +137,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         pyspark.sql.DataFrame
-
         """
         time_cols = self.get_load_data_time_columns()
         if len(time_cols) > 1:
@@ -160,23 +148,13 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df.withColumnRenamed(time_cols[0], self.model.dimension_query_name)
 
     @abc.abstractmethod
-    def get_time_ranges(
-        self,
-        model_years: Optional[list[int]] = None,
-    ):
+    def get_time_ranges(self):
         """Return time ranges with timezone applied.
-
-        Parameters
-        ----------
-        model_years : None | list[int]
-            If set, replace the base year in the time ranges with these model years. In this case
-            each range must be in the same year.
 
         Returns
         -------
         list
             list of DatetimeRange
-
         """
 
     @abc.abstractmethod
@@ -186,31 +164,23 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         tzinfo | None
-
         """
 
     @abc.abstractmethod
-    def get_time_interval_type(self):
+    def get_time_interval_type(self) -> TimeIntervalType:
         """Return the time interval type for this dimension.
 
         Returns
         -------
-        TimeIntervalType | None
-
+        TimeIntervalType
         """
 
     @abc.abstractmethod
     def list_expected_dataset_timestamps(
         self,
-        model_years: Optional[list[int]] = None,
-    ):
+        data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    ) -> list[tuple]:
         """Return a list of the timestamps expected in the load_data table.
-
-        Parameters
-        ----------
-        model_years : None | list[int]
-            If set, replace the base year in the time ranges with these model years. In this case
-            each range must be in the same year.
 
         Returns
         -------
@@ -219,17 +189,18 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         """
 
-    def convert_time_format(self, df):
+    def convert_time_format(self, df: DataFrame) -> DataFrame:
         """Convert time from str format to datetime if exists."""
         return df
 
     def _convert_time_to_project_time(
         self,
-        df,
-        project_time_dim,
+        df: DataFrame,
+        project_time_dim: "TimeDimensionBaseConfig",
+        context: ScratchDirContext,
         wrap_time: bool = False,
         time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
-    ):
+    ) -> DataFrame:
         """
         Shift time to match project time based on TimeIntervalType, time zone,
         and other attributes.
@@ -240,12 +211,19 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         if time_based_data_adjustment is None:
             time_based_data_adjustment = TimeBasedDataAdjustmentModel()
 
+        # At least in the case of DECARB-industrial, this is required to get through
+        # dataset-to-project mapping on one Kestrel node.
+        # That might not be true for other datasets, and so more customization might be
+        # required.
+        df = persist_intermediate_table(df, context)
+
         time_col = project_time_dim.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
         time_map = (
             df.select(time_col).distinct().select(time_col, F.col(time_col).alias("orig_ts"))
-        )
+        ).cache()
+        time_map.count()
 
         time_map = self._align_time_interval_type(time_map, project_time_dim)
         if time_based_data_adjustment.leap_day_adjustment != LeapDayAdjustmentType.NONE:
@@ -271,6 +249,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                 .drop("orig_ts")
             )
 
+        time_map.unpersist()
         return df
 
     def _align_time_interval_type(self, df, project_time_dim):
@@ -321,7 +300,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         self,
         time_ranges: TimeRangeModel,
         str_format: str,
-        model_years: Optional[list[int]] = None,
         tz: Optional[TimeZone] = None,
     ):
-        return build_time_ranges(time_ranges, str_format, model_years=model_years, tz=tz)
+        return build_time_ranges(time_ranges, str_format, tz=tz)

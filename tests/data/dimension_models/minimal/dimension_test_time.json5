@@ -104,7 +104,7 @@
       ],
       str_format: "%Y",
       include_leap_day: true,
-      measurement_type: "mean",
+      measurement_type: "total",
     },
     { // #[5]
       "class": "Time",

@@ -8,7 +8,7 @@ import pyspark.sql.functions as F
 
 from dsgrid.common import SCALING_FACTOR_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
+from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import check_for_nulls, read_parquet
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -153,6 +153,27 @@ def apply_scaling_factor(
             ).otherwise(F.col(column)),
         )
     return df.drop(scaling_factor_column)
+
+
+def check_historical_annual_time_model_year_consistency(
+    df: DataFrame, time_column: str, model_year_column: str
+) -> None:
+    """Check that the model year values match the time dimension years for a historical
+    dataset with an annual time dimension.
+    """
+    invalid = (
+        df.select(time_column, model_year_column)
+        .filter(f"{time_column} IS NOT NULL")
+        .distinct()
+        .filter(f"{time_column} != {model_year_column}")
+        .collect()
+    )
+    if invalid:
+        msg = (
+            "A historical dataset with annual time must have rows where the time years match the model years. "
+            f"{invalid}"
+        )
+        raise DSGInvalidDataset(msg)
 
 
 @track_timing(timer_stats_collector)

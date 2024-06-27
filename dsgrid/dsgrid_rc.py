@@ -34,7 +34,7 @@ class DsgridRuntimeConfig(DSGBaseModel):
         """Load the dsgrid runtime config if it exists or one with default values."""
         rc_file = cls.path()
         if rc_file.exists():
-            data = json5.loads(rc_file.read_text(encoding="utf-8"))
+            data = json5.loads(rc_file.read_text(encoding="utf-8-sig"))
             return cls(**data)
         return cls()
 

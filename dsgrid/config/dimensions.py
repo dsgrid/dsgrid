@@ -369,7 +369,7 @@ class DimensionModel(DimensionBaseModel):
                 )
             return records
 
-        with open(info.data["filename"], encoding="utf-8") as f_in:
+        with open(info.data["filename"], encoding="utf-8-sig") as f_in:
             records = convert_record_dicts_to_classes(
                 csv.DictReader(f_in), dim_class, check_duplicates=["id"]
             )
@@ -695,6 +695,16 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
         if "str_format" not in info.data or "frequency" not in info.data:
             return ranges
         return _check_time_ranges(ranges, info.data["str_format"], timedelta(days=365))
+
+    @field_validator("measurement_type")
+    @classmethod
+    def check_measurement_type(cls, measurement_type: MeasurementType) -> MeasurementType:
+        # This restriction exists because any other measurement type would require a frequency,
+        # and that isn't part of the model definition.
+        if measurement_type != MeasurementType.TOTAL:
+            msg = f"Annual time currently only supports MeasurementType total: {measurement_type}"
+            raise ValueError(msg)
+        return measurement_type
 
     def is_time_zone_required_in_geography(self):
         return False

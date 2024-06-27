@@ -20,6 +20,7 @@ from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 logger = logging.getLogger(__name__)
 
@@ -175,29 +176,19 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             write_dataframe_and_auto_partition(load_df, path)
         logger.info("Rewrote simplified %s", self._config.load_data_path)
 
-    def make_project_dataframe(self, project_config):
+    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         ld_df = self._load_data
-        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
-        if convert_time_before_project_mapping:
-            # There is currently no case that needs model years or value columns.
-            ld_df = self._convert_time_dimension(ld_df, project_config)
-
         # TODO: This might need to handle data skew in the future.
-        ld_df = self._remap_dimension_columns(ld_df, True)
+        ld_df = self._remap_dimension_columns(ld_df, True, scratch_dir_context=scratch_dir_context)
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
         ld_df = self._apply_fraction(ld_df, value_columns)
         project_metric_records = project_config.get_base_dimension(
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-
-        if not convert_time_before_project_mapping:
-            model_year_dim = project_config.get_base_dimension(DimensionType.MODEL_YEAR)
-            model_years = get_unique_values(model_year_dim.get_records_dataframe(), "id")
-            ld_df = self._convert_time_dimension(
-                ld_df, project_config, model_years=model_years, value_columns=value_columns
-            )
-
+        ld_df = self._convert_time_dimension(
+            ld_df, project_config, value_columns, scratch_dir_context
+        )
         return self._handle_unpivot_column_rename(ld_df)
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
@@ -208,12 +199,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if self._config.get_table_format_type() == TableFormatType.PIVOTED:
             ld_df = self._prefilter_pivoted_dimensions(context, ld_df)
         ld_df = self._prefilter_time_dimension(context, ld_df)
-
-        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
-        if convert_time_before_project_mapping:
-            # There is currently no case that needs model years or value columns.
-            ld_df = self._convert_time_dimension(ld_df, project_config)
-
         ld_df = self._remap_dimension_columns(
             ld_df,
             True,
@@ -227,16 +212,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-        if not convert_time_before_project_mapping:
-            m_year_df = context.try_get_record_ids_by_dimension_type(DimensionType.MODEL_YEAR)
-            if m_year_df is None:
-                model_years = project_config.get_base_dimension(
-                    DimensionType.MODEL_YEAR
-                ).get_unique_ids()
-            else:
-                model_years = get_unique_values(m_year_df, "id")
-            ld_df = self._convert_time_dimension(
-                ld_df, project_config, model_years=model_years, value_columns=value_columns
-            )
-
+        ld_df = self._convert_time_dimension(
+            ld_df, project_config, value_columns, context.scratch_dir_context
+        )
         return self._finalize_table(context, ld_df, value_columns, project_config)

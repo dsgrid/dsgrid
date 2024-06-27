@@ -16,6 +16,7 @@ from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.dataset import (
     apply_scaling_factor,
 )
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     create_dataframe_from_ids,
     read_dataframe,
@@ -48,7 +49,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(self):
         self._check_lookup_data_consistency()
-        self._check_dataset_time_consistency(self._load_data)
+        self._check_dataset_time_consistency(self._load_data.join(self._load_data_lookup, on="id"))
         self._check_dataset_internal_consistency()
 
     def make_dimension_association_table(self) -> DataFrame:
@@ -63,22 +64,16 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         return df
 
-    def make_project_dataframe(self, project_config):
+    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         # TODO: Can we remove NULLs at registration time?
         null_lk_df = self._load_data_lookup.filter("id is NULL")
         lk_df = self._load_data_lookup.filter("id is not NULL")
         ld_df = self._load_data
-
         ld_df = ld_df.join(lk_df, on="id").drop("id")
-
-        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
-        if convert_time_before_project_mapping:
-            # There is currently no case that needs model years or value columns.
-            ld_df = self._convert_time_dimension(ld_df, project_config)
 
         # TODO: This might need to handle data skew in the future.
         null_lk_df = self._remap_dimension_columns(null_lk_df, False)
-        ld_df = self._remap_dimension_columns(ld_df, True)
+        ld_df = self._remap_dimension_columns(ld_df, True, scratch_dir_context=scratch_dir_context)
         value_columns = set(ld_df.columns).intersection(self.get_value_columns_mapped_to_project())
         if SCALING_FACTOR_COLUMN in ld_df.columns:
             ld_df = apply_scaling_factor(ld_df, value_columns)
@@ -87,13 +82,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-        if not convert_time_before_project_mapping:
-            model_year_dim = project_config.get_base_dimension(DimensionType.MODEL_YEAR)
-            model_years = get_unique_values(model_year_dim.get_records_dataframe(), "id")
-            ld_df = self._convert_time_dimension(
-                ld_df, project_config, model_years=model_years, value_columns=value_columns
-            )
-
+        ld_df = self._convert_time_dimension(
+            ld_df, project_config, value_columns, scratch_dir_context
+        )
         ld_df = self._handle_unpivot_column_rename(ld_df)
         return self._add_null_values(ld_df, null_lk_df)
 
@@ -109,14 +100,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if self._config.get_table_format_type() == TableFormatType.PIVOTED:
             ld_df = self._prefilter_pivoted_dimensions(context, ld_df)
         ld_df = self._prefilter_time_dimension(context, ld_df)
-
         ld_df = ld_df.join(lk_df, on="id").drop("id")
-
-        convert_time_before_project_mapping = self._convert_time_before_project_mapping()
-        if convert_time_before_project_mapping:
-            # There is currently no case that needs model years or value columns.
-            ld_df = self._convert_time_dimension(ld_df, project_config)
-
         ld_df = self._remap_dimension_columns(
             ld_df,
             True,
@@ -136,19 +120,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         null_lk_df = self._remap_dimension_columns(
             null_lk_df, False, filtered_records=context.get_record_ids()
         )
-
-        if not convert_time_before_project_mapping:
-            m_year_df = context.try_get_record_ids_by_dimension_type(DimensionType.MODEL_YEAR)
-            if m_year_df is None:
-                model_years = project_config.get_base_dimension(
-                    DimensionType.MODEL_YEAR
-                ).get_unique_ids()
-            else:
-                model_years = get_unique_values(m_year_df, "id")
-            ld_df = self._convert_time_dimension(
-                ld_df, project_config, model_years=model_years, value_columns=value_columns
-            )
-
+        ld_df = self._convert_time_dimension(
+            ld_df, project_config, value_columns, context.scratch_dir_context
+        )
         ld_df = self._add_null_values(ld_df, null_lk_df)
         return self._finalize_table(context, ld_df, value_columns, project_config)
 

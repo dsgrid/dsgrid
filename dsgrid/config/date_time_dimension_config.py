@@ -1,4 +1,5 @@
 import logging
+
 from pyspark.sql.types import (
     StructType,
     StructField,
@@ -10,6 +11,7 @@ from dsgrid.dimension.time import DatetimeRange, DatetimeFormat
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -99,14 +101,14 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             )
         return
 
-    def build_time_dataframe(self, model_years=None):
+    def build_time_dataframe(self):
         # Note: DF.show() displays time in session time, which may be confusing.
         # But timestamps are stored correctly here
 
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
-        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
+        model_time = self.list_expected_dataset_timestamps()
         schema = StructType([StructField(time_col, TimestampType(), False)])
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
         return df_time
@@ -140,8 +142,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         self,
         df,
         project_time_dim,
-        model_years=None,
-        value_columns=None,
+        value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):
@@ -156,6 +158,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         df = self._convert_time_to_project_time(
             df,
             project_time_dim,
+            scratch_dir_context,
             wrap_time=wrap_time_allowed,
             time_based_data_adjustment=time_based_data_adjustment,
         )
@@ -164,10 +167,10 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return self.model.frequency
 
-    def get_time_ranges(self, model_years=None):
+    def get_time_ranges(self):
         ranges = []
         for start, end in self._build_time_ranges(
-            self.model.ranges, self.model.str_format, model_years=model_years, tz=self.get_tzinfo()
+            self.model.ranges, self.model.str_format, tz=self.get_tzinfo()
         ):
             ranges.append(
                 DatetimeRange(
@@ -193,9 +196,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self, model_years=None):
+    def list_expected_dataset_timestamps(self):
         timestamps = []
-        for time_range in self.get_time_ranges(model_years=model_years):
+        for time_range in self.get_time_ranges():
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps
 

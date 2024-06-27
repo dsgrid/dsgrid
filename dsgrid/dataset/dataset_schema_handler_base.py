@@ -5,10 +5,15 @@ from typing import Optional, Union
 
 from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
+from dsgrid.config.annual_time_dimension_config import (
+    AnnualTimeDimensionConfig,
+    map_annual_historical_time_to_date_time,
+)
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 
 import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dataset_config import DatasetConfig, InputDatasetType
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
 )
@@ -17,10 +22,14 @@ from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidQuery
-from dsgrid.dimension.time import TimeDimensionType, DaylightSavingAdjustmentModel
+from dsgrid.dimension.time import (
+    TimeDimensionType,
+    DaylightSavingAdjustmentModel,
+)
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.utils.dataset import (
+    check_historical_annual_time_model_year_consistency,
     is_noop_mapping,
     map_and_reduce_stacked_dimension,
     map_and_reduce_pivoted_dimension,
@@ -153,12 +162,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return list(set(load_data_df.columns).difference(set(value_cols + time_cols)))
 
     @abc.abstractmethod
-    def make_project_dataframe(self, project_config):
+    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         """Return a load_data dataframe with dimensions mapped to the project's.
 
         Parameters
         ----------
         project_config: ProjectConfig
+        scratch_dir_context: ScratchDirContext
 
         Returns
         -------
@@ -209,6 +219,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
         time_dim.check_dataset_time_consistency(load_data_df, time_cols)
         if time_dim.model.time_type != TimeDimensionType.NOOP:
             self._check_dataset_time_consistency_by_time_array(time_cols, load_data_df)
+        self._check_model_year_time_consistency(load_data_df)
+
+    def _check_model_year_time_consistency(self, df: DataFrame):
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        if self._config.model.dataset_type == InputDatasetType.HISTORICAL and isinstance(
+            time_dim, AnnualTimeDimensionConfig
+        ):
+            annual_cols = time_dim.get_load_data_time_columns()
+            assert len(annual_cols) == 1
+            annual_col = annual_cols[0]
+            check_historical_annual_time_model_year_consistency(
+                df, annual_col, DimensionType.MODEL_YEAR.value
+            )
 
     @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency_by_time_array(self, time_cols, load_data_df):
@@ -534,21 +557,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
         df = df.groupBy(*ordered_subset_columns(df, gcols)).agg(*agg_ops)
         return df.drop("fraction")
 
-    def _convert_time_before_project_mapping(self):
-        time_dim = self._config.get_dimension(DimensionType.TIME)
-        val = (
-            time_dim.model.is_time_zone_required_in_geography()
-            and not self._config.model.use_project_geography_time_zone
-        )
-        return val
-
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(
         self,
         load_data_df,
         project_config,
-        model_years=None,
-        value_columns=None,
+        value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
     ):
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
@@ -562,13 +577,26 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
             load_data_df = add_time_zone(load_data_df, geography_dim)
 
-        if model_years is not None:
-            model_years = sorted(int(x) for x in model_years)
+        if isinstance(time_dim, AnnualTimeDimensionConfig):
+            project_time_dim = project_config.get_base_dimension(DimensionType.TIME)
+            if not isinstance(project_time_dim, DateTimeDimensionConfig):
+                msg = f"Annual time can only be mapped to DateTime: {project_time_dim.model.time_type}"
+                raise NotImplementedError(msg)
+            if self._config.model.dataset_type == InputDatasetType.HISTORICAL:
+                return map_annual_historical_time_to_date_time(
+                    load_data_df,
+                    time_dim,
+                    project_time_dim,
+                    value_columns,
+                )
+            msg = f"Cannot map AnnualTime for a dataset of type {self._config.model.dataset_type}"
+            raise NotImplementedError(msg)
+
         load_data_df = time_dim.convert_dataframe(
             load_data_df,
             self._project_time_dim,
-            model_years=model_years,
-            value_columns=value_columns,
+            value_columns,
+            scratch_dir_context,
             wrap_time_allowed=wrap_time_allowed,
             time_based_data_adjustment=time_based_data_adjustment,
         )

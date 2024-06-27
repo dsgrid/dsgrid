@@ -5,6 +5,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     AnnualTimeDimensionModel,
+    map_annual_historical_time_to_date_time,
 )
 from dsgrid.config.date_time_dimension_config import (
     DateTimeDimensionConfig,
@@ -16,37 +17,86 @@ from dsgrid.dimension.time import (
     TimeIntervalType,
     TimeZone,
 )
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
+from dsgrid.utils.spark import create_dataframe_from_dicts
+
+
+@pytest.fixture(scope="module")
+def annual_dataframe():
+    data = [
+        {
+            "time_year": 2019,
+            "geography": "CO",
+            "electricity_sales": 602872.1,
+        },
+        {
+            "time_year": 2020,
+            "geography": "CO",
+            "electricity_sales": 702872.1,
+        },
+        {
+            "time_year": 2021,
+            "geography": "CO",
+            "electricity_sales": 802872.1,
+        },
+        {
+            "time_year": 2022,
+            "geography": "CO",
+            "electricity_sales": 902872.1,
+        },
+    ]
+    yield create_dataframe_from_dicts(data).cache()
 
 
 @pytest.fixture
-def annual_dataframe():
-    spark = get_spark_session()
-    df = spark.createDataFrame(
-        [
-            {
-                "time_year": "2019",
-                "geography": "CO",
-                "electricity_sales": 602872.1,
-            },
-            {
-                "time_year": "2020",
-                "geography": "CO",
-                "electricity_sales": 702872.1,
-            },
-            {
-                "time_year": "2021",
-                "geography": "CO",
-                "electricity_sales": 802872.1,
-            },
-            {
-                "time_year": "2022",
-                "geography": "CO",
-                "electricity_sales": 902872.1,
-            },
-        ]
+def annual_dataframe_with_model_year_values():
+    yield [
+        {
+            "time_year": 2019,
+            "model_year": 2019,
+            "geography": "CO",
+            "electricity_sales": 602872.1,
+        },
+        {
+            "time_year": 2020,
+            "model_year": 2020,
+            "geography": "CO",
+            "electricity_sales": 702872.1,
+        },
+        {
+            "time_year": 2021,
+            "model_year": 2021,
+            "geography": "CO",
+            "electricity_sales": 802872.1,
+        },
+        {
+            "time_year": None,
+            "model_year": 2022,
+            "geography": "CO",
+            "electricity_sales": 902872.1,
+        },
+    ]
+
+
+@pytest.fixture
+def annual_dataframe_with_model_year_valid(annual_dataframe_with_model_year_values):
+    data = annual_dataframe_with_model_year_values
+    yield create_dataframe_from_dicts(data).cache(), "time_year", "model_year"
+
+
+@pytest.fixture
+def annual_dataframe_with_model_year_invalid(annual_dataframe_with_model_year_values):
+    data = annual_dataframe_with_model_year_values
+    data.append(
+        {
+            "time_year": 2023,
+            "model_year": 2019,
+            "geography": "CO",
+            "electricity_sales": 702872.1,
+        },
     )
-    yield df
+    yield create_dataframe_from_dicts(data).cache(), "time_year", "model_year"
 
 
 @pytest.fixture
@@ -91,50 +141,50 @@ def date_time_dimension():
     )
 
 
-def test_map_annual_time_measured_to_datetime(
-    annual_dataframe, annual_time_dimension, date_time_dimension
-):
-    annual_time_dimension.model.measurement_type = MeasurementType.MEASURED
-    model_years = [2020, 2024]
-    df = annual_time_dimension.map_annual_time_measured_to_datetime(
-        annual_dataframe, date_time_dimension, model_years
-    )
-    assert df.count() == 168
-    values = df.select("electricity_sales").distinct().collect()
-    assert len(values) == 1
-    assert (
-        values[0].electricity_sales
-        == annual_dataframe.filter("time_year == 2020").collect()[0].electricity_sales
-    )
-    mapped_model_years = (
-        df.withColumn("year", F.year(df.timestamp)).select("year").distinct().collect()
-    )
-    assert len(mapped_model_years) == 1
-    assert mapped_model_years[0].year == 2020
-
-
 def test_map_annual_time_total_to_datetime(
     annual_dataframe, annual_time_dimension, date_time_dimension
 ):
     annual_time_dimension.model.measurement_type = MeasurementType.TOTAL
-    model_years = [2020, 2024]
-    value_columns = ["electricity_sales"]
-    df = annual_time_dimension.map_annual_total_to_datetime(
-        annual_dataframe, date_time_dimension, model_years, value_columns
+    value_columns = {"electricity_sales"}
+    df = map_annual_historical_time_to_date_time(
+        annual_dataframe,
+        annual_time_dimension,
+        date_time_dimension,
+        value_columns,
     )
-    assert df.count() == 168
-    values = df.select("electricity_sales").distinct().collect()
-    assert len(values) == 1
-    num_intervals_2020 = (
-        366 * 24 / (date_time_dimension.model.frequency.total_seconds() / (60 * 60))
+    expected_by_year = {
+        x.time_year: x.electricity_sales / (366 * 24) for x in annual_dataframe.collect()
+    }
+    num_rows = annual_dataframe.count()
+    num_timestamps = 24 * 7
+    assert df.count() == num_rows * num_timestamps
+    values = df.select("model_year", "electricity_sales").distinct().collect()
+    assert len(values) == num_rows
+    by_year = {x.model_year: x.electricity_sales for x in values}
+    assert len(by_year) == len(expected_by_year)
+    for year in by_year:
+        assert by_year[year] == expected_by_year[int(year)]
+
+    time_col = date_time_dimension.get_load_data_time_columns()[0]
+    count_timestamps_per_model_year = (
+        df.groupBy("model_year")
+        .agg(F.count(time_col).alias("count_timestamps"))
+        .select("count_timestamps")
+        .distinct()
+        .collect()
     )
-    assert (
-        values[0].electricity_sales
-        == annual_dataframe.filter("time_year == 2020").collect()[0].electricity_sales
-        / num_intervals_2020
-    )
-    mapped_model_years = (
-        df.withColumn("year", F.year(df.timestamp)).select("year").distinct().collect()
-    )
-    assert len(mapped_model_years) == 1
-    assert mapped_model_years[0].year == 2020
+    assert len(count_timestamps_per_model_year) == 1
+    assert count_timestamps_per_model_year[0]["count_timestamps"] == num_timestamps
+
+
+def test_historical_annual_model_year_consistency_valid(annual_dataframe_with_model_year_valid):
+    df, time_col, model_year_col = annual_dataframe_with_model_year_valid
+    check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)
+
+
+def test_historical_annual_model_year_consistency_invalid(
+    annual_dataframe_with_model_year_invalid,
+):
+    df, time_col, model_year_col = annual_dataframe_with_model_year_invalid
+    with pytest.raises(DSGInvalidDataset):
+        check_historical_annual_time_model_year_consistency(df, time_col, model_year_col)

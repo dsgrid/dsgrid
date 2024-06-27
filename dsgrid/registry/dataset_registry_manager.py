@@ -13,7 +13,10 @@ from dsgrid.config.dataset_config import (
     ALLOWED_DATA_FILES,
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
+from dsgrid.config.dimensions_config import (
+    DimensionsConfig,
+    DimensionsConfigModel,
+)
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
@@ -260,7 +263,9 @@ class DatasetRegistryManager(RegistryManagerBase):
                 dst = dataset_path / filename
                 # Writing with Spark is much faster than copying or rsync if there are
                 # multiple nodes in the cluster - much more parallelism.
-                write_dataframe(read_dataframe(path), dst)
+                # We set overwrite=True because if the path exists, it's only because a previous
+                # attempt failed.
+                write_dataframe(read_dataframe(path), dst, overwrite=True)
                 found_files = True
         if not found_files:
             msg = f"Did not find any data files in {config.dataset_path}"

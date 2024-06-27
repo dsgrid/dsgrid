@@ -90,7 +90,7 @@ def dump_line_delimited_json(data, filename, mode="w"):
         Mode to use for opening the file, defaults to "w"
 
     """
-    with open(filename, mode, encoding="utf-8") as f_out:
+    with open(filename, mode, encoding="utf-8-sig") as f_out:
         for obj in data:
             f_out.write(json.dumps(obj))
             f_out.write("\n")

@@ -1,4 +1,5 @@
 """Functions related to time"""
+
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import logging
@@ -26,7 +27,7 @@ from dsgrid.dimension.time import (
     adjust_timestamp_by_dst_offset,
 )
 from dsgrid.config.dimensions import TimeRangeModel
-from dsgrid.exceptions import DSGInvalidDimension, DSGInvalidOperation
+from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.time.types import DatetimeTimestampType, IndexTimestampType
 from dsgrid.utils.spark import get_spark_session
 
@@ -229,40 +230,31 @@ def get_dls_fallback_time_change_by_time_range(
 def build_time_ranges(
     time_ranges: TimeRangeModel,
     str_format: str,
-    model_years: Optional[list[int]] = None,
     tz: Optional[TimeZone] = None,
 ):
     ranges = []
-    allowed_year = None
     for time_range in time_ranges:
         start = datetime.strptime(time_range.start, str_format)
         end = datetime.strptime(time_range.end, str_format)
-        if model_years is not None:
-            if start.year != end.year or (allowed_year is not None and start.year != allowed_year):
-                raise DSGInvalidDimension(
-                    f"All time ranges must be in the same year if model_years is set: {model_years=}"
-                )
-            allowed_year = start.year
-        for year in model_years or [start.year]:
-            start_adj = datetime(
-                year=year,
-                month=start.month,
-                day=start.day,
-                hour=start.hour,
-                minute=start.minute,
-                second=start.second,
-                microsecond=start.microsecond,
-            )
-            end_adj = datetime(
-                year=end.year + year - start.year,
-                month=end.month,
-                day=end.day,
-                hour=end.hour,
-                minute=end.minute,
-                second=end.second,
-                microsecond=end.microsecond,
-            )
-            ranges.append((pd.Timestamp(start_adj, tz=tz), pd.Timestamp(end_adj, tz=tz)))
+        start_adj = datetime(
+            year=start.year,
+            month=start.month,
+            day=start.day,
+            hour=start.hour,
+            minute=start.minute,
+            second=start.second,
+            microsecond=start.microsecond,
+        )
+        end_adj = datetime(
+            year=end.year,
+            month=end.month,
+            day=end.day,
+            hour=end.hour,
+            minute=end.minute,
+            second=end.second,
+            microsecond=end.microsecond,
+        )
+        ranges.append((pd.Timestamp(start_adj, tz=tz), pd.Timestamp(end_adj, tz=tz)))
 
     ranges.sort(key=lambda x: x[0])
     return ranges
@@ -270,7 +262,6 @@ def build_time_ranges(
 
 def get_time_ranges(
     time_dimension_config,  #: DateTimeDimensionConfig,
-    model_years: Optional[list[int]] = None,
     timezone: TimeZone = None,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
@@ -287,9 +278,7 @@ def get_time_ranges(
         raise ValueError(msg)
 
     ranges = []
-    for start, end in build_time_ranges(
-        dt_ranges, dim_model.str_format, model_years=model_years, tz=timezone
-    ):
+    for start, end in build_time_ranges(dt_ranges, dim_model.str_format, tz=timezone):
         ranges.append(
             DatetimeRange(
                 start=start,
@@ -304,7 +293,6 @@ def get_time_ranges(
 
 def get_index_ranges(
     time_dimension_config,  #: IndexTimeDimensionConfig,
-    model_years: Optional[list[int]] = None,
     timezone: TimeZone = None,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
@@ -313,9 +301,7 @@ def get_index_ranges(
         timezone = dim_model.get_tzinfo()
     dt_ranges = time_dimension_config._create_represented_time_ranges()
     ranges = []
-    time_ranges = build_time_ranges(
-        dt_ranges, dim_model.str_format, model_years=model_years, tz=timezone
-    )
+    time_ranges = build_time_ranges(dt_ranges, dim_model.str_format, tz=timezone)
     for index_range, time_range in zip(dim_model.ranges, time_ranges):
         ranges.append(
             IndexTimeRange(
@@ -332,14 +318,12 @@ def get_index_ranges(
 
 def list_timestamps(
     time_dimension_config,  #: DateTimeDimensionConfig,
-    model_years: Optional[list[int]] = None,
     timezone: TimeZone = None,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
     timestamps = []
     for time_range in get_time_ranges(
         time_dimension_config,
-        model_years=model_years,
         timezone=timezone,
         time_based_data_adjustment=time_based_data_adjustment,
     ):
@@ -349,14 +333,12 @@ def list_timestamps(
 
 def list_time_indices(
     time_dimension_config,  #: IndexTimeDimensionConfig,
-    model_years: Optional[list[int]] = None,
     timezone: TimeZone = None,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
 ):
     indices = []
     for index_range in get_index_ranges(
         time_dimension_config,
-        model_years=model_years,
         timezone=timezone,
         time_based_data_adjustment=time_based_data_adjustment,
     ):
@@ -366,7 +348,6 @@ def list_time_indices(
 
 def build_index_time_map(
     time_dimension_config,  #: IndexTimeDimensionConfig,
-    model_years=None,
     timezone=None,
     time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
 ):
@@ -375,13 +356,11 @@ def build_index_time_map(
     time_col = time_col[0]
     indices = list_time_indices(
         time_dimension_config,
-        model_years=model_years,
         timezone=timezone,
         time_based_data_adjustment=time_based_data_adjustment,
     )
     timestamps = list_timestamps(
         time_dimension_config,
-        model_years=model_years,
         timezone=timezone,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -401,7 +380,7 @@ def build_index_time_map(
 
 
 def build_datetime_dataframe(
-    time_dimension_config, model_years=None, timezone=None, time_based_data_adjustment=None
+    time_dimension_config, timezone=None, time_based_data_adjustment=None
 ):
 
     time_col = time_dimension_config.get_load_data_time_columns()
@@ -409,7 +388,6 @@ def build_datetime_dataframe(
     time_col = time_col[0]
     model_time = list_timestamps(
         time_dimension_config,
-        model_years=model_years,
         timezone=timezone,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -419,7 +397,7 @@ def build_datetime_dataframe(
 
 
 def build_index_time_dataframe(
-    time_dimension_config, model_years=None, timezone=None, time_based_data_adjustment=None
+    time_dimension_config, timezone=None, time_based_data_adjustment=None
 ):
 
     time_col = time_dimension_config.get_load_data_time_columns()
@@ -427,7 +405,6 @@ def build_index_time_dataframe(
     time_col = time_col[0]
     model_time = list_time_indices(
         time_dimension_config,
-        model_years=model_years,
         timezone=timezone,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -440,7 +417,6 @@ def create_adjustment_map_from_model_time(
     time_dimension_config,  #: IndexTimeDimensionConfig,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel,
     time_zone: TimeZone,
-    model_years: Optional[list[int]] = None,
 ):
     """Create data adjustment mapping from model_time to prevailing time (timestamp) of input time_zone."""
     time_col = list(DatetimeTimestampType._fields)
@@ -452,7 +428,6 @@ def create_adjustment_map_from_model_time(
     TZ_st, TZ_pt = time_zone.get_standard_time(), time_zone.get_prevailing_time()
     ranges = get_time_ranges(
         time_dimension_config,
-        model_years=model_years,
         timezone=TZ_pt.tz,
         time_based_data_adjustment=time_based_data_adjustment,
     )
@@ -649,3 +624,8 @@ def apply_time_wrap(df, project_time_dim, diff: set):
         )
 
     return df
+
+
+def is_leap_year(year: int) -> bool:
+    """Return True if the year is a leap year."""
+    return year % 4 == 0 and (year % 100 != 0 or year % 400 == 0)

@@ -192,7 +192,7 @@ def df_date_time():
     )
     ts_st = [str(ts) for ts in ts_st]
     timestamps = [ts_pt, ts_pt, ts_st]
-    values = np.arange(0.0, 8784.0).tolist()
+    values = np.arange(0.0, 8784.0).tolist()  # daylight saving transition [1680:7396]
     sch = StructType(
         [
             StructField("timestamp", StringType(), False),
@@ -289,10 +289,6 @@ def check_validation_error_365_days(time_dimension_model):
         DateTimeDimensionModel.model_validate(data)
 
 
-def check_register_annual_time(annual_time_dimension_model):
-    print(annual_time_dimension_model)
-
-
 def to_utc(time_change):
     return [x.astimezone(ZoneInfo("UTC")) for x in time_change]
 
@@ -318,10 +314,8 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df, scratch
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
-    # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
-    print(f2.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2) == n_df
     ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
@@ -342,7 +336,6 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df, scratch
         time_based_data_adjustment=None,
     )
     f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
-    print(f3.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2.compare(f3)) == 0
     ), f"LocalModel_time.convert_dataframe() with time_based_data_adjustment=None should have the same behavior as with {time_based_data_adjustment=}"
@@ -362,10 +355,8 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df, scratch
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
-    # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
-    print(f2.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2) == n_df
     ), f"convert_dataframe() did not return the same row count. before={n_df} vs. after={len(f2)}"
@@ -401,7 +392,6 @@ def local_time_conversion_tests(config, project_time_dim, df, scratch_dir_contex
         time_based_data_adjustment=time_based_data_adjustment,
     )
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
-    print(f2.loc[1680:7396])  # daylight saving transition
     for geo in sorted(f2["geography"].unique()):
         assert (
             f2.loc[f2["geography"] == geo, "value"].to_list() == values
@@ -415,7 +405,6 @@ def local_time_conversion_tests(config, project_time_dim, df, scratch_dir_contex
         time_based_data_adjustment=None,
     )
     f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
-    print(f3.loc[1680:7396])  # daylight saving transition
     assert (
         len(f2.compare(f3)) == 0
     ), f"Local_time.convert_dataframe() with time_based_data_adjustment=None should have the same behavior as with {time_based_data_adjustment=}"
@@ -439,10 +428,6 @@ def test_time_dimension_model3(time_dimension_model3):
     check_date_range_creation(time_dimension_model3)
 
 
-def test_time_dimension_model4(annual_time_dimension_model):
-    check_register_annual_time(annual_time_dimension_model)
-
-
 def test_time_dimension_model5(representative_time_dimension_model):
     config = RepresentativePeriodTimeDimensionConfig(representative_time_dimension_model)
     if config.model.format.value == "one_week_per_month_by_hour":
@@ -450,7 +435,7 @@ def test_time_dimension_model5(representative_time_dimension_model):
         assert n_times == 24 * 7 * 12, n_times
         assert config.get_frequency() == datetime.timedelta(hours=1)
 
-    config.get_time_ranges()  # TODO: this is not correct yet in terms of year, maybe this functionality should exist in project instead
+    config.get_time_ranges()
 
 
 def test_daylight_saving_time_changes():
@@ -623,7 +608,6 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     joined_table = table1.selectExpr("time_index", "timestamp as model_time").join(
         table2, ["model_time"], "right"
     )
-    # joined_table.sort([F.col("time_index"), F.col("timestamp")]).show()
 
     # check joined_table
     res = joined_table.select("time_index", "multiplier").collect()
@@ -662,7 +646,6 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
             time_zone.tz_name,
         ),
     )
-    # joined_table.sort([F.col("time_index"), F.col("timestamp")]).show()
 
     # check joined_table
     res = joined_table.select("time_index", "multiplier").collect()
@@ -743,7 +726,6 @@ def test_index_time_conversion_subhourly(
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
-    # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
     assert (
@@ -788,7 +770,6 @@ def test_index_time_conversion_subhourly(
         wrap_time_allowed=True,
         time_based_data_adjustment=time_based_data_adjustment,
     )
-    # df2.sort(F.col("timestamp"), F.col("geography")).show()
 
     f2 = df2.sort(F.col("geography"), F.col("timestamp")).toPandas()
     assert (

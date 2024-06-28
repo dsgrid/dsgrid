@@ -379,38 +379,38 @@ def build_index_time_map(
     return df_time
 
 
-def build_datetime_dataframe(
-    time_dimension_config, timezone=None, time_based_data_adjustment=None
-):
+# def build_datetime_dataframe(
+#     time_dimension_config, timezone=None, time_based_data_adjustment=None
+# ):
 
-    time_col = time_dimension_config.get_load_data_time_columns()
-    assert len(time_col) == 1, time_col
-    time_col = time_col[0]
-    model_time = list_timestamps(
-        time_dimension_config,
-        timezone=timezone,
-        time_based_data_adjustment=time_based_data_adjustment,
-    )
-    schema = StructType([StructField(time_col, TimestampType(), False)])
-    df_time = get_spark_session().createDataFrame(model_time, schema=schema)
-    return df_time
+#     time_col = time_dimension_config.get_load_data_time_columns()
+#     assert len(time_col) == 1, time_col
+#     time_col = time_col[0]
+#     model_time = list_timestamps(
+#         time_dimension_config,
+#         timezone=timezone,
+#         time_based_data_adjustment=time_based_data_adjustment,
+#     )
+#     schema = StructType([StructField(time_col, TimestampType(), False)])
+#     df_time = get_spark_session().createDataFrame(model_time, schema=schema)
+#     return df_time
 
 
-def build_index_time_dataframe(
-    time_dimension_config, timezone=None, time_based_data_adjustment=None
-):
+# def build_index_time_dataframe(
+#     time_dimension_config, timezone=None, time_based_data_adjustment=None
+# ):
 
-    time_col = time_dimension_config.get_load_data_time_columns()
-    assert len(time_col) == 1, time_col
-    time_col = time_col[0]
-    model_time = list_time_indices(
-        time_dimension_config,
-        timezone=timezone,
-        time_based_data_adjustment=time_based_data_adjustment,
-    )
-    schema = StructType([StructField(time_col, IntegerType(), False)])
-    df_time = get_spark_session().createDataFrame(model_time, schema=schema)
-    return df_time
+#     time_col = time_dimension_config.get_load_data_time_columns()
+#     assert len(time_col) == 1, time_col
+#     time_col = time_col[0]
+#     model_time = list_time_indices(
+#         time_dimension_config,
+#         timezone=timezone,
+#         time_based_data_adjustment=time_based_data_adjustment,
+#     )
+#     schema = StructType([StructField(time_col, IntegerType(), False)])
+#     df_time = get_spark_session().createDataFrame(model_time, schema=schema)
+#     return df_time
 
 
 def create_adjustment_map_from_model_time(

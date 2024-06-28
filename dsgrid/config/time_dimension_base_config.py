@@ -178,9 +178,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     @abc.abstractmethod
     def list_expected_dataset_timestamps(
         self,
-        data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
     ) -> list[tuple]:
         """Return a list of the timestamps expected in the load_data table.
+        Parameters
+        ----------
+        time_based_data_adjustmen : TimeBasedDataAdjustmentModel | None
 
         Returns
         -------

@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from dsgrid.dimension.time import make_time_range
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from .dimensions import NoOpTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -22,26 +22,21 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     #     pass
 
     def convert_dataframe(
-        self, df, project_time_dim, model_years=None, value_columns=None, wrap_time_allowed=False
+        self,
+        df,
+        project_time_dim,
+        value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
+        wrap_time_allowed=False,
+        time_based_data_adjustment=None,
     ):
         return df
 
     def get_frequency(self):
         return timedelta(days=0)
 
-    def get_time_ranges(self, model_years=None):
-        frequency = self.get_frequency()
-        ranges = [
-            make_time_range(
-                start=None,
-                end=None,
-                frequency=frequency,
-                leap_day_adjustment=None,
-                time_interval_type=None,
-            )
-        ]
-
-        return ranges
+    def get_time_ranges(self):
+        return []
 
     def get_load_data_time_columns(self):
         return []
@@ -52,5 +47,5 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_interval_type(self):
         return None
 
-    def list_expected_dataset_timestamps(self, model_years=None):
+    def list_expected_dataset_timestamps(self):
         return []

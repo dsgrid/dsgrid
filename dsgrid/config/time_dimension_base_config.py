@@ -1,21 +1,39 @@
 import abc
-from datetime import datetime, timedelta
+import logging
+from datetime import timedelta
 from typing import Optional
 
-import pandas as pd
 import pyspark.sql.functions as F
+from pyspark.sql import Row
+from pyspark.sql import DataFrame
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
-from dsgrid.dimension.time import TimeZone, TimeIntervalType
-from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidDimension
+from dsgrid.dimension.time import (
+    TimeZone,
+    TimeIntervalType,
+    LeapDayAdjustmentType,
+    TimeBasedDataAdjustmentModel,
+)
+from dsgrid.dimension.time_utils import (
+    build_time_ranges,
+    filter_to_project_timestamps,
+    shift_time_interval,
+    time_difference,
+    apply_time_wrap,
+)
 from dsgrid.config.dimensions import TimeRangeModel
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.utils.spark import persist_intermediate_table
+
+
+logger = logging.getLogger(__name__)
 
 
 class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     """Base class for all time dimension configs"""
 
     @abc.abstractmethod
-    def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]):
+    def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]) -> None:
         """Check consistency of the load data with the time dimension.
 
         Parameters
@@ -31,18 +49,12 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
-    def build_time_dataframe(self, model_years: Optional[list[int]] = None):
+    def build_time_dataframe(self) -> DataFrame:
         """Build time dimension as specified in config in a spark dataframe.
-
-        Parameters
-        ----------
-        model_years : None | list[int]
-            If specified, repeat the timestamps for each model year.
 
         Returns
         -------
         pyspark.sql.DataFrame
-
         """
 
     # @abc.abstractmethod
@@ -62,38 +74,38 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         self,
         df,
         project_time_dim,
-        model_years: Optional[list[int]] = None,
-        value_columns: Optional[set[str]] = None,
+        value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
         wrap_time_allowed: bool = False,
-    ):
+        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    ) -> DataFrame:
         """Convert input df to use project's time format and time zone.
 
         Parameters
         ----------
         df : pyspark.sql.DataFrame
         project_time_dim : TimeDimensionBaseConfig
-        model_years : None | list[int]
-            Model years required by the project. Not required for all time dimension types.
-        value_columns : None | set[str]
-            Columns in the dataframe that represent load values. Not required for all time
-            dimension types.
+        value_columns : set[str]
+            Columns in the dataframe that represent load values.
+        scratch_dir_context
+            Used to persist intermediate tables.
         wrapped_time_allowed : bool
             Whether to allow time-wrapping to align time zone
+        time_based_data_adjustment : None | TimeBasedDataAdjustmentModel
+            Leap day and daylight saving adjustments to make to both time and data.
 
         Returns
         -------
         pyspark.sql.DataFrame
-
         """
 
     @abc.abstractmethod
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         """Return the frequency.
 
         Returns
         -------
         timedelta
-
         """
 
     @abc.abstractmethod
@@ -103,7 +115,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         list
-
         """
 
     def list_load_data_columns_for_query_name(self) -> list[str]:
@@ -112,12 +123,11 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         list[str]
-
         """
         # This may need to be re-implemented by child classes.
         return [self.model.dimension_query_name]
 
-    def map_timestamp_load_data_columns_for_query_name(self, df):
+    def map_timestamp_load_data_columns_for_query_name(self, df) -> DataFrame:
         """Map the timestamp columns in the load data table to those specified by the query name.
 
         Parameters
@@ -127,7 +137,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         pyspark.sql.DataFrame
-
         """
         time_cols = self.get_load_data_time_columns()
         if len(time_cols) > 1:
@@ -139,20 +148,13 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df.withColumnRenamed(time_cols[0], self.model.dimension_query_name)
 
     @abc.abstractmethod
-    def get_time_ranges(self, model_years: Optional[list[int]] = None):
+    def get_time_ranges(self):
         """Return time ranges with timezone applied.
-
-        Parameters
-        ----------
-        model_years : None | list[int]
-            If set, replace the base year in the time ranges with these model years. In this case
-            each range must be in the same year.
 
         Returns
         -------
         list
             list of DatetimeRange
-
         """
 
     @abc.abstractmethod
@@ -162,28 +164,26 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         Returns
         -------
         tzinfo | None
-
         """
 
     @abc.abstractmethod
-    def get_time_interval_type(self):
+    def get_time_interval_type(self) -> TimeIntervalType:
         """Return the time interval type for this dimension.
 
         Returns
         -------
-        TimeIntervalType | None
-
+        TimeIntervalType
         """
 
     @abc.abstractmethod
-    def list_expected_dataset_timestamps(self, model_years: Optional[list[int]] = None):
+    def list_expected_dataset_timestamps(
+        self,
+        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    ) -> list[tuple]:
         """Return a list of the timestamps expected in the load_data table.
-
         Parameters
         ----------
-        model_years : None | list[int]
-            If set, replace the base year in the time ranges with these model years. In this case
-            each range must be in the same year.
+        time_based_data_adjustmen : TimeBasedDataAdjustmentModel | None
 
         Returns
         -------
@@ -192,32 +192,75 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         """
 
-    def _convert_time_to_project_time_interval(
-        self, df, project_time_dim=None, wrap_time: bool = False
-    ):
+    def convert_time_format(self, df: DataFrame) -> DataFrame:
+        """Convert time from str format to datetime if exists."""
+        return df
+
+    def _convert_time_to_project_time(
+        self,
+        df: DataFrame,
+        project_time_dim: "TimeDimensionBaseConfig",
+        context: ScratchDirContext,
+        wrap_time: bool = False,
+        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    ) -> DataFrame:
         """
         Shift time to match project time based on TimeIntervalType, time zone,
         and other attributes.
-        - Time-wrapping is applied as needed as part of align_time_interval_type
-        - Separately, input wrap_time allows time-wrapping to be applied if dataset
-        has a different time zone than project. wrap_time_allowed is specified by
-        the project's InputDatasetModel.
+        - Time-wrapping is applied automatically when aligning time_interval_type.
+        - wrap_time_allowed from InputDatasetModel is used to align time due to
+        time_zone differences
         """
-        if project_time_dim is None:
-            return df
+        if time_based_data_adjustment is None:
+            time_based_data_adjustment = TimeBasedDataAdjustmentModel()
 
-        df = self._align_time_interval_type(df, project_time_dim)
+        # At least in the case of DECARB-industrial, this is required to get through
+        # dataset-to-project mapping on one Kestrel node.
+        # That might not be true for other datasets, and so more customization might be
+        # required.
+        df = persist_intermediate_table(df, context)
+
+        time_col = project_time_dim.get_load_data_time_columns()
+        assert len(time_col) == 1, time_col
+        time_col = time_col[0]
+        time_map = (
+            df.select(time_col).distinct().select(time_col, F.col(time_col).alias("orig_ts"))
+        ).cache()
+        time_map.count()
+
+        time_map = self._align_time_interval_type(time_map, project_time_dim)
+        if time_based_data_adjustment.leap_day_adjustment != LeapDayAdjustmentType.NONE:
+            time_map = filter_to_project_timestamps(time_map, project_time_dim)
 
         if wrap_time:
-            diff = self._time_difference(df, project_time_dim, difference="left")
-            df = self._apply_time_wrap(df, project_time_dim, diff)
+            diff = time_difference(time_map, project_time_dim, difference="left")
+            if diff:
+                time_map = apply_time_wrap(time_map, project_time_dim, diff)
+            else:
+                logger.warning("wrap_time is not required, no time misalignment found.")
 
+        time_map_diff = (
+            time_map.select((F.col(time_col) - F.col("orig_ts")).alias("diff"))
+            .distinct()
+            .collect()
+        )
+        if time_map_diff != [Row(diff=timedelta(0))]:
+            other_cols = [x for x in df.columns if x != time_col]
+            df = (
+                df.select(F.col(time_col).alias("orig_ts"), *other_cols)
+                .join(time_map, "orig_ts", "inner")
+                .drop("orig_ts")
+            )
+
+        time_map.unpersist()
         return df
 
     def _align_time_interval_type(self, df, project_time_dim):
         """Align time interval type between df and project_time_dim.
         If time range spills over into another year after time interval alignment,
         the time range will be wrapped around so it's bounded within the year.
+        Returns
+            df: Pyspark dataframe
         """
         dtime_interval = self.get_time_interval_type()
         ptime_interval = project_time_dim.get_time_interval_type()
@@ -229,180 +272,37 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         if dtime_interval == ptime_interval:
             return df
 
-        df = self._shift_time_interval(
+        df = shift_time_interval(
             df, time_col, dtime_interval, ptime_interval, self.get_frequency()
         )
 
-        diff = self._time_difference(df, project_time_dim, difference="left")
-        if diff:
-            df = self._apply_time_wrap(df, project_time_dim, diff)
+        # Apply time wrap to one timestamp
+        if self.model.ranges == project_time_dim.model.ranges:
+            project_time = project_time_dim.list_expected_dataset_timestamps()
+            time_delta = (
+                project_time[-1][0] - project_time[0][0] + project_time_dim.get_frequency()
+            ).total_seconds()
 
-        return df
-
-    @staticmethod
-    def _shift_time_interval(
-        df,
-        time_column: str,
-        from_time_interval: TimeIntervalType,
-        to_time_interval: TimeIntervalType,
-        time_step: timedelta,
-        new_time_column: Optional[str] = None,
-    ):
-        """
-        Shift time_column by time_step in df as needed by comparing from_time_interval
-        to to_time_interval. If new_time_column is None, time_column is shifted in
-        place, else shifted time is added as new_time_column in df.
-        """
-        assert (
-            from_time_interval != to_time_interval
-        ), f"{from_time_interval=} is the same as {to_time_interval=}"
-
-        if new_time_column is None:
-            new_time_column = time_column
-
-        if TimeIntervalType.INSTANTANEOUS in (from_time_interval, to_time_interval):
-            raise NotImplementedError(
-                "aligning time intervals with instantaneous is not yet supported"
-            )
-
-        match (from_time_interval, to_time_interval):
-            case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
-                df = df.withColumn(
-                    new_time_column,
-                    F.col(time_column) + F.expr(f"INTERVAL {time_step.seconds} SECONDS"),
+            if dtime_interval == TimeIntervalType.PERIOD_BEGINNING:
+                df_change = df.join(df.agg(F.max(time_col).alias(time_col)), time_col)
+                df = df_change.withColumn(
+                    time_col,
+                    F.from_unixtime(F.unix_timestamp(time_col) - time_delta).cast("timestamp"),
+                ).union(df.exceptAll(df_change))
+            elif dtime_interval == TimeIntervalType.PERIOD_ENDING:
+                df_change = df.join(df.agg(F.min(time_col).alias(time_col)), time_col).select(
+                    *df.columns
                 )
-            case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
-                df = df.withColumn(
-                    new_time_column,
-                    F.col(time_column) - F.expr(f"INTERVAL {time_step.seconds} SECONDS"),
-                )
-
-        return df
-
-    @staticmethod
-    def _time_difference(df, project_time_dim, difference: str = "left"):
-        """Compare the time col in df and project_time_dim"""
-
-        time_col = project_time_dim.get_load_data_time_columns()
-        assert len(time_col) == 1, time_col
-        time_col = time_col[0]
-
-        project_time = {
-            row[0]
-            for row in project_time_dim.build_time_dataframe()
-            .select(time_col)
-            .filter(f"{time_col} IS NOT NULL")
-            .distinct()
-            .collect()
-        }
-        dataset_time = {
-            row[0]
-            for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
-        }
-
-        if difference == "left":
-            return dataset_time.difference(project_time)
-
-        if difference == "right":
-            return project_time.difference(dataset_time)
-
-        if difference == "symmetric":
-            return dataset_time.symmetric_difference(project_time)
-
-        raise ValueError(f"Unsupported function input {difference=}")
-
-    @staticmethod
-    def _apply_time_wrap(df, project_time_dim, diff: set):
-        """Apply time-wrapping"""
-
-        time_col = project_time_dim.get_load_data_time_columns()
-        assert len(time_col) == 1, time_col
-        time_col = time_col[0]
-
-        project_time = {
-            row[time_col]
-            for row in project_time_dim.build_time_dataframe()
-            .select(time_col)
-            .filter(f"{time_col} IS NOT NULL")
-            .distinct()
-            .collect()
-        }
-
-        # extract time_delta based on if diff is to the left or right of project_time
-        time_delta = (
-            max(project_time) - min(project_time) + project_time_dim.get_frequency()
-        ).total_seconds()
-        if min(diff) > max(project_time):
-            time_delta *= -1
-
-        # time-wrap by "changing" the year with time_delta
-        df = (
-            df.filter(F.col(time_col).isin(diff))
-            .withColumn(
-                time_col,
-                F.from_unixtime(F.unix_timestamp(time_col) + time_delta).cast("timestamp"),
-            )
-            .union(df.filter(~F.col(time_col).isin(diff)))
-        )
-
-        dataset_time = {
-            row[0]
-            for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
-        }
-
-        # check
-        if dataset_time.symmetric_difference(project_time):
-            left_msg, right_msg = "", ""
-            if left_diff := dataset_time.difference(project_time):
-                left_msg = f"\nProcessed dataset time contains {len(left_diff)} extra timestamp(s): {left_diff}"
-            if right_diff := project_time.difference(dataset_time):
-                right_msg = f"\nProcessed dataset time is missing {len(right_diff)} timestamp(s): {right_diff}"
-            raise DSGInvalidOperation(
-                f"Dataset time cannot be processed to match project time. {left_msg}{right_msg}"
-            )
-
+                df = df_change.withColumn(
+                    time_col,
+                    F.from_unixtime(F.unix_timestamp(time_col) + time_delta).cast("timestamp"),
+                ).union(df.exceptAll(df_change))
         return df
 
     def _build_time_ranges(
         self,
         time_ranges: TimeRangeModel,
         str_format: str,
-        model_years: Optional[list[int]] = None,
         tz: Optional[TimeZone] = None,
     ):
-        ranges = []
-        allowed_year = None
-        for time_range in time_ranges:
-            start = datetime.strptime(time_range.start, str_format)
-            end = datetime.strptime(time_range.end, str_format)
-            if model_years is not None:
-                if start.year != end.year or (
-                    allowed_year is not None and start.year != allowed_year
-                ):
-                    raise DSGInvalidDimension(
-                        f"All time ranges must be in the same year if model_years is set: {model_years=}"
-                    )
-                allowed_year = start.year
-            for year in model_years or [start.year]:
-                start_adj = datetime(
-                    year=year,
-                    month=start.month,
-                    day=start.day,
-                    hour=start.hour,
-                    minute=start.minute,
-                    second=start.second,
-                    microsecond=start.microsecond,
-                )
-                end_adj = datetime(
-                    year=end.year + year - start.year,
-                    month=end.month,
-                    day=end.day,
-                    hour=end.hour,
-                    minute=end.minute,
-                    second=end.second,
-                    microsecond=end.microsecond,
-                )
-                ranges.append((pd.Timestamp(start_adj, tz=tz), pd.Timestamp(end_adj, tz=tz)))
-
-        ranges.sort(key=lambda x: x[0])
-        return ranges
+        return build_time_ranges(time_ranges, str_format, tz=tz)

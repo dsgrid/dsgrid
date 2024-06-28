@@ -162,7 +162,7 @@ class MappingTableModel(DimensionMappingBaseModel):
                 records = convert_record_dicts_to_classes(records, MappingTableRecordModel)
             return records
 
-        with open(info.data["filename"], encoding="utf8") as f_in:
+        with open(info.data["filename"], encoding="utf-8-sig") as f_in:
             return convert_record_dicts_to_classes(csv.DictReader(f_in), MappingTableRecordModel)
 
     @field_serializer("filename")

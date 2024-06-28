@@ -45,7 +45,7 @@ def test_project_load(cached_registry):
         assert isinstance(project, Project)
 
 
-def test_dataset_load(cached_registry):
+def test_dataset_load(cached_registry, scratch_dir_context):
     conn = cached_registry
     mgr = RegistryManager.load(conn, offline_mode=True)
     project = mgr.project_manager.load_project(PROJECT_ID)
@@ -53,7 +53,7 @@ def test_dataset_load(cached_registry):
     dataset = project.get_dataset(DATASET_ID)
 
     assert isinstance(dataset, Dataset)
-    data = dataset.make_project_dataframe(project.config)
+    data = dataset.make_project_dataframe(project.config, scratch_dir_context)
     assert "timestamp" in data.columns
     assert "cooling" in data.columns
     assert "fans" in data.columns

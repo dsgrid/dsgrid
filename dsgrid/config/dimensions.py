@@ -4,7 +4,8 @@ import importlib
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Any, List, Optional, Union
+from typing import Any, List, Optional, Union, Literal
+import copy
 
 from pydantic import field_serializer, field_validator, model_validator, Field, ValidationInfo
 from pydantic.functional_validators import BeforeValidator
@@ -13,12 +14,12 @@ from typing_extensions import Annotated
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.time import (
-    LeapDayAdjustmentType,
     TimeIntervalType,
     MeasurementType,
     TimeZone,
     TimeDimensionType,
     RepresentativePeriodFormat,
+    DatetimeFormat,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME, REGEX_VALID_REGISTRY_DISPLAY_NAME
 from dsgrid.utils.files import compute_file_hash
@@ -368,7 +369,7 @@ class DimensionModel(DimensionBaseModel):
                 )
             return records
 
-        with open(info.data["filename"], encoding="utf-8") as f_in:
+        with open(info.data["filename"], encoding="utf-8-sig") as f_in:
             records = convert_record_dicts_to_classes(
                 csv.DictReader(f_in), dim_class, check_duplicates=["id"]
             )
@@ -423,6 +424,25 @@ class MonthRangeModel(DSGBaseModel):
     ]
 
 
+class IndexRangeModel(DSGBaseModel):
+    """Defines a continuous range of indices."""
+
+    start: Annotated[
+        int,
+        Field(
+            title="start",
+            description="First of indices",
+        ),
+    ]
+    end: Annotated[
+        int,
+        Field(
+            title="end",
+            description="Last of indices (inclusive)",
+        ),
+    ]
+
+
 class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
     """Defines a base model common to all time dimensions."""
 
@@ -431,10 +451,7 @@ class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
         Field(
             title="time_type",
             default=TimeDimensionType.DATETIME,
-            description="""
-        Type of time dimension:
-            datetime, annual, representative_period, noop
-        """,
+            description="Type of time dimension",
             json_schema_extra={
                 "options": TimeDimensionType.format_for_docs(),
             },
@@ -450,8 +467,77 @@ class TimeDimensionBaseModel(DimensionBaseModel, abc.ABC):
         """Returns True if the geography dimension records must contain a time_zone column."""
 
 
+class AlignedTime(DSGBaseModel):
+    """Data has absolute timestamps that are aligned with the same start and end
+    for each geography."""
+
+    format_type: Literal[DatetimeFormat.ALIGNED] = DatetimeFormat.ALIGNED
+    timezone: Annotated[
+        TimeZone,
+        Field(
+            title="timezone",
+            description="Time zone of data",
+            json_schema_extra={
+                "options": TimeZone.format_descriptions_for_docs(),
+            },
+        ),
+    ]
+
+
+class LocalTimeAsStrings(DSGBaseModel):
+    """Data has absolute timestamps formatted as strings with offsets from UTC.
+    They are aligned for each geography when adjusted for time zone but staggered
+    in an absolute time scale."""
+
+    format_type: Literal[DatetimeFormat.LOCAL_AS_STRINGS] = DatetimeFormat.LOCAL_AS_STRINGS
+
+    data_str_format: Annotated[
+        str,
+        Field(
+            title="data_str_format",
+            default="yyyy-MM-dd HH:mm:ssZZZZZ",
+            description="Timestamp string format (for parsing the time column of the dataframe)",
+            json_schema_extra={
+                "notes": (
+                    "The string format is used to parse the timestamps in the dataframe while in Spark, "
+                    "(e.g., yyyy-MM-dd HH:mm:ssZZZZZ). "
+                    "Cheatsheet reference: `<https://spark.apache.org/docs/latest/sql-ref-datetime-pattern.html>`_.",
+                ),
+            },
+        ),
+    ]
+
+    @field_validator("data_str_format")
+    @classmethod
+    def check_data_str_format(cls, data_str_format):
+        raise NotImplementedError("DatetimeFormat.LOCAL_AS_STRINGS is not fully implemented.")
+        dsf = data_str_format
+        if (
+            "x" not in dsf
+            and "X" not in dsf
+            and "Z" not in dsf
+            and "z" not in dsf
+            and "V" not in dsf
+            and "O" not in dsf
+        ):
+            raise ValueError("data_str_format must provide time zone or zone offset.")
+        return data_str_format
+
+
 class DateTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a time dimension where timestamps translate to datetime objects."""
+
+    datetime_format: Annotated[
+        Union[AlignedTime, LocalTimeAsStrings],
+        Field(
+            title="datetime_format",
+            discriminator="format_type",
+            description="""
+        Format of the datetime used to define the data format, alignment between geography,
+        and time zone information.
+        """,
+        ),
+    ]
 
     measurement_type: Annotated[
         MeasurementType,
@@ -467,12 +553,13 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
+
     str_format: Annotated[
         Optional[str],
         Field(
             title="str_format",
             default="%Y-%m-%d %H:%M:%s",
-            description="Timestamp string format",
+            description="Timestamp string format (for parsing the time ranges)",
             json_schema_extra={
                 "notes": (
                     "The string format is used to parse the timestamps provided in the time ranges."
@@ -501,22 +588,6 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             description="Defines the continuous ranges of time in the data, inclusive of start and end time.",
         ),
     ]
-    leap_day_adjustment: Annotated[
-        Optional[LeapDayAdjustmentType],
-        Field(
-            title="leap_day_adjustment",
-            description="Leap day adjustment method applied to time data",
-            default=LeapDayAdjustmentType.NONE,
-            json_schema_extra={
-                "optional": True,
-                "options": LeapDayAdjustmentType.format_descriptions_for_docs(),
-                "notes": (
-                    "The dsgrid default is None, i.e., no adjustment made to leap years.",
-                    "Adjustments are made to leap years only.",
-                ),
-            },
-        ),
-    ]
     time_interval_type: Annotated[
         TimeIntervalType,
         Field(
@@ -527,43 +598,39 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             },
         ),
     ]
-    timezone: Annotated[
-        TimeZone,
-        Field(
-            title="timezone",
-            description="""
-        Time zone of data:
-            UTC,
-            HawaiiAleutianStandard,
-            AlaskaStandard, AlaskaPrevailing,
-            PacificStandard, PacificPrevailing,
-            MountainStandard, MountainPrevailing,
-            CentralStandard, CentralPrevailing,
-            EasternStandard, EasternPrevailing,
-        """,
-            json_schema_extra={
-                "options": TimeZone.format_descriptions_for_docs(),
-            },
-        ),
-    ]
 
-    @model_validator(mode="after")
-    def check_time_type_and_class_consistency(self):
-        _check_time_type_and_class_consistency(self)
-        return self
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values):
+        if "leap_day_adjustment" in values:
+            if values["leap_day_adjustment"] != "none":
+                msg = f"Unknown data_schema format: {values=}"
+                raise ValueError(msg)
+            values.pop("leap_day_adjustment")
+
+        if "timezone" in values:
+            values["datetime_format"] = {
+                "format_type": DatetimeFormat.ALIGNED.value,
+                "timezone": values["timezone"],
+            }
+            values.pop("timezone")
+
+        return values
 
     @model_validator(mode="after")
     def check_frequency(self) -> "DateTimeDimensionModel":
         if self.frequency in [timedelta(days=365), timedelta(days=366)]:
             raise ValueError(
-                f"frequency={self.frequency}, 365 or 366 days not allowed, "
+                f"frequency={self.frequency}, datetime config does not allow 365 or 366 days frequency, "
                 "use class=AnnualTime, time_type=annual to specify a year series."
             )
         return self
 
     @field_validator("ranges")
     @classmethod
-    def check_times(cls, ranges, info: ValidationInfo):
+    def check_times(
+        cls, ranges: List[TimeRangeModel], info: ValidationInfo
+    ) -> List[TimeRangeModel]:
         if "str_format" not in info.data or "frequency" not in info.data:
             return ranges
         return _check_time_ranges(ranges, info.data["str_format"], info.data["frequency"])
@@ -583,7 +650,7 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
             default=MeasurementType.TOTAL,
             description="""
         The type of measurement represented by a value associated with a timestamp:
-            mean, min, max, measured, total
+            e.g., mean, total
         """,
             json_schema_extra={
                 "options": MeasurementType.format_for_docs(),
@@ -620,17 +687,24 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
         ),
     ]
 
-    @model_validator(mode="after")
-    def check_time_type_and_class_consistency(self):
-        _check_time_type_and_class_consistency(self)
-        return self
-
     @field_validator("ranges")
     @classmethod
-    def check_times(cls, ranges, info: ValidationInfo):
+    def check_times(
+        cls, ranges: List[TimeRangeModel], info: ValidationInfo
+    ) -> List[TimeRangeModel]:
         if "str_format" not in info.data or "frequency" not in info.data:
             return ranges
         return _check_time_ranges(ranges, info.data["str_format"], timedelta(days=365))
+
+    @field_validator("measurement_type")
+    @classmethod
+    def check_measurement_type(cls, measurement_type: MeasurementType) -> MeasurementType:
+        # This restriction exists because any other measurement type would require a frequency,
+        # and that isn't part of the model definition.
+        if measurement_type != MeasurementType.TOTAL:
+            msg = f"Annual time currently only supports MeasurementType total: {measurement_type}"
+            raise ValueError(msg)
+        return measurement_type
 
     def is_time_zone_required_in_geography(self):
         return False
@@ -639,6 +713,7 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
 class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a representative time dimension."""
 
+    time_type: Annotated[TimeDimensionType, Field(default=TimeDimensionType.REPRESENTATIVE_PERIOD)]
     measurement_type: Annotated[
         MeasurementType,
         Field(
@@ -646,7 +721,7 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
             default=MeasurementType.TOTAL,
             description="""
         The type of measurement represented by a value associated with a timestamp:
-            mean, min, max, measured, total
+            e.g., mean, total
         """,
             json_schema_extra={
                 "options": MeasurementType.format_for_docs(),
@@ -682,15 +757,97 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         return True
 
 
+class IndexTimeDimensionModel(TimeDimensionBaseModel):
+    """Defines a time dimension where timestamps are indices."""
+
+    time_type: Annotated[TimeDimensionType, Field(default=TimeDimensionType.INDEX)]
+    measurement_type: Annotated[
+        MeasurementType,
+        Field(
+            title="measurement_type",
+            default=MeasurementType.TOTAL,
+            description="""
+        The type of measurement represented by a value associated with a timestamp:
+            e.g., mean, total
+        """,
+            json_schema_extra={
+                "options": MeasurementType.format_for_docs(),
+            },
+        ),
+    ]
+    ranges: Annotated[
+        List[IndexRangeModel],
+        Field(
+            title="ranges",
+            description="Defines the continuous ranges of indices of the data, inclusive of start and end index.",
+        ),
+    ]
+    frequency: Annotated[
+        timedelta,
+        Field(
+            title="frequency",
+            description="Resolution of the timestamps for which the ranges represent.",
+            json_schema_extra={
+                "notes": (
+                    "Reference: `Datetime timedelta objects"
+                    " <https://docs.python.org/3/library/datetime.html#timedelta-objects>`_",
+                ),
+            },
+        ),
+    ]
+    starting_timestamps: Annotated[
+        List[str],
+        Field(
+            title="starting timestamps",
+            description="Starting timestamp for for each of the ranges.",
+        ),
+    ]
+    str_format: Annotated[
+        Optional[str],
+        Field(
+            title="str_format",
+            default="%Y-%m-%d %H:%M:%s",
+            description="Timestamp string format",
+            json_schema_extra={
+                "notes": (
+                    "The string format is used to parse the starting timestamp provided."
+                    "Cheatsheet reference: `<https://strftime.org/>`_.",
+                ),
+            },
+        ),
+    ]
+    time_interval_type: Annotated[
+        TimeIntervalType,
+        Field(
+            title="time_interval",
+            description="The range of time that the value associated with a timestamp represents, e.g., period-beginning",
+            json_schema_extra={
+                "options": TimeIntervalType.format_descriptions_for_docs(),
+            },
+        ),
+    ]
+
+    @field_validator("starting_timestamps")
+    @classmethod
+    def check_timestamps(cls, starting_timestamps, info: ValidationInfo) -> list[str]:
+        if len(starting_timestamps) != len(info.data["ranges"]):
+            msg = f"{starting_timestamps=} must match the number of ranges."
+            raise ValueError(msg)
+        return starting_timestamps
+
+    @field_validator("ranges")
+    @classmethod
+    def check_indices(cls, ranges: list[IndexRangeModel]) -> list[IndexRangeModel]:
+        return _check_index_ranges(ranges)
+
+    def is_time_zone_required_in_geography(self):
+        return True
+
+
 class NoOpTimeDimensionModel(TimeDimensionBaseModel):
     """Defines a NoOp time dimension."""
 
     time_type: Annotated[TimeDimensionType, Field(default=TimeDimensionType.NOOP)]
-
-    @model_validator(mode="after")
-    def check_time_type_and_class_consistency(self):
-        _check_time_type_and_class_consistency(self)
-        return self
 
     def is_time_zone_required_in_geography(self):
         return False
@@ -763,6 +920,7 @@ class DimensionReferenceByNameModel(DSGBaseModel):
 
 
 def handle_dimension_union(values):
+    values = copy.deepcopy(values)
     for i, value in enumerate(values):
         if isinstance(value, DimensionBaseModel):
             continue
@@ -778,6 +936,8 @@ def handle_dimension_union(values):
                 values[i] = AnnualTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.REPRESENTATIVE_PERIOD.value:
                 values[i] = RepresentativePeriodTimeDimensionModel(**value)
+            elif value["time_type"] == TimeDimensionType.INDEX.value:
+                values[i] = IndexTimeDimensionModel(**value)
             elif value["time_type"] == TimeDimensionType.NOOP.value:
                 values[i] = NoOpTimeDimensionModel(**value)
             else:
@@ -795,6 +955,7 @@ DimensionsListModel = Annotated[
             DateTimeDimensionModel,
             AnnualTimeDimensionModel,
             RepresentativePeriodTimeDimensionModel,
+            IndexTimeDimensionModel,
             NoOpTimeDimensionModel,
         ]
     ],
@@ -802,7 +963,7 @@ DimensionsListModel = Annotated[
 ]
 
 
-def _check_time_ranges(ranges: list, str_format: str, frequency: timedelta):
+def _check_time_ranges(ranges: list[TimeRangeModel], str_format: str, frequency: timedelta):
     assert isinstance(frequency, timedelta)
     for time_range in ranges:
         # Make sure start and end time parse.
@@ -818,21 +979,12 @@ def _check_time_ranges(ranges: list, str_format: str, frequency: timedelta):
     return ranges
 
 
-# TODO: modify as model works with more time_type schema
-def _check_time_type_and_class_consistency(model):
-    if (
-        (model.class_name == "Time" and model.time_type == TimeDimensionType.DATETIME)
-        or (model.class_name == "AnnualTime" and model.time_type == TimeDimensionType.ANNUAL)
-        or (model.class_name == "NoOpTime" and model.time_type == TimeDimensionType.NOOP)
-    ):
-        pass
-    else:
-        raise ValueError(
-            f"time_type={model.time_type.value} does not match class_name={model.class_name}. \n"
-            " * For class=Time, use time_type=datetime. \n"
-            " * For class=AnnualTime, use time_type=annual. \n"
-            " * For class=NoOpTime, use time_type=noop. "
-        )
+def _check_index_ranges(ranges: list[IndexRangeModel]):
+    for range in ranges:
+        if range.end <= range.start:
+            raise ValueError(f"index range {range} end point must be greater than start point.")
+
+    return ranges
 
 
 class DimensionCommonModel(DSGBaseModel):

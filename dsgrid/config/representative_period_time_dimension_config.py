@@ -12,14 +12,15 @@ from dsgrid.dimension.time import (
     TimeZone,
     RepresentativePeriodFormat,
     DatetimeRange,
-    LeapDayAdjustmentType,
 )
+from dsgrid.dimension.time_utils import shift_time_interval
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import (
     OneWeekPerMonthByHourType,
     OneWeekdayDayAndOneWeekendDayPerMonthByHourType,
 )
 from dsgrid.utils.timing import track_timing, timer_stats_collector
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -58,13 +59,12 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             time_columns,
         )
 
-    def build_time_dataframe(self, model_years=None):
+    def build_time_dataframe(self):
         time_cols = self.get_load_data_time_columns()
         schema = StructType(
             [StructField(time_col, IntegerType(), False) for time_col in time_cols]
         )
-
-        model_time = self.list_expected_dataset_timestamps(model_years=model_years)
+        model_time = self.list_expected_dataset_timestamps()
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
 
         return df_time
@@ -73,8 +73,15 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     #     return self.build_time_dataframe()
 
     def convert_dataframe(
-        self, df, project_time_dim, model_years=None, value_columns=None, wrap_time_allowed=False
+        self,
+        df,
+        project_time_dim,
+        value_columns: set[str],
+        scratch_dir_context: ScratchDirContext,
+        wrap_time_allowed=False,
+        time_based_data_adjustment=None,
     ):
+        """Time interval type alignment is done in the mapping process."""
         if project_time_dim is None:
             return df
         if (
@@ -91,8 +98,8 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         assert "time_zone" in df.columns, df.columns
         geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
         assert geo_tz_values
-        geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
-        assert geo_tz_names
+        geo_tz_to_map = [TimeZone(tz) for tz in geo_tz_values]
+        geo_tz_to_map = [tz.tz_name for tz in geo_tz_to_map]  # covert to tz_name
 
         # create time map
         # temporarily set session time to UTC for timeinfo extraction
@@ -112,7 +119,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         try:
             project_time_df = project_time_dim.build_time_dataframe()
             map_time = "timestamp_to_map"
-            project_time_df = self._shift_time_interval(
+            project_time_df = shift_time_interval(
                 project_time_df,
                 ptime_col,
                 project_time_dim.get_time_interval_type(),
@@ -121,7 +128,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                 new_time_column=map_time,
             )
 
-            for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
+            for tz_value, tz_name in zip(geo_tz_values, geo_tz_to_map):
                 local_time_df = project_time_df.withColumn(
                     "time_zone", F.lit(tz_value)
                 ).withColumn(
@@ -159,29 +166,23 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self):
         return self._format_handler.get_frequency()
 
-    def get_time_ranges(self, model_years=None):
-        if model_years is not None:
-            # We do not expect to need this.
-            raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
-
+    def get_time_ranges(self):
         return self._format_handler.get_time_ranges(
-            self.model.ranges, self.model.time_interval_type, self.get_tzinfo()
+            self.model.ranges,
+            self.model.time_interval_type,
+            self.get_tzinfo(),
         )
 
     def get_load_data_time_columns(self):
         return self._format_handler.get_load_data_time_columns()
 
     def get_tzinfo(self):
-        # TBD
         return None
 
     def get_time_interval_type(self):
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self, model_years=None):
-        if model_years is not None:
-            # We do not expect to need this.
-            raise NotImplementedError(f"No support for {model_years=} in {type(self)}")
+    def list_expected_dataset_timestamps(self):
         return self._format_handler.list_expected_dataset_timestamps(self.model.ranges)
 
 
@@ -307,8 +308,6 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
                     start=pd.Timestamp(datetime(year=1970, month=model.start, day=1)),
                     end=pd.Timestamp(datetime(year=1970, month=model.end, day=last_day, hour=23)),
                     frequency=timedelta(hours=1),
-                    leap_day_adjustment=LeapDayAdjustmentType.NONE,
-                    time_interval_type=time_interval_type,
                 )
             )
 

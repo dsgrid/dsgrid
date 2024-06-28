@@ -53,3 +53,15 @@ class OneWeekdayDayAndOneWeekendDayPerMonthByHourType(NamedTuple):
     month: int
     is_weekday: bool
     hour: int
+
+
+class IndexTimestampType(NamedTuple):
+    """Single column with numerical indices."""
+
+    time_index: int
+
+
+class StringTimestampType(NamedTuple):
+    """Single column with time (must include offset) as str."""
+
+    timestamp: str

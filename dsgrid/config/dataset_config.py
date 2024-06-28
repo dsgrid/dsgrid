@@ -491,14 +491,11 @@ class DatasetConfigModel(DSGBaseModel):
                 raise ValueError(f"Unknown data_schema format: {values=}")
             values["data_schema"]["data_schema_type"] = values.pop("data_schema_type")
 
-        if "dataset_qualifier" in values:
-            if values["dataset_qualifier_metadata"] is None:
-                values["dataset_qualifier_metadata"] = {}
-            if "dataset_qualifier_type" in values["dataset_qualifier_metadata"]:
-                raise ValueError(f"Unknown dataset_qualifier_metadata format: {values=}")
-            values["dataset_qualifier_metadata"]["dataset_qualifier_type"] = values.pop(
-                "dataset_qualifier"
-            )
+        if "leap_day_adjustment" in values:
+            if values["leap_day_adjustment"] != "none":
+                raise ValueError(f"Unknown leap day adjustment: {values=}")
+            values.pop("leap_day_adjustment")
+
         return values
 
     @field_validator("dataset_id")

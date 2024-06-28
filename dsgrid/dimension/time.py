@@ -1,9 +1,13 @@
 """Dimensions related to time"""
-import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import logging
+from typing_extensions import Annotated
+from pydantic import Field
+from enum import Enum
+from typing import Optional
 
-from dsgrid.data_models import DSGEnum, EnumValue
+from dsgrid.data_models import DSGEnum, EnumValue, DSGBaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +18,16 @@ class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
+    INDEX = "index"
     NOOP = "noop"
+
+
+class DatetimeFormat(str, Enum):
+    """Defines the time format of the datetime config model"""
+
+    ALIGNED = "aligned"
+    LOCAL = "local"
+    LOCAL_AS_STRINGS = "local_as_strings"
 
 
 class RepresentativePeriodFormat(DSGEnum):
@@ -26,12 +39,12 @@ class RepresentativePeriodFormat(DSGEnum):
 
     ONE_WEEK_PER_MONTH_BY_HOUR = EnumValue(
         value="one_week_per_month_by_hour",
-        frequency=datetime.timedelta(hours=1),
+        frequency=timedelta(hours=1),
         description="load_data columns use 'month', 'day_of_week', 'hour' to specify time",
     )
     ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR = EnumValue(
         value="one_weekday_day_and_one_weekend_day_per_month_by_hour",
-        frequency=datetime.timedelta(hours=1),
+        frequency=timedelta(hours=1),
         description="load_data columns use 'month', 'hour', 'is_weekday' to specify time",
     )
 
@@ -41,17 +54,41 @@ class LeapDayAdjustmentType(DSGEnum):
 
     DROP_DEC31 = EnumValue(
         value="drop_dec31",
-        description="To adjust for leap years, December 31st gets dropped",
+        description="To adjust for leap years, December 31st timestamps and data get dropped.",
     )
     DROP_FEB29 = EnumValue(
         value="drop_feb29",
-        description="Feburary 29th is dropped. Currently not yet supported by dsgrid.",
+        description="Feburary 29th timestamps and data are dropped. Currently not yet supported by dsgrid.",
     )
     DROP_JAN1 = EnumValue(
         value="drop_jan1",
-        description="To adjust for leap years, January 1st gets dropped",
+        description="To adjust for leap years, January 1st timestamps and data get dropped.",
     )
     NONE = EnumValue(value="none", description="No leap day adjustment made.")
+
+
+class DaylightSavingSpringForwardType(DSGEnum):
+    """Daylight saving spring forward adjustment enum types"""
+
+    DROP = EnumValue(
+        value="drop",
+        description="Drop timestamp(s) and associated data for the spring forward hour (2AM in March)",
+    )
+    NONE = EnumValue(value="none", description="No daylight saving adjustment for data.")
+
+
+class DaylightSavingFallBackType(DSGEnum):
+    """Daylight saving fall back adjustment enum types"""
+
+    INTERPOLATE = EnumValue(
+        value="interpolate",
+        description="Fill data by interpolating between the left and right edges of the dataframe.",
+    )
+    DUPLICATE = EnumValue(
+        value="duplicate",
+        description="Fill data by duplicating the fall-back hour (1AM in November)",
+    )
+    NONE = EnumValue(value="none", description="No daylight saving adjustment for data.")
 
 
 class TimeIntervalType(DSGEnum):
@@ -116,74 +153,81 @@ class TimeZone(DSGEnum):
     )
     HST = EnumValue(
         value="HawaiiAleutianStandard",
-        description="Hawaii Standard Time (UTC=-10). Does not include DST shifts.",
+        description="Hawaii Standard Time (UTC=-10). No daylight saving shifts.",
         tz=ZoneInfo("US/Hawaii"),
-        tz_name="HST",
+        tz_name="-10:00",
     )
     AST = EnumValue(
         value="AlaskaStandard",
-        description="Alaskan Standard Time (UTC=-9). Does not include DST shifts.",
+        description="Alaskan Standard Time (UTC=-9). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+9"),
-        tz_name="AST",
+        tz_name="-09:00",
     )
     APT = EnumValue(
         value="AlaskaPrevailing",
-        description="Alaska Prevailing Time. Commonly called Alaska Local Time. Includes DST"
-        " shifts during DST times.",
+        description="Alaska Prevailing Time. Commonly called Alaska Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Alaska"),
         tz_name="US/Alaska",
     )
     PST = EnumValue(
         value="PacificStandard",
-        description="Pacific Standard Time (UTC=-8). Does not include DST shifts.",
+        description="Pacific Standard Time (UTC=-8). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+8"),
-        tz_name="PST",
+        tz_name="-08:00",
     )
     PPT = EnumValue(
         value="PacificPrevailing",
-        description="Pacific Prevailing Time. Commonly called Pacific Local Time. Includes DST"
-        " shifts ,during DST times.",
+        description="Pacific Prevailing Time. Commonly called Pacific Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Pacific"),
         tz_name="US/Pacific",
     )
     MST = EnumValue(
         value="MountainStandard",
-        description="Mountain Standard Time (UTC=-7). Does not include DST shifts.",
+        description="Mountain Standard Time (UTC=-7). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+7"),
-        tz_name="MST",
+        tz_name="-07:00",
     )
     MPT = EnumValue(
         value="MountainPrevailing",
-        description="Mountain Prevailing Time. Commonly called Mountain Local Time. Includes DST"
-        " shifts during DST times.",
+        description="Mountain Prevailing Time. Commonly called Mountain Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Mountain"),
         tz_name="US/Mountain",
     )
     CST = EnumValue(
         value="CentralStandard",
-        description="Central Standard Time (UTC=-6). Does not include DST shifts.",
+        description="Central Standard Time (UTC=-6). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+6"),
-        tz_name="CST",
+        tz_name="-06:00",
     )
     CPT = EnumValue(
         value="CentralPrevailing",
-        description="Central Prevailing Time. Commonly called Central Local Time. Includes DST"
-        " shifts during DST times.",
+        description="Central Prevailing Time. Commonly called Central Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Central"),
         tz_name="US/Central",
     )
     EST = EnumValue(
         value="EasternStandard",
-        description="Eastern Standard Time (UTC=-5). Does not include DST shifts.",
+        description="Eastern Standard Time (UTC=-5). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+5"),
-        tz_name="EST",
+        tz_name="-05:00",
     )
     EPT = EnumValue(
         value="EasternPrevailing",
-        description="Eastern Prevailing Time. Commonly called Eastern Local Time. Includes DST"
-        " shifts during DST times.",
+        description="Eastern Prevailing Time. Commonly called Eastern Local Time. "
+        "Includes daylight saving.",
         tz=ZoneInfo("US/Eastern"),
         tz_name="US/Eastern",
+    )
+    ARIZONA = EnumValue(
+        value="USArizona",
+        description="US/Arizona = Mountain Standard Time (UTC=-7). No daylight saving shifts. "
+        "For Arizona state except Navajo County",
+        tz=ZoneInfo("US/Arizona"),
+        tz_name="US/Arizona",
     )
 
     def get_standard_time(self):
@@ -202,6 +246,8 @@ class TimeZone(DSGEnum):
             return TimeZone.CST
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EST
+        if self == TimeZone.ARIZONA:
+            return TimeZone.ARIZONA
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def get_prevailing_time(self):
@@ -220,6 +266,8 @@ class TimeZone(DSGEnum):
             return TimeZone.CPT
         if self in [TimeZone.EST, TimeZone.EPT]:
             return TimeZone.EPT
+        if self == TimeZone.ARIZONA:
+            return TimeZone.ARIZONA
         raise NotImplementedError(f"BUG: case not covered: {self}")
 
     def is_standard(self):
@@ -231,16 +279,89 @@ class TimeZone(DSGEnum):
             TimeZone.MST,
             TimeZone.CST,
             TimeZone.EST,
+            TimeZone.ARIZONA,
         ]
         if self in lst:
             return True
         return False
 
     def is_prevailing(self):
-        lst = [TimeZone.APT, TimeZone.PPT, TimeZone.MPT, TimeZone.CPT, TimeZone.EPT]
+        lst = [
+            TimeZone.APT,
+            TimeZone.PPT,
+            TimeZone.MPT,
+            TimeZone.CPT,
+            TimeZone.EPT,
+            TimeZone.ARIZONA,
+        ]
         if self in lst:
             return True
         return False
+
+
+class DaylightSavingAdjustmentModel(DSGBaseModel):
+    """Defines how to drop and add data along with timestamps to convert standard time
+    load profiles to clock time"""
+
+    spring_forward_hour: Annotated[
+        DaylightSavingSpringForwardType,
+        Field(
+            title="spring_forward_hour",
+            description="Data adjustment for spring forward hour (a 2AM in March)",
+            default=DaylightSavingSpringForwardType.NONE,
+            json_schema_extra={
+                "options": DaylightSavingSpringForwardType.format_descriptions_for_docs(),
+            },
+        ),
+    ]
+
+    fall_back_hour: Annotated[
+        DaylightSavingFallBackType,
+        Field(
+            title="fall_back_hour",
+            description="Data adjustment for spring forward hour (a 2AM in November)",
+            default=DaylightSavingFallBackType.NONE,
+            json_schema_extra={
+                "options": DaylightSavingFallBackType.format_descriptions_for_docs(),
+            },
+        ),
+    ]
+
+
+class TimeBasedDataAdjustmentModel(DSGBaseModel):
+    """Defines how data needs to be adjusted with respect to time.
+    For leap day adjustment, up to one full day of timestamps and data are dropped.
+    For daylight savings, the dataframe is adjusted alongside the timestamps.
+    This is useful when the load profiles are modeled in standard time and
+    need to be converted to get clock time load profiles.
+    """
+
+    leap_day_adjustment: Annotated[
+        LeapDayAdjustmentType,
+        Field(
+            title="leap_day_adjustment",
+            description="Leap day adjustment method applied to time data",
+            default=LeapDayAdjustmentType.NONE,
+            json_schema_extra={
+                "options": LeapDayAdjustmentType.format_descriptions_for_docs(),
+                "notes": (
+                    "The dsgrid default is None, i.e., no adjustment made to leap years.",
+                    "Adjustments are made to leap years only.",
+                ),
+            },
+        ),
+    ]
+    daylight_saving_adjustment: Annotated[
+        DaylightSavingAdjustmentModel,
+        Field(
+            title="daylight_saving_adjustment",
+            description="Daylight saving adjustment method applied to time data",
+            default={
+                "spring_forward_hour": DaylightSavingSpringForwardType.NONE,
+                "fall_back_hour": DaylightSavingFallBackType.NONE,
+            },
+        ),
+    ]
 
 
 class DatetimeRange:
@@ -249,22 +370,29 @@ class DatetimeRange:
         start,
         end,
         frequency,
-        leap_day_adjustment: LeapDayAdjustmentType,
-        time_interval_type: TimeIntervalType,
+        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
     ):
+        if time_based_data_adjustment is None:
+            time_based_data_adjustment = TimeBasedDataAdjustmentModel()
         self.start = start
         self.end = end
         self.tzinfo = start.tzinfo
         self.frequency = frequency
-        self.leap_day_adjustment = leap_day_adjustment
-        self.time_interval_type = time_interval_type
+        self.leap_day_adjustment = time_based_data_adjustment.leap_day_adjustment
+        self.dls_springforward_adjustment = (
+            time_based_data_adjustment.daylight_saving_adjustment.spring_forward_hour
+        )
+        self.dls_fallback_adjustment = (
+            time_based_data_adjustment.daylight_saving_adjustment.fall_back_hour
+        )
 
     def __repr__(self):
         return (
             self.__class__.__qualname__
             + f"(start={self.start}, end={self.end}, frequency={self.frequency}, "
             + f"leap_day_adjustment={self.leap_day_adjustment}, "
-            + f"time_interval_type={self.time_interval_type})"
+            + f"dls_springforward_adjustment={self.dls_springforward_adjustment}, "
+            + f"dls_fallback_adjustment={self.dls_fallback_adjustment}."
         )
 
     def __str__(self):
@@ -289,13 +417,13 @@ class DatetimeRange:
 
         """
         cur = self.start.to_pydatetime().astimezone(ZoneInfo("UTC"))
-        end = (
-            self.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + self.frequency
-        )  # to make end time inclusive
+        end = self.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + self.frequency
 
         while cur < end:
-            month = cur.astimezone(self.tzinfo).month
-            day = cur.astimezone(self.tzinfo).day
+            cur_tz = cur.astimezone(self.tzinfo)
+            cur_tz = adjust_timestamp_by_dst_offset(cur_tz, self.frequency)
+            month = cur_tz.month
+            day = cur_tz.day
             if not (
                 self.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
                 and month == 2
@@ -311,7 +439,8 @@ class DatetimeRange:
                         and month == 1
                         and day == 1
                     ):
-                        yield cur.astimezone(self.tzinfo)
+                        yield cur_tz
+
             cur += self.frequency
 
     def list_time_range(self):
@@ -321,7 +450,7 @@ class DatetimeRange:
         -------
         list[datetime]
         """
-        return sorted(set(self._iter_timestamps()))
+        return list(self._iter_timestamps())
 
 
 class AnnualTimeRange(DatetimeRange):
@@ -335,20 +464,65 @@ class AnnualTimeRange(DatetimeRange):
         end = self.end.to_pydatetime()
         tz = self.tzinfo
         for year in range(start.year, end.year + 1):
-            yield datetime.datetime(year=year, month=1, day=1, tzinfo=tz)
+            yield datetime(year=year, month=1, day=1, tzinfo=tz)
 
 
-class NoOpTimeRange(DatetimeRange):
+class IndexTimeRange(DatetimeRange):
+    def __init__(
+        self,
+        start,
+        end,
+        frequency,
+        start_index,
+        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    ):
+        super().__init__(
+            start, end, frequency, time_based_data_adjustment=time_based_data_adjustment
+        )
+        self.start_index = start_index
+
     def _iter_timestamps(self):
-        yield None
+        cur = self.start.to_pydatetime().astimezone(ZoneInfo("UTC"))
+        cur_idx = self.start_index
+        end = (
+            self.end.to_pydatetime().astimezone(ZoneInfo("UTC")) + self.frequency
+        )  # to make end time inclusive
+
+        while cur < end:
+            cur_tz = cur.astimezone(self.tzinfo)
+            cur_tz = adjust_timestamp_by_dst_offset(cur_tz, self.frequency)
+            month = cur_tz.month
+            day = cur_tz.day
+            if not (
+                self.leap_day_adjustment == LeapDayAdjustmentType.DROP_FEB29
+                and month == 2
+                and day == 29
+            ):
+                if not (
+                    self.leap_day_adjustment == LeapDayAdjustmentType.DROP_DEC31
+                    and month == 12
+                    and day == 31
+                ):
+                    if not (
+                        self.leap_day_adjustment == LeapDayAdjustmentType.DROP_JAN1
+                        and month == 1
+                        and day == 1
+                    ):
+                        yield cur_idx
+            cur += self.frequency
+            cur_idx += 1
 
 
-def make_time_range(start, end, frequency, leap_day_adjustment, time_interval_type):
+def adjust_timestamp_by_dst_offset(timestamp, frequency):
+    """Reduce the timestamps within the daylight saving range by 1 hour.
+    Used to ensure that a time series at daily (or lower) frequency returns each day at the
+    same timestamp in prevailing time, an expected behavior in most standard libraries.
+    (e.g., ensure a time series can return 2018-03-11 00:00, 2018-03-12 00:00...
+    instead of 2018-03-11 00:00, 2018-03-12 01:00...)
+
     """
-    factory function that decides which TimeRange func to use based on frequency
-    """
-    if frequency == datetime.timedelta(days=365):
-        return AnnualTimeRange(start, end, frequency, leap_day_adjustment, time_interval_type)
-    elif frequency == datetime.timedelta(days=0):
-        return NoOpTimeRange(start, end, frequency, leap_day_adjustment, time_interval_type)
-    return DatetimeRange(start, end, frequency, leap_day_adjustment, time_interval_type)
+    if frequency < timedelta(hours=24):
+        return timestamp
+
+    offset = timestamp.dst() or timedelta(hours=0)
+    return timestamp - offset

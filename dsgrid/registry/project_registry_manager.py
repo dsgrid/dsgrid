@@ -62,7 +62,7 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     models_to_dataframe,
     get_unique_values,
-    persist_intermediate_query,
+    persist_intermediate_table,
 )
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
@@ -1048,9 +1048,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         wrap_time = project_config.get_dataset(dataset_id).wrap_time_allowed
 
         df = dtime.build_time_dataframe()
-        dtime._convert_time_to_project_time_interval(
-            df, project_time_dim=ptime, wrap_time=wrap_time
-        )
+        dtime._convert_time_to_project_time(df, ptime, wrap_time=wrap_time)
 
     @track_timing(timer_stats_collector)
     def _check_dataset_base_to_project_base_mappings(
@@ -1124,7 +1122,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         logger.info("Make dimension association table for %s", dataset_id)
         df = config.make_dimension_association_table(dataset_id, context)
-        df = persist_intermediate_query(df, context, auto_partition=True)
+        df = persist_intermediate_table(df, context)
         logger.info("Wrote dimension associations for dataset %s", dataset_id)
         return df
 

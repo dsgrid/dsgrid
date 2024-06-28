@@ -10,6 +10,7 @@ import pytest
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.utils.files import load_data
 from dsgrid.utils.run_command import run_command, check_run_command
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import init_spark, get_spark_session
 from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
@@ -156,3 +157,9 @@ def spark_time_zone(request):
     spark.conf.set("spark.sql.session.timeZone", request.param)
     yield
     spark.conf.set("spark.sql.session.timeZone", orig)
+
+
+@pytest.fixture
+def scratch_dir_context(tmp_path):
+    with ScratchDirContext(tmp_path) as context:
+        yield context

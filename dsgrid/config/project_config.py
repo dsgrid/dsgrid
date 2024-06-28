@@ -50,6 +50,11 @@ from .dimensions import (
     check_display_name,
     generate_dimension_query_name,
 )
+from dsgrid.dimension.time import (
+    TimeBasedDataAdjustmentModel,
+    DaylightSavingSpringForwardType,
+    DaylightSavingFallBackType,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -566,6 +571,30 @@ class InputDatasetModel(DSGBaseModel):
             default=False,
         ),
     ]
+    time_based_data_adjustment: Annotated[
+        TimeBasedDataAdjustmentModel,
+        Field(
+            title="time_based_data_adjustment",
+            description="Defines how the rest of the dataframe is adjusted with respect to time. "
+            "E.g., when drop associated data when dropping a leap day timestamp.",
+            default=TimeBasedDataAdjustmentModel(),
+        ),
+    ]
+
+    @field_validator("time_based_data_adjustment")
+    @classmethod
+    def check_data_adjustment(cls, time_based_data_adjustment):
+        """Check daylight saving adjustment"""
+        sfh = time_based_data_adjustment.daylight_saving_adjustment.spring_forward_hour
+        fbh = time_based_data_adjustment.daylight_saving_adjustment.fall_back_hour
+        if fbh == DaylightSavingFallBackType.NONE and sfh == DaylightSavingSpringForwardType.NONE:
+            return time_based_data_adjustment
+        if fbh != DaylightSavingFallBackType.NONE and sfh != DaylightSavingSpringForwardType.NONE:
+            return time_based_data_adjustment
+        msg = f"mismatch between spring_forward_hour and fall_back_hour, {time_based_data_adjustment=}."
+        raise ValueError(msg)
+
+    #  TODO: write validation that if daylight_saving_adjustment is specified, dataset time config must be IndexTimeDimensionConfig
 
 
 class DimensionMappingsModel(DSGBaseModel):

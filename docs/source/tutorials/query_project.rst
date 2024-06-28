@@ -2,7 +2,7 @@
 .. _tutorial_query_a_project:
 
 ***************
-Query a project
+Query a Project
 ***************
 In this tutorial you will learn how to query a dsgrid project for aggregated data. The query will
 use data from the dsgrid registry stored on NREL's HPC Kestrel cluster.

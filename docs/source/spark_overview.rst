@@ -146,6 +146,7 @@ Jupyter
 
     $ export PYSPARK_DRIVER_PYTHON=jupyter
     $ export PYSPARK_DRIVER_PYTHON_OPTS="notebook --no-browser --port=8889 --ip=0.0.0.0"
+    $ export SPARK_HOME=$(python -c "import pyspark;print(pyspark.__path__[0])")
 
 Local mode:
 
@@ -294,6 +295,9 @@ The [README](https://github.com/NREL/HPC/blob/master/applications/spark/README.m
 repository has generic instructions to run Spark in a variety of ways. The rest of this section
 calls out choices that you should make to run Spark jobs with dsgrid.
 
+.. note:: The latest scripts currently supporting Kestrel are at this branch:
+   https://github.com/daniel-thom/HPC/tree/kestrel-update. Please follow its README instead.
+
 1. Clone the repository.
 
 .. code-block:: console
@@ -311,15 +315,24 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 - If the debug partition is not too full, you can append ``--qos=standby`` to the command above
   and not be charged any AUs.
 
-3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.4.1 and
-   Python 3.11. The team has validated the container below. It was created with this Dockerfile
-   in dsgrid: ``docker/spark/Dockerfile``. The container includes ipython, jupyter, pyspark, pandas,
-   and pyarrow, but not dsgrid.
+3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.5.1.
+   The team has validated the container ``/datasets/images/apache_spark/spark351_py311.sif``. It
+   was created with this Dockerfile in dsgrid: ``docker/spark/Dockerfile``. The container includes
+   ipython, jupyter, pyspark, pandas, duckdb, and pyarrow, but not dsgrid. The
+   ``configure_and_start_spark.sh`` will normally be updated to use the currently-supported dsgrid
+   container by default, but there may be some cases where you need to specify it manually with the
+   ``-c`` option.
 
-   ``/projects/dsgrid/containers/spark350_py311.sif``
+.. code-block:: console
 
-4. Configure Spark parameters based on the amount of memory and CPU in each compute node. dsgrid
-   jobs on Kestrel seem to work better with dynamic allocation enabled.
+   $ configure_and_start_spark.sh -c <path_to_custom_container.sif>
+
+4. Configure Spark parameters based on the amount of memory and CPU in each compute node.
+
+   Set the driver memory (``-M``) to a size sufficient for data transfer between the driver and
+   cluster. For example, if you will convert a 4 GB dataframe to Pandas (``df.toPandas()``),
+   set the value to 4. Some online sources recommend setting it to a size at least as big as the
+   executor memory. It defaults to 1 GB.
 
    This command must be run on a compute node. The script will check for the environment variable
    ``SLURM_JOB_ID``, which is set by ``SLURM``. If you ssh'd into the compute node, it won't be set and
@@ -327,17 +340,20 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
    Choose the option that is appropriate for your environment.
 
-.. code-block:: console
-
-    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark350_py311.sif
-
-.. code-block:: console
-
-    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark350_py311.sif <SLURM_JOB_ID>
+   **Note**: Please don't run this command in ``/projects/dsgrid``. It creates runtime files
+   that others may not be able to delete. Run in ``/scratch/$USER`` instead.
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -D -c /projects/dsgrid/containers/spark350_py311.sif <SLURM_JOB_ID1> <SLURM_JOB_ID2>
+    $ configure_and_start_spark.sh
+
+.. code-block:: console
+
+    $ configure_and_start_spark.sh <SLURM_JOB_ID>
+
+.. code-block:: console
+
+    $ configure_and_start_spark.sh <SLURM_JOB_ID1> <SLURM_JOB_ID2>
 
 Run ``configure_and_start_spark.sh --help`` to see all options.
 

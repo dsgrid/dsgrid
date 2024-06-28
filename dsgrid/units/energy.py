@@ -241,6 +241,10 @@ def convert_units_unpivoted(
             .selectExpr("to_id AS id", "from_unit")
             .distinct()
         )
+    if unit_df.exceptAll(to_unit_records.selectExpr("id", "unit AS from_unit")).rdd.isEmpty():
+        logger.info("Return early because the units match.")
+        return df
+
     df = df.join(unit_df, on=df[metric_column] == unit_df["id"]).drop("id")
     tmp3 = to_unit_records.select("id", "unit").withColumnRenamed(unit_col, "to_unit")
     df = df.join(tmp3, on=df[metric_column] == tmp3["id"]).drop("id")

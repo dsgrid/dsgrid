@@ -3,14 +3,18 @@
 
 # USAGE:
 # Do not run this while connected to the VPN. You may get a certificate error while downloading spark.
-# docker build --tag spark_py311 --build-arg VERSION=x.y.z .
+# If you have a Mac with Apple silicon (not Intel CPUs), set this environment variable so that the
+# container will run on Intel CPUs.
+#   $ export DOCKER_DEFAULT_PLATFORM=linux/amd64
+# Build the container:
+#   $ docker build --tag spark_py311 --build-arg VERSION=x.y.z .
 
 # This container can be converted to an Apptainer container on Kestrel with these commands:
 # Save and upload the docker image to Kestrel.
 # $ docker save -o spark_py311_vx.y.z.tar spark_py311
 # $ scp spark_py311_vx.y.z.tar <username>@kestrel.hpc.nrel.gov:/projects/dsgrid/containers
 # Acquire a compute node with local storage (salloc --tmp=1600G).
-# $ export APPTAINER_CACHEDIR=/tmp/scratch
+# $ export APPTAINER_CACHEDIR=$TMPDIR
 # $ module load apptainer
 # Create writable image for testing and development or read-only image for production.
 # Writable
@@ -27,7 +31,7 @@ FROM python:3.11-slim
 USER root
 
 ARG VERSION
-ARG SPARK_VERSION=3.5.0
+ARG SPARK_VERSION=3.5.1
 ARG HADOOP_VERSION=3
 ARG FULL_STR=spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}
 
@@ -37,8 +41,8 @@ ENV CONTAINER_VERSION ${VERSION}
 # Install OpenSSH to communicate between containers, and dropbear SSH server
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update \
-    && apt-get install -y ca-certificates jq git nano default-jdk procps sysstat \
-    tini tmux tree vim wget openssh-client dropbear locales \
+    && apt-get install -y ca-certificates jq git nano default-jdk procps sysstat build-essential \
+    tini tmux tree unzip vim wget openssh-client dropbear locales \
     && rm -rf /var/lib/apt/lists/*
 
 # This prevents bash warnings on Kestrel.
@@ -73,7 +77,12 @@ RUN wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/${FULL_STR}.tgz \
 	&& cp ${SPARK_HOME}/kubernetes/dockerfiles/spark/entrypoint.sh /opt/entrypoint.sh \
 	&& chmod +x ${SPARK_HOME}/conf/spark-env.sh
 
-RUN pip install ipython jupyter pandas pyarrow
+RUN wget https://github.com/duckdb/duckdb/releases/download/v1.0.0/duckdb_cli-linux-amd64.zip \
+    && unzip duckdb_cli-linux-amd64.zip \
+    && rm duckdb_cli-linux-amd64.zip \
+    && mv duckdb /usr/local/bin
+
+RUN pip install ipython jupyter pandas pyarrow duckdb
 
 ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 ENV PATH $PATH:${SPARK_HOME}/bin:${SPARK_HOME}/sbin

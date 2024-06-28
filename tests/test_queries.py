@@ -170,10 +170,25 @@ def test_unit_mapping(cached_registry):
 
 
 def test_invalid_drop_pivoted_dimension(tmp_path):
+    with pytest.raises(ValueError):
+        AggregationModel(
+            dimensions=DimensionQueryNamesModel(
+                geography=["county"],
+                metric=[],
+                model_year=["model_year"],
+                scenario=["scenario"],
+                sector=["sector"],
+                subsector=["subsector"],
+                time=["time_est"],
+                weather_year=["weather_2012"],
+            ),
+            aggregation_function="sum",
+        )
+
     invalid_agg = AggregationModel(
         dimensions=DimensionQueryNamesModel(
             geography=["county"],
-            metric=[],
+            metric=["end_use"],
             model_year=["model_year"],
             scenario=["scenario"],
             sector=["sector"],
@@ -183,6 +198,7 @@ def test_invalid_drop_pivoted_dimension(tmp_path):
         ),
         aggregation_function="sum",
     )
+    invalid_agg.dimensions.metric.clear()
     query = ProjectQueryModel(
         name="test",
         project=ProjectQueryParamsModel(

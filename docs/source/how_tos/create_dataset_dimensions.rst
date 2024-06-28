@@ -1,5 +1,5 @@
 ********************************
-How to create dataset dimensions
+How to Create Dataset Dimensions
 ********************************
 
 This page assumes that you have already created a dataset config (TODO link).

@@ -1,11 +1,14 @@
 .. _how-to-start-spark-cluster-kestrel:
 
 ***************************************
-How to start a Spark cluster on Kestrel
+How to Start a Spark Cluster on Kestrel
 ***************************************
 This section assumes that you have cloned the HPC Spark setup scripts from this `repo
 <https://github.com/NREL/HPC.git>`_. If you are unfamiliar with that, please read the full details
 at :ref:`spark-on-hpc`.
+
+.. note:: The latest scripts currently supporting Kestrel are at this branch:
+   https://github.com/daniel-thom/HPC/tree/kestrel-update
 
 Compute Node Types
 ==================
@@ -13,7 +16,7 @@ Spark works best with fast local storage. The standard Kestrel nodes do not have
 The best candidates are the 256 standard nodes (no GPUs) with 1.92 TB NVMe M.2 drives. Please refer
 to the `Kestrel system configuration page
 <https://www.nrel.gov/hpc/kestrel-system-configuration.html>`_ for specific hardware information.
-The GPU nodes will work well, but at a greater cost in AUs.
+The GPU nodes will work as well, but at a greater cost in AUs.
 
 If those nodes are not available, you may be able to complete your queries by using the standard
 nodes and specifying a path on the Lustre filesystem in the Spark configuration file
@@ -39,7 +42,7 @@ Steps
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh -c /projects/dsgrid/containers/spark350_py311.sif
+    $ configure_and_start_spark.sh
 
 5. Set the Spark configuration environment variable.
 

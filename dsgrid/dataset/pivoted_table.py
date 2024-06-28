@@ -65,8 +65,6 @@ class PivotedTableHandler(TableFormatHandlerBase):
         )
         for agg in aggregations:
             dimension_query_name = None
-            # The metric dimension must be included in an aggregation so that we can handle
-            # possible unit conversions.
             metric_dim_config = None
             for dim_type, column in agg.iter_dimensions_to_keep():
                 query_name = column.dimension_query_name
@@ -87,6 +85,8 @@ class PivotedTableHandler(TableFormatHandlerBase):
                             msg = f"Bug: encountered {dimension_query_name=} twice"
                             raise Exception(msg)
                         dimension_query_name = query_name
+            if metric_dim_config is None:
+                raise Exception(f"Bug: A metric dimension is not included in {agg}")
             if dimension_query_name is None:
                 continue
             dim_config = self.project_config.get_dimension(dimension_query_name)
@@ -187,5 +187,6 @@ class PivotedTableHandler(TableFormatHandlerBase):
             metadata = final_metadata.get_metadata(dim_type)
             if dim_type in dropped_dimensions and metadata:
                 metadata.clear()
-            context.replace_dimension_metadata(dim_type, metadata, dataset_id=self.dataset_id)
+            if dim_type != pivoted_dimension_type:
+                context.replace_dimension_metadata(dim_type, metadata, dataset_id=self.dataset_id)
         return df

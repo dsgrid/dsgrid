@@ -488,6 +488,34 @@ def overwrite_dataframe_file(filename: Path | str, df: DataFrame) -> DataFrame:
 
 
 @track_timing(timer_stats_collector)
+def persist_intermediate_query(
+    df: DataFrame, scratch_dir_context: ScratchDirContext, auto_partition=False
+) -> DataFrame:
+    """Persist the current query to files and then read it back and return it.
+
+    This is advised when the query has become too complex or when the query might be evaluated
+    twice.
+
+    Parameters
+    ----------
+    df : DataFrame
+    scratch_dir_context : ScratchDirContext
+    auto_partition : bool
+        If True, call write_dataframe_and_auto_partition.
+
+    Returns
+    -------
+    DataFrame
+    """
+    spark = get_spark_session()
+    tmp_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+    if auto_partition:
+        return write_dataframe_and_auto_partition(df, tmp_file)
+    df.write.parquet(str(tmp_file))
+    return spark.read.parquet(str(tmp_file))
+
+
+@track_timing(timer_stats_collector)
 def write_dataframe_and_auto_partition(
     df: DataFrame,
     filename: Path,

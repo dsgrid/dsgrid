@@ -1,7 +1,7 @@
 .. _how-to-run-dsgrid-kestrel:
 
 ****************************
-How to run dsgrid on Kestrel
+How to Run dsgrid on Kestrel
 ****************************
 
 1. ssh to a login node and start a screen session (or similar, e.g., tmux):

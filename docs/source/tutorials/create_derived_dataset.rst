@@ -2,7 +2,7 @@
 .. _tutorial_create_a_derived_dataset:
 
 ************************
-Create a derived dataset
+Create a Derived Dataset
 ************************
 In this tutorial you will learn how to query a dsgrid project to produce and register a derived
 dataset. The tutorial uses the comstock_conus_2022_projected derived dataset from

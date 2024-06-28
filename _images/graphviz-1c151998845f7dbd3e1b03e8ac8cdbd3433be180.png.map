@@ -1,0 +1,10 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.AnnualTimeDimensionModel
+
+Defines an annual time dimension where timestamps are years.
+" alt="" coords="5,5,371,537"/>
+<area shape="rect" id="node2" title="dsgrid.config.dimensions.TimeRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="515,483,664,567"/>
+</map>

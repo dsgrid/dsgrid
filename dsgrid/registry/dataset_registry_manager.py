@@ -23,6 +23,7 @@ from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.utils.spark import (
     read_dataframe,
+    write_dataframe,
     write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -286,7 +287,10 @@ class DatasetRegistryManager(RegistryManagerBase):
                         pivoted_dimension_type.value,
                         VALUE_COLUMN,
                     )
-                write_dataframe_and_auto_partition(df, dst)
+                if dst.suffix == ".parquet":
+                    write_dataframe_and_auto_partition(df, dst)
+                else:
+                    write_dataframe(df, dst, overwrite=True)
                 found_files = True
         if not found_files:
             msg = f"Did not find any data files in {config.dataset_path}"

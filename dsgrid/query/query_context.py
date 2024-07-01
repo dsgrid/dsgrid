@@ -71,8 +71,7 @@ class QueryContext:
 
     def get_pivoted_columns(self) -> set[str]:
         if self.get_table_format_type() != TableFormatType.PIVOTED:
-            msg = "Bug: get_pivoted_columns is only supported on a pivoted table"
-            raise Exception(msg)
+            raise Exception("Bug: get_pivoted_columns is only supported on a pivoted table")
         metadata = self._get_metadata()
         return self.get_dimension_column_names(metadata.table_format.pivoted_dimension_type)
 

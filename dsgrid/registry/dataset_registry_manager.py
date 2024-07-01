@@ -23,7 +23,7 @@ from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.utils.spark import (
     read_dataframe,
-    write_dataframe,
+    write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
@@ -269,6 +269,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self.fs_interface.mkdir(dataset_registry_dir)
         found_files = False
         for filename in ALLOWED_DATA_FILES:
+            assert config.dataset_path is not None
             path = Path(config.dataset_path) / filename
             if path.exists():
                 dst = dataset_path / filename
@@ -285,9 +286,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                         pivoted_dimension_type.value,
                         VALUE_COLUMN,
                     )
-                # We set overwrite=True because if the path exists, it's only because a previous
-                # attempt failed.
-                write_dataframe(df, dst, overwrite=True)
+                write_dataframe_and_auto_partition(df, dst)
                 found_files = True
         if not found_files:
             msg = f"Did not find any data files in {config.dataset_path}"

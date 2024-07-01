@@ -173,12 +173,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-
-        ld_df = self._convert_time_dimension(
+        return self._convert_time_dimension(
             ld_df, project_config, value_columns, scratch_dir_context
         )
-
-        return self._handle_unpivot_column_rename(ld_df)
 
     def make_project_dataframe_from_query(self, context: QueryContext, project_config):
         ld_df = self._load_data
@@ -196,5 +193,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             DimensionType.METRIC
         ).get_records_dataframe()
         ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
-
+        ld_df = self._convert_time_dimension(
+            ld_df, project_config, value_columns, context.scratch_dir_context
+        )
         return self._finalize_table(context, ld_df, project_config)

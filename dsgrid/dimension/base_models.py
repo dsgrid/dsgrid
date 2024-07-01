@@ -37,12 +37,12 @@ class DimensionType(DSGEnum):
 
     @staticmethod
     def get_dimension_types_allowed_as_columns() -> set["DimensionType"]:
-        """Return the dimension types as columns that may exist in data. Excludes time."""
+        """Return the dimension types that may exist in the data table as columns."""
         return {x for x in DimensionType if x != DimensionType.TIME}
 
     @staticmethod
-    def get_allowed_dimension_columns() -> set[str]:
-        """Return the dimension types as columns that may exist in data. Excludes time."""
+    def get_allowed_dimension_column_names() -> set[str]:
+        """Return the dimension types that may exist in the data table as columns."""
         return {x.value for x in DimensionType.get_dimension_types_allowed_as_columns()}
 
 

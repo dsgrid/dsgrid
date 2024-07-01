@@ -163,7 +163,6 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             )
 
         df = None
-        # Pivoted output tables cannot be used for future queries.
         if load_cached_table:
             df, metadata = self._try_read_cache(context)
         if df is None:

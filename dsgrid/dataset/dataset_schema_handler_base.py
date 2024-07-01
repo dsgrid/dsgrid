@@ -234,9 +234,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         )
 
     def _finalize_table(self, context: QueryContext, df, project_config):
-        table_format = self._config.get_table_format_type()
         table_handler = make_table_format_handler(
-            table_format,
+            self._config.get_table_format_type(),
             project_config,
             dataset_id=self.dataset_id,
         )
@@ -311,7 +310,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     @staticmethod
     def _list_dimension_columns(df: DataFrame) -> list[str]:
-        columns = DimensionType.get_allowed_dimension_columns()
+        columns = DimensionType.get_allowed_dimension_column_names()
         return [x for x in df.columns if x in columns]
 
     def _list_dimensions(self, df: DataFrame) -> list[DimensionType]:

@@ -199,6 +199,65 @@ def test_invalid_drop_metric_dimension():
         )
 
 
+def test_invalid_pivoted_dimension_aggregations():
+    with pytest.raises(ValueError):
+        QueryResultParamsModel(
+            aggregations=[
+                AggregationModel(
+                    dimensions=DimensionQueryNamesModel(
+                        geography=["county"],
+                        metric=["electricity_end_uses", "natural_gas_end_uses"],
+                        model_year=["model_year"],
+                        scenario=["scenario"],
+                        sector=["sector"],
+                        subsector=["subsector"],
+                        time=["time_est"],
+                        weather_year=["weather_2012"],
+                    ),
+                    aggregation_function="sum",
+                ),
+            ],
+            table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
+        )
+
+    with pytest.raises(ValueError):
+        QueryResultParamsModel(
+            aggregations=[
+                AggregationModel(
+                    dimensions=DimensionQueryNamesModel(
+                        geography=["county"],
+                        metric=["end_uses_by_fuel_type"],
+                        model_year=["model_year"],
+                        scenario=["scenario"],
+                        sector=["sector"],
+                        subsector=["subsector"],
+                        time=["time_est"],
+                        weather_year=["weather_2012"],
+                    ),
+                    aggregation_function="sum",
+                ),
+                AggregationModel(
+                    dimensions=DimensionQueryNamesModel(
+                        geography=["county"],
+                        metric=[],
+                        model_year=[],
+                        scenario=[],
+                        sector=[],
+                        subsector=[],
+                        time=[
+                            ColumnModel(
+                                dimension_query_name="time_est", function="hour", alias="hour"
+                            )
+                        ],
+                        weather_year=[],
+                    ),
+                    aggregation_function="mean",
+                ),
+            ],
+            table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
+        )
+
+
 def test_invalid_aggregation_subset_dimension():
     with pytest.raises(DSGInvalidQuery):
         run_query_test(QueryTestInvalidAggregation)

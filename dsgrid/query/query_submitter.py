@@ -5,29 +5,31 @@ from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
 
+from pyspark.sql import DataFrame
+
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionCategory
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
 from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
+from dsgrid.query.query_context import QueryContext
+from dsgrid.query.report_factory import make_report
 from dsgrid.utils.spark import (
-    get_unique_values,
     read_dataframe,
     try_read_dataframe,
     write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.files import load_data
-from .models import (
+from dsgrid.query.models import (
     ProjectQueryModel,
     CreateCompositeDatasetQueryModel,
     CompositeDatasetQueryModel,
-    ReportType,
     DatasetMetadataModel,
 )
-from .query_context import QueryContext
-from .report_peak_load import PeakLoadReport
 
 
 logger = logging.getLogger(__name__)
@@ -136,6 +138,10 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         f"allowed. base={base_name} supplemental={supp_names}"
                     )
 
+        for report_inputs in model.result.reports:
+            report = make_report(report_inputs.report_type)
+            report.check_query(model)
+
     def _run_query(
         self,
         scratch_dir_context: ScratchDirContext,
@@ -169,10 +175,25 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if persist_intermediate_table and not is_cached:
             df = self._persist_intermediate_result(context, df)
 
-        handler = make_table_format_handler(context.get_table_format_type(), self._project.config)
         if context.model.result.dimension_filters:
             df = self._apply_filters(df, context)
 
+        repartition = not persist_intermediate_table
+        table_filename = self._process_aggregations_and_save(
+            df, context, repartition, zip_file=zip_file
+        )
+
+        for report_inputs in context.model.result.reports:
+            report = make_report(report_inputs.report_type)
+            output_dir = self._output_dir / context.model.name
+            report.generate(table_filename, output_dir, context, report_inputs.inputs)
+
+        return df, context
+
+    def _process_aggregations_and_save(
+        self, df: DataFrame, context: QueryContext, repartition: bool, zip_file: bool = False
+    ) -> Path:
+        handler = make_table_format_handler(TableFormatType.UNPIVOTED, self._project.config)
         df = handler.process_aggregations(df, context.model.result.aggregations, context)
 
         if context.model.result.replace_ids_with_names:
@@ -181,19 +202,13 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if context.model.result.sort_columns:
             df = df.sort(*context.model.result.sort_columns)
 
-        repartition = not persist_intermediate_table
+        if isinstance(context.model.result.table_format, PivotedTableFormatModel):
+            df = _pivot_table(df, context)
+
         table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
-
-        for report in context.model.result.reports:
-            output_dir = self._output_dir / context.model.name
-            if report.report_type == ReportType.PEAK_LOAD:
-                peak_load = PeakLoadReport()
-                peak_load.generate(table_filename, output_dir, context, report.inputs)
-
-        return df, context
+        return table_filename
 
     def _apply_filters(self, df, context: QueryContext):
-        pivoted_dim_type = context.get_pivoted_dimension_type()
         for dim_filter in context.model.result.dimension_filters:
             column_names = context.get_dimension_column_names(dim_filter.dimension_type)
             if len(column_names) > 1:
@@ -204,34 +219,17 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 records = dim_filter.get_filtered_records_dataframe(
                     self.project.config.get_dimension
                 )
-                if pivoted_dim_type is not None and dim_filter.dimension_type == pivoted_dim_type:
-                    df = self._drop_filtered_pivoted_columns(df, context, records)
-                else:
-                    column = next(iter(column_names))
-                    df = df.join(records.select("id"), on=df[column] == records["id"]).drop("id")
+                column = next(iter(column_names))
+                df = df.join(records.select("id"), on=df[column] == records["id"]).drop("id")
             else:
-                if pivoted_dim_type is not None and dim_filter.dimension_type == pivoted_dim_type:
-                    dim_records = self.project.config.get_dimension_records(
-                        dim_filter.dimension_query_name
+                query_name = dim_filter.dimension_query_name
+                if query_name not in df.columns:
+                    # Consider catching this exception and still write to a file.
+                    # It could mean writing a lot of data the user doesn't want.
+                    raise DSGInvalidParameter(
+                        f"filter column {query_name} is not in the dataframe: {df.columns}"
                     )
-                    records = dim_filter.apply_filter(dim_records, column="id")
-                    df = self._drop_filtered_pivoted_columns(df, context, records)
-                else:
-                    query_name = dim_filter.dimension_query_name
-                    if query_name not in df.columns:
-                        # Consider catching this exception and still write to a file.
-                        # It could mean writing a lot of data the user doesn't want.
-                        raise DSGInvalidParameter(
-                            f"filter column {query_name} is not in the dataframe: {df.columns}"
-                        )
-                    df = dim_filter.apply_filter(df, column=query_name)
-        return df
-
-    @staticmethod
-    def _drop_filtered_pivoted_columns(df, context: QueryContext, records):
-        record_ids = get_unique_values(records, "id")
-        drop_columns = context.get_pivoted_columns() - record_ids
-        df = df.drop(*drop_columns)
+                df = dim_filter.apply_filter(df, column=query_name)
         return df
 
     @track_timing(timer_stats_collector)
@@ -374,17 +372,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             context = QueryContext(query, scratch_dir_context)
             df, context.metadata = self._read_dataset(query.dataset_id)
-            handler = make_table_format_handler(
-                context.get_table_format_type(), self._project.config
-            )
-
-            repartition = False
-            if context.model.result.aggregations:
-                df = handler.process_aggregations(df, context.model.result.aggregations, context)
-
-            if context.model.result.replace_ids_with_names:
-                df = handler.replace_ids_with_names(df)
-            self._save_query_results(context, df, repartition)
+            self._process_aggregations_and_save(df, context, repartition=False)
 
     def _load_composite_dataset_query(self, dataset_id):
         filename = self._composite_datasets_dir() / dataset_id / "query.json"
@@ -406,3 +394,9 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         filename = output_dir / "table.parquet"
         self._save_result(context, df, filename, repartition)
         self.metadata_filename(output_dir).write_text(context.metadata.model_dump_json(indent=2))
+
+
+def _pivot_table(df: DataFrame, context: QueryContext):
+    pivoted_column = context.convert_to_pivoted()
+    ids = [x for x in df.columns if x not in {pivoted_column, VALUE_COLUMN}]
+    return df.groupBy(*ids).pivot(pivoted_column).sum(VALUE_COLUMN)

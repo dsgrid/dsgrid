@@ -7,7 +7,6 @@ import pyspark.sql.functions as F
 from pyspark.sql.types import IntegerType
 from pyspark.sql import SparkSession
 
-from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.mapping_tables import MappingTableRecordModel
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
@@ -320,53 +319,6 @@ def perform_op_by_electricity(stats, table, name, operation):
     stats[name]["count"] = table.count()
 
 
-def make_unpivoted_datasets():
-    """Convert the ComStock datasets to unpivoted format for test coverage."""
-    path = REGISTRY_PATH
-    comstock_reference_path = (
-        path / "data" / "comstock_conus_2022_reference" / "1.0.0" / "load_data.parquet"
-    )
-    comstock_projected_path = (
-        path / "data" / "comstock_conus_2022_projected" / "1.0.0" / "table.parquet"
-    )
-    convert_table_to_unpivoted(comstock_reference_path, BUILDING_PIVOTED_COLUMNS, "metric")
-    convert_table_to_unpivoted(comstock_projected_path, BUILDING_PIVOTED_COLUMNS, "metric")
-    dataset_schemas = {
-        "comstock_conus_2022_reference": {
-            "data_schema_type": "standard",
-            "table_format": {
-                "format_type": "unpivoted",
-                "value_column": "value",
-            },
-        },
-        "comstock_conus_2022_projected": {
-            "data_schema_type": "one_table",
-            "table_format": {
-                "format_type": "unpivoted",
-                "value_column": "value",
-            },
-        },
-    }
-    change_dataset_schemas(dataset_schemas)
-    print(f"Changed datasets to unpivoted format: {list(dataset_schemas.keys())}")
-
-
-def convert_table_to_unpivoted(path: Path, pivoted_columns, variable_column_name: str):
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    df = spark.read.load(str(path)).cache()
-    df.count()
-    try:
-        ids = set(df.columns).difference(pivoted_columns)
-        df.unpivot(
-            [x for x in df.columns if x in ids],
-            list(pivoted_columns),
-            variable_column_name,
-            VALUE_COLUMN,
-        ).coalesce(1).write.mode("overwrite").parquet(str(path))
-    finally:
-        df.unpersist()
-
-
 def change_dataset_schemas(dataset_schemas: dict):
     filenames = list((REGISTRY_PATH / "dump").glob("datasets_*data.json"))
     assert len(filenames) == 1
@@ -382,4 +334,3 @@ def change_dataset_schemas(dataset_schemas: dict):
 
 if __name__ == "__main__":
     build_expected_datasets()
-    make_unpivoted_datasets()

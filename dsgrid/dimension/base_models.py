@@ -27,13 +27,23 @@ class DimensionType(DSGEnum):
         return self.value < other.value
 
     @classmethod
-    def from_column(cls, column):
+    def from_column(cls, column) -> "DimensionType":
         try:
             return cls(column)
         except ValueError:
             raise DSGInvalidDimension(
                 f"column={column} is not expected or of a known dimension type."
             )
+
+    @staticmethod
+    def get_dimension_types_allowed_as_columns() -> set["DimensionType"]:
+        """Return the dimension types that may exist in the data table as columns."""
+        return {x for x in DimensionType if x != DimensionType.TIME}
+
+    @staticmethod
+    def get_allowed_dimension_column_names() -> set[str]:
+        """Return the dimension types that may exist in the data table as columns."""
+        return {x.value for x in DimensionType.get_dimension_types_allowed_as_columns()}
 
 
 class DimensionCategory(DSGEnum):

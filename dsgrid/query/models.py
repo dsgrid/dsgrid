@@ -237,7 +237,7 @@ class DatasetDimensionsMetadataModel(DSGBaseModel):
         """Replace the dimension metadata."""
         setattr(self, dimension_type.value, metadata)
 
-    def get_column_names(self, dimension_type: DimensionType):
+    def get_column_names(self, dimension_type: DimensionType) -> set[str]:
         """Return the column names for the given dimension type."""
         column_names = set()
         for item in getattr(self, dimension_type.value):
@@ -525,6 +525,27 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
             default=None,
         ),
     ]
+
+    @model_validator(mode="after")
+    def check_pivot_dimension_type(self) -> "QueryResultParamsModel":
+        if self.table_format.format_type == TableFormatType.PIVOTED:
+            pivoted_dim_type = self.table_format.pivoted_dimension_type
+            for agg in self.aggregations:
+                names = getattr(agg.dimensions, pivoted_dim_type.value)
+                num_names = len(names)
+                if num_names == 0:
+                    msg = (
+                        f"The pivoted dimension ({pivoted_dim_type}) "
+                        "must be specified in all aggregations."
+                    )
+                    raise ValueError(msg)
+                elif len(names) > 1:
+                    msg = (
+                        f"The pivoted dimension ({pivoted_dim_type}) "
+                        "cannot have more than one dimension query name: {names}"
+                    )
+                    raise ValueError(msg)
+        return self
 
     @field_validator("output_format")
     @classmethod

@@ -1,5 +1,4 @@
 import logging
-import math
 import os
 
 import pyspark.sql.functions as F
@@ -9,7 +8,6 @@ from pyspark.sql.types import StructType, IntegerType
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.utils.dataset import (
     apply_scaling_factor,
-    map_and_reduce_pivoted_dimension,
     is_noop_mapping,
     remove_invalid_null_timestamps,
     repartition_if_needed_by_mapping,
@@ -62,70 +60,6 @@ def dataframes():
     )
     pivoted_columns = {"com_elec", "res_elec", "common_elec"}
     yield df, records, pivoted_columns
-
-
-def test_map_and_reduce_pivoted_dimension_sum_rename(dataframes):
-    df, records, pivoted_columns = dataframes
-    operation = "sum"
-    res, new_pivoted, dropped = map_and_reduce_pivoted_dimension(
-        df, records, pivoted_columns, operation, rename=True
-    )
-    assert new_pivoted == ["all_electricity_sum"]
-    assert sorted(dropped) == sorted(pivoted_columns)
-    expected = 2.1 + 7.8 + 3.5 + 6.8 + 4.2 + 5.8 + 1.3 + 4.8
-    assert math.isclose(
-        res.select("all_electricity_sum")
-        .agg(F.sum("all_electricity_sum").alias("sum_elec"))
-        .collect()[0]
-        .sum_elec,
-        expected,
-    )
-
-
-def test_map_and_reduce_pivoted_dimension_sum_no_rename(dataframes):
-    df, records, pivoted_columns = dataframes
-    operation = "sum"
-    res, new_pivoted, dropped = map_and_reduce_pivoted_dimension(
-        df, records, pivoted_columns, operation, rename=False
-    )
-    assert new_pivoted == ["all_electricity"]
-    assert sorted(dropped) == sorted(pivoted_columns)
-    expected = 2.1 + 7.8 + 3.5 + 6.8 + 4.2 + 5.8 + 1.3 + 4.8
-    assert math.isclose(
-        res.select("all_electricity")
-        .agg(F.sum("all_electricity").alias("sum_elec"))
-        .collect()[0]
-        .sum_elec,
-        expected,
-    )
-
-
-def test_map_and_reduce_pivoted_dimension_max(dataframes):
-    df, records, pivoted_columns = dataframes
-    operation = "max"
-    res, new_pivoted, dropped = map_and_reduce_pivoted_dimension(
-        df, records, pivoted_columns, operation, rename=False
-    )
-    assert new_pivoted == ["all_electricity"]
-    assert sorted(dropped) == sorted(pivoted_columns)
-    assert res.filter("county == 'Jefferson'").collect()[0].all_electricity == 7.8
-    assert res.filter("county == 'Boulder'").collect()[0].all_electricity == 6.8
-    assert res.filter("county == 'Denver'").collect()[0].all_electricity == 5.8
-    assert res.filter("county == 'Adams'").collect()[0].all_electricity == 4.8
-
-
-def test_map_and_reduce_pivoted_dimension_min(dataframes):
-    df, records, pivoted_columns = dataframes
-    operation = "min"
-    res, new_pivoted, dropped = map_and_reduce_pivoted_dimension(
-        df, records, pivoted_columns, operation, rename=False
-    )
-    assert new_pivoted == ["all_electricity"]
-    assert sorted(dropped) == sorted(pivoted_columns)
-    assert res.filter("county == 'Jefferson'").collect()[0].all_electricity == 2.1
-    assert res.filter("county == 'Boulder'").collect()[0].all_electricity == 3.5
-    assert res.filter("county == 'Denver'").collect()[0].all_electricity == 4.2
-    assert res.filter("county == 'Adams'").collect()[0].all_electricity == 1.3
 
 
 def test_is_noop_mapping_true():
@@ -315,18 +249,3 @@ def test_repartition_if_needed_by_mapping_not_needed(tmp_path, caplog, dataframe
         )
         assert "Repartition is not needed" in caplog.text
         assert "Completed repartition" not in caplog.text
-
-
-# TODO: enable this when we decide if and how to handle NULL values in mean operations.
-# def test_map_and_reduce_pivoted_dimension_mean(dataframes):
-#    df, records, pivoted_columns = dataframes
-#    operation = "mean"
-#    res, new_pivoted, dropped = map_and_reduce_pivoted_dimension(
-#        df, records, pivoted_columns, operation, rename=False
-#    )
-#    assert new_pivoted == ["all_electricity"]
-#    assert sorted(dropped) == sorted(pivoted_columns)
-#    assert math.isclose(res.filter("county == 'Jefferson'").collect()[0].all_electricity, (2.1 + 7.8) / 2)
-#    assert math.isclose(res.filter("county == 'Boulder'").collect()[0].all_electricity, (3.5 + 6.8) / 2)
-#    assert math.isclose(res.filter("county == 'Denver'").collect()[0].all_electricity, (4.2 + 5.8) / 2)
-#    assert math.isclose(res.filter("county == 'Adams'").collect()[0].all_electricity, (1.3 + 4.8) / 2)

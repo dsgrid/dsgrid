@@ -1,3 +1,4 @@
+import io
 import logging
 import os
 import tempfile
@@ -220,7 +221,7 @@ def test_submit_project_query(client):
     )
     assert other_status == status
     json_text = check_response(client, f"/async_tasks/data/{async_task_id}").text
-    df = pd.read_json(json_text, orient="split")
+    df = pd.read_json(io.StringIO(json_text), orient="split")
     assert isinstance(df, pd.DataFrame)
 
     data = check_response(client, f"/async_tasks/archive_file/{async_task_id}")

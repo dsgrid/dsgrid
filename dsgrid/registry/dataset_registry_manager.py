@@ -288,6 +288,8 @@ class DatasetRegistryManager(RegistryManagerBase):
                         VALUE_COLUMN,
                     )
                 if dst.suffix == ".parquet":
+                    # This function doesn't support CSV and JSON. Support could be added if
+                    # needed. We only use it for large files.
                     write_dataframe_and_auto_partition(df, dst)
                 else:
                     write_dataframe(df, dst, overwrite=True)

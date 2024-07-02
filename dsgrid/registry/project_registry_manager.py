@@ -12,7 +12,6 @@ from typing import Type, Union
 import json5
 import pandas as pd
 from prettytable import PrettyTable
-from pyspark.sql import DataFrame
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
@@ -60,9 +59,13 @@ from dsgrid.utils.files import load_data, in_other_dir
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
+    DataFrame,
     models_to_dataframe,
     get_unique_values,
     write_dataframe_and_auto_partition,
+    use_duckdb,
+    is_dataframe_empty,
+    F,
 )
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
@@ -931,7 +934,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     )
                 reverse_records = (
                     records.drop("from_fraction")
-                    .selectExpr("to_id AS from_id", "from_id AS to_id")
+                    .select(F.col("to_id").alias("from_id"), F.col("from_id").alias("to_id"))
                     .toPandas()
                 )
                 dst = Path(tempfile.gettempdir()) / f"reverse_{p_mapping.config_id}.csv"
@@ -1076,7 +1079,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             cols = sorted(project_table.columns)
 
             diff = project_table.select(*cols).exceptAll(mapped_dataset_table.select(*cols))
-            if not diff.rdd.isEmpty():
+            if not is_dataframe_empty(diff):
                 self._handle_dimension_association_errors(
                     diff, mapped_dataset_table, dataset_config, project_config.config_id
                 )
@@ -1086,7 +1089,8 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         dataset_id = dataset_config.config_id
         out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
-        diff.cache()
+        if not use_duckdb():
+            diff.cache()
         diff.write.options(header=True).mode("overwrite").csv(out_file)
         logger.error(
             "Dataset %s is missing required dimension records from project %s. "
@@ -1096,8 +1100,9 @@ class ProjectRegistryManager(RegistryManagerBase):
             out_file,
         )
         diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
-        diff.unpersist()
-        mapped_dataset_table.cache()
+        if not use_duckdb():
+            diff.unpersist()
+            mapped_dataset_table.cache()
         dataset_counts = {}
         for col in diff.columns:
             dataset_counts[col] = mapped_dataset_table.select(col).distinct().count()
@@ -1108,7 +1113,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                     dataset_counts[col],
                     diff_counts[col],
                 )
-        mapped_dataset_table.unpersist()
+        if not use_duckdb():
+            mapped_dataset_table.unpersist()
 
         raise DSGInvalidDataset(
             f"Dataset {dataset_config.config_id} is missing required dimension records. "

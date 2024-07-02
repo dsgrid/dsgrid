@@ -5,7 +5,6 @@ import logging
 from collections import Counter
 
 from prettytable import PrettyTable
-import pyspark.sql.functions as F
 
 from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
@@ -15,7 +14,7 @@ from dsgrid.exceptions import (
     DSGValueNotRegistered,
 )
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.utils.spark import models_to_dataframe, F
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
 from .common import ConfigKey, make_initial_config_registration, RegistryType

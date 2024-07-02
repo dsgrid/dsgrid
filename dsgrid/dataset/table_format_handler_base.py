@@ -1,9 +1,6 @@
 import abc
 import logging
 
-from pyspark.sql import DataFrame
-import pyspark.sql.functions as F
-
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidParameter
@@ -13,7 +10,7 @@ from dsgrid.query.models import (
     ColumnType,
     DimensionMetadataModel,
 )
-from dsgrid.utils.spark import get_unique_values
+from dsgrid.utils.spark import get_unique_values, DataFrame, F
 from dsgrid.utils.dataset import remove_invalid_null_timestamps
 
 

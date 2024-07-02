@@ -3,10 +3,6 @@
 from collections import defaultdict, namedtuple
 from pathlib import Path
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-from pyspark.sql import SparkSession
-
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.mapping_tables import MappingTableRecordModel
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
@@ -17,7 +13,7 @@ from dsgrid.utils.files import (
     load_line_delimited_json,
     dump_line_delimited_json,
 )
-from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.utils.spark import models_to_dataframe, F, IntegerType, get_spark_session, use_duckdb
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
 from dsgrid.tests.utils import read_csv_single_table_format, read_parquet_two_table_format
 
@@ -182,7 +178,7 @@ def apply_load_mapping_aeo_res(aeo_res):
 def make_projection_df(aeo, ld_df, join_columns):
     # comstock and resstock have a single year of data for model_year 2018
     # Apply the growth rate for 2020 and 2040, the years in the filtered registry.
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
+    spark = get_spark_session()
     years_df = spark.createDataFrame([{"model_year": "2020"}, {"model_year": "2040"}])
     aeo = aeo.crossJoin(years_df)
     ld_df = ld_df.crossJoin(years_df)
@@ -351,9 +347,11 @@ def make_unpivoted_datasets():
 
 
 def convert_table_to_unpivoted(path: Path, pivoted_columns, variable_column_name: str):
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    df = spark.read.load(str(path)).cache()
-    df.count()
+    spark = get_spark_session()
+    df = spark.read.load(str(path))
+    if not use_duckdb():
+        df.cache()
+        df.count()
     try:
         ids = set(df.columns).difference(pivoted_columns)
         df.unpivot(
@@ -363,7 +361,8 @@ def convert_table_to_unpivoted(path: Path, pivoted_columns, variable_column_name
             VALUE_COLUMN,
         ).coalesce(1).write.mode("overwrite").parquet(str(path))
     finally:
-        df.unpersist()
+        if not use_duckdb():
+            df.unpersist()
 
 
 def change_dataset_schemas(dataset_schemas: dict):

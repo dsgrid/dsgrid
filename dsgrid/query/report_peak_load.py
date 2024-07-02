@@ -1,14 +1,12 @@
 import logging
 from pathlib import Path
 
-import pyspark.sql.functions as F
-
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.dataset import ordered_subset_columns
-from dsgrid.utils.spark import read_dataframe
+from dsgrid.utils.spark import read_dataframe, F
 from .query_context import QueryContext
 from .reports_base import ReportsBase
 

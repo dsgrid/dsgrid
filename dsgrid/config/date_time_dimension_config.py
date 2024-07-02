@@ -1,11 +1,10 @@
 import logging
-from pyspark.sql.types import StructType, StructField, TimestampType
 
 from dsgrid.dimension.time import make_time_range
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import get_spark_session, StructType, StructField, TimestampType
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 

@@ -7,14 +7,15 @@ from pathlib import Path
 
 from IPython.display import display, HTML
 import ipywidgets as widgets
-from pyspark.sql import SparkSession
+
+# from pyspark.sql import SparkSession
 
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.exceptions import DSGBaseException
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.loggers import setup_logging
-from dsgrid.utils.spark import init_spark
+from dsgrid.utils.spark import init_spark, SparkSession
 
 SS_PROJECT = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/project.json5"
 RS_DATASET = "https://github.com/dsgrid/dsgrid-project-StandardScenarios/blob/main/dsgrid_project/datasets/modeled/resstock/dataset.json5"

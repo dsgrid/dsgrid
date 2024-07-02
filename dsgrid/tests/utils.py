@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from pyspark.sql import SparkSession
+from dsgrid.utils.spark import get_spark_session
 
 
 def read_parquet(filename: Path):
@@ -8,19 +8,19 @@ def read_parquet(filename: Path):
     If you don't use this, the parquet file will get deleted on a failure and you won't be able
     to inspect the dataframe.
     """
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
+    spark = get_spark_session()
     df = spark.read.parquet(str(filename)).cache()
     df.count()
     return df
 
 
 def read_csv_single_table_format(path: Path):
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
+    spark = get_spark_session()
     return spark.read.csv(str(path), header=True, inferSchema=True)
 
 
 def read_parquet_two_table_format(path: Path):
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
+    spark = get_spark_session()
     load_data = spark.read.parquet(str(path / "load_data.parquet"))
     lookup = spark.read.parquet(str(path / "load_data_lookup.parquet"))
     table = load_data.join(lookup, on="id").drop("id")

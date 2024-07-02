@@ -1,14 +1,13 @@
 import logging
 from pathlib import Path
 
-from pyspark.sql import DataFrame
-from pyspark.sql.types import StringType
-
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.utils.spark import (
+    DataFrame,
+    StringType,
     create_dataframe_from_ids,
     read_dataframe,
     get_unique_values,

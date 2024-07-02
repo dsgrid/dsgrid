@@ -2,11 +2,9 @@
 
 import logging
 
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame
-
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.exceptions import DSGInvalidDimension, DSGInvalidParameter
+from dsgrid.utils.spark import DataFrame, F
 
 
 KWH = "kWh"
@@ -238,7 +236,7 @@ def convert_units_unpivoted(
         tmp2 = from_to_records.select("from_id", "to_id")
         unit_df = (
             tmp1.join(tmp2, on=tmp1["id"] == tmp2["from_id"])
-            .selectExpr("to_id AS id", "from_unit")
+            .select(F.col("to_id").alias("id"), "from_unit")
             .distinct()
         )
     df = df.join(unit_df, on=df[metric_column] == unit_df["id"]).drop("id")

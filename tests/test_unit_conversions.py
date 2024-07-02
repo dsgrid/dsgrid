@@ -1,6 +1,5 @@
 import math
 
-import pyspark.sql.functions as F
 import pytest
 
 from dsgrid.common import VALUE_COLUMN
@@ -42,7 +41,7 @@ from dsgrid.units.energy import (
     to_mbtu,
     from_any_to_any,
 )
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import get_spark_session, use_duckdb, F
 
 
 KWH_VAL = 1234.5
@@ -68,8 +67,11 @@ def records_dataframe():
             {"id": "unitless", "name": "unitless", "fuel_id": "electricity", "unit": ""},
         ]
     )
-    yield records.cache()
-    records.unpersist()
+    if not use_duckdb():
+        records.cache()
+    yield records
+    if not use_duckdb():
+        records.unpersist()
 
 
 @pytest.fixture(scope="module")
@@ -88,8 +90,11 @@ def pivoted_dataframes(records_dataframe):
             },
         ]
     )
-    yield df.cache(), records_dataframe
-    df.unpersist()
+    if not use_duckdb():
+        df.cache()
+    yield df, records_dataframe
+    if not use_duckdb():
+        df.unpersist()
 
 
 @pytest.fixture(scope="module")
@@ -134,8 +139,11 @@ def unpivoted_dataframes(records_dataframe):
             },
         ]
     )
-    yield df.cache(), records_dataframe
-    df.unpersist()
+    if not use_duckdb():
+        df.cache()
+    yield records_dataframe
+    if not use_duckdb():
+        df.unpersist()
 
 
 def test_constants():

@@ -2,35 +2,35 @@ import logging
 import os
 from collections import defaultdict
 
-import pyspark
-from pyspark.sql import DataFrame
-import pyspark.sql.functions as F
-
 from dsgrid.common import SCALING_FACTOR_COLUMN
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping
-from dsgrid.utils.spark import check_for_nulls
+from dsgrid.utils.spark import check_for_nulls, DataFrame, F, is_dataframe_empty, use_duckdb
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
 
 
-@track_timing(timer_stats_collector)
 def map_and_reduce_stacked_dimension(df, records, column):
     if "fraction" not in df.columns:
         df = df.withColumn("fraction", F.lit(1.0))
     # map and consolidate from_fraction only
-    # TODO: can remove this if we do it at registration time
+
     records = records.filter("to_id IS NOT NULL")
+    if use_duckdb and df.relation.alias == records.relation.alias:
+        records.relation = records.relation.set_alias("other")
 
     df = (
-        df.join(records, on=df[column] == records.from_id, how="inner")
+        df.join(records, on=getattr(df, column) == records.from_id, how="inner")
         .drop("from_id")
         .drop(column)
         .withColumnRenamed("to_id", column)
     ).filter(f"{column} IS NOT NULL")
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
-    df = df.fillna(1.0, subset=["from_fraction"]).selectExpr(
-        *nonfraction_cols, "fraction*from_fraction AS fraction"
+    # TODO DT: DuckDB doesn't have fillna. Do we even need it?
+    # Could use SQL directly.
+    # df = df.fillna(1.0, subset=["from_fraction"]).select(
+    df = df.select(
+        *nonfraction_cols, (F.col("fraction") * F.col("from_fraction")).alias("fraction")
     )
     return df
 
@@ -110,7 +110,7 @@ def map_and_reduce_pivoted_dimension(df, records, pivoted_columns, operation, re
         dropped.update({x for x in records_dict[tid]})
 
     extra_cols = sorted(extra_pivoted_columns_to_keep)
-    return df.selectExpr(*nonvalue_cols, *extra_cols, *exprs), sorted(final_columns), dropped
+    return df.select(*nonvalue_cols, *extra_cols, *exprs), sorted(final_columns), dropped
 
 
 def add_time_zone(load_data_df, geography_dim):
@@ -177,14 +177,15 @@ def check_null_value_in_dimension_rows(dim_table, exclude_columns=None):
         )
 
 
-def is_noop_mapping(records: pyspark.sql.DataFrame) -> bool:
+def is_noop_mapping(records: DataFrame) -> bool:
     """Return True if the mapping is a no-op."""
-    return records.filter(
-        (records.to_id.isNull() & ~records.from_id.isNull())
-        | (~records.to_id.isNull() & records.from_id.isNull())
-        | (records.from_id != records.to_id)
-        | (records.from_fraction != 1.0)
-    ).rdd.isEmpty()
+    return is_dataframe_empty(
+        records.filter(
+            "(to_id IS NULL and from_id IS NOT NULL) or "
+            "(to_id IS NOT NULL and from_id IS NULL) or "
+            "(from_id != to_id) or (from_fraction != 1.0)"
+        )
+    )
 
 
 def ordered_subset_columns(df, subset: set[str]) -> list[str]:

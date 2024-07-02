@@ -3,9 +3,6 @@ import logging
 import os
 from typing import Union
 
-from pyspark.sql import DataFrame
-import pyspark.sql.functions as F
-
 import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
@@ -25,7 +22,7 @@ from dsgrid.utils.dataset import (
     add_time_zone,
     ordered_subset_columns,
 )
-from dsgrid.utils.spark import get_unique_values
+from dsgrid.utils.spark import get_unique_values, DataFrame, F
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -399,7 +396,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         project_record_ids,
                         on=dataset_mapping.to_id == project_record_ids.id,
                     )
-                    .selectExpr("dataset_record_id AS id")
+                    .select("dataset_record_id")
+                    .withColumnRenamed("dataset_record_id", "id")
                     .distinct()
                 )
             yield dim_type, dataset_record_ids
@@ -430,7 +428,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if dim_type.value not in df.columns:
                 # This dimensions is stored in another table (e.g., lookup or load_data)
                 continue
-            df = df.join(tmp, on=df[dim_type.value] == tmp.dataset_record_id).drop(
+            df = df.join(tmp, on=getattr(df, dim_type.value) == tmp.dataset_record_id).drop(
                 "dataset_record_id"
             )
 

@@ -1,7 +1,5 @@
 import logging
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import FloatType
 import pytest
 
 import pandas as pd
@@ -13,7 +11,7 @@ from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone, TimeIntervalType
 from dsgrid.utils.dataset import add_time_zone
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import get_spark_session, FloatType, F
 from dsgrid.exceptions import DSGDatasetConfigError
 
 

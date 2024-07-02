@@ -3,7 +3,6 @@ import os
 import shutil
 from pathlib import Path
 
-import pyspark
 import pytest
 from pydantic import ValidationError
 
@@ -27,6 +26,7 @@ from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.spark import DataFrame
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
@@ -256,7 +256,7 @@ def test_auto_updates(tmp_registry_db):
     ][0]
 
     # Test that we can convert records to a Spark DataFrame. Unrelated to the rest.
-    assert isinstance(dimension.get_records_dataframe(), pyspark.sql.DataFrame)
+    assert isinstance(dimension.get_records_dataframe(), DataFrame)
 
     dimension.model.description += "; test update"
     update_type = VersionUpdateType.MINOR

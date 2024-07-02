@@ -6,7 +6,7 @@ import logging
 
 from dsgrid.loggers import setup_logging
 from dsgrid.utils.timing import timed_info
-from dsgrid.utils.spark import init_spark
+from dsgrid.utils.spark import use_duckdb, read_parquet
 from dsgrid.utils.spark_partition import SparkPartition
 
 logger = logging.getLogger(__name__)
@@ -106,6 +106,10 @@ class EnumerateTable:
             - df.repartition(col): shuffle and create partitions by col.nunique + 1 empty/very small partition
             - df.repartition(n, col): shufffle, number partitions = min(n, col.nunique)
         """
+        if use_duckdb():
+            logger.warning("save_file is not optimized for DuckDB")
+            df.write.parquet(filepath)
+            return
 
         current_n_parts = df.rdd.getNumPartitions()
 
@@ -135,11 +139,8 @@ class EnumerateTable:
     @timed_info
     def run(self, relocated_file, lookup_file):
         """read from relocated_file, replace lookup_file with new output"""
-
-        spark = init_spark("dsgrid-load")
-
         # 1. load data
-        df_lookup = spark.read.parquet(relocated_file)
+        df_lookup = read_parquet(relocated_file)
 
         # 2. get keys to enumerte on
         keys_to_exclude = ["scale_factor", "id"]

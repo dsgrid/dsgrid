@@ -1,10 +1,6 @@
 import logging
 from pathlib import Path
 
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame
-from pyspark.sql.types import StringType
-
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
@@ -17,11 +13,16 @@ from dsgrid.utils.dataset import (
     apply_scaling_factor,
 )
 from dsgrid.utils.spark import (
+    DataFrame,
+    F,
+    StringType,
     create_dataframe_from_ids,
     read_dataframe,
     get_unique_values,
     overwrite_dataframe_file,
     write_dataframe_and_auto_partition,
+    is_dataframe_empty,
+    use_duckdb,
 )
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
@@ -147,7 +148,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @staticmethod
     def _add_null_values(ld_df, null_lk_df):
-        if not null_lk_df.rdd.isEmpty():
+        if not is_dataframe_empty(null_lk_df):
             for col in set(ld_df.columns).difference(null_lk_df.columns):
                 null_lk_df = null_lk_df.withColumn(col, F.lit(None))
             ld_df = ld_df.union(null_lk_df.select(*ld_df.columns))
@@ -229,7 +230,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ldl_ids = self._load_data_lookup.select("id").distinct()
 
         with Timer(timer_stats_collector, "check load_data for nulls"):
-            if not self._load_data.select("id").filter("id is NULL").rdd.isEmpty():
+            if not is_dataframe_empty(self._load_data.select("id").filter("id is NULL")):
                 raise DSGInvalidDataset(
                     f"load_data for dataset {self._config.config_id} has a null ID"
                 )
@@ -242,23 +243,26 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             count = joined.count()
 
         if data_id_count != count:
-            with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
-                diff = ld_ids.unionAll(ldl_ids).exceptAll(ld_ids.intersect(ldl_ids))
-                # TODO: Starting with Python 3.10 and Spark 3.3.0, this fails unless we call cache.
-                # Works fine on Python 3.9 and Spark 3.2.0. Haven't debugged further.
-                # The size should not cause a problem.
-                diff.cache()
-                diff_count = diff.count()
-                limit = 100
-                if diff_count < limit:
-                    diff_list = diff.collect()
-                else:
-                    diff_list = diff.limit(limit).collect()
-                logger.error(
-                    "load_data and load_data_lookup have %s different IDs: %s",
-                    diff_count,
-                    diff_list,
-                )
+            if not use_duckdb():
+                # TODO: duckdb doesn't support intersect. Could use SQL directly.
+                with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
+                    diff = ld_ids.unionAll(ldl_ids).exceptAll(ld_ids.intersect(ldl_ids))
+                    # TODO: Starting with Python 3.10 and Spark 3.3.0, this fails unless we call cache.
+                    # Works fine on Python 3.9 and Spark 3.2.0. Haven't debugged further.
+                    # The size should not cause a problem.
+                    if not use_duckdb():
+                        diff.cache()
+                    diff_count = diff.count()
+                    limit = 100
+                    if diff_count < limit:
+                        diff_list = diff.collect()
+                    else:
+                        diff_list = diff.limit(limit).collect()
+                    logger.error(
+                        "load_data and load_data_lookup have %s different IDs: %s",
+                        diff_count,
+                        diff_list,
+                    )
             raise DSGInvalidDataset(
                 f"Data IDs for {self._config.config_id} data/lookup are inconsistent"
             )
@@ -295,7 +299,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel]):
         lookup = self._load_data_lookup
-        lookup.cache()
+        if not use_duckdb():
+            lookup.cache()
         load_df = self._load_data
         lookup_columns = set(lookup.columns)
         time_columns = set(
@@ -322,7 +327,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         lookup2 = lookup.coalesce(1)
         lookup2 = overwrite_dataframe_file(self._config.load_data_lookup_path, lookup2)
-        lookup.unpersist()
+        if not use_duckdb():
+            lookup.unpersist()
         logger.info("Rewrote simplified %s", self._config.load_data_lookup_path)
         ids = next(iter(lookup2.select("id").distinct().select(F.collect_list("id")).first()))
 

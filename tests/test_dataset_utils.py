@@ -1,8 +1,6 @@
 import math
 
-import pyspark.sql.functions as F
 import pytest
-from pyspark.sql.types import StructType, IntegerType
 
 from dsgrid.utils.dataset import (
     apply_scaling_factor,
@@ -10,7 +8,7 @@ from dsgrid.utils.dataset import (
     is_noop_mapping,
     remove_invalid_null_timestamps,
 )
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import get_spark_session, StructType, IntegerType, F, is_dataframe_empty
 
 
 @pytest.fixture(scope="module")
@@ -245,7 +243,7 @@ def test_remove_invalid_null_timestamps():
     result = remove_invalid_null_timestamps(df, {time_col}, stacked)
     assert result.count() == 6
     assert result.filter("county == 'Boulder'").count() == 2
-    assert result.filter(f"county == 'Boulder' and {time_col} is NULL").rdd.isEmpty()
+    assert is_dataframe_empty(result.filter(f"county == 'Boulder' and {time_col} is NULL"))
 
 
 def test_apply_scaling_factor():

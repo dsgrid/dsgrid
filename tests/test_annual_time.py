@@ -1,4 +1,3 @@
-import pyspark.sql.functions as F
 import pytest
 
 from dsgrid.dimension.base_models import DimensionType
@@ -16,7 +15,7 @@ from dsgrid.dimension.time import (
     TimeIntervalType,
     TimeZone,
 )
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import get_spark_session, F
 
 
 @pytest.fixture

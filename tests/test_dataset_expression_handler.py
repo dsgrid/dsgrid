@@ -2,7 +2,7 @@ import pytest
 
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.exceptions import DSGInvalidOperation
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import get_spark_session, use_duckdb
 
 STACKED_DIMENSION_COLUMNS = ["county", "model_year"]
 PIVOTED_COLUMNS = ["elec_cooling", "elec_heating"]
@@ -31,7 +31,9 @@ def datasets():
 
 
 def test_dataset_expression_add(datasets):
-    df = evaluate_expression("dataset1 + dataset2", datasets).df.cache()
+    df = evaluate_expression("dataset1 + dataset2", datasets).df
+    if not use_duckdb():
+        df.cache()
     assert df.count() == 3
     assert df.filter("county == 'Jefferson'").collect()[0].elec_cooling == 11
     assert df.filter("county == 'Boulder'").collect()[0].elec_cooling == 13
@@ -40,7 +42,9 @@ def test_dataset_expression_add(datasets):
 
 
 def test_dataset_expression_mul(datasets):
-    df = evaluate_expression("dataset1 * dataset2", datasets).df.cache()
+    df = evaluate_expression("dataset1 * dataset2", datasets).df
+    if not use_duckdb():
+        df.cache()
     assert df.count() == 3
     assert df.filter("county == 'Jefferson'").collect()[0].elec_cooling == 18
     assert df.filter("county == 'Boulder'").collect()[0].elec_cooling == 30
@@ -49,7 +53,9 @@ def test_dataset_expression_mul(datasets):
 
 
 def test_dataset_expression_sub(datasets):
-    df = evaluate_expression("dataset2 - dataset1", datasets).df.cache()
+    df = evaluate_expression("dataset2 - dataset1", datasets).df
+    if not use_duckdb():
+        df.cache()
     assert df.count() == 3
     assert df.filter("county == 'Jefferson'").collect()[0].elec_cooling == 7
     assert df.filter("county == 'Boulder'").collect()[0].elec_cooling == 7
@@ -58,7 +64,9 @@ def test_dataset_expression_sub(datasets):
 
 
 def test_dataset_expression_union(datasets):
-    df = evaluate_expression("dataset1 | dataset2", datasets).df.cache()
+    df = evaluate_expression("dataset1 | dataset2", datasets).df
+    if not use_duckdb():
+        df.cache()
     assert df.count() == 6
     assert df.filter("county == 'Jefferson'").count() == 2
     assert df.filter("county == 'Boulder'").count() == 2
@@ -67,7 +75,9 @@ def test_dataset_expression_union(datasets):
 
 
 def test_dataset_expression_combo(datasets):
-    df = evaluate_expression("(dataset1 + dataset2) | (dataset1 * dataset2)", datasets).df.cache()
+    df = evaluate_expression("(dataset1 + dataset2) | (dataset1 * dataset2)", datasets).df
+    if not use_duckdb():
+        df.cache()
     assert df.count() == 6
     jefferson = df.filter("county == 'Jefferson'").cache()
     assert jefferson.count() == 2

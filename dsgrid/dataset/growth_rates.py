@@ -1,12 +1,8 @@
 import logging
 
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame
-from pyspark.sql.types import IntegerType
-
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.query.models import ProjectionDatasetModel
-from dsgrid.utils.spark import get_unique_values
+from dsgrid.utils.spark import get_unique_values, DataFrame, F, IntegerType
 
 
 logger = logging.getLogger(__name__)

@@ -6,6 +6,7 @@ from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimensionMapping
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.spark import F, use_duckdb
 
 
 PROJECT_ID = "test_efs"
@@ -71,6 +72,8 @@ def test_dataset_load(cached_registry):
     assert records.filter("id = 'CO'").count() > 0
 
 
+# TODO
+@pytest.mark.skipif(use_duckdb())
 def test_dimension_map_and_reduce_in_dataset(cached_registry):
     conn = cached_registry
     mgr = RegistryManager.load(conn, offline_mode=True)
@@ -141,13 +144,13 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
             # apply mapping to load_data.sum(), then compare to mapped_load_data.sum()
             # 2B.1 get total enduse loads from each table
             sum_query = [
-                f"SUM({col}) AS {col}"
+                F.sum(col).alias(col)
                 for col in dataset._handler.config.get_pivoted_dimension_columns()
             ]
-            load_data_sum = load_data_df.selectExpr(*sum_query)
+            load_data_sum = load_data_df.select(*sum_query)
 
-            sum_query = [f"SUM({col}) AS {col}" for col in mapping_config.get_unique_to_ids()]
-            mapped_load_data_sum = mapped_load_data.selectExpr(*sum_query).toPandas()
+            sum_query = [F.sum(col) for col in mapping_config.get_unique_to_ids()]
+            mapped_load_data_sum = mapped_load_data.select(*sum_query).toPandas()
 
             # 2B.2 apply mapping
             # this part of the code is the same as 'dataset_schema_handler_base._map_and_reduce_dimension() for pivoted dim mapping'

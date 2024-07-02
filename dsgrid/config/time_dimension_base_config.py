@@ -3,12 +3,12 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 import pandas as pd
-import pyspark.sql.functions as F
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import TimeZone, TimeIntervalType
 from dsgrid.exceptions import DSGInvalidOperation, DSGInvalidDimension
 from dsgrid.config.dimensions import TimeRangeModel
+from dsgrid.utils.spark import F
 
 
 class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):

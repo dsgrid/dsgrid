@@ -1,16 +1,18 @@
 from functools import reduce
 from typing import Optional
 
-from pyspark.sql import DataFrame
+import pytest
 
 from dsgrid.time.types import DayType
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
+    DataFrame,
     get_spark_session,
     get_type_from_union,
     try_read_dataframe,
     restart_spark_with_custom_conf,
     create_dataframe_from_product,
+    use_duckdb,
 )
 
 
@@ -31,6 +33,7 @@ def test_try_read_dataframe_valid(tmp_path):
     assert df.collect()[0].a == 1
 
 
+@pytest.mark.skipif(use_duckdb())
 def test_restart_spark():
     spark = get_spark_session()
     cur_partitions = spark.conf.get("spark.sql.shuffle.partitions")

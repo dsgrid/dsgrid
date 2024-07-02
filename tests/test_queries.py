@@ -5,11 +5,8 @@ import shutil
 import tempfile
 from pathlib import Path
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 import pytest
 from click.testing import CliRunner
-from pyspark.sql import SparkSession
 
 from dsgrid.common import DEFAULT_DB_PASSWORD, VALUE_COLUMN
 from dsgrid.cli.dsgrid import cli
@@ -49,6 +46,15 @@ from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDataset
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.spark import (
+    SparkSession,
+    F,
+    DoubleType,
+    StringType,
+    StructField,
+    StructType,
+    use_duckdb,
+)
 from dsgrid.tests.utils import read_parquet
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
@@ -378,9 +384,10 @@ def get_project(database, project_id):
 def shutdown_project():
     """Shutdown a project and stop the SparkSession so that another process can create one."""
     _projects.clear()
-    spark = SparkSession.getActiveSession()
-    if spark is not None:
-        spark.stop()
+    if not use_duckdb():
+        spark = SparkSession.getActiveSession()
+        if spark is not None:
+            spark.stop()
 
 
 def run_query_test(test_query_cls, *args, expected_values=None):
@@ -1373,8 +1380,7 @@ def perform_op(df, column, operation):
 def validate_electricity_use_by_county(
     op, results_path, raw_stats, datasets, expected_county_count
 ):
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    results = spark.read.parquet(str(results_path))
+    results = read_parquet(results_path)
     counties = [str(x.county) for x in results.select("county").distinct().collect()]
     assert len(counties) == expected_county_count, counties
     stats = raw_stats["by_county"]
@@ -1388,8 +1394,7 @@ def validate_electricity_use_by_county(
 
 
 def validate_electricity_use_by_state(op, results_path, raw_stats, datasets):
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    results = spark.read.parquet(str(results_path))
+    results = read_parquet(results_path)
     if op == "sum":
         exp_ca = get_expected_ca_sum_electricity(raw_stats, datasets)
         exp_ny = get_expected_ny_sum_electricity(raw_stats, datasets)

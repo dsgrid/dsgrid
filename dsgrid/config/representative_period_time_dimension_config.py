@@ -2,8 +2,6 @@ import abc
 import calendar
 import logging
 from datetime import datetime, timedelta
-from pyspark.sql.types import StructType, StructField, IntegerType
-import pyspark.sql.functions as F
 
 import pandas as pd
 
@@ -16,7 +14,7 @@ from dsgrid.dimension.time import (
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import OneWeekPerMonthByHourType
 from dsgrid.utils.timing import track_timing, timer_stats_collector
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import StructType, StructField, IntegerType, F, get_spark_session
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -124,12 +122,12 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                 )
                 select = [ptime_col, "time_zone"]
                 for col in time_cols:
-                    func = col.replace("_", "")
-                    expr = f"{func}(local_time) AS {col}"
+                    func = getattr(F, col.replace("_", ""))
+                    expr = func("local_time").alias(col)
                     if col == "day_of_week":
-                        expr = f"mod(dayofweek(local_time)+7-2, 7) AS {col}"
+                        expr = F.weekday("local_time").alias(col)
                     select.append(expr)
-                local_time_df = local_time_df.selectExpr(*select)
+                local_time_df = local_time_df.select(*select)
                 if idx == 0:
                     time_df = local_time_df
                 else:

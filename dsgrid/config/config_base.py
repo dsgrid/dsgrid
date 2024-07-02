@@ -3,10 +3,9 @@ import logging
 from pathlib import Path
 
 import json5
-from pyspark.sql import DataFrame
 
 from dsgrid.exceptions import DSGInvalidOperation
-from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.utils.spark import models_to_dataframe, DataFrame
 
 
 logger = logging.getLogger(__name__)

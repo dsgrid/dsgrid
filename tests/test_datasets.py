@@ -15,13 +15,20 @@ from dsgrid.tests.common import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )
-from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json, load_data
+from dsgrid.utils.files import (
+    dump_line_delimited_json,
+    load_line_delimited_json,
+    load_data,
+    delete_if_exists,
+)
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 logger = logging.getLogger()
 
 PROJECT_ID = "test_efs"
 DATASET_ID = "test_efs_comstock"
+
+# TODO duckdb: need to pass newline_delimited to spark.read.json somehow
 
 
 def make_registry(base_dir, test_project_dir, test_data_dir):
@@ -123,8 +130,7 @@ def register_and_submit_dataset(setup_registry_single):
         missing_record_file = Path(
             f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
         )
-        if missing_record_file.exists():
-            shutil.rmtree(missing_record_file)
+        delete_if_exists(missing_record_file)
 
 
 def test_invalid_load_data_lookup_column_name(register_dataset):
@@ -326,5 +332,4 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
         missing_record_file = Path(
             f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
         )
-        if missing_record_file.exists():
-            shutil.rmtree(missing_record_file)
+        delete_if_exists(missing_record_file)

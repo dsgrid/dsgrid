@@ -1,10 +1,6 @@
 import logging
 from pathlib import Path
 
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame
-from pyspark.sql.types import StringType
-
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
@@ -13,6 +9,21 @@ from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
+from dsgrid.spark.functions import (
+    cache,
+    coalesce,
+    collect_list,
+    cross_join,
+    except_all,
+    is_dataframe_empty,
+    unpersist,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+    F,
+    StringType,
+    use_duckdb,
+)
 from dsgrid.utils.dataset import (
     apply_scaling_factor,
 )
@@ -57,12 +68,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         df = self._load_data.select("id", *dim_cols).distinct()
         df = df.join(lk_df, on="id").drop("id")
         df = self._remap_dimension_columns(df).drop("fraction")
-        null_lk_df = (
-            self._remap_dimension_columns(self._load_data_lookup.filter("id is NULL"))
-            .drop("fraction")
-            .crossJoin(df.select(*dim_cols).distinct())
-        )
-        return self._add_null_values(df, null_lk_df)
+        null_lk_df = self._remap_dimension_columns(
+            self._load_data_lookup.filter("id is NULL")
+        ).drop("fraction")
+        return self._add_null_values(df, cross_join(null_lk_df, df.select(*dim_cols).distinct()))
 
     def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         # TODO: Can we remove NULLs at registration time?
@@ -123,7 +132,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @staticmethod
     def _add_null_values(ld_df, null_lk_df):
-        if not null_lk_df.rdd.isEmpty():
+        if not is_dataframe_empty(null_lk_df):
             for col in set(ld_df.columns).difference(null_lk_df.columns):
                 null_lk_df = null_lk_df.withColumn(col, F.lit(None))
             ld_df = ld_df.union(null_lk_df.select(*ld_df.columns))
@@ -199,7 +208,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ldl_ids = self._load_data_lookup.select("id").distinct()
 
         with Timer(timer_stats_collector, "check load_data for nulls"):
-            if not self._load_data.select("id").filter("id is NULL").rdd.isEmpty():
+            if not is_dataframe_empty(self._load_data.select("id").filter("id is NULL")):
                 raise DSGInvalidDataset(
                     f"load_data for dataset {self._config.config_id} has a null ID"
                 )
@@ -212,23 +221,26 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             count = joined.count()
 
         if data_id_count != count:
-            with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
-                diff = ld_ids.unionAll(ldl_ids).exceptAll(ld_ids.intersect(ldl_ids))
-                # TODO: Starting with Python 3.10 and Spark 3.3.0, this fails unless we call cache.
-                # Works fine on Python 3.9 and Spark 3.2.0. Haven't debugged further.
-                # The size should not cause a problem.
-                diff.cache()
-                diff_count = diff.count()
-                limit = 100
-                if diff_count < limit:
-                    diff_list = diff.collect()
-                else:
-                    diff_list = diff.limit(limit).collect()
-                logger.error(
-                    "load_data and load_data_lookup have %s different IDs: %s",
-                    diff_count,
-                    diff_list,
-                )
+            if not use_duckdb():
+                # TODO: duckdb doesn't support intersect. Could use SQL directly.
+                with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
+                    diff = except_all(ld_ids.unionAll(ldl_ids), ld_ids.intersect(ldl_ids))
+                    # TODO: Starting with Python 3.10 and Spark 3.3.0, this fails unless we call cache.
+                    # Works fine on Python 3.9 and Spark 3.2.0. Haven't debugged further.
+                    # The size should not cause a problem.
+                    if not use_duckdb():
+                        diff.cache()
+                    diff_count = diff.count()
+                    limit = 100
+                    if diff_count < limit:
+                        diff_list = diff.collect()
+                    else:
+                        diff_list = diff.limit(limit).collect()
+                    logger.error(
+                        "load_data and load_data_lookup have %s different IDs: %s",
+                        diff_count,
+                        diff_list,
+                    )
             raise DSGInvalidDataset(
                 f"Data IDs for {self._config.config_id} data/lookup are inconsistent"
             )
@@ -265,13 +277,13 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel]):
         lookup = self._load_data_lookup
-        lookup.cache()
+        cache(lookup)
         load_df = self._load_data
         lookup_columns = set(lookup.columns)
         for dim in dimensions:
             column = dim.dimension_type.value
             if column in lookup_columns:
-                lookup = lookup.filter(lookup[column].isin(dim.record_ids))
+                lookup = lookup.filter(getattr(lookup, column).isin(dim.record_ids))
 
         drop_columns = []
         for dim in self._config.model.trivial_dimensions:
@@ -281,12 +293,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             drop_columns.append(col)
         lookup = lookup.drop(*drop_columns)
 
-        lookup2 = lookup.coalesce(1)
+        lookup2 = coalesce(lookup, 1)
         lookup2 = overwrite_dataframe_file(self._config.load_data_lookup_path, lookup2)
-        lookup.unpersist()
+        unpersist(lookup)
         logger.info("Rewrote simplified %s", self._config.load_data_lookup_path)
-        ids = next(iter(lookup2.select("id").distinct().select(F.collect_list("id")).first()))
-
+        ids = collect_list(lookup2.select("id").distinct(), "id")
         load_df = self._load_data.filter(self._load_data.id.isin(ids))
         path = Path(self._config.load_data_path)
         if path.suffix == ".csv":

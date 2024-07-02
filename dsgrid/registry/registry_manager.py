@@ -9,8 +9,6 @@ import sys
 import uuid
 from pathlib import Path
 
-from pyspark.sql import SparkSession
-
 from dsgrid.common import (
     LOCAL_REGISTRY,
     REMOTE_REGISTRY,
@@ -26,7 +24,7 @@ from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidParameter
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.filesystem.factory import make_filesystem_interface
-from dsgrid.utils.spark import init_spark
+from dsgrid.utils.spark import init_spark, get_active_session
 from .common import (
     RegistryManagerParams,
 )
@@ -51,7 +49,7 @@ class RegistryManager:
 
     def __init__(self, params: RegistryManagerParams, db: RegistryDatabase):
         self._check_environment_variables(params)
-        if SparkSession.getActiveSession() is None:
+        if get_active_session() is None:
             init_spark("dsgrid")
         self._params = params
         self._dimension_mgr = DimensionRegistryManager.load(

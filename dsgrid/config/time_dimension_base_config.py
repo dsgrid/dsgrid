@@ -3,10 +3,6 @@ import logging
 from datetime import timedelta
 from typing import Optional
 
-import pyspark.sql.functions as F
-from pyspark.sql import Row
-from pyspark.sql import DataFrame
-
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import (
     TimeZone,
@@ -22,6 +18,20 @@ from dsgrid.dimension.time_utils import (
     apply_time_wrap,
 )
 from dsgrid.config.dimensions import TimeRangeModel
+from dsgrid.spark.functions import (
+    aggregate,
+    except_all,
+    interval,
+    make_temp_view_name,
+    select_expr,
+    unpersist,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+    F,
+    Row,
+    use_duckdb,
+)
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 
@@ -144,7 +154,10 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                 f"{type(self)}: {time_cols=}"
             )
 
-        return df.withColumnRenamed(time_cols[0], self.model.dimension_query_name)
+        time_col = time_cols[0]
+        if time_col not in df.columns:
+            return df
+        return df.withColumnRenamed(time_col, self.model.dimension_query_name)
 
     @abc.abstractmethod
     def get_time_ranges(self):
@@ -218,8 +231,13 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         time_col = time_col[0]
         time_map = (
             df.select(time_col).distinct().select(time_col, F.col(time_col).alias("orig_ts"))
-        ).cache()
-        time_map.count()
+        )
+        if use_duckdb():
+            # TODO DT
+            time_map.relation = time_map.relation.set_alias(make_temp_view_name())
+        else:
+            time_map.cache()
+            time_map.count()
 
         time_map = self._align_time_interval_type(time_map, project_time_dim)
         if time_based_data_adjustment.leap_day_adjustment != LeapDayAdjustmentType.NONE:
@@ -233,19 +251,19 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                 logger.warning("wrap_time is not required, no time misalignment found.")
 
         time_map_diff = (
-            time_map.select((F.col(time_col) - F.col("orig_ts")).alias("diff"))
-            .distinct()
-            .collect()
+            select_expr(time_map, [f"{time_col} - orig_ts AS diff"]).distinct().collect()
         )
         if time_map_diff != [Row(diff=timedelta(0))]:
             other_cols = [x for x in df.columns if x != time_col]
+            # TODO duckdb: something is wrong here
             df = (
-                df.select(F.col(time_col).alias("orig_ts"), *other_cols)
+                df.select(time_col, *other_cols)
+                .withColumnRenamed(time_col, "orig_ts")
                 .join(time_map, "orig_ts", "inner")
                 .drop("orig_ts")
             )
 
-        time_map.unpersist()
+        unpersist(time_map)
         return df
 
     def _align_time_interval_type(self, df, project_time_dim):
@@ -272,24 +290,28 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         # Apply time wrap to one timestamp
         if self.model.ranges == project_time_dim.model.ranges:
             project_time = project_time_dim.list_expected_dataset_timestamps()
-            time_delta = (
-                project_time[-1][0] - project_time[0][0] + project_time_dim.get_frequency()
-            ).total_seconds()
+            time_delta = int(
+                (
+                    project_time[-1][0] - project_time[0][0] + project_time_dim.get_frequency()
+                ).total_seconds()
+            )
 
             if dtime_interval == TimeIntervalType.PERIOD_BEGINNING:
-                df_change = df.join(df.agg(F.max(time_col).alias(time_col)), time_col)
-                df = df_change.withColumn(
-                    time_col,
-                    F.from_unixtime(F.unix_timestamp(time_col) - time_delta).cast("timestamp"),
-                ).union(df.exceptAll(df_change))
-            elif dtime_interval == TimeIntervalType.PERIOD_ENDING:
-                df_change = df.join(df.agg(F.min(time_col).alias(time_col)), time_col).select(
-                    *df.columns
+                df_change = df.join(aggregate(df, "max", time_col, time_col), time_col)
+                df = interval(df_change, time_col, "-", time_delta, "SECONDS", time_col).union(
+                    except_all(df, df_change)
                 )
-                df = df_change.withColumn(
-                    time_col,
-                    F.from_unixtime(F.unix_timestamp(time_col) + time_delta).cast("timestamp"),
-                ).union(df.exceptAll(df_change))
+                df = (
+                    interval(df_change, time_col, "-", time_delta, "SECONDS", time_col)
+                    .union(except_all(df, df_change))
+                    .union(except_all(df, df_change))
+                )
+            elif dtime_interval == TimeIntervalType.PERIOD_ENDING:
+                df2 = aggregate(df, "min", time_col, time_col)
+                df_change = df.join(df2, time_col).select(*df.columns)
+                df = interval(df_change, time_col, "+", time_delta, "SECONDS", time_col).union(
+                    except_all(df, df_change)
+                )
         return df
 
     def _build_time_ranges(

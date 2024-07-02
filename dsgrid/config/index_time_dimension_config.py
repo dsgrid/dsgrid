@@ -1,14 +1,5 @@
 import logging
 from datetime import datetime
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    TimestampType,
-    IntegerType,
-    DoubleType,
-    StringType,
-)
-import pyspark.sql.functions as F
 
 from dsgrid.dimension.time import (
     IndexTimeRange,
@@ -21,10 +12,24 @@ from dsgrid.dimension.time_utils import (
     build_index_time_map,
 )
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
+from dsgrid.spark.functions import (
+    join_multiple_columns,
+)
+from dsgrid.spark.types import (
+    DoubleType,
+    F,
+    IntegerType,
+    StringType,
+    StructField,
+    StructType,
+    TimestampType,
+)
 from dsgrid.time.types import DatetimeTimestampType, IndexTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import (
+    get_spark_session,
+)
 from .dimensions import IndexTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.config.dimensions import TimeRangeModel
@@ -131,6 +136,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         assert "time_zone" in df.columns, df.columns
         geo_tz = [TimeZone(row.time_zone) for row in df.select("time_zone").distinct().collect()]
         assert geo_tz
+
         # indices correspond to clock time laid out like Standard Time
         geo_tz2 = [tz.get_standard_time() for tz in geo_tz]
 
@@ -153,12 +159,13 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
             # time_based_data_adjustment mapping table
             table = create_adjustment_map_from_model_time(self, time_based_data_adjustment, tz)
             index_map = (
-                index_map.selectExpr(idx_col, "time_zone", f"{time_col} AS model_time")
+                index_map.select(idx_col, "time_zone", F.col(time_col).alias("model_time"))
                 .join(table, ["model_time"], "right")
                 .drop("model_time")
             )
             time_map = time_map.union(index_map.select(schema.names))
-        df = df.join(time_map, on=[idx_col, "time_zone"], how="inner").drop(idx_col, "time_zone")
+
+        df = join_multiple_columns(df, time_map, [idx_col, "time_zone"]).drop(idx_col, "time_zone")
         groupby = [x for x in df.columns if x not in value_columns.union({"multiplier"})]
         df = df.groupBy(*groupby).agg(
             *[F.sum(F.col(col) * F.col("multiplier")).alias(col) for col in value_columns]

@@ -2,9 +2,6 @@ import logging
 from datetime import timedelta
 
 import pandas as pd
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame
-from pyspark.sql.types import StructType, StructField, IntegerType, StringType
 
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dimension.base_models import DimensionType
@@ -12,9 +9,24 @@ from dsgrid.dimension.time import AnnualTimeRange
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.time.types import AnnualTimestampType
 from dsgrid.dimension.time_utils import is_leap_year
-from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.spark.functions import (
+    cross_join,
+    select_expr,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+    StructType,
+    StructField,
+    IntegerType,
+    StringType,
+    F,
+)
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import get_spark_session, custom_spark_conf
+from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.utils.spark import (
+    get_spark_session,
+    set_session_time_zone,
+)
 from .dimensions import AnnualTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -127,15 +139,13 @@ def map_annual_time_to_date_time(
 ) -> DataFrame:
     """Map a DataFrame with an annual time dimension to a DateTime time dimension."""
     annual_col = annual_dim.get_load_data_time_columns()[0]
-    dt_df = dt_dim.build_time_dataframe()
     myear_column = DimensionType.MODEL_YEAR.value
     dt_col = dt_dim.get_load_data_time_columns()[0]
+    dt_df = dt_dim.build_time_dataframe()
 
     # Note that MeasurementType.TOTAL has already been verified.
-    with custom_spark_conf(
-        {"spark.sql.session.timeZone": dt_dim.model.datetime_format.timezone.tz_name}
-    ):
-        years = dt_df.withColumn("year", F.year(dt_col)).select("year").distinct().collect()
+    with set_session_time_zone(dt_dim.model.datetime_format.timezone.tz_name):
+        years = select_expr(dt_df, [f"YEAR({dt_col}) AS year"]).distinct().collect()
         if len(years) != 1:
             msg = "DateTime dimension has more than one year: {years=}"
             raise NotImplementedError(msg)
@@ -145,7 +155,7 @@ def map_annual_time_to_date_time(
             measured_duration = timedelta(days=365)
 
     df2 = (
-        df.crossJoin(dt_df)
+        cross_join(df, dt_df)
         .withColumn(myear_column, F.col(annual_col).cast(StringType()))
         .drop(annual_col)
     )

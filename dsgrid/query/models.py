@@ -2,7 +2,6 @@ import abc
 from enum import Enum
 from typing import Any, Optional, Union, Literal, List, TypeAlias
 
-import pyspark.sql.functions as F
 from pydantic import field_validator, model_validator, Field, field_serializer, ValidationInfo
 from semver import VersionInfo
 from typing_extensions import Annotated
@@ -22,6 +21,7 @@ from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
+from dsgrid.spark.types import F
 from dsgrid.utils.files import compute_hash
 
 

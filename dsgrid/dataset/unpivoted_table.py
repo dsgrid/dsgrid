@@ -1,7 +1,5 @@
 import logging
 
-from pyspark.sql import DataFrame
-
 import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
@@ -11,6 +9,7 @@ from dsgrid.query.models import (
     DatasetDimensionsMetadataModel,
 )
 from dsgrid.query.query_context import QueryContext
+from dsgrid.spark.types import DataFrame
 from .table_format_handler_base import TableFormatHandlerBase
 
 

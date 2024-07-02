@@ -1,7 +1,5 @@
 import logging
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import FloatType
 import pytest
 
 import pandas as pd
@@ -14,6 +12,22 @@ from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone, TimeIntervalType
 from dsgrid.dimension.time_utils import shift_time_interval
+from dsgrid.spark.functions import (
+    create_temp_view,
+    make_temp_view_name,
+    from_utc_timestamp,
+    get_current_time_zone,
+    join_multiple_columns,
+    select_expr,
+    set_current_time_zone,
+    to_utc_timestamp,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+    FloatType,
+    F,
+    use_duckdb,
+)
 from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.spark import get_spark_session
 from dsgrid.exceptions import DSGDatasetConfigError
@@ -227,12 +241,16 @@ def _compare_time_conversion(
     else:
         converted_dataset_time = df
     ptime_col = project_time_dim.get_load_data_time_columns()
-    dfp = set(project_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
-    dfd = set(converted_dataset_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
+    dfp = project_time.select(ptime_col).distinct().orderBy(*ptime_col).collect()
+    dfd = converted_dataset_time.select(ptime_col).distinct().orderBy(*ptime_col).collect()
     if dfp != dfd:
-        raise DSGDatasetConfigError(
-            "dataset time dimension converted to project requirement does not match project time dimension. \n{delta}"
+        project_delta = sorted(set(dfp).difference(dfd))
+        dataset_delta = sorted(set(dfd).difference(dfp))
+        msg = (
+            "dataset time dimension converted to project requirement does not match project time dimension.\n "
+            f"project - dataset = {project_delta}\ndataset - project {dataset_delta=}"
         )
+        raise DSGDatasetConfigError(msg)
 
 
 def compare_time_conversion(
@@ -255,7 +273,7 @@ def compare_time_conversion(
 
 
 def check_time_dataframe(time_dim):
-    session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
+    session_tz = get_current_time_zone()
     time_df = time_dim.build_time_dataframe().collect()
     time_df_start = min(time_df)[0].astimezone(ZoneInfo(session_tz))
     time_df_end = max(time_df)[0].astimezone(ZoneInfo(session_tz))
@@ -274,8 +292,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     """check that annual sum from tempo data is the same when mapped in pyspark,
     and when mapped in pandas to get the frequency each value in raw_data gets mapped
     """
-    spark = get_spark_session()
-    session_tz_orig = session_tz = spark.conf.get("spark.sql.session.timeZone")
+    session_tz_orig = session_tz = get_current_time_zone()
 
     ptime_col = project_time_dim.get_load_data_time_columns()
     assert len(ptime_col) == 1, ptime_col
@@ -287,9 +304,11 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     # get sum from converted_data
     groupby_cols = [col for col in converted_data.columns if col not in [ptime_col, VALUE_COLUMN]]
     converted_sum = converted_data.groupBy(*groupby_cols).agg(
-        F.sum(F.round(VALUE_COLUMN, 3)).alias(VALUE_COLUMN)
+        F.sum(VALUE_COLUMN).alias(VALUE_COLUMN)
     )
-    converted_sum_df = converted_sum.toPandas().set_index(groupby_cols).sort_index()
+    pdf = converted_sum.toPandas()
+    pdf[VALUE_COLUMN] = pdf[VALUE_COLUMN].round(3)
+    converted_sum_df = pdf.set_index(groupby_cols).sort_index()
 
     # process raw_data, get freq each values will be mapped and get sumproduct from there
     # [1] sum from raw_data, mapping via pandas
@@ -315,6 +334,8 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             )
 
     geo_tz_values = [row.time_zone for row in raw_data.select("time_zone").distinct().collect()]
+    assert geo_tz_values
+    geo_tz_values.sort()
     geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
 
     model_time_df = []
@@ -344,15 +365,16 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     )
     other_cols = [col for col in raw_data.columns if col != VALUE_COLUMN]
     raw_data_df = (
-        raw_data.select(other_cols + [F.round(VALUE_COLUMN, 3).alias(VALUE_COLUMN)])
+        raw_data.select(other_cols + [VALUE_COLUMN])
         .toPandas()
         .join(model_time_map, on=["time_zone"] + time_cols, how="left")
     )
+    raw_data_df[VALUE_COLUMN] = raw_data_df[VALUE_COLUMN].round(3)
 
     # [2] sum from raw_data, mapping via spark
     # temporarily set to UTC
-    spark.conf.set("spark.sql.session.timeZone", "UTC")
-    session_tz = spark.conf.get("spark.sql.session.timeZone")
+    set_current_time_zone("UTC")
+    session_tz = get_current_time_zone()
 
     try:
         project_time_df = project_time_dim.build_time_dataframe()
@@ -365,46 +387,67 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             new_time_column="map_time",
         )
         idx = 0
+        if use_duckdb():
+            weekday_func = "ISODOW"
+            weekday_modifier = " - 1"
+        else:
+            weekday_func = "WEEKDAY"
+            weekday_modifier = ""
         for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
-            local_time_df = (
-                project_time_df.withColumn("time_zone", F.lit(tz_value))
-                .withColumn("UTC", F.to_utc_timestamp(F.col("map_time"), session_tz))
-                .withColumn("local_time", F.from_utc_timestamp(F.col("UTC"), tz_name))
-            )
+            local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_value))
+            local_time_df = to_utc_timestamp(local_time_df, "map_time", session_tz, "UTC")
+            local_time_df = from_utc_timestamp(local_time_df, "UTC", tz_name, "local_time")
             select = [ptime_col, "map_time", "time_zone", "UTC", "local_time"]
             for col in time_cols:
                 func = col.replace("_", "")
                 expr = f"{func}(local_time) AS {col}"
                 if col == "day_of_week":
-                    expr = f"mod(dayofweek(local_time)+7-2, 7) AS {col}"
+                    expr = f"{weekday_func}(local_time) {weekday_modifier} AS {col}"
                 select.append(expr)
-            local_time_df = local_time_df.selectExpr(*select)
+            local_time_df = select_expr(local_time_df, select)
             if idx == 0:
                 time_df = local_time_df
             else:
                 time_df = time_df.union(local_time_df)
             idx += 1
+        assert isinstance(time_df, DataFrame)
+        if use_duckdb():
+            # DuckDB does not persist the hour value unless we create a table.
+            view = create_temp_view(time_df)
+            table = make_temp_view_name()
+            spark = get_spark_session()
+            spark.sql(f"CREATE TABLE {table} AS SELECT * FROM {view}")
+            time_df = spark.sql(f"SELECT * FROM {table}")
     finally:
         # reset session timezone
-        spark.conf.set("spark.sql.session.timeZone", session_tz_orig)
-        session_tz = spark.conf.get("spark.sql.session.timeZone")
+        set_current_time_zone(session_tz_orig)
+        session_tz = get_current_time_zone()
 
-    raw_data_df2 = raw_data.join(
-        time_df.groupBy(["time_zone"] + time_cols).count(),
-        on=["time_zone"] + time_cols,
+    # TODO duckdb: something is slightly off here.
+    grouped_time_df = time_df.groupBy(["time_zone"] + time_cols).count()
+    if use_duckdb():
+        grouped_time_df = grouped_time_df.withColumnRenamed("count_star()", "count")
+
+    raw_data_df2 = join_multiple_columns(
+        raw_data,
+        grouped_time_df,
+        ["time_zone"] + time_cols,
         how="left",
     )
+
     raw_sum_df2 = raw_data_df2.groupBy(groupby_cols).agg(
-        F.sum(F.round(VALUE_COLUMN, 3) * F.col("count").cast(FloatType())).alias(VALUE_COLUMN)
+        F.sum(F.col(VALUE_COLUMN) * F.col("count").cast(FloatType())).alias(VALUE_COLUMN)
     )
     raw_sum_df2 = raw_sum_df2.toPandas().set_index(groupby_cols).sort_index()
+    raw_sum_df2[VALUE_COLUMN] = raw_sum_df2[VALUE_COLUMN].round(3)
 
     # check 1: that mapping df are the same for both spark and pandas
-    time_df2 = time_df.collect()
-    time_df2 = pd.DataFrame(time_df2, columns=time_df.columns)
-    time_df2[ptime_col] = pd.to_datetime(time_df2[ptime_col]).dt.tz_localize(
-        session_tz, ambiguous="infer"
-    )
+    time_df2 = time_df.toPandas()
+    if not use_duckdb():
+        time_df2[ptime_col] = pd.to_datetime(time_df2[ptime_col]).dt.tz_localize(
+            session_tz, ambiguous="infer"
+        )
+    # else: already tz_aware?
 
     cond = model_time_df["month"] != time_df2["month"]
     cond |= model_time_df["day_of_week"] != time_df2["day_of_week"]
@@ -467,14 +510,15 @@ def check_exploded_tempo_time(project_time_dim, load_data):
         .to_frame()
     )
     project_time = project_time_dim.build_time_dataframe()
-    tempo_time = load_data.select(time_col).distinct().sort(F.asc(time_col))
+    tempo_time = load_data.select(time_col).distinct().sort(time_col)
 
     # QC 1: each timestamp has the same number of occurences
-    freq_count = load_data.groupBy(time_col).count().select("count").distinct().collect()
+    count_column = "count_star()" if use_duckdb() else "count"
+    freq_count = load_data.groupBy(time_col).count().select(count_column).distinct().collect()
     assert len(freq_count) == 1, freq_count
 
     # QC 2: model_time == project_time == tempo_time
-    session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
+    session_tz = get_current_time_zone()
     model_time[time_col] = model_time[time_col].dt.tz_convert(session_tz)
     project_time = [t[0].astimezone(ZoneInfo(session_tz)) for t in project_time.collect()]
     project_time = pd.DataFrame(project_time, columns=["project_time"])

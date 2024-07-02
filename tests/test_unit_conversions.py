@@ -1,6 +1,5 @@
 import math
 
-import pyspark.sql.functions as F
 import pytest
 
 from dsgrid.common import VALUE_COLUMN
@@ -42,7 +41,8 @@ from dsgrid.units.energy import (
     to_mbtu,
     from_any_to_any,
 )
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.spark.types import F, use_duckdb
+from dsgrid.utils.spark import create_dataframe_from_dicts, get_spark_session
 
 
 KWH_VAL = 1234.5
@@ -56,86 +56,89 @@ UNIT_COLUMNS = ("fans", "cooling", "dryer", "ev_l1l2", "ng_heating", "p_heating"
 
 @pytest.fixture(scope="module")
 def records_dataframe():
-    spark = get_spark_session()
-    records = spark.createDataFrame(
-        [
-            {"id": "fans", "name": "Fans", "fuel_id": "electricity", "unit": KWH},
-            {"id": "cooling", "name": "Space Cooling", "fuel_id": "electricity", "unit": MWH},
-            {"id": "dryer", "name": "Dryer", "fuel_id": "electricity", "unit": GWH},
-            {"id": "ev_l1l2", "name": "EV L1/L2", "fuel_id": "electricity", "unit": TWH},
-            {"id": "ng_heating", "name": "NG - Heating", "fuel_id": "natural_gas", "unit": THERM},
-            {"id": "p_heating", "name": "Propane - Heating", "fuel_id": "propane", "unit": MBTU},
-            {"id": "unitless", "name": "unitless", "fuel_id": "electricity", "unit": ""},
-        ]
-    )
-    yield records.cache()
-    records.unpersist()
+    data = [
+        {"id": "fans", "name": "Fans", "fuel_id": "electricity", "unit": KWH},
+        {"id": "cooling", "name": "Space Cooling", "fuel_id": "electricity", "unit": MWH},
+        {"id": "dryer", "name": "Dryer", "fuel_id": "electricity", "unit": GWH},
+        {"id": "ev_l1l2", "name": "EV L1/L2", "fuel_id": "electricity", "unit": TWH},
+        {"id": "ng_heating", "name": "NG - Heating", "fuel_id": "natural_gas", "unit": THERM},
+        {"id": "p_heating", "name": "Propane - Heating", "fuel_id": "propane", "unit": MBTU},
+        {"id": "unitless", "name": "unitless", "fuel_id": "electricity", "unit": ""},
+    ]
+    records = create_dataframe_from_dicts(data)
+    if not use_duckdb():
+        records.cache()
+    yield records
+    if not use_duckdb():
+        records.unpersist()
 
 
 @pytest.fixture(scope="module")
 def pivoted_dataframes(records_dataframe):
-    spark = get_spark_session()
-    df = spark.createDataFrame(
-        [
-            {
-                "fans": KWH_VAL,
-                "cooling": MWH_VAL,
-                "dryer": GWH_VAL,
-                "ev_l1l2": TWH_VAL,
-                "ng_heating": THERM_VAL,
-                "p_heating": MBTU_VAL,
-                "unitless": KWH_VAL,
-            },
-        ]
-    )
-    yield df.cache(), records_dataframe
-    df.unpersist()
+    data = [
+        {
+            "fans": KWH_VAL,
+            "cooling": MWH_VAL,
+            "dryer": GWH_VAL,
+            "ev_l1l2": TWH_VAL,
+            "ng_heating": THERM_VAL,
+            "p_heating": MBTU_VAL,
+            "unitless": KWH_VAL,
+        },
+    ]
+    df = create_dataframe_from_dicts(data)
+    if not use_duckdb():
+        df.cache()
+    yield df, records_dataframe
+    if not use_duckdb():
+        df.unpersist()
 
 
 @pytest.fixture(scope="module")
 def unpivoted_dataframes(records_dataframe):
-    spark = get_spark_session()
-    df = spark.createDataFrame(
-        [
-            {
-                "timestamp": 1,
-                "metric": "fans",
-                "value": KWH_VAL,
-            },
-            {
-                "timestamp": 1,
-                "metric": "cooling",
-                "value": MWH_VAL,
-            },
-            {
-                "timestamp": 1,
-                "metric": "dryer",
-                "value": GWH_VAL,
-            },
-            {
-                "timestamp": 1,
-                "metric": "ev_l1l2",
-                "value": TWH_VAL,
-            },
-            {
-                "timestamp": 1,
-                "metric": "ng_heating",
-                "value": THERM_VAL,
-            },
-            {
-                "timestamp": 1,
-                "metric": "p_heating",
-                "value": MBTU_VAL,
-            },
-            {
-                "timestamp": 1,
-                "metric": "unitless",
-                "value": KWH_VAL,
-            },
-        ]
-    )
-    yield df.cache(), records_dataframe
-    df.unpersist()
+    data = [
+        {
+            "timestamp": 1,
+            "metric": "fans",
+            "value": KWH_VAL,
+        },
+        {
+            "timestamp": 1,
+            "metric": "cooling",
+            "value": MWH_VAL,
+        },
+        {
+            "timestamp": 1,
+            "metric": "dryer",
+            "value": GWH_VAL,
+        },
+        {
+            "timestamp": 1,
+            "metric": "ev_l1l2",
+            "value": TWH_VAL,
+        },
+        {
+            "timestamp": 1,
+            "metric": "ng_heating",
+            "value": THERM_VAL,
+        },
+        {
+            "timestamp": 1,
+            "metric": "p_heating",
+            "value": MBTU_VAL,
+        },
+        {
+            "timestamp": 1,
+            "metric": "unitless",
+            "value": KWH_VAL,
+        },
+    ]
+    df = create_dataframe_from_dicts(data)
+    if not use_duckdb():
+        df.cache()
+    yield df, records_dataframe
+    if not use_duckdb():
+        df.unpersist()
 
 
 def test_constants():
@@ -190,7 +193,7 @@ def test_to_units(pivoted_dataframes, inputs):
 def test_from_any_to_any(unpivoted_dataframes, to_unit):
     df, records = unpivoted_dataframes
     df_with_units = (
-        df.join(records, on=df["metric"] == records["id"])
+        df.join(records, on=df.metric == records.id)
         .withColumnRenamed("unit", "from_unit")
         .withColumn("to_unit", F.lit(to_unit))
         .select("metric", "timestamp", "from_unit", "to_unit", VALUE_COLUMN)

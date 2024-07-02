@@ -5,7 +5,6 @@ import logging
 from collections import Counter
 
 from prettytable import PrettyTable
-import pyspark.sql.functions as F
 
 from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
@@ -14,6 +13,7 @@ from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
 )
+from dsgrid.spark.types import F
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.spark import models_to_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -206,9 +206,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     ):
         mapping_df = models_to_dataframe(mapping_records)
         mapping_sum_df = (
-            mapping_df.groupBy(group_by)
-            .agg(F.sum("from_fraction").alias("sum_fraction"))
-            .sort(F.desc("sum_fraction"), group_by)
+            mapping_df.groupBy(group_by).agg(F.sum("from_fraction").alias("sum_fraction"))
+            # TODO duckdb: not supported, do we really need descending?
+            .sort("sum_fraction", group_by)  # , ascending=False
         )
         fracs_greater_than_one = mapping_sum_df.filter((F.col("sum_fraction") - 1.0) > tolerance)
         fracs_less_than_one = mapping_sum_df.filter(1.0 - F.col("sum_fraction") > tolerance)

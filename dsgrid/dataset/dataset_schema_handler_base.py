@@ -3,8 +3,6 @@ import logging
 import os
 from typing import Optional, Union
 
-from pyspark.sql import DataFrame
-import pyspark.sql.functions as F
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     map_annual_time_to_date_time,
@@ -28,6 +26,7 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
+from dsgrid.spark.types import DataFrame, F
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
     is_noop_mapping,
@@ -178,15 +177,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
         )
         for col in time_cols:
             load_data_df = load_data_df.filter(f"{col} is not null")
-        counts = load_data_df.groupBy(*time_cols).count().select("count")
-        distinct_counts = counts.select("count").distinct().collect()
+        tmp = load_data_df.groupBy(*time_cols).count()
+        count_col = "count" if "count" in tmp.columns else "count_star()"  # TODO duckdb
+        counts = tmp.select(count_col)
+        distinct_counts = counts.select(count_col).distinct().collect()
         if len(distinct_counts) != 1:
             raise DSGInvalidDataset(
                 "All time arrays must be repeated the same number of times: "
                 f"unique timestamp repeats = {len(distinct_counts)}"
             )
-        ta_counts = load_data_df.groupBy(*unique_array_cols).count().select("count")
-        distinct_ta_counts = ta_counts.select("count").distinct().collect()
+        ta_counts = load_data_df.groupBy(*unique_array_cols).count().select(count_col)
+        distinct_ta_counts = ta_counts.select(count_col).distinct().collect()
         if len(distinct_ta_counts) != 1:
             raise DSGInvalidDataset(
                 "All combinations of non-time dimensions must have the same time array length: "
@@ -292,7 +293,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         project_record_ids,
                         on=dataset_mapping.to_id == project_record_ids.id,
                     )
-                    .selectExpr("dataset_record_id AS id")
+                    .select("dataset_record_id")
+                    .withColumnRenamed("dataset_record_id", "id")
                     .distinct()
                 )
             yield dim_type, dataset_record_ids
@@ -330,7 +332,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if dim_type.value not in df.columns:
                 # This dimensions is stored in another table (e.g., lookup or load_data)
                 continue
-            df = df.join(tmp, on=df[dim_type.value] == tmp.dataset_record_id).drop(
+            df = df.join(tmp, on=getattr(df, dim_type.value) == tmp.dataset_record_id).drop(
                 "dataset_record_id"
             )
 

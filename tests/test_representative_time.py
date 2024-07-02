@@ -4,15 +4,6 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
-import pyspark.sql.functions as F
-from pyspark.sql.types import (
-    BooleanType,
-    ByteType,
-    DoubleType,
-    StringType,
-    StructType,
-    StructField,
-)
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType, TimeZone
@@ -31,7 +22,23 @@ from dsgrid.config.representative_period_time_dimension_config import (
     RepresentativePeriodTimeDimensionConfig,
 )
 from dsgrid.dimension.time import MeasurementType, TimeIntervalType, RepresentativePeriodFormat
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.spark.functions import (
+    aggregate_single_value,
+    is_dataframe_empty,
+)
+from dsgrid.spark.types import (
+    BooleanType,
+    ByteType,
+    DoubleType,
+    F,
+    StringType,
+    StructType,
+    StructField,
+    use_duckdb,
+)
+from dsgrid.utils.spark import (
+    get_spark_session,
+)
 
 
 ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE = (
@@ -139,11 +146,9 @@ def test_time_mapping(
     resolution = timedelta(hours=1)
     expected_timestamps = [start + i * resolution for i in range(8760)]
     assert est_timestamps == expected_timestamps
-    assert mapped_df.filter(f"{VALUE_COLUMN} IS NULL").rdd.isEmpty()
+    assert is_dataframe_empty(mapped_df.filter(f"{VALUE_COLUMN} IS NULL"))
 
-    max_values = df.select("value").agg(F.max("value").alias("max")).collect()
-    assert len(max_values) == 1
-    max_value = max_values[0].max
+    max_value = aggregate_single_value(df.select(VALUE_COLUMN), "max", VALUE_COLUMN)
     max_row = df.filter(f"value == {max_value}").collect()[0]
     # Expected max is determined by manually inspecting the file.
     expected_max = 0.9995036580360138
@@ -162,26 +167,36 @@ def test_time_mapping(
     assert max_row.geography == expected_geo
     assert max_row.model_year == expected_model_year
     assert max_row.scenario == expected_scenario
-    mapped_df_at_max = mapped_df.filter(f"value == {max_value}").cache()
-    filtered_mapped_df = mapped_df.filter(
-        (F.col("model_year") == max_row.model_year)
-        & (F.col("geography") == max_row.geography)
-        & (F.col("scenario") == max_row.scenario)
-        & (F.month("timestamp") == max_row.month)
-        & (F.hour("timestamp") == expected_hour_pst)
-        & (F.weekday("timestamp") < 5)
-    ).cache()
-    try:
-        assert mapped_df_at_max.count() == num_weekdays_in_march_2018
-        assert filtered_mapped_df.count() == num_weekdays_in_march_2018
-        assert filtered_mapped_df.select("value").distinct().count() == 1
-        assert math.isclose(
-            filtered_mapped_df.select("value").distinct().collect()[0]["value"], expected_max
+    mapped_df_at_max = mapped_df.filter(f"value == {max_value}")
+    mapped_df.createOrReplaceTempView("tmp_view")
+    if use_duckdb():
+        func = "ISODOW"
+        saturday = 6
+    else:
+        func = "WEEKDAY"
+        saturday = 5
+
+    query = f"""
+        SELECT *
+        FROM tmp_view
+        WHERE (
+            model_year = '{max_row.model_year}'
+            AND geography = '{max_row.geography}'
+            AND scenario = '{max_row.scenario}'
+            AND MONTH(timestamp) = {max_row.month}
+            AND HOUR(timestamp) = {expected_hour_pst}
+            AND {func}(timestamp) < {saturday}
         )
-        assert (
-            mapped_df_at_max.sort("timestamp").collect()
-            == filtered_mapped_df.sort("timestamp").collect()
-        )
-    finally:
-        mapped_df_at_max.unpersist()
-        filtered_mapped_df.unpersist()
+    """
+    spark = get_spark_session()
+    filtered_mapped_df = spark.sql(query)
+    assert mapped_df_at_max.count() == num_weekdays_in_march_2018
+    assert filtered_mapped_df.count() == num_weekdays_in_march_2018
+    assert filtered_mapped_df.select("value").distinct().count() == 1
+    assert math.isclose(
+        filtered_mapped_df.select("value").distinct().collect()[0]["value"], expected_max
+    )
+    assert (
+        mapped_df_at_max.sort("timestamp").collect()
+        == filtered_mapped_df.sort("timestamp").collect()
+    )

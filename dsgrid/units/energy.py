@@ -2,10 +2,9 @@
 
 import logging
 
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame
-
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.spark.functions import except_all, is_dataframe_empty
+from dsgrid.spark.types import DataFrame, F
 
 
 KWH = "kWh"
@@ -191,17 +190,19 @@ def convert_units_unpivoted(
     else:
         tmp2 = from_to_records.select("from_id", "to_id")
         unit_df = (
-            tmp1.join(tmp2, on=tmp1["id"] == tmp2["from_id"])
-            .selectExpr("to_id AS id", "from_unit")
+            tmp1.join(tmp2, on=tmp1.id == tmp2.from_id)
+            .select(F.col("to_id").alias("id"), "from_unit")
             .distinct()
         )
-    if unit_df.exceptAll(to_unit_records.selectExpr("id", "unit AS from_unit")).rdd.isEmpty():
+    if is_dataframe_empty(
+        except_all(unit_df, to_unit_records.select("id", F.col("unit").alias("from_unit")))
+    ):
         logger.info("Return early because the units match.")
         return df
 
-    df = df.join(unit_df, on=df[metric_column] == unit_df["id"]).drop("id")
+    df = df.join(unit_df, on=getattr(df, metric_column) == unit_df.id).drop("id")
     tmp3 = to_unit_records.select("id", "unit").withColumnRenamed(unit_col, "to_unit")
-    df = df.join(tmp3, on=df[metric_column] == tmp3["id"]).drop("id")
+    df = df.join(tmp3, on=getattr(df, metric_column) == tmp3.id).drop("id")
     logger.info("Converting units from column %s", metric_column)
     return df.withColumn(VALUE_COLUMN, from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)).drop(
         "from_unit", "to_unit"

@@ -35,6 +35,7 @@ dependencies = [
     "click>=8",
     "dash",
     "dash_bootstrap_components",
+    "duckdb",
     "fastapi",
     "json5",
     "pandas",

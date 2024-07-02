@@ -45,7 +45,6 @@ dependencies = [
     "requests",
     "s3path",
     "semver",
-    "sqlalchemy",
     "uvicorn",
     "tzdata",  # time zone stuff
 ]

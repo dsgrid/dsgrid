@@ -417,6 +417,11 @@ class ProjectRegistryManager(RegistryManagerBase):
             dimensions = []
             subset_refs = {}
             for subset_dimension in subset_dimensions:
+                if subset_dimension.dimensions and subset_dimension.selectors:
+                    msg = f"A subset dimension group cannot have both dimensions and selectors: {subset_dimension.name}."
+                    raise ValueError(msg)
+                for dim in subset_dimension.dimensions:
+                    subset_dimension.record_ids.update({x.id for x in dim.records})
                 base_dim = None
                 for ref in base_dimension_references:
                     if ref.dimension_type == subset_dimension.dimension_type:
@@ -425,6 +430,12 @@ class ProjectRegistryManager(RegistryManagerBase):
                 assert base_dim is not None, subset_dimension
                 base_records = base_dim.get_records_dataframe()
                 self._check_subset_dimension_consistency(subset_dimension, base_records)
+                for dim in subset_dimension.dimensions:
+                    dimensions.append(dim)
+                    key = (subset_dimension.dimension_type, dim.name)
+                    if key in subset_refs:
+                        raise Exception(f"Bug: unhandled case of duplicate dimension name: {key=}")
+                    subset_refs[key] = subset_dimension
                 for selector in subset_dimension.selectors:
                     new_records = base_records.filter(base_records["id"].isin(selector.records))
                     filename = tmp_path / f"{subset_dimension.name}_{selector.name}.csv"
@@ -475,13 +486,14 @@ class ProjectRegistryManager(RegistryManagerBase):
             )
             raise DSGInvalidParameter(msg)
 
-        diff = base_record_ids.difference(subset_dimension.record_ids)
-        if diff:
-            msg = (
-                f"subset dimension {subset_dimension.name} "
-                f"does not list these base dimension records: {diff}"
-            )
-            raise DSGInvalidParameter(msg)
+        # TODO DT: there is no place to put these when filling out directly.
+        # diff = base_record_ids.difference(subset_dimension.record_ids)
+        # if diff:
+        #    msg = (
+        #        f"subset dimension {subset_dimension.name} "
+        #        f"does not list these base dimension records: {diff}"
+        #    )
+        #    raise DSGInvalidParameter(msg)
 
     def _register_supplemental_dimensions_from_subset_dimensions(
         self, model, context, submitter, log_message
@@ -519,6 +531,94 @@ class ProjectRegistryManager(RegistryManagerBase):
                     for record_id in selector.records:
                         mapping_records.append({"from_id": record_id, "to_id": selector.name})
                         dim_record_ids.add(record_id)
+
+                filename = tmp_path / f"{subset_dimension_group.dimension_query_name}.csv"
+                pd.DataFrame(records).to_csv(filename, index=False)
+
+                for record_id in base_dim.get_unique_ids().difference(dim_record_ids):
+                    mapping_records.append({"from_id": record_id, "to_id": ""})
+                map_record_file = (
+                    tmp_path / f"{subset_dimension_group.dimension_query_name}_mapping.csv"
+                )
+                pd.DataFrame.from_records(mapping_records).to_csv(map_record_file, index=False)
+
+                dim = SupplementalDimensionModel(
+                    filename=str(filename),
+                    name=subset_dimension_group.name,
+                    display_name=subset_dimension_group.display_name,
+                    dimension_type=dimension_type,
+                    module=base_dim.model.module,
+                    class_name=base_dim.model.class_name,
+                    description=subset_dimension_group.description,
+                    mapping=MappingTableByNameModel(
+                        filename=str(map_record_file),
+                        mapping_type=DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS,
+                        description=f"Aggregation map for {subset_dimension_group.name}",
+                    ),
+                )
+                dimensions.append(dim)
+
+            self._register_supplemental_dimensions_from_models(
+                tmpdir,
+                model,
+                dimensions,
+                context,
+                submitter,
+                log_message,
+            )
+
+    def _register_supplemental_dimensions_from_subset_dimensions2(
+        self, model, context, submitter, log_message
+    ):
+        """Registers a supplemental dimension for each subset specified in the project config's
+        subset dimension groups. Also registers a mapping from the base dimension to each new
+        supplemental dimension. Appends references to those dimensions to the project config's
+        supplemental_dimension_references list.
+        """
+        with TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            dimensions = []
+            for subset_dimension_group in model.dimensions.subset_dimensions:
+                if not subset_dimension_group.create_supplemental_dimension:
+                    continue
+                dimension_type = subset_dimension_group.dimension_type
+                base_dim = None
+                for ref in model.dimensions.base_dimension_references:
+                    if ref.dimension_type == dimension_type:
+                        base_dim = self._dimension_mgr.get_by_id(ref.dimension_id)
+                        break
+                assert base_dim is not None, subset_dimension_group
+                records = defaultdict(list)
+                mapping_records = []
+                dim_record_ids = set()
+                if subset_dimension_group.selectors:
+                    # The pydantic validator has already checked consistency of these columns.
+                    for column in subset_dimension_group.selectors[0].column_values:
+                        records[column] = []
+                    for selector in subset_dimension_group.selectors:
+                        records["id"].append(selector.name)
+                        records["name"].append(selector.name)
+                        if selector.column_values:
+                            for column, value in selector.column_values.items():
+                                records[column].append(value)
+                        for record_id in selector.records:
+                            mapping_records.append({"from_id": record_id, "to_id": selector.name})
+                            dim_record_ids.add(record_id)
+                else:
+                    assert subset_dimension_group.dimensions
+                    for dim in subset_dimension_group.dimensions:
+                        records["id"].append(dim.dimension_query_name)
+                        records["name"].append(dim.dimension_query_name)
+                        for i, record in enumerate(dim.records):
+                            data = record.model_dump()
+                            std_keys = ("id", "name")
+                            if i == 0 and len(data) > len(std_keys):
+                                for key in set(data.keys()).difference(std_keys):
+                                    records[key].append(data[key])
+                            mapping_records.append(
+                                {"from_id": record.id, "to_id": dim.dimension_query_name}
+                            )
+                            dim_record_ids.add(record.id)
 
                 filename = tmp_path / f"{subset_dimension_group.dimension_query_name}.csv"
                 pd.DataFrame(records).to_csv(filename, index=False)

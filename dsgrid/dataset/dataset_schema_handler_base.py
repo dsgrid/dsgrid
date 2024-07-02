@@ -197,6 +197,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         ta_counts = load_data_df.groupBy(*unique_array_cols).count().select("count")
         distinct_ta_counts = ta_counts.select("count").distinct().collect()
         if len(distinct_ta_counts) != 1:
+            # TODO: This doesn't support the case where a dataset has multiple years spanning
+            # leap data / no leap data (8760 / 8784).
             raise DSGInvalidDataset(
                 "All combinations of non-time dimensions must have the same time array length: "
                 f"unique time array lengths = {len(distinct_ta_counts)}"

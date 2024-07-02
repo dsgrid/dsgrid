@@ -11,6 +11,7 @@ from pydantic import field_serializer, field_validator, model_validator, Field, 
 from pydantic.functional_validators import BeforeValidator
 from typing_extensions import Annotated
 
+from dsgrid.config.common import compute_hash_from_model_records
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.time import (
@@ -22,7 +23,6 @@ from dsgrid.dimension.time import (
     DatetimeFormat,
 )
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME, REGEX_VALID_REGISTRY_DISPLAY_NAME
-from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
 
 
@@ -307,17 +307,6 @@ class DimensionModel(DimensionBaseModel):
             "output purposes. The registry database stores records in the dimension JSON document.",
         ),
     ]
-    file_hash: Annotated[
-        Optional[str],
-        Field(
-            title="file_hash",
-            description="Hash of the contents of the file",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-            default=None,
-        ),
-    ]
     records: Annotated[
         List,
         Field(
@@ -327,6 +316,17 @@ class DimensionModel(DimensionBaseModel):
                 "dsgrid_internal": True,
             },
             default=[],
+        ),
+    ]
+    file_hash: Annotated[
+        Optional[str],
+        Field(
+            title="file_hash",
+            description="Hash of the contents of the file",
+            json_schema_extra={
+                "dsgrid_internal": True,
+            },
+            default=None,
         ),
     ]
 
@@ -344,36 +344,32 @@ class DimensionModel(DimensionBaseModel):
 
         return filename
 
-    @field_validator("file_hash")
-    @classmethod
-    def compute_file_hash(cls, file_hash, info: ValidationInfo):
-        if "filename" not in info.data:
-            return file_hash
-
-        if file_hash is None:
-            file_hash = compute_file_hash(info.data["filename"])
-        return file_hash
-
     @field_validator("records")
     @classmethod
-    def add_records(cls, records, info: ValidationInfo):
+    def add_records(cls, records, info: ValidationInfo) -> list:
         """Add records from the file."""
-        dim_class = info.data.get("cls")
-        if "filename" not in info.data or dim_class is None:
+        if (info.data.get("filename") is None or info.data.get("cls") is None) and not records:
+            # Some other error occurred.
             return records
 
         if records:
             if isinstance(records[0], dict):
                 records = convert_record_dicts_to_classes(
-                    records, dim_class, check_duplicates=["id"]
+                    records, info.data["cls"], check_duplicates=["id"]
                 )
             return records
 
-        with open(info.data["filename"], encoding="utf-8-sig") as f_in:
-            records = convert_record_dicts_to_classes(
-                csv.DictReader(f_in), dim_class, check_duplicates=["id"]
+        with open(info.data["filename"], encoding="utf-8") as f_in:
+            return convert_record_dicts_to_classes(
+                csv.DictReader(f_in), info.data["cls"], check_duplicates=["id"]
             )
-        return records
+
+    @field_validator("file_hash")
+    @classmethod
+    def compute_file_hash(cls, file_hash, info: ValidationInfo):
+        if file_hash is None and not info.data.get("records"):
+            return file_hash
+        return compute_hash_from_model_records(file_hash, info)
 
     @field_serializer("cls", "filename")
     def serialize_cls(self, val, _):

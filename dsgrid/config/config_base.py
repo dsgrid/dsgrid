@@ -56,7 +56,7 @@ class ConfigBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def config_filename():
+    def config_filename() -> str:
         """Return the config filename.
 
         Returns
@@ -92,10 +92,10 @@ class ConfigBase(abc.ABC):
     def model_class():
         """Return the data model class backing the config"""
 
-    def serialize(self, path, force=False):
+    def serialize(self, path: str | Path, force=False):
         """Serialize the configuration to a path.
 
-        path : str
+        path : str | Path
             Directory
         force : bool
             If True, overwrite files.

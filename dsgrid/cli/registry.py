@@ -701,7 +701,12 @@ def update_project(
 def register_supplemental_dimensions(
     ctx, registry_manager, project_id, filename: Path, log_message
 ):
-    """Register new supplemental dimensions with a project."""
+    """Register new supplemental dimensions with a project. The JSON/JSON5 filename must
+    match the data model defined by this documentation:
+
+    \b
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel
+    """
     submitter = getpass.getuser()
     project_mgr = registry_manager.project_manager
     res = handle_dsgrid_exception(
@@ -729,7 +734,12 @@ def register_supplemental_dimensions(
     help="Please specify the reason for the new datasets.",
 )
 def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, log_message):
-    """Add requirements for one or more datasets to a project."""
+    """Add requirements for one or more datasets to a project. The JSON/JSON5 filename must
+    match the data model defined by this documentation:
+
+    \b
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetListModel
+    """
     submitter = getpass.getuser()
     project_mgr = registry_manager.project_manager
     res = handle_dsgrid_exception(
@@ -759,7 +769,12 @@ def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, 
 def replace_dataset_dimension_requirements(
     ctx, registry_manager, project_id, filename: Path, log_message
 ):
-    """Replace dimension requirements for one or more datasets in a project."""
+    """Replace dimension requirements for one or more datasets in a project. The JSON/JSON5
+    filename must match the data model defined by this documentation:
+
+    \b
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsListModel
+    """
     submitter = getpass.getuser()
     project_mgr = registry_manager.project_manager
     res = handle_dsgrid_exception(

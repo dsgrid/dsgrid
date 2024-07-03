@@ -696,12 +696,12 @@ def update_project(
     "--log-message",
     required=True,
     type=str,
-    help="Reason for addition",
+    help="Please specify the reason for this addition.",
 )
 def register_supplemental_dimensions(
     ctx, registry_manager, project_id, filename: Path, log_message
 ):
-    """Register new supplemental dimensions to a project."""
+    """Register new supplemental dimensions with a project."""
     submitter = getpass.getuser()
     project_mgr = registry_manager.project_manager
     res = handle_dsgrid_exception(

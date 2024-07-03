@@ -675,9 +675,7 @@ class DatasetConfig(ConfigBase):
             case TableFormatType.PIVOTED:
                 return self.get_pivoted_dimension_columns()
             case TableFormatType.UNPIVOTED:
-                # TODO DT: is this acceptable
                 return [VALUE_COLUMN]
-                # return [self.model.data_schema.table_format.value_column]
             case _:
                 raise NotImplementedError(str(self.get_table_format_type()))
 

@@ -282,7 +282,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                     assert pivoted_dimension_type is not None
                     ids = set(df.columns) - {VALUE_COLUMN, *pivoted_columns}
                     df = df.unpivot(
-                        [x for x in df.columns if x in ids],
+                        list(ids),
                         pivoted_columns,
                         pivoted_dimension_type.value,
                         VALUE_COLUMN,

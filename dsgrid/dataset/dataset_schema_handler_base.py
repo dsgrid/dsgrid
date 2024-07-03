@@ -12,6 +12,7 @@ from dsgrid.config.annual_time_dimension_config import (
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 
 import dsgrid.units.energy as energy
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig, InputDatasetType
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
@@ -105,19 +106,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         return self._config
 
-    def get_columns_for_unique_arrays(self, load_data_df):
-        """Returns the list of dimension columns aginst which the number of timestamps is checked.
-
-        Returns
-        -------
-        list[str]
-            List of column names.
-
-        """
-        time_cols = self._get_time_dimension_columns()
-        value_cols = self._config.get_value_columns()
-        return list(set(load_data_df.columns).difference(set(value_cols + time_cols)))
-
     @abc.abstractmethod
     def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         """Return a load_data dataframe with dimensions mapped to the project's.
@@ -184,7 +172,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _check_dataset_time_consistency_by_time_array(self, time_cols, load_data_df):
         """Check that each unique time array has the same timestamps."""
         logger.info("Check dataset time consistency by time array.")
-        unique_array_cols = self.get_columns_for_unique_arrays(load_data_df)
+        unique_array_cols = set(DimensionType.get_allowed_dimension_column_names()).intersection(
+            load_data_df.columns
+        )
         for col in time_cols:
             load_data_df = load_data_df.filter(f"{col} is not null")
         counts = load_data_df.groupBy(*time_cols).count().select("count")
@@ -204,10 +194,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _check_load_data_unpivoted_value_column(self, df):
         logger.info("Check load data unpivoted columns.")
-        if self._config.model.data_schema.table_format.value_column not in df.columns:
-            raise DSGInvalidDataset(
-                f"value_column={self._config.model.data_schema.table_format.value_column} is not in columns={df.columns}"
-            )
+        if VALUE_COLUMN not in df.columns:
+            raise DSGInvalidDataset(f"value_column={VALUE_COLUMN} is not in columns={df.columns}")
 
     def _convert_units(self, df, project_metric_records, value_columns):
         if not self._config.model.enable_unit_conversion:
@@ -313,7 +301,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         columns = DimensionType.get_allowed_dimension_column_names()
         return [x for x in df.columns if x in columns]
 
-    def _list_dimensions(self, df: DataFrame) -> list[DimensionType]:
+    def _list_dimension_types_in_load_data(self, df: DataFrame) -> list[DimensionType]:
         dims = [DimensionType(x) for x in DatasetSchemaHandlerBase._list_dimension_columns(df)]
         if self._config.get_table_format_type() == TableFormatType.PIVOTED:
             pivoted_type = self._config.get_pivoted_dimension_type()

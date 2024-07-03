@@ -154,7 +154,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if not found_id:
             raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
 
-        load_data_dimensions = set(self._list_dimensions(self._load_data))
+        load_data_dimensions = set(self._list_dimension_types_in_load_data(self._load_data))
         expected_dimensions = {
             d
             for d in DimensionType.get_dimension_types_allowed_as_columns()

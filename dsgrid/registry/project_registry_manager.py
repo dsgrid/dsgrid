@@ -40,6 +40,9 @@ from dsgrid.config.supplemental_dimension import (
     SupplementalDimensionModel,
     SupplementalDimensionsListModel,
 )
+from dsgrid.config.input_dataset_dimension_requirements import (
+    InputDatasetDimensionRequirementsListModel,
+)
 from dsgrid.config.mapping_tables import (
     MappingTableModel,
     MappingTableByNameModel,
@@ -788,6 +791,33 @@ class ProjectRegistryManager(RegistryManagerBase):
             raise
         finally:
             context.finalize(error_occurred)
+
+    def replace_dataset_dimension_requirements(
+        self,
+        project_id: str,
+        filename: Path,
+        submitter: str,
+        log_message: str,
+    ):
+        """Replace dataset requirements in a project."""
+        config = self.get_by_id(project_id)
+        model = InputDatasetDimensionRequirementsListModel.from_file(filename)
+        for dataset in model.datasets:
+            for i in range(len(config.model.datasets)):
+                if config.model.datasets[i].dataset_id == dataset.dataset_id:
+                    config.model.datasets[i].required_dimensions = dataset.required_dimensions
+                    if config.model.datasets[i].status == DatasetRegistryStatus.REGISTERED:
+                        config.model.datasets[i].status = DatasetRegistryStatus.UNREGISTERED
+                        logger.info(
+                            "Changed dataset %s status to %s in project %s",
+                            dataset.dataset_id,
+                            config.model.datasets[i].status.value,
+                            project_id,
+                        )
+                        # TODO: When issue #309 is addressed, we need to set all dependent
+                        # derived datasets to unregistered also.
+
+        self._update_config(config, submitter, VersionUpdateType.MINOR, log_message)
 
     def _submit_dataset_and_register_mappings(
         self,

@@ -9,6 +9,10 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from dsgrid.cli.dsgrid import cli
+from dsgrid.config.input_dataset_dimension_requirements import (
+    InputDatasetDimensionRequirementsModel,
+    InputDatasetDimensionRequirementsListModel,
+)
 from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
@@ -322,6 +326,63 @@ def test_add_supplemental_dimension(tmp_registry_db):
             found_new_dimension = True
             break
     assert found_new_dimension
+
+
+def test_replace_dataset_dimension_requirements(tmp_registry_db):
+    test_project_dir, tmp_path, db_name = tmp_registry_db
+    mgr = make_test_data_registry(
+        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
+    )
+    project_mgr = mgr.project_manager
+    project_id = project_mgr.list_ids()[0]
+    config = project_mgr.get_by_id(project_id)
+    requirements_file = tmp_path / "requirements.json5"
+    dataset = config.model.datasets[1]
+    assert dataset.status == DatasetRegistryStatus.REGISTERED
+    assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
+    reqs = dataset.required_dimensions
+    assert reqs.multi_dimensional[0].subsector.supplemental[0].record_ids == [
+        "commercial_subsectors"
+    ]
+    reqs.multi_dimensional[0].subsector.supplemental[0].record_ids = ["residential_subsectors"]
+    reqs.multi_dimensional[0].subsector.supplemental[0].name = "Residential Subsector"
+    model = InputDatasetDimensionRequirementsListModel(
+        datasets=[
+            InputDatasetDimensionRequirementsModel(
+                dataset_id=dataset.dataset_id, required_dimensions=reqs
+            ),
+        ],
+    )
+    with open(requirements_file, "w") as f:
+        f.write(model.model_dump_json())
+
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli,
+        [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "--database-name",
+            db_name,
+            "--offline",
+            "registry",
+            "projects",
+            "replace-dataset-dimension-requirements",
+            project_id,
+            str(requirements_file),
+            "-l",
+            "replace dataset dimension requirements",
+        ],
+    )
+    assert result.exit_code == 0
+    config = project_mgr.get_by_id(project_id)
+    assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
+    assert config.model.datasets[1].status == DatasetRegistryStatus.UNREGISTERED
+    assert reqs.multi_dimensional[0].subsector.supplemental[0].record_ids == [
+        "residential_subsectors"
+    ]
 
 
 def test_auto_updates(tmp_registry_db):

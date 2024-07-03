@@ -5,8 +5,12 @@ from pathlib import Path
 
 import pyspark
 import pytest
+from click.testing import CliRunner
 from pydantic import ValidationError
 
+from dsgrid.cli.dsgrid import cli
+from dsgrid.common import DEFAULT_DB_PASSWORD
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
@@ -238,6 +242,86 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
     assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids
     assert not manager.dataset_manager.list_ids()
     assert manager.project_manager.list_ids() == [project_id]
+
+
+def test_add_supplemental_dimension(tmp_registry_db):
+    test_project_dir, tmp_path, db_name = tmp_registry_db
+    mgr = make_test_data_registry(
+        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
+    )
+    project_mgr = mgr.project_manager
+    project_id = project_mgr.list_ids()[0]
+    project = project_mgr.get_by_id(project_id)
+    county_ids = list(project.get_base_dimension(DimensionType.GEOGRAPHY).get_unique_ids())
+
+    num_regions = 5
+    regions = {x: [] for x in range(num_regions)}
+    for i in range(len(county_ids)):
+        region_id = i % num_regions
+        regions[region_id].append(county_ids[i])
+
+    dimensions_file = tmp_path / "dimensions.json5"
+    dim_records_file = tmp_path / "regions.csv"
+    mapping_records_file = tmp_path / "mappings.csv"
+    new_dimensions = {
+        "supplemental_dimensions": [
+            {
+                "type": "geography",
+                "class": "GeographyDimensionBaseModel",
+                "name": "Random Region",
+                "display_name": "Random Region",
+                "description": "Randomly-generated regions",
+                "file": str(dim_records_file),
+                "module": "dsgrid.dimension.standard",
+                "mapping": {
+                    "description": "Maps US Counties to regions",
+                    "file": str(mapping_records_file),
+                    "mapping_type": "many_to_one_aggregation",
+                },
+            },
+        ],
+    }
+
+    dump_data(new_dimensions, dimensions_file)
+    with open(dim_records_file, "w") as f:
+        f.write("id,name\n")
+        for region in regions:
+            f.write(f"{region},{region}\n")
+
+    with open(mapping_records_file, "w") as f:
+        f.write("from_id,to_id\n")
+        for region, county_ids in regions.items():
+            for county_id in county_ids:
+                f.write(f"{county_id},{region}\n")
+
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli,
+        [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "--database-name",
+            db_name,
+            "--offline",
+            "registry",
+            "projects",
+            "register-supplemental-dimensions",
+            project_id,
+            str(dimensions_file),
+            "-l",
+            "test register-supplemental-dimensions",
+        ],
+    )
+    assert result.exit_code == 0
+    found_new_dimension = False
+    project = project_mgr.get_by_id(project_id)
+    for dim in project.list_supplemental_dimensions(DimensionType.GEOGRAPHY):
+        if dim.model.name == "Random Region":
+            found_new_dimension = True
+            break
+    assert found_new_dimension
 
 
 def test_auto_updates(tmp_registry_db):

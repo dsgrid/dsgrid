@@ -36,7 +36,10 @@ from dsgrid.config.dimension_mappings_config import (
     DimensionMappingsConfig,
     DimensionMappingsConfigModel,
 )
-from dsgrid.config.supplemental_dimension import SupplementalDimensionModel
+from dsgrid.config.supplemental_dimension import (
+    SupplementalDimensionModel,
+    SupplementalDimensionsListModel,
+)
 from dsgrid.config.mapping_tables import (
     MappingTableModel,
     MappingTableByNameModel,
@@ -758,6 +761,34 @@ class ProjectRegistryManager(RegistryManagerBase):
             if need_to_finalize:
                 context.finalize(error_occurred)
 
+    def register_supplemental_dimensions(
+        self,
+        project_id: str,
+        filename: Path,
+        submitter: str,
+        log_message: str,
+    ):
+        """Register new supplemental dimensions."""
+        config = self.get_by_id(project_id)
+        model = SupplementalDimensionsListModel.from_file(filename)
+        context = RegistrationContext()
+        error_occurred = False
+        try:
+            self._register_supplemental_dimensions_from_models(
+                filename.parent,
+                config.model,
+                model.supplemental_dimensions,
+                context,
+                submitter,
+                log_message,
+            )
+            self._update_config(config, submitter, VersionUpdateType.PATCH, log_message)
+        except Exception:
+            error_occurred = True
+            raise
+        finally:
+            context.finalize(error_occurred)
+
     def _submit_dataset_and_register_mappings(
         self,
         project_config: ProjectConfig,
@@ -1148,20 +1179,23 @@ class ProjectRegistryManager(RegistryManagerBase):
         log_message: str,
     ):
         old_config = self.get_by_id(config.model.project_id)
-        old_version = old_config.model.version
         checker = ProjectUpdateChecker(old_config.model, config.model)
         checker.run()
         self._run_checks(config)
 
+        new_config = self._update_config(config, submitter, update_type, log_message)
+        return new_config.model
+
+    def _update_config(self, config, submitter, update_type, log_message):
+        old_version = config.model.version
         old_key = ConfigKey(config.config_id, old_version)
-        model = self._update_config(config, submitter, update_type, log_message)
+        model = super()._update_config(config, submitter, update_type, log_message)
         new_config = ProjectConfig(model)
         self._update_dimensions_and_mappings(new_config)
         new_key = ConfigKey(new_config.model.project_id, new_config.model.version)
         self._projects.pop(old_key, None)
         self._projects[new_key] = new_config
-
-        return model
+        return new_config
 
     def remove(self, project_id: str):
         self.db.delete_all(project_id)

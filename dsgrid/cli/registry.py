@@ -726,7 +726,35 @@ def register_supplemental_dimensions(
     "--log-message",
     required=True,
     type=str,
-    help="Reason for replacement of requirements",
+    help="Please specify the reason for the new datasets.",
+)
+def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, log_message):
+    """Add requirements for one or more datasets to a project."""
+    submitter = getpass.getuser()
+    project_mgr = registry_manager.project_manager
+    res = handle_dsgrid_exception(
+        ctx,
+        project_mgr.add_dataset_requirements,
+        project_id,
+        filename,
+        submitter,
+        log_message,
+    )
+    if res[1] != 0:
+        return 1
+
+
+@click.command()
+@click.pass_obj
+@click.pass_context
+@click.argument("project_id")
+@click.argument("filename", callback=_path_callback)
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    type=str,
+    help="Please specify the reason for the new requirements.",
 )
 def replace_dataset_dimension_requirements(
     ctx, registry_manager, project_id, filename: Path, log_message
@@ -985,6 +1013,7 @@ projects.add_command(register_and_submit_dataset)
 projects.add_command(dump_project)
 projects.add_command(update_project)
 projects.add_command(register_supplemental_dimensions)
+projects.add_command(add_dataset_requirements)
 projects.add_command(replace_dataset_dimension_requirements)
 projects.add_command(list_project_dimension_query_names)
 

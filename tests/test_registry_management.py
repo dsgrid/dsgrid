@@ -1,3 +1,4 @@
+import copy
 import getpass
 import os
 import shutil
@@ -9,9 +10,10 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from dsgrid.cli.dsgrid import cli
-from dsgrid.config.input_dataset_dimension_requirements import (
+from dsgrid.config.input_dataset_requirements import (
     InputDatasetDimensionRequirementsModel,
     InputDatasetDimensionRequirementsListModel,
+    InputDatasetListModel,
 )
 from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.dimension.base_models import DimensionType
@@ -326,6 +328,50 @@ def test_add_supplemental_dimension(tmp_registry_db):
             found_new_dimension = True
             break
     assert found_new_dimension
+
+
+def test_add_dataset_requirements(tmp_registry_db):
+    test_project_dir, tmp_path, db_name = tmp_registry_db
+    mgr = make_test_data_registry(
+        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
+    )
+    project_mgr = mgr.project_manager
+    project_id = project_mgr.list_ids()[0]
+    config = project_mgr.get_by_id(project_id)
+    dataset = copy.deepcopy(config.model.datasets[0])
+    dataset.dataset_id = "fake"
+    dataset.status = DatasetRegistryStatus.UNREGISTERED
+    dataset.mapping_references.clear()
+    model = InputDatasetListModel(datasets=[dataset])
+    dataset_file = tmp_path / "datasets.json5"
+    with open(dataset_file, "w") as f:
+        f.write(model.model_dump_json())
+
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli,
+        [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "--database-name",
+            db_name,
+            "--offline",
+            "registry",
+            "projects",
+            "add-dataset-requirements",
+            project_id,
+            str(dataset_file),
+            "-l",
+            "replace dataset dimension requirements",
+        ],
+    )
+    assert result.exit_code == 0
+    config = project_mgr.get_by_id(project_id)
+    assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
+    assert config.model.datasets[1].status == DatasetRegistryStatus.REGISTERED
+    assert config.model.datasets[2].dataset_id == "fake"
 
 
 def test_replace_dataset_dimension_requirements(tmp_registry_db):

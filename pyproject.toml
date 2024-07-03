@@ -43,6 +43,7 @@ dependencies = [
     "pyspark==3.5.1",  # Keep this synced with the spark version in Dockerfile.
     "python-arango",
     "requests",
+    "rich_click",
     "s3path",
     "semver",
     "uvicorn",

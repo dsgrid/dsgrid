@@ -831,16 +831,6 @@ class ProjectRegistryManager(RegistryManagerBase):
                 if config.model.datasets[i].dataset_id == dataset.dataset_id:
                     config.model.datasets[i].required_dimensions = dataset.required_dimensions
                     if config.model.datasets[i].status == DatasetRegistryStatus.REGISTERED:
-                        if (
-                            dataset.dataset_type is not None
-                            and dataset.dataset_type != config.model.datasets[i].dataset_type
-                        ):
-                            msg = (
-                                "If dataset_type is set, it must match the existing type."
-                                f"existing={config.model.datasets[i].dataset_type} "
-                                f"new={dataset.dataset_type}"
-                            )
-                            raise DSGInvalidParameter(msg)
                         config.model.datasets[i].status = DatasetRegistryStatus.UNREGISTERED
                         logger.info(
                             "Changed dataset %s status to %s in project %s",

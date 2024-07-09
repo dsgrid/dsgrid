@@ -393,7 +393,7 @@ def test_replace_dataset_dimension_requirements(tmp_registry_db):
     reqs.multi_dimensional[0].subsector.supplemental[0].record_ids = ["residential_subsectors"]
     reqs.multi_dimensional[0].subsector.supplemental[0].name = "Residential Subsector"
     model = InputDatasetDimensionRequirementsListModel(
-        datasets=[
+        dataset_dimension_requirements=[
             InputDatasetDimensionRequirementsModel(
                 dataset_id=dataset.dataset_id, required_dimensions=reqs
             ),

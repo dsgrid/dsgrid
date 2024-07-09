@@ -825,7 +825,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         """Replace dataset requirements in a project."""
         config = self.get_by_id(project_id)
         model = InputDatasetDimensionRequirementsListModel.from_file(filename)
-        for dataset in model.datasets:
+        for dataset in model.dataset_dimension_requirements:
             found = False
             for i in range(len(config.model.datasets)):
                 if config.model.datasets[i].dataset_id == dataset.dataset_id:

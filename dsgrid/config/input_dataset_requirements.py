@@ -23,7 +23,7 @@ class InputDatasetDimensionRequirementsModel(DSGBaseModel):
 class InputDatasetDimensionRequirementsListModel(DSGBaseModel):
     """Defines a list of dataset dimension requirements."""
 
-    datasets: Annotated[
+    dataset_dimension_requirements: Annotated[
         conlist(InputDatasetDimensionRequirementsModel, min_length=1),
         Field(description="List of dataset dimension requirements"),
     ]

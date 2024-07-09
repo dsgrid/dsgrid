@@ -7,6 +7,7 @@ from pydantic import field_validator, model_validator, Field
 from typing_extensions import Annotated
 import pyspark.sql.functions as F
 
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.exceptions import DSGInvalidParameter
@@ -674,7 +675,7 @@ class DatasetConfig(ConfigBase):
             case TableFormatType.PIVOTED:
                 return self.get_pivoted_dimension_columns()
             case TableFormatType.UNPIVOTED:
-                return [self.model.data_schema.table_format.value_column]
+                return [VALUE_COLUMN]
             case _:
                 raise NotImplementedError(str(self.get_table_format_type()))
 

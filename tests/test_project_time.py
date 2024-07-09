@@ -7,6 +7,7 @@ import pytest
 import pandas as pd
 import numpy as np
 from zoneinfo import ZoneInfo
+from dsgrid.common import VALUE_COLUMN
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_database import DatabaseConnection
@@ -282,12 +283,11 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
     tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
     time_cols = tempo_time_dim.get_load_data_time_columns()
-    enduse_cols = tempo._handler.config.get_pivoted_dimension_columns()
 
     # get sum from converted_data
-    groupby_cols = [col for col in converted_data.columns if col not in enduse_cols + [ptime_col]]
+    groupby_cols = [col for col in converted_data.columns if col not in [ptime_col, VALUE_COLUMN]]
     converted_sum = converted_data.groupBy(*groupby_cols).agg(
-        *[F.sum(F.round(col, 3)).alias(col) for col in enduse_cols]
+        F.sum(F.round(VALUE_COLUMN, 3)).alias(VALUE_COLUMN)
     )
     converted_sum_df = converted_sum.toPandas().set_index(groupby_cols).sort_index()
 
@@ -342,9 +342,9 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
         .rename("count")
         .to_frame()
     )
-    other_cols = [col for col in raw_data.columns if col not in enduse_cols]
+    other_cols = [col for col in raw_data.columns if col != VALUE_COLUMN]
     raw_data_df = (
-        raw_data.select(other_cols + [F.round(col, 3).alias(col) for col in enduse_cols])
+        raw_data.select(other_cols + [F.round(VALUE_COLUMN, 3).alias(VALUE_COLUMN)])
         .toPandas()
         .join(model_time_map, on=["time_zone"] + time_cols, how="left")
     )
@@ -395,10 +395,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
         how="left",
     )
     raw_sum_df2 = raw_data_df2.groupBy(groupby_cols).agg(
-        *[
-            F.sum(F.round(col, 3) * F.col("count").cast(FloatType())).alias(col)
-            for col in enduse_cols
-        ]
+        F.sum(F.round(VALUE_COLUMN, 3) * F.col("count").cast(FloatType())).alias(VALUE_COLUMN)
     )
     raw_sum_df2 = raw_sum_df2.toPandas().set_index(groupby_cols).sort_index()
 
@@ -433,24 +430,16 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     ], f"Mismatch in number of timestamps for spark: {n_ts2} vs. {len(model_time)}"
 
     # check 3: annual sum
-    raw_data_df[enduse_cols] = raw_data_df[enduse_cols].multiply(raw_data_df["count"], axis=0)
-    raw_sum_df = raw_data_df.groupby(groupby_cols)[enduse_cols].sum().sort_index()
+    raw_data_df[VALUE_COLUMN] = raw_data_df[VALUE_COLUMN].multiply(raw_data_df["count"], axis=0)
+    raw_sum_df = raw_data_df.groupby(groupby_cols)[[VALUE_COLUMN]].sum().sort_index()
 
     # compare annual sums
     delta_df = (converted_sum_df - raw_sum_df) / converted_sum_df
-    delta_df[enduse_cols].abs().sum()
-
     delta_df2 = (converted_sum_df - raw_sum_df2) / converted_sum_df
-    delta_df2[enduse_cols].abs().sum()
 
     # tolerance of 0.000 in pct change
-    assert delta_df[enduse_cols].abs().sum().round(3).to_list() == [
-        0
-    ], f"Mismatch, delta:\n{delta_df[delta_df[enduse_cols]!=0]}"
-
-    assert delta_df2[enduse_cols].abs().sum().round(3).to_list() == [
-        0
-    ], f"Mismatch, delta:\n{delta_df2[delta_df2[enduse_cols]!=0]}"
+    assert delta_df[VALUE_COLUMN].abs().sum().round(3) == 0.0
+    assert delta_df2[VALUE_COLUMN].abs().sum().round(3) == 0.0
 
 
 def check_exploded_tempo_time(project_time_dim, load_data):

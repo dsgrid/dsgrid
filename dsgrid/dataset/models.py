@@ -1,10 +1,9 @@
 from enum import Enum
 from typing import Literal, Union
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing_extensions import Annotated
 
-from dsgrid.common import VALUE_COLUMN
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 
@@ -31,14 +30,12 @@ class PivotedTableFormatModel(DSGBaseModel):
 
 class UnpivotedTableFormatModel(DSGBaseModel):
     format_type: Literal[TableFormatType.UNPIVOTED] = TableFormatType.UNPIVOTED
-    value_column: Annotated[
-        str,
-        Field(
-            default=VALUE_COLUMN,
-            title="value_column",
-            description="The name of the load_data column that contains data values (numeric).",
-        ),
-    ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy(cls, values: dict) -> dict:
+        values.pop("value_column", None)
+        return values
 
 
 TableFormatModel = Annotated[

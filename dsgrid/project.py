@@ -5,13 +5,10 @@ import shutil
 from pathlib import Path
 from typing import Optional
 
-import pyspark.sql.functions as F
 from pyspark.sql import SparkSession
-from pyspark.sql.types import DoubleType
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.project_config import ProjectConfig
-from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.dataset.growth_rates import apply_exponential_growth_rate, apply_annual_multiplier
@@ -214,51 +211,10 @@ class Project:
 
         # All dataset columns need to be in the same order.
         context.consolidate_dataset_metadata()
-        match context.get_table_format_type():
-            case TableFormatType.PIVOTED:
-                datasets = self._convert_pivoted_datasets(context, df_filenames)
-            case TableFormatType.UNPIVOTED:
-                datasets = self._convert_unpivoted_datasets(context, df_filenames)
-            case _:
-                raise NotImplementedError(str(context.get_table_format_type()))
-
+        datasets = self._convert_datasets(context, df_filenames)
         return evaluate_expression(context.model.project.dataset.expression, datasets).df
 
-    def _convert_pivoted_datasets(self, context: QueryContext, filenames: dict[str, Path]):
-        pivoted_columns = context.get_pivoted_columns()
-        pivoted_columns_sorted = sorted(pivoted_columns)
-
-        dim_columns, time_columns = self._get_dimension_columns(context)
-        for col in dim_columns:
-            match context.model.result.column_type:
-                case ColumnType.DIMENSION_QUERY_NAMES:
-                    dimension_type = self._config.get_dimension(col).model.dimension_type
-                case ColumnType.DIMENSION_TYPES:
-                    dimension_type = DimensionType.from_column(col)
-                case _:
-                    raise NotImplementedError(
-                        f"BUG: unhandled {context.model.result.column_type=}"
-                    )
-            if dimension_type == context.get_pivoted_dimension_type():
-                dim_columns.remove(col)
-                break
-
-        expected_columns = time_columns + pivoted_columns_sorted + dim_columns
-
-        datasets = {}
-        for dataset_id, path in filenames.items():
-            df = read_dataframe(path)
-            unexpected = sorted(set(df.columns).difference(expected_columns))
-            if unexpected:
-                raise Exception(f"Unexpected columns are present in {dataset_id=} {unexpected=}")
-            for column in pivoted_columns.difference(df.columns):
-                df = df.withColumn(column, F.lit(None).cast(DoubleType()))
-            datasets[dataset_id] = DatasetExpressionHandler(
-                df.select(*expected_columns), time_columns + dim_columns, pivoted_columns_sorted
-            )
-        return datasets
-
-    def _convert_unpivoted_datasets(self, context: QueryContext, filenames: dict[str, Path]):
+    def _convert_datasets(self, context: QueryContext, filenames: dict[str, Path]):
         dim_columns, time_columns = self._get_dimension_columns(context)
         expected_columns = time_columns + dim_columns
         expected_columns.append(VALUE_COLUMN)
@@ -444,29 +400,6 @@ class Project:
             cached_datasets_dir,
             dataset.growth_rate_dataset_id,
         )
-        match context.get_table_format_type():
-            case TableFormatType.PIVOTED:
-                pivoted_dimension_type = context.get_pivoted_dimension_type(
-                    dataset_id=dataset.initial_value_dataset_id
-                )
-                value_columns = context.get_pivoted_columns(
-                    dataset_id=dataset.initial_value_dataset_id
-                )
-                value_columns_gr = context.get_pivoted_columns(
-                    dataset_id=dataset.growth_rate_dataset_id
-                )
-            case TableFormatType.UNPIVOTED:
-                pivoted_dimension_type = None
-                value_columns = {VALUE_COLUMN}
-                value_columns_gr = {VALUE_COLUMN}
-            case _:
-                raise NotImplementedError(str(context.get_table_format_type()))
-        if value_columns != value_columns_gr:
-            raise Exception(
-                f"BUG: Mismatch in value_columns columns: "
-                f"{value_columns.symmetric_difference(value_columns_gr)}"
-            )
-
         model_year_column = get_myear_column(dataset.initial_value_dataset_id)
         model_year_column_gr = get_myear_column(dataset.growth_rate_dataset_id)
         if model_year_column != model_year_column_gr:
@@ -479,12 +412,6 @@ class Project:
                 time_columns = context.get_dimension_column_names(
                     DimensionType.TIME, dataset_id=dataset.initial_value_dataset_id
                 )
-                if pivoted_dimension_type is not None:
-                    pivoted_column_names = context.get_dimension_query_names(
-                        pivoted_dimension_type,
-                        dataset.initial_value_dataset_id,
-                    )
-                    assert len(pivoted_column_names) == 1
             case ColumnType.DIMENSION_TYPES:
                 dset = self.get_dataset(dataset.initial_value_dataset_id)
                 time_dim = dset.config.get_dimension(DimensionType.TIME)
@@ -498,6 +425,7 @@ class Project:
             logger.info("Build projection dataset %s", dataset.dataset_id)
             iv_df = read_dataframe(iv_path)
             gr_df = read_dataframe(gr_path)
+            value_columns = {VALUE_COLUMN}
             match dataset.construction_method:
                 case DatasetConstructionMethod.EXPONENTIAL_GROWTH:
                     df = apply_exponential_growth_rate(
@@ -509,15 +437,9 @@ class Project:
                     raise NotImplementedError(f"BUG: Unsupported {dataset.construction_method=}")
             df = write_dataframe_and_auto_partition(df, dataset_path)
 
-            kwargs = {}
-            if context.get_table_format_type() == TableFormatType.PIVOTED:
-                kwargs["pivoted_columns"] = value_columns
-                kwargs["pivoted_dimension_type"] = pivoted_dimension_type
             context.set_dataset_metadata(
                 dataset.dataset_id,
                 context.model.result.column_type,
-                context.get_table_format_type(),
                 self._config,
-                **kwargs,
             )
             context.serialize_dataset_metadata_to_file(dataset.dataset_id, metadata_file)

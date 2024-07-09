@@ -84,9 +84,7 @@ def la_expected_electricity_hour_16(tmp_path_factory):
                 ],
             ),
         ),
-        result=QueryResultParamsModel(
-            table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC)
-        ),
+        result=QueryResultParamsModel(),
     )
     ProjectQuerySubmitter(project, output_dir).submit(
         query,
@@ -94,14 +92,18 @@ def la_expected_electricity_hour_16(tmp_path_factory):
         load_cached_table=False,
     )
     df = read_parquet(str(output_dir / query.name / "table.parquet")).filter("county == '06037'")
-    df = df.withColumn("elec", df.electricity_cooling + df.electricity_heating).drop(
-        "electricity_cooling", "electricity_heating"
+    end_uses = ["electricity_cooling", "electricity_heating"]
+    gcols = [x for x in df.columns if x not in {"end_use", "value"}]
+    df = (
+        df.filter(F.col("end_use").isin(end_uses))
+        .groupBy(*gcols)
+        .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
     )
     expected = (
         df.groupBy("county", F.hour("time_est").alias("hour"))
-        .agg(F.mean("elec"))
+        .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
         .filter("hour == 16")
-        .collect()[0]["avg(elec)"]
+        .collect()[0][VALUE_COLUMN]
     )
     yield {
         "la_electricity_hour_16": expected,
@@ -113,19 +115,30 @@ def test_electricity_values(category):
     run_query_test(QueryTestElectricityValues, category)
 
 
-def test_electricity_use_by_county():
-    run_query_test(QueryTestElectricityUse, "county", "sum")
-    run_query_test(QueryTestElectricityUse, "county", "max")
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        ("county", "sum"),
+        ("county", "max"),
+        ("state", "sum"),
+        ("state", "max"),
+    ],
+)
+def test_electricity_use(inputs):
+    geo, op = inputs
+    run_query_test(QueryTestElectricityUse, geo, op)
 
 
-def test_electricity_use_by_state():
-    run_query_test(QueryTestElectricityUse, "state", "sum")
-    run_query_test(QueryTestElectricityUse, "state", "max")
-
-
-def test_electricity_use_with_results_filter():
-    run_query_test(QueryTestElectricityUseFilterResults, "county", "sum", DimensionCategory.BASE)
-    run_query_test(QueryTestElectricityUseFilterResults, "county", "sum", DimensionCategory.SUBSET)
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        ("county", "sum", DimensionCategory.BASE),
+        ("county", "sum", DimensionCategory.SUBSET),
+    ],
+)
+def test_electricity_use_with_results_filter(inputs):
+    geo, op, category = inputs
+    run_query_test(QueryTestElectricityUseFilterResults, geo, op, category)
 
 
 def test_total_electricity_use_with_filter():
@@ -169,7 +182,7 @@ def test_unit_mapping(cached_registry):
     run_query_test(QueryTestUnitMapping)
 
 
-def test_invalid_drop_pivoted_dimension(tmp_path):
+def test_invalid_drop_metric_dimension():
     with pytest.raises(ValueError):
         AggregationModel(
             dimensions=DimensionQueryNamesModel(
@@ -185,47 +198,64 @@ def test_invalid_drop_pivoted_dimension(tmp_path):
             aggregation_function="sum",
         )
 
-    invalid_agg = AggregationModel(
-        dimensions=DimensionQueryNamesModel(
-            geography=["county"],
-            metric=["end_use"],
-            model_year=["model_year"],
-            scenario=["scenario"],
-            sector=["sector"],
-            subsector=["subsector"],
-            time=["time_est"],
-            weather_year=["weather_2012"],
-        ),
-        aggregation_function="sum",
-    )
-    invalid_agg.dimensions.metric.clear()
-    query = ProjectQueryModel(
-        name="test",
-        project=ProjectQueryParamsModel(
-            project_id="dsgrid_conus_2022",
-            include_dsgrid_dataset_components=False,
-            dataset=DatasetModel(
-                dataset_id="projected_dg_conus_2022",
-                source_datasets=[
-                    StandaloneDatasetModel(
-                        dataset_id="comstock_conus_2022_reference",
-                    ),
-                    StandaloneDatasetModel(
-                        dataset_id="resstock_conus_2022_reference",
-                    ),
-                ],
-            ),
-        ),
-        result=QueryResultParamsModel(
-            output_format="parquet",
-        ),
-    )
-    project = get_project("simple-standard-scenarios", "dsgrid_conus_2022")
-    output_dir = tmp_path / "queries"
 
-    query.result.aggregations = [invalid_agg]
-    with pytest.raises(DSGInvalidQuery):
-        ProjectQuerySubmitter(project, output_dir).submit(query)
+def test_invalid_pivoted_dimension_aggregations():
+    with pytest.raises(ValueError):
+        QueryResultParamsModel(
+            aggregations=[
+                AggregationModel(
+                    dimensions=DimensionQueryNamesModel(
+                        geography=["county"],
+                        metric=["electricity_end_uses", "natural_gas_end_uses"],
+                        model_year=["model_year"],
+                        scenario=["scenario"],
+                        sector=["sector"],
+                        subsector=["subsector"],
+                        time=["time_est"],
+                        weather_year=["weather_2012"],
+                    ),
+                    aggregation_function="sum",
+                ),
+            ],
+            table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
+        )
+
+    with pytest.raises(ValueError):
+        QueryResultParamsModel(
+            aggregations=[
+                AggregationModel(
+                    dimensions=DimensionQueryNamesModel(
+                        geography=["county"],
+                        metric=["end_uses_by_fuel_type"],
+                        model_year=["model_year"],
+                        scenario=["scenario"],
+                        sector=["sector"],
+                        subsector=["subsector"],
+                        time=["time_est"],
+                        weather_year=["weather_2012"],
+                    ),
+                    aggregation_function="sum",
+                ),
+                AggregationModel(
+                    dimensions=DimensionQueryNamesModel(
+                        geography=["county"],
+                        metric=[],
+                        model_year=[],
+                        scenario=[],
+                        sector=[],
+                        subsector=[],
+                        time=[
+                            ColumnModel(
+                                dimension_query_name="time_est", function="hour", alias="hour"
+                            )
+                        ],
+                        weather_year=[],
+                    ),
+                    aggregation_function="mean",
+                ),
+            ],
+            table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
+        )
 
 
 def test_invalid_aggregation_subset_dimension():
@@ -407,14 +437,16 @@ def test_transform_pivoted_dataset(tmp_path):
     path = project.transform_dataset("resstock_conus_2022_projected", tmp_path)
     df = read_parquet(path).filter("geography == '06037'")
     cooling = (
-        df.select("electricity_cooling")
-        .agg(F.sum("electricity_cooling").alias("cooling"))
+        df.filter("metric = 'electricity_cooling'")
+        .select(VALUE_COLUMN)
+        .agg(F.sum(VALUE_COLUMN).alias("cooling"))
         .collect()[0]
         .cooling
     )
     heating = (
-        df.select("electricity_heating")
-        .agg(F.sum("electricity_heating").alias("heating"))
+        df.filter("metric = 'electricity_heating'")
+        .select(VALUE_COLUMN)
+        .agg(F.sum(VALUE_COLUMN).alias("heating"))
         .collect()[0]
         .heating
     )
@@ -1284,9 +1316,7 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                     ),
                 ),
             ),
-            result=QueryResultParamsModel(
-                table_format=PivotedTableFormatModel(pivoted_dimension_type=DimensionType.METRIC),
-            ),
+            result=QueryResultParamsModel(),
         )
         return self._model
 
@@ -1294,21 +1324,20 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
         df = read_parquet(
             str(self.output_dir / "composite_datasets" / self._model.dataset_id / "table.parquet")
         )
-        assert "natural_gas_heating" not in df.columns
-        non_value_columns = set(
-            self._project.config.list_dimension_query_names(category=DimensionCategory.BASE)
+        assert sorted([x.end_use for x in df.select("end_use").distinct().collect()]) == [
+            "electricity_cooling",
+            "electricity_heating",
+        ]
+        summary = (
+            df.select("end_use", VALUE_COLUMN)
+            .groupBy("end_use")
+            .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
+            .collect()
         )
-        non_value_columns.update({"id", "timestamp"})
-        value_columns = sorted((x for x in df.columns if x not in non_value_columns))
-        expected = ["electricity_cooling", "electricity_heating"]
-        # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating", "fraction"]
-        assert value_columns == expected
-
-        total_cooling = df.agg(F.sum("electricity_cooling").alias("sum")).collect()[0].sum
-        total_heating = df.agg(F.sum("electricity_heating").alias("sum")).collect()[0].sum
+        totals = {x.end_use: x[VALUE_COLUMN] for x in summary}
         expected = self.get_raw_stats()["overall"]["resstock"]["sum"]
-        assert math.isclose(total_cooling, expected["electricity_cooling"])
-        assert math.isclose(total_heating, expected["electricity_heating"])
+        assert math.isclose(totals["electricity_cooling"], expected["electricity_cooling"])
+        assert math.isclose(totals["electricity_heating"], expected["electricity_heating"])
         return True
 
 
@@ -1410,20 +1439,29 @@ class QueryTestUnitMapping(QueryTestBase):
         raw_ld = ld.join(lk, on="id").drop("id")
         # This test dataset has some fractional mapping values included.
         # subsector = hospital and model_year = 2020 are 1.0, fans are 1.0
-        expected = (
-            raw_ld.sort("timestamp").filter("subsector == 'com__Hospital'").limit(1).collect()[0]
+        expected_cooling = (
+            raw_ld.sort("timestamp")
+            .filter("subsector == 'com__Hospital' and metric = 'com_cooling'")
+            .limit(1)
+            .collect()[0]
         )
-        subsector = expected.subsector.replace("com__", "")
+        expected_fans = (
+            raw_ld.sort("timestamp")
+            .filter("subsector == 'com__Hospital' and metric = 'com_fans'")
+            .limit(1)
+            .collect()[0]
+        )
+        subsector = expected_cooling.subsector.replace("com__", "")
         actual = (
             df.filter(
-                f"comstock_building_type == '{subsector}' and county == '{expected.geography}' and model_year == '2020'"
+                f"comstock_building_type == '{subsector}' and county == '{expected_cooling.geography}' and model_year == '2020'"
             )
             .sort("2012_hourly_est")
             .limit(1)
             .collect()[0]
         )
-        assert actual.fans == expected.com_fans * 0.9
-        assert actual.cooling == expected.com_cooling * 1000
+        assert actual.fans == expected_fans[VALUE_COLUMN] * 0.9
+        assert actual.cooling == expected_cooling[VALUE_COLUMN] * 1000
         return True
 
 
@@ -1527,7 +1565,7 @@ def calc_expected_eia_861_ca_res_load_value():
     raw = dataset._handler._load_data.filter("geography == 'CA' and sector == 'res'").collect()
     assert len(raw) == 1
     num_scenarios = 2
-    elec_mwh_state = raw[0].electricity_sales * num_scenarios
+    elec_mwh_state = raw[0][VALUE_COLUMN] * num_scenarios
     elec_mwh_selected_counties = elec_mwh_state * fraction_06037 + elec_mwh_state * fraction_06073
     return elec_mwh_selected_counties
 

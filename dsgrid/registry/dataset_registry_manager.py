@@ -8,15 +8,15 @@ from typing import Type, Union
 
 from prettytable import PrettyTable
 
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     ALLOWED_DATA_FILES,
+    ALLOWED_LOAD_DATA_FILENAMES,
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-from dsgrid.config.dimensions_config import (
-    DimensionsConfig,
-    DimensionsConfigModel,
-)
+from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
+from dsgrid.dataset.models import TableFormatType, UnpivotedTableFormatModel
 from dsgrid.dimension.base_models import check_required_dimensions
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
@@ -24,6 +24,7 @@ from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingR
 from dsgrid.utils.spark import (
     read_dataframe,
     write_dataframe,
+    write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
@@ -243,6 +244,17 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._run_checks(config)
         registration = make_initial_config_registration(submitter, log_message)
 
+        if config.get_table_format_type() == TableFormatType.PIVOTED:
+            logger.info("Converting dataset %s from pivoted to unpivoted.", dataset_id)
+            needs_unpivot = True
+            pivoted_columns = config.get_pivoted_dimension_columns()
+            pivoted_dimension_type = config.get_pivoted_dimension_type()
+            config.model.data_schema.table_format = UnpivotedTableFormatModel()
+        else:
+            needs_unpivot = False
+            pivoted_columns = None
+            pivoted_dimension_type = None
+
         # The dataset_version starts the same as the config but can change later.
         config.model.dataset_version = registration.version
         dataset_registry_dir = self.get_registry_data_directory(dataset_id)
@@ -258,14 +270,29 @@ class DatasetRegistryManager(RegistryManagerBase):
         self.fs_interface.mkdir(dataset_registry_dir)
         found_files = False
         for filename in ALLOWED_DATA_FILES:
+            assert config.dataset_path is not None
             path = Path(config.dataset_path) / filename
             if path.exists():
                 dst = dataset_path / filename
                 # Writing with Spark is much faster than copying or rsync if there are
                 # multiple nodes in the cluster - much more parallelism.
-                # We set overwrite=True because if the path exists, it's only because a previous
-                # attempt failed.
-                write_dataframe(read_dataframe(path), dst, overwrite=True)
+                df = read_dataframe(path)
+                if needs_unpivot and filename in ALLOWED_LOAD_DATA_FILENAMES:
+                    assert pivoted_columns is not None
+                    assert pivoted_dimension_type is not None
+                    ids = set(df.columns) - {VALUE_COLUMN, *pivoted_columns}
+                    df = df.unpivot(
+                        list(ids),
+                        pivoted_columns,
+                        pivoted_dimension_type.value,
+                        VALUE_COLUMN,
+                    )
+                if dst.suffix == ".parquet":
+                    # This function doesn't support CSV and JSON. Support could be added if
+                    # needed. We only use it for large files.
+                    write_dataframe_and_auto_partition(df, dst)
+                else:
+                    write_dataframe(df, dst, overwrite=True)
                 found_files = True
         if not found_files:
             msg = f"Did not find any data files in {config.dataset_path}"

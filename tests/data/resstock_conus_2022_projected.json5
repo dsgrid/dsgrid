@@ -22,14 +22,12 @@
   },
   "result": {
     "replace_ids_with_names": false,
-    "aggregations": [
-    ],
+    "aggregations": [],
     "reports": [],
     "column_type": "dimension_types",
     "output_format": "parquet",
     "table_format": {
-      format_type: "pivoted",
-      pivoted_dimension_type: "metric",
+      format_type: "unpivoted",
     },
     "sort_columns": [],
     "dimension_filters": [],

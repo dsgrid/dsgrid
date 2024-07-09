@@ -4,7 +4,7 @@ import getpass
 import logging
 import sys
 
-import click
+import rich_click as click
 
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.loggers import setup_logging

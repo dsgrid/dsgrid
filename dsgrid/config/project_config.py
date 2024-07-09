@@ -537,7 +537,7 @@ class InputDatasetModel(DSGBaseModel):
     required_dimensions: Annotated[
         RequiredDimensionsModel,
         Field(
-            title="required_dimenions",
+            title="required_dimensions",
             description="Defines required record IDs that must exist for each dimension.",
             default=RequiredDimensionsModel(),
         ),

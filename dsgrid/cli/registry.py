@@ -5,7 +5,7 @@ import logging
 import sys
 from pathlib import Path
 
-import click
+import rich_click as click
 from semver import VersionInfo
 
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
@@ -686,6 +686,107 @@ def update_project(
         return 1
 
 
+@click.command()
+@click.pass_obj
+@click.pass_context
+@click.argument("project_id")
+@click.argument("filename", callback=_path_callback)
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    type=str,
+    help="Please specify the reason for this addition.",
+)
+def register_supplemental_dimensions(
+    ctx, registry_manager, project_id, filename: Path, log_message
+):
+    """Register new supplemental dimensions with a project. The JSON/JSON5 filename must
+    match the data model defined by this documentation:
+
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel
+    """
+
+    submitter = getpass.getuser()
+    project_mgr = registry_manager.project_manager
+    res = handle_dsgrid_exception(
+        ctx,
+        project_mgr.register_supplemental_dimensions,
+        project_id,
+        filename,
+        submitter,
+        log_message,
+    )
+    if res[1] != 0:
+        return 1
+
+
+@click.command()
+@click.pass_obj
+@click.pass_context
+@click.argument("project_id")
+@click.argument("filename", callback=_path_callback)
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    type=str,
+    help="Please specify the reason for the new datasets.",
+)
+def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, log_message):
+    """Add requirements for one or more datasets to a project. The JSON/JSON5 filename must
+    match the data model defined by this documentation:
+
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetListModel
+    """
+    submitter = getpass.getuser()
+    project_mgr = registry_manager.project_manager
+    res = handle_dsgrid_exception(
+        ctx,
+        project_mgr.add_dataset_requirements,
+        project_id,
+        filename,
+        submitter,
+        log_message,
+    )
+    if res[1] != 0:
+        return 1
+
+
+@click.command()
+@click.pass_obj
+@click.pass_context
+@click.argument("project_id")
+@click.argument("filename", callback=_path_callback)
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    type=str,
+    help="Please specify the reason for the new requirements.",
+)
+def replace_dataset_dimension_requirements(
+    ctx, registry_manager, project_id, filename: Path, log_message
+):
+    """Replace dimension requirements for one or more datasets in a project. The JSON/JSON5
+    filename must match the data model defined by this documentation:
+
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsListModel
+    """
+    submitter = getpass.getuser()
+    project_mgr = registry_manager.project_manager
+    res = handle_dsgrid_exception(
+        ctx,
+        project_mgr.replace_dataset_dimension_requirements,
+        project_id,
+        filename,
+        submitter,
+        log_message,
+    )
+    if res[1] != 0:
+        return 1
+
+
 @click.command(name="list-dimension-query-names")
 @click.argument("project-id")
 @click.option(
@@ -713,7 +814,9 @@ def update_project(
     help="Exclude supplemental dimension query names.",
 )
 @click.pass_obj
+@click.pass_context
 def list_project_dimension_query_names(
+    ctx,
     registry_manager: RegistryManager,
     project_id,
     exclude_base,
@@ -729,7 +832,11 @@ def list_project_dimension_query_names(
         return 1
 
     manager = registry_manager.project_manager
-    project_config = manager.get_by_id(project_id)
+    res = handle_dsgrid_exception(ctx, manager.get_by_id, project_id)
+    if res[1] != 0:
+        return 1
+
+    project_config = res[0]
     base = None if exclude_base else project_config.get_base_dimension_to_query_name_mapping()
     sub = None if exclude_subset else project_config.get_subset_dimension_to_query_name_mapping()
     supp = (
@@ -918,6 +1025,9 @@ projects.add_command(submit_dataset)
 projects.add_command(register_and_submit_dataset)
 projects.add_command(dump_project)
 projects.add_command(update_project)
+projects.add_command(register_supplemental_dimensions)
+projects.add_command(add_dataset_requirements)
+projects.add_command(replace_dataset_dimension_requirements)
 projects.add_command(list_project_dimension_query_names)
 
 datasets.add_command(list_datasets)

@@ -5,7 +5,7 @@ import shutil
 import sys
 from pathlib import Path
 
-import click
+import rich_click as click
 
 from dsgrid.cli.common import get_value_from_context, OptionPromptPassword
 from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY

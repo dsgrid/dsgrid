@@ -2,7 +2,7 @@
 
 import sys
 
-import click
+import rich_click as click
 
 
 @click.command()

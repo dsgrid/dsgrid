@@ -40,6 +40,10 @@ from dsgrid.config.supplemental_dimension import (
     SupplementalDimensionModel,
     SupplementalDimensionsListModel,
 )
+from dsgrid.config.input_dataset_requirements import (
+    InputDatasetDimensionRequirementsListModel,
+    InputDatasetListModel,
+)
 from dsgrid.config.mapping_tables import (
     MappingTableModel,
     MappingTableByNameModel,
@@ -788,6 +792,61 @@ class ProjectRegistryManager(RegistryManagerBase):
             raise
         finally:
             context.finalize(error_occurred)
+
+    def add_dataset_requirements(
+        self,
+        project_id: str,
+        filename: Path,
+        submitter: str,
+        log_message: str,
+    ):
+        """Add requirements for one or more datasets to the project."""
+        config = self.get_by_id(project_id)
+        model = InputDatasetListModel.from_file(filename)
+        existing_ids = {x.dataset_id for x in config.model.datasets}
+        for dataset in model.datasets:
+            if dataset.dataset_id in existing_ids:
+                msg = f"{dataset.dataset_id} is already stored in the project"
+                raise DSGInvalidParameter(msg)
+            if dataset.status != DatasetRegistryStatus.UNREGISTERED:
+                msg = f"New dataset {dataset.dataset_id} status must be unregistered: {dataset.status}"
+                raise DSGInvalidParameter(msg)
+
+        config.model.datasets += model.datasets
+        self._update_config(config, submitter, VersionUpdateType.PATCH, log_message)
+
+    def replace_dataset_dimension_requirements(
+        self,
+        project_id: str,
+        filename: Path,
+        submitter: str,
+        log_message: str,
+    ):
+        """Replace dataset requirements in a project."""
+        config = self.get_by_id(project_id)
+        model = InputDatasetDimensionRequirementsListModel.from_file(filename)
+        for dataset in model.dataset_dimension_requirements:
+            found = False
+            for i in range(len(config.model.datasets)):
+                if config.model.datasets[i].dataset_id == dataset.dataset_id:
+                    config.model.datasets[i].required_dimensions = dataset.required_dimensions
+                    if config.model.datasets[i].status == DatasetRegistryStatus.REGISTERED:
+                        config.model.datasets[i].status = DatasetRegistryStatus.UNREGISTERED
+                        logger.info(
+                            "Changed dataset %s status to %s in project %s",
+                            dataset.dataset_id,
+                            config.model.datasets[i].status.value,
+                            project_id,
+                        )
+                        # TODO: When issue #309 is addressed, we need to set all dependent
+                        # derived datasets to unregistered also.
+                        found = True
+                        break
+            if not found:
+                msg = f"{dataset.dataset_type} is not present in the project config"
+                raise DSGInvalidParameter(msg)
+
+        self._update_config(config, submitter, VersionUpdateType.MINOR, log_message)
 
     def _submit_dataset_and_register_mappings(
         self,

@@ -4,7 +4,7 @@ import logging
 import sys
 from pathlib import Path
 
-import click
+import rich_click as click
 from pydantic import ValidationError
 
 from dsgrid.common import REMOTE_REGISTRY

@@ -5,7 +5,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-import click
+import rich_click as click
 
 from dsgrid.loggers import setup_logging, check_log_file_size
 from dsgrid.registry.registry_database import DatabaseConnection

@@ -2,7 +2,7 @@ import logging
 import sys
 from pathlib import Path
 
-import click
+import rich_click as click
 
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGBaseException

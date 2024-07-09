@@ -3,7 +3,7 @@
 import getpass
 import logging
 
-import click
+import rich_click as click
 
 from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.cli.common import handle_scratch_dir

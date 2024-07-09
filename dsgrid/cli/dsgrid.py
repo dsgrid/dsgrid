@@ -3,7 +3,7 @@
 import logging
 from pathlib import Path
 
-import click
+import rich_click as click
 
 from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.cli.common import get_log_level_from_str, handle_scratch_dir, OptionPromptPassword

@@ -228,8 +228,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     # TODO: Starting with Python 3.10 and Spark 3.3.0, this fails unless we call cache.
                     # Works fine on Python 3.9 and Spark 3.2.0. Haven't debugged further.
                     # The size should not cause a problem.
-                    if not use_duckdb():
-                        diff.cache()
+                    cache(diff)
                     diff_count = diff.count()
                     limit = 100
                     if diff_count < limit:

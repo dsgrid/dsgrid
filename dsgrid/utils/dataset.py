@@ -10,6 +10,7 @@ from dsgrid.spark.functions import (
     read_parquet,
     is_dataframe_empty,
     join_multiple_columns,
+    unpivot,
 )
 from dsgrid.spark.types import (
     DataFrame,
@@ -229,12 +230,7 @@ def unpivot_dataframe(
     """Unpivot the dataframe, accounting for time columns."""
     values = value_columns if isinstance(value_columns, set) else set(value_columns)
     ids = [x for x in df.columns if x != VALUE_COLUMN and x not in values]
-    df = df.unpivot(
-        ids,
-        value_columns,
-        variable_column,
-        VALUE_COLUMN,
-    )
+    df = unpivot(df, value_columns, variable_column, VALUE_COLUMN)
     cols = set(df.columns).difference(time_columns)
     new_rows = df.filter(f"{VALUE_COLUMN} IS NULL").select(*cols).distinct()
     for col in time_columns:

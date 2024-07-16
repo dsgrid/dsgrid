@@ -62,13 +62,14 @@ from dsgrid.registry.common import (
     ProjectRegistryStatus,
 )
 from dsgrid.spark.functions import (
+    cache,
     except_all,
     is_dataframe_empty,
+    unpersist,
 )
 from dsgrid.spark.types import (
     DataFrame,
     F,
-    use_duckdb,
 )
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, in_other_dir
@@ -1182,8 +1183,7 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         dataset_id = dataset_config.config_id
         out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
-        if not use_duckdb():
-            diff.cache()
+        cache(diff)
         # TODO duckdb
         diff.write.csv(out_file, header=True)
         # diff.write.options(header=True).mode("overwrite").csv(out_file)
@@ -1195,9 +1195,8 @@ class ProjectRegistryManager(RegistryManagerBase):
             out_file,
         )
         diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
-        if not use_duckdb():
-            diff.unpersist()
-            mapped_dataset_table.cache()
+        unpersist(diff)
+        cache(mapped_dataset_table)
         dataset_counts = {}
         for col in diff.columns:
             dataset_counts[col] = mapped_dataset_table.select(col).distinct().count()
@@ -1208,8 +1207,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     dataset_counts[col],
                     diff_counts[col],
                 )
-        if not use_duckdb():
-            mapped_dataset_table.unpersist()
+        unpersist(mapped_dataset_table)
 
         raise DSGInvalidDataset(
             f"Dataset {dataset_config.config_id} is missing required dimension records. "

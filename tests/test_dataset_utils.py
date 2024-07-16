@@ -7,7 +7,9 @@ from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.spark.functions import (
     aggregate_single_value,
+    cache,
     is_dataframe_empty,
+    unpersist,
 )
 from dsgrid.spark.types import use_duckdb
 from dsgrid.utils.dataset import (
@@ -108,8 +110,8 @@ def pivoted_dataframe_with_time():
             },
         ]
     )
-    yield df.cache(), ["time_index"], ["cooling", "heating"]
-    df.unpersist()
+    yield cache(df), ["time_index"], ["cooling", "heating"]
+    unpersist(df)
 
 
 def test_is_noop_mapping_true():

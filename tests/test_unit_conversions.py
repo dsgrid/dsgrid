@@ -41,8 +41,9 @@ from dsgrid.units.energy import (
     to_mbtu,
     from_any_to_any,
 )
-from dsgrid.spark.types import F, use_duckdb
-from dsgrid.utils.spark import create_dataframe_from_dicts, get_spark_session
+from dsgrid.spark.functions import cache, unpersist
+from dsgrid.spark.types import F
+from dsgrid.utils.spark import create_dataframe_from_dicts
 
 
 KWH_VAL = 1234.5
@@ -66,11 +67,9 @@ def records_dataframe():
         {"id": "unitless", "name": "unitless", "fuel_id": "electricity", "unit": ""},
     ]
     records = create_dataframe_from_dicts(data)
-    if not use_duckdb():
-        records.cache()
+    cache(records)
     yield records
-    if not use_duckdb():
-        records.unpersist()
+    unpersist(records)
 
 
 @pytest.fixture(scope="module")
@@ -87,11 +86,9 @@ def pivoted_dataframes(records_dataframe):
         },
     ]
     df = create_dataframe_from_dicts(data)
-    if not use_duckdb():
-        df.cache()
+    cache(df)
     yield df, records_dataframe
-    if not use_duckdb():
-        df.unpersist()
+    unpersist(df)
 
 
 @pytest.fixture(scope="module")
@@ -134,11 +131,9 @@ def unpivoted_dataframes(records_dataframe):
         },
     ]
     df = create_dataframe_from_dicts(data)
-    if not use_duckdb():
-        df.cache()
+    cache(df)
     yield df, records_dataframe
-    if not use_duckdb():
-        df.unpersist()
+    unpersist(df)
 
 
 def test_constants():

@@ -332,7 +332,6 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     return spark
 
 
-
 def is_dataframe_empty(df: DataFrame) -> bool:
     """Return True if the DataFrame is empty."""
     if use_duckdb():

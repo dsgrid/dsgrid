@@ -512,16 +512,14 @@ def _unpivot_duckdb(
     view = create_temp_view(df)
     cols = ",".join(pivoted_columns)
     query = f"""
-        UNPIVOT {view}
-        ON {cols}
-        INTO
-            NAME {name_column}
-            VALUE {value_column}
+        SELECT * FROM {view}
+        UNPIVOT INCLUDE NULLS (
+            {value_column}
+            FOR {name_column} in ({cols})
+        )
     """
     spark = get_spark_session()
     df = spark.sql(query)
-    # TODO duckdb: How to delete this? Create a random name? How many will we accumulate?
-    # spark.sql(f"DROP VIEW {view}")
     return df
 
 

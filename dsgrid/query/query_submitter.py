@@ -69,7 +69,7 @@ class QuerySubmitterBase:
 
     @staticmethod
     def query_filename(path: Path):
-        return path / "query.json"
+        return path / "query.json5"
 
     @staticmethod
     def table_filename(path: Path):
@@ -375,7 +375,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             self._process_aggregations_and_save(df, context, repartition=False)
 
     def _load_composite_dataset_query(self, dataset_id):
-        filename = self._composite_datasets_dir() / dataset_id / "query.json"
+        filename = self._composite_datasets_dir() / dataset_id / "query.json5"
         return CreateCompositeDatasetQueryModel.from_file(filename)
 
     def _read_dataset(self, dataset_id):

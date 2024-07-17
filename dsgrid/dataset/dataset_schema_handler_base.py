@@ -37,6 +37,7 @@ from dsgrid.utils.dataset import (
     repartition_if_needed_by_mapping,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.utils.spark import persist_intermediate_table
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -429,6 +430,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 )
             msg = f"Cannot map AnnualTime for a dataset of type {self._config.model.dataset_type}"
             raise NotImplementedError(msg)
+
+        # In many cases we need to persist the current query before mapping time.
+        # This has been true for DECARB industrial and transportation.
+        load_data_df = persist_intermediate_table(
+            load_data_df, scratch_dir_context, tag="query before mapping time"
+        )
 
         load_data_df = time_dim.convert_dataframe(
             load_data_df,

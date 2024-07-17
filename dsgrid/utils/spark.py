@@ -68,6 +68,17 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     if spark_conf is not None:
         for key, val in spark_conf.items():
             conf.set(key, val)
+
+    out_ts_type = conf.get("spark.sql.parquet.outputTimestampType")
+    if out_ts_type is None:
+        conf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
+    elif out_ts_type != "TIMESTAMP_MICROS":
+        logger.warning(
+            "spark.sql.parquet.outputTimestampType is set to %s. Writing parquet files may "
+            "produced undesired results.",
+            out_ts_type,
+        )
+
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf.setMaster(cluster)

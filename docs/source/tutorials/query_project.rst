@@ -27,6 +27,10 @@ ssh to a login node to begin the tutorial.
 
 2. Add this content to a file called ``query.json5``:
 
+
+.. note:: There is a CLI command that can generate a query file for your project. Refer to
+   ``dsgrid query project create --help``.
+
 .. code-block:: JavaScript
 
     {

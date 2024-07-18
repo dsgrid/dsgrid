@@ -68,6 +68,17 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     if spark_conf is not None:
         for key, val in spark_conf.items():
             conf.set(key, val)
+
+    out_ts_type = conf.get("spark.sql.parquet.outputTimestampType")
+    if out_ts_type is None:
+        conf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
+    elif out_ts_type != "TIMESTAMP_MICROS":
+        logger.warning(
+            "spark.sql.parquet.outputTimestampType is set to %s. Writing parquet files may "
+            "produced undesired results.",
+            out_ts_type,
+        )
+
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf.setMaster(cluster)
@@ -622,15 +633,19 @@ def write_dataframe(df: DataFrame, filename: str | Path, overwrite: bool = False
         df.write.json(name)
 
 
-def persist_intermediate_table(df: DataFrame, context: ScratchDirContext) -> DataFrame:
+@track_timing(timer_stats_collector)
+def persist_intermediate_table(df: DataFrame, context: ScratchDirContext, tag=None) -> DataFrame:
     """Persist a table to the scratch directory. This can be helpful to avoid multiple
     evaluations of the same query.
     """
     # Note: This does not use the Spark warehouse because we are not properly configuring or
     # managing it across sessions. And, we are already using the scratch dir for our own files.
     path = context.get_temp_filename(suffix=".parquet")
+    logger.info("Start persist_intermediate_table %s %s", path, tag or "")
     write_dataframe(df, path)
-    return read_dataframe(path)
+    df = read_dataframe(path)
+    logger.info("Completed persist_intermediate_table %s %s", path, tag or "")
+    return df
 
 
 def sql(query: str) -> DataFrame:

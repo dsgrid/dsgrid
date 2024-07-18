@@ -325,8 +325,8 @@ class Project:
                 dataset = self.load_dataset(dataset_id)
                 with Timer(timer_stats_collector, "build_project_mapped_dataset"):
                     df = dataset.make_project_dataframe_from_query(context, self._config)
-                    write_dataframe_and_auto_partition(df, cached_dataset_path)
                     context.serialize_dataset_metadata_to_file(dataset.dataset_id, metadata_file)
+                    write_dataframe_and_auto_partition(df, cached_dataset_path)
         else:
             assert metadata_file.exists(), metadata_file
             context.set_dataset_metadata_from_file(dataset_id, metadata_file)

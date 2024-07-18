@@ -231,7 +231,7 @@ def test_submit_project_query(client):
         with ZipFile(fp.name) as zipf:
             names = {os.path.basename(x) for x in zipf.namelist()}
             assert "metadata.json" in names
-            assert "query.json" in names
+            assert "query.json5" in names
 
 
 def check_response(client, endpoint, data=None, expected_status_code=200):

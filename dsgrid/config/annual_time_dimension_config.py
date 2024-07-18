@@ -78,7 +78,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
     ):
-        # Currently, only map_annual_historical_time_to_date_time is supported.
+        # Currently, only map_annual_time_to_date_time is supported.
         raise NotImplementedError("AnnualTimeDimensionConfig.convert_dataframe")
 
     def get_frequency(self):
@@ -119,13 +119,13 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         return timestamps
 
 
-def map_annual_historical_time_to_date_time(
+def map_annual_time_to_date_time(
     df: DataFrame,
     annual_dim: AnnualTimeDimensionConfig,
     dt_dim: DateTimeDimensionConfig,
     value_columns: set[str],
 ) -> DataFrame:
-    """Map a DataFrame with an annual/historical time dimension to a DateTime time dimension."""
+    """Map a DataFrame with an annual time dimension to a DateTime time dimension."""
     annual_col = annual_dim.get_load_data_time_columns()[0]
     dt_df = dt_dim.build_time_dataframe()
     myear_column = DimensionType.MODEL_YEAR.value

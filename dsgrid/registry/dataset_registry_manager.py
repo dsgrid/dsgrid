@@ -8,7 +8,6 @@ from typing import Type, Union
 
 from prettytable import PrettyTable
 
-from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     ALLOWED_DATA_FILES,
@@ -17,10 +16,11 @@ from dsgrid.config.dataset_config import (
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dataset.models import TableFormatType, UnpivotedTableFormatModel
-from dsgrid.dimension.base_models import check_required_dimensions
+from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from dsgrid.utils.dataset import unpivot_dataframe
 from dsgrid.utils.spark import (
     read_dataframe,
     write_dataframe,
@@ -280,12 +280,11 @@ class DatasetRegistryManager(RegistryManagerBase):
                 if needs_unpivot and filename in ALLOWED_LOAD_DATA_FILENAMES:
                     assert pivoted_columns is not None
                     assert pivoted_dimension_type is not None
-                    ids = set(df.columns) - {VALUE_COLUMN, *pivoted_columns}
-                    df = df.unpivot(
-                        list(ids),
-                        pivoted_columns,
-                        pivoted_dimension_type.value,
-                        VALUE_COLUMN,
+                    time_columns = config.get_dimension(
+                        DimensionType.TIME
+                    ).get_load_data_time_columns()
+                    df = unpivot_dataframe(
+                        df, pivoted_columns, pivoted_dimension_type.value, time_columns
                     )
                 if dst.suffix == ".parquet":
                     # This function doesn't support CSV and JSON. Support could be added if

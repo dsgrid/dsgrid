@@ -7,7 +7,7 @@ from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
-    map_annual_historical_time_to_date_time,
+    map_annual_time_to_date_time,
 )
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 
@@ -421,15 +421,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if not isinstance(project_time_dim, DateTimeDimensionConfig):
                 msg = f"Annual time can only be mapped to DateTime: {project_time_dim.model.time_type}"
                 raise NotImplementedError(msg)
-            if self._config.model.dataset_type == InputDatasetType.HISTORICAL:
-                return map_annual_historical_time_to_date_time(
-                    load_data_df,
-                    time_dim,
-                    project_time_dim,
-                    value_columns,
-                )
-            msg = f"Cannot map AnnualTime for a dataset of type {self._config.model.dataset_type}"
-            raise NotImplementedError(msg)
+
+            return map_annual_time_to_date_time(
+                load_data_df,
+                time_dim,
+                project_time_dim,
+                value_columns,
+            )
 
         # In many cases we need to persist the current query before mapping time.
         # This has been true for DECARB industrial and transportation.

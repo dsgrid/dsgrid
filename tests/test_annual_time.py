@@ -5,7 +5,7 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     AnnualTimeDimensionModel,
-    map_annual_historical_time_to_date_time,
+    map_annual_time_to_date_time,
 )
 from dsgrid.config.date_time_dimension_config import (
     DateTimeDimensionConfig,
@@ -146,7 +146,7 @@ def test_map_annual_time_total_to_datetime(
 ):
     annual_time_dimension.model.measurement_type = MeasurementType.TOTAL
     value_columns = {"electricity_sales"}
-    df = map_annual_historical_time_to_date_time(
+    df = map_annual_time_to_date_time(
         annual_dataframe,
         annual_time_dimension,
         date_time_dimension,

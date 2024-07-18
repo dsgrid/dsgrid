@@ -217,4 +217,9 @@ def unpivot_dataframe(
     new_rows = df.filter(f"{VALUE_COLUMN} IS NULL").select(*cols).distinct()
     for col in time_columns:
         new_rows = new_rows.withColumn(col, F.lit(None))
-    return df.filter(f"{VALUE_COLUMN} IS NOT NULL").union(new_rows.select(*df.columns))
+
+    return (
+        df.filter(f"{VALUE_COLUMN} IS NOT NULL")
+        .union(new_rows.select(*df.columns))
+        .select(*ids, variable_column, VALUE_COLUMN)
+    )

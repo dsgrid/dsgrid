@@ -302,8 +302,8 @@ def test_repartition_if_needed_by_mapping_not_needed(tmp_path, caplog, dataframe
 def test_unpivot(pivoted_dataframe_with_time):
     df, time_columns, value_columns = pivoted_dataframe_with_time
     unpivoted = unpivot_dataframe(df, value_columns, "end_use", time_columns)
-    expected_columns = {*time_columns, "end_use", VALUE_COLUMN, "county"}
-    assert not expected_columns.difference(unpivoted.columns)
+    expected_columns = [*time_columns, "county", "end_use", VALUE_COLUMN]
+    assert unpivoted.columns == expected_columns
     null_data = unpivoted.filter("county = 'Boulder' and end_use = 'heating'").collect()
     assert len(null_data) == 1
     assert null_data[0].time_index is None

@@ -1,11 +1,12 @@
 import logging
 import os
+from typing import Iterable
 
 import pyspark
 from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
 
-from dsgrid.common import SCALING_FACTOR_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -198,3 +199,27 @@ def repartition_if_needed_by_mapping(
         logger.debug("Repartition is not needed for mapping_type %s", mapping_type)
 
     return df
+
+
+def unpivot_dataframe(
+    df: DataFrame, value_columns: Iterable[str], variable_column: str, time_columns: list[str]
+) -> DataFrame:
+    """Unpivot the dataframe, accounting for time columns."""
+    values = value_columns if isinstance(value_columns, set) else set(value_columns)
+    ids = [x for x in df.columns if x != VALUE_COLUMN and x not in values]
+    df = df.unpivot(
+        ids,
+        value_columns,
+        variable_column,
+        VALUE_COLUMN,
+    )
+    cols = set(df.columns).difference(time_columns)
+    new_rows = df.filter(f"{VALUE_COLUMN} IS NULL").select(*cols).distinct()
+    for col in time_columns:
+        new_rows = new_rows.withColumn(col, F.lit(None))
+
+    return (
+        df.filter(f"{VALUE_COLUMN} IS NOT NULL")
+        .union(new_rows.select(*df.columns))
+        .select(*ids, variable_column, VALUE_COLUMN)
+    )

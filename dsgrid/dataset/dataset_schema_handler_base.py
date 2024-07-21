@@ -178,16 +178,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
         for col in time_cols:
             load_data_df = load_data_df.filter(f"{col} is not null")
         tmp = load_data_df.groupBy(*time_cols).count()
-        count_col = "count" if "count" in tmp.columns else "count_star()"  # TODO duckdb
-        counts = tmp.select(count_col)
-        distinct_counts = counts.select(count_col).distinct().collect()
+        counts = tmp.select("count")
+        distinct_counts = counts.select("count").distinct().collect()
         if len(distinct_counts) != 1:
             raise DSGInvalidDataset(
                 "All time arrays must be repeated the same number of times: "
                 f"unique timestamp repeats = {len(distinct_counts)}"
             )
-        ta_counts = load_data_df.groupBy(*unique_array_cols).count().select(count_col)
-        distinct_ta_counts = ta_counts.select(count_col).distinct().collect()
+        ta_counts = load_data_df.groupBy(*unique_array_cols).count().select("count")
+        distinct_ta_counts = ta_counts.select("count").distinct().collect()
         if len(distinct_ta_counts) != 1:
             raise DSGInvalidDataset(
                 "All combinations of non-time dimensions must have the same time array length: "

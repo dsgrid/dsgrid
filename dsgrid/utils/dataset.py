@@ -32,9 +32,6 @@ def map_and_reduce_stacked_dimension(df, records, column, drop_column=True, to_c
         df = df.withColumn("fraction", F.lit(1.0))
     # map and consolidate from_fraction only
     records = records.filter("to_id IS NOT NULL")
-    # if use_duckdb() and df.relation.alias == records.relation.alias:
-    # records.relation = records.relation.set_alias("other")
-
     df = df.join(records, on=getattr(df, column) == records.from_id, how="inner").drop("from_id")
     if drop_column:
         df = df.drop(column)

@@ -423,10 +423,7 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
         set_current_time_zone(session_tz_orig)
         session_tz = get_current_time_zone()
 
-    # TODO duckdb: something is slightly off here.
     grouped_time_df = time_df.groupBy(["time_zone"] + time_cols).count()
-    if use_duckdb():
-        grouped_time_df = grouped_time_df.withColumnRenamed("count_star()", "count")
 
     raw_data_df2 = join_multiple_columns(
         raw_data,
@@ -513,8 +510,7 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     tempo_time = load_data.select(time_col).distinct().sort(time_col)
 
     # QC 1: each timestamp has the same number of occurences
-    count_column = "count_star()" if use_duckdb() else "count"
-    freq_count = load_data.groupBy(time_col).count().select(count_column).distinct().collect()
+    freq_count = load_data.groupBy(time_col).count().select("count").distinct().collect()
     assert len(freq_count) == 1, freq_count
 
     # QC 2: model_time == project_time == tempo_time

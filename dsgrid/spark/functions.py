@@ -96,17 +96,14 @@ def count_distinct_on_group_by(
 
 
 def create_temp_view(df: DataFrame) -> str:
+    """Create a temporary view with a random name and return the name."""
     view1 = make_temp_view_name()
-    view2 = make_temp_view_name()
     df.createOrReplaceTempView(view1)
-    get_spark_session().sql(f"CREATE TABLE {view2} AS SELECT * from {view1}")
-    return view2
-    # TODO duckdb: something is broken.
-    # Should be able to create a view with SQL or df.createOrReplaceTempView, but those get
-    # lost or corrupted. Refer to https://github.com/duckdb/duckdb/issues/12987
+    return view1
 
 
 def make_temp_view_name() -> str:
+    """Make a random name to be used as a view."""
     return f"{TEMP_TABLE_PREFIX}_{uuid4().hex}"
 
 

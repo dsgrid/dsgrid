@@ -6,7 +6,7 @@ from typing import Dict, List, Optional, Type
 
 import pandas as pd
 from pydantic import field_validator, model_validator, Field, ValidationInfo
-from pyspark.sql import DataFrame
+
 from typing_extensions import Annotated
 
 from dsgrid.config.dataset_config import DatasetConfig
@@ -31,11 +31,17 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     check_config_id_strict,
 )
+from dsgrid.spark.functions import (
+    is_dataframe_empty,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+)
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
-    get_unique_values,
     cross_join_dfs,
     create_dataframe_from_product,
+    get_unique_values,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
@@ -1305,7 +1311,7 @@ class ProjectConfig(ConfigBase):
         mapping_records = self.get_base_to_supplemental_mapping_records(
             dim.model.dimension_query_name
         ).filter(f"to_id == '{supplemental_id}'")
-        if mapping_records.rdd.isEmpty():
+        if is_dataframe_empty(mapping_records):
             raise DSGInvalidDimensionAssociation(
                 f"Did not find {dim.model.dimension_type} supplemental dimension with record ID "
                 f"{supplemental_id} while attempting to substitute the records with base records."

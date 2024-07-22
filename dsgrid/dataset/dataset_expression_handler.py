@@ -1,8 +1,8 @@
 import operator
 
-from pyspark.sql import DataFrame
-
 from dsgrid.exceptions import DSGInvalidOperation
+from dsgrid.spark.functions import join_multiple_columns
+from dsgrid.spark.types import DataFrame
 from dsgrid.utils.py_expression_eval import Parser
 
 
@@ -29,11 +29,11 @@ class DatasetExpressionHandler:
         other_df = other.df
         for column in self.value_columns:
             other_df = other_df.withColumnRenamed(column, renamed(column))
-        df = self.df.join(other_df, on=self.dimension_columns)
+        df = join_multiple_columns(self.df, other_df, self.dimension_columns)
 
         for column in self.value_columns:
             other_column = renamed(column)
-            df = df.withColumn(column, op(df[column], df[other_column]))
+            df = df.withColumn(column, op(getattr(df, column), getattr(df, other_column)))
 
         df = df.select(*self.df.columns)
         joined_count = df.count()

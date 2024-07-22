@@ -1,18 +1,11 @@
 import datetime
+import logging
 from zoneinfo import ZoneInfo
+
 import pandas as pd
 import pytest
-from pydantic import ValidationError
-import logging
-import pyspark.sql.functions as F
 import numpy as np
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    StringType,
-    IntegerType,
-    DoubleType,
-)
+from pydantic import ValidationError
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dimensions_config import DimensionsConfigModel
@@ -40,7 +33,20 @@ from dsgrid.dimension.time_utils import (
     build_index_time_map,
     get_time_ranges,
 )
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.spark.functions import (
+    shift_time_zone,
+)
+from dsgrid.spark.types import (
+    DoubleType,
+    F,
+    IntegerType,
+    StringType,
+    StructField,
+    StructType,
+)
+from dsgrid.utils.spark import (
+    get_spark_session,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -605,7 +611,7 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     table2 = create_adjustment_map_from_model_time(
         config, time_based_data_adjustment=time_based_data_adjustment, time_zone=time_zone
     )
-    joined_table = table1.selectExpr("time_index", "timestamp as model_time").join(
+    joined_table = table1.select("time_index", F.col("timestamp").alias("model_time")).join(
         table2, ["model_time"], "right"
     )
 
@@ -636,15 +642,11 @@ def test_data_adjustment_mapping_table(index_time_dimension_model):
     table2 = create_adjustment_map_from_model_time(
         config, time_based_data_adjustment=time_based_data_adjustment, time_zone=time_zone
     )
-    joined_table = table1.selectExpr("time_index", "timestamp as model_time").join(
+    joined_table = table1.select("time_index", F.col("timestamp").alias("model_time")).join(
         table2, ["model_time"], "right"
     )
-    joined_table = joined_table.withColumn(
-        "standard_time",
-        F.from_utc_timestamp(
-            F.to_utc_timestamp(F.col("timestamp"), TimeZone.MPT.tz_name),
-            time_zone.tz_name,
-        ),
+    joined_table = shift_time_zone(
+        joined_table, "timestamp", TimeZone.MPT.tz_name, time_zone.tz_name, "standard_time"
     )
 
     # check joined_table

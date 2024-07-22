@@ -1,8 +1,12 @@
 from functools import reduce
 from typing import Optional
 
-from pyspark.sql import DataFrame
+import pytest
 
+from dsgrid.spark.types import (
+    DataFrame,
+    use_duckdb,
+)
 from dsgrid.time.types import DayType
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
@@ -23,7 +27,7 @@ def test_try_read_dataframe_invalid(tmp_path):
 
 def test_try_read_dataframe_valid(tmp_path):
     spark = get_spark_session()
-    df = spark.createDataFrame([{"a": 1}])
+    df = spark.createDataFrame([(1,)], ["a"])
     filename = tmp_path / "table.parquet"
     df.write.parquet(str(filename))
     df = try_read_dataframe(filename)
@@ -31,6 +35,7 @@ def test_try_read_dataframe_valid(tmp_path):
     assert df.collect()[0].a == 1
 
 
+@pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB")
 def test_restart_spark():
     spark = get_spark_session()
     cur_partitions = spark.conf.get("spark.sql.shuffle.partitions")

@@ -3,14 +3,13 @@ import logging
 from enum import Enum
 from typing import Any, Union, Literal
 
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame
 from pydantic import field_validator, model_validator, Field
 from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidParameter
+from dsgrid.spark.types import DataFrame, F
 
 
 logger = logging.getLogger(__name__)

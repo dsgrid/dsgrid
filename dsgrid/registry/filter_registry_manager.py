@@ -2,6 +2,7 @@ import logging
 
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
+from dsgrid.spark.functions import is_dataframe_empty
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from .registry_manager import RegistryManager
 
@@ -97,7 +98,7 @@ class FilterRegistryManager(RegistryManager):
                     changed = True
 
             # TODO: probably need to remove a dimension mapping if it is empty
-            if records is not None and changed and not records.rdd.isEmpty():
+            if records is not None and changed and not is_dataframe_empty(records):
                 mapping.model.records = [x.asDict() for x in records.collect()]
                 self.dimension_mapping_manager.db.replace(mapping.model, check_rev=False)
                 logger.info(

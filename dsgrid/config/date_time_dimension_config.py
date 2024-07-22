@@ -1,14 +1,8 @@
 import logging
 
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    TimestampType,
-)
-import pyspark.sql.functions as F
-
 from dsgrid.dimension.time import DatetimeRange, DatetimeFormat
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
+from dsgrid.spark.types import F, StructType, StructField, TimestampType
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -41,6 +35,11 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         time_range = time_ranges[0]
         # TODO: need to support validation of multiple time ranges: DSGRID-173
 
+        # TODO duckdb: reading
+        # dsgrid-test-data/datasets/test_efs_comstock_unpivoted/load_data.parquet/**/*.parquet
+        # returns TimestampNTZType in duckdb
+        # All spark written dataframes may need to be rewritten with
+        # spark.conf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
         assert (
             load_data_df.schema[time_col].dataType == TimestampType()
         ), f"datetime {time_col} column must be TimestampType"

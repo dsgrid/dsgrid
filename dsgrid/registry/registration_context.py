@@ -1,6 +1,7 @@
 import logging
 
 from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.spark.functions import drop_temp_tables_and_views
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from .common import RegistryType
 from .registry_manager_base import RegistryManagerBase
@@ -116,6 +117,7 @@ class RegistrationContext:
 
         """
         try:
+            drop_temp_tables_and_views()
             for registry_type, manager_context in self._managers.items():
                 if manager_context is not None:
                     if manager_context.ids:

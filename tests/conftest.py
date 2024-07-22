@@ -8,10 +8,12 @@ from tempfile import gettempdir
 import pytest
 
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
+from dsgrid.spark.functions import get_current_time_zone, set_current_time_zone
+from dsgrid.spark.types import use_duckdb
 from dsgrid.utils.files import load_data
 from dsgrid.utils.run_command import run_command, check_run_command
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import init_spark, get_spark_session
+from dsgrid.utils.spark import init_spark
 from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
     TEST_PROJECT_PATH,
@@ -81,11 +83,11 @@ def _get_latest_commit():
     return commit
 
 
-@pytest.fixture
 def spark_session():
     spark = init_spark("dsgrid_test")
     yield spark
-    spark.stop()
+    if not use_duckdb():
+        spark.stop()
 
 
 @pytest.fixture(scope="module")
@@ -152,11 +154,10 @@ def tmp_registry_db(make_test_project_dir, tmp_path):
 
 @pytest.fixture
 def spark_time_zone(request):
-    spark = get_spark_session()
-    orig = spark.conf.get("spark.sql.session.timeZone")
-    spark.conf.set("spark.sql.session.timeZone", request.param)
+    orig = get_current_time_zone()
+    set_current_time_zone(request.param)
     yield
-    spark.conf.set("spark.sql.session.timeZone", orig)
+    set_current_time_zone(orig)
 
 
 @pytest.fixture

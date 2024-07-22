@@ -5,8 +5,6 @@ from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
 
-from pyspark.sql import DataFrame
-
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
@@ -17,13 +15,16 @@ from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
+from dsgrid.spark.functions import pivot
+from dsgrid.spark.types import DataFrame
 from dsgrid.utils.spark import (
     read_dataframe,
     try_read_dataframe,
+    write_dataframe,
     write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.files import load_data
+from dsgrid.utils.files import delete_if_exists, load_data
 from dsgrid.query.models import (
     ProjectQueryModel,
     CreateCompositeDatasetQueryModel,
@@ -220,7 +221,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     self.project.config.get_dimension
                 )
                 column = next(iter(column_names))
-                df = df.join(records.select("id"), on=df[column] == records["id"]).drop("id")
+                df = df.join(
+                    records.select("id"), on=getattr(df, column) == getattr(records, "id")
+                ).drop("id")
             else:
                 query_name = dim_filter.dimension_query_name
                 if query_name not in df.columns:
@@ -260,7 +263,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)
             else:
-                df.write.mode("overwrite").parquet(str(filename))
+                delete_if_exists(filename)
+                write_dataframe(df, filename, overwrite=True)
         else:
             raise NotImplementedError(f"Unsupported output_format={suffix}")
         self.query_filename(output_dir).write_text(context.model.serialize()[1])
@@ -308,14 +312,16 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         """
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
-            return self._run_query(
+            df, context = self._run_query(
                 scratch_dir_context,
                 model,
                 load_cached_table,
                 persist_intermediate_table=persist_intermediate_table,
                 zip_file=zip_file,
                 force=force,
-            )[0]
+            )
+            context.finalize()
+            return df
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
@@ -353,6 +359,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
                 force=force,
             )
             self._save_composite_dataset(context, df, not persist_intermediate_table)
+            context.finalize()
 
     @track_timing(timer_stats_collector)
     def submit(
@@ -373,6 +380,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             context = QueryContext(query, scratch_dir_context)
             df, context.metadata = self._read_dataset(query.dataset_id)
             self._process_aggregations_and_save(df, context, repartition=False)
+            context.finalize()
 
     def _load_composite_dataset_query(self, dataset_id):
         filename = self._composite_datasets_dir() / dataset_id / "query.json5"
@@ -398,5 +406,6 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
 
 def _pivot_table(df: DataFrame, context: QueryContext):
     pivoted_column = context.convert_to_pivoted()
-    ids = [x for x in df.columns if x not in {pivoted_column, VALUE_COLUMN}]
-    return df.groupBy(*ids).pivot(pivoted_column).sum(VALUE_COLUMN)
+    # ids = [x for x in df.columns if x not in {pivoted_column, VALUE_COLUMN}]
+    # return df.groupBy(*ids).pivot(pivoted_column).sum(VALUE_COLUMN)
+    return pivot(df, pivoted_column, VALUE_COLUMN)

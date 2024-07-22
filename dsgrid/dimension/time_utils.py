@@ -4,14 +4,6 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 import logging
 from typing import Optional
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    TimestampType,
-    DoubleType,
-    IntegerType,
-)
-import pyspark.sql.functions as F
 
 import pandas as pd
 
@@ -28,8 +20,22 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.config.dimensions import TimeRangeModel
 from dsgrid.exceptions import DSGInvalidOperation
+from dsgrid.spark.functions import (
+    interval,
+    prepare_timestamps_for_dataframe,
+)
+from dsgrid.spark.types import (
+    DoubleType,
+    IntegerType,
+    StructField,
+    StructType,
+    TimestampType,
+    use_duckdb,
+)
 from dsgrid.time.types import DatetimeTimestampType, IndexTimestampType
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import (
+    get_spark_session,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -320,6 +326,7 @@ def list_timestamps(
     time_dimension_config,  #: DateTimeDimensionConfig,
     timezone: TimeZone = None,
     time_based_data_adjustment: TimeBasedDataAdjustmentModel = None,
+    convert_to_utc: bool = False,
 ):
     timestamps = []
     for time_range in get_time_ranges(
@@ -327,7 +334,10 @@ def list_timestamps(
         timezone=timezone,
         time_based_data_adjustment=time_based_data_adjustment,
     ):
-        timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
+        for timestamp in time_range.list_time_range():
+            if convert_to_utc:
+                timestamp = timestamp.astimezone(ZoneInfo("UTC"))
+            timestamps.append(DatetimeTimestampType(timestamp))
     return timestamps
 
 
@@ -363,6 +373,7 @@ def build_index_time_map(
         time_dimension_config,
         timezone=timezone,
         time_based_data_adjustment=time_based_data_adjustment,
+        convert_to_utc=use_duckdb(),
     )
     ts_time_col = timestamps[0]._fields[0]
     schema = StructType(
@@ -491,6 +502,8 @@ def create_adjustment_map_from_model_time(
             StructField("multiplier", DoubleType(), False),
         ]
     )
+    model_time = prepare_timestamps_for_dataframe(model_time)
+    prevailing_time = prepare_timestamps_for_dataframe(prevailing_time)
     table = get_spark_session().createDataFrame(
         zip(model_time, prevailing_time, multipliers), schema=schema
     )
@@ -539,15 +552,9 @@ def shift_time_interval(
 
     match (from_time_interval, to_time_interval):
         case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
-            df = df.withColumn(
-                new_time_column,
-                F.col(time_column) + F.expr(f"INTERVAL {time_step.seconds} SECONDS"),
-            )
+            df = interval(df, time_column, "+", time_step.seconds, "SECONDS", new_time_column)
         case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
-            df = df.withColumn(
-                new_time_column,
-                F.col(time_column) - F.expr(f"INTERVAL {time_step.seconds} SECONDS"),
-            )
+            df = interval(df, time_column, "-", time_step.seconds, "SECONDS", new_time_column)
 
     return df
 
@@ -599,18 +606,15 @@ def apply_time_wrap(df, project_time_dim, diff: set):
         time_delta *= -1
 
     # time-wrap by "changing" the year with time_delta
-    df = (
-        df.filter(F.col(time_col).isin(diff))
-        .withColumn(
-            time_col,
-            F.from_unixtime(F.unix_timestamp(time_col) + time_delta).cast("timestamp"),
-        )
-        .union(df.filter(~F.col(time_col).isin(diff)))
-    )
+    diff2 = prepare_timestamps_for_dataframe(diff)
+    df1 = df.filter(getattr(df, time_col).isin(diff2))
+    df2 = interval(df1, time_col, "+", int(time_delta), "SECONDS", time_col)
+    df3 = df.filter(~(getattr(df, time_col).isin(diff2)))
+    df4 = df2.union(df3)
 
     dataset_time = {
         row[0]
-        for row in df.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
+        for row in df4.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
     }
     # check
     if dataset_time.symmetric_difference(project_time):
@@ -623,7 +627,7 @@ def apply_time_wrap(df, project_time_dim, diff: set):
             f"Dataset time cannot be processed to match project time. {left_msg}{right_msg}"
         )
 
-    return df
+    return df4
 
 
 def is_leap_year(year: int) -> bool:

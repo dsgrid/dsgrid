@@ -5,7 +5,6 @@ from typing import List, Optional, Dict, Literal, Union
 
 from pydantic import field_validator, model_validator, Field
 from typing_extensions import Annotated
-import pyspark.sql.functions as F
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
@@ -14,6 +13,10 @@ from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
+from dsgrid.spark.types import (
+    DataFrame,
+    F,
+)
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
@@ -687,7 +690,7 @@ class DatasetConfig(ConfigBase):
         """Return the format type of the table."""
         return TableFormatType(self._model.data_schema.table_format.format_type)
 
-    def add_trivial_dimensions(self, df):
+    def add_trivial_dimensions(self, df: DataFrame):
         """Add trivial 1-element dimensions to load_data_lookup."""
         for dim in self._dimensions.values():
             if dim.model.dimension_type in self.model.trivial_dimensions:

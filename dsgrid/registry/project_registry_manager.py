@@ -576,7 +576,10 @@ class ProjectRegistryManager(RegistryManagerBase):
             dim_type_to_ref = {
                 x.dimension_type: x for x in model.dimensions.base_dimension_references
             }
-            for dimension_type in (x for x in DimensionType if x != DimensionType.TIME):
+            # Metric is excluded because fuel_id and unit may not be the same for all records.
+            # Time doesn't have records.
+            exclude = {DimensionType.METRIC, DimensionType.TIME}
+            for dimension_type in (x for x in DimensionType if x not in exclude):
                 dim_ref = dim_type_to_ref[dimension_type]
                 dim_config = self._dimension_mgr.get_by_id(dim_ref.dimension_id)
                 dt_str = dimension_type.value

@@ -1,0 +1,30 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsModel
+
+Defines dataset dimension requirements.
+" alt="" coords="5,5,376,89"/>
+<area shape="rect" id="node2" title="dsgrid.config.project_config.RequiredDimensionsModel
+
+Defines required record IDs that must exist for each dimension in a dataset.
+Record IDs can reside in the project&#39;s base, subset, or supplemental dimensions. Using subset
+dimensions is recommended. dsgrid will substitute base records for mapped subset records
+at runtime. If no records are listed for a dimension then all project base records are
+required.
+" alt="" coords="520,63,965,147"/>
+<area shape="rect" id="node6" title="dsgrid.config.project_config.RequiredDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="1109,106,1533,330"/>
+<area shape="rect" id="node3" title="dsgrid.config.project_config.RequiredDimensionRecordsByTypeModel
+
+Base data model for all dsgrid data models
+" alt="" coords="1677,219,2179,331"/>
+<area shape="rect" id="node4" title="dsgrid.config.project_config.RequiredSubsetDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2351,224,2679,308"/>
+<area shape="rect" id="node5" title="dsgrid.config.project_config.RequiredSupplementalDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2323,356,2707,440"/>
+</map>

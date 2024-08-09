@@ -357,7 +357,6 @@ def test_remove_dataset(tmp_registry_db):
             "datasets",
             "remove",
             dataset_id,
-            "1.0.0",
         ],
     )
     assert result.exit_code == 0

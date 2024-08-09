@@ -5,7 +5,6 @@ import logging
 from datetime import datetime
 from zoneinfo import ZoneInfo
 from pathlib import Path
-from typing import Optional
 
 from semver import VersionInfo
 
@@ -416,7 +415,7 @@ class RegistryManagerBase(abc.ABC):
         return remote_path
 
     @abc.abstractmethod
-    def remove(self, config_id: str, version: Optional[str] = None):
+    def remove(self, config_id: str):
         """Remove an item from the registry.
 
         Parameters

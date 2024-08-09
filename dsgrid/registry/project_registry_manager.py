@@ -7,7 +7,7 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional, Type, Union
+from typing import Type, Union
 
 import json5
 import pandas as pd
@@ -1259,7 +1259,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._projects[new_key] = new_config
         return new_config
 
-    def remove(self, project_id: str, version: Optional[str] = None):
+    def remove(self, project_id: str):
         self.db.delete_all(project_id)
         for key in [x for x in self._projects if x.id == project_id]:
             self._projects.pop(key)

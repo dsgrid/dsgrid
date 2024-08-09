@@ -222,18 +222,16 @@ Dataset Commands
 
 @click.command(name="remove")
 @click.argument("dataset-id")
-@click.argument("version")
 @click.pass_obj
-def remove_dataset(registry_manager: RegistryManager, dataset_id: str, version: str):
+def remove_dataset(registry_manager: RegistryManager, dataset_id: str):
     """Remove a dataset from the dsgrid repository."""
-    registry_manager.dataset_manager.remove(dataset_id, version=version)
+    registry_manager.dataset_manager.remove(dataset_id)
     project_mgr = registry_manager.project_manager
     for project_id in project_mgr.list_ids():
         config = project_mgr.get_by_id(project_id)
         for dataset in config.iter_datasets():
             if (
                 dataset.dataset_id == dataset_id
-                and dataset.version == version
                 and dataset.status == DatasetRegistryStatus.REGISTERED
             ):
                 dataset.status = DatasetRegistryStatus.UNREGISTERED

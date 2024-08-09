@@ -2,7 +2,7 @@
 
 import getpass
 import logging
-from typing import Optional, Union
+from typing import Union
 
 from prettytable import PrettyTable
 
@@ -384,7 +384,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._dimensions[new_key] = get_dimension_config(model)
         return model
 
-    def remove(self, dimension_id, version: Optional[str] = None):
+    def remove(self, dimension_id):
         self.db.delete_all(dimension_id)
         for key in [x for x in self._dimensions if x.id == dimension_id]:
             self._dimensions.pop(key)

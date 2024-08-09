@@ -3,6 +3,7 @@
 import getpass
 import logging
 from collections import Counter
+from typing import Optional
 
 from prettytable import PrettyTable
 import pyspark.sql.functions as F
@@ -411,7 +412,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         return model
 
-    def remove(self, mapping_id):
+    def remove(self, mapping_id: str, version: Optional[str] = None):
         self.db.delete_all(mapping_id)
         for key in [x for x in self._mappings if x.id == mapping_id]:
             self._mappings.pop(key)

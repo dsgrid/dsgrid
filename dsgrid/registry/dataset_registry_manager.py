@@ -4,7 +4,7 @@ import getpass
 import logging
 import os
 from pathlib import Path
-from typing import Type, Union
+from typing import Optional, Type, Union
 
 from prettytable import PrettyTable
 
@@ -361,8 +361,8 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         return model
 
-    def remove(self, dataset_id: str):
-        config = self.get_by_id(dataset_id)
+    def remove(self, dataset_id: str, version: Optional[str] = None):
+        config = self.get_by_id(dataset_id, version=version)
         if self.fs_interface.exists(config.dataset_path):
             self.fs_interface.rm_tree(Path(config.dataset_path).parent)
         self.db.delete_all(dataset_id)

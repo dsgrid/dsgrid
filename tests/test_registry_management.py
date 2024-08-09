@@ -250,6 +250,73 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
     assert manager.project_manager.list_ids() == [project_id]
 
 
+def test_add_subset_dimensions(tmp_registry_db):
+    test_project_dir, tmp_path, db_name = tmp_registry_db
+    mgr = make_test_data_registry(
+        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
+    )
+    project_mgr = mgr.project_manager
+    project_id = project_mgr.list_ids()[0]
+    project = project_mgr.get_by_id(project_id)
+    subset_data_file = tmp_path / "data.csv"
+    subset_dimensions_data = """
+id,electricity_end_uses
+cooling,x
+fans,x
+    """
+    subset_dimensions_model = {
+        "subset_dimensions": [
+            {
+                "name": "End Uses by Fuel Type",
+                "display_name": "end_uses_by_fuel_type",
+                "description": "Provides selection of end uses by fuel type.",
+                "type": "metric",
+                "filename": str(subset_data_file),
+                "create_supplemental_dimension": True,
+                "selectors": [
+                    {
+                        "name": "electricity_end_uses",
+                        "description": "All Electric End Uses",
+                        "column_values": {"fuel_id": "electricity", "unit": "MWh"},
+                    },
+                ],
+            },
+        ],
+    }
+    model_file = tmp_path / "model.json5"
+    dump_data(subset_dimensions_model, model_file)
+    subset_data_file.write_text(subset_dimensions_data, encoding="utf-8")
+
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli,
+        [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "--database-name",
+            db_name,
+            "--offline",
+            "registry",
+            "projects",
+            "register-subset-dimensions",
+            project_id,
+            str(model_file),
+            "-l",
+            "test register-subset-dimensions",
+        ],
+    )
+    assert result.exit_code == 0
+    found_new_dimension = False
+    project = project_mgr.get_by_id(project_id)
+    for dim in project.list_supplemental_dimensions(DimensionType.METRIC):
+        if dim.model.name == "End Uses by Fuel Type":
+            found_new_dimension = True
+            break
+    assert found_new_dimension
+
+
 def test_add_supplemental_dimension(tmp_registry_db):
     test_project_dir, tmp_path, db_name = tmp_registry_db
     mgr = make_test_data_registry(

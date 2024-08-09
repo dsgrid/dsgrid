@@ -54,6 +54,7 @@ from dsgrid.config.project_config import (
     ProjectConfigModel,
     RequiredDimensionRecordsModel,
     SubsetDimensionGroupModel,
+    SubsetDimensionGroupListModel,
 )
 from dsgrid.project import Project
 from dsgrid.registry.common import (
@@ -287,16 +288,9 @@ class ProjectRegistryManager(RegistryManagerBase):
                 model.dimensions.base_dimension_references.append(ref)
             model.dimensions.base_dimensions.clear()
         if model.dimensions.subset_dimensions:
-            logger.info("Register subset dimensions")
-            self._register_from_subset_dimensions(
-                model.dimensions.subset_dimensions,
-                model.dimensions.base_dimension_references,
-                context,
-                submitter,
-                log_message,
-            )
-            self._register_supplemental_dimensions_from_subset_dimensions(
+            self._register_subset_dimensions(
                 model,
+                model.dimensions.subset_dimensions,
                 context,
                 submitter,
                 log_message,
@@ -412,8 +406,37 @@ class ProjectRegistryManager(RegistryManagerBase):
             self._dimension_mapping_mgr.make_dimension_mapping_references(mapping_ids)
         )
 
-    def _register_from_subset_dimensions(
-        self, subset_dimensions, base_dimension_references, context, submitter, log_message
+    def _register_subset_dimensions(
+        self,
+        model: ProjectConfigModel,
+        subset_dimensions: list[SubsetDimensionGroupModel],
+        context: RegistrationContext,
+        submitter: str,
+        log_message: str,
+    ):
+        logger.info("Register subset dimensions")
+        self._register_dimensions_from_subset_dimension_groups(
+            subset_dimensions,
+            model.dimensions.base_dimension_references,
+            context,
+            submitter,
+            log_message,
+        )
+        self._register_supplemental_dimensions_from_subset_dimensions(
+            model,
+            subset_dimensions,
+            context,
+            submitter,
+            log_message,
+        )
+
+    def _register_dimensions_from_subset_dimension_groups(
+        self,
+        subset_dimensions: list[SubsetDimensionGroupModel],
+        base_dimension_references: list[DimensionReferenceModel],
+        context: RegistrationContext,
+        submitter: str,
+        log_message: str,
     ):
         """Registers a dimension for each subset specified in the project config's subset
         dimension groups. Appends references to those dimensions to subset_dimensions, which is
@@ -491,7 +514,12 @@ class ProjectRegistryManager(RegistryManagerBase):
             raise DSGInvalidParameter(msg)
 
     def _register_supplemental_dimensions_from_subset_dimensions(
-        self, model, context, submitter, log_message
+        self,
+        model: ProjectConfigModel,
+        subset_dimensions: list[SubsetDimensionGroupModel],
+        context: RegistrationContext,
+        submitter: str,
+        log_message: str,
     ):
         """Registers a supplemental dimension for each subset specified in the project config's
         subset dimension groups. Also registers a mapping from the base dimension to each new
@@ -501,7 +529,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         with TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
             dimensions = []
-            for subset_dimension_group in model.dimensions.subset_dimensions:
+            for subset_dimension_group in subset_dimensions:
                 if not subset_dimension_group.create_supplemental_dimension:
                     continue
                 dimension_type = subset_dimension_group.dimension_type
@@ -767,6 +795,33 @@ class ProjectRegistryManager(RegistryManagerBase):
         finally:
             if need_to_finalize:
                 context.finalize(error_occurred)
+
+    def register_subset_dimensions(
+        self,
+        project_id: str,
+        filename: Path,
+        submitter: str,
+        log_message: str,
+    ):
+        """Register new subset dimensions."""
+        config = self.get_by_id(project_id)
+        subset_model = SubsetDimensionGroupListModel.from_file(filename)
+        context = RegistrationContext()
+        error_occurred = False
+        try:
+            self._register_subset_dimensions(
+                config.model,
+                subset_model.subset_dimensions,
+                context,
+                submitter,
+                log_message,
+            )
+            self._update_config(config, submitter, VersionUpdateType.PATCH, log_message)
+        except Exception:
+            error_occurred = True
+            raise
+        finally:
+            context.finalize(error_occurred)
 
     def register_supplemental_dimensions(
         self,

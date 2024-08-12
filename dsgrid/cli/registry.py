@@ -2,8 +2,10 @@
 
 import getpass
 import logging
+import shutil
 import sys
 from pathlib import Path
+from typing import Optional
 
 import rich_click as click
 from semver import VersionInfo
@@ -11,9 +13,17 @@ from semver import VersionInfo
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.registry.common import VersionUpdateType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.id_remappings import (
+    map_dimension_ids_to_names,
+    map_dimension_names_to_ids,
+    map_dimension_mapping_names_to_ids,
+    replace_dimension_mapping_names_with_current_ids,
+    replace_dimension_names_with_current_ids,
+)
 from dsgrid.utils.filters import ACCEPTED_OPS
 
 
@@ -1253,6 +1263,149 @@ def update_dataset(
 
 
 @click.command()
+@click.argument("registration_file", type=click.Path(exists=True))
+@click.option(
+    "-d",
+    "--base-data-dir",
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="Base directory for input data. If set, and if the dataset paths are relative, prepend "
+    "them with this path.",
+)
+@click.option(
+    "-r",
+    "--base-repo-dir",
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="Base directory for dsgrid project/dataset repository. If set, and if the config file "
+    "paths are relative, prepend them with this path.",
+)
+@click.pass_obj
+@click.pass_context
+def bulk_register(
+    ctx,
+    registry_manager: RegistryManager,
+    registration_file: Path,
+    base_data_dir: Optional[Path],
+    base_repo_dir: Optional[Path],
+):
+    """Bulk register projects, datasets, and their dimensions. The JSON/JSON5 filename must
+    match the data model defined by this documentation:
+
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.registration_models.RegistrationModel"""
+    registration = RegistrationModel.from_file(registration_file)
+    tmp_files = []
+    try:
+        res = handle_dsgrid_exception(
+            ctx,
+            _run_bulk_registration,
+            registry_manager,
+            registration,
+            tmp_files,
+            base_data_dir,
+            base_repo_dir,
+        )
+        if res[1] != 0:
+            return 1
+    finally:
+        for path in tmp_files:
+            path.unlink()
+
+
+def _run_bulk_registration(
+    mgr: RegistryManager,
+    registration: RegistrationModel,
+    tmp_files: list[Path],
+    base_data_dir: Optional[Path],
+    base_repo_dir: Optional[Path],
+):
+    user = getpass.getuser()
+    log_message = "Initial registration"
+    project_mgr = mgr.project_manager
+    dataset_mgr = mgr.dataset_manager
+    dim_mgr = mgr.dimension_manager
+    dim_mapping_mgr = mgr.dimension_mapping_manager
+
+    if base_data_dir is not None:
+        for project in registration.projects:
+            for dataset in project.datasets:
+                if not dataset.dataset_path.is_absolute():
+                    dataset.dataset_path = base_data_dir / dataset.dataset_path
+    if base_repo_dir is not None:
+        for project in registration.projects:
+            if not project.config_file.is_absolute():
+                project.config_file = base_repo_dir / project.config_file
+            for dataset in project.datasets:
+                if not dataset.config_file.is_absolute():
+                    dataset.config_file = base_repo_dir / dataset.config_file
+                if not dataset.dimension_mapping_file.is_absolute():
+                    dataset.dimension_mapping_file = base_repo_dir / dataset.dimension_mapping_file
+    for project in registration.projects:
+        if project.register_project:
+            project_mgr.register(project.config_file, user, log_message)
+
+        for dataset in project.datasets:
+            refs_file = None
+            config_file = None
+            if dataset.register_dataset:
+                if dataset.replace_dimension_names_with_ids:
+                    mappings = map_dimension_names_to_ids(dim_mgr)
+                    orig = dataset.config_file
+                    config_file = orig.with_stem(orig.name + "__tmp")
+                    shutil.copyfile(orig, config_file)
+                    tmp_files.append(config_file)
+                    replace_dimension_names_with_current_ids(config_file, mappings)
+                else:
+                    config_file = dataset.config_file
+
+            assert config_file is not None
+            if dataset.submit_to_project:
+                if (
+                    dataset.replace_dimension_mapping_names_with_ids
+                    and dataset.dimension_mapping_references_file is not None
+                ):
+                    dim_id_to_name = map_dimension_ids_to_names(mgr.dimension_manager)
+                    mappings = map_dimension_mapping_names_to_ids(dim_mapping_mgr, dim_id_to_name)
+                    orig = dataset.dimension_mapping_references_file
+                    refs_file = orig.with_stem(orig.name + "__tmp")
+                    shutil.copyfile(orig, refs_file)
+                    tmp_files.append(refs_file)
+                    replace_dimension_mapping_names_with_current_ids(refs_file, mappings)
+                else:
+                    refs_file = dataset.dimension_mapping_references_file
+
+            if dataset.register_dataset and dataset.submit_to_project:
+                # If something fails in the submit stage, dsgrid will delete the dataset.
+                project_mgr.register_and_submit_dataset(
+                    config_file,
+                    dataset.dataset_path,
+                    project.project_id,
+                    user,
+                    log_message,
+                    dimension_mapping_file=dataset.dimension_mapping_file,
+                    dimension_mapping_references_file=refs_file,
+                    autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
+                )
+            elif dataset.register_dataset:
+                dataset_mgr.register(
+                    config_file,
+                    dataset.dataset_path,
+                    user,
+                    log_message,
+                )
+            elif dataset.submit_to_project:
+                project_mgr.submit_dataset(
+                    project.project_id,
+                    dataset.dataset_id,
+                    user,
+                    log_message,
+                    dimension_mapping_file=dataset.dimension_mapping_file,
+                    dimension_mapping_references_file=refs_file,
+                    autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
+                )
+
+
+@click.command()
 @click.pass_obj
 @click.pass_context
 @click.option(
@@ -1305,4 +1458,5 @@ registry.add_command(dimensions)
 registry.add_command(dimension_mappings)
 registry.add_command(projects)
 registry.add_command(datasets)
+registry.add_command(bulk_register)
 registry.add_command(data_sync)

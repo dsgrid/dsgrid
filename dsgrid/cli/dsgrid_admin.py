@@ -154,16 +154,21 @@ Registry Commands
     help="local dsgrid registry data path.",
 )
 @click.option(
-    "-f", "--force", is_flag=True, default=False, help="Delete registry_path if it already exists."
+    "-f",
+    "--overwrite",
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Delete registry_path and the database if they already exist.",
 )
 @click.pass_context
-def create_registry(ctx, db_name, data_path, force):
+def create_registry(ctx, db_name, data_path, overwrite):
     """Create a new registry."""
     if data_path.exists():
-        if force:
+        if overwrite:
             shutil.rmtree(data_path)
         else:
-            print(f"{data_path} already exists. Set --force to overwrite.", file=sys.stderr)
+            print(f"{data_path} already exists. Set --overwrite to overwrite.", file=sys.stderr)
             sys.exit(1)
 
     conn = DatabaseConnection.from_url(
@@ -172,7 +177,7 @@ def create_registry(ctx, db_name, data_path, force):
         username=get_value_from_context(ctx, "username"),
         password=get_value_from_context(ctx, "password"),
     )
-    RegistryManager.create(conn, data_path)
+    RegistryManager.create(conn, data_path, overwrite=overwrite)
     logger.info("Created registry at %s with %s", conn.url, conn.database)
 
 

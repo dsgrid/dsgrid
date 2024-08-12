@@ -9,7 +9,7 @@ import pyspark.sql.functions as F
 from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 import pytest
 from click.testing import CliRunner
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, DataFrame
 
 from dsgrid.common import DEFAULT_DB_PASSWORD, VALUE_COLUMN
 from dsgrid.cli.dsgrid import cli
@@ -52,6 +52,7 @@ from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import TEST_PROJECT_PATH
 from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
+from dsgrid.utils.spark import get_spark_session
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
@@ -161,6 +162,10 @@ def test_total_electricity_use_by_state_and_pca(column_inputs):
     else:
         with pytest.raises(ValueError):
             run_query_test(QueryTestElectricityUseByStateAndPCA, column_type, columns)
+
+
+def test_annual_electricity_by_state():
+    run_query_test(QueryTestAnnualElectricityUseByState)
 
 
 def test_diurnal_electricity_use_by_county_chained(la_expected_electricity_hour_16):
@@ -1105,6 +1110,68 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
         return True
 
 
+class QueryTestAnnualElectricityUseByState(QueryTestBase):
+    NAME = "annual_electricity_use_by_state"
+
+    def make_query(self):
+        self._model = ProjectQueryModel(
+            name=self.NAME,
+            project=ProjectQueryParamsModel(
+                project_id=self.get_project_id(),
+                include_dsgrid_dataset_components=False,
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
+                        StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
+                        StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
+                    ],
+                ),
+            ),
+            result=QueryResultParamsModel(
+                aggregations=[
+                    AggregationModel(
+                        dimensions=DimensionQueryNamesModel(
+                            geography=["state"],
+                            metric=["end_uses_by_fuel_type"],
+                            model_year=["model_year"],
+                            scenario=["scenario"],
+                            sector=["sector"],
+                            subsector=["subsector"],
+                            time=[
+                                ColumnModel(
+                                    dimension_query_name="time_est", function="year", alias="year"
+                                )
+                            ],
+                            weather_year=["weather_2012"],
+                        ),
+                        aggregation_function="sum",
+                    ),
+                ],
+                sort_columns=["state"],
+                output_format="csv",
+                table_format=UnpivotedTableFormatModel(),
+            ),
+        )
+        return self._model
+
+    def validate(self, expected_values):
+        filename = self.output_dir / self.name / "table.csv"
+        spark = get_spark_session()
+        df = spark.read.csv(str(filename), header=True, inferSchema=True)
+        years = df.select("year").distinct().collect()
+        assert len(years) == 1
+        assert years[0].year == 2012
+        validate_electricity_use_by_state(
+            "sum",
+            df.groupBy("state", "end_uses_by_fuel_type", "year").agg(
+                F.sum(VALUE_COLUMN).alias(VALUE_COLUMN)
+            ),
+            self.get_raw_stats(),
+            "comstock_resstock",
+        )
+        return True
+
+
 class QueryTestPeakLoadByStateSubsector(QueryTestBase):
     NAME = "peak-load-by-state-subsector"
 
@@ -1486,9 +1553,12 @@ def validate_electricity_use_by_county(
         assert math.isclose(actual, expected)
 
 
-def validate_electricity_use_by_state(op, results_path, raw_stats, datasets):
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    results = spark.read.parquet(str(results_path))
+def validate_electricity_use_by_state(op, results_path: DataFrame | Path, raw_stats, datasets):
+    if isinstance(results_path, DataFrame):
+        results = results_path
+    else:
+        spark = SparkSession.builder.appName("dgrid").getOrCreate()
+        results = spark.read.parquet(str(results_path))
     if op == "sum":
         exp_ca = get_expected_ca_sum_electricity(raw_stats, datasets)
         exp_ny = get_expected_ny_sum_electricity(raw_stats, datasets)
@@ -1496,6 +1566,7 @@ def validate_electricity_use_by_state(op, results_path, raw_stats, datasets):
         assert op == "max", op
         exp_ca = get_expected_ca_max_electricity(raw_stats, datasets)
         exp_ny = get_expected_ny_max_electricity(raw_stats, datasets)
+
     col = "end_uses_by_fuel_type"
     actual_ca = results.filter(f"state == 'CA' and {col} == 'electricity_end_uses'").collect()[0][
         VALUE_COLUMN

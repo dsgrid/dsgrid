@@ -7,7 +7,7 @@ from pyspark.sql.types import (
 )
 import pyspark.sql.functions as F
 
-from dsgrid.dimension.time import DatetimeRange, DatetimeFormat
+from dsgrid.dimension.time import DatetimeRange, DatetimeFormat, TimeZone
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -185,13 +185,19 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_load_data_time_columns(self):
         return list(DatetimeTimestampType._fields)
 
-    def get_tzinfo(self):
+    def get_time_zone(self) -> TimeZone | None:
         if self.model.datetime_format.format_type == DatetimeFormat.ALIGNED:
-            return self.model.datetime_format.timezone.tz
+            return self.model.datetime_format.timezone
         if self.model.datetime_format.format_type in [DatetimeFormat.LOCAL_AS_STRINGS]:
             return None
-        msg = f"Undefined tzinfo for {self.model.datetime_format.format_type=}"
+        msg = f"Undefined time zone for {self.model.datetime_format.format_type=}"
         raise NotImplementedError(msg)
+
+    def get_tzinfo(self):
+        time_zone = self.get_time_zone()
+        if time_zone is None:
+            return None
+        return time_zone.tz
 
     def get_time_interval_type(self):
         return self.model.time_interval_type

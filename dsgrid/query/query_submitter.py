@@ -11,13 +11,15 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
-from dsgrid.dimension.base_models import DimensionCategory
+from dsgrid.dimension.base_models import DimensionCategory, DimensionType
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
 from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
+from dsgrid.project import Project
 from dsgrid.utils.spark import (
+    custom_spark_conf,
     read_dataframe,
     try_read_dataframe,
     write_dataframe_and_auto_partition,
@@ -107,7 +109,7 @@ class QuerySubmitterBase:
 
 
 class ProjectBasedQuerySubmitter(QuerySubmitterBase):
-    def __init__(self, project, *args, **kwargs):
+    def __init__(self, project: Project, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._project = project
 
@@ -306,16 +308,23 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         DSGInvalidQuery
             Raised if the query is invalid
         """
+        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
-            return self._run_query(
-                scratch_dir_context,
-                model,
-                load_cached_table,
-                persist_intermediate_table=persist_intermediate_table,
-                zip_file=zip_file,
-                force=force,
-            )[0]
+            # Ensure that queries that aggregate time reflect the project's time zone instead
+            # of the local computer.
+            # If any other settings get customized here, handle them in restart_spark()
+            # as well. This change won't persist Spark session restarts.
+            conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
+            with custom_spark_conf(conf):
+                return self._run_query(
+                    scratch_dir_context,
+                    model,
+                    load_cached_table,
+                    persist_intermediate_table=persist_intermediate_table,
+                    zip_file=zip_file,
+                    force=force,
+                )[0]
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
@@ -343,16 +352,21 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             If True, overwrite any existing output directory.
 
         """
+        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
-            df, context = self._run_query(
-                scratch_dir_context,
-                model,
-                load_cached_table,
-                persist_intermediate_table,
-                force=force,
-            )
-            self._save_composite_dataset(context, df, not persist_intermediate_table)
+            # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
+            # you add a new customization.
+            conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
+            with custom_spark_conf(conf):
+                df, context = self._run_query(
+                    scratch_dir_context,
+                    model,
+                    load_cached_table,
+                    persist_intermediate_table,
+                    force=force,
+                )
+                self._save_composite_dataset(context, df, not persist_intermediate_table)
 
     @track_timing(timer_stats_collector)
     def submit(
@@ -367,12 +381,17 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         query : CompositeDatasetQueryModel
         scratch_dir : Optional[Path]
         """
+        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
         scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         # orig_query = self._load_composite_dataset_query(query.dataset_id)
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             context = QueryContext(query, scratch_dir_context)
             df, context.metadata = self._read_dataset(query.dataset_id)
-            self._process_aggregations_and_save(df, context, repartition=False)
+            # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
+            # you add a new customization.
+            conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
+            with custom_spark_conf(conf):
+                self._process_aggregations_and_save(df, context, repartition=False)
 
     def _load_composite_dataset_query(self, dataset_id):
         filename = self._composite_datasets_dir() / dataset_id / "query.json5"

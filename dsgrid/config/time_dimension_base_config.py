@@ -157,6 +157,10 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
 
     @abc.abstractmethod
+    def get_time_zone(self) -> TimeZone | None:
+        """Return a TimeZone instance for this dimension."""
+
+    @abc.abstractmethod
     def get_tzinfo(self):
         """Return a tzinfo instance for this dimension.
 

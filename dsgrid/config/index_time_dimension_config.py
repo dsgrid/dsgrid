@@ -205,6 +205,9 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_load_data_time_columns(self):
         return list(IndexTimestampType._fields)
 
+    def get_time_zone(self) -> None:
+        return None
+
     def get_tzinfo(self):
         return None
 

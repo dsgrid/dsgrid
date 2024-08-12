@@ -407,7 +407,7 @@ Create and populate the registry.
 $ dsgrid-admin create-registry --data-path=tests/data/registry cached-test-dsgrid
 ```
 ```
-dsgrid registry bulk-register tests/data/test_efs_registration.json
+$ dsgrid registry bulk-register tests/data/test_efs_registration.json
 ```
 
 Now you can run any `dsgrid registry` command.

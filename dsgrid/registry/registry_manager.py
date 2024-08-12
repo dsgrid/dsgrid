@@ -168,7 +168,7 @@ class RegistryManager:
         conn: DatabaseConnection,
         remote_path=REMOTE_REGISTRY,
         use_remote_data=None,
-        offline_mode=False,
+        offline_mode=True,
         user=None,
         no_prompts=False,
         scratch_dir=None,

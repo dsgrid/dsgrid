@@ -3,7 +3,7 @@ import pytest
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.registry.registry_database import RegistryDatabase, DatabaseConnection
 from dsgrid.utils.files import load_data, dump_data
-from dsgrid.tests.common import (
+from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )

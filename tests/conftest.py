@@ -6,10 +6,13 @@ from pathlib import Path
 from tempfile import gettempdir
 
 import pytest
+from click.testing import CliRunner
 
+from dsgrid.cli.dsgrid import cli as cli
+from dsgrid.cli.dsgrid_admin import cli as cli_admin
+from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
-from dsgrid.utils.files import load_data
-from dsgrid.utils.run_command import run_command, check_run_command
+from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import init_spark, get_spark_session
 from dsgrid.tests.common import (
@@ -42,13 +45,9 @@ def pytest_sessionstart(session):
 @pytest.fixture(scope="session")
 def cached_registry():
     """Creates a shared registry that is is only rebuilt after a new commit."""
-    data = load_data(TEST_EFS_REGISTRATION_FILE)
-    assert data["data_path"] == str(TEST_REGISTRY_PATH)
-    conn = DatabaseConnection(**data["conn"])
-    assert conn.database == TEST_REGISTRY_DATABASE
     commit_file = TEST_REGISTRY_PATH / "commit.txt"
     latest_commit = _get_latest_commit()
-
+    conn = DatabaseConnection(database=TEST_REGISTRY_DATABASE, password=DEFAULT_DB_PASSWORD)
     if (
         TEST_REGISTRY_PATH.exists()
         and commit_file.exists()
@@ -58,12 +57,42 @@ def cached_registry():
     else:
         if TEST_REGISTRY_PATH.exists():
             shutil.rmtree(TEST_REGISTRY_PATH)
-        ret = run_command(f"python dsgrid/tests/register.py {TEST_EFS_REGISTRATION_FILE}")
-        if ret == 0:
-            print("make script returned 0")
+        runner = CliRunner(mix_stderr=False)
+        result = runner.invoke(
+            cli_admin,
+            [
+                "--username",
+                "root",
+                "--password",
+                conn.password,
+                "--offline",
+                "create-registry",
+                conn.database,
+                "--data-path",
+                str(TEST_REGISTRY_PATH),
+                "--overwrite",
+            ],
+        )
+        assert result.exit_code == 0
+        result = runner.invoke(
+            cli,
+            [
+                "--username",
+                "root",
+                "--password",
+                conn.password,
+                "--database-name",
+                conn.database,
+                "--offline",
+                "registry",
+                "bulk-register",
+                str(TEST_EFS_REGISTRATION_FILE),
+            ],
+        )
+        if result.exit_code == 0:
             commit_file.write_text(latest_commit + "\n")
         elif TEST_REGISTRY_PATH.exists():
-            print("make script returned non-zero:", ret)
+            print("make script returned non-zero:", result.exit_code)
             # Delete it because it is invalid.
             shutil.rmtree(TEST_REGISTRY_PATH)
             RegistryDatabase.delete(conn)

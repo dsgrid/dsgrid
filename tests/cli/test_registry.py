@@ -8,10 +8,10 @@ from dsgrid.cli.dsgrid import cli
 from dsgrid.cli.dsgrid_admin import cli as admin_cli
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.tests.common import TEST_DATASET_DIRECTORY
 from dsgrid.utils.files import load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.tests.common import TEST_DATASET_DIRECTORY
-from dsgrid.tests.common import (
+from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )

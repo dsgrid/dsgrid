@@ -14,13 +14,13 @@ from dsgrid.tests.common import (
     create_local_test_registry,
     TEST_DATASET_DIRECTORY,
     TEST_REMOTE_REGISTRY,
+    TEST_PROJECT_REPO,
 )
 from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.utils.files import load_data
-from dsgrid.tests.common import (
+from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
-    TEST_PROJECT_REPO,
 )
 
 

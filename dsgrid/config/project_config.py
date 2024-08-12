@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Type
 
 import pandas as pd
-from pydantic import field_validator, model_validator, Field, ValidationInfo
+from pydantic import conlist, field_validator, model_validator, Field, ValidationInfo
 from pyspark.sql import DataFrame
 from typing_extensions import Annotated
 
@@ -205,6 +205,15 @@ class SubsetDimensionGroupModel(DSGBaseModel):
 
         self.filename = None
         return self
+
+
+class SubsetDimensionGroupListModel(DSGBaseModel):
+    """Defines a list of subset dimensions."""
+
+    subset_dimensions: Annotated[
+        conlist(SubsetDimensionGroupModel, min_length=1),
+        Field(description="List of subset dimensions to be registered"),
+    ]
 
 
 class DimensionsModel(DSGBaseModel):

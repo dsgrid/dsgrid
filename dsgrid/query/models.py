@@ -486,6 +486,18 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
             default=[],
         ),
     ]
+    aggregate_each_dataset: Annotated[
+        bool,
+        Field(
+            description="Aggregate each dataset before applying the expression to create one "
+            "overall dataset. The default behavior is to perform one aggregation on the overall "
+            "dataset. This parameter must be set to True for queries that will be adding or "
+            "subtracting datasets with different dimensionality. Warning: setting this value to "
+            "True could produce rows with duplicate dimension combinations when performing a "
+            "union of datasets while also dropping one or more dimensions.",
+            default=False,
+        ),
+    ]
     reports: Annotated[
         list[ReportInputModel],
         Field(description="Run these pre-defined reports on the result.", default=[]),

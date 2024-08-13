@@ -8,6 +8,7 @@ from zipfile import ZipFile
 from pyspark.sql import DataFrame
 
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
@@ -22,12 +23,14 @@ from dsgrid.utils.spark import (
     custom_spark_conf,
     read_dataframe,
     try_read_dataframe,
+    write_dataframe,
     write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.files import load_data
 from dsgrid.query.models import (
     ProjectQueryModel,
+    ColumnType,
     CreateCompositeDatasetQueryModel,
     CompositeDatasetQueryModel,
     DatasetMetadataModel,
@@ -60,9 +63,11 @@ class QuerySubmitterBase:
         return self._output_dir / "composite_datasets"
 
     def _cached_tables_dir(self):
+        """Directory for intermediate tables made up of multiple project-mapped datasets."""
         return self._output_dir / "cached_tables"
 
     def _cached_project_mapped_datasets_dir(self):
+        """Directory for intermediate project-mapped datasets."""
         return self._output_dir / "cached_project_mapped_datasets"
 
     @staticmethod
@@ -168,22 +173,29 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if load_cached_table:
             df, metadata = self._try_read_cache(context)
         if df is None:
-            df = self._project.process_query(context, self._cached_project_mapped_datasets_dir())
+            df_filenames = self._project.process_query(
+                context, self._cached_project_mapped_datasets_dir()
+            )
+            df = self._postprocess_datasets(context, scratch_dir_context, df_filenames)
             is_cached = False
         else:
             context.metadata = metadata
             is_cached = True
 
-        if persist_intermediate_table and not is_cached:
+        if (
+            persist_intermediate_table
+            and not is_cached
+            and not context.model.result.aggregate_each_dataset
+        ):
             df = self._persist_intermediate_result(context, df)
 
-        if context.model.result.dimension_filters:
-            df = self._apply_filters(df, context)
+        if not context.model.result.aggregate_each_dataset:
+            if context.model.result.dimension_filters:
+                df = self._apply_filters(df, context)
+            df = self._process_aggregations(df, context)
 
         repartition = not persist_intermediate_table
-        table_filename = self._process_aggregations_and_save(
-            df, context, repartition, zip_file=zip_file
-        )
+        table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
 
         for report_inputs in context.model.result.reports:
             report = make_report(report_inputs.report_type)
@@ -192,10 +204,62 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
         return df, context
 
-    def _process_aggregations_and_save(
-        self, df: DataFrame, context: QueryContext, repartition: bool, zip_file: bool = False
-    ) -> Path:
-        handler = make_table_format_handler(TableFormatType.UNPIVOTED, self._project.config)
+    def _postprocess_datasets(
+        self,
+        context: QueryContext,
+        scratch_dir_context: ScratchDirContext,
+        df_filenames: dict[str, Path],
+    ) -> DataFrame:
+        if context.model.result.aggregate_each_dataset:
+            for dataset_id, path in df_filenames.items():
+                df = read_dataframe(path)
+                if context.model.result.dimension_filters:
+                    df = self._apply_filters(df, context)
+                df = self._process_aggregations(df, context, dataset_id=dataset_id)
+                path = scratch_dir_context.get_temp_filename(suffix=".parquet")
+                write_dataframe(df, path)
+                df_filenames[dataset_id] = path
+
+        # All dataset columns need to be in the same order.
+        context.consolidate_dataset_metadata()
+        datasets = self._convert_datasets(context, df_filenames)
+        return evaluate_expression(context.model.project.dataset.expression, datasets).df
+
+    def _convert_datasets(self, context: QueryContext, filenames: dict[str, Path]):
+        dim_columns, time_columns = self._get_dimension_columns(context)
+        expected_columns = time_columns + dim_columns
+        expected_columns.append(VALUE_COLUMN)
+
+        datasets = {}
+        for dataset_id, path in filenames.items():
+            df = read_dataframe(path)
+            unexpected = sorted(set(df.columns).difference(expected_columns))
+            if unexpected:
+                raise Exception(f"Unexpected columns are present in {dataset_id=} {unexpected=}")
+            datasets[dataset_id] = DatasetExpressionHandler(
+                df.select(*expected_columns), time_columns + dim_columns, [VALUE_COLUMN]
+            )
+        return datasets
+
+    def _get_dimension_columns(self, context: QueryContext) -> tuple[list[str], list[str]]:
+        match context.model.result.column_type:
+            case ColumnType.DIMENSION_QUERY_NAMES:
+                dim_columns = context.get_all_dimension_column_names(exclude={DimensionType.TIME})
+                time_columns = context.get_dimension_column_names(DimensionType.TIME)
+            case ColumnType.DIMENSION_TYPES:
+                dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
+                time_columns = context.get_dimension_column_names(DimensionType.TIME)
+            case _:
+                raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
+
+        return sorted(dim_columns), sorted(time_columns)
+
+    def _process_aggregations(
+        self, df: DataFrame, context: QueryContext, dataset_id: Optional[str] = None
+    ) -> DataFrame:
+        handler = make_table_format_handler(
+            TableFormatType.UNPIVOTED, self._project.config, dataset_id=dataset_id
+        )
         df = handler.process_aggregations(df, context.model.result.aggregations, context)
 
         if context.model.result.replace_ids_with_names:
@@ -206,6 +270,13 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
         if isinstance(context.model.result.table_format, PivotedTableFormatModel):
             df = _pivot_table(df, context)
+
+        return df
+
+    def _process_aggregations_and_save(
+        self, df: DataFrame, context: QueryContext, repartition: bool, zip_file: bool = False
+    ) -> Path:
+        df = self._process_aggregations(df, context)
 
         table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
         return table_filename

@@ -308,15 +308,15 @@ calls out choices that you should make to run Spark jobs with dsgrid.
 
 .. code-block:: console
 
-    $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G
+    $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G --mem=240G
 
 - NREL's Kestrel cluster will let you allocate one debug job each with two nodes. So, you can use
   these scripts to create a two-node cluster for one hour.
 - If the debug partition is not too full, you can append ``--qos=standby`` to the command above
   and not be charged any AUs.
 
-3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.5.1.
-   The team has validated the container ``/datasets/images/apache_spark/spark351_py311.sif``. It
+3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.5.2.
+   The team has validated the container ``/datasets/images/apache_spark/spark352_py311.sif``. It
    was created with this Dockerfile in dsgrid: ``docker/spark/Dockerfile``. The container includes
    ipython, jupyter, pyspark, pandas, duckdb, and pyarrow, but not dsgrid. The
    ``configure_and_start_spark.sh`` will normally be updated to use the currently-supported dsgrid

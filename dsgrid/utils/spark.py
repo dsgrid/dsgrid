@@ -785,6 +785,9 @@ def custom_spark_conf(conf):
             logger.info("Set %s=%s temporarily", key, val)
         yield
     finally:
+        # Note that the user code could have restarted the session.
+        # Get the current one.
+        spark = get_spark_session()
         for key, val in orig_settings.items():
             spark.conf.set(key, val)
 

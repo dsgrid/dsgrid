@@ -52,7 +52,7 @@ from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import TEST_PROJECT_PATH
 from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import custom_spark_conf, get_spark_session
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
@@ -100,12 +100,14 @@ def la_expected_electricity_hour_16(tmp_path_factory):
         .groupBy(*gcols)
         .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
     )
-    expected = (
-        df.groupBy("county", F.hour("time_est").alias("hour"))
-        .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
-        .filter("hour == 16")
-        .collect()[0][VALUE_COLUMN]
-    )
+    tz = project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
+    with custom_spark_conf({"spark.sql.session.timeZone": tz.tz_name}):
+        expected = (
+            df.groupBy("county", F.hour("time_est").alias("hour"))
+            .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
+            .filter("hour == 16")
+            .collect()[0][VALUE_COLUMN]
+        )
     yield {
         "la_electricity_hour_16": expected,
     }

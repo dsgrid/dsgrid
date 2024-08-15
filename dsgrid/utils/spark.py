@@ -91,7 +91,7 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     return spark
 
 
-def restart_spark(*args, force=False, **kwargs):
+def restart_spark(*args, force=False, **kwargs) -> SparkSession:
     """Restart a SparkSession with new config parameters. Refer to init_spark for parameters.
 
     Parameters
@@ -107,8 +107,11 @@ def restart_spark(*args, force=False, **kwargs):
     """
     spark = SparkSession.getActiveSession()
     needs_restart = force
+    orig_time_zone = spark.conf.get("spark.sql.session.timeZone")
+    conf = kwargs.get("spark_conf", {})
+    new_time_zone = conf.get("spark.sql.session.timeZone", orig_time_zone)
+
     if not force:
-        conf = kwargs.get("spark_conf", {})
         for key, val in conf.items():
             current = spark.conf.get(key, None)
             if isinstance(current, str):
@@ -126,6 +129,10 @@ def restart_spark(*args, force=False, **kwargs):
         spark.stop()
         logger.info("Stopped the SparkSession so that it can be restarted with a new config.")
         spark = init_spark(*args, **kwargs)
+        if spark.conf.get("spark.sql.session.timeZone") != new_time_zone:
+            # We set this value in query_submitter.py and that change will get lost
+            # when the session is restarted.
+            spark.conf.set("spark.sql.session.timeZone", new_time_zone)
     else:
         logger.info("No restart of Spark is needed.")
 
@@ -778,6 +785,9 @@ def custom_spark_conf(conf):
             logger.info("Set %s=%s temporarily", key, val)
         yield
     finally:
+        # Note that the user code could have restarted the session.
+        # Get the current one.
+        spark = get_spark_session()
         for key, val in orig_settings.items():
             spark.conf.set(key, val)
 

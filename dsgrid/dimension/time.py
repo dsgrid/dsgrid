@@ -1,6 +1,6 @@
 """Dimensions related to time"""
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import logging
 from typing_extensions import Annotated
 from pydantic import Field
@@ -297,6 +297,25 @@ class TimeZone(DSGEnum):
         if self in lst:
             return True
         return False
+
+
+_TIME_ZONE_NAME_TO_ZONE_INFO = {x.tz_name: x.tz for x in TimeZone}
+
+assert len(_TIME_ZONE_NAME_TO_ZONE_INFO) == len(TimeZone)
+
+
+def get_zone_info_from_tz_name(tz_name: str) -> ZoneInfo:
+    """Return the ZoneInfo matching tz_name."""
+    return _TIME_ZONE_NAME_TO_ZONE_INFO[tz_name]
+
+
+def get_zone_info_from_spark_session(tz_name: str) -> ZoneInfo:
+    """Return the ZoneInfo matching tz_name, which must have been read from the Spark session."""
+    try:
+        # We set the Spark session time zone to tz_name which is incompatible with ZoneInfo.
+        return ZoneInfo(key=tz_name)
+    except ZoneInfoNotFoundError:
+        return get_zone_info_from_tz_name(tz_name)
 
 
 class DaylightSavingAdjustmentModel(DSGBaseModel):

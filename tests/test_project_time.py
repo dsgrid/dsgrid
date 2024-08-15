@@ -6,13 +6,12 @@ import pytest
 
 import pandas as pd
 import numpy as np
-from zoneinfo import ZoneInfo
 from dsgrid.common import VALUE_COLUMN
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.dimension.time import TimeZone, TimeIntervalType
+from dsgrid.dimension.time import TimeZone, TimeIntervalType, get_zone_info_from_spark_session
 from dsgrid.dimension.time_utils import shift_time_interval
 from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.spark import get_spark_session
@@ -256,9 +255,11 @@ def compare_time_conversion(
 
 def check_time_dataframe(time_dim):
     session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
+    assert session_tz is not None
+    z_info = get_zone_info_from_spark_session(session_tz)
     time_df = time_dim.build_time_dataframe().collect()
-    time_df_start = min(time_df)[0].astimezone(ZoneInfo(session_tz))
-    time_df_end = max(time_df)[0].astimezone(ZoneInfo(session_tz))
+    time_df_start = min(time_df)[0].astimezone(z_info)
+    time_df_end = max(time_df)[0].astimezone(z_info)
     time_range = time_dim.get_time_ranges()[0]
     time_range_start = time_range.start.tz_convert(session_tz)
     time_range_end = time_range.end.tz_convert(session_tz)
@@ -475,10 +476,12 @@ def check_exploded_tempo_time(project_time_dim, load_data):
 
     # QC 2: model_time == project_time == tempo_time
     session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
+    assert session_tz is not None
+    z_info = get_zone_info_from_spark_session(session_tz)
     model_time[time_col] = model_time[time_col].dt.tz_convert(session_tz)
-    project_time = [t[0].astimezone(ZoneInfo(session_tz)) for t in project_time.collect()]
+    project_time = [t[0].astimezone(z_info) for t in project_time.collect()]
     project_time = pd.DataFrame(project_time, columns=["project_time"])
-    tempo_time = [t[0].astimezone(ZoneInfo(session_tz)) for t in tempo_time.collect()]
+    tempo_time = [t[0].astimezone(z_info) for t in tempo_time.collect()]
     tempo_time = pd.DataFrame(tempo_time, columns=["tempo_time"])
 
     # Checks

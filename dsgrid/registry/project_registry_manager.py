@@ -849,7 +849,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 msg = f"{dataset.dataset_type} is not present in the project config"
                 raise DSGInvalidParameter(msg)
 
-        self._update_config(config, submitter, VersionUpdateType.MINOR, log_message)
+        self._update_config(config, submitter, VersionUpdateType.MAJOR, log_message)
 
     def _submit_dataset_and_register_mappings(
         self,

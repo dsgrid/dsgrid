@@ -221,27 +221,38 @@ Dataset Commands
 
 
 @click.command(name="remove")
-@click.argument("dataset-id")
+@click.argument("dataset-ids", nargs=-1)
 @click.pass_obj
-def remove_dataset(registry_manager: RegistryManager, dataset_id: str):
-    """Remove a dataset from the dsgrid repository."""
-    registry_manager.dataset_manager.remove(dataset_id)
+def remove_datasets(registry_manager: RegistryManager, dataset_ids: list[str]):
+    """Remove one or more datasets from the dsgrid repository."""
+    dataset_mgr = registry_manager.dataset_manager
     project_mgr = registry_manager.project_manager
+
+    # Ensure that all dataset IDs are valid before removing any of them.
+    for dataset_id in dataset_ids:
+        dataset_mgr.get_by_id(dataset_id)
+
+    for dataset_id in dataset_ids:
+        registry_manager.dataset_manager.remove(dataset_id)
+
+    dataset_ids_set = set(dataset_ids)
     for project_id in project_mgr.list_ids():
         config = project_mgr.get_by_id(project_id)
+        removed_dataset_ids = []
         for dataset in config.iter_datasets():
             if (
-                dataset.dataset_id == dataset_id
+                dataset.dataset_id in dataset_ids_set
                 and dataset.status == DatasetRegistryStatus.REGISTERED
             ):
                 dataset.status = DatasetRegistryStatus.UNREGISTERED
-                msg = (
-                    f"Set dataset {dataset_id} status to unregistered in project {project_id} "
-                    "after removal."
-                )
-                project_mgr.update(
-                    config, VersionUpdateType.MINOR, msg, submitter=getpass.getuser()
-                )
+                removed_dataset_ids.append(dataset.dataset_id)
+        if removed_dataset_ids:
+            ids = ", ".join(removed_dataset_ids)
+            msg = (
+                f"Set status for datasets {ids} to unregistered in project {project_id} "
+                "after removal."
+            )
+            project_mgr.update(config, VersionUpdateType.MAJOR, msg, submitter=getpass.getuser())
 
 
 @click.command()
@@ -325,4 +336,4 @@ registry.add_command(datasets)
 dimensions.add_command(remove_dimension)
 dimension_mappings.add_command(remove_dimension_mapping)
 projects.add_command(remove_project)
-datasets.add_command(remove_dataset)
+datasets.add_command(remove_datasets)

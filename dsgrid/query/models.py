@@ -461,12 +461,9 @@ class QueryBaseModel(CacheableQueryBaseModel, abc.ABC):
         ),
     ]
 
-    def serialize_cached_content(self):
-        """Return a JSON representation of the model that can be used for caching purposes along
-        with a hash that uniquely identifies it.
-        """
-        text = self.model_dump_json(exclude={"name"}, indent=2)
-        return compute_hash(text.encode()), text
+    def serialize_cached_content(self) -> dict[str, Any]:
+        """Return a JSON-able representation of the model that can be used for caching purposes."""
+        return self.model_dump(mode="json", exclude={"name"})
 
 
 class QueryResultParamsModel(CacheableQueryBaseModel):
@@ -597,10 +594,13 @@ class ProjectQueryModel(QueryBaseModel):
         ),
     ]
 
-    def serialize_cached_content(self):
+    def serialize_cached_content(self) -> dict[str, Any]:
         # Exclude all result-oriented fields in orer to faciliate re-using queries.
-        text = self.project.model_dump_json(indent=2)
-        return compute_hash(text.encode()), text
+        exclude = {
+            "spark_conf_per_dataset",  # Doesn't change the query.
+            "version",  # We use the project major version as a separate field.
+        }
+        return self.project.model_dump(mode="json", exclude=exclude)
 
 
 class CreateCompositeDatasetQueryModel(QueryBaseModel):
@@ -621,10 +621,9 @@ class CreateCompositeDatasetQueryModel(QueryBaseModel):
         ),
     ]
 
-    def serialize_cached_content(self):
+    def serialize_cached_content(self) -> dict[str, Any]:
         # Exclude all result-oriented fields in orer to faciliate re-using queries.
-        text = self.project.model_dump_json(indent=2)
-        return compute_hash(text.encode()), text
+        return self.project.model_dump(mode="json", exclude="spark_conf_per_dataset")
 
 
 class CompositeDatasetQueryModel(QueryBaseModel):

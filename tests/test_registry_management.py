@@ -10,6 +10,7 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from dsgrid.cli.dsgrid import cli
+from dsgrid.cli.dsgrid_admin import cli as cli_admin
 from dsgrid.config.input_dataset_requirements import (
     InputDatasetDimensionRequirementsModel,
     InputDatasetDimensionRequirementsListModel,
@@ -395,6 +396,39 @@ def test_add_supplemental_dimension(tmp_registry_db):
             found_new_dimension = True
             break
     assert found_new_dimension
+
+
+def test_remove_dataset(tmp_registry_db):
+    test_project_dir, tmp_path, db_name = tmp_registry_db
+    mgr = make_test_data_registry(
+        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
+    )
+    project_mgr = mgr.project_manager
+    project_id = project_mgr.list_ids()[0]
+    config = project_mgr.get_by_id(project_id)
+    dataset_id = config.model.datasets[0].dataset_id
+    assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
+
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli_admin,
+        [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "--database-name",
+            db_name,
+            "--offline",
+            "registry",
+            "datasets",
+            "remove",
+            dataset_id,
+        ],
+    )
+    assert result.exit_code == 0
+    config = project_mgr.get_by_id(project_id)
+    assert config.model.datasets[0].status == DatasetRegistryStatus.UNREGISTERED
 
 
 def test_add_dataset_requirements(tmp_registry_db):

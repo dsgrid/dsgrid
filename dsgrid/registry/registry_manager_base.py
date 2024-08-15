@@ -415,7 +415,7 @@ class RegistryManagerBase(abc.ABC):
         return remote_path
 
     @abc.abstractmethod
-    def remove(self, config_id):
+    def remove(self, config_id: str):
         """Remove an item from the registry.
 
         Parameters

@@ -245,6 +245,7 @@ def remove_datasets(registry_manager: RegistryManager, dataset_ids: list[str]):
                 and dataset.status == DatasetRegistryStatus.REGISTERED
             ):
                 dataset.status = DatasetRegistryStatus.UNREGISTERED
+                dataset.mapping_references.clear()
                 removed_dataset_ids.append(dataset.dataset_id)
         if removed_dataset_ids:
             ids = ", ".join(removed_dataset_ids)

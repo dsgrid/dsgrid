@@ -357,8 +357,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
-            # TODO #207: Some users may want us to use pandas because Spark makes a csv directory.
-            df.write.mode("overwrite").csv(str(filename), header=True)
+            df.toPandas().to_csv(filename, header=True, index=False)
         elif suffix == ".parquet":
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)

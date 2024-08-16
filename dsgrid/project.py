@@ -1,11 +1,13 @@
 """Interface to a dsgrid project."""
 
+import json
 import logging
 import shutil
 from pathlib import Path
 from typing import Optional
 
 from pyspark.sql import SparkSession
+from semver import VersionInfo
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.project_config import ProjectConfig
@@ -24,6 +26,7 @@ from dsgrid.query.models import (
     DatasetConstructionMethod,
     ColumnType,
 )
+from dsgrid.utils.files import compute_hash
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     read_dataframe,
@@ -261,13 +264,9 @@ class Project:
 
         """
         logger.info("Start processing query for dataset_id=%s", dataset_id)
-        project_version = f"{context.model.project.project_id}__{context.model.project.version}"
-        model_hash, text = context.model.project.dataset.params.serialize()
-        hash_dir = cached_datasets_dir / project_version / model_hash
-        if not hash_dir.exists():
-            hash_dir.mkdir(parents=True)
-            model_file = hash_dir / "model.json"
-            model_file.write_text(text)
+        hash_dir = self._compute_dataset_hash_and_serialize(
+            context, cached_datasets_dir, dataset_id
+        )
         cached_dataset_path = hash_dir / (dataset_id + ".parquet")
         metadata_file = cached_dataset_path.with_suffix(".json5")
         if try_read_dataframe(cached_dataset_path) is None:
@@ -312,13 +311,9 @@ class Project:
             dataset.construction_method.value,
             dataset.initial_value_dataset_id,
         )
-        project_version = f"{context.model.project.project_id}__{context.model.project.version}"
-        model_hash, text = context.model.project.dataset.params.serialize()
-        hash_dir = cached_datasets_dir / project_version / model_hash
-        if not hash_dir.exists():
-            hash_dir.mkdir(parents=True)
-            model_file = hash_dir / "model.json"
-            model_file.write_text(text)
+        hash_dir = self._compute_dataset_hash_and_serialize(
+            context, cached_datasets_dir, dataset.dataset_id
+        )
         cached_dataset_path = hash_dir / (dataset.dataset_id + ".parquet")
         metadata_file = cached_dataset_path.with_suffix(".json5")
         if try_read_dataframe(cached_dataset_path) is None:
@@ -409,3 +404,38 @@ class Project:
                 self._config,
             )
             context.serialize_dataset_metadata_to_file(dataset.dataset_id, metadata_file)
+
+    def _compute_dataset_hash_and_serialize(
+        self, context: QueryContext, cached_datasets_dir: Path, dataset_id: str
+    ) -> Path:
+        """Create a hash that can be used to identify whether the mapping of the dataset to
+        project dimensions can be skipped based on a previous query.
+
+        If a directory with the hash does not already exist, create it and serialize the content
+        used to create the hash.
+
+        Examples of changes that will invalidate the query:
+          - Bump to project major version number
+          - Change to a dataset version
+          - Change to a project's dimension requirements for a dataset
+          - Change to a dataset dimension mapping
+
+        Returns
+        -------
+        str
+            Directory based on the hash
+        """
+        dataset_query_info = {
+            "project_id": self._config.model.project_id,
+            "project_major_version": VersionInfo.parse(self._config.model.version).major,
+            "dataset": self._config.get_dataset(dataset_id).model_dump(mode="json"),
+            "dataset_query_params": context.model.project.dataset.params.model_dump(mode="json"),
+        }
+        text = json.dumps(dataset_query_info, indent=2)
+        hash_dir_name = compute_hash(text.encode())
+        hash_dir = cached_datasets_dir / hash_dir_name
+        if not hash_dir.exists():
+            hash_dir.mkdir()
+            model_file = hash_dir / "model.json"
+            model_file.write_text(text)
+        return hash_dir

@@ -1,4 +1,5 @@
 import abc
+import json
 import logging
 import shutil
 from pathlib import Path
@@ -6,6 +7,7 @@ from typing import Optional
 from zipfile import ZipFile
 
 from pyspark.sql import DataFrame
+from semver import VersionInfo
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
@@ -27,7 +29,7 @@ from dsgrid.utils.spark import (
     write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.files import load_data
+from dsgrid.utils.files import compute_hash, load_data
 from dsgrid.query.models import (
     ProjectQueryModel,
     ColumnType,
@@ -86,32 +88,6 @@ class QuerySubmitterBase:
     def _cached_table_filename(path: Path):
         return path / "table.parquet"
 
-    @track_timing(timer_stats_collector)
-    def _persist_intermediate_result(self, context: QueryContext, df):
-        hash, text = context.model.serialize_cached_content()
-        cached_dir = self._cached_tables_dir() / hash
-        if cached_dir.exists():
-            shutil.rmtree(cached_dir)
-        cached_dir.mkdir()
-        filename = self._cached_table_filename(cached_dir)
-        df = write_dataframe_and_auto_partition(df, filename)
-
-        self.metadata_filename(cached_dir).write_text(context.metadata.model_dump_json(indent=2))
-        self.query_filename(cached_dir).write_text(text)
-        logger.info("Persisted intermediate table to %s", filename)
-        return df
-
-    def _try_read_cache(self, context: QueryContext):
-        hash, _ = context.model.serialize_cached_content()
-        cached_dir = self._cached_tables_dir() / hash
-        filename = self._cached_table_filename(cached_dir)
-        df = try_read_dataframe(filename)
-        if df is not None:
-            logger.info("Load intermediate table from cache: %s", filename)
-            metadata_file = self.metadata_filename(cached_dir)
-            return df, DatasetMetadataModel.from_file(metadata_file)
-        return None, None
-
 
 class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     def __init__(self, project: Project, *args, **kwargs):
@@ -121,6 +97,43 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     @property
     def project(self):
         return self._project
+
+    def _create_table_hash(self, context: QueryContext) -> tuple[str, str]:
+        """Create a hash that can be used to identify whether the following sequence
+        can be skipped based on a previous query:
+          - Apply expression across all datasets in the query.
+          - Apply filters.
+          - Apply aggregations.
+
+        Examples of changes that will invalidate the query:
+          - Change to the project section of the query
+          - Bump to project major version number
+          - Change to a dataset version
+          - Change to a project's dimension requirements for a dataset
+          - Change to a dataset dimension mapping
+        """
+        data = {
+            "project_major_version": VersionInfo.parse(self._project.config.model.version).major,
+            "project_query": context.model.serialize_cached_content(),
+            "datasets": [
+                self._project.config.get_dataset(x.dataset_id).model_dump(mode="json")
+                for x in context.model.project.dataset.source_datasets
+            ],
+        }
+        text = json.dumps(data, indent=2)
+        hash_value = compute_hash(text.encode())
+        return text, hash_value
+
+    def _try_read_cache(self, context: QueryContext):
+        _, hash_value = self._create_table_hash(context)
+        cached_dir = self._cached_tables_dir() / hash_value
+        filename = self._cached_table_filename(cached_dir)
+        df = try_read_dataframe(filename)
+        if df is not None:
+            logger.info("Load intermediate table from cache: %s", filename)
+            metadata_file = self.metadata_filename(cached_dir)
+            return df, DatasetMetadataModel.from_file(metadata_file)
+        return None, None
 
     def _run_checks(self, model):
         subsets = set(self.project.config.list_dimension_query_names(DimensionCategory.SUBSET))
@@ -182,11 +195,11 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             context.metadata = metadata
             is_cached = True
 
-        if (
-            persist_intermediate_table
-            and not is_cached
-            and not context.model.result.aggregate_each_dataset
-        ):
+        if context.model.result.aggregate_each_dataset:
+            # This wouldn't save any time.
+            persist_intermediate_table = False
+
+        if persist_intermediate_table and not is_cached:
             df = self._persist_intermediate_result(context, df)
 
         if not context.model.result.aggregate_each_dataset:
@@ -203,6 +216,23 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             report.generate(table_filename, output_dir, context, report_inputs.inputs)
 
         return df, context
+
+    @track_timing(timer_stats_collector)
+    def _persist_intermediate_result(self, context: QueryContext, df):
+        text, hash_value = self._create_table_hash(context)
+        cached_dir = self._cached_tables_dir() / hash_value
+        if cached_dir.exists():
+            shutil.rmtree(cached_dir)
+        cached_dir.mkdir()
+        filename = self._cached_table_filename(cached_dir)
+        df = write_dataframe_and_auto_partition(df, filename)
+
+        self.metadata_filename(cached_dir).write_text(
+            context.metadata.model_dump_json(indent=2), encoding="utf-8"
+        )
+        self.query_filename(cached_dir).write_text(text, encoding="utf-8")
+        logger.info("Persisted intermediate table to %s", filename)
+        return df
 
     def _postprocess_datasets(
         self,
@@ -327,8 +357,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
-            # TODO #207: Some users may want us to use pandas because Spark makes a csv directory.
-            df.write.mode("overwrite").csv(str(filename), header=True)
+            df.toPandas().to_csv(filename, header=True, index=False)
         elif suffix == ".parquet":
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)

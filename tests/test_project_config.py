@@ -137,3 +137,16 @@ def test_invalid_multi_dimensional_requirement_partial_intersection():
             single_dimensional=RequiredDimensionRecordsModel(**single_dim_data),
             multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
         )
+
+
+def test_invalid_multi_dimensional_requirement_base_and_base_missing():
+    multi_dim_data = [
+        {
+            "metric": {"base": ["metric1"], "base_missing": ["metric2"]},
+            "subsector": {"base": ["subsector1"]},
+        },
+    ]
+    with pytest.raises(ValueError, match="base and base_missing cannot both be set"):
+        RequiredDimensionsModel(
+            multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
+        )

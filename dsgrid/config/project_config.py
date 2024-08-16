@@ -406,12 +406,25 @@ class RequiredSupplementalDimensionRecordsModel(DSGBaseModel):
 class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
 
     base: list[str] = []
+    base_missing: list[str] = []
     subset: list[RequiredSubsetDimensionRecordsModel] = []
     supplemental: list[RequiredSupplementalDimensionRecordsModel] = []
 
+    @model_validator(mode="after")
+    def check_base(self) -> "RequiredDimensionRecordsByTypeModel":
+        if self.base and self.base_missing:
+            msg = f"base and base_missing cannot both be set: {self.base=} {self.base_missing=}"
+            raise ValueError(msg)
+        return self
+
     def defines_dimension_requirement(self) -> bool:
         """Returns True if the model defines a dimension requirement."""
-        return bool(self.base) or bool(self.subset) or bool(self.supplemental)
+        return (
+            bool(self.base)
+            or bool(self.base_missing)
+            or bool(self.subset)
+            or bool(self.supplemental)
+        )
 
 
 class RequiredDimensionRecordsModel(DSGBaseModel):
@@ -1192,11 +1205,16 @@ class ProjectConfig(ConfigBase):
             for field in sorted(RequiredDimensionRecordsModel.model_fields):
                 dim_type = DimensionType(field)
                 req = getattr(multi_req, field)
-                record_ids = (
-                    self.get_base_dimension(dim_type).get_unique_ids()
-                    if req.base == ["__all__"]
-                    else set(req.base)
-                )
+                if req.base == ["__all__"]:
+                    record_ids = self.get_base_dimension(dim_type).get_unique_ids()
+                elif req.base_missing:
+                    record_ids = (
+                        self.get_base_dimension(dim_type)
+                        .get_unique_ids()
+                        .difference(req.base_missing)
+                    )
+                else:
+                    record_ids = set(req.base)
                 record_ids.update(self._get_required_record_ids_from_subsets(req))
                 record_ids.update(self._get_required_record_ids_from_supplementals(req, dim_type))
                 if record_ids:

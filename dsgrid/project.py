@@ -10,7 +10,6 @@ from pyspark.sql import SparkSession
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dataset.dataset import Dataset
-from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.dataset.growth_rates import apply_exponential_growth_rate, apply_annual_multiplier
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
@@ -189,7 +188,8 @@ class Project:
         return [x.dataset_id for x in self._iter_datasets()]
 
     @track_timing(timer_stats_collector)
-    def process_query(self, context: QueryContext, cached_datasets_dir: Path):
+    def process_query(self, context: QueryContext, cached_datasets_dir: Path) -> dict[str, Path]:
+        """Return a dictionary of dataset_id to dataframe path for all datasets in the query."""
         self._build_filtered_record_ids_by_dimension_type(context)
 
         # Note: Store DataFrame filenames instead of objects because the SparkSession will get
@@ -207,42 +207,8 @@ class Project:
 
         if not df_filenames:
             logger.warning("No data matched %s", context.model.name)
-            return None
 
-        # All dataset columns need to be in the same order.
-        context.consolidate_dataset_metadata()
-        datasets = self._convert_datasets(context, df_filenames)
-        return evaluate_expression(context.model.project.dataset.expression, datasets).df
-
-    def _convert_datasets(self, context: QueryContext, filenames: dict[str, Path]):
-        dim_columns, time_columns = self._get_dimension_columns(context)
-        expected_columns = time_columns + dim_columns
-        expected_columns.append(VALUE_COLUMN)
-
-        datasets = {}
-        for dataset_id, path in filenames.items():
-            df = read_dataframe(path)
-            unexpected = sorted(set(df.columns).difference(expected_columns))
-            if unexpected:
-                raise Exception(f"Unexpected columns are present in {dataset_id=} {unexpected=}")
-            datasets[dataset_id] = DatasetExpressionHandler(
-                df.select(*expected_columns), time_columns + dim_columns, [VALUE_COLUMN]
-            )
-        return datasets
-
-    def _get_dimension_columns(self, context: QueryContext) -> tuple[list[str], list[str]]:
-        match context.model.result.column_type:
-            case ColumnType.DIMENSION_QUERY_NAMES:
-                dim_columns = context.get_all_dimension_query_names()
-                time_columns = context.get_dimension_column_names(DimensionType.TIME)
-            case ColumnType.DIMENSION_TYPES:
-                dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
-                time_columns = context.get_dimension_column_names(DimensionType.TIME)
-            case _:
-                raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
-
-        dim_columns -= time_columns
-        return sorted(dim_columns), sorted(time_columns)
+        return df_filenames
 
     def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
         record_ids = {}

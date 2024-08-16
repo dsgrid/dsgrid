@@ -151,19 +151,23 @@ def test_total_electricity_use_with_filter():
 @pytest.mark.parametrize(
     "column_inputs",
     [
-        (ColumnType.DIMENSION_QUERY_NAMES, ["state", "reeds_pca", "census_region"], True),
-        (ColumnType.DIMENSION_TYPES, ["reeds_pca"], True),
-        (ColumnType.DIMENSION_TYPES, ["state"], True),
-        (ColumnType.DIMENSION_TYPES, ["state", "reeds_pca", "census_region"], False),
+        (ColumnType.DIMENSION_QUERY_NAMES, ["state", "reeds_pca", "census_region"], True, True),
+        (ColumnType.DIMENSION_TYPES, ["reeds_pca"], False, True),
+        (ColumnType.DIMENSION_TYPES, ["state"], False, True),
+        (ColumnType.DIMENSION_TYPES, ["state", "reeds_pca", "census_region"], True, False),
     ],
 )
 def test_total_electricity_use_by_state_and_pca(column_inputs):
-    column_type, columns, is_valid = column_inputs
+    column_type, columns, aggregate_each_dataset, is_valid = column_inputs
     if is_valid:
-        run_query_test(QueryTestElectricityUseByStateAndPCA, column_type, columns)
+        run_query_test(
+            QueryTestElectricityUseByStateAndPCA, column_type, columns, aggregate_each_dataset
+        )
     else:
         with pytest.raises(ValueError):
-            run_query_test(QueryTestElectricityUseByStateAndPCA, column_type, columns)
+            run_query_test(
+                QueryTestElectricityUseByStateAndPCA, column_type, columns, aggregate_each_dataset
+            )
 
 
 def test_annual_electricity_by_state():
@@ -1053,10 +1057,18 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
 class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
     NAME = "total_electricity_use_by_state_and_pca"
 
-    def __init__(self, column_type: ColumnType, geography_columns, *args, **kwargs):
+    def __init__(
+        self,
+        column_type: ColumnType,
+        geography_columns: list[str],
+        aggregate_each_dataset: bool,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._column_type = column_type
         self._geography_columns = geography_columns
+        self._aggregate_each_dataset = aggregate_each_dataset
 
     def make_query(self):
         self._model = ProjectQueryModel(
@@ -1075,6 +1087,7 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
             ),
             result=QueryResultParamsModel(
                 column_type=self._column_type,
+                aggregate_each_dataset=self._aggregate_each_dataset,
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(

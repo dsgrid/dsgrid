@@ -486,12 +486,13 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     aggregate_each_dataset: Annotated[
         bool,
         Field(
-            description="Aggregate each dataset before applying the expression to create one "
-            "overall dataset. The default behavior is to perform one aggregation on the overall "
-            "dataset. This parameter must be set to True for queries that will be adding or "
-            "subtracting datasets with different dimensionality. Warning: setting this value to "
-            "True could produce rows with duplicate dimension combinations when performing a "
-            "union of datasets while also dropping one or more dimensions.",
+            description="If True, aggregate each dataset before applying the expression to create one "
+            "overall dataset. This parameter must be set to True for queries that will be adding or "
+            "subtracting datasets with different dimensionality. Defaults to False, which corresponds to "
+            "the default behavior of performing one aggregation on the overall dataset. WARNING: "
+            "For a standard query that performs a union of datasets, setting this value to True could "
+            "produce rows with duplicate dimension combinations, especially if one or more "
+            "dimensions are also dropped.",
             default=False,
         ),
     ]

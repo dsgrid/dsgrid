@@ -12,6 +12,7 @@ from dsgrid.config.mapping_tables import MappingTableModel
 from dsgrid.config.project_config import ProjectConfigModel
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGValueNotRegistered
 from .common import Collection, DatasetRegistryStatus, RegistrationModel, Edge, RegistryType
 from .registry_database import RegistryDatabase
 
@@ -158,7 +159,13 @@ class RegistryInterfaceBase(abc.ABC):
         -------
         str
         """
-        return self._db.get_latest_version(self._get_root_db_id(model_id))
+        try:
+            return self._db.get_latest_version(self._get_root_db_id(model_id))
+        except DSGValueNotRegistered:
+            msg = (
+                f"id='{model_id}' is not registered in the '{self._collection_name()}' collection"
+            )
+            raise DSGValueNotRegistered(msg)
 
     def get_registration(self, model) -> RegistrationModel:
         """Return the registration information for the model."""
@@ -267,10 +274,22 @@ class RegistryInterfaceBase(abc.ABC):
         return self._db.replace_document(data)
 
     def _get_by_version(self, model_id, version):
-        return self._db._get_by_version(self._get_root_db_id(model_id), version)
+        try:
+            return self._db._get_by_version(self._get_root_db_id(model_id), version)
+        except DSGValueNotRegistered:
+            msg = (
+                f"id='{model_id}' is not registered in the '{self._collection_name()}' collection"
+            )
+            raise DSGValueNotRegistered(msg)
 
     def _get_latest(self, model_id):
-        return self._db.get_latest(self._get_root_db_id(model_id))
+        try:
+            return self._db.get_latest(self._get_root_db_id(model_id))
+        except DSGValueNotRegistered:
+            msg = (
+                f"id='{model_id}' is not registered in the '{self._collection_name()}' collection"
+            )
+            raise DSGValueNotRegistered(msg)
 
     def _get_root_db_id(self, model_id):
         return f"{self.root_collection_name()}/{model_id}"

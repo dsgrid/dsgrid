@@ -35,9 +35,6 @@ Project
 
 .. autopydantic_model:: dsgrid.config.project_config.DimensionsByCategoryModel
 
-.. autopydantic_model:: dsgrid.config.project_config.SubsetDimensionGroupModel
-.. autopydantic_model:: dsgrid.config.project_config.SubsetDimensionGroupListModel
-
 Dimension
 =========
 

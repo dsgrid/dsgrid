@@ -90,7 +90,14 @@ _COMMON_RUN_OPTIONS = (
 )
 
 
-@click.command("create")
+_create_project_query_epilog = """
+Examples:\n
+$ dsgrid query project create my-result-name my-project-id my-dataset-id\n
+$ dsgrid query project create --default-result-aggregation my-result-name my-project-id my-dataset-id\n
+"""
+
+
+@click.command("create", epilog=_create_project_query_epilog)
 @click.argument("query_name")
 @click.argument("project_id")
 @click.argument("dataset_id")
@@ -107,14 +114,6 @@ _COMMON_RUN_OPTIONS = (
     default="sum",
     show_default=True,
     help="Aggregation function for any included default aggregations.",
-)
-@click.option(
-    "-d",
-    "--default-per-dataset-aggregation",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Add default per-dataset aggregration.",
 )
 @click.option(
     "-f",
@@ -148,7 +147,6 @@ def create_project_query(
     dataset_id,
     filters,
     aggregation_function,
-    default_per_dataset_aggregation,
     query_file,
     default_result_aggregation,
     force,
@@ -262,7 +260,13 @@ def validate_project_query(query_file):
         raise
 
 
-@click.command("run")
+_run_project_query_epilog = """
+Examples:\n
+$ dsgrid query project run query.json5
+"""
+
+
+@click.command("run", epilog=_run_project_query_epilog)
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @click.option(
     "--persist-intermediate-table/--no-persist-intermediate-table",
@@ -387,7 +391,13 @@ def query_composite_dataset(
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
 
 
-@click.command()
+_create_derived_dataset_config_epilog = """
+Examples:\n
+$ dsgrid query project create-derived-dataset-config query_output/my_result my_dataset_config\n
+"""
+
+
+@click.command(epilog=_create_derived_dataset_config_epilog)
 @click.argument("src")
 @click.argument("dst")
 @add_options(_COMMON_REGISTRY_OPTIONS)

@@ -310,7 +310,6 @@ def test_query_cli_create_validate(tmp_path):
         "query",
         "project",
         "create",
-        "-d",
         "-r",
         "-f",
         str(filename),

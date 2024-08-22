@@ -147,7 +147,7 @@ def list_dimensions(registry_manager, filter):
 
 _register_dimensions_epilog = """
 Examples:\n
-$ dsgrid registry dimensions register -l "Registry dimensions for my-project" dimensions.json5\n
+$ dsgrid registry dimensions register -l "Register dimensions for my-project" dimensions.json5\n
 """
 
 
@@ -164,8 +164,8 @@ $ dsgrid registry dimensions register -l "Registry dimensions for my-project" di
 def register_dimensions(
     ctx, registry_manager: RegistryManager, dimension_config_file: Path, log_message: str
 ):
-    """Register new dimensions with the dsgrid repository. The JSON/JSON5 filename must
-    match the data model defined by this documentation:
+    """Register new dimensions with the dsgrid repository. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/dimension.html#dsgrid.config.dimensions.DimensionsConfigModel
     """
     manager = registry_manager.dimension_manager
@@ -313,7 +313,7 @@ def list_dimension_mappings(registry_manager, filter):
 
 _register_dimension_mappings_epilog = """
 Examples:\\
-$ dsgrid registry dimension-mappings list -l "Register dimension mappings for my-project" dimension_mappings.json5\n
+$ dsgrid registry dimension-mappings register -l "Register dimension mappings for my-project" dimension_mappings.json5\n
 """
 
 
@@ -332,8 +332,8 @@ $ dsgrid registry dimension-mappings list -l "Register dimension mappings for my
 def register_dimension_mappings(
     ctx, registry_manager: RegistryManager, dimension_mapping_config_file: Path, log_message: str
 ):
-    """Register new dimension mappings with the dsgrid repository. The JSON/JSON5 filename must
-    match the data model defined by this documentation:
+    """Register new dimension mappings with the dsgrid repository. The contents of the JSON/JSON5
+    file must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel
     """
     submitter = getpass.getuser()
@@ -399,7 +399,11 @@ def dump_dimension_mapping(
 
 _update_dimension_mapping_epilog = """
 Examples:\n
-$ dsgrid registry dimension-mappings update -d 17565575 -l "Update dimension mappings" -u major -v 1.0.0 dimension_mappings.json5"\n
+$ dsgrid registry dimension-mappings update \\ \n
+    -d 17565575 \\ \n
+    -l "Swap out the state to county mapping for my-dataset to that-project" \\ \n
+    -u major \\ \n
+    -v 1.0.0 dimension_mappings.json5"
 """
 
 
@@ -444,7 +448,7 @@ def update_dimension_mapping(
     update_type: VersionUpdateType,
     version: str,
 ):
-    """Update an existing dimension mapping registry. The JSON/JSON5 filename must
+    """Update an existing dimension mapping registry. The contents of the JSON/JSON5 file must
     match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.mapping_tables.MappingTableModel
     """
@@ -515,7 +519,7 @@ def register_project(
     project_config_file,
     log_message,
 ):
-    """Register a new project with the dsgrid repository. The JSON/JSON5 filename must
+    """Register a new project with the dsgrid repository. The contents of the JSON/JSON5 file must
     match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.project_config.ProjectConfigModel
     """
@@ -858,7 +862,7 @@ $ dsgrid registry projects register-subset-dimensions \\ \n
 def register_subset_dimensions(
     ctx, registry_manager: RegistryManager, project_id: str, filename: Path, log_message: str
 ):
-    """Register new subset dimensions with a project. The JSON/JSON5 filename must
+    """Register new subset dimensions with a project. The contents of the JSON/JSON5 file must
     match the data model defined by this documentation:
 
     https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.project_config.SubsetDimensionGroupListModel
@@ -881,7 +885,7 @@ def register_subset_dimensions(
 _register_supplemental_dimensions_epilog = """
 Examples:\n
 $ dsgrid registry projects register-supplemental-dimensions \\ \n
-    -l "Register supplemental dimension for states for my-project-id" \\ \n
+    -l "Register states supplemental dimension for my-project-id" \\ \n
     my-project-id \\ \n
     supplemental_dimensions.json5\n
 """
@@ -902,8 +906,8 @@ $ dsgrid registry projects register-supplemental-dimensions \\ \n
 def register_supplemental_dimensions(
     ctx, registry_manager, project_id, filename: Path, log_message
 ):
-    """Register new supplemental dimensions with a project. The JSON/JSON5 filename must
-    match the data model defined by this documentation:
+    """Register new supplemental dimensions with a project. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel
     """
 
@@ -943,8 +947,8 @@ $ dsgrid registry projects add-dataset-requirements \\ \n
     help="Please specify the reason for the new datasets.",
 )
 def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, log_message):
-    """Add requirements for one or more datasets to a project. The JSON/JSON5 filename must
-    match the data model defined by this documentation:
+    """Add requirements for one or more datasets to a project. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetListModel
     """
     submitter = getpass.getuser()
@@ -985,8 +989,8 @@ $ dsgrid registry projects replace-dataset-dimension-requirements \\ \n
 def replace_dataset_dimension_requirements(
     ctx, registry_manager, project_id, filename: Path, log_message
 ):
-    """Replace dimension requirements for one or more datasets in a project. The JSON/JSON5
-    filename must match the data model defined by this documentation:
+    """Replace dimension requirements for one or more datasets in a project. The contents of the
+    JSON/JSON5 file must match the data model defined by this documentation:
 
     https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsListModel
     """
@@ -1006,9 +1010,9 @@ def replace_dataset_dimension_requirements(
 
 _list_project_dimension_query_names_epilog = """
 Examples:\n
-$ dsgrid registry projects list-dimension-query-names\n
-$ dsgrid registry projects list-dimension-query-names --exclude-subset\n
-$ dsgrid registry projects list-dimension-query-names --exclude-supplemental\n
+$ dsgrid registry projects list-dimension-query-names my_project_id\n
+$ dsgrid registry projects list-dimension-query-names --exclude-subset my_project_id\n
+$ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_project_id\n
 """
 
 
@@ -1135,8 +1139,8 @@ $ dsgrid registry datasets register dataset.json5 -l "Register dataset my-datase
 @click.pass_obj
 @click.pass_context
 def register_dataset(ctx, registry_manager, dataset_config_file, dataset_path, log_message):
-    """Register a new dataset with the registry. The JSON/JSON5
-    filename must match the data model defined by this documentation:
+    """Register a new dataset with the registry. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
     """
     manager = registry_manager.dataset_manager
@@ -1189,7 +1193,7 @@ $ dsgrid registry datasets update \\ \n
     -l "Update the description for dataset my-dataset-id." \\ \n
     -u patch \\ \n
     -v 1.0.0 \\ \n
-    my-dataset-id\n
+    dataset.json5\n
 """
 
 
@@ -1228,8 +1232,8 @@ $ dsgrid registry datasets update \\ \n
 def update_dataset(
     ctx, registry_manager, dataset_config_file, dataset_id, log_message, update_type, version
 ):
-    """Update an existing dataset in the registry. The JSON/JSON5
-    filename must match the data model defined by this documentation:
+    """Update an existing dataset in the registry. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
     """
     manager = registry_manager.dataset_manager

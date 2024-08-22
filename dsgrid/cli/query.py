@@ -92,8 +92,8 @@ _COMMON_RUN_OPTIONS = (
 
 _create_project_query_epilog = """
 Examples:\n
-$ dsgrid query project create my-result-name my-project-id my-dataset-id\n
-$ dsgrid query project create --default-result-aggregation my-result-name my-project-id my-dataset-id\n
+$ dsgrid query project create my_query_result_name my_project_id my_dataset_id\n
+$ dsgrid query project create --default-result-aggregation my_query_result_name my_project_id my_dataset_id\n
 """
 
 
@@ -393,7 +393,7 @@ def query_composite_dataset(
 
 _create_derived_dataset_config_epilog = """
 Examples:\n
-$ dsgrid query project create-derived-dataset-config query_output/my_result my_dataset_config\n
+$ dsgrid query project create-derived-dataset-config query_output/my_query_result_name my_dataset_config\n
 """
 
 

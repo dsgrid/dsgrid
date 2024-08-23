@@ -31,18 +31,18 @@ registry: ``projects``, ``datasets``, ``dimensions``, and ``dimension-mapppings`
 
 Each of those subgroups has four main commands:
 
-- ``register``: Register a new configuration item in the registry. This command typically takes a
-  JSON5 file as an input. After registration, all other commands will refer to the item by its ID.
-  Projects and datasets have a user-created string as their ID (``project_id`` and ``dataset_id``)
-  stored in the JSON5 file. Dimensions and dimension mappings receive integer IDs from the registry
-  during registration.
-- ``list``: List configuration items stored in the registry in a table. Each command offers the
-  ability to filter the results by the table columns.
-- ``dump``: Export configuration items from the registry to local files. This command takes the
-  configuration ID as an input. Refer to the ``list`` commands to find the IDs.
-- ``update``: Change an existing configuration item in the registry. A typical workflow would be
-  to run the ``dump`` command to export a configuration to local files, edit them, and then run the
-  ``update`` command.
+- ``register``: Register a new item (project, dataset, dimension, or dimension mapping). This
+  command typically takes a JSON5 file as an input. After registration, all other commands will
+  refer to the item by its ID. Projects and datasets have a user-created string as their ID
+  (``project_id`` and ``dataset_id``), which is defined in the original JSON5 file. Dimensions and
+  dimension mappings receive integer IDs from the registry during registration.
+- ``list``: List items stored in the registry in a table. Each command offers the ability to filter
+  the results by the table columns.
+- ``dump``: Export items from the registry to local files. This command takes the item ID as an
+  input. Refer to the ``list`` commands to find the IDs.
+- ``update``: Change an existing item in the registry. A typical workflow would be to run the
+  ``dump`` command to export a configuration to local files, edit them, and then run the ``update``
+  command.
 
 Refer to each command's ``--help`` output for additional information. Full CLI documentation at
 :ref:`cli-reference`.

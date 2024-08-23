@@ -43,3 +43,8 @@ Dimension Reference
 ===================
 
 .. autopydantic_model:: dsgrid.config.dimensions.DimensionReferenceModel
+
+Dimensions Config
+=================
+
+.. autopydantic_model:: dsgrid.config.dimensions_config.DimensionsConfigModel

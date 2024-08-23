@@ -1,3 +1,5 @@
+.. _cli-reference:
+
 *************
 CLI Reference
 *************

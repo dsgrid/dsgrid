@@ -134,7 +134,7 @@ $ dsgrid registry dimensions list -f "Submitter == username"\n
     multiple=True,
     type=str,
     help=f"""
-    Filter table with a case-insensitive expression in the format 'field operation value',
+    Filter table with a case-insensitive expression in the format 'column operation value',
     accepts multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
     """,
@@ -300,7 +300,7 @@ $ dsgrid registry dimension-mappings list -f "Type [From, To] contains geography
     multiple=True,
     type=str,
     help=f"""
-    Filter table with a case-insensitive expression in the format 'field operation value',
+    Filter table with a case-insensitive expression in the format 'column operation value',
     accepts multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
     """,
@@ -483,7 +483,7 @@ $ dsgrid registry projects list -f "ID contains efs"\n
     multiple=True,
     type=str,
     help=f"""
-    Filter table with a case-insensitive expression in the format 'field operation value',
+    Filter table with a case-insensitive expression in the format 'column operation value',
     accepts multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
     """,
@@ -1110,7 +1110,7 @@ $ dsgrid registry datasets list -f "ID contains com" -f "Submitter == username"\
     multiple=True,
     type=str,
     help=f"""
-    Filter table with a case-insensitive expression in the format 'field operation value',
+    Filter table with a case-insensitive expression in the format 'column operation value',
     accepts multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
     """,

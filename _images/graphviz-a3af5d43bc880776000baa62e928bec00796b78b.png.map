@@ -1,0 +1,10 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.project_config.DimensionsByCategoryModel
+
+Defines the query names by base and supplemental category.
+" alt="" coords="485,133,727,245"/>
+<area shape="rect" id="node2" title="dsgrid.config.project_config.ProjectDimensionQueryNamesModel
+
+Defines the query names for all base and supplemental dimensions in the project.
+" alt="" coords="5,5,341,257"/>
+</map>

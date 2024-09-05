@@ -23,7 +23,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionConfig
 from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidOperation, DSGValueNotRegistered, DSGInvalidParameter
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.utils.spark import init_spark
@@ -89,6 +89,7 @@ class RegistryManager:
         remote_path=REMOTE_REGISTRY,
         user=None,
         scratch_dir=None,
+        overwrite=False,
     ):
         """Creates a new RegistryManager at the given path.
 
@@ -103,12 +104,18 @@ class RegistryManager:
         scratch_dir : None | Path
             Base directory for dsgrid temporary directories. Must be accessible on all compute
             nodes. Defaults to the current directory.
+        overwrite: bool
+            Overwrite the database if it exists.
 
         Returns
         -------
         RegistryManager
 
         """
+        if RegistryDatabase.has_database(conn) and not overwrite:
+            msg = f"database={conn.database} already exists. Choose a different name or set overwrite=True."
+            raise DSGInvalidOperation(msg)
+
         if not user:
             user = getpass.getuser()
         uid = str(uuid.uuid4())
@@ -161,7 +168,7 @@ class RegistryManager:
         conn: DatabaseConnection,
         remote_path=REMOTE_REGISTRY,
         use_remote_data=None,
-        offline_mode=False,
+        offline_mode=True,
         user=None,
         no_prompts=False,
         scratch_dir=None,

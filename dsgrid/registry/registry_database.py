@@ -175,6 +175,13 @@ class RegistryDatabase:
             sys_db.delete_database(conn.database)
             logger.info("Deleted the database %s", conn.database)
 
+    @staticmethod
+    def has_database(conn: DatabaseConnection) -> bool:
+        """Return True if the database exists."""
+        client = ArangoClient(hosts=f"http://{conn.hostname}:{conn.port}")
+        sys_db = client.db("_system", username=conn.username, password=conn.password)
+        return sys_db.has_database(conn.database)
+
     def insert_edge(self, from_id, to_id, data, edge: Edge):
         self._graph.edge_collection(edge.value).insert(
             {

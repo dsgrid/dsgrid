@@ -1,4 +1,4 @@
-"""Contains data models to control registration of test projects and datasets."""
+"""Contains data models to control bulk registration of projects and datasets."""
 
 from pathlib import Path
 from typing import Any, Iterable, Optional

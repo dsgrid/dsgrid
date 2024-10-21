@@ -1,10 +1,9 @@
 """Contains data models to control registration of test projects and datasets."""
 
-from collections.abc import Iterable
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Iterable, Optional
 
-from pydantic import Field, model_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel
@@ -12,28 +11,40 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.utils.files import load_data
 
 
+class ProjectRegistrationModel(DSGBaseModel):
+    """Defines a project to be registered."""
+
+    project_id: Annotated[str, Field(description="Project ID")]
+    config_file: Annotated[Path, Field(description="Path to project.json5")]
+    log_message: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            description="Log message to use when registering the project. Defaults to an auto-generated message.",
+        ),
+    ]
+
+    @model_validator(mode="before")
+    @classmethod
+    def fix_paths(cls, data: dict[str, Any]) -> dict[str, Any]:
+        _fix_paths(data, ("config_file",))
+        return data
+
+    @field_validator("log_message")
+    def fix_log_message(cls, log_message: Optional[str], info: ValidationInfo) -> str:
+        if log_message is None:
+            log_message = f"Register project {info.data['project_id']}"
+        return log_message
+
+
 class DatasetRegistrationModel(DSGBaseModel):
-    """Defines a dataset to be registered and optionally submitted to a project."""
+    """Defines a dataset to be registered."""
 
     dataset_id: Annotated[str, Field(description="Dataset ID")]
     dataset_path: Annotated[
         Path, Field(description="Directory containing load_data/load_data_lookup.parquet")
     ]
     config_file: Annotated[Path, Field(description="Path to dataset.json5")]
-    dimension_mapping_file: Annotated[
-        Optional[Path],
-        Field(
-            description="Path to file containing mappings of dataset-to-project dimensions",
-            default=None,
-        ),
-    ]
-    dimension_mapping_references_file: Annotated[
-        Optional[Path],
-        Field(
-            description="Path to file containing references to mappings of dataset-to-project dimensions",
-            default=None,
-        ),
-    ]
     replace_dimension_names_with_ids: Annotated[
         bool,
         Field(
@@ -42,27 +53,19 @@ class DatasetRegistrationModel(DSGBaseModel):
             default=False,
         ),
     ]
-    replace_dimension_mapping_names_with_ids: Annotated[
-        bool,
+    log_message: Annotated[
+        Optional[str],
         Field(
-            description="Replace the dimension mapping entries with IDs of dimension mappings "
-            "in the database with matching names. Typically only useful for tests.",
-            default=False,
+            default=None,
+            description="Log message to use when registering the dataset. Defaults to an auto-generated message.",
         ),
     ]
-    register_dataset: Annotated[
-        bool, Field(description="If True, register the dataset", default=True)
-    ]
-    submit_to_project: Annotated[
-        bool, Field(description="If True, submit the dataset to the project", default=True)
-    ]
-    autogen_reverse_supplemental_mappings: Annotated[
-        set[DimensionType],
-        Field(
-            description="Dimensions on which to attempt create reverse mappings from supplemental dimensions.",
-            default=set(),
-        ),
-    ]
+
+    @field_validator("log_message")
+    def fix_log_message(cls, log_message: Optional[str], info: ValidationInfo) -> str:
+        if log_message is None:
+            log_message = f"Register dataset {info.data['dataset_id']}"
+        return log_message
 
     @model_validator(mode="before")
     @classmethod
@@ -78,6 +81,49 @@ class DatasetRegistrationModel(DSGBaseModel):
         )
         return data
 
+
+class DatasetSubmissionModel(DSGBaseModel):
+    """Defines how a dataset should be submitted to a project."""
+
+    dataset_id: str
+    project_id: str
+    dimension_mapping_file: Annotated[
+        Optional[Path],
+        Field(
+            description="Path to file containing mappings of dataset-to-project dimensions",
+            default=None,
+        ),
+    ]
+    dimension_mapping_references_file: Annotated[
+        Optional[Path],
+        Field(
+            description="Path to file containing references to mappings of dataset-to-project dimensions",
+            default=None,
+        ),
+    ]
+    replace_dimension_mapping_names_with_ids: Annotated[
+        bool,
+        Field(
+            description="Replace the dimension mapping entries with IDs of dimension mappings "
+            "in the database with matching names. Typically only useful for tests.",
+            default=False,
+        ),
+    ]
+    autogen_reverse_supplemental_mappings: Annotated[
+        set[DimensionType],
+        Field(
+            description="Dimensions on which to attempt create reverse mappings from supplemental dimensions.",
+            default=set(),
+        ),
+    ]
+    log_message: Annotated[
+        Optional[str],
+        Field(
+            default=None,
+            description="Log message to use when submitting the dataset. Defaults to an auto-generated message.",
+        ),
+    ]
+
     @model_validator(mode="before")
     @classmethod
     def fix_autogen_reverse_supplemental_mappings(cls, data: dict[str, Any]) -> dict[str, Any]:
@@ -87,25 +133,48 @@ class DatasetRegistrationModel(DSGBaseModel):
             }
         return data
 
+    @field_validator("log_message")
+    def fix_log_message(cls, log_message: Optional[str], info: ValidationInfo) -> str:
+        if log_message is None:
+            log_message = (
+                f"Submit dataset {info.data['dataset_id']} to project {info.data['project_id']}"
+            )
+        return log_message
 
-class ProjectRegistrationModel(DSGBaseModel):
-    """Defines a project to be registered."""
 
-    project_id: Annotated[str, Field(description="Project ID")]
-    config_file: Annotated[Path, Field(description="Path to project.json5")]
-    datasets: Annotated[
-        list[DatasetRegistrationModel],
-        Field(description="List of datasets to register and optionally submit to the project"),
-    ]
-    register_project: Annotated[
-        bool, Field(description="If True, register the project.", default=True)
-    ]
+class SubmittedDatasetsJournal(DSGBaseModel):
+    """Defines a dataset that was successfully submitted to a project."""
 
-    @model_validator(mode="before")
-    @classmethod
-    def fix_paths(cls, data: dict[str, Any]) -> dict[str, Any]:
-        _fix_paths(data, ("config_file",))
-        return data
+    dataset_id: str
+    project_id: str
+
+
+class RegistrationJournal(DSGBaseModel):
+    """Defines projects and datasets that were succesfully registered."""
+
+    registered_projects: list[str] = []
+    registered_datasets: list[str] = []
+    submitted_datasets: list[SubmittedDatasetsJournal] = []
+
+    def add_dataset(self, dataset_id: str) -> None:
+        assert dataset_id not in self.registered_datasets, dataset_id
+        self.registered_datasets.append(dataset_id)
+
+    def add_project(self, project_id: str) -> None:
+        assert project_id not in self.registered_projects, project_id
+        self.registered_projects.append(project_id)
+
+    def add_submitted_dataset(self, dataset_id: str, project_id: str) -> None:
+        entry = SubmittedDatasetsJournal(dataset_id=dataset_id, project_id=project_id)
+        assert entry not in self.submitted_datasets, entry
+        self.submitted_datasets.append(entry)
+
+    def has_entries(self) -> bool:
+        return (
+            bool(self.registered_projects)
+            or bool(self.registered_datasets)
+            or bool(self.submitted_datasets)
+        )
 
 
 class RegistrationModel(DSGBaseModel):
@@ -113,8 +182,39 @@ class RegistrationModel(DSGBaseModel):
 
     projects: Annotated[
         list[ProjectRegistrationModel],
-        Field(description="Defines all projects and datasets to register."),
+        Field(description="List of projects to register."),
     ]
+    datasets: Annotated[
+        list[DatasetRegistrationModel],
+        Field(description="List of datasets to register."),
+    ]
+    dataset_submissions: Annotated[
+        list[DatasetSubmissionModel],
+        Field(description="List of datasets to be submitted to projects."),
+    ]
+
+    def filter_by_journal(self, journal: RegistrationJournal) -> "RegistrationModel":
+        """Return a new instance of RegistrationModel by filtering an existing instance with
+        a journal.
+        """
+        projects = list(
+            filter(lambda x: x.project_id not in journal.registered_projects, self.projects)
+        )
+        datasets = list(
+            filter(lambda x: x.dataset_id not in journal.registered_datasets, self.datasets)
+        )
+        dataset_submissions = list(
+            filter(
+                lambda x: SubmittedDatasetsJournal(
+                    dataset_id=x.dataset_id, project_id=x.project_id
+                )
+                not in journal.submitted_datasets,
+                self.dataset_submissions,
+            )
+        )
+        return RegistrationModel(
+            projects=projects, datasets=datasets, dataset_submissions=dataset_submissions
+        )
 
 
 def _fix_paths(data: dict[str, Any], fields: Iterable[str]) -> None:

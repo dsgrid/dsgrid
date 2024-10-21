@@ -1,31 +1,36 @@
 {
-  "projects": [
+  projects: [
     {
-      "project_id": "test_efs",
-      "config_file": "dsgrid-test-data/test_efs/dsgrid_project/project.json5",
-      "register_project": true,
-      "datasets": [
-        {
-          "dataset_id": "test_efs_comstock_unpivoted",
-          "dataset_path": "dsgrid-test-data/datasets/test_efs_comstock_unpivoted",
-          "config_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock_unpivoted/dataset.json5",
-          "dimension_mapping_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock_unpivoted/dimension_mappings.json5",
-          "register_dataset": true,
-          "submit_to_project": true,
-          "replace_dimension_names_with_ids": true,
-          "replace_dimension_mapping_names_with_ids": true
-        },
-        {
-          "dataset_id": "test_efs_comstock",
-          "dataset_path": "dsgrid-test-data/datasets/test_efs_comstock",
-          "config_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dataset.json5",
-          "dimension_mapping_file": "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dimension_mappings.json5",
-          "register_dataset": true,
-          "submit_to_project": true,
-          "replace_dimension_names_with_ids": true,
-          "replace_dimension_mapping_names_with_ids": true
-        },
-      ]
-    }
-  ]
+      project_id: "test_efs",
+      config_file: "dsgrid-test-data/test_efs/dsgrid_project/project.json5",
+    },
+  ],
+  datasets: [
+    {
+      dataset_id: "test_efs_comstock_unpivoted",
+      dataset_path: "dsgrid-test-data/datasets/test_efs_comstock_unpivoted",
+      config_file: "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock_unpivoted/dataset.json5",
+      replace_dimension_names_with_ids: true,
+    },
+    {
+      dataset_id: "test_efs_comstock",
+      dataset_path: "dsgrid-test-data/datasets/test_efs_comstock",
+      config_file: "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dataset.json5",
+      replace_dimension_names_with_ids: true,
+    },
+  ],
+  dataset_submissions: [
+    {
+      dataset_id: "test_efs_comstock_unpivoted",
+      project_id: "test_efs",
+      dimension_mapping_file: "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock_unpivoted/dimension_mappings.json5",
+      replace_dimension_mapping_names_with_ids: true
+    },
+    {
+      dataset_id: "test_efs_comstock",
+      project_id: "test_efs",
+      dimension_mapping_file: "dsgrid-test-data/test_efs/dsgrid_project/datasets/modeled/comstock/dimension_mappings.json5",
+      replace_dimension_mapping_names_with_ids: true
+    },
+  ],
 }

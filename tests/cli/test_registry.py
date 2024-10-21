@@ -6,10 +6,11 @@ from click.testing import CliRunner
 from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.cli.dsgrid import cli
 from dsgrid.cli.dsgrid_admin import cli as admin_cli
+from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import TEST_DATASET_DIRECTORY
-from dsgrid.utils.files import load_data
+from dsgrid.tests.common import TEST_DATASET_DIRECTORY, TEST_EFS_REGISTRATION_FILE
+from dsgrid.utils.files import dump_data, load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
@@ -316,3 +317,76 @@ def test_register_dsgrid_projects(tmp_registry_db):
     config = project.config
     context = ScratchDirContext(tmpdir)
     config.make_dimension_association_table("decarb_2023_transport", context)
+
+
+def test_bulk_register(tmp_registry_db):
+    test_project_dir, tmp_path, db_name = tmp_registry_db
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        admin_cli,
+        [
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "create-registry",
+            db_name,
+            "-p",
+            str(tmp_path),
+            "--force",
+        ],
+    )
+    assert result.exit_code == 0
+
+    # Inject an error so that registration of the second dataset fails.
+    dataset_config_file = test_project_dir / "datasets" / "modeled" / "comstock" / "dataset.json5"
+    config = load_data(dataset_config_file)
+    config["dimensions"][0]["display_name"] += "!@#$%"
+    dump_data(config, dataset_config_file)
+    registration = RegistrationModel.from_file(TEST_EFS_REGISTRATION_FILE)
+    registration.datasets[1].config_file = dataset_config_file
+    registration_file = tmp_path / "registration.json5"
+    registration_file.write_text(registration.model_dump_json(indent=2), encoding="utf-8")
+
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli,
+        [
+            "-N",
+            db_name,
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "registry",
+            "bulk-register",
+            str(registration_file),
+        ],
+    )
+    assert result.exit_code != 0
+    regex = re.compile(
+        r"Recorded successfully registered projects and datasets to ([\w-]+\.json5)"
+    )
+    match = regex.search(result.stderr)
+    assert match
+    journal_file = Path(match.group(1))
+    assert journal_file.exists()
+
+    result = runner.invoke(
+        cli,
+        [
+            "-N",
+            db_name,
+            "--username",
+            "root",
+            "--password",
+            DEFAULT_DB_PASSWORD,
+            "registry",
+            "bulk-register",
+            str(TEST_EFS_REGISTRATION_FILE),
+            "-j",
+            str(journal_file),
+        ],
+    )
+    assert result.exit_code == 0
+    assert not journal_file.exists()

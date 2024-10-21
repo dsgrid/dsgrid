@@ -6,6 +6,7 @@ import shutil
 import sys
 from pathlib import Path
 from typing import Optional
+from uuid import uuid4
 
 import rich_click as click
 from semver import VersionInfo
@@ -13,7 +14,7 @@ from semver import VersionInfo
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.config.registration_models import RegistrationModel
+from dsgrid.config.registration_models import RegistrationModel, RegistrationJournal
 from dsgrid.registry.common import VersionUpdateType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
@@ -1262,7 +1263,14 @@ def update_dataset(
         return 1
 
 
-@click.command()
+_bulk_register_epilog = """
+Examples:\n
+$ dsgrid registry bulk-register registration.json5
+$ dsgrid registry bulk-register registration.json5 -j journal__11f733f6-ac9b-4f70-ad4b-df75b291f150.json5
+"""
+
+
+@click.command(epilog=_bulk_register_epilog)
 @click.argument("registration_file", type=click.Path(exists=True))
 @click.option(
     "-d",
@@ -1280,6 +1288,15 @@ def update_dataset(
     help="Base directory for dsgrid project/dataset repository. If set, and if the config file "
     "paths are relative, prepend them with this path.",
 )
+@click.option(
+    "-j",
+    "--journal-file",
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="Journal file created by a previous bulk register operation. If passed, the code will "
+    "read it and skip all projects and datasets that were successfully registered. "
+    "The file will be updated with IDs that are successfully registered.",
+)
 @click.pass_obj
 @click.pass_context
 def bulk_register(
@@ -1287,14 +1304,27 @@ def bulk_register(
     registry_manager: RegistryManager,
     registration_file: Path,
     base_data_dir: Optional[Path],
+    journal_file: Optional[Path],
     base_repo_dir: Optional[Path],
 ):
-    """Bulk register projects, datasets, and their dimensions. The JSON/JSON5 filename must
-    match the data model defined by this documentation:
+    """Bulk register projects, datasets, and their dimensions. If any failure occurs, the code
+    records successfully registered project and dataset IDs to a journal file and prints its
+    filename to the console. Users can pass that filename with the --journal-file option to
+    avoid registering those projects and datasets on subsequent attempts.
 
-    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.registration_models.RegistrationModel"""
+    The JSON/JSON5 filename must match the data model defined by this documentation:
+
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.registration_models.RegistrationModel
+    """
     registration = RegistrationModel.from_file(registration_file)
     tmp_files = []
+    if journal_file is None:
+        journal_file = Path(f"journal__{uuid4()}.json5")
+        journal = RegistrationJournal()
+    else:
+        journal = RegistrationJournal.from_file(journal_file)
+        registration = registration.filter_by_journal(journal)
+    failure_occurred = False
     try:
         res = handle_dsgrid_exception(
             ctx,
@@ -1304,10 +1334,25 @@ def bulk_register(
             tmp_files,
             base_data_dir,
             base_repo_dir,
+            journal,
         )
         if res[1] != 0:
             return 1
+    except Exception:
+        failure_occurred = True
+        raise
     finally:
+        if failure_occurred and journal.has_entries():
+            journal_file.write_text(journal.model_dump_json(indent=2), encoding="utf-8")
+            logger.info(
+                "Recorded successfully registered projects and datasets to %s. "
+                "Pass this file to the `--journal-file` option of this command to skip those IDs "
+                "on subsequent attempts.",
+                journal_file,
+            )
+        elif journal_file.exists():
+            journal_file.unlink()
+            logger.info("Deleted journal file %s after successful registration.", journal_file)
         for path in tmp_files:
             path.unlink()
 
@@ -1318,91 +1363,84 @@ def _run_bulk_registration(
     tmp_files: list[Path],
     base_data_dir: Optional[Path],
     base_repo_dir: Optional[Path],
+    journal: RegistrationJournal,
 ):
     user = getpass.getuser()
-    log_message = "Initial registration"
     project_mgr = mgr.project_manager
     dataset_mgr = mgr.dataset_manager
     dim_mgr = mgr.dimension_manager
     dim_mapping_mgr = mgr.dimension_mapping_manager
 
-    if base_data_dir is not None:
-        for project in registration.projects:
-            for dataset in project.datasets:
-                if not dataset.dataset_path.is_absolute():
-                    dataset.dataset_path = base_data_dir / dataset.dataset_path
     if base_repo_dir is not None:
         for project in registration.projects:
             if not project.config_file.is_absolute():
                 project.config_file = base_repo_dir / project.config_file
-            for dataset in project.datasets:
-                if not dataset.config_file.is_absolute():
-                    dataset.config_file = base_repo_dir / dataset.config_file
-                if not dataset.dimension_mapping_file.is_absolute():
-                    dataset.dimension_mapping_file = base_repo_dir / dataset.dimension_mapping_file
+        for dataset in registration.datasets:
+            if base_repo_dir is not None and not dataset.config_file.is_absolute():
+                dataset.config_file = base_repo_dir / dataset.config_file
+        for dataset in registration.dataset_submissions:
+            for field in ("dimension_mapping_file", "dimension_mapping_references_file"):
+                path = getattr(dataset, field)
+                if path is not None and not path.is_absolute():
+                    setattr(dataset, field, base_repo_dir / path)
+
+    if base_data_dir is not None:
+        for dataset in registration.datasets:
+            if not dataset.dataset_path.is_absolute():
+                dataset.dataset_path = base_data_dir / dataset.dataset_path
+
     for project in registration.projects:
-        if project.register_project:
-            project_mgr.register(project.config_file, user, log_message)
+        project_mgr.register(project.config_file, user, project.log_message)
+        journal.add_project(project.project_id)
 
-        for dataset in project.datasets:
-            refs_file = None
-            config_file = None
-            if dataset.register_dataset:
-                if dataset.replace_dimension_names_with_ids:
-                    mappings = map_dimension_names_to_ids(dim_mgr)
-                    orig = dataset.config_file
-                    config_file = orig.with_stem(orig.name + "__tmp")
-                    shutil.copyfile(orig, config_file)
-                    tmp_files.append(config_file)
-                    replace_dimension_names_with_current_ids(config_file, mappings)
-                else:
-                    config_file = dataset.config_file
+    for dataset in registration.datasets:
+        config_file = None
+        if dataset.replace_dimension_names_with_ids:
+            mappings = map_dimension_names_to_ids(dim_mgr)
+            orig = dataset.config_file
+            config_file = orig.with_stem(orig.name + "__tmp")
+            shutil.copyfile(orig, config_file)
+            tmp_files.append(config_file)
+            replace_dimension_names_with_current_ids(config_file, mappings)
+        else:
+            config_file = dataset.config_file
 
-            assert config_file is not None
-            if dataset.submit_to_project:
-                if (
-                    dataset.replace_dimension_mapping_names_with_ids
-                    and dataset.dimension_mapping_references_file is not None
-                ):
-                    dim_id_to_name = map_dimension_ids_to_names(mgr.dimension_manager)
-                    mappings = map_dimension_mapping_names_to_ids(dim_mapping_mgr, dim_id_to_name)
-                    orig = dataset.dimension_mapping_references_file
-                    refs_file = orig.with_stem(orig.name + "__tmp")
-                    shutil.copyfile(orig, refs_file)
-                    tmp_files.append(refs_file)
-                    replace_dimension_mapping_names_with_current_ids(refs_file, mappings)
-                else:
-                    refs_file = dataset.dimension_mapping_references_file
+        assert dataset.log_message is not None
+        dataset_mgr.register(
+            config_file,
+            dataset.dataset_path,
+            user,
+            dataset.log_message,
+        )
+        journal.add_dataset(dataset.dataset_id)
 
-            if dataset.register_dataset and dataset.submit_to_project:
-                # If something fails in the submit stage, dsgrid will delete the dataset.
-                project_mgr.register_and_submit_dataset(
-                    config_file,
-                    dataset.dataset_path,
-                    project.project_id,
-                    user,
-                    log_message,
-                    dimension_mapping_file=dataset.dimension_mapping_file,
-                    dimension_mapping_references_file=refs_file,
-                    autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
-                )
-            elif dataset.register_dataset:
-                dataset_mgr.register(
-                    config_file,
-                    dataset.dataset_path,
-                    user,
-                    log_message,
-                )
-            elif dataset.submit_to_project:
-                project_mgr.submit_dataset(
-                    project.project_id,
-                    dataset.dataset_id,
-                    user,
-                    log_message,
-                    dimension_mapping_file=dataset.dimension_mapping_file,
-                    dimension_mapping_references_file=refs_file,
-                    autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
-                )
+    for dataset in registration.dataset_submissions:
+        refs_file = None
+        if (
+            dataset.replace_dimension_mapping_names_with_ids
+            and dataset.dimension_mapping_references_file is not None
+        ):
+            dim_id_to_name = map_dimension_ids_to_names(mgr.dimension_manager)
+            mappings = map_dimension_mapping_names_to_ids(dim_mapping_mgr, dim_id_to_name)
+            orig = dataset.dimension_mapping_references_file
+            refs_file = orig.with_stem(orig.name + "__tmp")
+            shutil.copyfile(orig, refs_file)
+            tmp_files.append(refs_file)
+            replace_dimension_mapping_names_with_current_ids(refs_file, mappings)
+        else:
+            refs_file = dataset.dimension_mapping_references_file
+
+        assert dataset.log_message is not None
+        project_mgr.submit_dataset(
+            dataset.project_id,
+            dataset.dataset_id,
+            user,
+            dataset.log_message,
+            dimension_mapping_file=dataset.dimension_mapping_file,
+            dimension_mapping_references_file=refs_file,
+            autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
+        )
+        journal.add_submitted_dataset(dataset.dataset_id, dataset.project_id)
 
 
 @click.command()

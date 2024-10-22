@@ -11,7 +11,7 @@ from dsgrid.tests.common import (
     # TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import load_data
-from dsgrid.tests.common import (
+from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )

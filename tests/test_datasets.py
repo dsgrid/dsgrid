@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
-from dsgrid.tests.common import (
+from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )

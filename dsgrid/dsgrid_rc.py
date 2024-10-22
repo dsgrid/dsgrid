@@ -22,7 +22,7 @@ class DsgridRuntimeConfig(DSGBaseModel):
     database_url: str | None = "http://localhost:8529"
     database_user: str = "root"
     database_password: str = DEFAULT_DB_PASSWORD
-    offline: bool = False
+    offline: bool = True
     console_level: str = "info"
     file_level: str = "info"
     timings: bool = False

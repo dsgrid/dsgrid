@@ -30,14 +30,16 @@ from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
+    TEST_DATASET_DIRECTORY,
+)
+from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     map_dimension_ids_to_names,
     map_dimension_mapping_names_to_ids,
     replace_dimension_names_with_current_ids,
     replace_dimension_mapping_names_with_current_ids,
-    TEST_DATASET_DIRECTORY,
 )
-from dsgrid.utils.files import dump_data, load_data
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 

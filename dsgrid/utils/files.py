@@ -6,6 +6,7 @@ import os
 import json
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import json5
 
@@ -54,7 +55,7 @@ def dump_data(data, filename, **kwargs):
     logger.debug("Dumped data to %s", filename)
 
 
-def load_data(filename, **kwargs):
+def load_data(filename, **kwargs) -> dict[str, Any]:
     """Load data from the file.
     Supports JSON, JSON5, or custom via kwargs.
 

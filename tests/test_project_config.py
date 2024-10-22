@@ -13,7 +13,7 @@ from dsgrid.config.project_config import (
     RequiredDimensionRecordsModel,
 )
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import (
+from dsgrid.utils.id_remappings import (
     map_dimension_ids_to_names,
     map_dimension_names_to_ids,
     map_dimension_mapping_names_to_ids,

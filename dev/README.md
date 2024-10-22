@@ -223,10 +223,15 @@ run multiple iterations.
 Run this from your scratch directory.
 
 ```
+$ dsgrid-admin create-registry --data-path standard-scenarios-registry-data standard-scenarios
+```
+```
 $ spark-submit \
     --master=spark://$(hostname):7077 \
     --conf spark.sql.shuffle.partitions=2400 \
-    dsgrid/tests/register.py tests/data/standard_scenarios_registration.json
+    $(which dsgrid-cli.py) registry bulk-register \
+        --data-path=standard-scenarios-registry-data \
+        tests/data/standard_scenarios_registration.json5
 ```
 
 2. Acquire a new compute node. It can be any type of node and you only need it for an hour.
@@ -399,15 +404,19 @@ export DSGRID_LOCAL_DATA_DIRECTORY=~/.dsgrid-data
 
 Create and populate the registry.
 ```
-python dsgrid/tests/register.py tests/data/test_efs_registration.json
+$ dsgrid-admin create-registry --data-path=tests/data/registry cached-test-dsgrid
+```
+```
+$ dsgrid registry bulk-register tests/data/test_efs_registration.json
 ```
 
 Now you can run any `dsgrid registry` command.
 
 ## Register projects and datasets under development
 When developing projects and datasets you will likely have to run the registration commands many
-times. dsgrid provides a helper script for this purpose. Refer to `dsgrid/tests/register.py` and
-the data models in `dsgrid/tests/registration_models.py`. They automate the registration process
+times. dsgrid provides a helper script for this purpose. Refer to
+`dsgrid registry bulk-register --help` and
+the data models in `dsgrid/config/registration_models.py`. They automate the registration process
 so that you don't have to write your own scripts. Example config files are
 `tests/data/test_efs_registration.json` and `tests/data/standard_scenarios_registration.json`.
 

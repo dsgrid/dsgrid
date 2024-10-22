@@ -1304,8 +1304,8 @@ def bulk_register(
     registry_manager: RegistryManager,
     registration_file: Path,
     base_data_dir: Optional[Path],
-    journal_file: Optional[Path],
     base_repo_dir: Optional[Path],
+    journal_file: Optional[Path],
 ):
     """Bulk register projects, datasets, and their dimensions. If any failure occurs, the code
     records successfully registered project and dataset IDs to a journal file and prints its
@@ -1376,7 +1376,7 @@ def _run_bulk_registration(
             if not project.config_file.is_absolute():
                 project.config_file = base_repo_dir / project.config_file
         for dataset in registration.datasets:
-            if base_repo_dir is not None and not dataset.config_file.is_absolute():
+            if not dataset.config_file.is_absolute():
                 dataset.config_file = base_repo_dir / dataset.config_file
         for dataset in registration.dataset_submissions:
             for field in ("dimension_mapping_file", "dimension_mapping_references_file"):

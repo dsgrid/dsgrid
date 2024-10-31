@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 
 from pydantic import field_validator, Field
-from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.utilities import check_uniqueness
@@ -18,13 +17,10 @@ class DimensionsConfigModel(DSGBaseModel):
     Used when registering multiple dimensions in one command.
     """
 
-    dimensions: Annotated[
-        DimensionsListModel,
-        Field(
-            title="dimensions",
-            description="Dimensions for submission to the dimension registry",
-        ),
-    ]
+    dimensions: DimensionsListModel = Field(
+        title="dimensions",
+        description="Dimensions for submission to the dimension registry",
+    )
 
     @field_validator("dimensions")
     @classmethod

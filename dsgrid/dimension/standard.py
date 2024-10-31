@@ -1,9 +1,8 @@
 """Standard dimension classes for dsgrid"""
 
-from typing import Optional, Union
+from typing import Optional
 
-from pydantic import field_validator, Field
-from typing_extensions import Annotated
+from pydantic import Field
 
 from dsgrid.config.dimensions import (
     DateTimeDimensionModel,
@@ -37,8 +36,8 @@ class State(GeographyDimensionBaseModel):
     """State attributes"""
 
     is_conus: Optional[bool] = None
-    census_division: Optional[str] = ""
-    census_region: Optional[str] = ""
+    census_division: str = ""
+    census_region: str = ""
 
 
 class County(GeographyDimensionBaseModel):
@@ -53,14 +52,11 @@ class County(GeographyDimensionBaseModel):
 class Sector(SectorDimensionBaseModel):
     """Sector attributes"""
 
-    category: Annotated[
-        Optional[str],
-        Field(
-            title="sector",
-            description="Sector dimension",
-            default="",
-        ),
-    ]
+    category: str = Field(
+        title="sector",
+        description="Sector dimension",
+        default="",
+    )
 
 
 # ---------------------------
@@ -69,25 +65,8 @@ class Sector(SectorDimensionBaseModel):
 class Subsector(SubsectorDimensionBaseModel):
     """Subsector attributes"""
 
-    # NOTE: making sector optional for now, we may remove because it should be
-    #   handled in the association tables
-    sector: Annotated[
-        Optional[str],
-        Field(
-            default="",
-        ),
-    ]
-    abbr: Annotated[
-        Optional[str],
-        Field(
-            default="",
-        ),
-    ]
-
-    @field_validator("abbr", mode="before")
-    @classmethod
-    def validate_abbr(cls, value: Union[str, None]) -> str:
-        return value or ""
+    sector: str = ""
+    abbr: str = ""
 
 
 # ---------------------------

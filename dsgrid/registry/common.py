@@ -9,7 +9,6 @@ from typing import Optional
 
 from pydantic import Field
 from semver import VersionInfo
-from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel, DSGEnum
 from dsgrid.utils.versioning import make_version
@@ -132,35 +131,23 @@ RegistryManagerParams = namedtuple(
 class RegistrationModel(DSGBaseModel):
     """Registration fields required by the ProjectConfig and DatasetConfig"""
 
-    version: Annotated[
-        str,
-        Field(
-            title="version",
-            description="Version resulting from the registration",
-        ),
-    ]
-    submitter: Annotated[
-        str,
-        Field(
-            title="submitter",
-            description="Username that submitted the registration",
-        ),
-    ]
-    date: Annotated[
-        datetime,
-        Field(
-            title="date",
-            description="Registration date",
-        ),
-    ]
-    log_message: Annotated[
-        Optional[str],
-        Field(
-            None,
-            title="log_message",
-            description="Reason for the update",
-        ),
-    ]
+    version: str = Field(
+        title="version",
+        description="Version resulting from the registration",
+    )
+    submitter: str = Field(
+        title="submitter",
+        description="Username that submitted the registration",
+    )
+    date: datetime = Field(
+        title="date",
+        description="Registration date",
+    )
+    log_message: Optional[str] = Field(
+        default=None,
+        title="log_message",
+        description="Reason for the update",
+    )
 
 
 def get_version_from_filename(filename):

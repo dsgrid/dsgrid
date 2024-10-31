@@ -1,10 +1,9 @@
 import csv
 import logging
 import os
-from typing import List, Optional, Union
+from typing import Optional
 
 from pydantic import field_validator, Field, ValidationInfo, field_serializer
-from typing_extensions import Annotated
 
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingBaseModel,
@@ -23,29 +22,20 @@ logger = logging.getLogger(__name__)
 class MappingTableRecordModel(DSGBaseModel):
     """Represents one record in dimension mapping record files. Maps one dimension to another."""
 
-    from_id: Annotated[
-        str,
-        Field(
-            title="from_id",
-            description="Source mapping",
-        ),
-    ]
-    to_id: Annotated[
-        Union[str, None],
-        Field(
-            None,
-            title="to_id",
-            description="Destination mapping",
-        ),
-    ]
-    from_fraction: Annotated[
-        float,
-        Field(
-            title="from_fraction",
-            description="Fraction of from_id to map to to_id",
-            default=1.0,
-        ),
-    ]
+    from_id: str = Field(
+        title="from_id",
+        description="Source mapping",
+    )
+    to_id: Optional[str] = Field(
+        default=None,
+        title="to_id",
+        description="Destination mapping",
+    )
+    from_fraction: float = Field(
+        title="from_fraction",
+        description="Fraction of from_id to map to to_id",
+        default=1.0,
+    )
 
     @field_validator("from_id", "to_id")
     @classmethod
@@ -60,14 +50,11 @@ class MappingTableByNameModel(DimensionMappingPreRegisteredBaseModel):
     This will be converted to a MappingTableModel as soon as the dimensions are registered.
     """
 
-    filename: Annotated[
-        str,
-        Field(
-            title="filename",
-            alias="file",
-            description="Filename containing association table records.",
-        ),
-    ]
+    filename: str = Field(
+        title="filename",
+        alias="file",
+        description="Filename containing association table records.",
+    )
 
 
 class DatasetBaseToProjectMappingTableModel(DimensionMappingDatasetToProjectBaseModel):
@@ -76,57 +63,45 @@ class DatasetBaseToProjectMappingTableModel(DimensionMappingDatasetToProjectBase
     the dimensions are registered.
     """
 
-    filename: Annotated[
-        str,
-        Field(
-            title="filename",
-            alias="file",
-            description="Filename containing association table records.",
-        ),
-    ]
+    filename: str = Field(
+        title="filename",
+        alias="file",
+        description="Filename containing association table records.",
+    )
 
 
 class DatasetBaseToProjectMappingTableListModel(DSGBaseModel):
     """Represents the config file passed to register-and-submit-dataset command."""
 
-    mappings: List[DatasetBaseToProjectMappingTableModel]
+    mappings: list[DatasetBaseToProjectMappingTableModel]
 
 
 class MappingTableModel(DimensionMappingBaseModel):
     """Attributes for a dimension mapping table"""
 
-    filename: Annotated[
-        Optional[str],
-        Field(
-            title="filename",
-            alias="file",
-            default=None,
-            description="Filename containing association table records. Only assigned for user input "
-            "and output purposes. The registry database stores records in the mapping JSON document.",
-        ),
-    ]
-    file_hash: Annotated[
-        Optional[str],
-        Field(
-            title="file_hash",
-            description="Hash of the contents of the file, computed by dsgrid.",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-            default=None,
-        ),
-    ]
-    records: Annotated[
-        List,
-        Field(
-            title="records",
-            description="dimension mapping records in filename that get loaded at runtime",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-            default=[],
-        ),
-    ]
+    filename: Optional[str] = Field(
+        title="filename",
+        alias="file",
+        default=None,
+        description="Filename containing association table records. Only assigned for user input "
+        "and output purposes. The registry database stores records in the mapping JSON document.",
+    )
+    file_hash: Optional[str] = Field(
+        title="file_hash",
+        description="Hash of the contents of the file, computed by dsgrid.",
+        json_schema_extra={
+            "dsgrid_internal": True,
+        },
+        default=None,
+    )
+    records: list = Field(
+        title="records",
+        description="dimension mapping records in filename that get loaded at runtime",
+        json_schema_extra={
+            "dsgrid_internal": True,
+        },
+        default=[],
+    )
 
     @field_validator("filename")
     @classmethod

@@ -2,7 +2,7 @@
 
 import getpass
 import logging
-from typing import Union
+from typing import Optional, Union
 
 from prettytable import PrettyTable
 
@@ -275,10 +275,10 @@ class DimensionRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        filters: list[str] = None,
-        max_width: Union[int, dict] = None,
-        drop_fields: list[str] = None,
-        dimension_ids: set[str] = None,
+        filters: Optional[list[str]] = None,
+        max_width: Optional[Union[int, dict]] = None,
+        drop_fields: Optional[list[str]] = None,
+        dimension_ids: Optional[set[str]] = None,
         return_table: bool = False,
         **kwargs,
     ):

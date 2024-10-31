@@ -1,7 +1,7 @@
 import abc
 import logging
 import os
-from typing import Optional, Union
+from typing import Optional
 
 from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
@@ -51,7 +51,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         config,
         dimension_mgr,
         dimension_mapping_mgr,
-        mapping_references: Union[None, list[DimensionMappingReferenceModel]] = None,
+        mapping_references: Optional[list[DimensionMappingReferenceModel]] = None,
         project_time_dim=None,
     ):
         self._config: DatasetConfig = config

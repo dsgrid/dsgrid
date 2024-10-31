@@ -39,7 +39,7 @@ dependencies = [
     "json5",
     "pandas",
     "prettytable",
-    "pydantic~=2.4.0",
+    "pydantic~=2.9.2",
     "pyspark==3.5.2",  # Keep this synced with the spark version in Dockerfile.
     "python-arango",
     "requests",

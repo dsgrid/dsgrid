@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
-from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
@@ -14,15 +13,12 @@ from dsgrid.utils.files import load_data
 class ProjectRegistrationModel(DSGBaseModel):
     """Defines a project to be registered."""
 
-    project_id: Annotated[str, Field(description="Project ID")]
-    config_file: Annotated[Path, Field(description="Path to project.json5")]
-    log_message: Annotated[
-        Optional[str],
-        Field(
-            default=None,
-            description="Log message to use when registering the project. Defaults to an auto-generated message.",
-        ),
-    ]
+    project_id: str = Field(description="Project ID")
+    config_file: Path = Field(description="Path to project.json5")
+    log_message: Optional[str] = Field(
+        default=None,
+        description="Log message to use when registering the project. Defaults to an auto-generated message.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -40,26 +36,20 @@ class ProjectRegistrationModel(DSGBaseModel):
 class DatasetRegistrationModel(DSGBaseModel):
     """Defines a dataset to be registered."""
 
-    dataset_id: Annotated[str, Field(description="Dataset ID")]
-    dataset_path: Annotated[
-        Path, Field(description="Directory containing load_data/load_data_lookup.parquet")
-    ]
-    config_file: Annotated[Path, Field(description="Path to dataset.json5")]
-    replace_dimension_names_with_ids: Annotated[
-        bool,
-        Field(
-            description="Replace the dimension entries with IDs of dimensions in the database "
-            "with matching names. Typically only useful for tests.",
-            default=False,
-        ),
-    ]
-    log_message: Annotated[
-        Optional[str],
-        Field(
-            default=None,
-            description="Log message to use when registering the dataset. Defaults to an auto-generated message.",
-        ),
-    ]
+    dataset_id: str = Field(description="Dataset ID")
+    dataset_path: Path = Field(
+        description="Directory containing load_data/load_data_lookup.parquet"
+    )
+    config_file: Path = Field(description="Path to dataset.json5")
+    replace_dimension_names_with_ids: bool = Field(
+        description="Replace the dimension entries with IDs of dimensions in the database "
+        "with matching names. Typically only useful for tests.",
+        default=False,
+    )
+    log_message: Optional[str] = Field(
+        default=None,
+        description="Log message to use when registering the dataset. Defaults to an auto-generated message.",
+    )
 
     @field_validator("log_message")
     def fix_log_message(cls, log_message: Optional[str], info: ValidationInfo) -> str:
@@ -87,42 +77,27 @@ class DatasetSubmissionModel(DSGBaseModel):
 
     dataset_id: str
     project_id: str
-    dimension_mapping_file: Annotated[
-        Optional[Path],
-        Field(
-            description="Path to file containing mappings of dataset-to-project dimensions",
-            default=None,
-        ),
-    ]
-    dimension_mapping_references_file: Annotated[
-        Optional[Path],
-        Field(
-            description="Path to file containing references to mappings of dataset-to-project dimensions",
-            default=None,
-        ),
-    ]
-    replace_dimension_mapping_names_with_ids: Annotated[
-        bool,
-        Field(
-            description="Replace the dimension mapping entries with IDs of dimension mappings "
-            "in the database with matching names. Typically only useful for tests.",
-            default=False,
-        ),
-    ]
-    autogen_reverse_supplemental_mappings: Annotated[
-        set[DimensionType],
-        Field(
-            description="Dimensions on which to attempt create reverse mappings from supplemental dimensions.",
-            default=set(),
-        ),
-    ]
-    log_message: Annotated[
-        Optional[str],
-        Field(
-            default=None,
-            description="Log message to use when submitting the dataset. Defaults to an auto-generated message.",
-        ),
-    ]
+    dimension_mapping_file: Optional[Path] = Field(
+        description="Path to file containing mappings of dataset-to-project dimensions",
+        default=None,
+    )
+    dimension_mapping_references_file: Optional[Path] = Field(
+        description="Path to file containing references to mappings of dataset-to-project dimensions",
+        default=None,
+    )
+    replace_dimension_mapping_names_with_ids: bool = Field(
+        description="Replace the dimension mapping entries with IDs of dimension mappings "
+        "in the database with matching names. Typically only useful for tests.",
+        default=False,
+    )
+    autogen_reverse_supplemental_mappings: set[DimensionType] = Field(
+        description="Dimensions on which to attempt create reverse mappings from supplemental dimensions.",
+        default=set(),
+    )
+    log_message: Optional[str] = Field(
+        default=None,
+        description="Log message to use when submitting the dataset. Defaults to an auto-generated message.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -180,18 +155,11 @@ class RegistrationJournal(DSGBaseModel):
 class RegistrationModel(DSGBaseModel):
     """Defines a list of projects and datasets to be registered."""
 
-    projects: Annotated[
-        list[ProjectRegistrationModel],
-        Field(description="List of projects to register."),
-    ]
-    datasets: Annotated[
-        list[DatasetRegistrationModel],
-        Field(description="List of datasets to register."),
-    ]
-    dataset_submissions: Annotated[
-        list[DatasetSubmissionModel],
-        Field(description="List of datasets to be submitted to projects."),
-    ]
+    projects: list[ProjectRegistrationModel] = Field(description="List of projects to register.")
+    datasets: list[DatasetRegistrationModel] = Field(description="List of datasets to register.")
+    dataset_submissions: list[DatasetSubmissionModel] = Field(
+        description="List of datasets to be submitted to projects."
+    )
 
     def filter_by_journal(self, journal: RegistrationJournal) -> "RegistrationModel":
         """Return a new instance of RegistrationModel by filtering an existing instance with

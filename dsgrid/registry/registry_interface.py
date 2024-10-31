@@ -4,7 +4,6 @@ import logging
 from typing import Optional
 
 from pydantic import Field
-from typing_extensions import Annotated
 
 from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.config.dimensions import handle_dimension_union
@@ -24,39 +23,30 @@ class RegistryModel(DSGBaseModel):
     """Base model for a registry root"""
 
     registry_type: str
-    id: Annotated[
-        Optional[str],
-        Field(
-            None,
-            alias="_id",
-            description="Registry database ID",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-        ),
-    ]
-    key: Annotated[
-        Optional[str],
-        Field(
-            None,
-            alias="_key",
-            description="Registry database key",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-        ),
-    ]
-    rev: Annotated[
-        Optional[str],
-        Field(
-            None,
-            alias="_rev",
-            description="Registry database revision",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-        ),
-    ]
+    id: Optional[str] = Field(
+        default=None,
+        alias="_id",
+        description="Registry database ID",
+        json_schema_extra={
+            "dsgrid_internal": True,
+        },
+    )
+    key: Optional[str] = Field(
+        default=None,
+        alias="_key",
+        description="Registry database key",
+        json_schema_extra={
+            "dsgrid_internal": True,
+        },
+    )
+    rev: Optional[str] = Field(
+        default=None,
+        alias="_rev",
+        description="Registry database revision",
+        json_schema_extra={
+            "dsgrid_internal": True,
+        },
+    )
 
 
 class DatasetRegistryModel(RegistryModel):

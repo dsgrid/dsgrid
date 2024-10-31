@@ -2,7 +2,6 @@ import enum
 from datetime import datetime
 
 from pydantic import Field
-from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.query.models import ProjectQueryModel
@@ -52,19 +51,13 @@ class StoreModel(DSGBaseModel):
 
 class SparkSubmitProjectQueryRequest(DSGBaseModel):
 
-    use_spark_submit: Annotated[
-        bool,
-        Field(
-            default=True,
-            description="If True, run the query command through spark-submit. If False, run the "
-            "command directly in dsgrid.",
-        ),
-    ]
-    spark_submit_options: Annotated[
-        dict[str, str],
-        Field(
-            default={},
-            description="Options to forward to the spark-submit command (e.g., --master spark://hostname:7077",
-        ),
-    ]
+    use_spark_submit: bool = Field(
+        default=True,
+        description="If True, run the query command through spark-submit. If False, run the "
+        "command directly in dsgrid.",
+    )
+    spark_submit_options: dict[str, str] = Field(
+        default={},
+        description="Options to forward to the spark-submit command (e.g., --master spark://hostname:7077",
+    )
     query: ProjectQueryModel

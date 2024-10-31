@@ -3,7 +3,6 @@
 from typing import Optional
 
 from pydantic import field_validator, model_validator, Field
-from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
@@ -19,7 +18,7 @@ class DimensionSimpleModel(DSGBaseModel):
 class DimensionsSimpleModel(DSGBaseModel):
 
     base_dimensions: list[DimensionSimpleModel]
-    supplemental_dimensions: Annotated[list[DimensionSimpleModel], Field(default=[])]
+    supplemental_dimensions: list[DimensionSimpleModel] = Field(default=[])
 
     @field_validator("base_dimensions")
     @classmethod

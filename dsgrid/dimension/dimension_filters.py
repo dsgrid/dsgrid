@@ -6,7 +6,6 @@ from typing import Any, Union, Literal
 import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 from pydantic import field_validator, model_validator, Field
-from typing_extensions import Annotated
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
@@ -31,9 +30,9 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
     """Base model for all filters"""
 
     dimension_type: DimensionType
-    column: Annotated[
-        str, Field(title="column", description="Column of dimension records to use", default="id")
-    ]
+    column: str = Field(
+        title="column", description="Column of dimension records to use", default="id"
+    )
 
     @abc.abstractmethod
     def apply_filter(self, df, column=None):
@@ -171,25 +170,19 @@ class DimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel
     df.filter(~F.col("sector").startswith("com"))
     """
 
-    operator: Annotated[
-        str, Field(title="operator", description="Method on pyspark.sql.functions.col to invoke")
-    ]
-    value: Annotated[
-        Any,
-        Field(
-            None,
-            title="value",
-            description="Value to filter on. Use a two-element list for the between operator.",
-        ),
-    ]
-    negate: Annotated[
-        bool,
-        Field(
-            title="negate",
-            description="Change the filter to match the negation of the value.",
-            default=False,
-        ),
-    ]
+    operator: str = Field(
+        title="operator", description="Method on pyspark.sql.functions.col to invoke"
+    )
+    value: Any = Field(
+        default=None,
+        title="value",
+        description="Value to filter on. Use a two-element list for the between operator.",
+    )
+    negate: bool = Field(
+        title="negate",
+        description="Change the filter to match the negation of the value.",
+        default=False,
+    )
     filter_type: Literal[DimensionFilterType.COLUMN_OPERATOR] = DimensionFilterType.COLUMN_OPERATOR
 
     @field_validator("operator")
@@ -215,20 +208,17 @@ class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBa
     df.filter(F.col("timestamp").between("2012-07-01 00:00:00", "2012-08-01 00:00:00"))
     """
 
-    lower_bound: Annotated[
-        Any, Field(None, title="lower_bound", description="Lower bound, inclusive")
-    ]
-    upper_bound: Annotated[
-        Any, Field(None, title="upper_bound", description="Upper bound, inclusive")
-    ]
-    negate: Annotated[
-        bool,
-        Field(
-            title="negate",
-            description="Change the filter to match the negation of the value.",
-            default=False,
-        ),
-    ]
+    lower_bound: Any = Field(
+        default=None, title="lower_bound", description="Lower bound, inclusive"
+    )
+    upper_bound: Any = Field(
+        default=None, title="upper_bound", description="Upper bound, inclusive"
+    )
+    negate: bool = Field(
+        title="negate",
+        description="Change the filter to match the negation of the value.",
+        default=False,
+    )
     filter_type: Literal[
         DimensionFilterType.BETWEEN_COLUMN_OPERATOR
     ] = DimensionFilterType.BETWEEN_COLUMN_OPERATOR
@@ -286,23 +276,17 @@ class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
 class SupplementalDimensionFilterColumnOperatorModel(DimensionFilterSingleQueryNameBaseModel):
     """Filters base dimension records that have a valid mapping to a supplemental dimension."""
 
-    value: Annotated[Any, Field(title="value", description="Value to filter on", default="%")]
-    operator: Annotated[
-        str,
-        Field(
-            title="operator",
-            description="Method on pyspark.sql.functions.col to invoke",
-            default="like",
-        ),
-    ]
-    negate: Annotated[
-        bool,
-        Field(
-            title="negate",
-            description="Filter out valid mappings to this supplemental dimension.",
-            default=False,
-        ),
-    ]
+    value: Any = Field(title="value", description="Value to filter on", default="%")
+    operator: str = Field(
+        title="operator",
+        description="Method on pyspark.sql.functions.col to invoke",
+        default="like",
+    )
+    negate: bool = Field(
+        title="negate",
+        description="Filter out valid mappings to this supplemental dimension.",
+        default=False,
+    )
     filter_type: Literal[
         DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR
     ] = DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR

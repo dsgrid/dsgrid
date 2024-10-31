@@ -18,7 +18,6 @@ class TableFormatType(str, Enum):
 class PivotedTableFormatModel(DSGBaseModel):
     format_type: Literal[TableFormatType.PIVOTED] = TableFormatType.PIVOTED
     pivoted_dimension_type: DimensionType = Field(
-        alias="load_data_column_dimension",  # TODO: remove when datasets have been converted
         title="pivoted_dimension_type",
         description="The data dimension whose records are columns (pivoted) that contain "
         "data values (numeric) in the load_data table.",

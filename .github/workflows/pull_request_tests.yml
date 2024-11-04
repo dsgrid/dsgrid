@@ -8,11 +8,11 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
-        python-version: ["3.10"]
+        python-version: ["3.11"]
         include:
           # Installing Spark on a Windows VM needs work.
           - os: ubuntu-latest
-            python-version: "3.10"
+            python-version: "3.11"
 
     steps:
     - uses: actions/checkout@v4

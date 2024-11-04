@@ -353,7 +353,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     zipf.write(path)
         return filename
 
-    def _save_result(self, context, df, filename, repartition):
+    def _save_result(self, context: QueryContext, df, filename, repartition):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":

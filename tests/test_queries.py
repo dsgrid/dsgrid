@@ -2,6 +2,7 @@ import abc
 import logging
 import math
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
@@ -510,6 +511,8 @@ def run_query_test(test_query_cls, *args, expected_values=None):
                 force=True,
             )
             assert query.validate(expected_values=expected_values)
+            metadata_file = output_dir / query.name / "metadata.json"
+            subprocess.run(["python", "scripts/table_metadata.py", str(metadata_file)], check=True)
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -526,15 +529,15 @@ class QueryTestBase(abc.ABC):
         self._cached_stats = None
 
     @staticmethod
-    def get_database_name():
+    def get_database_name() -> str:
         return "simple-standard-scenarios"
 
     @staticmethod
-    def get_project_id():
+    def get_project_id() -> str:
         return "dsgrid_conus_2022"
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return the name of the query.
 
         Returns

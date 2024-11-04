@@ -31,11 +31,11 @@ class QueryContext:
         self._scratch_dir_context = scratch_dir_context
 
     @property
-    def metadata(self):
+    def metadata(self) -> DatasetMetadataModel:
         return self._metadata
 
     @metadata.setter
-    def metadata(self, val):
+    def metadata(self, val: DatasetMetadataModel):
         self._metadata = val
 
     @property

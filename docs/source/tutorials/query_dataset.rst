@@ -6,9 +6,9 @@ Query a Dataset with Python
 ***************************
 In this tutorial you will learn how to query data from a registered dsgrid dataset.
 use data from the dsgrid registry stored on NREL's HPC Kestrel cluster, and the same data
-stored on `OEDI <https://data.openei.org/>`.
+stored on `OEDI <https://data.openei.org/>`_.
 
-This tutorial will use the `tempo dataset<https://github.com/dsgrid/dsgrid-project-StandardScenarios/tree/main/tempo_project>` as an example
+This tutorial will use the `tempo dataset <https://github.com/dsgrid/dsgrid-project-StandardScenarios/tree/main/tempo_project>`_ as an example
 
 Query objectives
 ================
@@ -31,17 +31,20 @@ Setup Environment
 1. Setup python environment
 
 from a terminal run:
-.. code-block:: Bash
-   module load python  # only if running on kepler
 
-   python -m venv dsgrid-tutorial
-   source dsgrid-tutorial/bin/activate
+.. code-block:: bash
+
+   $ module load python  # only if running on kepler
+
+   $ python -m venv dsgrid-tutorial
+   $ source dsgrid-tutorial/bin/activate
 
 2. Install duckdb and pandas
 
-.. code-block:: Bash
-   pip install duckdb
-   pip install pandas
+.. code-block:: bash
+
+   $ pip install duckdb
+   $ pip install pandas
 
 
 Load data from Kestrel
@@ -49,12 +52,14 @@ Load data from Kestrel
 
 1. Enter a python interpreter
 
-.. code-block:: Bash
-   python
+.. code-block:: bash
+
+   $ python
 
 2. Load .parquet files from Kestrel into a table
 
-.. code-block:: Python
+.. code-block:: python
+
    import duckdb
 
    tablename = "tbl"
@@ -78,7 +83,8 @@ Load data from OEDI
 2. Load .parquet files from OEDI into a table
    This step is identical to the previous loading step, except the file path is different
 
-.. code-block:: Python
+.. code-block:: python
+
    import duckdb
 
    tablename = "tbl"
@@ -103,7 +109,8 @@ can make queries much more efficient.
 
 Using the same tablename and filepath from the sections above
 
-.. code-block:: Python
+.. code-block:: python
+
    duckdb.sql("""CREATE TABLE {tablename} AS SELECT *
                 FROM read_parquet('{filepath}/table.parquet/**/*.parquet',
                 hive_partitioning=true, hive_types_autocast=false
@@ -115,11 +122,13 @@ Export Data
 
 1. Create a pandas dataframe after loading, and possibly filtering, from the previous steps
 
-.. code-block:: Python
-   dataframe = duckdb.sql("SELECT * FROM {tablename}")
+.. code-block:: python
+
+   dataframe = duckdb.sql("SELECT * FROM {tablename}").df()
 
 2. Export dataframe to csv after createing dataframe
 
-.. code-block:: Python
+.. code-block:: python
+
    dataframe.to_csv('~/mydata.csv')
 

@@ -23,3 +23,4 @@ is stored at ``~/dsgrid-data``.
    create_and_submit_dataset
    query_project
    create_derived_dataset
+   query_dataset

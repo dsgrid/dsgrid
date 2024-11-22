@@ -8,14 +8,14 @@ In this tutorial you will learn how to query data from a registered dsgrid datas
 use data from the dsgrid registry stored on NREL's HPC Kestrel cluster, and the same data
 stored on `OEDI <https://data.openei.org/>`_.
 
-This tutorial will use the `tempo dataset <https://github.com/dsgrid/dsgrid-project-StandardScenarios/tree/main/tempo_project>`_ as an example
+This tutorial will use the `state_level_simplified` dataset from the `tempo project <https://github.com/dsgrid/dsgrid-project-StandardScenarios/tree/main/tempo_project>`_ as an example.
 
 Query objectives
 ================
 This query will accomplish the following:
 
 - Read data from Kestrel filesystem and OEDI s3 bucket
-- Filter data for given model years, state/country, and scenario
+- Filter data for given model years, geography, scenario, and other dimensions
 - Export the query results to a pandas dataframe or a csv
 
 Required Knowledge

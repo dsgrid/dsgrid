@@ -34,7 +34,7 @@ from a terminal run:
 
 .. code-block:: bash
 
-   $ module load python  # only if running on kepler
+   $ module load python  # only if running on Kestrel
 
    $ python -m venv dsgrid-tutorial
    $ source dsgrid-tutorial/bin/activate
@@ -67,12 +67,12 @@ Load data from Kestrel
    dataset_name = "state_level_simplified"
    filepath = f"{data_dir}/{dataset_name}"
 
-   duckdb.sql(f"""CREATE TABLE {tablename} AS SELECT * 
+   duckdb.sql(f"""CREATE VIEW {tablename} AS SELECT * 
                 FROM read_parquet('{filepath}/table.parquet/**/*.parquet',
-                hive_partitioning=true, hive_types_autocast=false""")
+                hive_partitioning=true, hive_types_autocast=false)""")
 
    duckdb.sql(f"DESCRIBE {tablename}")  # shows columns and types
-   duckdb.sql(f"SELECT * FROM {tablename} LIMIT 5").df()  # shows first 5 rows
+   duckdb.sql(f"SELECT * FROM {tablename} LIMIT 5").todf()  # shows first 5 rows
 
 
 Load data from OEDI
@@ -81,7 +81,7 @@ Load data from OEDI
 1. Enter python interpreter the same as above
    
 2. Load .parquet files from OEDI into a table
-   This step is identical to the previous loading step, except the file path is different
+   This step is identical to the previous loading step, except the file path is different, and we will create a table instead of a view
 
 .. code-block:: python
 
@@ -126,9 +126,9 @@ Export Data
 
    dataframe = duckdb.sql("SELECT * FROM {tablename}").df()
 
-2. Export dataframe to csv after createing dataframe
+2. Export dataframe to csv after creating dataframe
 
 .. code-block:: python
 
-   dataframe.to_csv('~/mydata.csv')
+   dataframe.to_csv('mydata.csv')
 

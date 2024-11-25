@@ -47,8 +47,8 @@ from a terminal run:
    $ pip install pandas
 
 
-Load data from Kestrel
-======================
+Load Data
+=========
 
 1. Enter a python interpreter
 
@@ -58,46 +58,41 @@ Load data from Kestrel
 
 2. Load .parquet files from Kestrel into a table
 
-.. code-block:: python
+.. tabs::
 
-   import duckdb
+   .. code-tab:: python Kestrel
 
-   tablename = "tbl"
-   data_dir = "/datasets/dsgrid/dsgrid-tempo-v2022"
-   dataset_name = "state_level_simplified"
-   filepath = f"{data_dir}/{dataset_name}"
+      import duckdb
 
-   duckdb.sql(f"""CREATE VIEW {tablename} AS SELECT * 
-                FROM read_parquet('{filepath}/table.parquet/**/*.parquet',
-                hive_partitioning=true, hive_types_autocast=false)""")
+      tablename = "tbl"
+      data_dir = "/datasets/dsgrid/dsgrid-tempo-v2022"
+      dataset_name = "state_level_simplified"
+      filepath = f"{data_dir}/{dataset_name}"
 
-   duckdb.sql(f"DESCRIBE {tablename}")  # shows columns and types
-   duckdb.sql(f"SELECT * FROM {tablename} LIMIT 5").todf()  # shows first 5 rows
+      duckdb.sql(f"""CREATE VIEW {tablename} AS SELECT * 
+                   FROM read_parquet("{filepath}/table.parquet/**/*.parquet",
+                   hive_partitioning=true, hive_types_autocast=false)""")
+
+      duckdb.sql(f"DESCRIBE {tablename}")  # shows columns and types
+      duckdb.sql(f"SELECT * FROM {tablename} LIMIT 5").to_df()  # shows first 5 rows
 
 
-Load data from OEDI
-===================
+   .. code-tab:: python OEDI
 
-1. Enter python interpreter the same as above
-   
-2. Load .parquet files from OEDI into a table
-   This step is identical to the previous loading step, except the file path is different, and we will create a table instead of a view
+      import duckdb
 
-.. code-block:: python
+      tablename = "tbl"
+      data_dir = "s3://nrel-pds-dsgrid/tempo/tempo-2022/v1.0.0"
+      dataset_name = "state_level_simplified"
+      filepath = f"{data_dir}/{dataset_name}"
 
-   import duckdb
+      duckdb.sql(f"""CREATE TABLE {tablename} AS SELECT * 
+                   FROM read_parquet('{filepath}/table.parquet/**/*.parquet',
+                   hive_partitioning=true, hive_types_autocast=false)""")
 
-   tablename = "tbl"
-   data_dir = "s3://nrel-pds-dsgrid/tempo/tempo-2022/v1.0.0/"
-   dataset_name = "state_level_simplified"
-   filepath = f"{data_dir}/{dataset_name}"
+      duckdb.sql(f"DESCRIBE {tablename}")  # shows columns and types
+      duckdb.sql(f"SELECT * FROM {tablename} LIMIT 5").to_df()  # shows first 5 rows
 
-   duckdb.sql(f"""CREATE TABLE {tablename} AS SELECT * 
-                FROM read_parquet('{filepath}/table.parquet/**/*.parquet',
-                hive_partitioning=true, hive_types_autocast=false""")
-
-   duckdb.sql(f"DESCRIBE {tablename}")  # shows columns and types
-   duckdb.sql(f"SELECT * FROM {tablename} LIMIT 5").df()  # shows first 5 rows
 
 Filter data with duckdb
 =======================
@@ -124,39 +119,70 @@ This example will cover 2 distinct topics:
  - aggregation with duckdb
  - how to use dsgrid metadata in a query
 
- dsgrid datasets contain a metadata.json file that specifies dimensions, their column names and query_names, and the value column of the dataset. Metadata can be loaded to generate information about each dimension in a variable called columns_by_type, and the value_column, in the following code:
+dsgrid datasets contain a metadata.json file that specifies dimensions, their column names, query_names, and the value column of the dataset. The best way to use this metadata is to load it as TableMetadata using the provided dsgrid/scripts/table_metadata.py file. The TableMetadata can be loaded with pydantic installed and if using OEDI, pyarrow will also be needed to load the metadata.json.
 
- .. code-block:: python
+To load the table_metadata script, either copy it from github into a directory that will be used as the dsgrid_path in the Read Metadata step, or clone dsgrid and use the repository. Set the scripts_path variable to the directory that contains table_metadata.py. If using a dsgrid repo, this path will be in the dsgrid/scripts directory.
 
-   import json
+Setup:
 
-   dataset_path = "/datasets/dsgrid/dsgrid-tempo-v2022/state_level_simplified"
-   metadata_path = f"{dataset_path}/metadata.json"
-   with open(metadata_path, 'r') as fs:
-      metadata = json.load(fs)
+.. tabs::
 
-   assert metadata["table_format"]["format_type"] == "unpivoted", "expecting an unpivoted table"
-   value_column = metadata["table_format"]["value_column"]
-   columns_by_type = {dim_type: metadata["dimensions"][dim_type][0]["column_names"][0] 
-                   for dim_type in metadata["dimensions"] if metadata["dimensions"][dim_type]}
+   .. code-tab:: bash Kestrel
+       
+      python -m pip install pydantic
+ 
+   .. code-tab:: bash OEDI
+      
+      python -m pip install pydantic pyarrow
 
-These metadata columnss_by_type and value_column can be used to write queries that would apply to different datasets. The following example will query the `state_level_simplified` datasets, and aggregate the results by: model_year, scenario, geography and subsector with a column for the value summed up across groups.
+Read Metadata:
+
+.. tabs::
+
+   .. code-tab:: python Kestrel
+
+      import path
+      import sys
+
+      scripts_path = Path(<insert path here>)
+      sys.path.append(scripts_path)
+
+      from scripts.table_metadata import TableMetadata
+
+      dataset_path = "/datasets/dsgrid/dsgrid-tempo-v2022/state_level_simplified"
+      metadata_path = f"{dataset_path}/metadata.json"
+      table_metadata = TableMetadata.from_file(metadata_path)
+
+   .. code-tab:: python OEDI
+
+      import path
+      import sys
+
+      scripts_path = Path(<insert path here>)
+      sys.path.append(scripts_path)
+
+      from scripts.table_metadata import TableMetadata
+
+      bucket = "nrel-pds-dsgrid"
+      filepath = "tempo/tempo-2022/v1.0.0/state_level_simplified/metadata.json"
+      table_metadata = TableMetadata.from_s3(bucket, filepath)
+
+These metadata columns_by_type and value_column can be used to write queries that would apply to different datasets. The following example will query the `state_level_simplified` datasets, and aggregate the results by: model_year, scenario, geography and subsector with a column for the value summed up across groups. Each dimension could have multiple columns, so we first create the group_by_cols from the metadata, and use this list to create the table.
 
 .. code-block:: python
 
+   group_by_dimensions = ['model_year', 'scenario', 'geography', 'subsector']
+   group_by_cols = []
+
+   for dimension in group_by_dimensions:
+        group_by_cols.extend(table_metadata.list_columns(dimension))
+
+   group_by_str = ", ".join(group_by_cols)
+        
    duckdb.sql(f"""CREATE TABLE {tablename} AS 
-                  SELECT 
-                      SUM({value_column}) AS value_sum,
-                      {columns_by_type['model_year']},
-                      {columns_by_type['scenario']},
-                      {columns_by_type['geography']},
-                      {columns_by_type['subsector']}
+                  SELECT SUM({value_column}) AS value_sum, {group_by_str}
                   FROM read_parquet('{filepath}/table.parquet/**/*.parquet')
-                  GROUP BY 
-                      {columns_by_type['model_year']},
-                      {columns_by_type['scenario']},
-                      {columns_by_type['geography']},
-                      {columns_by_type['subsector']}
+                  GROUP BY {group_by_str}
                       """)
                   
 This query would also work on the `full_dataset` by using metadata for dimensions, but that query could take hours, or fail because of memory limitations.

@@ -1,0 +1,15 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.query.models.AggregationModel
+
+Aggregate on one or more dimensions.
+" alt="" coords="5,5,401,89"/>
+<area shape="rect" id="node2" title="dsgrid.query.models.DimensionQueryNamesModel
+
+Defines the list of dimensions to which the value columns should be aggregated.
+If a value is empty, that dimension will be aggregated and dropped from the table.
+" alt="" coords="545,63,884,315"/>
+<area shape="rect" id="node3" title="dsgrid.query.models.ColumnModel
+
+Defines one column in a SQL aggregation statement.
+" alt="" coords="1028,190,1313,302"/>
+</map>

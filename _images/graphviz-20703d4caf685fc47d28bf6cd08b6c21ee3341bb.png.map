@@ -1,0 +1,50 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel
+
+Reference to a dimension mapping stored in the registry.
+
+The DimensionMappingReferenceModel is utilized by the project configuration (project.json5) as well as by the
+dimension mapping reference configuration (dimension_mapping_references.json5) that may be required when submitting a dataset to a project.
+" alt="" coords="760,147,1065,315"/>
+<area shape="rect" id="node2" title="dsgrid.config.project_config.InputDatasetModel
+
+Defines an input dataset for the project config.
+" alt="" coords="5,5,535,257"/>
+<area shape="rect" id="node3" title="dsgrid.config.project_config.RequiredDimensionsModel
+
+Defines required record IDs that must exist for each dimension in a dataset.
+Record IDs can reside in the project&#39;s base, subset, or supplemental dimensions. Using subset
+dimensions is recommended. dsgrid will substitute base records for mapped subset records
+at runtime. If no records are listed for a dimension then all project base records are
+required.
+" alt="" coords="690,15,1135,99"/>
+<area shape="rect" id="node4" title="dsgrid.dimension.time.TimeBasedDataAdjustmentModel
+
+Defines how data needs to be adjusted with respect to time.
+For leap day adjustment, up to one full day of timestamps and data are dropped.
+For daylight savings, the dataframe is adjusted alongside the timestamps.
+This is useful when the load profiles are modeled in standard time and
+need to be converted to get clock time load profiles.
+" alt="" coords="679,364,1147,448"/>
+<area shape="rect" id="node8" title="dsgrid.config.project_config.RequiredDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="1293,59,1717,283"/>
+<area shape="rect" id="node9" title="dsgrid.dimension.time.DaylightSavingAdjustmentModel
+
+Defines how to drop and add data along with timestamps to convert standard time
+load profiles to clock time
+" alt="" coords="1291,421,1719,505"/>
+<area shape="rect" id="node5" title="dsgrid.config.project_config.RequiredDimensionRecordsByTypeModel
+
+Base data model for all dsgrid data models
+" alt="" coords="1863,172,2365,312"/>
+<area shape="rect" id="node6" title="dsgrid.config.project_config.RequiredSubsetDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2537,205,2865,289"/>
+<area shape="rect" id="node7" title="dsgrid.config.project_config.RequiredSupplementalDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="2509,337,2893,421"/>
+</map>

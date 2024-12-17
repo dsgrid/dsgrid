@@ -8,7 +8,7 @@ from pathlib import Path
 import rich_click as click
 
 from dsgrid.loggers import setup_logging, check_log_file_size
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     create_local_test_registry,
@@ -30,11 +30,11 @@ logger = logging.getLogger(__name__)
 def make_test_data_registry(
     registry_path,
     src_dir,
-    database_name="test-dsgrid",
     dataset_path=None,
     include_projects=True,
     include_datasets=True,
     offline_mode=True,
+    database_url="sqlite:///dsgrid-test.db",
 ) -> RegistryManager:
     """Creates a local registry from a dsgrid project source directory for testing.
 
@@ -59,7 +59,7 @@ def make_test_data_registry(
     if dataset_path is None:
         dataset_path = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY)
     dataset_path = Path(dataset_path)
-    conn = DatabaseConnection(database=database_name)
+    conn = DatabaseConnection(url=database_url)
     create_local_test_registry(registry_path, conn=conn)
     dataset_dirs = [Path("datasets/modeled/comstock"), Path("datasets/modeled/comstock_unpivoted")]
 
@@ -90,8 +90,8 @@ def make_test_data_registry(
         )
     if include_datasets:
         for i, dataset_config_file in enumerate(dataset_config_files):
-            print("\n 2. register dataset: \n")
             dataset_id = dataset_ids[i]
+            print(f"\n 2. register dataset {dataset_id}: \n")
             dataset_mapping_file = dataset_mapping_files[i]
             mappings = map_dimension_names_to_ids(manager.dimension_manager)
             replace_dimension_names_with_current_ids(dataset_config_file, mappings)
@@ -101,7 +101,7 @@ def make_test_data_registry(
                 user,
                 log_message,
             )
-            print("\n 3. submit dataset to project\n")
+            print(f"\n 3. submit dataset {dataset_id} to project\n")
             manager.project_manager.submit_dataset(
                 project_id,
                 dataset_id,

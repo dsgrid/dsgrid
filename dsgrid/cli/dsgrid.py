@@ -6,7 +6,7 @@ from pathlib import Path
 import rich_click as click
 
 from dsgrid.utils.timing import timer_stats_collector
-from dsgrid.cli.common import get_log_level_from_str, handle_scratch_dir, OptionPromptPassword
+from dsgrid.cli.common import get_log_level_from_str, handle_scratch_dir
 from dsgrid.cli.config import config
 from dsgrid.cli.download import download
 from dsgrid.cli.install_notebooks import install_notebooks
@@ -55,14 +55,24 @@ _config = DsgridRuntimeConfig.load()
     show_default=True,
     help="Enable tracking of function timings.",
 )
-@click.option(
-    "-N",
-    "--database-name",
-    type=str,
-    default=_config.database_name,
-    envvar="DSGRID_REGISTRY_DATABASE_NAME",
-    help="Database name",
-)
+# Server-related options are commented-out because the registry is currently only
+# supported in SQLite. If/when we add postgres support, these can be added back.
+# @click.option(
+#    "-U",
+#    "--username",
+#    type=str,
+#    default=_config.database_user,
+#    help="Database username",
+# )
+# @click.option(
+#    "-P",
+#    "--password",
+#    prompt=True,
+#    hide_input=True,
+#    cls=OptionPromptPassword,
+#    help="dsgrid registry password. Will prompt unless it is passed or the username matches the "
+#    "runtime config file.",
+# )
 @click.option(
     "-u",
     "--url",
@@ -70,22 +80,6 @@ _config = DsgridRuntimeConfig.load()
     default=_config.database_url,
     envvar="DSGRID_REGISTRY_DATABASE_URL",
     help="Database URL. Ex: http://localhost:8529",
-)
-@click.option(
-    "-U",
-    "--username",
-    type=str,
-    default=_config.database_user,
-    help="Database username",
-)
-@click.option(
-    "-P",
-    "--password",
-    prompt=True,
-    hide_input=True,
-    cls=OptionPromptPassword,
-    help="dsgrid registry password. Will prompt unless it is passed or the username matches the "
-    "runtime config file.",
 )
 @click.option(
     "-r",
@@ -112,10 +106,9 @@ def cli(
     no_prompts,
     offline,
     timings,
-    database_name,
+    # username,
+    # password,
     url,
-    username,
-    password,
     reraise_exceptions,
     scratch_dir,
 ):

@@ -19,7 +19,7 @@ class DsgridRuntimeConfig(DSGBaseModel):
     """Defines the runtime config that can be stored in users' home directories."""
 
     database_name: str | None = None
-    database_url: str | None = "http://localhost:8529"
+    database_url: str | None = "sqlite:///dsgrid.db"
     database_user: str = "root"
     database_password: str = DEFAULT_DB_PASSWORD
     offline: bool = True

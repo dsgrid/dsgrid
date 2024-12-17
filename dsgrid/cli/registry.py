@@ -15,8 +15,7 @@ from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.registration_models import RegistrationModel, RegistrationJournal
-from dsgrid.registry.common import VersionUpdateType
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection, VersionUpdateType
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.id_remappings import (
     map_dimension_ids_to_names,
@@ -70,11 +69,11 @@ Click Group Definitions
 @click.pass_context
 def registry(ctx, remote_path):
     """Manage a registry."""
-    conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "url"),
-        database=get_value_from_context(ctx, "database_name"),
-        username=get_value_from_context(ctx, "username"),
-        password=get_value_from_context(ctx, "password"),
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
+        # database=get_value_from_context(ctx, "database_name"),
+        # username=get_value_from_context(ctx, "username"),
+        # password=get_value_from_context(ctx, "password"),
     )
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
     no_prompts = ctx.parent.params["no_prompts"]
@@ -185,7 +184,7 @@ def register_dimensions(
         ctx, manager.register, dimension_config_file, submitter, log_message
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _dump_dimension_epilog = """
@@ -225,7 +224,7 @@ def dump_dimension(ctx, registry_manager, dimension_id, version, directory, forc
         ctx, manager.dump, dimension_id, Path(directory), version=version, force=force
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _update_dimension_epilog = """
@@ -289,7 +288,7 @@ def update_dimension(
         version,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 """
@@ -353,7 +352,7 @@ def register_dimension_mappings(
         ctx, manager.register, dimension_mapping_config_file, submitter, log_message
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _dump_dimension_mapping_epilog = """
@@ -405,7 +404,7 @@ def dump_dimension_mapping(
         force=force,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _update_dimension_mapping_epilog = """
@@ -505,7 +504,7 @@ def list_projects(ctx, registry_manager, filter):
     """List the registered projects."""
     res = handle_dsgrid_exception(ctx, registry_manager.project_manager.show, filters=filter)
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _register_project_epilog = """
@@ -543,7 +542,7 @@ def register_project(
         log_message,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _submit_dataset_epilog = """
@@ -637,7 +636,6 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     -c dataset.json5 \\ \n
     -d path/to/my/dataset \\ \n
     -p my-project-id \\ \n
-    -d my-dataset-id \\ \n
     -m dimension_mappings.json5 \\ \n
     -l "Register and submit dataset my-dataset to project my-project." \n
 """
@@ -731,7 +729,7 @@ def register_and_submit_dataset(
         autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _dump_project_epilog = """
@@ -778,7 +776,7 @@ def dump_project(
         ctx, manager.dump, project_id, directory, version=version, force=force
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _update_project_epilog = """
@@ -846,7 +844,7 @@ def update_project(
         version,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _register_subset_dimensions_epilog = """
@@ -870,8 +868,20 @@ $ dsgrid registry projects register-subset-dimensions \\ \n
     type=str,
     help="Please specify the reason for this addition.",
 )
+@click.option(
+    "-t",
+    "--update-type",
+    default="patch",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=_version_update_callback,
+)
 def register_subset_dimensions(
-    ctx, registry_manager: RegistryManager, project_id: str, filename: Path, log_message: str
+    ctx,
+    registry_manager: RegistryManager,
+    project_id: str,
+    filename: Path,
+    log_message: str,
+    update_type: VersionUpdateType,
 ):
     """Register new subset dimensions with a project. The contents of the JSON/JSON5 file must
     match the data model defined by this documentation:
@@ -888,9 +898,10 @@ def register_subset_dimensions(
         filename,
         submitter,
         log_message,
+        update_type,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _register_supplemental_dimensions_epilog = """
@@ -914,8 +925,15 @@ $ dsgrid registry projects register-supplemental-dimensions \\ \n
     type=str,
     help="Please specify the reason for this addition.",
 )
+@click.option(
+    "-t",
+    "--update-type",
+    default="patch",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=_version_update_callback,
+)
 def register_supplemental_dimensions(
-    ctx, registry_manager, project_id, filename: Path, log_message
+    ctx, registry_manager, project_id, filename: Path, log_message, update_type
 ):
     """Register new supplemental dimensions with a project. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
@@ -931,9 +949,10 @@ def register_supplemental_dimensions(
         filename,
         submitter,
         log_message,
+        update_type,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _add_dataset_requirements_epilog = """
@@ -957,7 +976,16 @@ $ dsgrid registry projects add-dataset-requirements \\ \n
     type=str,
     help="Please specify the reason for the new datasets.",
 )
-def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, log_message):
+@click.option(
+    "-t",
+    "--update-type",
+    default="patch",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=_version_update_callback,
+)
+def add_dataset_requirements(
+    ctx, registry_manager, project_id, filename: Path, log_message, update_type
+):
     """Add requirements for one or more datasets to a project. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetListModel
@@ -971,9 +999,10 @@ def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, 
         filename,
         submitter,
         log_message,
+        update_type,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _replace_dataset_dimension_requirements_epilog = """
@@ -997,8 +1026,15 @@ $ dsgrid registry projects replace-dataset-dimension-requirements \\ \n
     type=str,
     help="Please specify the reason for the new requirements.",
 )
+@click.option(
+    "-t",
+    "--update-type",
+    default="major",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=_version_update_callback,
+)
 def replace_dataset_dimension_requirements(
-    ctx, registry_manager, project_id, filename: Path, log_message
+    ctx, registry_manager, project_id, filename: Path, log_message, update_type
 ):
     """Replace dimension requirements for one or more datasets in a project. The contents of the
     JSON/JSON5 file must match the data model defined by this documentation:
@@ -1014,9 +1050,10 @@ def replace_dataset_dimension_requirements(
         filename,
         submitter,
         log_message,
+        update_type,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _list_project_dimension_query_names_epilog = """
@@ -1071,12 +1108,12 @@ def list_project_dimension_query_names(
             "exclude_base, exclude_subset, and exclude_supplemental cannot all be set",
             file=sys.stderr,
         )
-        return 1
+        ctx.exit(1)
 
     manager = registry_manager.project_manager
     res = handle_dsgrid_exception(ctx, manager.get_by_id, project_id)
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
     project_config = res[0]
     base = None if exclude_base else project_config.get_base_dimension_to_query_name_mapping()
@@ -1160,7 +1197,7 @@ def register_dataset(ctx, registry_manager, dataset_config_file, dataset_path, l
         ctx, manager.register, dataset_config_file, dataset_path, submitter, log_message
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _dump_dataset_epilog = """
@@ -1260,7 +1297,7 @@ def update_dataset(
         version,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 _bulk_register_epilog = """
@@ -1337,7 +1374,7 @@ def bulk_register(
             journal,
         )
         if res[1] != 0:
-            return 1
+            ctx.exit(res[1])
     except Exception:
         failure_occurred = True
         raise

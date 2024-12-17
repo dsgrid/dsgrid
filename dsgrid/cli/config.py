@@ -27,18 +27,11 @@ def config():
     help="Enable tracking of function timings.",
 )
 @click.option(
-    "-N",
-    "--database-name",
-    type=str,
-    default=None,
-    help="Database name",
-)
-@click.option(
     "-u",
     "--url",
     type=str,
     default=None,
-    help="Database URL. Ex: http://localhost:8529",
+    help="Database URL. Ex: sqlite:///registry.db",
 )
 @click.option(
     "-U",
@@ -96,7 +89,6 @@ def config():
 )
 def create(
     timings,
-    database_name,
     url,
     username,
     password,
@@ -109,7 +101,6 @@ def create(
     """Create a local dsgrid runtime configuration file."""
     dsgrid_config = DsgridRuntimeConfig(
         timings=timings,
-        database_name=database_name,
         database_url=url,
         database_user=username,
         database_password=password,

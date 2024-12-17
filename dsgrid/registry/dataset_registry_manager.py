@@ -1,12 +1,12 @@
 """Manages the registry for dimension datasets"""
 
-import getpass
 import logging
 import os
 from pathlib import Path
-from typing import Type, Union
+from typing import Optional, Type, Union
 
 from prettytable import PrettyTable
+from sqlalchemy import Connection
 
 from dsgrid.config.dataset_config import (
     DatasetConfig,
@@ -20,6 +20,7 @@ from dsgrid.dimension.base_models import DimensionType, check_required_dimension
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from dsgrid.registry.registry_interface import DatasetRegistryInterface
 from dsgrid.utils.dataset import unpivot_dataframe
 from dsgrid.utils.spark import (
     read_dataframe,
@@ -31,12 +32,10 @@ from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from .common import (
     VersionUpdateType,
-    make_initial_config_registration,
     ConfigKey,
     RegistryType,
 )
 from .registration_context import RegistrationContext
-from .registry_interface import DatasetRegistryInterface
 from .registry_manager_base import RegistryManagerBase
 
 logger = logging.getLogger(__name__)
@@ -90,16 +89,16 @@ class DatasetRegistryManager(RegistryManagerBase):
         return dataset_path
 
     @track_timing(timer_stats_collector)
-    def _run_checks(self, config: DatasetConfig):
+    def _run_checks(self, conn: Connection, config: DatasetConfig):
         logger.info("Run dataset registration checks.")
         check_required_dimensions(config.model.dimension_references, "dataset dimensions")
         check_uniqueness((x.model.name for x in config.model.dimensions), "dimension name")
         if not os.environ.get("__DSGRID_SKIP_CHECK_DATASET_CONSISTENCY__"):
-            self._check_dataset_consistency(config)
+            self._check_dataset_consistency(conn, config)
 
-    def _check_dataset_consistency(self, config: DatasetConfig):
+    def _check_dataset_consistency(self, conn: Connection, config: DatasetConfig):
         schema_handler = make_dataset_schema_handler(
-            config, self._dimension_mgr, self._dimension_mapping_mgr
+            conn, config, self._dimension_mgr, self._dimension_mapping_mgr
         )
         schema_handler.check_consistency()
 
@@ -111,23 +110,26 @@ class DatasetRegistryManager(RegistryManagerBase):
     def dimension_mapping_manager(self) -> DimensionMappingRegistryManager:
         return self._dimension_mapping_mgr
 
-    def finalize_registration(self, config_ids, error_occurred):
+    def finalize_registration(self, conn: Connection, config_ids: set[str], error_occurred: bool):
         assert len(config_ids) == 1, config_ids
-        dataset_id = config_ids[0]
         if error_occurred:
-            logger.info("Remove intermediate dataset after error")
-            self.remove(dataset_id)
+            for dataset_id in config_ids:
+                logger.info("Remove intermediate dataset after error")
+                self.remove_data(dataset_id, conn=conn)
+            for key in [x for x in self._datasets if x.id in config_ids]:
+                self._datasets.pop(key)
 
         if not self.offline_mode:
-            lock_file = self.get_registry_lock_file(dataset_id)
-            self.cloud_interface.check_lock_file(lock_file)
-            if not error_occurred:
-                self.sync_push(self.get_registry_data_directory(dataset_id))
-            self.cloud_interface.remove_lock_file(lock_file)
+            for dataset_id in config_ids:
+                lock_file = self.get_registry_lock_file(dataset_id)
+                self.cloud_interface.check_lock_file(lock_file)
+                if not error_occurred:
+                    self.sync_push(self.get_registry_data_directory(dataset_id))
+                self.cloud_interface.remove_lock_file(lock_file)
 
-    def get_by_id(self, dataset_id: str, version=None):
+    def get_by_id(self, dataset_id: str, version=None, conn: Optional[Connection] = None):
         if version is None:
-            version = self._db.get_latest_version(dataset_id)
+            version = self._db.get_latest_version(conn, dataset_id)
 
         key = ConfigKey(dataset_id, version)
         dataset = self._datasets.get(key)
@@ -135,13 +137,13 @@ class DatasetRegistryManager(RegistryManagerBase):
             return dataset
 
         if version is None:
-            model = self.db.get_latest(dataset_id)
+            model = self.db.get_latest(conn, dataset_id)
         else:
-            model = self.db.get_by_version(dataset_id, version)
+            model = self.db.get_by_version(conn, dataset_id, version)
 
         dataset_path = self._get_registry_data_path()
         config = DatasetConfig.load_from_registry(model, dataset_path)
-        self._update_dimensions(config)
+        self._update_dimensions(conn, config)
         self._datasets[key] = config
         return config
 
@@ -153,59 +155,49 @@ class DatasetRegistryManager(RegistryManagerBase):
     def get_registry_lock_file(self, config_id: str):
         return f"configs/.locks/{config_id}.lock"
 
-    def _update_dimensions(self, config: DatasetConfig):
-        dimensions = self._dimension_mgr.load_dimensions(config.model.dimension_references)
+    def _update_dimensions(self, conn: Optional[Connection], config: DatasetConfig):
+        dimensions = self._dimension_mgr.load_dimensions(
+            config.model.dimension_references, conn=conn
+        )
         config.update_dimensions(dimensions)
 
     def register(
         self,
         config_file: Path,
         dataset_path: Path,
-        submitter: str,
-        log_message: str,
-        context: RegistrationContext | None = None,
+        submitter: Optional[str] = None,
+        log_message: Optional[str] = None,
+        context: Optional[RegistrationContext] = None,
     ):
         config = DatasetConfig.load_from_user_path(config_file, dataset_path)
-        self._update_dimensions(config)
-        return self.register_from_config(
-            config, dataset_path, submitter, log_message, context=context
-        )
+        if context is None:
+            assert submitter is not None
+            assert log_message is not None
+            with RegistrationContext(
+                self.db, log_message, VersionUpdateType.MAJOR, submitter
+            ) as context:
+                return self.register_from_config(config, dataset_path, context)
+        else:
+            return self.register_from_config(config, dataset_path, context)
 
     @track_timing(timer_stats_collector)
     def register_from_config(
         self,
         config: DatasetConfig,
         dataset_path: Path,
-        submitter: str,
-        log_message: str,
-        context: RegistrationContext | None = None,
+        context: RegistrationContext,
     ):
-        error_occurred = False
-        need_to_finalize = context is None
-        if context is None:
-            context = RegistrationContext()
-
-        try:
-            self._register_dataset_and_dimensions(
-                config,
-                dataset_path,
-                submitter,
-                log_message,
-                context,
-            )
-        except Exception:
-            error_occurred = True
-            raise
-        finally:
-            if need_to_finalize:
-                context.finalize(error_occurred)
+        self._update_dimensions(context.connection, config)
+        self._register_dataset_and_dimensions(
+            config,
+            dataset_path,
+            context,
+        )
 
     def _register_dataset_and_dimensions(
         self,
         config: DatasetConfig,
         dataset_path: Path,
-        submitter: str,
-        log_message: str,
         context: RegistrationContext,
     ):
         logger.info("Start registration of dataset %s", config.model.dataset_id)
@@ -216,33 +208,30 @@ class DatasetRegistryManager(RegistryManagerBase):
                 f"Loading a dataset from S3 is not currently supported: {dataset_path}"
             )
 
-        self._check_if_already_registered(config.model.dataset_id)
+        conn = context.connection
+        self._check_if_already_registered(conn, config.model.dataset_id)
 
         if config.model.dimensions:
             dim_model = DimensionsConfigModel(dimensions=config.model.dimensions)
             dims_config = DimensionsConfig.load_from_model(dim_model)
-            dimension_ids = self._dimension_mgr.register_from_config(
-                dims_config, submitter, log_message, context=context
-            )
+            dimension_ids = self._dimension_mgr.register_from_config(dims_config, context=context)
             config.model.dimension_references += self._dimension_mgr.make_dimension_references(
-                dimension_ids
+                conn, dimension_ids
             )
             config.model.dimensions.clear()
 
-        self._update_dimensions(config)
-        self._register(config, dataset_path, submitter, log_message)
+        self._update_dimensions(conn, config)
+        self._register(config, dataset_path, context)
         context.add_id(RegistryType.DATASET, config.model.dataset_id, self)
 
     def _register(
         self,
         config: DatasetConfig,
         dataset_path: Path,
-        submitter: str,
-        log_message: str,
+        context: RegistrationContext,
     ):
         dataset_id = config.model.dataset_id
-        self._run_checks(config)
-        registration = make_initial_config_registration(submitter, log_message)
+        self._run_checks(context.connection, config)
 
         if config.get_table_format_type() == TableFormatType.PIVOTED:
             logger.info("Converting dataset %s from pivoted to unpivoted.", dataset_id)
@@ -256,7 +245,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             pivoted_dimension_type = None
 
         # The dataset_version starts the same as the config but can change later.
-        config.model.dataset_version = registration.version
+        config.model.dataset_version = "1.0.0"
         dataset_registry_dir = self.get_registry_data_directory(dataset_id)
         if not dataset_registry_dir.parent.exists():
             msg = (
@@ -265,7 +254,8 @@ class DatasetRegistryManager(RegistryManagerBase):
                 "unexpected."
             )
             raise Exception(msg)
-        dataset_path = dataset_registry_dir / registration.version
+
+        dataset_path = dataset_registry_dir / config.model.dataset_version
         dataset_path.mkdir(exist_ok=True, parents=True)
         self.fs_interface.mkdir(dataset_registry_dir)
         found_files = False
@@ -297,12 +287,13 @@ class DatasetRegistryManager(RegistryManagerBase):
             msg = f"Did not find any data files in {config.dataset_path}"
             raise DSGInvalidDataset(msg)
 
-        self._db.insert(config.model, registration)
+        config.model.version = "1.0.0"
+        self._db.insert(context.connection, config.model, context.registration)
         logger.info(
             "%s Registered dataset %s with version=%s",
             self._log_offline_mode_prefix(),
             dataset_id,
-            registration.version,
+            config.model.dataset_version,
         )
 
     def update_from_file(
@@ -314,11 +305,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         log_message: str,
         version: str,
     ):
-        dataset_path = self._params.base_path / "data" / dataset_id / version
-        config = DatasetConfig.load_from_user_path(config_file, dataset_path)
-        self._update_dimensions(config)
-        self._check_update(config, dataset_id, version)
-        self.update(config, update_type, log_message, submitter)
+        with RegistrationContext(self.db, log_message, update_type, submitter) as context:
+            conn = context.connection
+            dataset_path = self._params.base_path / "data" / dataset_id / version
+            config = DatasetConfig.load_from_user_path(config_file, dataset_path)
+            self._update_dimensions(conn, config)
+            self._check_update(conn, config, dataset_id, version)
+            self.update_with_context(config, context)
 
     @track_timing(timer_stats_collector)
     def update(
@@ -326,53 +319,57 @@ class DatasetRegistryManager(RegistryManagerBase):
         config: DatasetConfig,
         update_type: VersionUpdateType,
         log_message: str,
-        submitter: str | None = None,
-    ):
-        if submitter is None:
-            submitter = getpass.getuser()
+        submitter: Optional[str] = None,
+    ) -> DatasetConfig:
         lock_file_path = self.get_registry_lock_file(config.model.dataset_id)
         with self.cloud_interface.make_lock_file_managed(lock_file_path):
             # Note that projects will not pick up these changes until submit-dataset
             # is called again.
-            return self._update(config, submitter, update_type, log_message)
+            with RegistrationContext(self.db, log_message, update_type, submitter) as context:
+                return self.update_with_context(config, context)
 
-    def _update(
+    def update_with_context(
         self,
         config: DatasetConfig,
-        submitter: str,
-        update_type: VersionUpdateType,
-        log_message: str,
-    ):
-        self._run_checks(config)
+        context: RegistrationContext,
+    ) -> DatasetConfig:
+        conn = context.connection
+        self._run_checks(conn, config)
         dataset_id = config.model.dataset_id
-        cur_model = self.db.get_latest(dataset_id)
+        cur_model = self.db.get_latest(conn, dataset_id)
         old_key = ConfigKey(dataset_id, cur_model.version)
-        model = self._update_config(config, submitter, update_type, log_message)
+        model = self._update_config(config, context)
         new_key = ConfigKey(dataset_id, model.version)
         self._datasets.pop(old_key, None)
 
         dataset_path = self._get_registry_data_path()
         config = DatasetConfig.load_from_registry(model, dataset_path)
-        self._update_dimensions(config)
+        self._update_dimensions(conn, config)
         self._datasets[new_key] = config
 
         if not self.offline_mode:
             self.sync_push(self.get_registry_data_directory(dataset_id))
 
-        return model
+        return config
 
-    def remove(self, dataset_id: str):
-        config = self.get_by_id(dataset_id)
-        if self.fs_interface.exists(config.dataset_path):
-            self.fs_interface.rm_tree(Path(config.dataset_path).parent)
-        self.db.delete_all(dataset_id)
+    def remove(self, dataset_id: str, conn: Optional[Connection] = None):
+        self.remove_data(dataset_id, conn=conn)
+        self.db.delete_all(conn, dataset_id)
         for key in [x for x in self._datasets if x.id == dataset_id]:
             self._datasets.pop(key)
 
         logger.info("Removed %s from the registry.", dataset_id)
 
+    def remove_data(self, dataset_id: str, conn: Optional[Connection] = None):
+        config = self.get_by_id(dataset_id, conn=conn)
+        if self.fs_interface.exists(config.dataset_path):
+            self.fs_interface.rm_tree(Path(config.dataset_path).parent)
+
+        logger.info("Removed data for %s from the registry.", dataset_id)
+
     def show(
         self,
+        conn: Optional[Connection] = None,
         filters: list[str] | None = None,
         max_width: Union[int, dict] | None = None,
         drop_fields: list[str] | None = None,
@@ -423,13 +420,13 @@ class DatasetRegistryManager(RegistryManagerBase):
             transformed_filters = transform_and_validate_filters(filters)
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
-        for model in self.db.iter_models(all_versions=True):
-            registration = self.db.get_registration(model)
+        for model in self.db.iter_models(conn, all_versions=True):
+            registration = self.db.get_registration(conn, model)
 
             all_fields = (
                 model.dataset_id,
-                registration.version,
-                registration.date.strftime("%Y-%m-%d %H:%M:%S"),
+                model.version,
+                registration.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 registration.submitter,
                 registration.log_message,
             )

@@ -34,7 +34,7 @@ def make_registry(base_dir, test_project_dir, test_data_dir):
         test_project_dir,
         dataset_path=test_data_dir,
         include_datasets=False,
-        database_name="tmp-dsgrid",
+        database_url=f"sqlite:///{base_dir}/registry.db",
     )
     dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
     assert dataset_config_path.exists()

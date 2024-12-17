@@ -38,7 +38,7 @@ from dsgrid.query.models import (
 from dsgrid.query.query_submitter import (
     ProjectQuerySubmitter,
 )  # , CompositeDatasetQuerySubmitter
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -163,11 +163,8 @@ def create_project_query(
             )
             return 1
 
-    conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "url"),
-        database=get_value_from_context(ctx, "database_name"),
-        username=get_value_from_context(ctx, "username"),
-        password=get_value_from_context(ctx, "password"),
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
     )
     registry_manager = RegistryManager.load(
         conn,
@@ -299,11 +296,8 @@ def run_project_query(
     """Run a query on a dsgrid project."""
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
     query = ProjectQueryModel.from_file(query_definition_file)
-    conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "url"),
-        database=get_value_from_context(ctx, "database_name"),
-        username=get_value_from_context(ctx, "username"),
-        password=get_value_from_context(ctx, "password"),
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
     )
     registry_manager = RegistryManager.load(
         conn,
@@ -324,7 +318,7 @@ def run_project_query(
         force=force,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 @click.command("create_dataset")
@@ -419,11 +413,8 @@ def create_derived_dataset_config(ctx, src, dst, remote_path, force):
     dst_path = fs_interface.path(dst)
     check_output_directory(dst_path, fs_interface, force)
 
-    conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "url"),
-        database=get_value_from_context(ctx, "database_name"),
-        username=get_value_from_context(ctx, "username"),
-        password=get_value_from_context(ctx, "password"),
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
     )
     registry_manager = RegistryManager.load(
         conn,

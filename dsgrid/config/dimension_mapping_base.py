@@ -3,7 +3,7 @@ from typing import Optional
 
 from pydantic import Field, ValidationInfo, field_validator
 
-from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
+from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDimensionMapping
 from .dimensions import DimensionReferenceModel
@@ -144,7 +144,7 @@ class DimensionMappingArchetype(DSGEnum):
     )
 
 
-class DimensionMappingBaseModel(DSGBaseModel):
+class DimensionMappingBaseModel(DSGBaseDatabaseModel):
     """Base class for mapping dimensions"""
 
     mapping_type: DimensionMappingType = Field(
@@ -204,26 +204,9 @@ class DimensionMappingBaseModel(DSGBaseModel):
             "updateable": False,
         },
     )
-    id: Optional[str] = Field(
+    id: Optional[int] = Field(
         default=None,
-        alias="_id",
         description="Registry database ID",
-        json_schema_extra={
-            "dsgrid_internal": True,
-        },
-    )
-    key: Optional[str] = Field(
-        default=None,
-        alias="_key",
-        description="Registry database key",
-        json_schema_extra={
-            "dsgrid_internal": True,
-        },
-    )
-    rev: Optional[str] = Field(
-        default=None,
-        alias="_rev",
-        description="Registry database revision",
         json_schema_extra={
             "dsgrid_internal": True,
         },

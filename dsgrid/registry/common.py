@@ -1,16 +1,16 @@
 """Common definitions for registry components"""
 
-import enum
 import logging
 import re
 from collections import namedtuple
 from datetime import datetime
+from enum import StrEnum
+from pathlib import Path
 from typing import Optional
 
 from pydantic import Field
-from semver import VersionInfo
 
-from dsgrid.data_models import DSGBaseModel, DSGEnum
+from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.versioning import make_version
 
 
@@ -45,33 +45,41 @@ def check_config_id_strict(config_id, tag):
         )
 
 
-class Collection(enum.Enum):
-    """Collections in the database"""
+class DatabaseConnection(DSGBaseModel):
+    """Input information to connect to a registry database"""
 
-    DATASETS = "datasets"  # dataset config
-    DATASET_DATA = "dataset_data"  # actual data (parquet files). tracks data versions
-    DATASET_ROOTS = "dataset_roots"
-    DATASET_DATA_ROOTS = "dataset_data_roots"
-    DIMENSION_TYPES = "dimension_types"
-    DIMENSIONS = "dimensions"
-    DIMENSION_ROOTS = "dimension_roots"
-    DIMENSION_MAPPINGS = "dimension_mappings"
-    DIMENSION_MAPPING_ROOTS = "dimension_mapping_roots"
-    PROJECTS = "projects"
-    PROJECT_ROOTS = "project_roots"
+    url: str
+    # There attributes are commented-out because the registry is currently only
+    # supported in SQLite. If/when we add postgres support, these can be added back.
+    # database: str = "dsgrid"
+    # hostname: str = "localhost"
+    # port: int = 8529
+    # username: str = "root"
+    # password: str = DEFAULT_DB_PASSWORD
+
+    # @classmethod
+    # def from_url(cls, url, **kwargs):
+    # """Create a connection from a URL."""
+    # regex = re.compile(r"http://(.*):(\d+)")
+    # match = regex.search(url)
+    # if match is None:
+    #    raise DSGInvalidParameter(f"Invalid URL format: {url}")
+    # hostname = match.group(1)
+    # port = match.group(2)
+    # return cls(hostname=hostname, port=port, **kwargs)
+
+    def get_filename(self) -> Path | None:
+        """Return the filename from the URL, if file-based, otherwise None."""
+        regex = re.compile(r"sqlite:\/\/\/(.*)")
+        match = regex.search(self.url)
+        if not match:
+            return None
+            # msg = f"Failed to find a filename in {self.url}"
+            # raise DSGInvalidParameter(msg)
+        return Path(match.group(1))
 
 
-class Edge(enum.Enum):
-    """Types of edges in the database"""
-
-    CONTAINS = "contains"
-    UPDATED_TO = "updated_to"
-    DERIVES = "derives"
-    LATEST = "latest"
-    OF_TYPE = "of_type"
-
-
-class RegistryType(DSGEnum):
+class RegistryType(StrEnum):
     """Registry types"""
 
     DATASET = "dataset"
@@ -80,14 +88,32 @@ class RegistryType(DSGEnum):
     PROJECT = "project"
 
 
-class DatasetRegistryStatus(DSGEnum):
+MODEL_ID_TABLE_MAPPING = {
+    RegistryType.PROJECT: "project_id",
+    RegistryType.DATASET: "dataset_id",
+    RegistryType.DIMENSION: "dimension_id",
+    RegistryType.DIMENSION_MAPPING: "mapping_id",
+}
+
+
+class RegistryTables(StrEnum):
+    """Registry tables"""
+
+    KEY_VALUE = "key_value"
+    CURRENT_VERSIONS = "current_versions"
+    MODELS = "models"
+    REGISTRATIONS = "registrations"
+    CONTAINS = "contains"
+
+
+class DatasetRegistryStatus(StrEnum):
     """Statuses for a dataset within a project"""
 
     UNREGISTERED = "Unregistered"
     REGISTERED = "Registered"
 
 
-class ProjectRegistryStatus(DSGEnum):
+class ProjectRegistryStatus(StrEnum):
     """Statuses for a project within the DSGRID registry"""
 
     INITIAL_REGISTRATION = "Initial Registration"
@@ -97,7 +123,7 @@ class ProjectRegistryStatus(DSGEnum):
     DEPRECATED = "Deprecated"
 
 
-class VersionUpdateType(DSGEnum):
+class VersionUpdateType(StrEnum):
     """Types of updates that can be made to projects, datasets, and dimensions"""
 
     # TODO: we need to find general version update types that can be mapped to
@@ -131,22 +157,23 @@ RegistryManagerParams = namedtuple(
 class RegistrationModel(DSGBaseModel):
     """Registration fields required by the ProjectConfig and DatasetConfig"""
 
-    version: str = Field(
-        title="version",
-        description="Version resulting from the registration",
+    id: Optional[int] = Field(default=None, description="database ID of the registration")
+    timestamp: datetime = Field(
+        title="timestamp",
+        description="Registration timestamp",
     )
     submitter: str = Field(
         title="submitter",
         description="Username that submitted the registration",
     )
-    date: datetime = Field(
-        title="date",
-        description="Registration date",
-    )
     log_message: Optional[str] = Field(
         default=None,
         title="log_message",
         description="Reason for the update",
+    )
+    update_type: VersionUpdateType = Field(
+        title="update_type",
+        description="Type of update",
     )
 
 
@@ -156,16 +183,6 @@ def get_version_from_filename(filename):
     match = regex.search(filename)
     assert match, filename
     return match.groupdict("handle"), make_version(match.groupdict("version"))
-
-
-def make_initial_config_registration(submitter, log_message):
-    version = VersionInfo(major=1)
-    return RegistrationModel(
-        version=str(version),
-        submitter=submitter,
-        date=datetime.now(),
-        log_message=log_message,
-    )
 
 
 def make_filename_from_version(handle, version):

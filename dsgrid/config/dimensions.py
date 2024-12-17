@@ -11,7 +11,7 @@ from pydantic import field_serializer, field_validator, model_validator, Field, 
 from pydantic.functional_validators import BeforeValidator
 from typing_extensions import Annotated
 
-from dsgrid.data_models import DSGBaseModel
+from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.time import (
     TimeIntervalType,
@@ -29,7 +29,7 @@ from dsgrid.utils.utilities import convert_record_dicts_to_classes
 logger = logging.getLogger(__name__)
 
 
-class DimensionBaseModel(DSGBaseModel):
+class DimensionBaseModel(DSGBaseDatabaseModel):
     """Common attributes for all dimensions"""
 
     name: str = Field(
@@ -139,26 +139,9 @@ class DimensionBaseModel(DSGBaseModel):
             ),
         },
     )
-    id: Optional[str] = Field(
+    id: Optional[int] = Field(
         default=None,
-        alias="_id",
         description="Registry database ID",
-        json_schema_extra={
-            "dsgrid_internal": True,
-        },
-    )
-    key: Optional[str] = Field(
-        default=None,
-        alias="_key",
-        description="Registry database key",
-        json_schema_extra={
-            "dsgrid_internal": True,
-        },
-    )
-    rev: Optional[str] = Field(
-        default=None,
-        alias="_rev",
-        description="Registry database revision",
         json_schema_extra={
             "dsgrid_internal": True,
         },

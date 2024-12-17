@@ -122,8 +122,4 @@ You can also set these environment variables:
 
 .. code-block:: console
 
-   $ export DSGRID_REGISTRY_DATABASE_URL=http://dsgrid-registry.hpc.nrel.gov:8529
-
-.. code-block:: console
-
-   $ export DSGRID_REGISTRY_DATABASE_NAME=standard-scenarios
+   $ export DSGRID_REGISTRY_DATABASE_URL=sqlite:///registry.db

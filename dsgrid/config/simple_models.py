@@ -52,6 +52,5 @@ class ProjectSimpleModel(DSGBaseModel):
 
 class RegistrySimpleModel(DSGBaseModel):
 
-    name: str
     projects: list[ProjectSimpleModel]
     datasets: list[DatasetSimpleModel]

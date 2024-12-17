@@ -6,7 +6,6 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
-from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.cli.dsgrid import cli
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.query.derived_dataset import (
@@ -24,8 +23,9 @@ from dsgrid.query.models import (
     DatasetConstructionMethod,
 )
 from dsgrid.query.query_submitter import QuerySubmitterBase
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
 from dsgrid.utils.spark import read_dataframe
 
 
@@ -84,19 +84,16 @@ def test_resstock_projection_invalid_query_replace_ids_with_names(valid_query):
 
 
 def test_create_derived_dataset_config(tmp_path):
+    conn = DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB)
     dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"
     runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
         cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
             "--offline",
-            "--database-name",
-            "simple-standard-scenarios",
+            "--url",
+            conn.url,
             "query",
             "project",
             "run",
@@ -124,7 +121,6 @@ def test_create_derived_dataset_config(tmp_path):
     dataset_dir = tmp_path / dataset_id
     dataset_config_file = dataset_dir / DatasetConfig.config_filename()
 
-    conn = DatabaseConnection(database="simple-standard-scenarios")
     registry_manager = RegistryManager.load(conn, offline_mode=True)
     dataset_dir.mkdir()
     assert create_derived_dataset_config_from_query(query_output, dataset_dir, registry_manager)
@@ -133,13 +129,9 @@ def test_create_derived_dataset_config(tmp_path):
     result = runner.invoke(
         cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
             "--offline",
-            "--database-name",
-            "simple-standard-scenarios",
+            "--url",
+            conn.url,
             "query",
             "project",
             "create-derived-dataset-config",

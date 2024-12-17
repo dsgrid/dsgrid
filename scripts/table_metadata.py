@@ -80,8 +80,9 @@ class TableMetadata(BaseModel):
 
     @classmethod
     def from_s3(cls, bucket: str, filepath: str) -> Self:
-        """ load json from s3 """
+        """load json from s3"""
         from pyarrow import fs  # import here to keep pyarrow dependency only in this method
+
         s3 = fs.S3FileSystem(region=fs.resolve_s3_region("nrel-pds-dsgrid"))
         with s3.open_input_stream(f"{bucket}/{filepath}") as fs:
             return cls(**json.load(fs))

@@ -5,6 +5,8 @@ from typing import Optional
 
 from pyspark.sql import DataFrame
 import pyspark.sql.functions as F
+from sqlalchemy import Connection
+
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     map_annual_time_to_date_time,
@@ -49,11 +51,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def __init__(
         self,
         config,
+        conn: Connection,
         dimension_mgr,
         dimension_mapping_mgr,
         mapping_references: Optional[list[DimensionMappingReferenceModel]] = None,
         project_time_dim=None,
     ):
+        self._conn = conn
         self._config: DatasetConfig = config
         self._dimension_mgr = dimension_mgr
         self._dimension_mapping_mgr = dimension_mapping_mgr
@@ -91,6 +95,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         dimensions : list[DimensionSimpleModel]
         """
+
+    @property
+    def connection(self) -> Connection:
+        """Return the active sqlalchemy connection to the registry database."""
+        return self._conn
 
     @property
     def dataset_id(self):
@@ -209,7 +218,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             dim_type = ref.from_dimension_type
             if dim_type == DimensionType.METRIC:
                 mapping_records = self._dimension_mapping_mgr.get_by_id(
-                    ref.mapping_id, version=ref.version
+                    ref.mapping_id, version=ref.version, conn=self.connection
                 ).get_records_dataframe()
                 break
 
@@ -267,7 +276,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         ref = self._get_dataset_to_project_mapping_reference(dimension_type)
         if ref is None:
             return ref
-        return self._dimension_mapping_mgr.get_by_id(ref.mapping_id, version=ref.version)
+        return self._dimension_mapping_mgr.get_by_id(
+            ref.mapping_id, version=ref.version, conn=self.connection
+        )
 
     def _get_dataset_to_project_mapping_reference(self, dimension_type: DimensionType):
         for ref in self._mapping_references:
@@ -355,7 +366,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             dim_type = ref.from_dimension_type
             column = dim_type.value
             mapping_config = self._dimension_mapping_mgr.get_by_id(
-                ref.mapping_id, version=ref.version
+                ref.mapping_id, version=ref.version, conn=self.connection
             )
             logger.info(
                 "Mapping dimension type %s mapping_type=%s",

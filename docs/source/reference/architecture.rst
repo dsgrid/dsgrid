@@ -11,11 +11,11 @@ This page describes the dsgrid software architecture.
 
 Overview
 ========
-- Store project and dataset metadata in ArangoDB.
-- Store dimension and dimension-mapping metadata and records in ArangoDB.
+- Store project and dataset metadata in SQLite.
+- Store dimension and dimension-mapping metadata and records in SQLite.
 - Store dataset time-series data in Parquet files on a shared filesystem (e.g., Lustre, S3).
-- Store dependencies between registry components in an ArangoDB graph.
-- Store version history of registry components in an ArangoDB graph.
+- Store dependencies between registry components in SQLite.
+- Store version history of registry components in SQLite.
 - Load all data tables in Apache Spark and use its DataFrame API for queries. Convert to Pandas
   DataFrames for post-processing and visualizations.
 
@@ -24,8 +24,7 @@ APIs
 
 Python
 ~~~~~~
-dsgrid applications use the dsgrid Python package to perform all operations. The package uses the
-ArangoDB Python driver to communicate with the database.
+dsgrid applications use the dsgrid Python package to perform all operations.
 
 HTTP
 ~~~~

@@ -8,7 +8,7 @@ import rich_click as click
 
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.loggers import setup_logging
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -19,12 +19,6 @@ from dsgrid.registry.registry_manager import RegistryManager
     show_default=True,
     envvar="DSGRID_REGISTRY_DATABASE_URL",
     help="dsgrid registry database URL. Override with the environment variable DSGRID_REGISTRY_DATABASE_URL",
-)
-@click.option(
-    "--database-name",
-    default="dsgrid",
-    show_default=True,
-    help="dsgrid registry database name.",
 )
 @click.option(
     "--remote-path",
@@ -43,10 +37,10 @@ from dsgrid.registry.registry_manager import RegistryManager
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def load(url, database_name, remote_path, offline, verbose):
+def load(url, remote_path, offline, verbose):
     level = logging.DEBUG if verbose else logging.INFO
     setup_logging("dsgrid", "dsgrid.log", console_level=level, file_level=level, mode="a")
-    conn = DatabaseConnection.from_url(url, database=database_name)
+    conn = DatabaseConnection(url=url)
     return RegistryManager.load(conn, remote_path, offline_mode=offline)
 
 

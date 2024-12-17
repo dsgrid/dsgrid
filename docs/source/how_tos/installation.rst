@@ -19,7 +19,7 @@ Steps to make a dsgrid Conda environment:
 
 .. code-block:: console
 
-    $ conda create -n dsgrid python=3.10
+    $ conda create -n dsgrid python=3.11
 
 3. Activate the environment:
 
@@ -27,10 +27,8 @@ Steps to make a dsgrid Conda environment:
 
     $ conda activate dsgrid
 
-dsgrid's key dependencies are an `ArangoDB registry <#registry>`_, which can be
-`shared <#nrel-shared-registry>`_ or `standalone <#standalone-registry>`_, and
-`Apache Spark`_. Apache Spark requires Java, so check if you have it. Both of these
-commands must work:
+dsgrid's key dependency is `Apache Spark`_. Apache Spark requires Java, so check if you have it.
+Both of these commands must work:
 
 .. tabs::
 
@@ -79,20 +77,18 @@ Registry
 
 NREL Shared Registry
 --------------------
-The current dsgrid registry is hosted on a VM in the NREL data center. The database URL is
-http://dsgrid-registry.hpc.nrel.gov:8529. All configuration information is stored in the database
-and all dataset files are stored on the the NREL HPC.
-
-You can list projects, datasets, and dimensions with the dsgrid CLI tool from any system within
-NREL. To query the data you must be on the NREL HPC.
-
-.. todo:: Steps to replicate the database to another system
+The current dsgrid registries are stored in per-project SQLite database files.
+All configuration information is stored in the database(s) and all dataset files are stored on
+the NREL HPC shared filesystem.
 
 Standalone Registry
 -------------------
-To use dsgrid in your own computational environment, you will need to run ArangoDB and either set
-up a new dsgrid registry or load a dsgrid registry that has been written to disk. Please see the
-:ref:`how-to guide on setting up a standalone dsgrid registry <set_up_standalone_registry>`.
+To use dsgrid in your own computational environment, you will need to initialize your own
+registry with this CLI command:
+
+.. code-block:: bash
+
+   dsgrid-admin create-registry --help
 
 Apache Spark
 ============
@@ -109,10 +105,7 @@ with this command:
 
 .. code-block:: console
 
-    $ dsgrid -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios registry projects list
-
-You can test your installation similarly if you are using a different registry, just change the
-ArangoDB URL (-u) and database name (-N) arguments to match your set-up.
+    $ dsgrid -u sqlite:///<your-db-path> registry projects list
 
 .. _configure_dsgrid:
 
@@ -121,17 +114,14 @@ Save your configuration
 
 Running ``dsgrid config create`` stores key information for working with dsgrid in a config file at
 ``~/.dsgrid.json5``. Currently, dsgrid only supports offline mode, and the other key information to
-store is the ArangoDB URL and the name of the dsgrid registry. The parameters in the config file
-are the default values used by the command-line interface.
+store is the registry URL. The parameters in the config file are the default values used by the
+command-line interface.
 
 The appropriate configuration for using the shared registry at NREL is:
 
 .. code-block:: console
 
-    $ dsgrid config create -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios --offline
-
-Similar to testing your installation, you can save the correct configurations for other set-ups
-by changing the ArangoDB URL (-u) and database name (-N) arguments of the above command.
+    $ dsgrid config create -u sqlite:////projects/dsgrid/standard-scenarios.db --offline
 
 .. todo:: Access from AWS
 

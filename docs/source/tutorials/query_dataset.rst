@@ -69,7 +69,7 @@ Load Data
       dataset_name = "state_level_simplified"
       filepath = f"{data_dir}/{dataset_name}"
 
-      duckdb.sql(f"""CREATE VIEW {tablename} AS SELECT * 
+      duckdb.sql(f"""CREATE VIEW {tablename} AS SELECT *
                    FROM read_parquet("{filepath}/table.parquet/**/*.parquet",
                    hive_partitioning=true, hive_types_autocast=false)""")
 
@@ -86,7 +86,7 @@ Load Data
       dataset_name = "state_level_simplified"
       filepath = f"{data_dir}/{dataset_name}"
 
-      duckdb.sql(f"""CREATE TABLE {tablename} AS SELECT * 
+      duckdb.sql(f"""CREATE TABLE {tablename} AS SELECT *
                    FROM read_parquet('{filepath}/table.parquet/**/*.parquet',
                    hive_partitioning=true, hive_types_autocast=false)""")
 
@@ -128,11 +128,11 @@ Setup:
 .. tabs::
 
    .. code-tab:: bash Kestrel
-       
+
       python -m pip install pydantic
- 
+
    .. code-tab:: bash OEDI
-      
+
       python -m pip install pydantic pyarrow
 
 Read Metadata:
@@ -178,15 +178,15 @@ These metadata columns_by_type and value_column can be used to write queries tha
         group_by_cols.extend(table_metadata.list_columns(dimension))
 
    group_by_str = ", ".join(group_by_cols)
-        
-   duckdb.sql(f"""CREATE TABLE {tablename} AS 
+
+   duckdb.sql(f"""CREATE TABLE {tablename} AS
                   SELECT SUM({value_column}) AS value_sum, {group_by_str}
                   FROM read_parquet('{filepath}/table.parquet/**/*.parquet')
                   GROUP BY {group_by_str}
                       """)
-                  
+
 This query would also work on the `full_dataset` by using metadata for dimensions, but that query could take hours, or fail because of memory limitations.
-                
+
 Export Data
 ===========
 
@@ -201,4 +201,3 @@ Export Data
 .. code-block:: python
 
    dataframe.to_csv('mydata.csv')
-

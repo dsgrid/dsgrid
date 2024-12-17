@@ -13,7 +13,6 @@ This guide lists the steps to perform common dsgrid operations.
    browse_registry
    create_dataset_dimensions
    filter_a_query
-   set_up_standalone_registry
    run_dsgrid_on_kestrel
    spark_cluster_on_kestrel
    visualize_data_with_tableau

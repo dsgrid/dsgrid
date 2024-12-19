@@ -42,11 +42,11 @@ dependencies = [
     "pyarrow",
     "pydantic~=2.9.2",
     "pyspark==3.5.2",  # Keep this synced with the spark version in Dockerfile.
-    "python-arango",
     "requests",
     "rich_click",
     "s3path",
     "semver",
+    "sqlalchemy >= 2, < 3",
     "uvicorn",
     "tzdata",  # time zone stuff
 ]

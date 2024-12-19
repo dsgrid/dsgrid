@@ -13,7 +13,6 @@ COUNTY_ID = "08031"
 STATE_ID = "CO"
 QUERY_NAME = "state"
 FILTER_CONFIG = {
-    "name": "test-registry",
     "projects": [
         {
             "project_id": PROJECT_ID,
@@ -42,7 +41,7 @@ def test_filter_registry(cached_registry, tmp_path):
     simple_model = RegistrySimpleModel(**FILTER_CONFIG)
     dst_data_path = tmp_path / "test-dsgrid-registry"
     src_conn = cached_registry
-    dst_conn = DatabaseConnection(database="filtered-dsgrid")
+    dst_conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/registry.db")
 
     try:
         RegistryManager.copy(src_conn, dst_conn, dst_data_path, force=True)

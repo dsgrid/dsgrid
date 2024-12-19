@@ -7,9 +7,9 @@ from semver import VersionInfo
 
 from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidOperation
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
+from dsgrid.registry.project_registry_manager import ProjectRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.registry.common import VersionUpdateType
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection, VersionUpdateType
 from dsgrid.utils.files import dump_data, load_data
 
 TEST_PROJECT_PATH = Path(__file__).absolute().parents[2] / "dsgrid-test-data"
@@ -17,16 +17,21 @@ TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_efs"
 TEST_STANDARD_SCENARIOS_PROJECT_REPO = TEST_PROJECT_PATH / "standard_scenarios_2021"
 TEST_DATASET_DIRECTORY = TEST_PROJECT_PATH / "datasets"
 TEST_REGISTRY_DATABASE = "cached-test-dsgrid"
-TEST_REGISTRY_PATH = Path("tests/data/registry")
+TEST_REGISTRY_BASE_PATH = Path("tests/data/registry")
+TEST_REGISTRY_DATA_PATH = Path("tests/data/registry/registry_data")
 TEST_EFS_REGISTRATION_FILE = Path("tests/data/test_efs_registration.json5")
 AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 TEST_REMOTE_REGISTRY = "s3://nrel-dsgrid-registry-test"
+CACHED_TEST_REGISTRY_DB = f"sqlite:///{TEST_REGISTRY_BASE_PATH}/cached_registry.db"
+SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB = (
+    f"sqlite:///{TEST_PROJECT_PATH}/filtered_registries/simple_standard_scenarios/registry.db"
+)
 
 
-def create_local_test_registry(tmpdir, conn=None):
+def create_local_test_registry(tmpdir: Path, conn=None):
     if conn is None:
-        conn = DatabaseConnection(database="test-dsgrid")
-    data_path = Path(tmpdir)
+        conn = DatabaseConnection(url=f"sqlite:///{tmpdir}/dsgrid-test.db")
+    data_path = tmpdir / "registry_data"
     RegistryManager.create(conn, data_path, overwrite=True)
     return data_path
 
@@ -70,7 +75,7 @@ def check_configs_update(base_dir, manager):
     return updated_ids
 
 
-def check_config_update(base_dir, mgr, config_id, user, version):
+def check_config_update(base_dir, mgr: ProjectRegistryManager, config_id, user, version):
     """Runs basic positive and negative update tests for the config.
 
     Parameters

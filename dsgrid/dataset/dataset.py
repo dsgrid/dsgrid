@@ -51,8 +51,10 @@ class Dataset(DatasetBase):
         Dataset
 
         """
+        conn = dimension_mgr.db.engine.connect()
         return cls(
             make_dataset_schema_handler(
+                conn,
                 config,
                 dimension_mgr,
                 dimension_mapping_mgr,

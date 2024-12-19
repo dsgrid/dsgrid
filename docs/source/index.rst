@@ -57,7 +57,7 @@ The people who interact with dsgrid are typically:
 Because the dsgrid data can be quite large (on the order of terabytes), and are compiled from a
 variety of data sources, dsgrid uses two key technologies to facilitate its workflows:
 
-- A graph database (currently ArangoDB) to hold dsgrid registries (metadata on and relationships
+- A SQL database (currently SQLite) to hold dsgrid registries (metadata on and relationships
   between dsgrid components, e.g., dimensions, datasets, dimension mappings, projects, derived
   datasets, queries)
 - A big-data engine (currently Apache Spark) to perform database operations across a cluster of
@@ -237,14 +237,14 @@ machines, currently a lot of dsgrid work requires `NREL High Performance Computi
 Standalone
 ^^^^^^^^^^
 
-TODO: List the key set-up tasks (spin up and connect to ArangoDB, spin up and connect to
+TODO: List the key set-up tasks (spin up and connect to
 Apache Spark cluster, and generally configure dsgrid to be pointing to all the right places)
 and link to the appropriate how-tos
 
 NREL High Performance Computing
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-TODO: List the key set-up tasks (spin up and connect to ArangoDB, spin up and connect to
+TODO: List the key set-up tasks (spin up and connect to
 Apache Spark cluster, and generally configure dsgrid to be pointing to all the right places)
 and link to the appropriate how-tos
 

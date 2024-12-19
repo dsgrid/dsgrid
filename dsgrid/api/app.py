@@ -53,9 +53,6 @@ logger = setup_logging(__name__, "dsgrid_api.log")
 DSGRID_REGISTRY_DATABASE_URL = os.environ.get("DSGRID_REGISTRY_DATABASE_URL")
 if DSGRID_REGISTRY_DATABASE_URL is None:
     raise Exception("The environment variable DSGRID_REGISTRY_DATABASE_URL must be set.")
-DSGRID_REGISTRY_DATABASE_NAME = os.environ.get("DSGRID_REGISTRY_DATABASE_NAME")
-if DSGRID_REGISTRY_DATABASE_NAME is None:
-    raise Exception("The environment variable DSGRID_REGISTRY_DATABASE_NAME must be set.")
 QUERY_OUTPUT_DIR = os.environ.get("DSGRID_QUERY_OUTPUT_DIR")
 if QUERY_OUTPUT_DIR is None:
     raise Exception("The environment variable DSGRID_QUERY_OUTPUT_DIR must be set.")
@@ -70,11 +67,10 @@ no_prompts = True
 # If both processes try to use the Hive metastore, a crash will occur.
 spark = init_spark("dsgrid_api", check_env=False)
 dsgrid_config = DsgridRuntimeConfig.load()
-conn = DatabaseConnection.from_url(
-    DSGRID_REGISTRY_DATABASE_URL,
-    database=DSGRID_REGISTRY_DATABASE_NAME,
-    username=dsgrid_config.database_user,
-    password=dsgrid_config.database_password,
+conn = DatabaseConnection(
+    url=DSGRID_REGISTRY_DATABASE_URL,
+    # username=dsgrid_config.database_user,
+    # password=dsgrid_config.database_password,
 )
 manager = RegistryManager.load(
     conn, REMOTE_REGISTRY, offline_mode=offline_mode, no_prompts=no_prompts
@@ -374,7 +370,6 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
         base_cmd = (
             f"--offline "
             f"--url={DSGRID_REGISTRY_DATABASE_URL} "
-            f"--database-name={DSGRID_REGISTRY_DATABASE_NAME} "
             f"query project run "
             f"--output={output_dir} --zip-file --force {fp.name}"
         )

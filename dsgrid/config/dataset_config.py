@@ -11,7 +11,7 @@ from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, Tab
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
-from dsgrid.data_models import DSGBaseModel, DSGEnum, EnumValue
+from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
@@ -206,7 +206,7 @@ class GrowthRateModel(DSGBaseModel):
     )
 
 
-class DatasetConfigModel(DSGBaseModel):
+class DatasetConfigModel(DSGBaseDatabaseModel):
     """Represents dataset configurations."""
 
     dataset_id: str = Field(
@@ -371,30 +371,6 @@ class DatasetConfigModel(DSGBaseModel):
                 "Trivial dimensions are 1-element dimensions that are not present in the parquet data"
                 " columns. Instead they are added by dsgrid as an alias column.",
             ),
-        },
-    )
-    id: Optional[str] = Field(
-        default=None,
-        alias="_id",
-        description="Registry database ID",
-        json_schema_extra={
-            "dsgrid_internal": True,
-        },
-    )
-    key: Optional[str] = Field(
-        default=None,
-        alias="_key",
-        description="Registry database key",
-        json_schema_extra={
-            "dsgrid_internal": True,
-        },
-    )
-    rev: Optional[str] = Field(
-        default=None,
-        alias="_rev",
-        description="Registry database revision",
-        json_schema_extra={
-            "dsgrid_internal": True,
         },
     )
 

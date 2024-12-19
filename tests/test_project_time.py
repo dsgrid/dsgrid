@@ -16,6 +16,7 @@ from dsgrid.dimension.time_utils import shift_time_interval
 from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.spark import get_spark_session
 from dsgrid.exceptions import DSGDatasetConfigError
+from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
 
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture
 def project():
-    conn = DatabaseConnection(database="simple-standard-scenarios")
+    conn = DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB)
     registry_mgr = RegistryManager.load(conn, offline_mode=True)
     project_id = "dsgrid_conus_2022"
     project = registry_mgr.project_manager.load_project(project_id)

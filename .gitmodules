@@ -1,7 +1,7 @@
 [submodule "dsgrid-test-data"]
 	path = dsgrid-test-data
 	url = https://github.com/dsgrid/dsgrid-test-data
-	branch = main
+	branch = dt/sqlite-registry
 [submodule "dsgrid-project-StandardScenarios"]
 	path = dsgrid-project-StandardScenarios
 	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
@@ -9,4 +9,4 @@
 [submodule "dsgrid-project-DECARB"]
 	path = dsgrid-project-DECARB
 	url = https://github.com/dsgrid/dsgrid-project-DECARB
-	branch = main
+	branch = fix/transport-subsector

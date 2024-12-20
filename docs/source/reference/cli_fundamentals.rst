@@ -75,7 +75,7 @@ Bash Instructions
 
 .. code-block:: console
 
-    $ _dsgrid_COMPLETE=bash_source dsgrid > ~/.dsgrid-complete.bash
+    $ _DSGRID_COMPLETE=bash_source dsgrid > ~/.dsgrid-complete.bash
 
 Add this line to your ``~/.bashrc`` file::
 
@@ -86,7 +86,7 @@ Zsh Instructions
 
 .. code-block:: console
 
-    $ _dsgrid_COMPLETE=zsh_source dsgrid > ~/.dsgrid-complete.zsh
+    $ _DSGRID_COMPLETE=zsh_source dsgrid > ~/.dsgrid-complete.zsh
 
 Add this line to your ``~/.zshrc`` file::
 
@@ -97,7 +97,7 @@ Fish Instructions
 
 .. code-block:: console
 
-   $ _dsgrid_COMPLETE=fish_source dsgrid > ~/.config/fish/completions/dsgrid.fish
+   $ _DSGRID_COMPLETE=fish_source dsgrid > ~/.config/fish/completions/dsgrid.fish
 
 Database Connection
 ===================

@@ -51,17 +51,17 @@ class Dataset(DatasetBase):
         Dataset
 
         """
-        conn = dimension_mgr.db.engine.connect()
-        return cls(
-            make_dataset_schema_handler(
-                conn,
-                config,
-                dimension_mgr,
-                dimension_mapping_mgr,
-                mapping_references=mapping_references,
-                project_time_dim=project_time_dim,
+        with dimension_mgr.db.engine.connect() as conn:
+            return cls(
+                make_dataset_schema_handler(
+                    conn,
+                    config,
+                    dimension_mgr,
+                    dimension_mapping_mgr,
+                    mapping_references=mapping_references,
+                    project_time_dim=project_time_dim,
+                )
             )
-        )
 
     def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         return self._handler.make_project_dataframe(project_config, scratch_dir_context)

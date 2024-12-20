@@ -122,4 +122,4 @@ You can also set these environment variables:
 
 .. code-block:: console
 
-   $ export DSGRID_REGISTRY_DATABASE_URL=sqlite:///registry.db
+   $ export DSGRID_REGISTRY_DATABASE_URL=sqlite:///<your-registry-path>

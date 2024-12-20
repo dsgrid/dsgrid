@@ -88,7 +88,7 @@ class RegistryType(StrEnum):
     PROJECT = "project"
 
 
-MODEL_ID_TABLE_MAPPING = {
+MODEL_TYPE_TO_ID_FIELD_MAPPING = {
     RegistryType.PROJECT: "project_id",
     RegistryType.DATASET: "dataset_id",
     RegistryType.DIMENSION: "dimension_id",

@@ -5,7 +5,8 @@ Support for a server solution (e.g., PostgreSQL) can easily be added when that b
 This page describes the schema and some tips for developers on how to inspect it manually.
 
 ## Tables
-Refer to the `create_tables` in `dsgrid/registry/registry_database.py` for the database schema.
+Refer to the `create_tables` function in `dsgrid/registry/registry_database.py` for the detailed
+database schema. The tables are also briefly described below.
 
 ### models
 This table stores all project, dataset, dimension, and dimension mapping configurations.
@@ -16,10 +17,9 @@ This table stores all project, dataset, dimension, and dimension mapping configu
 `dimension_id` and `mapping_id`.
 - `version`: dsgrid version of a model
 - `model_type`: Specifies the type of the model in the row: `project`, `dataset`, `dimension`,
-`dimension_mapping`.
+or `dimension_mapping`.
 - `registration_id`: Foreign key for the registration action that added the row.
 - `model`: The dsgrid configuration, such as `ProjectConfigModel`, encoded as a JSON string.
-Dimension and dimension mapping models contain their records.
 
 **Note**: `model_id` + `version` + `model_type` is a secondary way to uniquely identify a row.
 
@@ -46,7 +46,8 @@ This table specifies parent-child relationships between models.
 **Note**: Please ensure that you have a recent version of sqlite3 (likely >= 3.42). The `model`
 column in the `models` table contains a JSON-encoded string. Earlier versions do not support
 JSON features. The version installed in macOS 13.7 (3.39.5) is insufficient. Mac users can
-get a recent version with `homebrew` (`brew install sqlite3`). TODO Windows
+get a recent version with `homebrew` (`brew install sqlite3`). TODO: Windows-specific
+sqlite3 installation instructions
 
 ### Open the database
 ```
@@ -236,6 +237,7 @@ with engine.connect() as conn:
     dimension = conn.execute(stmt).fetchone()[0]
     print(dimension["records"])
 ```
+
 ```
 [
     {'id': '06037', 'name': 'Los Angeles', 'time_zone': 'PacificPrevailing', 'state': 'CA'},
@@ -246,9 +248,11 @@ with engine.connect() as conn:
 ```
 
 This removes the last record, as an example.
-```
+```python
 dimension["records"] = dimension["records"][:-1]
 ```
+
+```python
 with engine.connect() as conn:
     stmt = (
         update(table)

@@ -244,7 +244,6 @@ class DatasetRegistryManager(RegistryManagerBase):
             pivoted_columns = None
             pivoted_dimension_type = None
 
-        # The dataset_version starts the same as the config but can change later.
         config.model.dataset_version = "1.0.0"
         dataset_registry_dir = self.get_registry_data_directory(dataset_id)
         if not dataset_registry_dir.parent.exists():

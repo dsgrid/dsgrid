@@ -38,12 +38,13 @@ class RegistryAutoUpdater:
     ):
         """Update all configs that consume this config. Recursive.
         This is an in incomplete, experimental feature, and is subject to change.
-        Should only be called an admin that understands the consequences.
+        Should only be called by an admin that understands the consequences.
         Passing a dimension may trigger an update to a project and a dimension mapping.
         The change to that dimension mapping may trigger another update to the project.
         This guarantees that each config version will only be bumped once.
 
-        It is up to the caller to ensure changes are synced to the remote registry.
+        It is up to the caller to ensure changes are synced to the remote registry if not in
+        offline mode.
 
         Datasets likely need to be resubmitted to their projects.
 
@@ -70,7 +71,7 @@ class RegistryAutoUpdater:
         elif isinstance(config, DatasetConfig):
             self._update_dataset_users(config, original_version, context)
         else:
-            msg = "{type(config)}"
+            msg = f"Updates of configs dependent on {type(config)}"
             raise NotImplementedError(msg)
 
     def _update_dimension_users(
@@ -90,8 +91,8 @@ class RegistryAutoUpdater:
             msg = f"current version cannot be the same as the original: {original_version}"
             raise DSGInvalidParameter(msg)
 
-        affected = self._db.get_containing_models_by_version(
-            context.connection, config.model.dimension_id, original_version
+        affected = self._db.get_containing_models(
+            context.connection, config.model, version=original_version
         )
         for mapping in self._update_dimension_mappings_with_dimensions(
             affected, config, original_version
@@ -230,8 +231,11 @@ class RegistryAutoUpdater:
         Edits updated_projects as necessary.
         """
         for key, dim in dimensions.items():
-            for model in self._db.get_containing_models_by_version(
-                context.connection, dim.model.dimension_id, key.version
+            for model in self._db.get_containing_models(
+                context.connection,
+                dim.model,
+                version=key.version,
+                parent_model_type=RegistryType.PROJECT,
             )[RegistryType.PROJECT]:
                 config = updated_projects.get(
                     model.project_id, self._project_mgr.get_by_id(model.project_id)
@@ -260,8 +264,11 @@ class RegistryAutoUpdater:
         Edits updated_projects as necessary.
         """
         for key, mapping in mappings.items():
-            for model in self._db.get_containing_models_by_version(
-                context.connection, mapping.model.mapping_id, key.version
+            for model in self._db.get_containing_models(
+                context.connection,
+                mapping.model,
+                version=key.version,
+                parent_model_type=RegistryType.PROJECT,
             )[RegistryType.PROJECT]:
                 config = updated_projects.get(
                     model.project_id, self._project_mgr.get_by_id(model.project_id)
@@ -287,8 +294,11 @@ class RegistryAutoUpdater:
         context: RegistrationContext,
     ) -> None:
         for key, dataset in datasets.items():
-            for model in self._db.get_containing_models_by_version(
-                context.connection, dataset.model.dataset_id, key.version
+            for model in self._db.get_containing_models(
+                context.connection,
+                dataset.model,
+                version=key.version,
+                parent_model_type=RegistryType.PROJECT,
             )[RegistryType.PROJECT]:
                 config = updated_projects.get(
                     model.project_id, self._project_mgr.get_by_id(model.project_id)

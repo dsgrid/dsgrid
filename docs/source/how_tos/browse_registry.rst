@@ -49,7 +49,7 @@ dsgrid provides a Dash application that allows you to browse the registry in a w
 
 .. code-block:: console
 
-    $ export DSGRID_REGISTRY_DATABASE_URL=sqlite:///registry.db
+    $ export DSGRID_REGISTRY_DATABASE_URL=sqlite:///<your-db-path>
     $ export DSGRID_QUERY_OUTPUT_DIR=api_query_output
     $ export DSGRID_API_SERVER_STORE_DIR=.
 

@@ -8,11 +8,17 @@ import pandas as pd
 from sqlalchemy import Connection, Engine
 
 from dsgrid.config.dataset_config import DatasetConfigModel
-from dsgrid.config.dimensions import handle_dimension_union
+from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
+from dsgrid.config.dimensions import DimensionBaseModel, handle_dimension_union
 from dsgrid.config.mapping_tables import MappingTableModel
 from dsgrid.config.project_config import ProjectConfigModel
 from dsgrid.data_models import DSGBaseDatabaseModel
-from dsgrid.registry.common import DatasetRegistryStatus, RegistrationModel, RegistryType
+from dsgrid.registry.common import (
+    DatasetRegistryStatus,
+    MODEL_TYPE_TO_ID_FIELD_MAPPING,
+    RegistrationModel,
+    RegistryType,
+)
 from dsgrid.registry.registry_database import RegistryDatabase
 
 
@@ -194,59 +200,49 @@ class RegistryInterfaceBase(abc.ABC):
             if filter_config is None or self._does_filter_match(model, filter_config):
                 yield self._make_dsgrid_model(data)
 
-    def get_containing_models_by_version(
-        self,
-        conn: Optional[Connection],
-        model_id: str,
-        version: str,
-        model_type: Optional[RegistryType] = None,
-    ) -> dict[RegistryType, list[DSGBaseDatabaseModel]]:
-        """Return all models that contain the given model. Only looks at the latest version of
-        each model.
-        """
-        if conn is None:
-            with self._db.engine.connect() as conn:
-                return self._get_containing_models_by_version(conn, model_id, version, model_type)
-        return self._get_containing_models_by_version(conn, model_id, version, model_type)
-
-    def _get_containing_models_by_version(
-        self,
-        conn: Connection,
-        model_id: str,
-        version: str,
-        model_type: Optional[RegistryType] = None,
-    ) -> dict[RegistryType, list[DSGBaseDatabaseModel]]:
-        results = {x: [] for x in RegistryType}
-        for model_type, data in self._db.get_containing_models_by_version(
-            conn, model_id, version, model_type=model_type
-        ):
-            model = _INTERFACE_BY_TYPE[model_type]._make_dsgrid_model(data)
-            results[model_type].append(model)
-        return results
-
     def get_containing_models(
         self,
         conn: Optional[Connection],
         model: DSGBaseDatabaseModel,
-        model_type: Optional[RegistryType] = None,
+        version: Optional[str] = None,
+        parent_model_type: Optional[RegistryType] = None,
     ) -> dict[RegistryType, list[DSGBaseDatabaseModel]]:
-        """Return all models that contain the given model. Only looks at the latest version of
-        each model.
+        """Return all models that contain the given model. If version is not set, use the current
+        version of model. Only looks at the latest version of each parent model.
         """
+        version_ = version or model.version
+        if isinstance(model, ProjectConfigModel):
+            model_type = RegistryType.PROJECT
+        elif isinstance(model, DatasetConfigModel):
+            model_type = RegistryType.DATASET
+        elif isinstance(model, DimensionBaseModel):
+            model_type = RegistryType.DIMENSION
+        elif isinstance(model, DimensionMappingBaseModel):
+            model_type = RegistryType.DIMENSION_MAPPING
+        else:
+            msg = str(type(model))
+            raise NotImplementedError(msg)
+        model_id = getattr(model, MODEL_TYPE_TO_ID_FIELD_MAPPING[model_type])
         if conn is None:
             with self._db.engine.connect() as conn:
-                return self._get_containing_models(conn, model, model_type=model_type)
-        return self._get_containing_models(conn, model, model_type=model_type)
+                return self._get_containing_models(
+                    conn, model_type, model_id, version_, parent_model_type=parent_model_type
+                )
+        return self._get_containing_models(
+            conn, model_type, model_id, version_, parent_model_type=parent_model_type
+        )
 
     def _get_containing_models(
         self,
         conn: Connection,
-        model: DSGBaseDatabaseModel,
-        model_type: Optional[RegistryType] = None,
+        child_model_type: RegistryType,
+        model_id: str,
+        version: str,
+        parent_model_type: Optional[RegistryType] = None,
     ) -> dict[RegistryType, list[DSGBaseDatabaseModel]]:
         results = {x: [] for x in RegistryType}
         for model_type, data in self._db.get_containing_models(
-            conn, model.id, model_type=model_type
+            conn, child_model_type, model_id, version, parent_model_type=parent_model_type
         ):
             model = _INTERFACE_BY_TYPE[model_type]._make_dsgrid_model(data)
             results[model_type].append(model)
@@ -458,14 +454,14 @@ assert len(_INTERFACE_BY_TYPE) == len(RegistryType)
 @contextmanager
 def commit_manager(engine: Engine):
     failed = False
-    conn = engine.connect()
-    try:
-        yield conn
-    except Exception:
-        failed = True
-        raise
-    finally:
-        if failed:
-            conn.rollback()
-        else:
-            conn.commit()
+    with engine.connect() as conn:
+        try:
+            yield conn
+        except Exception:
+            failed = True
+            raise
+        finally:
+            if failed:
+                conn.rollback()
+            else:
+                conn.commit()

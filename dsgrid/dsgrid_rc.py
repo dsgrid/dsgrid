@@ -3,8 +3,11 @@
 import logging
 import sys
 from pathlib import Path
+from typing import Any
+from warnings import warn
 
 import json5
+from pydantic import model_validator
 
 from dsgrid.common import DEFAULT_DB_PASSWORD, DEFAULT_SCRATCH_DIR
 from dsgrid.data_models import DSGBaseModel
@@ -18,8 +21,7 @@ logger = logging.getLogger(__name__)
 class DsgridRuntimeConfig(DSGBaseModel):
     """Defines the runtime config that can be stored in users' home directories."""
 
-    database_name: str | None = None
-    database_url: str | None = "sqlite:///dsgrid.db"
+    database_url: str
     database_user: str = "root"
     database_password: str = DEFAULT_DB_PASSWORD
     offline: bool = True
@@ -28,6 +30,18 @@ class DsgridRuntimeConfig(DSGBaseModel):
     timings: bool = False
     reraise_exceptions: bool = False
     scratch_dir: None | Path = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def remove_legacy_fields(cls, data: dict[str, Any]) -> dict[str, Any]:
+        for field in ("database_name",):
+            res = data.pop(field, None)
+            if res is not None:
+                warn(
+                    f"The dsgrid runtime config field {field} is deprecated. Please remove it. "
+                    "This will cause an error in a future release.",
+                )
+        return data
 
     @classmethod
     def load(cls) -> "DsgridRuntimeConfig":

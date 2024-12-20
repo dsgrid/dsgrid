@@ -35,7 +35,7 @@ from dsgrid.registry.common import (
     RegistrationModel,
     RegistryTables,
     RegistryType,
-    MODEL_ID_TABLE_MAPPING,
+    MODEL_TYPE_TO_ID_FIELD_MAPPING,
 )
 from dsgrid.utils.files import dump_data
 
@@ -129,7 +129,7 @@ class RegistryDatabase:
             if overwrite:
                 shutil.rmtree(data_path)
             else:
-                msg = "{data_path=} already exists. Choose a different path or set overwrite=True"
+                msg = f"{data_path=} already exists. Choose a different path or set overwrite=True"
                 raise DSGInvalidOperation(msg)
 
         create_tables(self._engine, self._metadata)
@@ -234,7 +234,7 @@ class RegistryDatabase:
 
     @staticmethod
     def _get_model_id_field(model_type: RegistryType) -> str:
-        return MODEL_ID_TABLE_MAPPING[model_type]
+        return MODEL_TYPE_TO_ID_FIELD_MAPPING[model_type]
 
     def insert_model(
         self,
@@ -291,11 +291,11 @@ class RegistryDatabase:
         return new_model
 
     def _add_database_id(self, conn: Connection, table: Table, db_id: int) -> dict[str, Any]:
+        """Add the newly-generated ID to the model's JSON blob and update the db."""
         stmt = select(table.c.model).where(table.c.id == db_id)
         res = conn.execute(stmt).fetchone()
         assert res
         data = res[0]
-        # Ensure that all future reads will have the database ID set in the model.
         data["id"] = db_id
         conn.execute(update(table).where(table.c.id == db_id).values(model=data))
         return data
@@ -327,8 +327,8 @@ class RegistryDatabase:
         conn.execute(stmt)
         logger.debug("Set the current version of %s %s to %s", model_type, model_id, db_id)
 
-    def get_containing_models(
-        self, conn: Connection, db_id: int, model_type: Optional[RegistryType] = None
+    def get_containing_models_by_db_id(
+        self, conn: Connection, db_id: int, parent_model_type: Optional[RegistryType] = None
     ) -> list[tuple[RegistryType, dict[str, Any]]]:
         table1 = self.get_table(RegistryTables.CONTAINS)
         table2 = self.get_table(RegistryTables.MODELS)
@@ -339,24 +339,30 @@ class RegistryDatabase:
             .join(table3, table2.c.id == table3.c.current_id)
             .where(table1.c.child_id == db_id)
         )
-        if model_type is not None:
-            stmt = stmt.where(table2.c.model_type == model_type)
+        if parent_model_type is not None:
+            stmt = stmt.where(table2.c.model_type == parent_model_type)
         return [(RegistryType(x[0]), x[1]) for x in conn.execute(stmt).fetchall()]
 
-    def get_containing_models_by_version(
+    def get_containing_models(
         self,
         conn: Connection,
+        child_model_type: RegistryType,
         model_id: str,
         version: str,
-        model_type: Optional[RegistryType] = None,
+        parent_model_type: Optional[RegistryType] = None,
     ):
-        db_id = self._get_db_id(conn, model_id, version)
-        return self.get_containing_models(conn, db_id, model_type=model_type)
+        db_id = self._get_db_id(conn, child_model_type, model_id, version)
+        return self.get_containing_models_by_db_id(
+            conn, db_id, parent_model_type=parent_model_type
+        )
 
-    def _get_db_id(self, conn: Connection, model_id: str, version: str) -> int:
+    def _get_db_id(
+        self, conn: Connection, model_type: RegistryType, model_id: str, version: str
+    ) -> int:
         table = self.get_table(RegistryTables.MODELS)
         stmt = (
             select(table.c.id)
+            .where(table.c.model_type == model_type)
             .where(table.c.model_id == model_id)
             .where(table.c.version == version)
         )
@@ -365,7 +371,7 @@ class RegistryDatabase:
         return res[0]
 
     def delete_models(self, conn: Connection, model_type: RegistryType, model_id: str) -> None:
-        """Delete all documents with the model_id."""
+        """Delete all documents of model_type with the model_id."""
         for table in (RegistryTables.MODELS, RegistryTables.CURRENT_VERSIONS):
             table = self._get_table(table)
             stmt = (

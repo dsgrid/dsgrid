@@ -1,6 +1,7 @@
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 import rich_click as click
 
@@ -51,7 +52,7 @@ def get_log_level_from_str(level):
             raise Exception(f"Unsupported level={level}")
 
 
-def get_value_from_context(ctx, field) -> str:
+def get_value_from_context(ctx, field) -> Any:
     """Get the field value from the root of a click context."""
     return ctx.find_root().params[field]
 

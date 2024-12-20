@@ -8,7 +8,8 @@ from pyspark.sql.types import IntegerType
 from pyspark.sql import SparkSession
 
 from dsgrid.config.mapping_tables import MappingTableRecordModel
-from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
+from dsgrid.registry.common import DatabaseConnection
+from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.files import (
     dump_data,

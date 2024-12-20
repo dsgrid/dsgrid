@@ -113,7 +113,7 @@ name as needed.
 
 .. code-block:: console
 
-   $ dsgrid config create -u http://dsgrid-registry.hpc.nrel.gov:8529 -N standard-scenarios --offline
+   $ dsgrid config create sqlite:///<your-db-path> -N standard-scenarios --offline
    Wrote dsgrid config to /Users/dthom/.dsgrid.json5
 
 Environment variables
@@ -122,8 +122,4 @@ You can also set these environment variables:
 
 .. code-block:: console
 
-   $ export DSGRID_REGISTRY_DATABASE_URL=http://dsgrid-registry.hpc.nrel.gov:8529
-
-.. code-block:: console
-
-   $ export DSGRID_REGISTRY_DATABASE_NAME=standard-scenarios
+   $ export DSGRID_REGISTRY_DATABASE_URL=sqlite:///<your-registry-path>

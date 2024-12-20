@@ -1,8 +1,10 @@
 """Contains utility functions to map to/from dimension/mapping names and IDs."""
+
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.utils.files import dump_data, load_data
 
 
-def map_dimension_names_to_ids(dimension_mgr):
+def map_dimension_names_to_ids(dimension_mgr: DimensionRegistryManager):
     mapping = {}
     for dim in dimension_mgr.db.dimensions:
         if dim["name"] in mapping:

@@ -3,11 +3,10 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.cli.dsgrid import cli
 from dsgrid.cli.dsgrid_admin import cli as admin_cli
 from dsgrid.config.registration_models import RegistrationModel
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import TEST_DATASET_DIRECTORY, TEST_EFS_REGISTRATION_FILE
 from dsgrid.utils.files import dump_data, load_data
@@ -22,17 +21,13 @@ DECARB_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-DECARB"
 
 
 def test_register_dimensions_and_mappings(tmp_registry_db):
-    src_dir, tmpdir, db_name = tmp_registry_db
+    src_dir, tmpdir, url = tmp_registry_db
     runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
         admin_cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
             "create-registry",
-            db_name,
+            url,
             "-p",
             str(tmpdir),
             "--force",
@@ -43,12 +38,8 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
 
     dim_config_file = src_dir / "dimensions.json5"
     cmd = [
-        "--username",
-        "root",
-        "--password",
-        DEFAULT_DB_PASSWORD,
-        "--database-name",
-        db_name,
+        "--url",
+        url,
         "--offline",
         "registry",
         "dimensions",
@@ -59,7 +50,7 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     ]
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
-    conn = DatabaseConnection(database=db_name)
+    conn = DatabaseConnection(url=url)
     manager = RegistryManager.load(conn, offline_mode=True)
     mappings = map_dimension_names_to_ids(manager.dimension_manager)
     replace_dimension_names_with_current_ids(project_dimension_mapping_config, mappings)
@@ -68,12 +59,8 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     result = runner.invoke(cli, cmd)
 
     cmd = [
-        "--username",
-        "root",
-        "--password",
-        DEFAULT_DB_PASSWORD,
-        "--database-name",
-        db_name,
+        "--url",
+        url,
         "--offline",
         "registry",
         "dimension-mappings",
@@ -89,17 +76,13 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
 
 
 def test_register_project_and_dataset(tmp_registry_db):
-    src_dir, tmpdir, db_name = tmp_registry_db
+    src_dir, tmpdir, url = tmp_registry_db
     runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
         admin_cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
             "create-registry",
-            db_name,
+            url,
             "-p",
             str(tmpdir),
             "--force",
@@ -118,8 +101,8 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
-            "--database-name",
-            db_name,
+            "--url",
+            url,
             "--offline",
             "registry",
             "projects",
@@ -129,17 +112,13 @@ def test_register_project_and_dataset(tmp_registry_db):
             "log",
         ],
     )
-    conn = DatabaseConnection(database=db_name)
+    conn = DatabaseConnection(url=url)
     manager = RegistryManager.load(conn, offline_mode=True)
     mappings = map_dimension_names_to_ids(manager.dimension_manager)
     replace_dimension_names_with_current_ids(dataset_config, mappings)
     cmd = [
-        "--username",
-        "root",
-        "--password",
-        DEFAULT_DB_PASSWORD,
-        "--database-name",
-        db_name,
+        "--url",
+        url,
         "--offline",
         "registry",
         "projects",
@@ -159,7 +138,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
 
-    result = runner.invoke(cli, ["--database-name", db_name, "--offline", "registry", "list"])
+    result = runner.invoke(cli, ["--url", url, "--offline", "registry", "list"])
     assert result.exit_code == 0
     regex_project = re.compile(rf"{project_id}.*1\.1\.0")
     regex_dataset = re.compile(rf"{dataset_id}.*1\.0\.0")
@@ -171,12 +150,8 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(
         admin_cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--database-name",
-            db_name,
+            "--url",
+            url,
             "--offline",
             "registry",
             "projects",
@@ -188,12 +163,8 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(
         admin_cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--database-name",
-            db_name,
+            "--url",
+            url,
             "--offline",
             "registry",
             "datasets",
@@ -205,12 +176,8 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(
         admin_cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--database-name",
-            db_name,
+            "--url",
+            url,
             "--offline",
             "registry",
             "dimension-mappings",
@@ -222,12 +189,8 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(
         admin_cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--database-name",
-            db_name,
+            "--url",
+            url,
             "--offline",
             "registry",
             "dimensions",
@@ -242,12 +205,8 @@ def test_list_project_dimension_query_names(cached_registry):
     conn = cached_registry
     runner = CliRunner(mix_stderr=False)
     cmd = [
-        "--username",
-        "root",
-        "--password",
-        DEFAULT_DB_PASSWORD,
-        "--database-name",
-        conn.database,
+        "--url",
+        conn.url,
         "--offline",
         "registry",
         "projects",
@@ -264,17 +223,13 @@ def test_list_project_dimension_query_names(cached_registry):
 
 def test_register_dsgrid_projects(tmp_registry_db):
     """Test registration of the real dsgrid projects."""
-    _, tmpdir, db_name = tmp_registry_db
+    _, tmpdir, url = tmp_registry_db
     runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
         admin_cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
             "create-registry",
-            db_name,
+            url,
             "-p",
             str(tmpdir),
             "--force",
@@ -292,26 +247,20 @@ def test_register_dsgrid_projects(tmp_registry_db):
         result = runner.invoke(
             cli,
             [
-                "--username",
-                "root",
-                "--password",
-                DEFAULT_DB_PASSWORD,
                 "--url",
-                "http://localhost:8529",
-                "--database-name",
-                db_name,
+                url,
                 "--offline",
                 "registry",
                 "projects",
                 "register",
                 str(project_config),
                 "--log-message",
-                "log",
+                f"Register project {project_config}",
             ],
         )
         assert result.exit_code == 0
 
-    conn = DatabaseConnection(database=db_name)
+    conn = DatabaseConnection(url=url)
     manager = RegistryManager.load(conn, offline_mode=True)
     project = manager.project_manager.load_project("US_DOE_DECARB_2023")
     config = project.config
@@ -320,17 +269,13 @@ def test_register_dsgrid_projects(tmp_registry_db):
 
 
 def test_bulk_register(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
+    test_project_dir, tmp_path, url = tmp_registry_db
     runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
         admin_cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
             "create-registry",
-            db_name,
+            url,
             "-p",
             str(tmp_path),
             "--force",
@@ -352,12 +297,8 @@ def test_bulk_register(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
-            "-N",
-            db_name,
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
+            "--url",
+            url,
             "registry",
             "bulk-register",
             str(registration_file),
@@ -375,12 +316,8 @@ def test_bulk_register(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
-            "-N",
-            db_name,
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
+            "--url",
+            url,
             "registry",
             "bulk-register",
             str(TEST_EFS_REGISTRATION_FILE),

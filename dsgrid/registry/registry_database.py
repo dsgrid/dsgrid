@@ -195,9 +195,9 @@ class RegistryDatabase:
                 # The backup below will overwrite the data_path value.
                 table = dst.get_table(RegistryTables.KEY_VALUE)
                 stmt = select(table.c.value).where(table.c.key == "data_path")
-                res = dst_conn_.execute(stmt).fetchone()
-                assert res is not None
-                orig_data_path = res[0]
+                row = dst_conn_.execute(stmt).fetchone()
+                assert row is not None
+                orig_data_path = row.value
                 assert dst_conn_._dbapi_connection is not None
                 assert isinstance(
                     dst_conn_._dbapi_connection.driver_connection, sqlite3.Connection
@@ -293,9 +293,9 @@ class RegistryDatabase:
     def _add_database_id(self, conn: Connection, table: Table, db_id: int) -> dict[str, Any]:
         """Add the newly-generated ID to the model's JSON blob and update the db."""
         stmt = select(table.c.model).where(table.c.id == db_id)
-        res = conn.execute(stmt).fetchone()
-        assert res
-        data = res[0]
+        row = conn.execute(stmt).fetchone()
+        assert row
+        data = row.model
         data["id"] = db_id
         conn.execute(update(table).where(table.c.id == db_id).values(model=data))
         return data
@@ -341,7 +341,7 @@ class RegistryDatabase:
         )
         if parent_model_type is not None:
             stmt = stmt.where(table2.c.model_type == parent_model_type)
-        return [(RegistryType(x[0]), x[1]) for x in conn.execute(stmt).fetchall()]
+        return [(RegistryType(x.model_type), x.model) for x in conn.execute(stmt).fetchall()]
 
     def get_containing_models(
         self,
@@ -366,9 +366,9 @@ class RegistryDatabase:
             .where(table.c.model_id == model_id)
             .where(table.c.version == version)
         )
-        res = conn.execute(stmt).fetchone()
-        assert res
-        return res[0]
+        row = conn.execute(stmt).fetchone()
+        assert row
+        return row.id
 
     def delete_models(self, conn: Connection, model_type: RegistryType, model_id: str) -> None:
         """Delete all documents of model_type with the model_id."""
@@ -388,11 +388,11 @@ class RegistryDatabase:
         """Return the path where dataset data is stored."""
         table = self._get_table(RegistryTables.KEY_VALUE)
         with self._engine.connect() as conn:
-            res = conn.execute(select(table.c.value).where(table.c.key == "data_path")).fetchone()
-            if res is None:
+            row = conn.execute(select(table.c.value).where(table.c.key == "data_path")).fetchone()
+            if row is None:
                 msg = "Bug: received no result in query for data_path"
                 raise Exception(msg)
-            return Path(res[0])
+            return Path(row.value)
 
     def _get_table(self, table_type: RegistryTables) -> Table:
         return Table(table_type.value, self._metadata)
@@ -416,19 +416,19 @@ class RegistryDatabase:
             .where(table2.c.model_type == model_type)
             .where(table2.c.model_id == model_id)
         )
-        res = conn.execute(stmt).fetchall()
-        if not res:
+        rows = conn.execute(stmt).fetchall()
+        if not rows:
             msg = f"{model_type=} {model_id=} is not registered"
             raise DSGValueNotRegistered(msg)
-        if len(res) != 1:
-            msg = "Bug: received more than one model set to latest: {res}"
+        if len(rows) != 1:
+            msg = "Bug: received more than one model set to latest: {rows}"
             raise Exception(msg)
-        return res[0][0]
+        return getattr(rows[0], column)
 
     def list_model_ids(self, conn: Connection, model_type: RegistryType) -> list[str]:
         table = self.get_table(RegistryTables.MODELS)
         stmt = select(table.c.model_id).where(table.c.model_type == model_type).distinct()
-        return [x[0] for x in conn.execute(stmt).fetchall()]
+        return [x.model_id for x in conn.execute(stmt).fetchall()]
 
     def iter_models(
         self, conn: Connection, model_type: RegistryType, all_versions: bool = False
@@ -446,7 +446,7 @@ class RegistryDatabase:
                 .where(table2.c.model_type == model_type)
             )
         for item in conn.execute(stmt).fetchall():
-            yield item[0]
+            yield item.model
 
     def _get_by_version(
         self, conn: Connection, model_type: RegistryType, model_id: str, version: str
@@ -458,14 +458,14 @@ class RegistryDatabase:
             .where(table.c.model_id == model_id)
             .where(table.c.version == version)
         )
-        res = conn.execute(stmt).fetchall()
-        if not res:
+        rows = conn.execute(stmt).fetchall()
+        if not rows:
             msg = f"{model_type=} {model_id}"
             raise DSGValueNotRegistered(msg)
-        if len(res) > 1:
+        if len(rows) > 1:
             msg = f"Bug: found more than one row. {model_type=} {model_id=} {version=}"
             raise Exception(msg)
-        return res[0][0]
+        return rows[0].model
 
     def insert_registration(
         self,
@@ -507,20 +507,20 @@ class RegistryDatabase:
             .join_from(table1, table2, table1.c.registration_id == table2.c.id)
             .where(table1.c.id == db_id)
         )
-        res = conn.execute(stmt).fetchall()
-        if not res:
+        rows = conn.execute(stmt).fetchall()
+        if not rows:
             msg = f"{db_id=}"
             raise DSGValueNotRegistered(msg)
-        if len(res) > 1:
+        if len(rows) > 1:
             msg = f"Bug: found more than one row matching {db_id=}"
             raise Exception(msg)
-        row = res[0]
+        row = rows[0]
         return RegistrationModel(
-            id=row[0],
-            timestamp=row[1],
-            submitter=row[2],
-            update_type=row[3],
-            log_message=row[4],
+            id=row.id,
+            timestamp=row.timestamp,
+            submitter=row.submitter,
+            update_type=row.update_type,
+            log_message=row.log_message,
         )
 
     def get_initial_registration(
@@ -543,17 +543,17 @@ class RegistryDatabase:
             .order_by(table1.c.id)
             .limit(1)
         )
-        res = conn.execute(stmt).fetchone()
-        if not res:
+        row = conn.execute(stmt).fetchone()
+        if not row:
             msg = f"{model_type=} {model_id=}"
             raise DSGValueNotRegistered(msg)
-        assert res
+        assert row
         return RegistrationModel(
-            id=res[0],
-            timestamp=res[1],
-            submitter=res[2],
-            update_type=res[3],
-            log_message=res[4],
+            id=row.id,
+            timestamp=row.timestamp,
+            submitter=row.submitter,
+            update_type=row.update_type,
+            log_message=row.log_message,
         )
 
     def has(

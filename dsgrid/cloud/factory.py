@@ -1,6 +1,7 @@
-from .s3_storage_interface import S3StorageInterface
+# from .s3_storage_interface import S3StorageInterface
 from .fake_storage_interface import FakeStorageInterface
-from dsgrid.common import AWS_PROFILE_NAME
+
+# from dsgrid.common import AWS_PROFILE_NAME
 
 
 def make_cloud_storage_interface(local_path, remote_path, uuid, user, offline=False):
@@ -24,5 +25,7 @@ def make_cloud_storage_interface(local_path, remote_path, uuid, user, offline=Fa
 
     """
     if not offline and remote_path.lower().startswith("s3"):
-        return S3StorageInterface(local_path, remote_path, uuid, user, profile=AWS_PROFILE_NAME)
+        msg = f"Support for S3 is currently disabled: {remote_path=}"
+        raise NotImplementedError(msg)
+        # return S3StorageInterface(local_path, remote_path, uuid, user, profile=AWS_PROFILE_NAME)
     return FakeStorageInterface()

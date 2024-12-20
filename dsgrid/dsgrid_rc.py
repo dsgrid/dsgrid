@@ -3,7 +3,7 @@
 import logging
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from warnings import warn
 
 import json5
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 class DsgridRuntimeConfig(DSGBaseModel):
     """Defines the runtime config that can be stored in users' home directories."""
 
-    database_url: str
+    database_url: Optional[str] = None
     database_user: str = "root"
     database_password: str = DEFAULT_DB_PASSWORD
     offline: bool = True

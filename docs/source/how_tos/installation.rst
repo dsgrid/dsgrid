@@ -121,7 +121,7 @@ The appropriate configuration for using the shared registry at NREL is:
 
 .. code-block:: console
 
-    $ dsgrid config create -u sqlite:////projects/dsgrid/standard-scenarios.db --offline
+    $ dsgrid config create sqlite:////projects/dsgrid/standard-scenarios.db --offline
 
 .. todo:: Access from AWS
 

@@ -8,6 +8,7 @@ from typing import Optional
 
 from pyspark.sql import SparkSession
 from semver import VersionInfo
+from sqlalchemy import Connection
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.project_config import ProjectConfig
@@ -120,7 +121,7 @@ class Project:
             dataset = self.load_dataset(dataset_id)
         return dataset
 
-    def load_dataset(self, dataset_id):
+    def load_dataset(self, dataset_id, conn: Optional[Connection] = None):
         """Loads a dataset.
 
         Parameters
@@ -144,6 +145,7 @@ class Project:
             self._dimension_mapping_mgr,
             mapping_references=input_dataset.mapping_references,
             project_time_dim=self._config.get_base_dimension(DimensionType.TIME),
+            conn=conn,
         )
         self._datasets[dataset_id] = dataset
         return dataset
@@ -287,11 +289,14 @@ class Project:
                 logger.info("Build project-mapped dataset %s", dataset_id)
                 # Call load_dataset instead of get_dataset because the latter won't be valid here
                 # after the SparkSession restart.
-                dataset = self.load_dataset(dataset_id)
-                with Timer(timer_stats_collector, "build_project_mapped_dataset"):
-                    df = dataset.make_project_dataframe_from_query(context, self._config)
-                    context.serialize_dataset_metadata_to_file(dataset.dataset_id, metadata_file)
-                    write_dataframe_and_auto_partition(df, cached_dataset_path)
+                with self._dimension_mgr.db.engine.connect() as conn:
+                    dataset = self.load_dataset(dataset_id, conn=conn)
+                    with Timer(timer_stats_collector, "build_project_mapped_dataset"):
+                        df = dataset.make_project_dataframe_from_query(context, self._config)
+                        context.serialize_dataset_metadata_to_file(
+                            dataset.dataset_id, metadata_file
+                        )
+                        write_dataframe_and_auto_partition(df, cached_dataset_path)
         else:
             assert metadata_file.exists(), metadata_file
             context.set_dataset_metadata_from_file(dataset_id, metadata_file)

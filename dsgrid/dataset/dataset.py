@@ -2,6 +2,9 @@
 
 import abc
 import logging
+from typing import Optional
+
+from sqlalchemy import Connection
 
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.query.query_context import QueryContext
@@ -34,7 +37,13 @@ class Dataset(DatasetBase):
 
     @classmethod
     def load(
-        cls, config, dimension_mgr, dimension_mapping_mgr, mapping_references, project_time_dim
+        cls,
+        config,
+        dimension_mgr,
+        dimension_mapping_mgr,
+        mapping_references,
+        project_time_dim,
+        conn: Optional[Connection] = None,
     ):
         """Load a dataset from a store.
 
@@ -51,17 +60,16 @@ class Dataset(DatasetBase):
         Dataset
 
         """
-        with dimension_mgr.db.engine.connect() as conn:
-            return cls(
-                make_dataset_schema_handler(
-                    conn,
-                    config,
-                    dimension_mgr,
-                    dimension_mapping_mgr,
-                    mapping_references=mapping_references,
-                    project_time_dim=project_time_dim,
-                )
+        return cls(
+            make_dataset_schema_handler(
+                conn,
+                config,
+                dimension_mgr,
+                dimension_mapping_mgr,
+                mapping_references=mapping_references,
+                project_time_dim=project_time_dim,
             )
+        )
 
     def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         return self._handler.make_project_dataframe(project_config, scratch_dir_context)
@@ -87,4 +95,4 @@ class StandaloneDataset(DatasetBase):
         Dataset
 
         """
-        return cls(make_dataset_schema_handler(config, dimension_mgr, None))
+        return cls(make_dataset_schema_handler(None, config, dimension_mgr, None))

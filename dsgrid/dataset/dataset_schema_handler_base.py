@@ -51,7 +51,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def __init__(
         self,
         config,
-        conn: Connection,
+        conn: Optional[Connection],
         dimension_mgr,
         dimension_mapping_mgr,
         mapping_references: Optional[list[DimensionMappingReferenceModel]] = None,
@@ -97,7 +97,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @property
-    def connection(self) -> Connection:
+    def connection(self) -> Optional[Connection]:
         """Return the active sqlalchemy connection to the registry database."""
         return self._conn
 

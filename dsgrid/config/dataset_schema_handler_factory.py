@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import Connection
 
 from dsgrid.dataset.dataset_schema_handler_standard import StandardDatasetSchemaHandler
@@ -6,7 +8,7 @@ from .dataset_config import DataSchemaType
 
 
 def make_dataset_schema_handler(
-    conn: Connection,
+    conn: Optional[Connection],
     config,
     dimension_mgr,
     dimension_mapping_mgr,

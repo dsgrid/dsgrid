@@ -30,8 +30,10 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
 ]
 dependencies = [
-    "awscliv2",
-    "boto3",
+    # We may need these again in the future.
+    # "awscliv2",
+    # "boto3",
+    # "s3path",
     "click>=8",
     "dash",
     "dash_bootstrap_components",
@@ -45,7 +47,6 @@ dependencies = [
     "pyspark==3.5.2",  # Keep this synced with the spark version in Dockerfile.
     "requests",
     "rich_click",
-    "s3path",
     "semver",
     "sqlalchemy >= 2, < 3",
     "uvicorn",

@@ -1,7 +1,7 @@
 from pathlib import Path
 import os
 
-AWS_PROFILE_NAME = "nrel-aws-dsgrid"
+# AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 REMOTE_REGISTRY = "s3://nrel-dsgrid-registry"
 
 

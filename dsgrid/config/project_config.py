@@ -2,17 +2,15 @@ import itertools
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Dict, List, Optional, Type
+from typing import Optional, Type
 
 import pandas as pd
-from pydantic import field_validator, model_validator, Field, ValidationInfo
-
-from typing_extensions import Annotated
+from pydantic import conlist, field_validator, model_validator, Field, ValidationInfo
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionBaseConfig
 from dsgrid.config.mapping_tables import MappingTableConfig
-from dsgrid.data_models import DSGBaseModel, make_model_config
+from dsgrid.data_models import DSGBaseModel, DSGBaseDatabaseModel, make_model_config
 from dsgrid.dimension.base_models import (
     check_required_dimensions,
     check_timezone_in_geography,
@@ -45,11 +43,11 @@ from dsgrid.utils.spark import (
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
-from .config_base import ConfigBase
-from .dataset_config import InputDatasetType
-from .supplemental_dimension import SupplementalDimensionModel
-from .dimension_mapping_base import DimensionMappingReferenceModel
-from .dimensions import (
+from dsgrid.config.config_base import ConfigBase
+from dsgrid.config.dataset_config import InputDatasetType
+from dsgrid.config.supplemental_dimension import SupplementalDimensionModel
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
+from dsgrid.config.dimensions import (
     DimensionsListModel,
     DimensionReferenceModel,
     DimensionModel,
@@ -74,30 +72,24 @@ class SubsetDimensionSelectorModel(DSGBaseModel):
 
     name: str
     description: str
-    column_values: Annotated[
-        dict[str, str],
-        Field(
-            title="column_values",
-            description="Optional columns to populate in the subset dimension group's supplemental "
-            "dimension records table. For example, if each selector in the group defines the end "
-            "uses for one sector (e.g., commercial_end_uses, transportation_end_uses), the "
-            "supplemental dimension records table needs to define the 'fuel_id' and 'unit' fields of "
-            "the EnergyEndUse data model.",
-            default={},
-        ),
-    ]
-    records: Annotated[
-        list[str],
-        Field(
-            title="records",
-            description="Table of values populated by reading the parent subset dimension records "
-            "file. Should not be populated by the user.",
-            default=[],
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-        ),
-    ]
+    column_values: dict[str, str] = Field(
+        title="column_values",
+        description="Optional columns to populate in the subset dimension group's supplemental "
+        "dimension records table. For example, if each selector in the group defines the end "
+        "uses for one sector (e.g., commercial_end_uses, transportation_end_uses), the "
+        "supplemental dimension records table needs to define the 'fuel_id' and 'unit' fields of "
+        "the EnergyEndUse data model.",
+        default={},
+    )
+    records: list[str] = Field(
+        title="records",
+        description="Table of values populated by reading the parent subset dimension records "
+        "file. Should not be populated by the user.",
+        default=[],
+        json_schema_extra={
+            "dsgrid_internal": True,
+        },
+    )
 
 
 class SubsetDimensionGroupModel(DSGBaseModel):
@@ -105,60 +97,42 @@ class SubsetDimensionGroupModel(DSGBaseModel):
 
     name: str
     display_name: str
-    dimension_query_name: Annotated[
-        Optional[str],
-        Field(
-            None,
-            title="dimension_query_name",
-            description="Auto-generated query name for SQL queries.",
-        ),
-    ]
+    dimension_query_name: Optional[str] = Field(
+        default=None,
+        title="dimension_query_name",
+        description="Auto-generated query name for SQL queries.",
+    )
     description: str
-    dimension_type: Annotated[
-        DimensionType,
-        Field(
-            title="dimension_type",
-            alias="type",
-            description="Type of the dimension",
-            json_schema_extra={
-                "options": DimensionType.format_for_docs(),
-            },
-        ),
-    ]
-    filename: Annotated[
-        Optional[str],
-        Field(
-            default=None,
-            title="filename",
-            alias="file",
-            description="Filename containing dimension records. Only populated for initial "
-            "registration. Each selector's records are stored as JSON objects in the dsgrid registry.",
-        ),
-    ]
-    selectors: Annotated[
-        list[SubsetDimensionSelectorModel],
-        Field(
-            title="selectors",
-            description="Dimension selectors",
-        ),
-    ]
-    selector_references: Annotated[
-        list[DimensionReferenceModel],
-        Field(
-            title="selectors",
-            description="References to the subset dimensions generated by dsgrid during registration.",
-            default=[],
-        ),
-    ]
-    create_supplemental_dimension: Annotated[
-        bool,
-        Field(
-            title="create_supplemental_dimension",
-            description="Auto-generate supplemental dimensions in order to allow aggregrations on "
-            "the subsets.",
-            default=True,
-        ),
-    ]
+    dimension_type: DimensionType = Field(
+        title="dimension_type",
+        alias="type",
+        description="Type of the dimension",
+        json_schema_extra={
+            "options": DimensionType.format_for_docs(),
+        },
+    )
+    filename: Optional[str] = Field(
+        default=None,
+        title="filename",
+        alias="file",
+        description="Filename containing dimension records. Only populated for initial "
+        "registration. Each selector's records are stored as JSON objects in the dsgrid registry.",
+    )
+    selectors: list[SubsetDimensionSelectorModel] = Field(
+        title="selectors",
+        description="Dimension selectors",
+    )
+    selector_references: list[DimensionReferenceModel] = Field(
+        title="selectors",
+        description="References to the subset dimensions generated by dsgrid during registration.",
+        default=[],
+    )
+    create_supplemental_dimension: bool = Field(
+        title="create_supplemental_dimension",
+        description="Auto-generate supplemental dimensions in order to allow aggregrations on "
+        "the subsets.",
+        default=True,
+    )
     record_ids: set[str] = set()
 
     @field_validator("display_name")
@@ -213,94 +187,87 @@ class SubsetDimensionGroupModel(DSGBaseModel):
         return self
 
 
+class SubsetDimensionGroupListModel(DSGBaseModel):
+    """Defines a list of subset dimensions."""
+
+    subset_dimensions: conlist(SubsetDimensionGroupModel, min_length=1) = Field(
+        description="List of subset dimensions to be registered"
+    )
+
+
 class DimensionsModel(DSGBaseModel):
     """Contains dimensions defined by a project"""
 
-    base_dimensions: Annotated[
-        DimensionsListModel,
-        Field(
-            title="base_dimensions",
-            description="List of dimensions for a project's base dimensions. They will be "
-            "automatically registered during project registration and then converted to "
-            "base_dimension_references.",
-            json_schema_extra={
-                "requirements": (
-                    "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
-                    " one dimension reference per type is allowed.",
-                ),
-            },
-            default=[],
-        ),
-    ]
-    base_dimension_references: Annotated[
-        List[DimensionReferenceModel],
-        Field(
-            title="base_dimensions",
-            description="List of registry references (``DimensionReferenceModel``) for a project's "
-            "base dimensions.",
-            json_schema_extra={
-                "requirements": (
-                    "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
-                    " one dimension reference per type is allowed.",
-                ),
-            },
-            default=[],
-        ),
-    ]
-    subset_dimensions: Annotated[
-        list[SubsetDimensionGroupModel],
-        Field(
-            title="subset_dimensions",
-            description="List of subset dimension groups",
-            json_schema_extra={
-                "notes": (
-                    "Subset dimension groups are used to specify subsets of base dimension records that a "
-                    "dataset must support, dimensionality of derived datasets, and query filters. "
-                    "Subset dimension groups also define a new supplemental dimension whose records "
-                    "correspond to the table columns/subset selectors, such that defining a subset "
-                    "dimension group can be a convenient way to define reporting at a different level of "
-                    "aggregation as compared to the project's base dimensions.",
-                ),
-            },
-            default=[],
-        ),
-    ]
-    supplemental_dimensions: Annotated[
-        List[SupplementalDimensionModel],
-        Field(
-            title="supplemental_dimensions",
-            description="List of supplemental dimensions. They will be automatically registered "
-            "during project registration and then converted to supplemental_dimension_references.",
-            json_schema_extra={
-                "notes": (
-                    "Supplemental dimensions are used to support additional querying and transformations",
-                    "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
-                    "base data.",
-                ),
-            },
-            default=[],
-        ),
-    ]
-    supplemental_dimension_references: Annotated[
-        List[DimensionReferenceModel],
-        Field(
-            title="supplemental_dimension_references",
-            description="List of registry references for a project's supplemental dimensions.",
-            json_schema_extra={
-                "requirements": (
-                    "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType`"
-                    " are allowed for supplemental dimension references (i.e., multiple `Geography` types"
-                    " are allowed).",
-                ),
-                "notes": (
-                    "Supplemental dimensions are used to support additional querying and transformations",
-                    "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
-                    "base data.",
-                ),
-            },
-            default=[],
-        ),
-    ]
+    base_dimensions: DimensionsListModel = Field(
+        title="base_dimensions",
+        description="List of dimensions for a project's base dimensions. They will be "
+        "automatically registered during project registration and then converted to "
+        "base_dimension_references.",
+        json_schema_extra={
+            "requirements": (
+                "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
+                " one dimension reference per type is allowed.",
+            ),
+        },
+        default=[],
+    )
+    base_dimension_references: list[DimensionReferenceModel] = Field(
+        title="base_dimensions",
+        description="List of registry references (``DimensionReferenceModel``) for a project's "
+        "base dimensions.",
+        json_schema_extra={
+            "requirements": (
+                "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
+                " one dimension reference per type is allowed.",
+            ),
+        },
+        default=[],
+    )
+    subset_dimensions: list[SubsetDimensionGroupModel] = Field(
+        title="subset_dimensions",
+        description="List of subset dimension groups",
+        json_schema_extra={
+            "notes": (
+                "Subset dimension groups are used to specify subsets of base dimension records that a "
+                "dataset must support, dimensionality of derived datasets, and query filters. "
+                "Subset dimension groups also define a new supplemental dimension whose records "
+                "correspond to the table columns/subset selectors, such that defining a subset "
+                "dimension group can be a convenient way to define reporting at a different level of "
+                "aggregation as compared to the project's base dimensions.",
+            ),
+        },
+        default=[],
+    )
+    supplemental_dimensions: list[SupplementalDimensionModel] = Field(
+        title="supplemental_dimensions",
+        description="List of supplemental dimensions. They will be automatically registered "
+        "during project registration and then converted to supplemental_dimension_references.",
+        json_schema_extra={
+            "notes": (
+                "Supplemental dimensions are used to support additional querying and transformations",
+                "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
+                "base data.",
+            ),
+        },
+        default=[],
+    )
+    supplemental_dimension_references: list[DimensionReferenceModel] = Field(
+        title="supplemental_dimension_references",
+        description="List of registry references for a project's supplemental dimensions.",
+        json_schema_extra={
+            "requirements": (
+                "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType`"
+                " are allowed for supplemental dimension references (i.e., multiple `Geography` types"
+                " are allowed).",
+            ),
+            "notes": (
+                "Supplemental dimensions are used to support additional querying and transformations",
+                "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
+                "base data.",
+            ),
+        },
+        default=[],
+    )
 
     @model_validator(mode="after")
     def check_dimensions(self) -> "DimensionsModel":
@@ -386,29 +353,40 @@ class DimensionsModel(DSGBaseModel):
 
 class RequiredSubsetDimensionRecordsModel(DSGBaseModel):
 
-    name: Annotated[str, Field(description="Name of a subset dimension")]
-    selectors: Annotated[
-        list[str], Field(description="One or more selectors in the subset dimension")
-    ]
+    name: str = Field(description="Name of a subset dimension")
+    selectors: list[str] = Field(description="One or more selectors in the subset dimension")
 
 
 class RequiredSupplementalDimensionRecordsModel(DSGBaseModel):
 
-    name: Annotated[str, Field(description="Name of a supplemental dimension")]
-    record_ids: Annotated[
-        list[str], Field(description="One or more record IDs in the supplemental dimension")
-    ]
+    name: str = Field(description="Name of a supplemental dimension")
+    record_ids: list[str] = Field(
+        description="One or more record IDs in the supplemental dimension"
+    )
 
 
 class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
 
     base: list[str] = []
+    base_missing: list[str] = []
     subset: list[RequiredSubsetDimensionRecordsModel] = []
     supplemental: list[RequiredSupplementalDimensionRecordsModel] = []
 
+    @model_validator(mode="after")
+    def check_base(self) -> "RequiredDimensionRecordsByTypeModel":
+        if self.base and self.base_missing:
+            msg = f"base and base_missing cannot both be set: {self.base=} {self.base_missing=}"
+            raise ValueError(msg)
+        return self
+
     def defines_dimension_requirement(self) -> bool:
         """Returns True if the model defines a dimension requirement."""
-        return bool(self.base) or bool(self.subset) or bool(self.supplemental)
+        return (
+            bool(self.base)
+            or bool(self.base_missing)
+            or bool(self.subset)
+            or bool(self.supplemental)
+        )
 
 
 class RequiredDimensionRecordsModel(DSGBaseModel):
@@ -434,22 +412,16 @@ class RequiredDimensionsModel(DSGBaseModel):
     required.
     """
 
-    single_dimensional: Annotated[
-        RequiredDimensionRecordsModel,
-        Field(
-            description="Required records for a single dimension.",
-            default=RequiredDimensionRecordsModel(),
-        ),
-    ]
-    multi_dimensional: Annotated[
-        list[RequiredDimensionRecordsModel],
-        Field(
-            description="Required records for a combination of dimensions. For example, there may be "
-            "a dataset requirement for only one subsector for a given sector instead of a cross "
-            "product.",
-            default=[],
-        ),
-    ]
+    single_dimensional: RequiredDimensionRecordsModel = Field(
+        description="Required records for a single dimension.",
+        default=RequiredDimensionRecordsModel(),
+    )
+    multi_dimensional: list[RequiredDimensionRecordsModel] = Field(
+        description="Required records for a combination of dimensions. For example, there may be "
+        "a dataset requirement for only one subsector for a given sector instead of a cross "
+        "product.",
+        default=[],
+    )
 
     @model_validator(mode="after")
     def check_for_duplicates(self) -> "RequiredDimensionsModel":
@@ -499,93 +471,69 @@ class RequiredDimensionsModel(DSGBaseModel):
 class InputDatasetModel(DSGBaseModel):
     """Defines an input dataset for the project config."""
 
-    dataset_id: Annotated[
-        str,
-        Field(
-            title="dataset_id",
-            description="Unique dataset identifier.",
-            json_schema_extra={
-                "updateable": False,
-            },
-        ),
-    ]
-    dataset_type: Annotated[
-        InputDatasetType,
-        Field(
-            title="dataset_type",
-            description="Dataset type.",
-            json_schema_extra={
-                "options": InputDatasetType.format_for_docs(),
-                "updateable": False,
-            },
-        ),
-    ]
-    version: Annotated[
-        str,
-        Field(
-            title="version",
-            description="Version of the registered dataset",
-            default=None,
-            json_schema_extra={
-                "requirements": (
-                    # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
-                    # TODO: need to assume the latest version. DSGRID-190
-                    "The version specification is optional. If no version is supplied, then the latest"
-                    " version in the registry is assumed.",
-                    "The version string must be in semver format (e.g., '1.0.0') and it must be a valid/"
-                    "existing version in the registry.",
-                ),
-                "updateable": False,
-                # TODO: add notes about warnings for outdated versions? DSGRID-189.
-            },
-        ),
-    ]
-    required_dimensions: Annotated[
-        RequiredDimensionsModel,
-        Field(
-            title="required_dimensions",
-            description="Defines required record IDs that must exist for each dimension.",
-            default=RequiredDimensionsModel(),
-        ),
-    ]
-    mapping_references: Annotated[
-        List[DimensionMappingReferenceModel],
-        Field(
-            title="mapping_references",
-            description="Defines how to map the dataset dimensions to the project.",
-            default=[],
-        ),
-    ]
-    status: Annotated[
-        DatasetRegistryStatus,
-        Field(
-            title="status",
-            description="Registration status of the dataset, added by dsgrid.",
-            default=DatasetRegistryStatus.UNREGISTERED,
-            json_schema_extra={
-                "dsgrid_internal": True,
-                "notes": ("status is "),
-                "updateable": False,
-            },
-        ),
-    ]
-    wrap_time_allowed: Annotated[
-        bool,
-        Field(
-            title="wrap_time_allowed",
-            description="Whether to allow dataset time to be wrapped to project time if different",
-            default=False,
-        ),
-    ]
-    time_based_data_adjustment: Annotated[
-        TimeBasedDataAdjustmentModel,
-        Field(
-            title="time_based_data_adjustment",
-            description="Defines how the rest of the dataframe is adjusted with respect to time. "
-            "E.g., when drop associated data when dropping a leap day timestamp.",
-            default=TimeBasedDataAdjustmentModel(),
-        ),
-    ]
+    dataset_id: str = Field(
+        title="dataset_id",
+        description="Unique dataset identifier.",
+        json_schema_extra={
+            "updateable": False,
+        },
+    )
+    dataset_type: InputDatasetType = Field(
+        title="dataset_type",
+        description="Dataset type.",
+        json_schema_extra={
+            "options": InputDatasetType.format_for_docs(),
+            "updateable": False,
+        },
+    )
+    version: str = Field(
+        title="version",
+        description="Version of the registered dataset",
+        default=None,
+        json_schema_extra={
+            "requirements": (
+                # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
+                # TODO: need to assume the latest version. DSGRID-190
+                "The version specification is optional. If no version is supplied, then the latest"
+                " version in the registry is assumed.",
+                "The version string must be in semver format (e.g., '1.0.0') and it must be a valid/"
+                "existing version in the registry.",
+            ),
+            "updateable": False,
+            # TODO: add notes about warnings for outdated versions? DSGRID-189.
+        },
+    )
+    required_dimensions: RequiredDimensionsModel = Field(
+        title="required_dimensions",
+        description="Defines required record IDs that must exist for each dimension.",
+        default=RequiredDimensionsModel(),
+    )
+    mapping_references: list[DimensionMappingReferenceModel] = Field(
+        title="mapping_references",
+        description="Defines how to map the dataset dimensions to the project.",
+        default=[],
+    )
+    status: DatasetRegistryStatus = Field(
+        title="status",
+        description="Registration status of the dataset, added by dsgrid.",
+        default=DatasetRegistryStatus.UNREGISTERED,
+        json_schema_extra={
+            "dsgrid_internal": True,
+            "notes": ("status is "),
+            "updateable": False,
+        },
+    )
+    wrap_time_allowed: bool = Field(
+        title="wrap_time_allowed",
+        description="Whether to allow dataset time to be wrapped to project time if different",
+        default=False,
+    )
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel = Field(
+        title="time_based_data_adjustment",
+        description="Defines how the rest of the dataframe is adjusted with respect to time. "
+        "E.g., when drop associated data when dropping a leap day timestamp.",
+        default=TimeBasedDataAdjustmentModel(),
+    )
 
     @field_validator("time_based_data_adjustment")
     @classmethod
@@ -608,156 +556,84 @@ class DimensionMappingsModel(DSGBaseModel):
     including base-to-supplemental mappings and dataset-to-project mappings.
     """
 
-    base_to_supplemental_references: Annotated[
-        List[DimensionMappingReferenceModel],
-        Field(
-            title="base_to_supplemental_references",
-            description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
-            " used to support various queries and dimension transformations.",
-            default=[],
-        ),
-    ]
-    dataset_to_project: Annotated[
-        Dict[str, List[DimensionMappingReferenceModel]],
-        Field(
-            title="dataset_to_project",
-            description="Dataset-to-project mappings map dataset dimensions to project dimensions.",
-            default={},
-            json_schema_extra={
-                "dsgrid_internal": True,
-                "notes": (
-                    "Once a dataset is submitted to a project, dsgrid adds the dataset-to-project mappings"
-                    " to the project config",
-                    "Some projects may not have any dataset-to-project mappings. Dataset-to-project"
-                    " mappings are only supplied if a dataset's dimensions do not match the project's"
-                    " dimension. ",
-                ),
-                "updateable": False,
-            },
-            # TODO: need to document missing dimension records, fill values, etc. DSGRID-191.
-        ),
-    ]
+    base_to_supplemental_references: list[DimensionMappingReferenceModel] = Field(
+        title="base_to_supplemental_references",
+        description="Base dimension to supplemental dimension mappings (e.g., county-to-state)"
+        " used to support various queries and dimension transformations.",
+        default=[],
+    )
+    dataset_to_project: dict[str, list[DimensionMappingReferenceModel]] = Field(
+        title="dataset_to_project",
+        description="Dataset-to-project mappings map dataset dimensions to project dimensions.",
+        default={},
+        json_schema_extra={
+            "dsgrid_internal": True,
+            "notes": (
+                "Once a dataset is submitted to a project, dsgrid adds the dataset-to-project mappings"
+                " to the project config",
+                "Some projects may not have any dataset-to-project mappings. Dataset-to-project"
+                " mappings are only supplied if a dataset's dimensions do not match the project's"
+                " dimension. ",
+            ),
+            "updateable": False,
+        },
+        # TODO: need to document missing dimension records, fill values, etc. DSGRID-191.
+    )
 
 
-class ProjectConfigModel(DSGBaseModel):
+class ProjectConfigModel(DSGBaseDatabaseModel):
     """Represents project configurations"""
 
-    project_id: Annotated[
-        str,
-        Field(
-            title="project_id",
-            description="A unique project identifier that is project-specific (e.g., "
-            "'standard-scenarios-2021').",
-            json_schema_extra={
-                "requirements": ("Must not contain any dashes (`-`)",),
-                "updateable": False,
-            },
-        ),
-    ]
-    version: Annotated[
-        Optional[str],
-        Field(
-            None,
-            title="version",
-            description="Version, generated by dsgrid",
-            json_schema_extra={
-                "dsgrid_internal": True,
-                "updateable": False,
-            },
-        ),
-    ]
-    name: Annotated[
-        str,
-        Field(
-            title="name",
-            description="A project name to accompany the ID.",
-        ),
-    ]
-    description: Annotated[
-        str,
-        Field(
-            title="description",
-            description="Detailed project description.",
-            json_schema_extra={
-                "notes": (
-                    "The description will get stored in the project registry and may be used for"
-                    " searching",
-                ),
-            },
-        ),
-    ]
-    status: Annotated[
-        ProjectRegistryStatus,
-        Field(
-            title="status",
-            description="project registry status",
-            default=ProjectRegistryStatus.INITIAL_REGISTRATION,
-            json_schema_extra={
-                "dsgrid_internal": True,
-                "updateable": False,
-            },
-        ),
-    ]
-    datasets: Annotated[
-        List[InputDatasetModel],
-        Field(
-            title="datasets",
-            description="List of input datasets for the project.",
-        ),
-    ]
-    dimensions: Annotated[
-        DimensionsModel,
-        Field(
-            title="dimensions",
-            description="List of `base` and `supplemental` dimensions.",
-        ),
-    ]
-    dimension_mappings: Annotated[
-        DimensionMappingsModel,
-        Field(
-            title="dimension_mappings",
-            description="List of project mappings. Initialized with base-to-base and"
-            " base-to-supplemental mappings. dataset-to-project mappings are added by dsgrid as"
-            " datasets get registered with the project.",
-            default=DimensionMappingsModel(),
-            json_schema_extra={
-                "notes": ("`[dimension_mappings]` are optional at the project level.",),
-            },
-        ),
-    ]
-    id: Annotated[
-        Optional[str],
-        Field(
-            None,
-            alias="_id",
-            description="Registry database ID",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-        ),
-    ]
-    key: Annotated[
-        Optional[str],
-        Field(
-            None,
-            alias="_key",
-            description="Registry database key",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-        ),
-    ]
-    rev: Annotated[
-        Optional[str],
-        Field(
-            None,
-            alias="_rev",
-            description="Registry database revision",
-            json_schema_extra={
-                "dsgrid_internal": True,
-            },
-        ),
-    ]
+    project_id: str = Field(
+        title="project_id",
+        description="A unique project identifier that is project-specific (e.g., "
+        "'standard-scenarios-2021').",
+        json_schema_extra={
+            "requirements": ("Must not contain any dashes (`-`)",),
+            "updateable": False,
+        },
+    )
+    name: str = Field(
+        title="name",
+        description="A project name to accompany the ID.",
+    )
+    description: str = Field(
+        title="description",
+        description="Detailed project description.",
+        json_schema_extra={
+            "notes": (
+                "The description will get stored in the project registry and may be used for"
+                " searching",
+            ),
+        },
+    )
+    status: ProjectRegistryStatus = Field(
+        title="status",
+        description="project registry status",
+        default=ProjectRegistryStatus.INITIAL_REGISTRATION,
+        json_schema_extra={
+            "dsgrid_internal": True,
+            "updateable": False,
+        },
+    )
+    datasets: list[InputDatasetModel] = Field(
+        title="datasets",
+        description="List of input datasets for the project.",
+    )
+    dimensions: DimensionsModel = Field(
+        title="dimensions",
+        description="List of `base` and `supplemental` dimensions.",
+    )
+    dimension_mappings: DimensionMappingsModel = Field(
+        title="dimension_mappings",
+        description="List of project mappings. Initialized with base-to-base and"
+        " base-to-supplemental mappings. dataset-to-project mappings are added by dsgrid as"
+        " datasets get registered with the project.",
+        default=DimensionMappingsModel(),
+        json_schema_extra={
+            "notes": ("`[dimension_mappings]` are optional at the project level.",),
+        },
+    )
 
     @field_validator("project_id")
     @classmethod
@@ -774,8 +650,8 @@ class DimensionsByCategoryModel(DSGBaseModel):
     """Defines the query names by base and supplemental category."""
 
     base: str
-    subset: List[str]
-    supplemental: List[str]
+    subset: list[str]
+    supplemental: list[str]
 
 
 class ProjectDimensionQueryNamesModel(DSGBaseModel):
@@ -991,7 +867,7 @@ class ProjectConfig(ConfigBase):
                         query_names[dimension_type].append(dim.model.dimension_query_name)
         return query_names
 
-    def get_supplemental_dimension_to_query_name_mapping(self) -> dict[DimensionType, List[str]]:
+    def get_supplemental_dimension_to_query_name_mapping(self) -> dict[DimensionType, list[str]]:
         """Return a mapping of DimensionType to query name for supplemental dimensions."""
         query_names = {}
         for dimension_type in DimensionType:
@@ -1189,11 +1065,16 @@ class ProjectConfig(ConfigBase):
             for field in sorted(RequiredDimensionRecordsModel.model_fields):
                 dim_type = DimensionType(field)
                 req = getattr(multi_req, field)
-                record_ids = (
-                    self.get_base_dimension(dim_type).get_unique_ids()
-                    if req.base == ["__all__"]
-                    else set(req.base)
-                )
+                if req.base == ["__all__"]:
+                    record_ids = self.get_base_dimension(dim_type).get_unique_ids()
+                elif req.base_missing:
+                    record_ids = (
+                        self.get_base_dimension(dim_type)
+                        .get_unique_ids()
+                        .difference(req.base_missing)
+                    )
+                else:
+                    record_ids = set(req.base)
                 record_ids.update(self._get_required_record_ids_from_subsets(req))
                 record_ids.update(self._get_required_record_ids_from_supplementals(req, dim_type))
                 if record_ids:

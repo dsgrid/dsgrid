@@ -3,7 +3,7 @@ import pytest
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.registry.registry_database import RegistryDatabase, DatabaseConnection
 from dsgrid.utils.files import load_data, dump_data
-from dsgrid.tests.common import (
+from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )
@@ -12,12 +12,13 @@ from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 def test_trivial_dimension_bad(make_test_project_dir, make_test_data_dir, tmp_path):
     """Test bad trivial dimensions where county geography is set to trivial"""
+    conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/tmp-dsgrid-reg.db")
     manager = make_test_data_registry(
         tmp_path,
         make_test_project_dir,
         include_projects=False,
         include_datasets=False,
-        database_name="tmp-dsgrid",
+        database_url=conn.url,
     )
     try:
         project_config_file = make_test_project_dir / "project.json5"
@@ -42,4 +43,4 @@ def test_trivial_dimension_bad(make_test_project_dir, make_test_data_dir, tmp_pa
                 log_message="test",
             )
     finally:
-        RegistryDatabase.delete(DatabaseConnection(database="tmp-dsgrid"))
+        RegistryDatabase.delete(conn)

@@ -38,7 +38,7 @@ from dsgrid.query.models import (
 from dsgrid.query.query_submitter import (
     ProjectQuerySubmitter,
 )  # , CompositeDatasetQuerySubmitter
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 
 
@@ -90,7 +90,14 @@ _COMMON_RUN_OPTIONS = (
 )
 
 
-@click.command("create")
+_create_project_query_epilog = """
+Examples:\n
+$ dsgrid query project create my_query_result_name my_project_id my_dataset_id\n
+$ dsgrid query project create --default-result-aggregation my_query_result_name my_project_id my_dataset_id\n
+"""
+
+
+@click.command("create", epilog=_create_project_query_epilog)
 @click.argument("query_name")
 @click.argument("project_id")
 @click.argument("dataset_id")
@@ -107,14 +114,6 @@ _COMMON_RUN_OPTIONS = (
     default="sum",
     show_default=True,
     help="Aggregation function for any included default aggregations.",
-)
-@click.option(
-    "-d",
-    "--default-per-dataset-aggregation",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Add default per-dataset aggregration.",
 )
 @click.option(
     "-f",
@@ -148,7 +147,6 @@ def create_project_query(
     dataset_id,
     filters,
     aggregation_function,
-    default_per_dataset_aggregation,
     query_file,
     default_result_aggregation,
     force,
@@ -165,11 +163,8 @@ def create_project_query(
             )
             return 1
 
-    conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "url"),
-        database=get_value_from_context(ctx, "database_name"),
-        username=get_value_from_context(ctx, "username"),
-        password=get_value_from_context(ctx, "password"),
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
     )
     registry_manager = RegistryManager.load(
         conn,
@@ -262,7 +257,13 @@ def validate_project_query(query_file):
         raise
 
 
-@click.command("run")
+_run_project_query_epilog = """
+Examples:\n
+$ dsgrid query project run query.json5
+"""
+
+
+@click.command("run", epilog=_run_project_query_epilog)
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @click.option(
     "--persist-intermediate-table/--no-persist-intermediate-table",
@@ -295,11 +296,8 @@ def run_project_query(
     """Run a query on a dsgrid project."""
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
     query = ProjectQueryModel.from_file(query_definition_file)
-    conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "url"),
-        database=get_value_from_context(ctx, "database_name"),
-        username=get_value_from_context(ctx, "username"),
-        password=get_value_from_context(ctx, "password"),
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
     )
     registry_manager = RegistryManager.load(
         conn,
@@ -320,7 +318,7 @@ def run_project_query(
         force=force,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 @click.command("create_dataset")
@@ -387,7 +385,13 @@ def query_composite_dataset(
     # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
 
 
-@click.command()
+_create_derived_dataset_config_epilog = """
+Examples:\n
+$ dsgrid query project create-derived-dataset-config query_output/my_query_result_name my_dataset_config\n
+"""
+
+
+@click.command(epilog=_create_derived_dataset_config_epilog)
 @click.argument("src")
 @click.argument("dst")
 @add_options(_COMMON_REGISTRY_OPTIONS)
@@ -409,11 +413,8 @@ def create_derived_dataset_config(ctx, src, dst, remote_path, force):
     dst_path = fs_interface.path(dst)
     check_output_directory(dst_path, fs_interface, force)
 
-    conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "url"),
-        database=get_value_from_context(ctx, "database_name"),
-        username=get_value_from_context(ctx, "username"),
-        password=get_value_from_context(ctx, "password"),
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
     )
     registry_manager = RegistryManager.load(
         conn,

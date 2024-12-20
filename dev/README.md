@@ -48,119 +48,9 @@ You need to have some familiarity with Spark in order to run non-trivial tasks i
 This [page](https://dsgrid.github.io/dsgrid/spark_overview.html) provides an overview and explains
 various ways to use Spark in dsgrid.
 
-## ArangoDB
-dsgrid stores registry information in an ArangoDB database. You must install it locally in
-order to work with a local instance of dsgrid. There are two ways to install ArangoDB
-on your computer.
-
-Once installed, the easiest way to mange the database manually is through Arango's web UI,
-available at http://localhost:8529
-
-### Native installation
-1. Install `ArangoDB Community Edition` locally by following instructions at
-https://www.arangodb.com/download-major/. If asked and you plan to run dsgrid tests, set the root password to openSesame to match the defaults.
-
-Add the `bin` directory to your system path. On a Mac it will be in a location like this:
-
-    $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/bin
-
-though you may have chosen to install to `/Applications`. On Windows, it will be in a location like this:
-
-    C:\Users\$USER\AppData\Local\ArangoDB3 3.10.5\usr\bin
-
-and the executable installer will have already added it to your path (User variables, Path).
-
-Note the configuration files in this directory on Mac:
-
-    $HOME/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/etc/arangodb3
-
-and this directory on Windows:
-
-    C:\Users\$USER\AppData\Local\ArangoDB3 3.10.5\etc\arangodb3
-
-Customize as desired, particularly regarding authentication.
-
-2. Start the database by running `arangodb` on Mac and `arangod` on Windows. Also on Windows, it is preferable to run `arangod` from the path like `C:\Users\$USER\AppData\Local\ArangoDB3 3.10.5`. Alternatively, you can directly use the ArangoDB Server shortcut on your Windows desktop.
-
-On Mac if it gives the error
-`cannot find configuration file` then make this directory and copy the configuration files.
-
-```
-$ mkdir ~/.arangodb
-$ cp ~/Applications/ArangoDB3-CLI.app/Contents/Resources/opt/arangodb/etc/arangodb3/*conf ~/.arangodb
-```
-
-If you don't copy the files, you can specify the config file with `arangodb --conf <your-path>/arangod.conf`
-
-### Docker container
-
-#### Local
-Run the ArangoDB Docker container by following instructions at
-https://www.arangodb.com/download-major/docker/. Note the details about data persistence.
-
-For example:
-
-```
-$ docker create --name arangodb-persist arangodb true
-```
-
-```
-$ docker run --name=arango-container --volumes-from arangodb-persist -p 8529:8529 -e ARANGO_ROOT_PASSWORD=openSesame arangodb/arangodb:3.10.4
-```
-
-Once the docker container is running, Arango commands will need to be preceded with `docker exec`. For example, using the container name from above:
-
-```
-docker exec arango-container arangorestore ...
-```
-
-#### Kestrel
-The dsgrid repository includes `scripts/start_arangodb_on_kestrel.sh`. It will start an ArangoDB
-on a compute node using the debug partition. It stores Arango files in `/scratch/${USER}/arangodb3`
-and `/scratch/${USER}/arangodb3-apps`. If you would like to use a completely new database,
-delete those directories before running the script.
-
-Note that Slurm will log stdout/stderr from `arangod` into `./arango_<job-id>.o/e`.
-
-The repository also includes `scripts/start_spark_and_arango_on_kestrel.sh`. It starts Spark as well
-as ArangoDB, but you must have cloned `https://github.com/NREL/HPC.git`. It looks for the repo at
-`~/repos/HPC`, but you can set a custom value on the command line, such as the example below.
-
-You may want to adjust the number and type of nodes in the script based on your Spark requirements.
-```
-$ sbatch scripts/start_spark_and_arango_on_kestrel.sh ~/HPC
-```
-
-Note that Slurm will log stdout/stderr from into `./dsgrid_infra<job-id>.o/e`. Look at the .o
-file to see the URL for the Spark cluster and the Spark configuration directory.
-
-It is advised to gracefully shut down the database if you want to ensure that all updates have
-been persisted to files. To do that:
-
-1. ssh to the compute node running the database.
-2. Identify the process ID of `arangod`. In this example the PID is `195412`.
-```
-$ ps -ef | grep arango
-dthom    195412 195392  0 09:31 ?        00:00:06 arangod --server.authentication=true --config /tmp/arangod.conf
-```
-3. Send `SIGTERM` to the process.
-```
-$ kill -s TERM 195412
-```
-4. `arangod` will detect the signal and gracefully shutdown.
-
-Modify the HPC parameters as needed. Or run the commands manually. *Note that you should never run
-ArangoDB on a login node.*
-
-If you need to start a Spark cluster, you can do that on the same compute node running the database.
-
-
 ## Tests
 
 ### Setup
-You must be running a local instance of ArangoDB in order to run the tests. It can be a native
-installation or use Docker. The only requirement is that it be available at http://localhost:8529.
-
 The tests will create their own registries and clean up after themselves.
 
 The tests use the [test data repository](https://github.com/dsgrid/dsgrid-test-data.git)
@@ -178,39 +68,6 @@ Update the submodule when there are new changes in the test data repository:
 $ git submodule update --remote --merge
 ```
 
-### Import/restore simple-standard-scenarios registry
-Some tests require a filtered StandardScenarios registry. The test data repository
-contains a JSON-exported database that you must import into your local ArangoDB instance.
-
-You can use a native ArangoDB installation or the docker container. If using Docker you must have bind-mounted the `dsgrid-test-data` directory, as in `docker run -v $(pwd)/dsgrid-test-data:/dsgrid-test-data`.
-
-```
-$ arangorestore \
-    --create-database \
-    --input-directory \
-    dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \
-    --server.database simple-standard-scenarios \
-    --include-system-collections true
-```
-
-```
-$ docker exec arango-container arangorestore \
-    --create-database \
-    --input-directory \
-    /dsgrid-test-data/filtered_registries/simple_standard_scenarios/dump \
-    --server.database simple-standard-scenarios \
-    --include-system-collections true
-```
-
-If you are running on an HPC, run this script from the dsgrid repository. Note that you can run this
-command on a login node. `DB_HOSTNAME` is the node name of the compute node running Arango.
-```
-$ bash scripts/restore_simple_standard_scenarios.sh <path-to-your-local-dsgrid-test-data> <DB_HOSTNAME>
-```
-
-You will have to repeat this process anytime the test data is updated.
-**TODO**: Automate this process.
-
 ### Updating the simple-standard-scenarios registry
 If you update the configs or data for the StandardScenarios registry then you'll need to update
 the test data repository per these instructions.
@@ -223,24 +80,37 @@ run multiple iterations.
 Run this from your scratch directory.
 
 ```
+$ dsgrid-admin create-registry --data-path standard-scenarios-registry-data sqlite:///./standard-scenarios.db
+```
+```
 $ spark-submit \
     --master=spark://$(hostname):7077 \
     --conf spark.sql.shuffle.partitions=2400 \
-    dsgrid/tests/register.py tests/data/standard_scenarios_registration.json
+    $(which dsgrid-cli.py) --url sqlite:///./standard-scenarios.db registry bulk-register \
+        --data-path=standard-scenarios-registry-data \
+        tests/data/standard_scenarios_registration.json5
 ```
 
 2. Acquire a new compute node. It can be any type of node and you only need it for an hour.
 Create a local version of the dsgrid repository script `scripts/create_simple_standard_scenarios.sh`.
 Edit the environment variables at the top of the script as necessary and then run it. It will
 make a new registry database, filter the StandardScenarios data, unpivot the ComStock datasets
-(for test coverage), and create a backup of the database with arangodump in JSON format.
+(for test coverage), and create a backup of the database.
 
-3. Copy (e.g., cp, scp, rsync) or arangodump the output files (registry JSON and Parquet) from the
+3. Copy (e.g., cp, scp, rsync) the output files (registry .db and Parquet) from the
 previous step to a dsgrid-test-data repository in the directory
-`dsgrid-test-data/filtered_registries/simple_standard_scenarios`. Edit the file
-`dump/data_path_*.data.json` to ensure that the `data_path` value is set to
-`dsgrid-test-data/filtered_registries/simple_standard_scenarios`. Make a branch, commit, push
-it to GitHub, and open a pull request.
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios`. Edit the SQLite database table
+`key_value` such that the value associated with the key `data_path` is set to
+`dsgrid-test-data/filtered_registries/simple_standard_scenarios`.
+
+```
+$ sqlite3 /path/to/registry.db
+sqlite> UPDATE key_value
+SET value='dsgrid-test-data/filtered_registries/simple_standard_scenarios'
+WHERE key = 'data_path';
+```
+
+Make a branch, commit, push it to GitHub, and open a pull request.
 
 4. Run `python tests/simple_standard_scenarios_datasets.py` from the dsgrid base directory and add
 the modified file
@@ -265,17 +135,15 @@ If you only want to run AWS tests:
 pytest tests_aws
 ```
 
-If you're running tests on an HPC and used the `scripts/start_spark_and_arango_on_kestrel.sh` or set up a custom configuration you will want to:
+If you're running tests on an HPC set up a custom configuration you will want to:
 
-- ssh to the node where Arango is running
-- change to the directory from which you ran the `start_spark_and_arango_on_kestrel.sh` script or otherwise identify the full path to the Spark config directory
-- `export SPARK_CONF_DIR=$(pwd)/conf` (You can also get the correct command from `grep SPARK dsgrid_infra*.o`.)
+- `export SPARK_CONF_DIR=$(pwd)/conf`
 - `cd ~/dsgrid`
 - `module load conda`
 - activate your conda environment
 - `pytest tests`
 
-If you did not set up a Spark cluster and are instead running Spark in local mode you can skip the above command to `export SPARK_CONF_DIR=$(pwd)/conf` and will want to instead `export SPARK_LOCAL_DIRS=/tmp/scratch`.
+If you did not set up a Spark cluster and are instead running Spark in local mode you can skip the above command to `export SPARK_CONF_DIR=$(pwd)/conf` and will want to instead `export SPARK_LOCAL_DIRS=/tmp/scratch/<slurm-job-id>`.
 
 ### Workflow for developing a feature that changes code and data
 
@@ -399,15 +267,19 @@ export DSGRID_LOCAL_DATA_DIRECTORY=~/.dsgrid-data
 
 Create and populate the registry.
 ```
-python dsgrid/tests/register.py tests/data/test_efs_registration.json
+$ dsgrid-admin create-registry --data-path=tests/data/registry cached-test-dsgrid
+```
+```
+$ dsgrid registry bulk-register tests/data/test_efs_registration.json
 ```
 
 Now you can run any `dsgrid registry` command.
 
 ## Register projects and datasets under development
 When developing projects and datasets you will likely have to run the registration commands many
-times. dsgrid provides a helper script for this purpose. Refer to `dsgrid/tests/register.py` and
-the data models in `dsgrid/tests/registration_models.py`. They automate the registration process
+times. dsgrid provides a helper script for this purpose. Refer to
+`dsgrid registry bulk-register --help` and
+the data models in `dsgrid/config/registration_models.py`. They automate the registration process
 so that you don't have to write your own scripts. Example config files are
 `tests/data/test_efs_registration.json` and `tests/data/standard_scenarios_registration.json`.
 
@@ -442,7 +314,7 @@ display(HTML("<style>.container { width:100% !important; }</style>"))
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 
-conn = DatabaseConnection()
+conn = DatabaseConnection(url="sqlite:///<path-to-registry.db>")
 mgr = RegistryManager.load(conn, offline_mode=True)
 mgr.dimension_manager.show()
 ```
@@ -499,6 +371,10 @@ from devtools import debug
 debug(project_config.model)
 debug(geography_dim.model)
 ```
+
+## Registry Database
+The dsgrid registry is stored in a SQLite database. Please refer to this
+[page](registry_database.md) for more information.
 
 ## Queries
 
@@ -573,8 +449,7 @@ It may be easier to develop and run queries in Python. Follow examples in `~/rep
 ## API server
 Set these environment variables with your desired values.
 ```
-$ export DSGRID_REGISTRY_DATABASE_URL=http://localhost:8529
-$ export DSGRID_REGISTRY_DATABASE_NAME=simple-standard-scenarios
+$ export DSGRID_REGISTRY_DATABASE_URL=sqlite:///dsgrid-test-data/filtered_registries/simple_standard_scenarios/registry.db
 $ export DSGRID_QUERY_OUTPUT_DIR=api_query_output
 $ export DSGRID_API_SERVER_STORE_DIR=.
 ```

@@ -33,6 +33,7 @@ from dsgrid.api.response_models import (
     SparkSubmitProjectQueryResponse,
 )
 from dsgrid.query.models import ReportType
+from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
 from dsgrid.utils.files import load_data
 
 logger = logging.getLogger(__name__)
@@ -41,8 +42,7 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(scope="module")
 def client(tmp_path_factory):
     # These env variables need to be set before the app is imported.
-    os.environ["DSGRID_REGISTRY_DATABASE_URL"] = "http://localhost:8529"
-    os.environ["DSGRID_REGISTRY_DATABASE_NAME"] = "simple-standard-scenarios"
+    os.environ["DSGRID_REGISTRY_DATABASE_URL"] = SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
     QUERY_OUTPUT_DIR = tmp_path_factory.mktemp("test_dsgrid_query_output")
     os.environ["DSGRID_QUERY_OUTPUT_DIR"] = str(QUERY_OUTPUT_DIR)
     API_SERVER_STORE_DIR = tmp_path_factory.mktemp("test_dsgrid_api_server")
@@ -53,7 +53,6 @@ def client(tmp_path_factory):
     yield TestClient(app)
     for key in (
         "DSGRID_REGISTRY_DATABASE_URL",
-        "DSGRID_REGISTRY_DATABASE_NAME",
         "DSGRID_QUERY_OUTPUT_DIR",
         "DSGRID_API_SERVER_STORE_DIR",
         "DSGRID_API_SERVER_ENABLE_LOGGING",

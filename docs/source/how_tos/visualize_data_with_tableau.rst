@@ -40,7 +40,7 @@ Parquet files on an HPC
 This can be accomplished by connecting Tableau to a Spark cluster on the HPC.
 
 Follow the
-[Spark-on-HPC instructions](https://github.com/daniel-thom/HPC/blob/kestrel-update/applications/spark/README.md#visualize-data-with-tableau)
+`Spark-on-HPC instructions <https://github.com/daniel-thom/HPC/blob/kestrel-update/applications/spark/README.md#visualize-data-with-tableau>`_
 
 CSV files on a local computer
 =============================

@@ -13,8 +13,10 @@ from dsgrid.utils.spark import (
     get_spark_session,
     get_type_from_union,
     try_read_dataframe,
+    restart_spark,
     restart_spark_with_custom_conf,
     create_dataframe_from_product,
+    custom_spark_conf,
 )
 
 
@@ -55,6 +57,17 @@ def test_restart_spark():
     with restart_spark_with_custom_conf(conf=conf) as new_spark:
         assert new_spark.conf.get("spark.sql.shuffle.partitions") == new_partitions
         assert new_spark.conf.get("spark.rdd.compress") == new_compress
+
+
+def test_custom_spark_conf():
+    orig_session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
+    assert orig_session_tz != "UTC"
+    conf = {"spark.sql.session.timeZone": "UTC"}
+    with custom_spark_conf(conf):
+        assert get_spark_session().conf.get("spark.sql.session.timeZone") == "UTC"
+        restart_spark(force=True)
+        assert get_spark_session().conf.get("spark.sql.session.timeZone") == "UTC"
+    assert get_spark_session().conf.get("spark.sql.session.timeZone") == orig_session_tz
 
 
 def test_create_dataframe_from_product(tmp_path):

@@ -1,14 +1,16 @@
 """Interface to a dsgrid project."""
 
+import json
 import logging
 import shutil
 from pathlib import Path
 from typing import Optional
+from semver import VersionInfo
+from sqlalchemy import Connection
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dataset.dataset import Dataset
-from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.dataset.growth_rates import apply_exponential_growth_rate, apply_annual_multiplier
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
@@ -23,6 +25,7 @@ from dsgrid.query.models import (
     DatasetConstructionMethod,
     ColumnType,
 )
+from dsgrid.utils.files import compute_hash
 from dsgrid.spark.functions import (
     is_dataframe_empty,
 )
@@ -120,7 +123,7 @@ class Project:
             dataset = self.load_dataset(dataset_id)
         return dataset
 
-    def load_dataset(self, dataset_id):
+    def load_dataset(self, dataset_id, conn: Optional[Connection] = None):
         """Loads a dataset.
 
         Parameters
@@ -144,6 +147,7 @@ class Project:
             self._dimension_mapping_mgr,
             mapping_references=input_dataset.mapping_references,
             project_time_dim=self._config.get_base_dimension(DimensionType.TIME),
+            conn=conn,
         )
         self._datasets[dataset_id] = dataset
         return dataset
@@ -191,7 +195,8 @@ class Project:
         return [x.dataset_id for x in self._iter_datasets()]
 
     @track_timing(timer_stats_collector)
-    def process_query(self, context: QueryContext, cached_datasets_dir: Path):
+    def process_query(self, context: QueryContext, cached_datasets_dir: Path) -> dict[str, Path]:
+        """Return a dictionary of dataset_id to dataframe path for all datasets in the query."""
         self._build_filtered_record_ids_by_dimension_type(context)
 
         # Note: Store DataFrame filenames instead of objects because the SparkSession will get
@@ -209,42 +214,8 @@ class Project:
 
         if not df_filenames:
             logger.warning("No data matched %s", context.model.name)
-            return None
 
-        # All dataset columns need to be in the same order.
-        context.consolidate_dataset_metadata()
-        datasets = self._convert_datasets(context, df_filenames)
-        return evaluate_expression(context.model.project.dataset.expression, datasets).df
-
-    def _convert_datasets(self, context: QueryContext, filenames: dict[str, Path]):
-        dim_columns, time_columns = self._get_dimension_columns(context)
-        expected_columns = time_columns + dim_columns
-        expected_columns.append(VALUE_COLUMN)
-
-        datasets = {}
-        for dataset_id, path in filenames.items():
-            df = read_dataframe(path)
-            unexpected = sorted(set(df.columns).difference(expected_columns))
-            if unexpected:
-                raise Exception(f"Unexpected columns are present in {dataset_id=} {unexpected=}")
-            datasets[dataset_id] = DatasetExpressionHandler(
-                df.select(*expected_columns), time_columns + dim_columns, [VALUE_COLUMN]
-            )
-        return datasets
-
-    def _get_dimension_columns(self, context: QueryContext) -> tuple[list[str], list[str]]:
-        match context.model.result.column_type:
-            case ColumnType.DIMENSION_QUERY_NAMES:
-                dim_columns = context.get_all_dimension_query_names()
-                time_columns = context.get_dimension_column_names(DimensionType.TIME)
-            case ColumnType.DIMENSION_TYPES:
-                dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
-                time_columns = context.get_dimension_column_names(DimensionType.TIME)
-            case _:
-                raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
-
-        dim_columns -= time_columns
-        return sorted(dim_columns), sorted(time_columns)
+        return df_filenames
 
     def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
         record_ids = {}
@@ -298,13 +269,9 @@ class Project:
 
         """
         logger.info("Start processing query for dataset_id=%s", dataset_id)
-        project_version = f"{context.model.project.project_id}__{context.model.project.version}"
-        model_hash, text = context.model.project.dataset.params.serialize()
-        hash_dir = cached_datasets_dir / project_version / model_hash
-        if not hash_dir.exists():
-            hash_dir.mkdir(parents=True)
-            model_file = hash_dir / "model.json"
-            model_file.write_text(text)
+        hash_dir = self._compute_dataset_hash_and_serialize(
+            context, cached_datasets_dir, dataset_id
+        )
         cached_dataset_path = hash_dir / (dataset_id + ".parquet")
         metadata_file = cached_dataset_path.with_suffix(".json5")
         if try_read_dataframe(cached_dataset_path) is None:
@@ -325,11 +292,14 @@ class Project:
                 logger.info("Build project-mapped dataset %s", dataset_id)
                 # Call load_dataset instead of get_dataset because the latter won't be valid here
                 # after the SparkSession restart.
-                dataset = self.load_dataset(dataset_id)
-                with Timer(timer_stats_collector, "build_project_mapped_dataset"):
-                    df = dataset.make_project_dataframe_from_query(context, self._config)
-                    context.serialize_dataset_metadata_to_file(dataset.dataset_id, metadata_file)
-                    write_dataframe_and_auto_partition(df, cached_dataset_path)
+                with self._dimension_mgr.db.engine.connect() as conn:
+                    dataset = self.load_dataset(dataset_id, conn=conn)
+                    with Timer(timer_stats_collector, "build_project_mapped_dataset"):
+                        df = dataset.make_project_dataframe_from_query(context, self._config)
+                        context.serialize_dataset_metadata_to_file(
+                            dataset.dataset_id, metadata_file
+                        )
+                        write_dataframe_and_auto_partition(df, cached_dataset_path)
         else:
             assert metadata_file.exists(), metadata_file
             context.set_dataset_metadata_from_file(dataset_id, metadata_file)
@@ -349,13 +319,9 @@ class Project:
             dataset.construction_method.value,
             dataset.initial_value_dataset_id,
         )
-        project_version = f"{context.model.project.project_id}__{context.model.project.version}"
-        model_hash, text = context.model.project.dataset.params.serialize()
-        hash_dir = cached_datasets_dir / project_version / model_hash
-        if not hash_dir.exists():
-            hash_dir.mkdir(parents=True)
-            model_file = hash_dir / "model.json"
-            model_file.write_text(text)
+        hash_dir = self._compute_dataset_hash_and_serialize(
+            context, cached_datasets_dir, dataset.dataset_id
+        )
         cached_dataset_path = hash_dir / (dataset.dataset_id + ".parquet")
         metadata_file = cached_dataset_path.with_suffix(".json5")
         if try_read_dataframe(cached_dataset_path) is None:
@@ -446,3 +412,38 @@ class Project:
                 self._config,
             )
             context.serialize_dataset_metadata_to_file(dataset.dataset_id, metadata_file)
+
+    def _compute_dataset_hash_and_serialize(
+        self, context: QueryContext, cached_datasets_dir: Path, dataset_id: str
+    ) -> Path:
+        """Create a hash that can be used to identify whether the mapping of the dataset to
+        project dimensions can be skipped based on a previous query.
+
+        If a directory with the hash does not already exist, create it and serialize the content
+        used to create the hash.
+
+        Examples of changes that will invalidate the query:
+          - Bump to project major version number
+          - Change to a dataset version
+          - Change to a project's dimension requirements for a dataset
+          - Change to a dataset dimension mapping
+
+        Returns
+        -------
+        str
+            Directory based on the hash
+        """
+        dataset_query_info = {
+            "project_id": self._config.model.project_id,
+            "project_major_version": VersionInfo.parse(self._config.model.version).major,
+            "dataset": self._config.get_dataset(dataset_id).model_dump(mode="json"),
+            "dataset_query_params": context.model.project.dataset.params.model_dump(mode="json"),
+        }
+        text = json.dumps(dataset_query_info, indent=2)
+        hash_dir_name = compute_hash(text.encode())
+        hash_dir = cached_datasets_dir / hash_dir_name
+        if not hash_dir.exists():
+            hash_dir.mkdir()
+            model_file = hash_dir / "model.json"
+            model_file.write_text(text)
+        return hash_dir

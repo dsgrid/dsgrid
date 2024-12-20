@@ -9,12 +9,12 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from dsgrid.cli.dsgrid import cli
+from dsgrid.cli.dsgrid_admin import cli as cli_admin
 from dsgrid.config.input_dataset_requirements import (
     InputDatasetDimensionRequirementsModel,
     InputDatasetDimensionRequirementsListModel,
     InputDatasetListModel,
 )
-from dsgrid.common import DEFAULT_DB_PASSWORD
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
@@ -22,29 +22,35 @@ from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
 )
-from dsgrid.registry.common import DatasetRegistryStatus, ProjectRegistryStatus, VersionUpdateType
+from dsgrid.registry.common import (
+    DatasetRegistryStatus,
+    ProjectRegistryStatus,
+    RegistryTables,
+    VersionUpdateType,
+    RegistryType,
+)
+from dsgrid.registry.registry_auto_updater import RegistryAutoUpdater
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.types import DataFrame
 from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
+    TEST_DATASET_DIRECTORY,
+)
+from dsgrid.utils.files import dump_data, load_data
+from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     map_dimension_ids_to_names,
     map_dimension_mapping_names_to_ids,
     replace_dimension_names_with_current_ids,
     replace_dimension_mapping_names_with_current_ids,
-    TEST_DATASET_DIRECTORY,
 )
-from dsgrid.utils.files import dump_data, load_data
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
-def test_register_project_and_dataset(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
-    manager = make_test_data_registry(
-        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
-    )
+def test_register_project_and_dataset(mutable_cached_registry, tmp_path):
+    manager, test_project_dir = mutable_cached_registry
     project_mgr = manager.project_manager
     dataset_mgr = manager.dataset_manager
     dimension_mgr = manager.dimension_manager
@@ -65,8 +71,8 @@ def test_register_project_and_dataset(tmp_registry_db):
     log_message = "initial registration"
     dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
-    project_config = project_mgr.get_by_id(project_id, "1.1.0")
-    assert project_config.model.status == ProjectRegistryStatus.IN_PROGRESS
+    project_config = project_mgr.get_by_id(project_id, "1.2.0")
+    assert project_config.model.status == ProjectRegistryStatus.COMPLETE
     dataset = project_config.get_dataset(dataset_id)
     assert dataset.status == DatasetRegistryStatus.REGISTERED
 
@@ -90,8 +96,6 @@ def test_register_project_and_dataset(tmp_registry_db):
     dimension_mapping_mgr.dump(dimension_mapping_id, tmp_path)
     dimension_mapping_config = tmp_path / "dimension_mapping.json5"
     data = load_data(dimension_mapping_config)
-    for field in ("_id", "_key", "_rev"):
-        data.pop(field)
     dump_data({"mappings": [data]}, dimension_mapping_config)
     dimension_mapping_mgr.register(dimension_mapping_config, user, log_message)
     assert len(dimension_mapping_mgr.list_ids()) == len(mapping_ids)
@@ -99,6 +103,9 @@ def test_register_project_and_dataset(tmp_registry_db):
     check_configs_update(tmp_path, manager)
     check_update_project_dimension(tmp_path, manager)
     # Note that the dataset is now unregistered.
+
+    initial_registration = project_mgr.db.get_initial_registration(None, project_id)
+    assert initial_registration.log_message == "Initial registration"
 
     # Test removals.
     check_config_remove(project_mgr, project_id)
@@ -108,19 +115,17 @@ def test_register_project_and_dataset(tmp_registry_db):
 
 
 def test_duplicate_dimensions(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
-    conn = DatabaseConnection(database=db_name)
-    create_local_test_registry(Path(tmp_path), conn=conn)
+    test_project_dir, tmp_path, url = tmp_registry_db
+    conn = DatabaseConnection(url=url)
+    create_local_test_registry(tmp_path, conn=conn)
     user = getpass.getuser()
     log_message = "Initial registration"
     manager = RegistryManager.load(conn, offline_mode=True)
-
     dimension_mgr = manager.dimension_manager
     dimension_mgr.register(test_project_dir / "dimensions.json5", user, log_message)
 
     # Registering duplicate dimensions and mappings are allowed.
     # If names are the same, they are replaced. Otherwise, new ones get registered.
-    # Time dimension has more fields checked.
     dimension_ids = dimension_mgr.list_ids()
     dim_config_file = test_project_dir / "dimensions.json5"
 
@@ -135,10 +140,13 @@ def test_duplicate_dimensions(tmp_registry_db):
     assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 1
 
     data = load_data(dim_config_file)
+    found = False
     for dim in data["dimensions"]:
         if dim["type"] == "time":
             assert dim["time_interval_type"] == "period_beginning"
             dim["time_interval_type"] = "period_ending"
+            found = True
+    assert found
     dump_data(data, dim_config_file)
 
     dimension_mgr.register(dim_config_file, user, log_message)
@@ -146,8 +154,8 @@ def test_duplicate_dimensions(tmp_registry_db):
 
 
 def test_duplicate_project_dimension_display_names(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
-    conn = DatabaseConnection(database=db_name)
+    test_project_dir, tmp_path, url = tmp_registry_db
+    conn = DatabaseConnection(url=url)
     create_local_test_registry(tmp_path, conn=conn)
     user = getpass.getuser()
     log_message = "Initial registration"
@@ -164,13 +172,13 @@ def test_duplicate_project_dimension_display_names(tmp_registry_db):
 
 
 def test_register_duplicate_project_rollback_dimensions(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
+    test_project_dir, tmp_path, url = tmp_registry_db
     src_dir = test_project_dir
     manager = make_test_data_registry(
         tmp_path,
         test_project_dir,
         dataset_path=TEST_DATASET_DIRECTORY,
-        database_name=db_name,
+        database_url=url,
         include_projects=False,
         include_datasets=False,
     )
@@ -195,8 +203,8 @@ def test_register_duplicate_project_rollback_dimensions(tmp_registry_db):
 
 
 def test_register_and_submit_rollback_on_failure(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
-    conn = DatabaseConnection(database=db_name)
+    test_project_dir, tmp_path, url = tmp_registry_db
+    conn = DatabaseConnection(url=url)
     create_local_test_registry(tmp_path, conn=conn)
     manager = RegistryManager.load(conn, offline_mode=True)
     project_file = test_project_dir / "project.json5"
@@ -253,11 +261,69 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
     assert manager.project_manager.list_ids() == [project_id]
 
 
-def test_add_supplemental_dimension(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
-    mgr = make_test_data_registry(
-        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
+def test_add_subset_dimensions(mutable_cached_registry, tmp_path):
+    mgr, _ = mutable_cached_registry
+    project_mgr = mgr.project_manager
+    project_id = project_mgr.list_ids()[0]
+    project = project_mgr.get_by_id(project_id)
+    subset_data_file = tmp_path / "data.csv"
+    subset_dimensions_data = """
+id,electricity_end_uses
+cooling,x
+fans,x
+    """
+    subset_dimensions_model = {
+        "subset_dimensions": [
+            {
+                "name": "End Uses by Fuel Type",
+                "display_name": "end_uses_by_fuel_type",
+                "description": "Provides selection of end uses by fuel type.",
+                "type": "metric",
+                "filename": str(subset_data_file),
+                "create_supplemental_dimension": True,
+                "selectors": [
+                    {
+                        "name": "electricity_end_uses",
+                        "description": "All Electric End Uses",
+                        "column_values": {"fuel_id": "electricity", "unit": "MWh"},
+                    },
+                ],
+            },
+        ],
+    }
+    model_file = tmp_path / "model.json5"
+    dump_data(subset_dimensions_model, model_file)
+    subset_data_file.write_text(subset_dimensions_data, encoding="utf-8")
+
+    url = f"sqlite:///{project_mgr.db.engine.url.database}"
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli,
+        [
+            "--url",
+            url,
+            "--offline",
+            "registry",
+            "projects",
+            "register-subset-dimensions",
+            project_id,
+            str(model_file),
+            "-l",
+            "test register-subset-dimensions",
+        ],
     )
+    assert result.exit_code == 0
+    found_new_dimension = False
+    project = project_mgr.get_by_id(project_id)
+    for dim in project.list_supplemental_dimensions(DimensionType.METRIC):
+        if dim.model.name == "End Uses by Fuel Type":
+            found_new_dimension = True
+            break
+    assert found_new_dimension
+
+
+def test_add_supplemental_dimension(mutable_cached_registry, tmp_path):
+    mgr, _ = mutable_cached_registry
     project_mgr = mgr.project_manager
     project_id = project_mgr.list_ids()[0]
     project = project_mgr.get_by_id(project_id)
@@ -303,16 +369,13 @@ def test_add_supplemental_dimension(tmp_registry_db):
             for county_id in county_ids:
                 f.write(f"{county_id},{region}\n")
 
+    url = f"sqlite:///{project_mgr.db.engine.url.database}"
     runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
         cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--database-name",
-            db_name,
+            "--url",
+            url,
             "--offline",
             "registry",
             "projects",
@@ -333,11 +396,35 @@ def test_add_supplemental_dimension(tmp_registry_db):
     assert found_new_dimension
 
 
-def test_add_dataset_requirements(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
-    mgr = make_test_data_registry(
-        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
+def test_remove_dataset(mutable_cached_registry):
+    mgr, _ = mutable_cached_registry
+    project_mgr = mgr.project_manager
+    project_id = project_mgr.list_ids()[0]
+    config = project_mgr.get_by_id(project_id)
+    dataset_id = config.model.datasets[0].dataset_id
+    assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
+
+    url = f"sqlite:///{project_mgr.db.engine.url.database}"
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        cli_admin,
+        [
+            "--url",
+            url,
+            "--offline",
+            "registry",
+            "datasets",
+            "remove",
+            dataset_id,
+        ],
     )
+    assert result.exit_code == 0
+    config = project_mgr.get_by_id(project_id)
+    assert config.model.datasets[0].status == DatasetRegistryStatus.UNREGISTERED
+
+
+def test_add_dataset_requirements(mutable_cached_registry, tmp_path):
+    mgr, _ = mutable_cached_registry
     project_mgr = mgr.project_manager
     project_id = project_mgr.list_ids()[0]
     config = project_mgr.get_by_id(project_id)
@@ -350,16 +437,13 @@ def test_add_dataset_requirements(tmp_registry_db):
     with open(dataset_file, "w") as f:
         f.write(model.model_dump_json())
 
+    url = f"sqlite:///{project_mgr.db.engine.url.database}"
     runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
         cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--database-name",
-            db_name,
+            "--url",
+            url,
             "--offline",
             "registry",
             "projects",
@@ -377,11 +461,8 @@ def test_add_dataset_requirements(tmp_registry_db):
     assert config.model.datasets[2].dataset_id == "fake"
 
 
-def test_replace_dataset_dimension_requirements(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
-    mgr = make_test_data_registry(
-        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
-    )
+def test_replace_dataset_dimension_requirements(mutable_cached_registry, tmp_path):
+    mgr, _ = mutable_cached_registry
     project_mgr = mgr.project_manager
     project_id = project_mgr.list_ids()[0]
     config = project_mgr.get_by_id(project_id)
@@ -405,16 +486,13 @@ def test_replace_dataset_dimension_requirements(tmp_registry_db):
     with open(requirements_file, "w") as f:
         f.write(model.model_dump_json())
 
+    url = f"sqlite:///{project_mgr.db.engine.url.database}"
     runner = CliRunner(mix_stderr=False)
     result = runner.invoke(
         cli,
         [
-            "--username",
-            "root",
-            "--password",
-            DEFAULT_DB_PASSWORD,
-            "--database-name",
-            db_name,
+            "--url",
+            url,
             "--offline",
             "registry",
             "projects",
@@ -434,11 +512,8 @@ def test_replace_dataset_dimension_requirements(tmp_registry_db):
     ]
 
 
-def test_auto_updates(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
-    mgr = make_test_data_registry(
-        tmp_path, test_project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_name=db_name
-    )
+def test_auto_updates(mutable_cached_registry: tuple[RegistryManager, Path]):
+    mgr, _ = mutable_cached_registry
     project_mgr = mgr.project_manager
     dataset_mgr = mgr.dataset_manager
     dimension_mgr = mgr.dimension_manager
@@ -448,6 +523,7 @@ def test_auto_updates(tmp_registry_db):
     dimension = [
         x for x in dimension_mgr.iter_configs() if x.model.name.startswith("US Counties 2010")
     ][0]
+    orig_dim_version = dimension.model.version
 
     # Test that we can convert records to a Spark DataFrame. Unrelated to the rest.
     assert isinstance(dimension.get_records_dataframe(), DataFrame)
@@ -455,7 +531,7 @@ def test_auto_updates(tmp_registry_db):
     dimension.model.description += "; test update"
     update_type = VersionUpdateType.MINOR
     log_message = "test update"
-    dimension_mgr.update(dimension, update_type, log_message)
+    new_dimension = dimension_mgr.update(dimension, update_type, log_message)
 
     # Find a mapping that uses this dimension and verify that it gets updated.
     mapping = None
@@ -469,12 +545,20 @@ def test_auto_updates(tmp_registry_db):
     orig_version = dimension_mapping_mgr.get_latest_version(mapping.model.mapping_id)
     assert orig_version == "1.0.0"
 
-    mgr.update_dependent_configs(dimension, update_type, log_message)
+    project = project_mgr.get_by_id(project_id)
+    orig_project_version = project.model.version
+    assert orig_project_version == "1.2.0"
+
+    updater = RegistryAutoUpdater(mgr)
+    updater.update_dependent_configs(new_dimension, orig_dim_version, update_type, log_message)
 
     new_version = dimension_mapping_mgr.get_latest_version(mapping.model.mapping_id)
     assert new_version == "1.1.0"
 
     project = project_mgr.get_by_id(project_id)
+    new_project_version = project.model.version
+    assert new_project_version == "1.3.0"
+
     found = False
     for mapping_ref in project.model.dimension_mappings.base_to_supplemental_references:
         if mapping_ref.mapping_id == mapping.model.mapping_id:
@@ -483,6 +567,7 @@ def test_auto_updates(tmp_registry_db):
     assert found
 
     dataset = dataset_mgr.get_by_id(dataset_id)
+    assert dataset.model.version == "1.1.0"
     found = False
     for dimension_ref in dataset.model.dimension_references:
         if dimension_ref.dimension_id == dimension.model.dimension_id:
@@ -490,29 +575,32 @@ def test_auto_updates(tmp_registry_db):
             found = True
     assert found
 
-    assert project.model.datasets[0].version == "1.1.0"
-    assert project_mgr.get_latest_version(project_id) == "1.3.0"
-    assert dataset_mgr.get_latest_version(dataset_id) == "1.1.0"
-
     # The project should get updated again if we update the dimension mapping.
+    mapping = dimension_mapping_mgr.get_by_id(mapping.model.mapping_id)
     mapping.model.description += "test update"
-    dimension_mapping_mgr.update(mapping, VersionUpdateType.PATCH, "test update")
-    assert dimension_mapping_mgr.get_latest_version(mapping.config_id) == "1.1.1"
-    mgr.update_dependent_configs(mapping, VersionUpdateType.PATCH, "test update")
+    original_version = mapping.model.version
+    new_mapping = dimension_mapping_mgr.update(mapping, VersionUpdateType.PATCH, "test update")
+    assert new_mapping.model.version == "1.1.1"
+    updater.update_dependent_configs(
+        new_mapping, original_version, VersionUpdateType.PATCH, "test update"
+    )
     assert project_mgr.get_latest_version(project_id) == "1.3.1"
 
     # And again if we update the dataset.
     dataset.model.description += "test update"
+    original_version = dataset.model.version
     dataset_mgr.update(dataset, VersionUpdateType.PATCH, "test update")
-    mgr.update_dependent_configs(dataset, VersionUpdateType.PATCH, "test update")
+    updater.update_dependent_configs(
+        dataset, original_version, VersionUpdateType.PATCH, "test update"
+    )
     assert project_mgr.get_latest_version(project_id) == "1.3.2"
 
 
 def test_invalid_dimension_mapping(tmp_registry_db):
-    test_project_dir, tmp_path, db_name = tmp_registry_db
+    test_project_dir, tmp_path, url = tmp_registry_db
     user = getpass.getuser()
     log_message = "Initial registration"
-    conn = DatabaseConnection(database=db_name)
+    conn = DatabaseConnection(url=url)
     create_local_test_registry(tmp_path, conn=conn)
     manager = RegistryManager.load(conn, offline_mode=True)
 
@@ -560,9 +648,9 @@ def test_invalid_dimension_mapping(tmp_registry_db):
 
 
 def test_register_submit_dataset_long_workflow(tmp_registry_db):
-    src_dir, tmp_path, db_name = tmp_registry_db
+    src_dir, tmp_path, url = tmp_registry_db
     manager = make_test_data_registry(
-        tmp_path, src_dir, include_projects=False, include_datasets=False, database_name=db_name
+        tmp_path, src_dir, include_projects=False, include_datasets=False, database_url=url
     )
     dim_mapping_mgr = manager.dimension_mapping_manager
     project_config_file = src_dir / "project_with_dimension_ids.json5"
@@ -614,6 +702,32 @@ def test_register_submit_dataset_long_workflow(tmp_registry_db):
     assert manager.dataset_manager.list_ids() == [dataset_id]
 
 
+def test_registry_contains(cached_registry):
+    conn = cached_registry
+    mgr = RegistryManager.load(conn)
+    project_mgr = mgr.project_manager
+    dimension_mgr = mgr.dimension_manager
+    county_dim = None
+    for config in dimension_mgr.iter_configs():
+        if config.model.dimension_query_name == "county":
+            county_dim = config.model
+            break
+    assert county_dim is not None
+    containing_models = project_mgr.db.get_containing_models(None, county_dim)
+    assert len(containing_models[RegistryType.PROJECT]) == 1
+    assert len(containing_models[RegistryType.DATASET]) == 2
+    assert len(containing_models[RegistryType.DIMENSION_MAPPING]) == 4
+    assert len(containing_models[RegistryType.DIMENSION]) == 0
+
+
+def test_sql(cached_registry):
+    conn = cached_registry
+    mgr = RegistryManager.load(conn)
+    project_mgr = mgr.project_manager
+    df = project_mgr.db.sql(f"SELECT * FROM {RegistryTables.REGISTRATIONS.value}")
+    assert "timestamp" in df.columns
+
+
 def register_project(project_mgr, config_file, project_id, user, log_message):
     project_mgr.register(config_file, user, log_message)
     assert project_mgr.list_ids() == [project_id]
@@ -627,15 +741,17 @@ def register_dataset(dataset_mgr, config_file, dataset_id, user, log_message):
 def check_update_project_dimension(tmpdir, manager):
     """Verify that updating a project's dimension causes all datasets to go unregistered."""
     project_mgr = manager.project_manager
-    project_id = project_mgr.list_ids()[0]
     dimension_mgr = manager.dimension_manager
-    dimension_id = dimension_mgr.list_ids()[0]
+    project_id = project_mgr.list_ids()[0]
+    project_config = project_mgr.get_by_id(project_id)
+    dimension_id = project_config.model.dimensions.base_dimension_references[0].dimension_id
     user = getpass.getuser()
 
     dim_dir = tmpdir / "new_dimension"
     dim_config_file = dim_dir / dimension_mgr.config_class().config_filename()
     dimension_mgr.dump(dimension_id, dim_dir, force=True)
     dim_data = load_data(dim_config_file)
+    orig_version = dim_data["version"]
     dim_data["description"] += "; updated description"
     dump_data(dim_data, dim_config_file)
     dimension_mgr.update_from_file(
@@ -646,15 +762,19 @@ def check_update_project_dimension(tmpdir, manager):
         "update to description",
         dimension_mgr.get_latest_version(dimension_id),
     )
+    new_version = dimension_mgr.get_latest_version(dimension_id)
+    assert new_version != orig_version
     project_dir = tmpdir / "new_project"
     project_config_file = project_dir / project_mgr.config_class().config_filename()
     project_mgr.dump(project_id, project_dir, force=True)
     project_data = load_data(project_config_file)
-    new_version = dimension_mgr.get_latest_version(dimension_id)
+    found = False
     for dim in project_data["dimensions"]["base_dimension_references"]:
         if dim["dimension_id"] == dimension_id:
             dim["version"] = str(new_version)
+            found = True
             break
+    assert found
     dump_data(project_data, project_config_file)
     project_mgr.update_from_file(
         project_config_file,

@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
-from dsgrid.tests.common import (
+from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )
@@ -41,7 +41,7 @@ def make_registry(base_dir, test_project_dir, test_data_dir):
         test_project_dir,
         dataset_path=test_data_dir,
         include_datasets=False,
-        database_name="tmp-dsgrid",
+        database_url=f"sqlite:///{base_dir}/registry.db",
     )
     dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
     assert dataset_config_path.exists()

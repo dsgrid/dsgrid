@@ -7,6 +7,7 @@ import json
 import shutil
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Any
 
 import json5
 
@@ -30,7 +31,7 @@ def compute_file_hash(filename):
     return compute_hash(Path(filename).read_bytes())
 
 
-def compute_hash(text: str):
+def compute_hash(text: bytes):
     hash_obj = hashlib.sha256()
     hash_obj.update(text)
     return hash_obj.hexdigest()
@@ -65,7 +66,7 @@ def dump_data(data, filename, **kwargs):
     logger.debug("Dumped data to %s", filename)
 
 
-def load_data(filename, **kwargs):
+def load_data(filename, **kwargs) -> dict[str, Any]:
     """Load data from the file.
     Supports JSON, JSON5, or custom via kwargs.
 

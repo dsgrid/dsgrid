@@ -1,10 +1,13 @@
 """Manages the registry for dimension mappings"""
 
-import getpass
 import logging
 from collections import Counter
+from typing import Optional
+from pathlib import Path
+from uuid import uuid4
 
 from prettytable import PrettyTable
+from sqlalchemy import Connection
 
 from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.dimension_mappings_config import DimensionMappingsConfig
@@ -14,15 +17,20 @@ from dsgrid.exceptions import (
     DSGValueNotRegistered,
 )
 from dsgrid.spark.types import F
+from dsgrid.registry.registry_interface import DimensionMappingRegistryInterface
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.spark import models_to_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
-from .common import ConfigKey, make_initial_config_registration, RegistryType
+from .common import (
+    ConfigKey,
+    RegistryManagerParams,
+    VersionUpdateType,
+    RegistryType,
+)
 from .registration_context import RegistrationContext
 from .dimension_mapping_update_checker import DimensionMappingUpdateChecker
 from .dimension_registry_manager import DimensionRegistryManager
-from .registry_interface import DimensionMappingRegistryInterface
 from .registry_manager_base import RegistryManagerBase
 
 
@@ -38,8 +46,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._dimension_mgr = None
 
     @classmethod
-    def load(cls, path, fs_interface, dimension_manager, db):
-        mgr = cls._load(path, fs_interface)
+    def load(cls, path, params: RegistryManagerParams, dimension_manager, db):
+        mgr = cls._load(path, params)
         mgr.dimension_manager = dimension_manager
         mgr.db = db
         return mgr
@@ -68,7 +76,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def dimension_manager(self, val: DimensionRegistryManager):
         self._dimension_mgr = val
 
-    def _replace_duplicates(self, config: DimensionMappingsConfig):
+    def _replace_duplicates(self, config: DimensionMappingsConfig, context: RegistrationContext):
         def make_key(model):
             return (
                 model.from_dimension.dimension_id,
@@ -77,14 +85,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             )
 
         hashes = {}
-        for model in self.db.iter_models(all_versions=True):
+        for model in self.db.iter_models(context.connection, all_versions=True):
             key = make_key(model)
             if key in hashes:
                 msg = f"Bug: the same file_hash exists in multiple mappings: {model.mapping_id} {key}"
                 raise Exception(msg)
             hashes[key] = model
 
-        # TODO: This only works if the matching dimension is the latest.
         existing_ids = set()
         for i, mapping in enumerate(config.model.mappings):
             key = make_key(mapping)
@@ -101,13 +108,15 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         return existing_ids
 
-    def _check_records_against_dimension_records(self, config):
+    def _check_records_against_dimension_records(self, conn: Optional[Connection], config):
         """
         Check that records in mappings are subsets of from and to dimension records.
         """
         for mapping in config.model.mappings:
             actual_from_records = {x.from_id for x in mapping.records}
-            from_dimension = self._dimension_mgr.get_by_id(mapping.from_dimension.dimension_id)
+            from_dimension = self._dimension_mgr.get_by_id(
+                mapping.from_dimension.dimension_id, conn=conn
+            )
             allowed_from_records = from_dimension.get_unique_ids()
             diff = actual_from_records.difference(allowed_from_records)
             if diff:
@@ -121,7 +130,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             # mapping to a project's dimension for a specific data source, but that information
             # is not available here.
             actual_to_records = {x.to_id for x in mapping.records}
-            to_dimension = self._dimension_mgr.get_by_id(mapping.to_dimension.dimension_id)
+            to_dimension = self._dimension_mgr.get_by_id(
+                mapping.to_dimension.dimension_id, conn=conn
+            )
             allowed_to_records = to_dimension.get_unique_ids()
             if None in actual_to_records:
                 actual_to_records.remove(None)
@@ -231,15 +242,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 f"Mapping contains from_fraction sum less than 1 for {group_by}={id_less_than_one}. "
             )
 
-    def finalize_registration(self, mapping_ids, error_occurred):
-        if error_occurred:
-            logger.info("Remove all intermediate dimension mappings after error")
-            for mapping_id in mapping_ids:
-                self.remove(mapping_id)
-
-    def get_by_id(self, mapping_id, version=None):
+    def get_by_id(self, mapping_id, version=None, conn: Optional[Connection] = None):
         if version is None:
-            version = self._db.get_latest_version(mapping_id)
+            version = self._db.get_latest_version(conn, mapping_id)
 
         key = ConfigKey(mapping_id, version)
         mapping = self._mappings.get(key)
@@ -247,15 +252,17 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             return mapping
 
         if version is None:
-            model = self.db.get_latest(mapping_id)
+            model = self.db.get_latest(conn, mapping_id)
         else:
-            model = self.db.get_by_version(mapping_id, version)
+            model = self.db.get_by_version(conn, mapping_id, version)
 
         config = MappingTableConfig(model)
         self._mappings[key] = config
         return config
 
-    def load_dimension_mappings(self, dimension_mapping_references):
+    def load_dimension_mappings(
+        self, dimension_mapping_references, conn: Optional[Connection] = None
+    ):
         """Load dimension_mappings from files.
 
         Parameters
@@ -272,11 +279,13 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         mappings = {}
         for ref in dimension_mapping_references:
             key = ConfigKey(ref.mapping_id, ref.version)
-            mappings[key] = self.get_by_id(key.id, version=key.version)
+            mappings[key] = self.get_by_id(key.id, version=key.version, conn=conn)
 
         return mappings
 
-    def make_dimension_mapping_references(self, mapping_ids: list[str]):
+    def make_dimension_mapping_references(
+        self, mapping_ids: list[str], conn: Optional[Connection] = None
+    ):
         """Return a list of dimension mapping references from a list of registered mapping IDs.
 
         Parameters
@@ -290,7 +299,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         """
         refs = []
         for mapping_id in mapping_ids:
-            mapping = self.db.get_latest(mapping_id)
+            mapping = self.db.get_latest(conn, mapping_id)
             refs.append(
                 DimensionMappingReferenceModel(
                     from_dimension_type=mapping.from_dimension.dimension_type,
@@ -302,106 +311,92 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         return refs
 
     def register(self, config_file, submitter, log_message):
-        context = RegistrationContext()
-        error_occurred = False
-        try:
+        with RegistrationContext(
+            self.db, log_message, VersionUpdateType.MAJOR, submitter
+        ) as context:
             config = DimensionMappingsConfig.load(config_file)
-            return self.register_from_config(config, submitter, log_message, context=context)
-        except Exception:
-            error_occurred = True
-            raise
-        finally:
-            context.finalize(error_occurred)
+            return self.register_from_config(config, context)
 
     @track_timing(timer_stats_collector)
     def register_from_config(
-        self, config: DimensionMappingsConfig, submitter, log_message, context=None
+        self,
+        config: DimensionMappingsConfig,
+        context: RegistrationContext,
     ):
-        error_occurred = False
-        need_to_finalize = context is None
-        if context is None:
-            context = RegistrationContext()
+        return self._register(config, context)
 
-        try:
-            return self._register(config, submitter, log_message, context)
-        except Exception:
-            error_occurred = True
-            raise
-        finally:
-            if need_to_finalize:
-                context.finalize(error_occurred)
-
-    def _register(self, config, submitter, log_message, context):
-        existing_ids = self._replace_duplicates(config)
-        self._check_records_against_dimension_records(config)
+    def _register(self, config, context: RegistrationContext):
+        conn = context.connection
+        existing_ids = self._replace_duplicates(config, context)
+        self._check_records_against_dimension_records(conn, config)
         self.validate_records(config)
 
-        registration = make_initial_config_registration(submitter, log_message)
         dimension_mapping_ids = []
-        try:
-            # Guarantee that registration of dimension mappings is all or none.
-            for mapping in config.model.mappings:
-                from_id = mapping.from_dimension.dimension_id
-                to_id = mapping.to_dimension.dimension_id
-                if not self.dimension_manager.has_id(from_id):
-                    raise DSGValueNotRegistered(f"from_dimension ID {from_id} is not registered")
-                if not self.dimension_manager.has_id(to_id):
-                    raise DSGValueNotRegistered(f"to_dimension ID {to_id} is not registered")
+        for mapping in config.model.mappings:
+            from_id = mapping.from_dimension.dimension_id
+            to_id = mapping.to_dimension.dimension_id
+            if not self.dimension_manager.has_id(from_id, conn=conn):
+                raise DSGValueNotRegistered(f"from_dimension ID {from_id} is not registered")
+            if not self.dimension_manager.has_id(to_id, conn=conn):
+                raise DSGValueNotRegistered(f"to_dimension ID {to_id} is not registered")
 
-                if mapping.id is None:
-                    mapping = self.db.insert(mapping, registration)
-                else:
-                    assert mapping.mapping_id in existing_ids
-                    continue
-                logger.info(
-                    "%s Registered dimension mapping id=%s version=%s",
-                    self._log_offline_mode_prefix(),
-                    mapping.mapping_id,
-                    registration.version,
-                )
-                dimension_mapping_ids.append(mapping.mapping_id)
-        except Exception:
-            if dimension_mapping_ids:
-                logger.warning(
-                    "Exception occured after partial completion of dimension mapping registration."
-                )
-                for mapping_id in dimension_mapping_ids:
-                    self.remove(mapping_id)
-            raise
-
-        logger.info(
-            "%s Registered %s dimension mapping(s) with version=%s",
-            self._log_offline_mode_prefix(),
-            len(config.model.mappings),
-            registration.version,
-        )
+            if mapping.id is None:
+                assert mapping.mapping_id is None
+                mapping.mapping_id = str(uuid4())
+                mapping.version = "1.0.0"
+                mapping = self.db.insert(conn, mapping, context.registration)
+            else:
+                assert mapping.mapping_id in existing_ids
+                continue
+            logger.info(
+                "%s Registered dimension mapping id=%s version=%s",
+                self._log_offline_mode_prefix(),
+                mapping.mapping_id,
+                mapping.version,
+            )
+            dimension_mapping_ids.append(mapping.mapping_id)
 
         context.add_ids(RegistryType.DIMENSION_MAPPING, dimension_mapping_ids, self)
         dimension_mapping_ids.extend(existing_ids)
         return dimension_mapping_ids
 
     def update_from_file(
-        self, config_file, mapping_id, submitter, update_type, log_message, version
+        self,
+        config_file: Path,
+        mapping_id: str,
+        submitter: str,
+        update_type: VersionUpdateType,
+        log_message: str,
+        version: str,
     ):
-        config = MappingTableConfig.load(config_file)
-        self._check_update(config, mapping_id, version)
-        self.update(config, update_type, log_message, submitter=submitter)
+        with RegistrationContext(self.db, log_message, update_type, submitter) as context:
+            config = MappingTableConfig.load(config_file)
+            self._check_update(context.connection, config, mapping_id, version)
+            self.update_with_context(config, context)
 
     @track_timing(timer_stats_collector)
-    def update(self, config, update_type, log_message, submitter=None):
-        if submitter is None:
-            submitter = getpass.getuser()
+    def update(
+        self,
+        config: MappingTableConfig,
+        update_type: VersionUpdateType,
+        log_message: str,
+        submitter: Optional[str] = None,
+    ) -> MappingTableConfig:
         # lock_file_path = self.get_registry_lock_file(None)
         # with self.cloud_interface.make_lock_file_managed(lock_file_path):
-        return self._update(config, submitter, update_type, log_message)
+        with RegistrationContext(self.db, log_message, update_type, submitter) as context:
+            return self.update_with_context(config, context)
 
-    def _update(self, config, submitter, update_type, log_message):
-        old_config = self.get_by_id(config.model.mapping_id)
+    def update_with_context(
+        self, config: MappingTableConfig, context: RegistrationContext
+    ) -> MappingTableConfig:
+        conn = context.connection
+        old_config = self.get_by_id(config.model.mapping_id, conn=conn)
         checker = DimensionMappingUpdateChecker(old_config.model, config.model)
         checker.run()
         cur_version = old_config.model.version
         old_key = ConfigKey(config.model.mapping_id, cur_version)
-        model = self._update_config(config, submitter, update_type, log_message)
+        model = self._update_config(config, context)
         new_key = ConfigKey(config.model.mapping_id, model.version)
         self._mappings.pop(old_key, None)
         self._mappings[new_key] = MappingTableConfig(model)
@@ -409,18 +404,24 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         if not self.offline_mode:
             self.sync_push(self._path)
 
-        return model
+        return self._mappings[new_key]
 
-    def remove(self, mapping_id):
-        self.db.delete_all(mapping_id)
+    def finalize_registration(self, conn: Connection, config_ids: set[str], error_occurred: bool):
+        if error_occurred:
+            for key in [x for x in self._mappings if x.id in config_ids]:
+                self._mappings.pop(key)
+
+    def remove(self, mapping_id: str, conn: Optional[Connection] = None):
+        self.db.delete_all(conn, mapping_id)
         for key in [x for x in self._mappings if x.id == mapping_id]:
             self._mappings.pop(key)
 
     def show(
         self,
-        filters: list[str] = None,
+        conn: Optional[Connection] = None,
+        filters: Optional[list[str]] = None,
         max_width: int | dict | None = None,
-        drop_fields: list[str] = None,
+        drop_fields: Optional[list[str]] = None,
         return_table: bool = False,
         **kwargs,
     ):
@@ -469,15 +470,15 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             transformed_filters = transform_and_validate_filters(filters)
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
-        for model in self.db.iter_models():
-            registration = self.db.get_registration(model)
+        for model in self.db.iter_models(conn):
+            registration = self.db.get_registration(conn, model)
             from_dim = model.from_dimension.dimension_type.value
             to_dim = model.to_dimension.dimension_type.value
             all_fields = (
                 f"[{from_dim}, {to_dim}]",
                 model.mapping_id,
-                registration.version,
-                registration.date.strftime("%Y-%m-%d %H:%M:%S"),
+                model.version,
+                registration.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 registration.submitter,
                 registration.log_message,
             )

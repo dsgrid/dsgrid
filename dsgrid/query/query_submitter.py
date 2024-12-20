@@ -1,15 +1,19 @@
 import abc
+import json
 import logging
 import shutil
 from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
 
+from semver import VersionInfo
+
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
-from dsgrid.dimension.base_models import DimensionCategory
+from dsgrid.dimension.base_models import DimensionCategory, DimensionType
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
 from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
@@ -17,16 +21,19 @@ from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
 from dsgrid.spark.functions import pivot
 from dsgrid.spark.types import DataFrame
+from dsgrid.project import Project
 from dsgrid.utils.spark import (
+    custom_spark_conf,
     read_dataframe,
     try_read_dataframe,
     write_dataframe,
     write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.files import delete_if_exists, load_data
+from dsgrid.utils.files import delete_if_exists, compute_hash, load_data
 from dsgrid.query.models import (
     ProjectQueryModel,
+    ColumnType,
     CreateCompositeDatasetQueryModel,
     CompositeDatasetQueryModel,
     DatasetMetadataModel,
@@ -59,9 +66,11 @@ class QuerySubmitterBase:
         return self._output_dir / "composite_datasets"
 
     def _cached_tables_dir(self):
+        """Directory for intermediate tables made up of multiple project-mapped datasets."""
         return self._output_dir / "cached_tables"
 
     def _cached_project_mapped_datasets_dir(self):
+        """Directory for intermediate project-mapped datasets."""
         return self._output_dir / "cached_project_mapped_datasets"
 
     @staticmethod
@@ -80,24 +89,45 @@ class QuerySubmitterBase:
     def _cached_table_filename(path: Path):
         return path / "table.parquet"
 
-    @track_timing(timer_stats_collector)
-    def _persist_intermediate_result(self, context: QueryContext, df):
-        hash, text = context.model.serialize_cached_content()
-        cached_dir = self._cached_tables_dir() / hash
-        if cached_dir.exists():
-            shutil.rmtree(cached_dir)
-        cached_dir.mkdir()
-        filename = self._cached_table_filename(cached_dir)
-        df = write_dataframe_and_auto_partition(df, filename)
 
-        self.metadata_filename(cached_dir).write_text(context.metadata.model_dump_json(indent=2))
-        self.query_filename(cached_dir).write_text(text)
-        logger.info("Persisted intermediate table to %s", filename)
-        return df
+class ProjectBasedQuerySubmitter(QuerySubmitterBase):
+    def __init__(self, project: Project, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._project = project
+
+    @property
+    def project(self):
+        return self._project
+
+    def _create_table_hash(self, context: QueryContext) -> tuple[str, str]:
+        """Create a hash that can be used to identify whether the following sequence
+        can be skipped based on a previous query:
+          - Apply expression across all datasets in the query.
+          - Apply filters.
+          - Apply aggregations.
+
+        Examples of changes that will invalidate the query:
+          - Change to the project section of the query
+          - Bump to project major version number
+          - Change to a dataset version
+          - Change to a project's dimension requirements for a dataset
+          - Change to a dataset dimension mapping
+        """
+        data = {
+            "project_major_version": VersionInfo.parse(self._project.config.model.version).major,
+            "project_query": context.model.serialize_cached_content(),
+            "datasets": [
+                self._project.config.get_dataset(x.dataset_id).model_dump(mode="json")
+                for x in context.model.project.dataset.source_datasets
+            ],
+        }
+        text = json.dumps(data, indent=2)
+        hash_value = compute_hash(text.encode())
+        return text, hash_value
 
     def _try_read_cache(self, context: QueryContext):
-        hash, _ = context.model.serialize_cached_content()
-        cached_dir = self._cached_tables_dir() / hash
+        _, hash_value = self._create_table_hash(context)
+        cached_dir = self._cached_tables_dir() / hash_value
         filename = self._cached_table_filename(cached_dir)
         df = try_read_dataframe(filename)
         if df is not None:
@@ -105,16 +135,6 @@ class QuerySubmitterBase:
             metadata_file = self.metadata_filename(cached_dir)
             return df, DatasetMetadataModel.from_file(metadata_file)
         return None, None
-
-
-class ProjectBasedQuerySubmitter(QuerySubmitterBase):
-    def __init__(self, project, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._project = project
-
-    @property
-    def project(self):
-        return self._project
 
     def _run_checks(self, model):
         subsets = set(self.project.config.list_dimension_query_names(DimensionCategory.SUBSET))
@@ -167,22 +187,29 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         if load_cached_table:
             df, metadata = self._try_read_cache(context)
         if df is None:
-            df = self._project.process_query(context, self._cached_project_mapped_datasets_dir())
+            df_filenames = self._project.process_query(
+                context, self._cached_project_mapped_datasets_dir()
+            )
+            df = self._postprocess_datasets(context, scratch_dir_context, df_filenames)
             is_cached = False
         else:
             context.metadata = metadata
             is_cached = True
 
+        if context.model.result.aggregate_each_dataset:
+            # This wouldn't save any time.
+            persist_intermediate_table = False
+
         if persist_intermediate_table and not is_cached:
             df = self._persist_intermediate_result(context, df)
 
-        if context.model.result.dimension_filters:
-            df = self._apply_filters(df, context)
+        if not context.model.result.aggregate_each_dataset:
+            if context.model.result.dimension_filters:
+                df = self._apply_filters(df, context)
+            df = self._process_aggregations(df, context)
 
         repartition = not persist_intermediate_table
-        table_filename = self._process_aggregations_and_save(
-            df, context, repartition, zip_file=zip_file
-        )
+        table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
 
         for report_inputs in context.model.result.reports:
             report = make_report(report_inputs.report_type)
@@ -191,10 +218,79 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
         return df, context
 
-    def _process_aggregations_and_save(
-        self, df: DataFrame, context: QueryContext, repartition: bool, zip_file: bool = False
-    ) -> Path:
-        handler = make_table_format_handler(TableFormatType.UNPIVOTED, self._project.config)
+    @track_timing(timer_stats_collector)
+    def _persist_intermediate_result(self, context: QueryContext, df):
+        text, hash_value = self._create_table_hash(context)
+        cached_dir = self._cached_tables_dir() / hash_value
+        if cached_dir.exists():
+            shutil.rmtree(cached_dir)
+        cached_dir.mkdir()
+        filename = self._cached_table_filename(cached_dir)
+        df = write_dataframe_and_auto_partition(df, filename)
+
+        self.metadata_filename(cached_dir).write_text(
+            context.metadata.model_dump_json(indent=2), encoding="utf-8"
+        )
+        self.query_filename(cached_dir).write_text(text, encoding="utf-8")
+        logger.info("Persisted intermediate table to %s", filename)
+        return df
+
+    def _postprocess_datasets(
+        self,
+        context: QueryContext,
+        scratch_dir_context: ScratchDirContext,
+        df_filenames: dict[str, Path],
+    ) -> DataFrame:
+        if context.model.result.aggregate_each_dataset:
+            for dataset_id, path in df_filenames.items():
+                df = read_dataframe(path)
+                if context.model.result.dimension_filters:
+                    df = self._apply_filters(df, context)
+                df = self._process_aggregations(df, context, dataset_id=dataset_id)
+                path = scratch_dir_context.get_temp_filename(suffix=".parquet")
+                write_dataframe(df, path)
+                df_filenames[dataset_id] = path
+
+        # All dataset columns need to be in the same order.
+        context.consolidate_dataset_metadata()
+        datasets = self._convert_datasets(context, df_filenames)
+        return evaluate_expression(context.model.project.dataset.expression, datasets).df
+
+    def _convert_datasets(self, context: QueryContext, filenames: dict[str, Path]):
+        dim_columns, time_columns = self._get_dimension_columns(context)
+        expected_columns = time_columns + dim_columns
+        expected_columns.append(VALUE_COLUMN)
+
+        datasets = {}
+        for dataset_id, path in filenames.items():
+            df = read_dataframe(path)
+            unexpected = sorted(set(df.columns).difference(expected_columns))
+            if unexpected:
+                raise Exception(f"Unexpected columns are present in {dataset_id=} {unexpected=}")
+            datasets[dataset_id] = DatasetExpressionHandler(
+                df.select(*expected_columns), time_columns + dim_columns, [VALUE_COLUMN]
+            )
+        return datasets
+
+    def _get_dimension_columns(self, context: QueryContext) -> tuple[list[str], list[str]]:
+        match context.model.result.column_type:
+            case ColumnType.DIMENSION_QUERY_NAMES:
+                dim_columns = context.get_all_dimension_column_names(exclude={DimensionType.TIME})
+                time_columns = context.get_dimension_column_names(DimensionType.TIME)
+            case ColumnType.DIMENSION_TYPES:
+                dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
+                time_columns = context.get_dimension_column_names(DimensionType.TIME)
+            case _:
+                raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
+
+        return sorted(dim_columns), sorted(time_columns)
+
+    def _process_aggregations(
+        self, df: DataFrame, context: QueryContext, dataset_id: Optional[str] = None
+    ) -> DataFrame:
+        handler = make_table_format_handler(
+            TableFormatType.UNPIVOTED, self._project.config, dataset_id=dataset_id
+        )
         df = handler.process_aggregations(df, context.model.result.aggregations, context)
 
         if context.model.result.replace_ids_with_names:
@@ -205,6 +301,13 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
         if isinstance(context.model.result.table_format, PivotedTableFormatModel):
             df = _pivot_table(df, context)
+
+        return df
+
+    def _process_aggregations_and_save(
+        self, df: DataFrame, context: QueryContext, repartition: bool, zip_file: bool = False
+    ) -> Path:
+        df = self._process_aggregations(df, context)
 
         table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
         return table_filename
@@ -253,12 +356,11 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     zipf.write(path)
         return filename
 
-    def _save_result(self, context, df, filename, repartition):
+    def _save_result(self, context: QueryContext, df, filename, repartition):
         output_dir = filename.parent
         suffix = filename.suffix
         if suffix == ".csv":
-            # TODO #207: Some users may want us to use pandas because Spark makes a csv directory.
-            df.write.mode("overwrite").csv(str(filename), header=True)
+            df.toPandas().to_csv(filename, header=True, index=False)
         elif suffix == ".parquet":
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)
@@ -310,18 +412,25 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         DSGInvalidQuery
             Raised if the query is invalid
         """
+        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
-            df, context = self._run_query(
-                scratch_dir_context,
-                model,
-                load_cached_table,
-                persist_intermediate_table=persist_intermediate_table,
-                zip_file=zip_file,
-                force=force,
-            )
-            context.finalize()
-            return df
+            # Ensure that queries that aggregate time reflect the project's time zone instead
+            # of the local computer.
+            # If any other settings get customized here, handle them in restart_spark()
+            # as well. This change won't persist Spark session restarts.
+            conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
+            with custom_spark_conf(conf):
+                df, context = self._run_query(
+                    scratch_dir_context,
+                    model,
+                    load_cached_table,
+                    persist_intermediate_table=persist_intermediate_table,
+                    zip_file=zip_file,
+                    force=force,
+                )
+                context.finalize()
+                return df
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
@@ -349,17 +458,24 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             If True, overwrite any existing output directory.
 
         """
+        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
-            df, context = self._run_query(
-                scratch_dir_context,
-                model,
-                load_cached_table,
-                persist_intermediate_table,
-                force=force,
-            )
-            self._save_composite_dataset(context, df, not persist_intermediate_table)
-            context.finalize()
+            # Ensure that queries that aggregate time reflect the project's time zone instead
+            # of the local computer.
+            # If any other settings get customized here, handle them in restart_spark()
+            # as well. This change won't persist Spark session restarts.
+            conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
+            with custom_spark_conf(conf):
+                df, context = self._run_query(
+                    scratch_dir_context,
+                    model,
+                    load_cached_table,
+                    persist_intermediate_table,
+                    force=force,
+                )
+                self._save_composite_dataset(context, df, not persist_intermediate_table)
+                context.finalize()
 
     @track_timing(timer_stats_collector)
     def submit(
@@ -374,12 +490,17 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         query : CompositeDatasetQueryModel
         scratch_dir : Optional[Path]
         """
+        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
         scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         # orig_query = self._load_composite_dataset_query(query.dataset_id)
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             context = QueryContext(query, scratch_dir_context)
             df, context.metadata = self._read_dataset(query.dataset_id)
-            self._process_aggregations_and_save(df, context, repartition=False)
+            # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
+            # you add a new customization.
+            conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
+            with custom_spark_conf(conf):
+                self._process_aggregations_and_save(df, context, repartition=False)
             context.finalize()
 
     def _load_composite_dataset_query(self, dataset_id):

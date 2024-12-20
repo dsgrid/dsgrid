@@ -105,3 +105,7 @@ If you are using a conda environment
 ```
 conda deactivate
 ```
+
+## Software Record
+
+dsgrid is developed under NREL Software Record SWR-21-52, "demand-side grid model".

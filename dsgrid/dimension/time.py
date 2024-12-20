@@ -1,8 +1,7 @@
 """Dimensions related to time"""
 from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import logging
-from typing_extensions import Annotated
 from pydantic import Field
 from enum import Enum
 from typing import Optional
@@ -299,33 +298,46 @@ class TimeZone(DSGEnum):
         return False
 
 
+_TIME_ZONE_NAME_TO_ZONE_INFO = {x.tz_name: x.tz for x in TimeZone}
+
+assert len(_TIME_ZONE_NAME_TO_ZONE_INFO) == len(TimeZone)
+
+
+def get_zone_info_from_tz_name(tz_name: str) -> ZoneInfo:
+    """Return the ZoneInfo matching tz_name."""
+    return _TIME_ZONE_NAME_TO_ZONE_INFO[tz_name]
+
+
+def get_zone_info_from_spark_session(tz_name: str) -> ZoneInfo:
+    """Return the ZoneInfo matching tz_name, which must have been read from the Spark session."""
+    try:
+        # We set the Spark session time zone to tz_name which is incompatible with ZoneInfo.
+        return ZoneInfo(key=tz_name)
+    except ZoneInfoNotFoundError:
+        return get_zone_info_from_tz_name(tz_name)
+
+
 class DaylightSavingAdjustmentModel(DSGBaseModel):
     """Defines how to drop and add data along with timestamps to convert standard time
     load profiles to clock time"""
 
-    spring_forward_hour: Annotated[
-        DaylightSavingSpringForwardType,
-        Field(
-            title="spring_forward_hour",
-            description="Data adjustment for spring forward hour (a 2AM in March)",
-            default=DaylightSavingSpringForwardType.NONE,
-            json_schema_extra={
-                "options": DaylightSavingSpringForwardType.format_descriptions_for_docs(),
-            },
-        ),
-    ]
+    spring_forward_hour: DaylightSavingSpringForwardType = Field(
+        title="spring_forward_hour",
+        description="Data adjustment for spring forward hour (a 2AM in March)",
+        default=DaylightSavingSpringForwardType.NONE,
+        json_schema_extra={
+            "options": DaylightSavingSpringForwardType.format_descriptions_for_docs(),
+        },
+    )
 
-    fall_back_hour: Annotated[
-        DaylightSavingFallBackType,
-        Field(
-            title="fall_back_hour",
-            description="Data adjustment for spring forward hour (a 2AM in November)",
-            default=DaylightSavingFallBackType.NONE,
-            json_schema_extra={
-                "options": DaylightSavingFallBackType.format_descriptions_for_docs(),
-            },
-        ),
-    ]
+    fall_back_hour: DaylightSavingFallBackType = Field(
+        title="fall_back_hour",
+        description="Data adjustment for spring forward hour (a 2AM in November)",
+        default=DaylightSavingFallBackType.NONE,
+        json_schema_extra={
+            "options": DaylightSavingFallBackType.format_descriptions_for_docs(),
+        },
+    )
 
 
 class TimeBasedDataAdjustmentModel(DSGBaseModel):
@@ -336,32 +348,26 @@ class TimeBasedDataAdjustmentModel(DSGBaseModel):
     need to be converted to get clock time load profiles.
     """
 
-    leap_day_adjustment: Annotated[
-        LeapDayAdjustmentType,
-        Field(
-            title="leap_day_adjustment",
-            description="Leap day adjustment method applied to time data",
-            default=LeapDayAdjustmentType.NONE,
-            json_schema_extra={
-                "options": LeapDayAdjustmentType.format_descriptions_for_docs(),
-                "notes": (
-                    "The dsgrid default is None, i.e., no adjustment made to leap years.",
-                    "Adjustments are made to leap years only.",
-                ),
-            },
-        ),
-    ]
-    daylight_saving_adjustment: Annotated[
-        DaylightSavingAdjustmentModel,
-        Field(
-            title="daylight_saving_adjustment",
-            description="Daylight saving adjustment method applied to time data",
-            default={
-                "spring_forward_hour": DaylightSavingSpringForwardType.NONE,
-                "fall_back_hour": DaylightSavingFallBackType.NONE,
-            },
-        ),
-    ]
+    leap_day_adjustment: LeapDayAdjustmentType = Field(
+        title="leap_day_adjustment",
+        description="Leap day adjustment method applied to time data",
+        default=LeapDayAdjustmentType.NONE,
+        json_schema_extra={
+            "options": LeapDayAdjustmentType.format_descriptions_for_docs(),
+            "notes": (
+                "The dsgrid default is None, i.e., no adjustment made to leap years.",
+                "Adjustments are made to leap years only.",
+            ),
+        },
+    )
+    daylight_saving_adjustment: DaylightSavingAdjustmentModel = Field(
+        title="daylight_saving_adjustment",
+        description="Daylight saving adjustment method applied to time data",
+        default={
+            "spring_forward_hour": DaylightSavingSpringForwardType.NONE,
+            "fall_back_hour": DaylightSavingFallBackType.NONE,
+        },
+    )
 
 
 class DatetimeRange:

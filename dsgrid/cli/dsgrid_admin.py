@@ -7,12 +7,12 @@ from pathlib import Path
 
 import rich_click as click
 
-from dsgrid.cli.common import get_value_from_context, OptionPromptPassword
+from dsgrid.cli.common import get_value_from_context
 from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.loggers import setup_logging, check_log_file_size
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.registry.common import DatabaseConnection, DatasetRegistryStatus, VersionUpdateType
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.utils.files import load_data
@@ -28,14 +28,24 @@ Click Group Definitions
 
 
 @click.group()
-@click.option(
-    "--database-name",
-    default=_config.database_name,
-    envvar="DSGRID_REGISTRY_DATABASE_NAME",
-    show_default=True,
-    help="dsgrid registry database name. Override with the environment variable "
-    "DSGRID_REGISTRY_DATABASE_NAME",
-)
+# Server-related options are commented-out because the registry is currently only
+# supported in SQLite. If/when we add postgres support, these can be added back.
+# @click.option(
+#    "-U",
+#    "--username",
+#    default=_config.database_user,
+#    show_default=True,
+#    help="dsgrid registry user name",
+# )
+# @click.option(
+#    "-P",
+#    "--password",
+#    prompt=True,
+#    hide_input=True,
+#    cls=OptionPromptPassword,
+#    help="dsgrid registry password. Will prompt unless it is passed or the username matches the "
+#    "runtime config file.",
+# )
 @click.option(
     "--url",
     default=_config.database_url,
@@ -43,22 +53,6 @@ Click Group Definitions
     envvar="DSGRID_REGISTRY_DATABASE_URL",
     help="dsgrid registry database URL. Override with the environment variable "
     "DSGRID_REGISTRY_DATABASE_URL",
-)
-@click.option(
-    "-U",
-    "--username",
-    default=_config.database_user,
-    show_default=True,
-    help="dsgrid registry user name",
-)
-@click.option(
-    "-P",
-    "--password",
-    prompt=True,
-    hide_input=True,
-    cls=OptionPromptPassword,
-    help="dsgrid registry password. Will prompt unless it is passed or the username matches the "
-    "runtime config file.",
 )
 @click.option("-l", "--log-file", default="dsgrid_admin.log", type=str, help="Log to this file.")
 @click.option(
@@ -76,7 +70,8 @@ Click Group Definitions
 @click.option(
     "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
 )
-def cli(database_name, url, username, password, log_file, no_prompts, offline, verbose):
+# def cli(url, username, password, log_file, no_prompts, offline, verbose):
+def cli(url, log_file, no_prompts, offline, verbose):
     """dsgrid-admin commands"""
     path = Path(log_file)
     level = logging.DEBUG if verbose else logging.INFO
@@ -98,11 +93,10 @@ def registry(ctx, remote_path):
     if "--help" in sys.argv:
         ctx.obj = None
     else:
-        conn = DatabaseConnection.from_url(
-            get_value_from_context(ctx, "url"),
-            database=get_value_from_context(ctx, "database_name"),
-            username=get_value_from_context(ctx, "username"),
-            password=get_value_from_context(ctx, "password"),
+        conn = DatabaseConnection(
+            url=get_value_from_context(ctx, "url"),
+            # username=get_value_from_context(ctx, "username"),
+            # password=get_value_from_context(ctx, "password"),
         )
         ctx.obj = RegistryManager.load(
             conn,
@@ -114,25 +108,25 @@ def registry(ctx, remote_path):
 
 @click.group()
 @click.pass_obj
-def dimensions(registry_manager):
+def dimensions(registry_manager: RegistryManager):
     """Dimension subcommands"""
 
 
 @click.group()
 @click.pass_obj
-def dimension_mappings(registry_manager):
+def dimension_mappings(registry_manager: RegistryManager):
     """Dimension mapping subcommands"""
 
 
 @click.group()
 @click.pass_obj
-def projects(registry_manager):
+def projects(registry_manager: RegistryManager):
     """Project subcommands"""
 
 
 @click.group()
 @click.pass_obj
-def datasets(registry_manager):
+def datasets(registry_manager: RegistryManager):
     """Dataset subcommands"""
 
 
@@ -142,7 +136,7 @@ Registry Commands
 
 
 @click.command()
-@click.argument("db_name")
+@click.argument("url")
 @click.option(
     "-p",
     "--data-path",
@@ -152,26 +146,30 @@ Registry Commands
     help="local dsgrid registry data path.",
 )
 @click.option(
-    "-f", "--force", is_flag=True, default=False, help="Delete registry_path if it already exists."
+    "-f",
+    "--overwrite",
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Delete registry_path and the database if they already exist.",
 )
 @click.pass_context
-def create_registry(ctx, db_name, data_path, force):
+def create_registry(ctx, url, data_path, overwrite):
     """Create a new registry."""
     if data_path.exists():
-        if force:
+        if overwrite:
             shutil.rmtree(data_path)
         else:
-            print(f"{data_path} already exists. Set --force to overwrite.", file=sys.stderr)
+            print(f"{data_path} already exists. Set --overwrite to overwrite.", file=sys.stderr)
             sys.exit(1)
 
-    conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "url"),
-        database=db_name,
-        username=get_value_from_context(ctx, "username"),
-        password=get_value_from_context(ctx, "password"),
+    conn = DatabaseConnection(
+        url=url,  # This may change if/when we support a server database.
+        # url=get_value_from_context(ctx, "url"),
+        # username=get_value_from_context(ctx, "username"),
+        # password=get_value_from_context(ctx, "password"),
     )
-    RegistryManager.create(conn, data_path)
-    logger.info("Created registry at %s with %s", conn.url, conn.database)
+    RegistryManager.create(conn, data_path, overwrite=overwrite)
 
 
 """
@@ -182,7 +180,7 @@ Dimension Commands
 @click.command(name="remove")
 @click.argument("dimension-id")
 @click.pass_obj
-def remove_dimension(registry_manager, dimension_id):
+def remove_dimension(registry_manager: RegistryManager, dimension_id: str):
     """Remove a dimension from the dsgrid repository."""
     registry_manager.dimension_manager.remove(dimension_id)
 
@@ -195,7 +193,7 @@ Dimension Mapping Commands
 @click.command(name="remove")
 @click.argument("dimension-mapping-id")
 @click.pass_obj
-def remove_dimension_mapping(registry_manager, dimension_mapping_id):
+def remove_dimension_mapping(registry_manager: RegistryManager, dimension_mapping_id: str):
     """Remove a dimension mapping from the dsgrid repository."""
     registry_manager.dimension_mapping_manager.remove(dimension_mapping_id)
 
@@ -208,7 +206,7 @@ Project Commands
 @click.command(name="remove")
 @click.argument("project-id")
 @click.pass_obj
-def remove_project(registry_manager, project_id):
+def remove_project(registry_manager: RegistryManager, project_id: str):
     """Remove a project from the dsgrid repository."""
     registry_manager.project_manager.remove(project_id)
 
@@ -219,24 +217,52 @@ Dataset Commands
 
 
 @click.command(name="remove")
-@click.argument("dataset-id")
+@click.argument("dataset-ids", nargs=-1)
 @click.pass_obj
-def remove_dataset(registry_manager, dataset_id):
-    """Remove a dataset from the dsgrid repository."""
-    registry_manager.dataset_manager.remove(dataset_id)
+def remove_datasets(registry_manager: RegistryManager, dataset_ids: list[str]):
+    """Remove one or more datasets from the dsgrid repository."""
+    dataset_mgr = registry_manager.dataset_manager
+    project_mgr = registry_manager.project_manager
+
+    # Ensure that all dataset IDs are valid before removing any of them.
+    for dataset_id in dataset_ids:
+        dataset_mgr.get_by_id(dataset_id)
+
+    for dataset_id in dataset_ids:
+        registry_manager.dataset_manager.remove(dataset_id)
+
+    dataset_ids_set = set(dataset_ids)
+    for project_id in project_mgr.list_ids():
+        config = project_mgr.get_by_id(project_id)
+        removed_dataset_ids = []
+        for dataset in config.iter_datasets():
+            if (
+                dataset.dataset_id in dataset_ids_set
+                and dataset.status == DatasetRegistryStatus.REGISTERED
+            ):
+                dataset.status = DatasetRegistryStatus.UNREGISTERED
+                dataset.mapping_references.clear()
+                removed_dataset_ids.append(dataset.dataset_id)
+        if removed_dataset_ids:
+            ids = ", ".join(removed_dataset_ids)
+            msg = (
+                f"Set status for datasets {ids} to unregistered in project {project_id} "
+                "after removal."
+            )
+            project_mgr.update(config, VersionUpdateType.MAJOR, msg)
 
 
 @click.command()
 @click.option(
-    "--src-database-name",
+    "--src-database-url",
     required=True,
-    help="Source dsgrid registry database name.",
+    help="Source dsgrid registry database URL.",
 )
 @click.option(
-    "--dst-database-name",
+    "--dst-database-url",
     default="dsgrid",
     required=True,
-    help="Destination dsgrid registry database name.",
+    help="Destination dsgrid registry database URL.",
 )
 @click.argument("dst_data_path", type=click.Path(exists=False), callback=lambda *x: Path(x[2]))
 @click.argument("config_file", type=click.Path(exists=True), callback=lambda *x: Path(x[2]))
@@ -260,8 +286,8 @@ def remove_dataset(registry_manager, dataset_id):
 @click.pass_context
 def make_filtered_registry(
     ctx,
-    src_database_name,
-    dst_database_name,
+    src_database_url,
+    dst_database_url,
     dst_data_path: Path,
     config_file: Path,
     mode,
@@ -269,20 +295,17 @@ def make_filtered_registry(
 ):
     """Make a filtered registry for testing purposes."""
     simple_model = RegistrySimpleModel(**load_data(config_file))
-    url = get_value_from_context(ctx, "url")
-    username = get_value_from_context(ctx, "username")
-    password = get_value_from_context(ctx, "password")
-    src_conn = DatabaseConnection.from_url(
-        url,
-        database=src_database_name,
-        username=username,
-        password=password,
+    # username = get_value_from_context(ctx, "username")
+    # password = get_value_from_context(ctx, "password")
+    src_conn = DatabaseConnection(
+        url=src_database_url,
+        # username=username,
+        # password=password,
     )
-    dst_conn = DatabaseConnection.from_url(
-        url,
-        database=dst_database_name,
-        username=username,
-        password=password,
+    dst_conn = DatabaseConnection(
+        url=dst_database_url,
+        # username=username,
+        # password=password,
     )
     RegistryManager.copy(
         src_conn,
@@ -307,4 +330,4 @@ registry.add_command(datasets)
 dimensions.add_command(remove_dimension)
 dimension_mappings.add_command(remove_dimension_mapping)
 projects.add_command(remove_project)
-datasets.add_command(remove_dataset)
+datasets.add_command(remove_datasets)

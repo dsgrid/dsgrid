@@ -13,7 +13,7 @@ from dsgrid.config.project_config import (
     RequiredDimensionRecordsModel,
 )
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import (
+from dsgrid.utils.id_remappings import (
     map_dimension_ids_to_names,
     map_dimension_names_to_ids,
     map_dimension_mapping_names_to_ids,
@@ -135,5 +135,18 @@ def test_invalid_multi_dimensional_requirement_partial_intersection():
     with pytest.raises(ValueError, match="must have a full intersection"):
         RequiredDimensionsModel(
             single_dimensional=RequiredDimensionRecordsModel(**single_dim_data),
+            multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
+        )
+
+
+def test_invalid_multi_dimensional_requirement_base_and_base_missing():
+    multi_dim_data = [
+        {
+            "metric": {"base": ["metric1"], "base_missing": ["metric2"]},
+            "subsector": {"base": ["subsector1"]},
+        },
+    ]
+    with pytest.raises(ValueError, match="base and base_missing cannot both be set"):
+        RequiredDimensionsModel(
             multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
         )

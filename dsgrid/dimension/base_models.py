@@ -3,7 +3,6 @@
 from typing import Optional
 
 from pydantic import Field
-from typing_extensions import Annotated
 
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.data_models import DSGBaseModel, DSGEnum
@@ -58,20 +57,14 @@ class DimensionRecordBaseModel(DSGBaseModel):
     """Base class for all dsgrid dimension models"""
 
     # TODO: add support/links for docs
-    id: Annotated[
-        str,
-        Field(
-            title="ID",
-            description="Unique identifier within a dimension",
-        ),
-    ]
-    name: Annotated[
-        str,
-        Field(
-            title="name",
-            description="User-defined name",
-        ),
-    ]
+    id: str = Field(
+        title="ID",
+        description="Unique identifier within a dimension",
+    )
+    name: str = Field(
+        title="name",
+        description="User-defined name",
+    )
 
 
 class MetricDimensionBaseModel(DimensionRecordBaseModel):
@@ -81,19 +74,16 @@ class MetricDimensionBaseModel(DimensionRecordBaseModel):
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
-    time_zone: Annotated[
-        Optional[TimeZone],
-        Field(
-            None,
-            title="Local Prevailing Time Zone",
-            description="""
+    time_zone: Optional[TimeZone] = Field(
+        default=None,
+        title="Local Prevailing Time Zone",
+        description="""
         These time zone information are used in reference to project timezone
         to convert between project time and local times as necessary.
         All Prevailing timezones account for daylight savings time.
         If a location does not observe daylight savings, use Standard timezones.
         """,
-        ),
-    ]
+    )
 
 
 class DataSourceDimensionBaseModel(DimensionRecordBaseModel):

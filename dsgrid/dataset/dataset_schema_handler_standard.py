@@ -298,6 +298,12 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         logger.info("Rewrote simplified %s", self._config.load_data_lookup_path)
         ids = collect_list(lookup2.select("id").distinct(), "id")
         load_df = self._load_data.filter(self._load_data.id.isin(ids))
+        ld_columns = set(load_df.columns)
+        for dim in dimensions:
+            column = dim.dimension_type.value
+            if column in ld_columns:
+                load_df = load_df.filter(load_df[column].isin(dim.record_ids))
+
         path = Path(self._config.load_data_path)
         if path.suffix == ".csv":
             # write_dataframe_and_auto_partition doesn't support CSV yet

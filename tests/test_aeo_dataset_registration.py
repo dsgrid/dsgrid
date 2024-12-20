@@ -15,10 +15,11 @@ from dsgrid.tests.common import (
 )
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.registry.filter_registry_manager import FilterRegistryManager
-from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
-from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
+from dsgrid.registry.common import DatabaseConnection
+from dsgrid.registry.filter_registry_manager import FilterRegistryManager
+from dsgrid.registry.registry_database import RegistryDatabase
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.spark import get_unique_values
 
 
@@ -30,8 +31,9 @@ TEST_PROJECT_REPO = TEST_PROJECT_PATH / "test_aeo"
 
 @pytest.fixture(scope="module")
 def make_test_project_dir(tmp_path_factory):
-    database_name = "tmp-dsgrid"
-    conn = DatabaseConnection(database=database_name)
+    base_dir = tmp_path_factory.mktemp("registry")
+    url = f"sqlite:///{base_dir}/registry.db"
+    conn = DatabaseConnection(url=url)
     RegistryDatabase.delete(conn)
     tmpdir = _make_project_dir(TEST_PROJECT_REPO)
     src_dir = tmpdir / "dsgrid_project"
@@ -138,13 +140,11 @@ def _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset):
     )
 
 
-def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module, cached_registry):
+def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module):
     src_dir, _, conn = make_test_project_dir
-    cached_registry_conn = cached_registry
     dataset_id = "aeo2021_ref_com_energy_end_use_growth_factors"
     geography_record = "mountain"
     filter_config = {
-        "name": cached_registry_conn.database,
         "projects": [],
         "datasets": [
             {

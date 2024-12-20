@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Optional
 
 from dsgrid.dataset.models import (
     TableFormatType,
@@ -29,11 +30,11 @@ class QueryContext:
         self._scratch_dir_context = scratch_dir_context
 
     @property
-    def metadata(self):
+    def metadata(self) -> DatasetMetadataModel:
         return self._metadata
 
     @metadata.setter
-    def metadata(self, val):
+    def metadata(self, val: DatasetMetadataModel):
         self._metadata = val
 
     @property
@@ -101,15 +102,29 @@ class QueryContext:
     ) -> set[str]:
         return self._get_metadata(dataset_id).dimensions.get_column_names(dimension_type)
 
+    def get_all_dimension_column_names(
+        self, dataset_id: Optional[str] = None, exclude: Optional[set[DimensionType]] = None
+    ):
+        names = set()
+        for dimension_type in DimensionType:
+            if exclude is not None and dimension_type in exclude:
+                continue
+            names.update(self.get_dimension_column_names(dimension_type, dataset_id=dataset_id))
+        return names
+
     def get_dimension_query_names(
         self, dimension_type: DimensionType, dataset_id=None
     ) -> set[str]:
         return self._get_metadata(dataset_id).dimensions.get_dimension_query_names(dimension_type)
 
-    def get_all_dimension_query_names(self):
+    def get_all_dimension_query_names(
+        self, dataset_id: Optional[str] = None, exclude: Optional[set[DimensionType]] = None
+    ):
         names = set()
         for dimension_type in DimensionType:
-            names.update(self._metadata.dimensions.get_dimension_query_names(dimension_type))
+            if exclude is not None and dimension_type in exclude:
+                continue
+            names.update(self.get_dimension_query_names(dimension_type, dataset_id=dataset_id))
         return names
 
     def set_dataset_metadata(

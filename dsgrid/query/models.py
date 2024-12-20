@@ -1,6 +1,6 @@
 import abc
 from enum import Enum
-from typing import Any, Optional, Union, Literal, List, TypeAlias
+from typing import Any, Optional, Union, Literal, TypeAlias
 
 from pydantic import field_validator, model_validator, Field, field_serializer, ValidationInfo
 from semver import VersionInfo
@@ -41,7 +41,7 @@ DimensionFilters: TypeAlias = Annotated[
 class FilteredDatasetModel(DSGBaseModel):
     """Filters to apply to a dataset"""
 
-    dataset_id: Annotated[str, Field(description="Dataset ID")]
+    dataset_id: str = Field(description="Dataset ID")
     filters: list[DimensionFilters]
 
 
@@ -49,11 +49,10 @@ class ColumnModel(DSGBaseModel):
     """Defines one column in a SQL aggregation statement."""
 
     dimension_query_name: str
-    function: Annotated[
-        Optional[Any],
-        Field(None, description="Function or name of function in pyspark.sql.functions."),
-    ]
-    alias: Annotated[Optional[str], Field(None, description="Name of the resulting column.")]
+    function: Any = Field(
+        default=None, description="Function or name of function in pyspark.sql.functions."
+    )
+    alias: Optional[str] = Field(default=None, description="Name of the resulting column.")
 
     @field_validator("function")
     @classmethod
@@ -131,16 +130,11 @@ class DimensionQueryNamesModel(DSGBaseModel):
 class AggregationModel(DSGBaseModel):
     """Aggregate on one or more dimensions."""
 
-    aggregation_function: Annotated[
-        Any,
-        Field(
-            None,
-            description="Must be a function name in pyspark.sql.functions",
-        ),
-    ]
-    dimensions: Annotated[
-        DimensionQueryNamesModel, Field(description="Dimensions on which to aggregate")
-    ]
+    aggregation_function: Any = Field(
+        default=None,
+        description="Must be a function name in pyspark.sql.functions",
+    )
+    dimensions: DimensionQueryNamesModel = Field(description="Dimensions on which to aggregate")
 
     @field_validator("aggregation_function")
     @classmethod
@@ -194,14 +188,11 @@ class DimensionMetadataModel(DSGBaseModel):
     """Defines the columns in a table for a dimension."""
 
     dimension_query_name: str
-    column_names: Annotated[
-        list[str],
-        Field(
-            description="Columns associated with this dimension. Could be a dimension query name, "
-            "the string-ified DimensionType, multiple strings as can happen with time, or dimension "
-            "record IDS if the dimension is pivoted."
-        ),
-    ]
+    column_names: list[str] = Field(
+        description="Columns associated with this dimension. Could be a dimension query name, "
+        "the string-ified DimensionType, multiple strings as can happen with time, or dimension "
+        "record IDS if the dimension is pivoted."
+    )
 
     def make_key(self):
         return "__".join([self.dimension_query_name] + self.column_names)
@@ -285,13 +276,10 @@ class SparkConfByDataset(DSGBaseModel):
 class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
     """Parameters in a project query that only apply to datasets"""
 
-    dimension_filters: Annotated[
-        list[DimensionFilters],
-        Field(
-            description="Filters to apply to all datasets",
-            default=[],
-        ),
-    ]
+    dimension_filters: list[DimensionFilters] = Field(
+        description="Filters to apply to all datasets",
+        default=[],
+    )
 
 
 class DatasetType(str, Enum):
@@ -323,8 +311,8 @@ class DatasetBaseModel(DSGBaseModel, abc.ABC):
 class StandaloneDatasetModel(DatasetBaseModel):
     """A dataset with energy use data."""
 
-    dataset_type: Annotated[Literal[DatasetType.STANDALONE], Field(default=DatasetType.STANDALONE)]
-    dataset_id: Annotated[str, Field(description="Dataset identifier")]
+    dataset_type: Literal[DatasetType.STANDALONE] = Field(default=DatasetType.STANDALONE)
+    dataset_id: str = Field(description="Dataset identifier")
 
     def get_dataset_id(self) -> str:
         return self.dataset_id
@@ -333,61 +321,47 @@ class StandaloneDatasetModel(DatasetBaseModel):
 class ProjectionDatasetModel(DatasetBaseModel):
     """A dataset with growth rates that can be applied to a standalone dataset."""
 
-    dataset_type: Annotated[
-        Literal[DatasetType.PROJECTION],
-        Field(default=DatasetType.PROJECTION),
-    ]
-    dataset_id: Annotated[str, Field(description="Identifier for the resulting dataset")]
-    initial_value_dataset_id: Annotated[str, Field(description="Principal dataset identifier")]
-    growth_rate_dataset_id: Annotated[
-        str, Field(description="Growth rate dataset identifier to apply to the principal dataset")
-    ]
-    construction_method: Annotated[
-        DatasetConstructionMethod,
-        Field(
-            default=DatasetConstructionMethod.EXPONENTIAL_GROWTH,
-            description="Specifier for the code that applies the growth rate to the principal dataset",
-        ),
-    ]
-    base_year: Annotated[
-        Optional[int],
-        Field(
-            description="Base year of the dataset to use in growth rate application. Must be a year "
-            "defined in the principal dataset's model year dimension. If None, there must be only "
-            "one model year in that dimension and it will be used.",
-            default=None,
-        ),
-    ]
+    dataset_type: Literal[DatasetType.PROJECTION] = Field(default=DatasetType.PROJECTION)
+    dataset_id: str = Field(description="Identifier for the resulting dataset")
+    initial_value_dataset_id: str = Field(description="Principal dataset identifier")
+    growth_rate_dataset_id: str = Field(
+        description="Growth rate dataset identifier to apply to the principal dataset"
+    )
+    construction_method: DatasetConstructionMethod = Field(
+        default=DatasetConstructionMethod.EXPONENTIAL_GROWTH,
+        description="Specifier for the code that applies the growth rate to the principal dataset",
+    )
+    base_year: Optional[int] = Field(
+        description="Base year of the dataset to use in growth rate application. Must be a year "
+        "defined in the principal dataset's model year dimension. If None, there must be only "
+        "one model year in that dimension and it will be used.",
+        default=None,
+    )
 
     def get_dataset_id(self) -> str:
         return self.initial_value_dataset_id
 
 
+AbstractDatasetModel = Annotated[
+    Union[StandaloneDatasetModel, ProjectionDatasetModel], Field(discriminator="dataset_type")
+]
+
+
 class DatasetModel(DSGBaseModel):
     """Specifies the datasets to use in a project query."""
 
-    dataset_id: Annotated[str, Field(description="Identifier for the resulting dataset")]
-    source_datasets: Annotated[
-        List[Union[StandaloneDatasetModel, ProjectionDatasetModel]],
-        Field(
-            description="Datasets from which to read. Each must be of type DatasetBaseModel.",
-            discriminator="dataset_type",
-        ),
-    ]
-    expression: Annotated[
-        str | None,
-        Field(
-            description="Expression to combine datasets. Default is to take a union of all datasets.",
-            default=None,
-        ),
-    ]
-    params: Annotated[
-        ProjectQueryDatasetParamsModel,
-        Field(
-            description="Parameters affecting datasets. Used for caching intermediate tables.",
-            default=ProjectQueryDatasetParamsModel(),
-        ),
-    ]
+    dataset_id: str = Field(description="Identifier for the resulting dataset")
+    source_datasets: list[AbstractDatasetModel] = Field(
+        description="Datasets from which to read. Each must be of type DatasetBaseModel.",
+    )
+    expression: Optional[str] = Field(
+        description="Expression to combine datasets. Default is to take a union of all datasets.",
+        default=None,
+    )
+    params: ProjectQueryDatasetParamsModel = Field(
+        description="Parameters affecting datasets. Used for caching intermediate tables.",
+        default=ProjectQueryDatasetParamsModel(),
+    )
 
     @field_validator("expression")
     @classmethod
@@ -403,28 +377,22 @@ class DatasetModel(DSGBaseModel):
 class ProjectQueryParamsModel(CacheableQueryBaseModel):
     """Defines how to transform a project into a CompositeDataset"""
 
-    project_id: Annotated[str, Field(description="Project ID for query")]
-    dataset: Annotated[DatasetModel, Field(description="Definition of the dataset to create.")]
-    excluded_dataset_ids: Annotated[
-        list[str], Field(description="Datasets to exclude from query", default=[])
-    ]
+    project_id: str = Field(description="Project ID for query")
+    dataset: DatasetModel = Field(description="Definition of the dataset to create.")
+    excluded_dataset_ids: list[str] = Field(
+        description="Datasets to exclude from query", default=[]
+    )
     # TODO #203: default needs to change
-    include_dsgrid_dataset_components: Annotated[bool, Field(description="", default=False)]
-    version: Annotated[
-        Optional[str],
-        Field(
-            None,
-            description="Version of project or dataset on which the query is based. "
-            "Should not be set by the user",
-        ),
-    ]
-    spark_conf_per_dataset: Annotated[
-        list[SparkConfByDataset],
-        Field(
-            description="Apply these Spark configuration settings while a dataset is being processed.",
-            default=[],
-        ),
-    ]
+    include_dsgrid_dataset_components: bool = Field(description="", default=False)
+    version: Optional[str] = Field(
+        default=None,
+        description="Version of project or dataset on which the query is based. "
+        "Should not be set by the user",
+    )
+    spark_conf_per_dataset: list[SparkConfByDataset] = Field(
+        description="Apply these Spark configuration settings while a dataset is being processed.",
+        default=[],
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -451,80 +419,63 @@ QUERY_FORMAT_VERSION = VersionInfo.parse("0.1.0")
 class QueryBaseModel(CacheableQueryBaseModel, abc.ABC):
     """Base class for all queries"""
 
-    name: Annotated[str, Field(description="Name of query")]
+    name: str = Field(description="Name of query")
     # TODO #204: This field is not being used. Wait until development slows down.
-    version: Annotated[
-        str,
-        Field(
-            description="Version of the query structure. Changes to the major or minor version invalidate cached tables.",
-            default=str(QUERY_FORMAT_VERSION),  # TODO: str shouldn't be required
-        ),
-    ]
+    version: str = Field(
+        description="Version of the query structure. Changes to the major or minor version invalidate cached tables.",
+        default=str(QUERY_FORMAT_VERSION),  # TODO: str shouldn't be required
+    )
 
-    def serialize_cached_content(self):
-        """Return a JSON representation of the model that can be used for caching purposes along
-        with a hash that uniquely identifies it.
-        """
-        text = self.model_dump_json(exclude={"name"}, indent=2)
-        return compute_hash(text.encode()), text
+    def serialize_cached_content(self) -> dict[str, Any]:
+        """Return a JSON-able representation of the model that can be used for caching purposes."""
+        return self.model_dump(mode="json", exclude={"name"})
 
 
 class QueryResultParamsModel(CacheableQueryBaseModel):
     """Controls post-processing and storage of CompositeDatasets"""
 
-    replace_ids_with_names: Annotated[
-        bool,
-        Field(
-            description="Replace dimension record IDs with their names in result tables.",
-            default=False,
-        ),
-    ]
-    aggregations: Annotated[
-        list[AggregationModel],
-        Field(
-            description="Defines how to aggregate dimensions",
-            default=[],
-        ),
-    ]
-    reports: Annotated[
-        list[ReportInputModel],
-        Field(description="Run these pre-defined reports on the result.", default=[]),
-    ]
-    column_type: Annotated[
-        ColumnType,
-        Field(
-            description="Whether to make the result table columns dimension types. Default behavior "
-            "is to use dimension query names. In order to register a result table as a derived "
-            f"dataset, this must be set to {ColumnType.DIMENSION_TYPES.value}.",
-            default=ColumnType.DIMENSION_QUERY_NAMES,
-        ),
-    ]
+    replace_ids_with_names: bool = Field(
+        description="Replace dimension record IDs with their names in result tables.",
+        default=False,
+    )
+    aggregations: list[AggregationModel] = Field(
+        description="Defines how to aggregate dimensions",
+        default=[],
+    )
+    aggregate_each_dataset: bool = Field(
+        description="If True, aggregate each dataset before applying the expression to create one "
+        "overall dataset. This parameter must be set to True for queries that will be adding or "
+        "subtracting datasets with different dimensionality. Defaults to False, which corresponds to "
+        "the default behavior of performing one aggregation on the overall dataset. WARNING: "
+        "For a standard query that performs a union of datasets, setting this value to True could "
+        "produce rows with duplicate dimension combinations, especially if one or more "
+        "dimensions are also dropped.",
+        default=False,
+    )
+    reports: list[ReportInputModel] = Field(
+        description="Run these pre-defined reports on the result.", default=[]
+    )
+    column_type: ColumnType = Field(
+        description="Whether to make the result table columns dimension types. Default behavior "
+        "is to use dimension query names. In order to register a result table as a derived "
+        f"dataset, this must be set to {ColumnType.DIMENSION_TYPES.value}.",
+        default=ColumnType.DIMENSION_QUERY_NAMES,
+    )
     table_format: TableFormatModel = UnpivotedTableFormatModel()
-    output_format: Annotated[
-        str, Field(description="Output file format: csv or parquet", default="parquet")
-    ]
-    sort_columns: Annotated[
-        list[str],
-        Field(
-            description="Sort the results by these dimension query names.",
-            default=[],
-        ),
-    ]
-    dimension_filters: Annotated[
-        list[DimensionFilters],
-        Field(
-            description="Filters to apply to the result. Must contain columns in the result.",
-            default=[],
-        ),
-    ]
+    output_format: str = Field(description="Output file format: csv or parquet", default="parquet")
+    sort_columns: list[str] = Field(
+        description="Sort the results by these dimension query names.",
+        default=[],
+    )
+    dimension_filters: list[DimensionFilters] = Field(
+        description="Filters to apply to the result. Must contain columns in the result.",
+        default=[],
+    )
     # TODO #205: implement
-    time_zone: Annotated[
-        Optional[str],
-        Field(
-            description="Convert the results to this time zone.",
-            default=None,
-        ),
-    ]
+    time_zone: Optional[str] = Field(
+        description="Convert the results to this time zone.",
+        default=None,
+    )
 
     @model_validator(mode="after")
     def check_pivot_dimension_type(self) -> "QueryResultParamsModel":
@@ -571,24 +522,21 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
 class ProjectQueryModel(QueryBaseModel):
     """Represents a user query on a Project."""
 
-    project: Annotated[
-        ProjectQueryParamsModel,
-        Field(
-            description="Defines the datasets to use and how to transform them.",
-        ),
-    ]
-    result: Annotated[
-        QueryResultParamsModel,
-        Field(
-            default=QueryResultParamsModel(),
-            description="Controls the output results",
-        ),
-    ]
+    project: ProjectQueryParamsModel = Field(
+        description="Defines the datasets to use and how to transform them.",
+    )
+    result: QueryResultParamsModel = Field(
+        default=QueryResultParamsModel(),
+        description="Controls the output results",
+    )
 
-    def serialize_cached_content(self):
+    def serialize_cached_content(self) -> dict[str, Any]:
         # Exclude all result-oriented fields in orer to faciliate re-using queries.
-        text = self.project.model_dump_json(indent=2)
-        return compute_hash(text.encode()), text
+        exclude = {
+            "spark_conf_per_dataset",  # Doesn't change the query.
+            "version",  # We use the project major version as a separate field.
+        }
+        return self.project.model_dump(mode="json", exclude=exclude)
 
 
 class CreateCompositeDatasetQueryModel(QueryBaseModel):
@@ -596,30 +544,24 @@ class CreateCompositeDatasetQueryModel(QueryBaseModel):
     in order to retrieve dimension records and dimension mapping records.
     """
 
-    dataset_id: Annotated[str, Field(description="Composite Dataset ID for query")]
-    project: Annotated[
-        ProjectQueryParamsModel,
-        Field(description="Defines the datasets to use and how to transform them."),
-    ]
-    result: Annotated[
-        QueryResultParamsModel,
-        Field(
-            description="Controls the output results",
-            default=QueryResultParamsModel(),
-        ),
-    ]
+    dataset_id: str = Field(description="Composite Dataset ID for query")
+    project: ProjectQueryParamsModel = Field(
+        description="Defines the datasets to use and how to transform them."
+    )
+    result: QueryResultParamsModel = Field(
+        description="Controls the output results",
+        default=QueryResultParamsModel(),
+    )
 
-    def serialize_cached_content(self):
+    def serialize_cached_content(self) -> dict[str, Any]:
         # Exclude all result-oriented fields in orer to faciliate re-using queries.
-        text = self.project.model_dump_json(indent=2)
-        return compute_hash(text.encode()), text
+        return self.project.model_dump(mode="json", exclude="spark_conf_per_dataset")
 
 
 class CompositeDatasetQueryModel(QueryBaseModel):
     """Represents a user query on a dataset."""
 
-    dataset_id: Annotated[str, Field(description="Aggregated Dataset ID for query")]
-    result: Annotated[
-        QueryResultParamsModel,
-        Field(description="Controls the output results", default=QueryResultParamsModel()),
-    ]
+    dataset_id: str = Field(description="Aggregated Dataset ID for query")
+    result: QueryResultParamsModel = Field(
+        description="Controls the output results", default=QueryResultParamsModel()
+    )

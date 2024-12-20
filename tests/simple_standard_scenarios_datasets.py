@@ -4,7 +4,8 @@ from collections import defaultdict, namedtuple
 from pathlib import Path
 
 from dsgrid.config.mapping_tables import MappingTableRecordModel
-from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
+from dsgrid.registry.common import DatabaseConnection
+from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.functions import (
     cross_join,

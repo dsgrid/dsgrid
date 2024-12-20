@@ -4,25 +4,32 @@ import shutil
 import sys
 from pathlib import Path
 from tempfile import gettempdir
+from typing import Optional
 
 import pytest
+from click.testing import CliRunner
 
-from dsgrid.registry.registry_database import DatabaseConnection, RegistryDatabase
+from dsgrid.cli.dsgrid import cli as cli
+from dsgrid.cli.dsgrid_admin import cli as cli_admin
+from dsgrid.registry.common import DatabaseConnection
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.functions import get_current_time_zone, set_current_time_zone
 from dsgrid.spark.types import use_duckdb
-from dsgrid.utils.files import load_data
-from dsgrid.utils.run_command import run_command, check_run_command
+from dsgrid.registry.registry_database import RegistryDatabase
+from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import init_spark
 from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
     TEST_PROJECT_PATH,
     TEST_PROJECT_REPO,
-    TEST_REGISTRY_DATABASE,
-    TEST_REGISTRY_PATH,
+    TEST_REGISTRY_BASE_PATH,
+    TEST_REGISTRY_DATA_PATH,
     TEST_STANDARD_SCENARIOS_PROJECT_REPO,
     TEST_EFS_REGISTRATION_FILE,
+    CACHED_TEST_REGISTRY_DB,
 )
+from dsgrid.tests.make_us_data_registry import make_test_data_registry
 
 
 def pytest_sessionstart(session):
@@ -43,35 +50,79 @@ def pytest_sessionstart(session):
 
 @pytest.fixture(scope="session")
 def cached_registry():
-    """Creates a shared registry that is is only rebuilt after a new commit."""
-    data = load_data(TEST_EFS_REGISTRATION_FILE)
-    assert data["data_path"] == str(TEST_REGISTRY_PATH)
-    conn = DatabaseConnection(**data["conn"])
-    assert conn.database == TEST_REGISTRY_DATABASE
-    commit_file = TEST_REGISTRY_PATH / "commit.txt"
+    """Creates a shared registry that is is only rebuilt after a new commit.
+    Tests must not make any changes to this registry.
+    Refer to :func:`~mutable_cached_registry` if that is needed.
+    """
+    commit_file = TEST_REGISTRY_BASE_PATH / "commit.txt"
     latest_commit = _get_latest_commit()
-
-    if (
-        TEST_REGISTRY_PATH.exists()
-        and commit_file.exists()
-        and commit_file.read_text().strip() == latest_commit
-    ):
-        print(f"Use existing test registry at {TEST_REGISTRY_PATH}.")
+    conn = DatabaseConnection(url=CACHED_TEST_REGISTRY_DB)
+    if commit_file.exists() and commit_file.read_text().strip() == latest_commit:
+        print(f"Use existing test registry at {TEST_REGISTRY_BASE_PATH}.")
     else:
-        if TEST_REGISTRY_PATH.exists():
-            shutil.rmtree(TEST_REGISTRY_PATH)
-        ret = run_command(f"python dsgrid/tests/register.py {TEST_EFS_REGISTRATION_FILE}")
-        if ret == 0:
-            print("make script returned 0")
+        if TEST_REGISTRY_BASE_PATH.exists():
+            shutil.rmtree(TEST_REGISTRY_BASE_PATH)
+        TEST_REGISTRY_BASE_PATH.mkdir()
+        runner = CliRunner(mix_stderr=False)
+        result = runner.invoke(
+            cli_admin,
+            [
+                "--offline",
+                "create-registry",
+                conn.url,
+                "--data-path",
+                str(TEST_REGISTRY_DATA_PATH),
+                "--overwrite",
+            ],
+        )
+        assert result.exit_code == 0
+        result = runner.invoke(
+            cli,
+            [
+                "--url",
+                conn.url,
+                "--offline",
+                "registry",
+                "bulk-register",
+                str(TEST_EFS_REGISTRATION_FILE),
+            ],
+        )
+        if result.exit_code == 0:
             commit_file.write_text(latest_commit + "\n")
-        elif TEST_REGISTRY_PATH.exists():
-            print("make script returned non-zero:", ret)
+        elif TEST_REGISTRY_DATA_PATH.exists():
+            print("make script returned non-zero:", result.exit_code)
             # Delete it because it is invalid.
-            shutil.rmtree(TEST_REGISTRY_PATH)
+            shutil.rmtree(TEST_REGISTRY_DATA_PATH)
             RegistryDatabase.delete(conn)
             sys.exit(1)
 
     yield conn
+
+
+@pytest.fixture(scope="session")
+def src_tmp_registry_db(tmp_path_factory):
+    tmp_path = tmp_path_factory.mktemp("tmpdir")
+    project_dir = _make_project_dir(TEST_PROJECT_REPO, base_dir=tmp_path) / "dsgrid_project"
+    conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/tmp_reg.db")
+    RegistryDatabase.delete(conn)
+    registry_dir = tmp_path_factory.mktemp("registry_data")
+    make_test_data_registry(
+        registry_dir, project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_url=conn.url
+    )
+    yield conn, project_dir
+    RegistryDatabase.delete(conn)
+
+
+@pytest.fixture()
+def mutable_cached_registry(src_tmp_registry_db, tmp_path) -> tuple[RegistryManager, Path]:
+    """Creates a copy of the cached_registry. Tests may make changes to the registry."""
+    src_conn, src_project_dir = src_tmp_registry_db
+    dst_conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/dst_registry.db")
+    tmp_project_dir = tmp_path / "tmp_project_dir"
+    shutil.copytree(src_project_dir, tmp_project_dir)
+    RegistryManager.copy(src_conn, dst_conn, tmp_path / "mutable_registry_data")
+    mgr = RegistryManager.load(dst_conn)
+    return mgr, tmp_project_dir
 
 
 def _get_latest_commit():
@@ -134,21 +185,23 @@ def make_test_data_dir(tmp_path):
     yield dst_path
 
 
-def _make_project_dir(project):
-    tmpdir = Path(gettempdir()) / "test_project"
+def _make_project_dir(project, base_dir: Optional[Path] = None):
+    tmpdir_base = base_dir or Path(gettempdir())
+    tmpdir = tmpdir_base / "test_project"
     if os.path.exists(tmpdir):
         shutil.rmtree(tmpdir)
-    os.mkdir(tmpdir)
+    tmpdir.mkdir(parents=True)
     shutil.copytree(project / "dsgrid_project", tmpdir / "dsgrid_project")
     return tmpdir
 
 
 @pytest.fixture
 def tmp_registry_db(make_test_project_dir, tmp_path):
-    database_name = "tmp-dsgrid"
-    conn = DatabaseConnection(database=database_name)
+    conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/registry.db")
     RegistryDatabase.delete(conn)
-    yield make_test_project_dir, tmp_path, database_name
+    registry_path = tmp_path / "registry"
+    registry_path.mkdir()
+    yield make_test_project_dir, registry_path, conn.url
     RegistryDatabase.delete(conn)
 
 

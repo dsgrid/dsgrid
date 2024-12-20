@@ -2,13 +2,14 @@ import abc
 import logging
 import math
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
-from dsgrid.common import DEFAULT_DB_PASSWORD, VALUE_COLUMN
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.cli.dsgrid import cli
 from dsgrid.dataset.models import (
     PivotedTableFormatModel,
@@ -50,17 +51,23 @@ from dsgrid.spark.functions import (
     aggregate_single_value,
 )
 from dsgrid.spark.types import (
-    SparkSession,
-    F,
+    DataFrame,
     DoubleType,
-    StringType,
+    F,
+    SparkSession,
     StructField,
+    StringType,
     StructType,
     use_duckdb,
 )
-from dsgrid.tests.common import TEST_PROJECT_PATH
+from dsgrid.tests.common import (
+    CACHED_TEST_REGISTRY_DB,
+    SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
+    TEST_PROJECT_PATH,
+)
 from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
+from dsgrid.utils.spark import custom_spark_conf, get_spark_session
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
@@ -79,7 +86,10 @@ logger = logging.getLogger(__name__)
 @pytest.fixture(scope="module")
 def la_expected_electricity_hour_16(tmp_path_factory):
     output_dir = tmp_path_factory.mktemp("diurnal_queries")
-    project = get_project("simple-standard-scenarios", "dsgrid_conus_2022")
+    project = get_project(
+        DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB),
+        "dsgrid_conus_2022",
+    )
     query = ProjectQueryModel(
         name="projected_dg_conus_2022",
         project=ProjectQueryParamsModel(
@@ -108,12 +118,14 @@ def la_expected_electricity_hour_16(tmp_path_factory):
         .groupBy(*gcols)
         .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
     )
-    expected = (
-        df.groupBy("county", F.hour("time_est").alias("hour"))
-        .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
-        .filter("hour == 16")
-        .collect()[0][VALUE_COLUMN]
-    )
+    tz = project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
+    with custom_spark_conf({"spark.sql.session.timeZone": tz.tz_name}):
+        expected = (
+            df.groupBy("county", F.hour("time_est").alias("hour"))
+            .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
+            .filter("hour == 16")
+            .collect()[0][VALUE_COLUMN]
+        )
     yield {
         "la_electricity_hour_16": expected,
     }
@@ -157,19 +169,27 @@ def test_total_electricity_use_with_filter():
 @pytest.mark.parametrize(
     "column_inputs",
     [
-        (ColumnType.DIMENSION_QUERY_NAMES, ["state", "reeds_pca", "census_region"], True),
-        (ColumnType.DIMENSION_TYPES, ["reeds_pca"], True),
-        (ColumnType.DIMENSION_TYPES, ["state"], True),
-        (ColumnType.DIMENSION_TYPES, ["state", "reeds_pca", "census_region"], False),
+        (ColumnType.DIMENSION_QUERY_NAMES, ["state", "reeds_pca", "census_region"], True, True),
+        (ColumnType.DIMENSION_TYPES, ["reeds_pca"], False, True),
+        (ColumnType.DIMENSION_TYPES, ["state"], False, True),
+        (ColumnType.DIMENSION_TYPES, ["state", "reeds_pca", "census_region"], True, False),
     ],
 )
 def test_total_electricity_use_by_state_and_pca(column_inputs):
-    column_type, columns, is_valid = column_inputs
+    column_type, columns, aggregate_each_dataset, is_valid = column_inputs
     if is_valid:
-        run_query_test(QueryTestElectricityUseByStateAndPCA, column_type, columns)
+        run_query_test(
+            QueryTestElectricityUseByStateAndPCA, column_type, columns, aggregate_each_dataset
+        )
     else:
         with pytest.raises(ValueError):
-            run_query_test(QueryTestElectricityUseByStateAndPCA, column_type, columns)
+            run_query_test(
+                QueryTestElectricityUseByStateAndPCA, column_type, columns, aggregate_each_dataset
+            )
+
+
+def test_annual_electricity_by_state():
+    run_query_test(QueryTestAnnualElectricityUseByState)
 
 
 def test_diurnal_electricity_use_by_county_chained(la_expected_electricity_hour_16):
@@ -274,12 +294,15 @@ def test_invalid_aggregation_subset_dimension():
 
 def test_create_composite_dataset_query(tmp_path):
     output_dir = tmp_path / "queries"
-    project = get_project("simple-standard-scenarios", "dsgrid_conus_2022")
+    project = get_project(
+        DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB),
+        "dsgrid_conus_2022",
+    )
     query = QueryTestElectricityValuesCompositeDataset(
         REGISTRY_PATH, project, output_dir=output_dir
     )
     CompositeDatasetQuerySubmitter(project, output_dir).create_dataset(query.make_query())
-    query.validate()
+    assert query.validate()
 
     query2 = QueryTestElectricityValuesCompositeDatasetAgg(
         REGISTRY_PATH, project, output_dir=output_dir, geography="county"
@@ -298,17 +321,12 @@ def test_create_composite_dataset_query(tmp_path):
 def test_query_cli_create_validate(tmp_path):
     filename = tmp_path / "query.json5"
     cmd = [
-        "--username",
-        "root",
-        "--password",
-        DEFAULT_DB_PASSWORD,
         "--offline",
-        "--database-name",
-        "simple-standard-scenarios",
+        "--url",
+        SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
         "query",
         "project",
         "create",
-        "-d",
         "-r",
         "-f",
         str(filename),
@@ -360,13 +378,9 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
         dst = tmp_path / filename.name
         dump_data(data, dst)
         cmd = [
-            "--username",
-            conn.username,
-            "--password",
-            conn.password,
             "--offline",
-            "--database-name",
-            conn.database,
+            "--url",
+            conn.url,
             "query",
             "project",
             "run",
@@ -428,7 +442,10 @@ def test_dimension_query_names_model():
 
 
 def test_transform_unpivoted_dataset(tmp_path):
-    project = get_project(QueryTestBase.get_database_name(), QueryTestBase.get_project_id())
+    project = get_project(
+        DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB),
+        "dsgrid_conus_2022",
+    )
     path = project.transform_dataset("comstock_conus_2022_projected", tmp_path)
     df = read_parquet(path)
     actual = aggregate_single_value(
@@ -443,7 +460,10 @@ def test_transform_unpivoted_dataset(tmp_path):
 
 
 def test_transform_pivoted_dataset(tmp_path):
-    project = get_project(QueryTestBase.get_database_name(), QueryTestBase.get_project_id())
+    project = get_project(
+        DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB),
+        "dsgrid_conus_2022",
+    )
     path = project.transform_dataset("resstock_conus_2022_projected", tmp_path)
     df = read_parquet(path).filter("geography == '06037'")
     cooling = aggregate_single_value(
@@ -466,14 +486,13 @@ def test_transform_pivoted_dataset(tmp_path):
 _projects = {}
 
 
-def get_project(database, project_id):
+def get_project(conn: DatabaseConnection, project_id: str):
     """Load a Project and cache it for future calls.
     Loading is slow and the Project isn't being changed by these tests.
     """
-    key = (database, project_id)
+    key = (conn.url, project_id)
     if key in _projects:
         return _projects[key]
-    conn = DatabaseConnection(database=database)
     mgr = RegistryManager.load(
         conn,
         offline_mode=True,
@@ -496,7 +515,7 @@ def run_query_test(test_query_cls, *args, expected_values=None):
     if output_dir.exists():
         shutil.rmtree(output_dir)
 
-    project = get_project(test_query_cls.get_database_name(), test_query_cls.get_project_id())
+    project = get_project(test_query_cls.get_db_connection(), test_query_cls.get_project_id())
     try:
         query = test_query_cls(*args, REGISTRY_PATH, project, output_dir=output_dir)
         for load_cached_table in (False, True):
@@ -507,6 +526,8 @@ def run_query_test(test_query_cls, *args, expected_values=None):
                 force=True,
             )
             assert query.validate(expected_values=expected_values)
+            metadata_file = output_dir / query.name / "metadata.json"
+            subprocess.run(["python", "scripts/table_metadata.py", str(metadata_file)], check=True)
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -515,7 +536,12 @@ def run_query_test(test_query_cls, *args, expected_values=None):
 class QueryTestBase(abc.ABC):
     """Base class for all test queries"""
 
-    def __init__(self, registry_path, project, output_dir=Path("queries")):
+    def __init__(
+        self,
+        registry_path,
+        project,
+        output_dir=Path("queries"),
+    ):
         self._registry_path = Path(registry_path)
         self._project = project
         self._output_dir = Path(output_dir)
@@ -523,15 +549,15 @@ class QueryTestBase(abc.ABC):
         self._cached_stats = None
 
     @staticmethod
-    def get_database_name():
-        return "simple-standard-scenarios"
+    def get_db_connection() -> DatabaseConnection:
+        return DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB)
 
     @staticmethod
-    def get_project_id():
+    def get_project_id() -> str:
         return "dsgrid_conus_2022"
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return the name of the query.
 
         Returns
@@ -1047,10 +1073,18 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
 class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
     NAME = "total_electricity_use_by_state_and_pca"
 
-    def __init__(self, column_type: ColumnType, geography_columns, *args, **kwargs):
+    def __init__(
+        self,
+        column_type: ColumnType,
+        geography_columns: list[str],
+        aggregate_each_dataset: bool,
+        *args,
+        **kwargs,
+    ):
         super().__init__(*args, **kwargs)
         self._column_type = column_type
         self._geography_columns = geography_columns
+        self._aggregate_each_dataset = aggregate_each_dataset
 
     def make_query(self):
         self._model = ProjectQueryModel(
@@ -1069,6 +1103,7 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
             ),
             result=QueryResultParamsModel(
                 column_type=self._column_type,
+                aggregate_each_dataset=self._aggregate_each_dataset,
                 aggregations=[
                     AggregationModel(
                         dimensions=DimensionQueryNamesModel(
@@ -1103,6 +1138,68 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                     assert column.dimension_query_name not in df.columns
             case _:
                 assert False, f"Bug: add support for {self._column_type}"
+        return True
+
+
+class QueryTestAnnualElectricityUseByState(QueryTestBase):
+    NAME = "annual_electricity_use_by_state"
+
+    def make_query(self):
+        self._model = ProjectQueryModel(
+            name=self.NAME,
+            project=ProjectQueryParamsModel(
+                project_id=self.get_project_id(),
+                include_dsgrid_dataset_components=False,
+                dataset=DatasetModel(
+                    dataset_id="projected_dg_conus_2022",
+                    source_datasets=[
+                        StandaloneDatasetModel(dataset_id="comstock_conus_2022_projected"),
+                        StandaloneDatasetModel(dataset_id="resstock_conus_2022_projected"),
+                    ],
+                ),
+            ),
+            result=QueryResultParamsModel(
+                aggregations=[
+                    AggregationModel(
+                        dimensions=DimensionQueryNamesModel(
+                            geography=["state"],
+                            metric=["end_uses_by_fuel_type"],
+                            model_year=["model_year"],
+                            scenario=["scenario"],
+                            sector=["sector"],
+                            subsector=["subsector"],
+                            time=[
+                                ColumnModel(
+                                    dimension_query_name="time_est", function="year", alias="year"
+                                )
+                            ],
+                            weather_year=["weather_2012"],
+                        ),
+                        aggregation_function="sum",
+                    ),
+                ],
+                sort_columns=["state"],
+                output_format="csv",
+                table_format=UnpivotedTableFormatModel(),
+            ),
+        )
+        return self._model
+
+    def validate(self, expected_values):
+        filename = self.output_dir / self.name / "table.csv"
+        spark = get_spark_session()
+        df = spark.read.csv(str(filename), header=True, inferSchema=True)
+        years = df.select("year").distinct().collect()
+        assert len(years) == 1
+        assert years[0].year == 2012
+        validate_electricity_use_by_state(
+            "sum",
+            df.groupBy("state", "end_uses_by_fuel_type", "year").agg(
+                F.sum(VALUE_COLUMN).alias(VALUE_COLUMN)
+            ),
+            self.get_raw_stats(),
+            "comstock_resstock",
+        )
         return True
 
 
@@ -1399,8 +1496,8 @@ class QueryTestUnitMapping(QueryTestBase):
     NAME = "test_efs_comstock_query"
 
     @staticmethod
-    def get_database_name():
-        return "cached-test-dsgrid"
+    def get_db_connection() -> DatabaseConnection:
+        return DatabaseConnection(url=CACHED_TEST_REGISTRY_DB)
 
     @staticmethod
     def get_project_id():
@@ -1429,7 +1526,7 @@ class QueryTestUnitMapping(QueryTestBase):
     def validate(self, expected_values=None):
         filename = self.output_dir / self.name / "table.parquet"
         df = read_parquet(filename)
-        project = get_project(self.get_database_name(), self.get_project_id())
+        project = get_project(self.get_db_connection(), self.get_project_id())
         project.load_dataset("test_efs_comstock")
         dataset = project.get_dataset("test_efs_comstock")
         ld = dataset._handler._load_data
@@ -1484,8 +1581,11 @@ def validate_electricity_use_by_county(
         assert math.isclose(actual, expected)
 
 
-def validate_electricity_use_by_state(op, results_path, raw_stats, datasets):
-    results = read_parquet(results_path)
+def validate_electricity_use_by_state(op, results_path: DataFrame | Path, raw_stats, datasets):
+    if isinstance(results_path, DataFrame):
+        results = results_path
+    else:
+        results = read_parquet(results_path)
     if op == "sum":
         exp_ca = get_expected_ca_sum_electricity(raw_stats, datasets)
         exp_ny = get_expected_ny_sum_electricity(raw_stats, datasets)
@@ -1493,6 +1593,7 @@ def validate_electricity_use_by_state(op, results_path, raw_stats, datasets):
         assert op == "max", op
         exp_ca = get_expected_ca_max_electricity(raw_stats, datasets)
         exp_ny = get_expected_ny_max_electricity(raw_stats, datasets)
+
     col = "end_uses_by_fuel_type"
     actual_ca = results.filter(f"state == 'CA' and {col} == 'electricity_end_uses'").collect()[0][
         VALUE_COLUMN
@@ -1541,7 +1642,10 @@ def get_expected_ny_sum_electricity(raw_stats, datasets):
 
 
 def calc_expected_eia_861_ca_res_load_value():
-    project = get_project("simple-standard-scenarios", "dsgrid_conus_2022")
+    project = get_project(
+        DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB),
+        "dsgrid_conus_2022",
+    )
     dataset_id = dataset_id = "eia_861_annual_energy_use_state_sector"
     project.load_dataset(dataset_id)
     mapping_id = None
@@ -1597,8 +1701,7 @@ def run_query(
         load_cached_table=load_cached_table,
         force=True,
     )
-    result = query.validate()
-    print(f"Result of query {query.name} = {result}")
+    assert query.validate()
 
 
 def run_composite_dataset(
@@ -1610,7 +1713,7 @@ def run_composite_dataset(
     setup_logging(
         "dsgrid", "query.log", console_level=logging.INFO, file_level=logging.INFO, mode="w"
     )
-    conn = DatabaseConnection(database="simple_standard_scenarios")
+    conn = DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB)
     mgr = RegistryManager.load(
         conn,
         offline_mode=True,
@@ -1624,19 +1727,16 @@ def run_composite_dataset(
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
     )
-    result = query.validate()
-    print(f"Result of query {query.name} = {result}")
+    assert query.validate()
 
     query2 = QueryTestElectricityValuesCompositeDatasetAgg(
         registry_path, project, output_dir=output_dir, geography="county"
     )
     CompositeDatasetQuerySubmitter(project, output_dir).submit(query2.make_query())
-    result = query2.validate()
-    print(f"Result of query {query2.name} = {result}")
+    assert query2.validate()
 
     query3 = QueryTestElectricityValuesCompositeDatasetAgg(
         registry_path, project, output_dir=output_dir, geography="state"
     )
     CompositeDatasetQuerySubmitter(project, output_dir).submit(query3.make_query())
-    result = query3.validate()
-    print(f"Result of query {query3.name} = {result}")
+    assert query3.validate()

@@ -2,8 +2,11 @@
 
 import getpass
 import logging
+import shutil
 import sys
 from pathlib import Path
+from typing import Optional
+from uuid import uuid4
 
 import rich_click as click
 from semver import VersionInfo
@@ -11,9 +14,16 @@ from semver import VersionInfo
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.registry.common import VersionUpdateType
-from dsgrid.registry.registry_database import DatabaseConnection
+from dsgrid.config.registration_models import RegistrationModel, RegistrationJournal
+from dsgrid.registry.common import DatabaseConnection, VersionUpdateType
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.id_remappings import (
+    map_dimension_ids_to_names,
+    map_dimension_names_to_ids,
+    map_dimension_mapping_names_to_ids,
+    replace_dimension_mapping_names_with_current_ids,
+    replace_dimension_names_with_current_ids,
+)
 from dsgrid.utils.filters import ACCEPTED_OPS
 
 
@@ -59,11 +69,11 @@ Click Group Definitions
 @click.pass_context
 def registry(ctx, remote_path):
     """Manage a registry."""
-    conn = DatabaseConnection.from_url(
-        get_value_from_context(ctx, "url"),
-        database=get_value_from_context(ctx, "database_name"),
-        username=get_value_from_context(ctx, "username"),
-        password=get_value_from_context(ctx, "password"),
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
+        # database=get_value_from_context(ctx, "database_name"),
+        # username=get_value_from_context(ctx, "username"),
+        # password=get_value_from_context(ctx, "password"),
     )
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
     no_prompts = ctx.parent.params["no_prompts"]
@@ -78,25 +88,25 @@ def registry(ctx, remote_path):
 
 @click.group()
 @click.pass_obj
-def dimensions(registry_manager):
+def dimensions(registry_manager: RegistryManager):
     """Dimension subcommands"""
 
 
 @click.group()
 @click.pass_obj
-def dimension_mappings(registry_manager):
+def dimension_mappings(registry_manager: RegistryManager):
     """Dimension mapping subcommands"""
 
 
 @click.group()
 @click.pass_obj
-def projects(registry_manager):
+def projects(registry_manager: RegistryManager):
     """Project subcommands"""
 
 
 @click.group()
 @click.pass_obj
-def datasets(registry_manager):
+def datasets(registry_manager: RegistryManager):
     """Dataset subcommands"""
 
 
@@ -119,18 +129,24 @@ Dimension Commands
 """
 
 
-@click.command(name="list")
+_list_dimensions_epilog = """
+Examples:\n
+$ dsgrid registry dimensions list\n
+$ dsgrid registry dimensions list -f "Type == sector"\n
+$ dsgrid registry dimensions list -f "Submitter == username"\n
+"""
+
+
+@click.command(name="list", epilog=_list_dimensions_epilog)
 @click.option(
     "-f",
     "--filter",
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value',
-    accept multiple flags\b\n
+    Filter table with a case-insensitive expression in the format 'column operation value',
+    accepts multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n
-       -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
 @click.pass_obj
@@ -139,7 +155,13 @@ def list_dimensions(registry_manager, filter):
     registry_manager.dimension_manager.show(filters=filter)
 
 
-@click.command(name="register")
+_register_dimensions_epilog = """
+Examples:\n
+$ dsgrid registry dimensions register -l "Register dimensions for my-project" dimensions.json5\n
+"""
+
+
+@click.command(name="register", epilog=_register_dimensions_epilog)
 @click.argument("dimension-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-l",
@@ -149,18 +171,29 @@ def list_dimensions(registry_manager, filter):
 )
 @click.pass_obj
 @click.pass_context
-def register_dimensions(ctx, registry_manager, dimension_config_file, log_message):
-    """Register new dimensions with the dsgrid repository."""
+def register_dimensions(
+    ctx, registry_manager: RegistryManager, dimension_config_file: Path, log_message: str
+):
+    """Register new dimensions with the dsgrid repository. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
+    https://dsgrid.github.io/dsgrid/reference/data_models/dimension.html#dsgrid.config.dimensions.DimensionsConfigModel
+    """
     manager = registry_manager.dimension_manager
     submitter = getpass.getuser()
     res = handle_dsgrid_exception(
         ctx, manager.register, dimension_config_file, submitter, log_message
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command(name="dump")
+_dump_dimension_epilog = """
+Examples:\n
+$ dsgrid registry dimensions dump 17565829\n
+"""
+
+
+@click.command(name="dump", epilog=_dump_dimension_epilog)
 @click.argument("dimension-id")
 @click.option(
     "-v",
@@ -191,10 +224,16 @@ def dump_dimension(ctx, registry_manager, dimension_id, version, directory, forc
         ctx, manager.dump, dimension_id, Path(directory), version=version, force=force
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command(name="update")
+_update_dimension_epilog = """
+Examples:\n
+$ dsgrid registry dimensions update -d 17565829 -l "Update county dimension" -u major -v 1.0.0 dimension.json5\n
+"""
+
+
+@click.command(name="update", epilog=_update_dimension_epilog)
 @click.argument("dimension-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-d",
@@ -227,9 +266,15 @@ def dump_dimension(ctx, registry_manager, dimension_id, version, directory, forc
 @click.pass_obj
 @click.pass_context
 def update_dimension(
-    ctx, registry_manager, dimension_config_file, dimension_id, log_message, update_type, version
+    ctx,
+    registry_manager: RegistryManager,
+    dimension_config_file: Path,
+    dimension_id: str,
+    log_message: str,
+    update_type: VersionUpdateType,
+    version: str,
 ):
-    """Update an existing dimension registry."""
+    """Update an existing dimension in the registry."""
     manager = registry_manager.dimension_manager
     submitter = getpass.getuser()
     res = handle_dsgrid_exception(
@@ -243,7 +288,7 @@ def update_dimension(
         version,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
 """
@@ -251,18 +296,23 @@ Dimension Mapping Commands
 """
 
 
-@click.command(name="list")
+_list_dimension_mappings_epilog = """
+Examples:\n
+$ dsgrid registry dimension-mappings list\n
+$ dsgrid registry dimension-mappings list -f "Type [From, To] contains geography" -f "Submitter == username"\n
+"""
+
+
+@click.command(name="list", epilog=_list_dimension_mappings_epilog)
 @click.option(
     "-f",
     "--filter",
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value',
-    accept multiple flags\b\n
+    Filter table with a case-insensitive expression in the format 'column operation value',
+    accepts multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n
-       -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
 @click.pass_obj
@@ -271,7 +321,13 @@ def list_dimension_mappings(registry_manager, filter):
     registry_manager.dimension_mapping_manager.show(filters=filter)
 
 
-@click.command(name="register")
+_register_dimension_mappings_epilog = """
+Examples:\\
+$ dsgrid registry dimension-mappings register -l "Register dimension mappings for my-project" dimension_mappings.json5\n
+"""
+
+
+@click.command(name="register", epilog=_register_dimension_mappings_epilog)
 @click.argument(
     "dimension-mapping-config-file", type=click.Path(exists=True), callback=_path_callback
 )
@@ -283,18 +339,29 @@ def list_dimension_mappings(registry_manager, filter):
 )
 @click.pass_obj
 @click.pass_context
-def register_dimension_mappings(ctx, registry_manager, dimension_mapping_config_file, log_message):
-    """Register new dimension mappings with the dsgrid repository."""
+def register_dimension_mappings(
+    ctx, registry_manager: RegistryManager, dimension_mapping_config_file: Path, log_message: str
+):
+    """Register new dimension mappings with the dsgrid repository. The contents of the JSON/JSON5
+    file must match the data model defined by this documentation:
+    https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel
+    """
     submitter = getpass.getuser()
     manager = registry_manager.dimension_mapping_manager
     res = handle_dsgrid_exception(
         ctx, manager.register, dimension_mapping_config_file, submitter, log_message
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command(name="dump")
+_dump_dimension_mapping_epilog = """
+Examples:\n
+$ dsgrid registry dimension-mappings dump 17565575\n
+"""
+
+
+@click.command(name="dump", epilog=_dump_dimension_mapping_epilog)
 @click.argument("dimension-mapping-id")
 @click.option(
     "-v",
@@ -318,17 +385,39 @@ def register_dimension_mappings(ctx, registry_manager, dimension_mapping_config_
 )
 @click.pass_obj
 @click.pass_context
-def dump_dimension_mapping(ctx, registry_manager, dimension_mapping_id, version, directory, force):
+def dump_dimension_mapping(
+    ctx,
+    registry_manager: RegistryManager,
+    dimension_mapping_id: str,
+    version: str,
+    directory: Path,
+    force: bool,
+):
     """Dump a dimension mapping config file (and any related data) from the registry."""
     manager = registry_manager.dimension_mapping_manager
     res = handle_dsgrid_exception(
-        ctx, manager.dump, dimension_mapping_id, Path(directory), version=version, force=force
+        ctx,
+        manager.dump,
+        dimension_mapping_id,
+        Path(directory),
+        version=version,
+        force=force,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command(name="update")
+_update_dimension_mapping_epilog = """
+Examples:\n
+$ dsgrid registry dimension-mappings update \\ \n
+    -d 17565575 \\ \n
+    -l "Swap out the state to county mapping for my-dataset to that-project" \\ \n
+    -u major \\ \n
+    -v 1.0.0 dimension_mappings.json5"
+"""
+
+
+@click.command(name="update", epilog=_update_dimension_mapping_epilog)
 @click.argument(
     "dimension-mapping-config-file", type=click.Path(exists=True), callback=_path_callback
 )
@@ -362,14 +451,17 @@ def dump_dimension_mapping(ctx, registry_manager, dimension_mapping_id, version,
 )
 @click.pass_obj
 def update_dimension_mapping(
-    registry_manager,
-    dimension_mapping_config_file,
-    dimension_mapping_id,
-    log_message,
-    update_type,
-    version,
+    registry_manager: RegistryManager,
+    dimension_mapping_config_file: Path,
+    dimension_mapping_id: str,
+    log_message: str,
+    update_type: VersionUpdateType,
+    version: str,
 ):
-    """Update an existing dimension mapping registry."""
+    """Update an existing dimension mapping registry. The contents of the JSON/JSON5 file must
+    match the data model defined by this documentation:
+    https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.mapping_tables.MappingTableModel
+    """
     manager = registry_manager.dimension_mapping_manager
     submitter = getpass.getuser()
     manager.update_from_file(
@@ -387,18 +479,23 @@ Project Commands
 """
 
 
-@click.command(name="list")
+_list_projects_epilog = """
+Examples:\n
+$ dsgrid registry projects list\n
+$ dsgrid registry projects list -f "ID contains efs"\n
+"""
+
+
+@click.command(name="list", epilog=_list_projects_epilog)
 @click.option(
     "-f",
     "--filter",
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value',
-    accept multiple flags\b\n
+    Filter table with a case-insensitive expression in the format 'column operation value',
+    accepts multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n
-       -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
 @click.pass_obj
@@ -407,10 +504,16 @@ def list_projects(ctx, registry_manager, filter):
     """List the registered projects."""
     res = handle_dsgrid_exception(ctx, registry_manager.project_manager.show, filters=filter)
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command(name="register")
+_register_project_epilog = """
+Examples:\n
+$ dsgrid registry projects register -l "Register project my-project" project.json5\n
+"""
+
+
+@click.command(name="register", epilog=_register_project_epilog)
 @click.argument("project-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-l",
@@ -426,7 +529,10 @@ def register_project(
     project_config_file,
     log_message,
 ):
-    """Register a new project with the dsgrid repository."""
+    """Register a new project with the dsgrid repository. The contents of the JSON/JSON5 file must
+    match the data model defined by this documentation:
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.project_config.ProjectConfigModel
+    """
     submitter = getpass.getuser()
     res = handle_dsgrid_exception(
         ctx,
@@ -436,10 +542,20 @@ def register_project(
         log_message,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command()
+_submit_dataset_epilog = """
+Examples:\n
+$ dsgrid registry projects submit-dataset \\ \n
+    -p my-project-id \\ \n
+    -d my-dataset-id \\ \n
+    -m dimension_mappings.json5 \\ \n
+    -l "Submit dataset my-dataset to project my-project."\n
+"""
+
+
+@click.command(epilog=_submit_dataset_epilog)
 @click.option(
     "-d",
     "--dataset-id",
@@ -459,7 +575,8 @@ def register_project(
     "--dimension-mapping-file",
     type=click.Path(exists=True),
     show_default=True,
-    help="dimension mapping file",
+    help="Dimension mapping file. Must match the data model defined by "
+    "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel",
     callback=_path_callback,
 )
 @click.option(
@@ -468,7 +585,8 @@ def register_project(
     type=click.Path(exists=True),
     show_default=True,
     help="dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
-    "Use it when the mappings are already registered.",
+    "Use it when the mappings are already registered. Must mach the data model defined by "
+    "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel",
     callback=_path_callback,
 )
 @click.option(
@@ -512,7 +630,18 @@ def submit_dataset(
     )
 
 
-@click.command()
+_register_and_submit_dataset_epilog = """
+Examples:\n
+$ dsgrid registry projects register-and-submit-dataset \\ \n
+    -c dataset.json5 \\ \n
+    -d path/to/my/dataset \\ \n
+    -p my-project-id \\ \n
+    -m dimension_mappings.json5 \\ \n
+    -l "Register and submit dataset my-dataset to project my-project." \n
+"""
+
+
+@click.command(epilog=_register_and_submit_dataset_epilog)
 @click.option(
     "-c",
     "--dataset-config-file",
@@ -525,6 +654,7 @@ def submit_dataset(
     "-d",
     "--dataset-path",
     required=True,
+    help="Path to directory containing load data (Parquet) files.",
     type=click.Path(exists=True),
     callback=_path_callback,
 )
@@ -532,7 +662,8 @@ def submit_dataset(
     "-m",
     "--dimension-mapping-file",
     type=click.Path(exists=True),
-    help="File containing dimension mappings to register with the dataset",
+    help="Dimension mapping file. Must match the data model defined by "
+    "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel",
     callback=_path_callback,
 )
 @click.option(
@@ -541,7 +672,8 @@ def submit_dataset(
     type=click.Path(exists=True),
     show_default=True,
     help="dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
-    "Use it when the mappings are already registered.",
+    "Use it when the mappings are already registered. Must mach the data model defined by "
+    "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel",
     callback=_path_callback,
 )
 @click.option(
@@ -597,10 +729,16 @@ def register_and_submit_dataset(
         autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command(name="dump")
+_dump_project_epilog = """
+Examples:\n
+$ dsgrid registry projects dump my-project-id\n
+"""
+
+
+@click.command(name="dump", epilog=_dump_project_epilog)
 @click.argument("project-id")
 @click.option(
     "-v",
@@ -624,17 +762,34 @@ def register_and_submit_dataset(
 )
 @click.pass_obj
 @click.pass_context
-def dump_project(ctx, registry_manager, project_id, version, directory, force):
+def dump_project(
+    ctx,
+    registry_manager: RegistryManager,
+    project_id: str,
+    version: str,
+    directory: Path,
+    force: bool,
+):
     """Dump a project config file from the registry."""
     manager = registry_manager.project_manager
     res = handle_dsgrid_exception(
         ctx, manager.dump, project_id, directory, version=version, force=force
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command(name="update")
+_update_project_epilog = """
+Examples: \n
+$ dsgrid registry projects update \\ \n
+    -p my-project-id \\ \n
+    -u patch \\ \n
+    -v 1.5.0 \\ \n
+    -l "Update description for project my-project-id." \n
+"""
+
+
+@click.command(name="update", epilog=_update_project_epilog)
 @click.argument("project-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-p",
@@ -667,9 +822,15 @@ def dump_project(ctx, registry_manager, project_id, version, directory, force):
 @click.pass_obj
 @click.pass_context
 def update_project(
-    ctx, registry_manager, project_config_file, project_id, log_message, update_type, version
+    ctx,
+    registry_manager: RegistryManager,
+    project_config_file: Path,
+    project_id: str,
+    log_message: str,
+    update_type: VersionUpdateType,
+    version: str,
 ):
-    """Update an existing project registry."""
+    """Update an existing project in the registry."""
     manager = registry_manager.project_manager
     submitter = getpass.getuser()
     res = handle_dsgrid_exception(
@@ -683,10 +844,19 @@ def update_project(
         version,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command()
+_register_subset_dimensions_epilog = """
+Examples:\n
+$ dsgrid registry projects register-subset-dimensions \\ \n
+    -l "Register subset dimensions for end uses by fuel type for my-project-id." \\ \n
+    my-project-id \\ \n
+    subset_dimensions.json5 \n
+"""
+
+
+@click.command(epilog=_register_subset_dimensions_epilog)
 @click.pass_obj
 @click.pass_context
 @click.argument("project_id")
@@ -698,12 +868,75 @@ def update_project(
     type=str,
     help="Please specify the reason for this addition.",
 )
-def register_supplemental_dimensions(
-    ctx, registry_manager, project_id, filename: Path, log_message
+@click.option(
+    "-t",
+    "--update-type",
+    default="patch",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=_version_update_callback,
+)
+def register_subset_dimensions(
+    ctx,
+    registry_manager: RegistryManager,
+    project_id: str,
+    filename: Path,
+    log_message: str,
+    update_type: VersionUpdateType,
 ):
-    """Register new supplemental dimensions with a project. The JSON/JSON5 filename must
+    """Register new subset dimensions with a project. The contents of the JSON/JSON5 file must
     match the data model defined by this documentation:
 
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.project_config.SubsetDimensionGroupListModel
+    """
+
+    submitter = getpass.getuser()
+    project_mgr = registry_manager.project_manager
+    res = handle_dsgrid_exception(
+        ctx,
+        project_mgr.register_subset_dimensions,
+        project_id,
+        filename,
+        submitter,
+        log_message,
+        update_type,
+    )
+    if res[1] != 0:
+        ctx.exit(res[1])
+
+
+_register_supplemental_dimensions_epilog = """
+Examples:\n
+$ dsgrid registry projects register-supplemental-dimensions \\ \n
+    -l "Register states supplemental dimension for my-project-id" \\ \n
+    my-project-id \\ \n
+    supplemental_dimensions.json5\n
+"""
+
+
+@click.command(epilog=_register_supplemental_dimensions_epilog)
+@click.pass_obj
+@click.pass_context
+@click.argument("project_id")
+@click.argument("filename", callback=_path_callback)
+@click.option(
+    "-l",
+    "--log-message",
+    required=True,
+    type=str,
+    help="Please specify the reason for this addition.",
+)
+@click.option(
+    "-t",
+    "--update-type",
+    default="patch",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=_version_update_callback,
+)
+def register_supplemental_dimensions(
+    ctx, registry_manager, project_id, filename: Path, log_message, update_type
+):
+    """Register new supplemental dimensions with a project. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel
     """
 
@@ -716,12 +949,22 @@ def register_supplemental_dimensions(
         filename,
         submitter,
         log_message,
+        update_type,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command()
+_add_dataset_requirements_epilog = """
+Examples:\n
+$ dsgrid registry projects add-dataset-requirements \\ \n
+    -l "Add requirements for dataset my-dataset-id to my-project-id." \\ \n
+    my-project-id \\ \n
+    dataset_requirements.json5\n
+"""
+
+
+@click.command(epilog=_add_dataset_requirements_epilog)
 @click.pass_obj
 @click.pass_context
 @click.argument("project_id")
@@ -733,10 +976,18 @@ def register_supplemental_dimensions(
     type=str,
     help="Please specify the reason for the new datasets.",
 )
-def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, log_message):
-    """Add requirements for one or more datasets to a project. The JSON/JSON5 filename must
-    match the data model defined by this documentation:
-
+@click.option(
+    "-t",
+    "--update-type",
+    default="patch",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=_version_update_callback,
+)
+def add_dataset_requirements(
+    ctx, registry_manager, project_id, filename: Path, log_message, update_type
+):
+    """Add requirements for one or more datasets to a project. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetListModel
     """
     submitter = getpass.getuser()
@@ -748,12 +999,22 @@ def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, 
         filename,
         submitter,
         log_message,
+        update_type,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command()
+_replace_dataset_dimension_requirements_epilog = """
+Examples:\n
+$ dsgrid registry projects replace-dataset-dimension-requirements \\ \n
+    -l "Replace dimension requirements for dataset my-dataset-id in my-project-id." \\ \n
+    project_id \\ \n
+    dataset_dimension_requirements.json5\n
+"""
+
+
+@click.command(epilog=_replace_dataset_dimension_requirements_epilog)
 @click.pass_obj
 @click.pass_context
 @click.argument("project_id")
@@ -765,11 +1026,18 @@ def add_dataset_requirements(ctx, registry_manager, project_id, filename: Path, 
     type=str,
     help="Please specify the reason for the new requirements.",
 )
+@click.option(
+    "-t",
+    "--update-type",
+    default="major",
+    type=click.Choice([x.value for x in VersionUpdateType]),
+    callback=_version_update_callback,
+)
 def replace_dataset_dimension_requirements(
-    ctx, registry_manager, project_id, filename: Path, log_message
+    ctx, registry_manager, project_id, filename: Path, log_message, update_type
 ):
-    """Replace dimension requirements for one or more datasets in a project. The JSON/JSON5
-    filename must match the data model defined by this documentation:
+    """Replace dimension requirements for one or more datasets in a project. The contents of the
+    JSON/JSON5 file must match the data model defined by this documentation:
 
     https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.input_dataset_requirements.InputDatasetDimensionRequirementsListModel
     """
@@ -782,12 +1050,23 @@ def replace_dataset_dimension_requirements(
         filename,
         submitter,
         log_message,
+        update_type,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command(name="list-dimension-query-names")
+_list_project_dimension_query_names_epilog = """
+Examples:\n
+$ dsgrid registry projects list-dimension-query-names my_project_id\n
+$ dsgrid registry projects list-dimension-query-names --exclude-subset my_project_id\n
+$ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_project_id\n
+"""
+
+
+@click.command(
+    name="list-dimension-query-names", epilog=_list_project_dimension_query_names_epilog
+)
 @click.argument("project-id")
 @click.option(
     "-b",
@@ -829,12 +1108,12 @@ def list_project_dimension_query_names(
             "exclude_base, exclude_subset, and exclude_supplemental cannot all be set",
             file=sys.stderr,
         )
-        return 1
+        ctx.exit(1)
 
     manager = registry_manager.project_manager
     res = handle_dsgrid_exception(ctx, manager.get_by_id, project_id)
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
     project_config = res[0]
     base = None if exclude_base else project_config.get_base_dimension_to_query_name_mapping()
@@ -865,18 +1144,23 @@ Dataset Commands
 """
 
 
-@click.command(name="list")
+_list_datasets_epilog = """
+Examples:\n
+$ dsgrid registry datasets list\n
+$ dsgrid registry datasets list -f "ID contains com" -f "Submitter == username"\n
+"""
+
+
+@click.command(name="list", epilog=_list_datasets_epilog)
 @click.option(
     "-f",
     "--filter",
     multiple=True,
     type=str,
     help=f"""
-    filter table with a case-insensitive expression in the format 'field operation value',
-    accept multiple flags\b\n
+    Filter table with a case-insensitive expression in the format 'column operation value',
+    accepts multiple flags\b\n
     valid operations: {ACCEPTED_OPS}\n
-    example:\n
-       -f 'Submitter == username' -f 'Description contains sector'
     """,
 )
 @click.pass_obj
@@ -885,7 +1169,13 @@ def list_datasets(registry_manager, filter):
     registry_manager.dataset_manager.show(filters=filter)
 
 
-@click.command(name="register")
+_register_dataset_epilog = """
+Examples:\n
+$ dsgrid registry datasets register dataset.json5 -l "Register dataset my-dataset-id."\n
+"""
+
+
+@click.command(name="register", epilog=_register_dataset_epilog)
 @click.argument("dataset-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.argument("dataset-path", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
@@ -897,17 +1187,26 @@ def list_datasets(registry_manager, filter):
 @click.pass_obj
 @click.pass_context
 def register_dataset(ctx, registry_manager, dataset_config_file, dataset_path, log_message):
-    """Register a new dataset with the dsgrid repository."""
+    """Register a new dataset with the registry. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
+    https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
+    """
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
     res = handle_dsgrid_exception(
         ctx, manager.register, dataset_config_file, dataset_path, submitter, log_message
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
 
 
-@click.command(name="dump")
+_dump_dataset_epilog = """
+Examples:\n
+$ dsgrid registry datasets dump my-dataset-id\n
+"""
+
+
+@click.command(name="dump", epilog=_dump_dataset_epilog)
 @click.argument("dataset-id")
 @click.option(
     "-v",
@@ -936,7 +1235,17 @@ def dump_dataset(registry_manager, dataset_id, version, directory, force):
     manager.dump(dataset_id, directory, version=version, force=force)
 
 
-@click.command(name="update")
+_update_dataset_epilog = """
+Examples:\n
+$ dsgrid registry datasets update \\ \n
+    -l "Update the description for dataset my-dataset-id." \\ \n
+    -u patch \\ \n
+    -v 1.0.0 \\ \n
+    dataset.json5\n
+"""
+
+
+@click.command(name="update", epilog=_update_dataset_epilog)
 @click.argument("dataset-config-file", type=click.Path(exists=True), callback=_path_callback)
 @click.option(
     "-d",
@@ -971,7 +1280,10 @@ def dump_dataset(registry_manager, dataset_id, version, directory, force):
 def update_dataset(
     ctx, registry_manager, dataset_config_file, dataset_id, log_message, update_type, version
 ):
-    """Update an existing dataset registry."""
+    """Update an existing dataset in the registry. The contents of the JSON/JSON5 file
+    must match the data model defined by this documentation:
+    https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
+    """
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
     res = handle_dsgrid_exception(
@@ -985,7 +1297,187 @@ def update_dataset(
         version,
     )
     if res[1] != 0:
-        return 1
+        ctx.exit(res[1])
+
+
+_bulk_register_epilog = """
+Examples:\n
+$ dsgrid registry bulk-register registration.json5
+$ dsgrid registry bulk-register registration.json5 -j journal__11f733f6-ac9b-4f70-ad4b-df75b291f150.json5
+"""
+
+
+@click.command(epilog=_bulk_register_epilog)
+@click.argument("registration_file", type=click.Path(exists=True))
+@click.option(
+    "-d",
+    "--base-data-dir",
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="Base directory for input data. If set, and if the dataset paths are relative, prepend "
+    "them with this path.",
+)
+@click.option(
+    "-r",
+    "--base-repo-dir",
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="Base directory for dsgrid project/dataset repository. If set, and if the config file "
+    "paths are relative, prepend them with this path.",
+)
+@click.option(
+    "-j",
+    "--journal-file",
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="Journal file created by a previous bulk register operation. If passed, the code will "
+    "read it and skip all projects and datasets that were successfully registered. "
+    "The file will be updated with IDs that are successfully registered.",
+)
+@click.pass_obj
+@click.pass_context
+def bulk_register(
+    ctx,
+    registry_manager: RegistryManager,
+    registration_file: Path,
+    base_data_dir: Optional[Path],
+    base_repo_dir: Optional[Path],
+    journal_file: Optional[Path],
+):
+    """Bulk register projects, datasets, and their dimensions. If any failure occurs, the code
+    records successfully registered project and dataset IDs to a journal file and prints its
+    filename to the console. Users can pass that filename with the --journal-file option to
+    avoid registering those projects and datasets on subsequent attempts.
+
+    The JSON/JSON5 filename must match the data model defined by this documentation:
+
+    https://dsgrid.github.io/dsgrid/reference/data_models/project.html#dsgrid.config.registration_models.RegistrationModel
+    """
+    registration = RegistrationModel.from_file(registration_file)
+    tmp_files = []
+    if journal_file is None:
+        journal_file = Path(f"journal__{uuid4()}.json5")
+        journal = RegistrationJournal()
+    else:
+        journal = RegistrationJournal.from_file(journal_file)
+        registration = registration.filter_by_journal(journal)
+    failure_occurred = False
+    try:
+        res = handle_dsgrid_exception(
+            ctx,
+            _run_bulk_registration,
+            registry_manager,
+            registration,
+            tmp_files,
+            base_data_dir,
+            base_repo_dir,
+            journal,
+        )
+        if res[1] != 0:
+            ctx.exit(res[1])
+    except Exception:
+        failure_occurred = True
+        raise
+    finally:
+        if failure_occurred and journal.has_entries():
+            journal_file.write_text(journal.model_dump_json(indent=2), encoding="utf-8")
+            logger.info(
+                "Recorded successfully registered projects and datasets to %s. "
+                "Pass this file to the `--journal-file` option of this command to skip those IDs "
+                "on subsequent attempts.",
+                journal_file,
+            )
+        elif journal_file.exists():
+            journal_file.unlink()
+            logger.info("Deleted journal file %s after successful registration.", journal_file)
+        for path in tmp_files:
+            path.unlink()
+
+
+def _run_bulk_registration(
+    mgr: RegistryManager,
+    registration: RegistrationModel,
+    tmp_files: list[Path],
+    base_data_dir: Optional[Path],
+    base_repo_dir: Optional[Path],
+    journal: RegistrationJournal,
+):
+    user = getpass.getuser()
+    project_mgr = mgr.project_manager
+    dataset_mgr = mgr.dataset_manager
+    dim_mgr = mgr.dimension_manager
+    dim_mapping_mgr = mgr.dimension_mapping_manager
+
+    if base_repo_dir is not None:
+        for project in registration.projects:
+            if not project.config_file.is_absolute():
+                project.config_file = base_repo_dir / project.config_file
+        for dataset in registration.datasets:
+            if not dataset.config_file.is_absolute():
+                dataset.config_file = base_repo_dir / dataset.config_file
+        for dataset in registration.dataset_submissions:
+            for field in ("dimension_mapping_file", "dimension_mapping_references_file"):
+                path = getattr(dataset, field)
+                if path is not None and not path.is_absolute():
+                    setattr(dataset, field, base_repo_dir / path)
+
+    if base_data_dir is not None:
+        for dataset in registration.datasets:
+            if not dataset.dataset_path.is_absolute():
+                dataset.dataset_path = base_data_dir / dataset.dataset_path
+
+    for project in registration.projects:
+        project_mgr.register(project.config_file, user, project.log_message)
+        journal.add_project(project.project_id)
+
+    for dataset in registration.datasets:
+        config_file = None
+        if dataset.replace_dimension_names_with_ids:
+            mappings = map_dimension_names_to_ids(dim_mgr)
+            orig = dataset.config_file
+            config_file = orig.with_stem(orig.name + "__tmp")
+            shutil.copyfile(orig, config_file)
+            tmp_files.append(config_file)
+            replace_dimension_names_with_current_ids(config_file, mappings)
+        else:
+            config_file = dataset.config_file
+
+        assert dataset.log_message is not None
+        dataset_mgr.register(
+            config_file,
+            dataset.dataset_path,
+            user,
+            dataset.log_message,
+        )
+        journal.add_dataset(dataset.dataset_id)
+
+    for dataset in registration.dataset_submissions:
+        refs_file = None
+        if (
+            dataset.replace_dimension_mapping_names_with_ids
+            and dataset.dimension_mapping_references_file is not None
+        ):
+            dim_id_to_name = map_dimension_ids_to_names(mgr.dimension_manager)
+            mappings = map_dimension_mapping_names_to_ids(dim_mapping_mgr, dim_id_to_name)
+            orig = dataset.dimension_mapping_references_file
+            refs_file = orig.with_stem(orig.name + "__tmp")
+            shutil.copyfile(orig, refs_file)
+            tmp_files.append(refs_file)
+            replace_dimension_mapping_names_with_current_ids(refs_file, mappings)
+        else:
+            refs_file = dataset.dimension_mapping_references_file
+
+        assert dataset.log_message is not None
+        project_mgr.submit_dataset(
+            dataset.project_id,
+            dataset.dataset_id,
+            user,
+            dataset.log_message,
+            dimension_mapping_file=dataset.dimension_mapping_file,
+            dimension_mapping_references_file=refs_file,
+            autogen_reverse_supplemental_mappings=dataset.autogen_reverse_supplemental_mappings,
+        )
+        journal.add_submitted_dataset(dataset.dataset_id, dataset.project_id)
 
 
 @click.command()
@@ -1025,6 +1517,7 @@ projects.add_command(submit_dataset)
 projects.add_command(register_and_submit_dataset)
 projects.add_command(dump_project)
 projects.add_command(update_project)
+projects.add_command(register_subset_dimensions)
 projects.add_command(register_supplemental_dimensions)
 projects.add_command(add_dataset_requirements)
 projects.add_command(replace_dataset_dimension_requirements)
@@ -1040,4 +1533,5 @@ registry.add_command(dimensions)
 registry.add_command(dimension_mappings)
 registry.add_command(projects)
 registry.add_command(datasets)
+registry.add_command(bulk_register)
 registry.add_command(data_sync)

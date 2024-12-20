@@ -13,6 +13,9 @@ Project Config
 .. autopydantic_model:: dsgrid.config.project_config.RequiredDimensionRecordsModel
 .. autopydantic_model:: dsgrid.config.project_config.RequiredSupplementalDimensionRecordsModel
 .. autopydantic_model:: dsgrid.config.project_config.RequiredDimensionRecordsByTypeModel
+.. autopydantic_model:: dsgrid.config.project_config.SubsetDimensionGroupModel
+.. autopydantic_model:: dsgrid.config.project_config.SubsetDimensionGroupListModel
+
 
 To add new supplemental dimensions
 ==================================

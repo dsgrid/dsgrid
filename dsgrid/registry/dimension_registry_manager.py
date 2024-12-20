@@ -1,10 +1,13 @@
 """Manages the registry for dimensions"""
 
-import getpass
 import logging
-from typing import Union
+from collections import defaultdict
+from pathlib import Path
+from typing import Optional, Union
+from uuid import uuid4
 
 from prettytable import PrettyTable
+from sqlalchemy import Connection
 
 from dsgrid.config.dimension_config_factory import get_dimension_config, load_dimension_config
 from dsgrid.config.dimension_config import DimensionConfig
@@ -13,14 +16,13 @@ from dsgrid.config.dimensions import (
     TimeDimensionBaseModel,
     DimensionReferenceModel,
 )
-from dsgrid.registry.common import ConfigKey, make_initial_config_registration
+from dsgrid.registry.common import ConfigKey, RegistryType, VersionUpdateType
+from dsgrid.registry.registry_interface import DimensionRegistryInterface
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
-from .common import RegistryType
 from .registration_context import RegistrationContext
 from .dimension_update_checker import DimensionUpdateChecker
-from .registry_interface import DimensionRegistryInterface
 from .registry_manager_base import RegistryManagerBase
 
 
@@ -50,16 +52,15 @@ class DimensionRegistryManager(RegistryManagerBase):
     def name():
         return "Dimensions"
 
-    def _replace_duplicates(self, config: DimensionsConfig):
-        hashes = {}
+    def _replace_duplicates(self, config: DimensionsConfig, context: RegistrationContext):
+        hashes = defaultdict(list)
         time_dims = {}
-        for dimension in self._db.iter_models(all_versions=True):
+        for dimension in self._db.iter_models(context.connection, all_versions=True):
             if isinstance(dimension, TimeDimensionBaseModel):
                 time_dims[dimension.id] = dimension
             else:
-                hashes[dimension.file_hash] = dimension
+                hashes[dimension.file_hash].append(dimension)
 
-        # TODO: This only works if the matching dimension is the latest.
         existing_ids = set()
         for i, dim in enumerate(config.model.dimensions):
             replace_dim = False
@@ -69,21 +70,23 @@ class DimensionRegistryManager(RegistryManagerBase):
                 if existing is not None:
                     replace_dim = True
             elif dim.file_hash in hashes:
-                existing = hashes[dim.file_hash]
-                if dim.dimension_type == existing.dimension_type:
-                    if dim.name == existing.name and dim.display_name == existing.display_name:
+                for existing in hashes[dim.file_hash]:
+                    if (
+                        dim.dimension_type == existing.dimension_type
+                        and dim.name == existing.name
+                        and dim.display_name == existing.display_name
+                    ):
                         replace_dim = True
-                    else:
-                        logger.info(
-                            "Register new dimension even though records are duplicate with "
-                            "existing dimension. Existing name/display_name=%s/%s. "
-                            "New name/display_name=%s/%s",
-                            existing.name,
-                            existing.display_name,
-                            dim.name,
-                            dim.display_name,
-                        )
+                        break
+                if not replace_dim:
+                    logger.info(
+                        "Register new dimension even though records are duplicate with "
+                        "one or more existing dimensions. New name/display_name=%s/%s",
+                        dim.name,
+                        dim.display_name,
+                    )
             if replace_dim:
+                assert existing is not None
                 logger.info(
                     "Replace %s with existing dimension ID %s", dim.name, existing.dimension_id
                 )
@@ -97,7 +100,7 @@ class DimensionRegistryManager(RegistryManagerBase):
             if type(time_dim) is not type(new_dim):
                 continue
             match = True
-            exclude = set(("description", "dimension_id", "key", "id", "rev", "version"))
+            exclude = set(("dimension_id", "version", "id"))
             for field in type(new_dim).model_fields:
                 if field not in exclude and getattr(new_dim, field) != getattr(time_dim, field):
                     match = False
@@ -107,15 +110,11 @@ class DimensionRegistryManager(RegistryManagerBase):
 
         return None
 
-    def finalize_registration(self, config_ids: list[str], error_occurred: bool):
-        if error_occurred:
-            logger.info("Remove all intermediate dimensions after error")
-            for dimension_id in config_ids:
-                self.remove(dimension_id)
-
-    def get_by_id(self, config_id, version=None):
+    def get_by_id(
+        self, config_id: str, version: Optional[str] = None, conn: Optional[Connection] = None
+    ):
         if version is None:
-            version = self._db.get_latest_version(config_id)
+            version = self._db.get_latest_version(conn, config_id)
 
         key = ConfigKey(config_id, version)
         dimension = self._dimensions.get(key)
@@ -123,15 +122,15 @@ class DimensionRegistryManager(RegistryManagerBase):
             return dimension
 
         if version is None:
-            model = self.db.get_latest(config_id)
+            model = self.db.get_latest(conn, config_id)
         else:
-            model = self.db.get_by_version(config_id, version)
+            model = self.db.get_by_version(conn, config_id, version)
 
         config = get_dimension_config(model)
         self._dimensions[key] = config
         return config
 
-    def list_ids(self, dimension_type=None):
+    def list_ids(self, dimension_type=None, conn: Optional[Connection] = None):
         """Return the dimension ids for the given type.
 
         Parameters
@@ -144,16 +143,18 @@ class DimensionRegistryManager(RegistryManagerBase):
 
         """
         if dimension_type is None:
-            ids = list(self.iter_ids())
+            ids = super().list_ids(conn)
         else:
             ids = [
                 x.dimension_id
-                for x in self.db.iter_models(filter_config={"dimension_type": dimension_type})
+                for x in self.db.iter_models(
+                    conn, filter_config={"dimension_type": dimension_type}
+                )
             ]
         ids.sort()
         return ids
 
-    def load_dimensions(self, dimension_references):
+    def load_dimensions(self, dimension_references, conn: Optional[Connection] = None):
         """Load dimensions from the database.
 
         Parameters
@@ -171,87 +172,60 @@ class DimensionRegistryManager(RegistryManagerBase):
         dimensions = {}
         for dim in dimension_references:
             key = ConfigKey(dim.dimension_id, dim.version)
-            dimensions[key] = self.get_by_id(dim.dimension_id, version=dim.version)
+            dimensions[key] = self.get_by_id(dim.dimension_id, version=dim.version, conn=conn)
 
         return dimensions
 
     @track_timing(timer_stats_collector)
-    def register_from_config(self, config: DimensionsConfig, submitter, log_message, context=None):
-        error_occurred = False
-        need_to_finalize = context is None
-        if context is None:
-            context = RegistrationContext()
-
-        try:
-            return self._register(config, submitter, log_message, context)
-        except Exception:
-            error_occurred = True
-            raise
-        finally:
-            if need_to_finalize:
-                context.finalize(error_occurred)
+    def register_from_config(
+        self,
+        config: DimensionsConfig,
+        context: RegistrationContext,
+    ) -> list[str]:
+        return self._register(config, context)
 
     @track_timing(timer_stats_collector)
-    def register(self, config_file, submitter, log_message):
-        context = RegistrationContext()
-        error_occurred = False
-        try:
+    def register(self, config_file, submitter: str, log_message: str) -> list[str]:
+        with RegistrationContext(
+            self.db, log_message, VersionUpdateType.MAJOR, submitter
+        ) as context:
             config = DimensionsConfig.load(config_file)
-            return self.register_from_config(config, submitter, log_message, context=context)
-        except Exception:
-            error_occurred = True
-            raise
-        finally:
-            context.finalize(error_occurred)
+            return self.register_from_config(config, context=context)
 
-    def _register(self, config, submitter, log_message, context):
-        existing_ids = self._replace_duplicates(config)
-        registration = make_initial_config_registration(submitter, log_message)
+    def _register(self, config, context: RegistrationContext) -> list[str]:
+        existing_ids = self._replace_duplicates(config, context)
+        registered_dimension_ids = []
 
         # This function will either register the dimension specified by each model or re-use an
         # existing ID. The returned list must be in the same order as the list of models.
         final_dimension_ids = []
-        registered_dimension_ids = []
-
-        try:
-            # Guarantee that registration of dimensions is all or none.
-            for dim in config.model.dimensions:
-                if dim.id is None:
-                    dim = self.db.insert(dim, registration)
-                    final_dimension_ids.append(dim.dimension_id)
-                    registered_dimension_ids.append(dim.dimension_id)
-                    logger.info(
-                        "%s Registered dimension id=%s type=%s version=%s name=%s",
-                        self._log_offline_mode_prefix(),
-                        dim.id,
-                        dim.dimension_type.value,
-                        registration.version,
-                        dim.name,
-                    )
-                else:
-                    if dim.dimension_id not in existing_ids:
-                        msg = f"Bug: {dim.dimension_id=} should have been in existing_ids"
-                        raise Exception(msg)
-                    final_dimension_ids.append(dim.dimension_id)
-        except Exception:
-            if registered_dimension_ids:
-                logger.warning(
-                    "Exception occured after partial completion of dimension registration."
+        for dim in config.model.dimensions:
+            if dim.id is None:
+                assert dim.dimension_id is None
+                dim.dimension_id = str(uuid4())
+                dim.version = "1.0.0"
+                dim = self.db.insert(context.connection, dim, context.registration)
+                final_dimension_ids.append(dim.dimension_id)
+                registered_dimension_ids.append(dim.dimension_id)
+                logger.info(
+                    "%s Registered dimension id=%s type=%s version=%s name=%s",
+                    self._log_offline_mode_prefix(),
+                    dim.id,
+                    dim.dimension_type.value,
+                    dim.version,
+                    dim.name,
                 )
-                for dimension_id in registered_dimension_ids:
-                    self.remove(dimension_id)
-            raise
+            else:
+                if dim.dimension_id not in existing_ids:
+                    msg = f"Bug: {dim.dimension_id=} should have been in existing_ids"
+                    raise Exception(msg)
+                final_dimension_ids.append(dim.dimension_id)
 
-        logger.info(
-            "Registered %s dimensions with version=%s",
-            len(config.model.dimensions),
-            registration.version,
-        )
-
+        logger.info("Registered %s dimensions", len(config.model.dimensions))
         context.add_ids(RegistryType.DIMENSION, registered_dimension_ids, self)
         return final_dimension_ids
 
-    def make_dimension_references(self, dimension_ids: list[str]):
+    def make_dimension_references(self, conn: Connection, dimension_ids: list[str]):
         """Return a list of dimension references from a list of registered dimension IDs.
         This assumes that the latest version of the dimensions will be used because they were
         just created.
@@ -263,7 +237,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         """
         refs = []
         for dim_id in dimension_ids:
-            dim = self.db.get_latest(dim_id)
+            dim = self.db.get_latest(conn, dim_id)
             refs.append(
                 DimensionReferenceModel(
                     dimension_id=dim_id,
@@ -275,10 +249,11 @@ class DimensionRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        filters: list[str] = None,
-        max_width: Union[int, dict] = None,
-        drop_fields: list[str] = None,
-        dimension_ids: set[str] = None,
+        conn: Optional[Connection] = None,
+        filters: Optional[list[str]] = None,
+        max_width: Optional[Union[int, dict]] = None,
+        drop_fields: Optional[list[str]] = None,
+        dimension_ids: Optional[set[str]] = None,
         return_table: bool = False,
         **kwargs,
     ):
@@ -328,8 +303,8 @@ class DimensionRegistryManager(RegistryManagerBase):
             transformed_filters = transform_and_validate_filters(filters)
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
-        for model in self.db.iter_models():
-            registration = self.db.get_registration(model)
+        for model in self.db.iter_models(conn):
+            registration = self.db.get_registration(conn, model)
             if dimension_ids and model.dimension_id not in dimension_ids:
                 continue
 
@@ -337,8 +312,8 @@ class DimensionRegistryManager(RegistryManagerBase):
                 model.dimension_type.value,
                 model.dimension_query_name,
                 model.dimension_id,
-                registration.version,
-                registration.date.strftime("%Y-%m-%d %H:%M:%S"),
+                model.version,
+                registration.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 registration.submitter,
                 registration.log_message,
             )
@@ -360,32 +335,49 @@ class DimensionRegistryManager(RegistryManagerBase):
         display_table(table)
 
     def update_from_file(
-        self, config_file, dimension_id, submitter, update_type, log_message, version
+        self,
+        config_file: Path,
+        dimension_id: str,
+        submitter: str,
+        update_type: VersionUpdateType,
+        log_message: str,
+        version: str,
     ):
-        config = load_dimension_config(config_file)
-        self._check_update(config, dimension_id, version)
-        self.update(config, update_type, log_message, submitter=submitter)
+        with RegistrationContext(self.db, log_message, update_type, submitter) as context:
+            config = load_dimension_config(config_file)
+            self._check_update(context.connection, config, dimension_id, version)
+            self.update_with_context(config, context)
 
     @track_timing(timer_stats_collector)
-    def update(self, config, update_type, log_message, submitter=None):
-        if submitter is None:
-            submitter = getpass.getuser()
-        return self._update(config, submitter, update_type, log_message)
+    def update(
+        self,
+        config,
+        update_type: VersionUpdateType,
+        log_message: str,
+        submitter: Optional[str] = None,
+    ) -> DimensionConfig:
+        with RegistrationContext(self.db, log_message, update_type, submitter) as context:
+            return self.update_with_context(config, context)
 
-    def _update(self, config, submitter, update_type, log_message):
-        old_config = self.get_by_id(config.model.dimension_id)
+    def update_with_context(self, config, context: RegistrationContext) -> DimensionConfig:
+        old_config = self.get_by_id(config.model.dimension_id, conn=context.connection)
         checker = DimensionUpdateChecker(old_config.model, config.model)
         checker.run()
         cur_version = old_config.model.version
         old_key = ConfigKey(config.model.dimension_id, cur_version)
-        model = self._update_config(config, submitter, update_type, log_message)
-        new_key = ConfigKey(config.model.dimension_id, model.version)
+        model = self._update_config(config, context)
+        new_key = ConfigKey(model.dimension_id, model.version)
         self._dimensions.pop(old_key, None)
         self._dimensions[new_key] = get_dimension_config(model)
-        return model
+        return self._dimensions[new_key]
 
-    def remove(self, dimension_id):
-        self.db.delete_all(dimension_id)
+    def finalize_registration(self, conn: Connection, config_ids: set[str], error_occurred: bool):
+        if error_occurred:
+            for key in [x for x in self._dimensions if x.id in config_ids]:
+                self._dimensions.pop(key)
+
+    def remove(self, dimension_id, conn: Optional[Connection] = None):
+        self.db.delete_all(conn, dimension_id)
         for key in [x for x in self._dimensions if x.id == dimension_id]:
             self._dimensions.pop(key)
 

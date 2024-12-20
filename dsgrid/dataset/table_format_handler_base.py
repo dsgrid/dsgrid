@@ -51,7 +51,9 @@ class TableFormatHandlerBase(abc.ABC):
             query_name = column.dimension_query_name
             dim = self._project_config.get_dimension(query_name)
             expected_base_dim_cols = context.get_dimension_column_names_by_query_name(
-                dim.model.dimension_type, dim_type_to_query_name[dim.model.dimension_type]
+                dim.model.dimension_type,
+                dim_type_to_query_name[dim.model.dimension_type],
+                dataset_id=self._dataset_id,
             )
             if query_name in base_query_names:
                 assert columns.issuperset(
@@ -175,7 +177,12 @@ class TableFormatHandlerBase(abc.ABC):
         column_to_dim_type[name] = dim_type
 
     def _build_group_by_columns(
-        self, columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata
+        self,
+        columns,
+        context: QueryContext,
+        column_to_dim_type,
+        dim_type_to_query_name,
+        final_metadata,
     ):
         group_by_cols = []
         for column in columns:
@@ -183,7 +190,7 @@ class TableFormatHandlerBase(abc.ABC):
             match context.model.result.column_type:
                 case ColumnType.DIMENSION_TYPES:
                     column_names = context.get_dimension_column_names_by_query_name(
-                        dim_type, dim_type_to_query_name[dim_type]
+                        dim_type, dim_type_to_query_name[dim_type], dataset_id=self._dataset_id
                     )
                     if dim_type == DimensionType.TIME:
                         group_by_cols += column_names
@@ -219,9 +226,8 @@ class TableFormatHandlerBase(abc.ABC):
                 expr = expr.alias(column.alias)
         return expr
 
-    @staticmethod
     @track_timing(timer_stats_collector)
-    def _remove_invalid_null_timestamps(df: DataFrame, orig_id, context: QueryContext):
+    def _remove_invalid_null_timestamps(self, df: DataFrame, orig_id, context: QueryContext):
         if id(df) != orig_id:
             # The table could have NULL timestamps that designate expected-missing data.
             # Those rows could be obsolete after aggregating stacked dimensions.
@@ -229,7 +235,9 @@ class TableFormatHandlerBase(abc.ABC):
             value_columns = context.get_value_columns()
             if not value_columns:
                 raise Exception("Bug: value_columns cannot be empty")
-            time_columns = context.get_dimension_column_names(DimensionType.TIME)
+            time_columns = context.get_dimension_column_names(
+                DimensionType.TIME, dataset_id=self._dataset_id
+            )
             if time_columns:
                 # Persist the query up to this point to avoid multiple evaluations.
                 df = persist_intermediate_query(df, context.scratch_dir_context)

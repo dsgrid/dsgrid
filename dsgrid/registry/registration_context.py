@@ -1,10 +1,15 @@
+import getpass
 import logging
+from datetime import datetime
+from typing import Optional, Self
+
+from sqlalchemy import Connection
 
 from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.spark.functions import drop_temp_tables_and_views
+from dsgrid.registry.common import RegistrationModel, RegistryType, VersionUpdateType
+from dsgrid.registry.registry_interface import RegistryInterfaceBase
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from .common import RegistryType
-from .registry_manager_base import RegistryManagerBase
 
 
 logger = logging.getLogger(__name__)
@@ -13,8 +18,22 @@ logger = logging.getLogger(__name__)
 class RegistrationContext:
     """Maintains state information across a multi-config registration process."""
 
-    def __init__(self):
-        self._managers = {
+    def __init__(
+        self,
+        db: RegistryInterfaceBase,
+        log_message: str,
+        update_type: VersionUpdateType,
+        submitter: Optional[str],
+    ):
+        self._conn: Optional[Connection] = None
+        self._db = db
+        self._registration = RegistrationModel(
+            timestamp=datetime.now(),
+            submitter=submitter or getpass.getuser(),
+            log_message=log_message,
+            update_type=update_type,
+        )
+        self._managers: dict[RegistryType, Optional[RegistryManagerContext]] = {
             # This order is required for cleanup in self.finalize().
             RegistryType.PROJECT: None,
             RegistryType.DATASET: None,
@@ -23,7 +42,7 @@ class RegistrationContext:
         }
 
     def __del__(self):
-        for registry_type in list(RegistryType):
+        for registry_type in RegistryType:
             manager = self._managers.get(registry_type)
             if manager is not None:
                 logger.warning(
@@ -38,7 +57,37 @@ class RegistrationContext:
                         manager.ids,
                     )
 
-    def add_id(self, registry_type: RegistryType, config_id: str, manager: RegistryManagerBase):
+    def __enter__(self) -> Self:
+        self._conn = self._db.engine.connect()
+        self._registration = self._db.insert_registration(self._conn, self._registration)
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        if self._conn is None:
+            return
+        try:
+            if exc_type is None:
+                self.finalize(False)
+                self._conn.commit()
+            else:
+                # Order is important. Don't rollback the configs until dataset files are deleted.
+                self.finalize(True)
+                self._conn.rollback()
+        finally:
+            self._conn.close()
+
+    @property
+    def connection(self) -> Connection:
+        """Return the active sqlalchemy connection."""
+        assert self._conn is not None
+        return self._conn
+
+    @property
+    def registration(self) -> RegistrationModel:
+        """Return the registration entry for this context."""
+        return self._registration
+
+    def add_id(self, registry_type: RegistryType, config_id: str, manager):
         """Add a config ID that has been registered.
 
         Parameters
@@ -55,9 +104,7 @@ class RegistrationContext:
         """
         self.add_ids(registry_type, [config_id], manager)
 
-    def add_ids(
-        self, registry_type: RegistryType, config_ids: list[str], manager: RegistryManagerBase
-    ):
+    def add_ids(self, registry_type: RegistryType, config_ids: list[str], manager):
         """Add multiple config IDs that have been registered.
 
         Parameters
@@ -105,16 +152,10 @@ class RegistrationContext:
         return manager_context.ids
 
     @track_timing(timer_stats_collector)
-    def finalize(self, error_occurred):
+    def finalize(self, error_occurred: bool):
         """Perform final registration actions. If successful, sync all newly-registered configs
         and data with the remote registry. If there was an error, remove all intermediate
         registrations.
-
-        Parameters
-        ----------
-        error_occurred : bool
-            Set to True if there was a registration error. Remove all intermediate registrations.
-
         """
         try:
             drop_temp_tables_and_views()
@@ -122,7 +163,7 @@ class RegistrationContext:
                 if manager_context is not None:
                     if manager_context.ids:
                         manager_context.manager.finalize_registration(
-                            manager_context.ids, error_occurred
+                            self._conn, set(manager_context.ids), error_occurred
                         )
                         manager_context.ids.clear()
                         manager_context.set_unlocked()
@@ -138,7 +179,7 @@ class RegistrationContext:
 class RegistryManagerContext:
     """Maintains state for one registry type."""
 
-    def __init__(self, manager: RegistryManagerBase):
+    def __init__(self, manager):
         self._manager = manager
         self._has_lock = False
         self._ids = []

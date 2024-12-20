@@ -18,27 +18,21 @@ def config():
     """Config commands"""
 
 
-@click.command()
+_config_epilog = """
+Examples:\n
+$ dsgrid config create sqlite:///./registry.db\n
+$ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/registry.db\n
+"""
+
+
+@click.command(epilog=_config_epilog)
+@click.argument("url")
 @click.option(
     "--timings/--no-timings",
     default=False,
     is_flag=True,
     show_default=True,
     help="Enable tracking of function timings.",
-)
-@click.option(
-    "-N",
-    "--database-name",
-    type=str,
-    default=None,
-    help="Database name",
-)
-@click.option(
-    "-u",
-    "--url",
-    type=str,
-    default=None,
-    help="Database URL. Ex: http://localhost:8529",
 )
 @click.option(
     "-U",
@@ -95,9 +89,8 @@ def config():
     "nodes. Defaults to the current directory.",
 )
 def create(
-    timings,
-    database_name,
     url,
+    timings,
     username,
     password,
     offline,
@@ -109,7 +102,6 @@ def create(
     """Create a local dsgrid runtime configuration file."""
     dsgrid_config = DsgridRuntimeConfig(
         timings=timings,
-        database_name=database_name,
         database_url=url,
         database_user=username,
         database_password=password,

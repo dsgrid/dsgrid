@@ -203,6 +203,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_load_data_time_columns(self):
         return self._format_handler.get_load_data_time_columns()
 
+    def get_time_zone(self) -> None:
+        return None
+
     def get_tzinfo(self):
         return None
 

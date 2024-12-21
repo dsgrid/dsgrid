@@ -6,11 +6,8 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import DoubleType, StringType, StructField, StructType
 import pytest
 from click.testing import CliRunner
-from pyspark.sql import SparkSession, DataFrame
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.cli.dsgrid import cli
@@ -50,14 +47,28 @@ from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDataset
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.spark.functions import (
+    aggregate_single_value,
+    read_csv,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+    DoubleType,
+    F,
+    SparkSession,
+    StructField,
+    StringType,
+    StructType,
+    use_duckdb,
+)
 from dsgrid.tests.common import (
     CACHED_TEST_REGISTRY_DB,
-    TEST_PROJECT_PATH,
     SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
+    TEST_PROJECT_PATH,
 )
 from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
-from dsgrid.utils.spark import custom_spark_conf, get_spark_session
+from dsgrid.utils.spark import custom_spark_conf
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
@@ -397,11 +408,13 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
     assert five_year_years == [2010, 2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050]
 
     def get_pivoted_value_sum(df):
-        row = df.agg(F.sum("cooling").alias("cooling"), F.sum("fans").alias("fans")).collect()[0]
-        return row.cooling + row.fans
+        # TODO DT: single query?
+        return aggregate_single_value(df, "sum", "cooling") + aggregate_single_value(
+            df, "sum", "fans"
+        )
 
     def get_unpivoted_value_sum(df):
-        return df.agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN)).collect()[0][VALUE_COLUMN]
+        return aggregate_single_value(df, "sum", VALUE_COLUMN)
 
     get_value_sum = (
         get_pivoted_value_sum
@@ -436,16 +449,15 @@ def test_transform_unpivoted_dataset(tmp_path):
     )
     path = project.transform_dataset("comstock_conus_2022_projected", tmp_path)
     df = read_parquet(path)
-    actual = (
-        df.filter("geography == '06037'")
-        .filter(F.col("metric").isin(["electricity_cooling", "electricity_heating"]))
-        .agg(F.sum("value").alias("total"))
-        .collect()[0]
+    actual = aggregate_single_value(
+        df.filter("geography == '06037'").filter(
+            F.col("metric").isin(["electricity_cooling", "electricity_heating"])
+        ),
+        "sum",
+        VALUE_COLUMN,
     )
     raw_stats = load_dataset_stats()
-    assert math.isclose(
-        actual.total, raw_stats["by_county"]["06037"]["comstock"]["sum"]["electricity"]
-    )
+    assert math.isclose(actual, raw_stats["by_county"]["06037"]["comstock"]["sum"]["electricity"])
 
 
 def test_transform_pivoted_dataset(tmp_path):
@@ -455,19 +467,15 @@ def test_transform_pivoted_dataset(tmp_path):
     )
     path = project.transform_dataset("resstock_conus_2022_projected", tmp_path)
     df = read_parquet(path).filter("geography == '06037'")
-    cooling = (
-        df.filter("metric = 'electricity_cooling'")
-        .select(VALUE_COLUMN)
-        .agg(F.sum(VALUE_COLUMN).alias("cooling"))
-        .collect()[0]
-        .cooling
+    cooling = aggregate_single_value(
+        df.filter("metric = 'electricity_cooling'").select(VALUE_COLUMN),
+        "sum",
+        VALUE_COLUMN,
     )
-    heating = (
-        df.filter("metric = 'electricity_heating'")
-        .select(VALUE_COLUMN)
-        .agg(F.sum(VALUE_COLUMN).alias("heating"))
-        .collect()[0]
-        .heating
+    heating = aggregate_single_value(
+        df.filter("metric = 'electricity_heating'").select(VALUE_COLUMN),
+        "sum",
+        VALUE_COLUMN,
     )
     raw_stats = load_dataset_stats()
     assert math.isclose(
@@ -497,9 +505,10 @@ def get_project(conn: DatabaseConnection, project_id: str):
 def shutdown_project():
     """Shutdown a project and stop the SparkSession so that another process can create one."""
     _projects.clear()
-    spark = SparkSession.getActiveSession()
-    if spark is not None:
-        spark.stop()
+    if not use_duckdb():
+        spark = SparkSession.getActiveSession()
+        if spark is not None:
+            spark.stop()
 
 
 def run_query_test(test_query_cls, *args, expected_values=None):
@@ -721,17 +730,11 @@ class QueryTestElectricityValues(QueryTestBase):
             logger.error("County name = %s is not present", county_name)
             success = False
         if success:
-            total_cooling = (
-                df.filter("end_use == 'Cooling'")
-                .agg(F.sum(VALUE_COLUMN).alias("sum"))
-                .collect()[0]
-                .sum
+            total_cooling = aggregate_single_value(
+                df.filter("end_use == 'Cooling'"), "sum", VALUE_COLUMN
             )
-            total_heating = (
-                df.filter("end_use == 'Heating'")
-                .agg(F.sum(VALUE_COLUMN).alias("sum"))
-                .collect()[0]
-                .sum
+            total_heating = aggregate_single_value(
+                df.filter("end_use == 'Heating'"), "sum", VALUE_COLUMN
             )
             expected = self.get_raw_stats()["by_county"][county]["comstock_resstock"]["sum"]
             assert math.isclose(total_cooling, expected["electricity_cooling"])
@@ -1185,8 +1188,7 @@ class QueryTestAnnualElectricityUseByState(QueryTestBase):
 
     def validate(self, expected_values):
         filename = self.output_dir / self.name / "table.csv"
-        spark = get_spark_session()
-        df = spark.read.csv(str(filename), header=True, inferSchema=True)
+        df = read_csv(filename)
         years = df.select("year").distinct().collect()
         assert len(years) == 1
         assert years[0].year == 2012
@@ -1275,9 +1277,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                 & (tdf.end_uses_by_fuel_type == "electricity_end_uses")
             )
 
-        expected = (
-            df.filter(make_expr(df)).agg(F.max(VALUE_COLUMN).alias("max_val")).collect()[0].max_val
-        )
+        expected = aggregate_single_value(df.filter(make_expr(df)), "max", VALUE_COLUMN)
         actual = peak_load.filter(make_expr(peak_load)).collect()[0][VALUE_COLUMN]
         assert math.isclose(actual, expected)
         return True
@@ -1329,11 +1329,10 @@ class QueryTestMapAnnualTime(QueryTestBase):
         assert len(distinct_model_years) == 1
         assert distinct_model_years[0][DimensionType.MODEL_YEAR.value] == "2020"
         expected_ca_res = calc_expected_eia_861_ca_res_load_value()
-        actual_ca_res = (
-            df.filter("state == 'CA' and sector == 'res'")
-            .agg(F.sum("electricity_unspecified").alias("total_electricity"))
-            .collect()[0]
-            .total_electricity
+        actual_ca_res = aggregate_single_value(
+            df.filter("state == 'CA' and sector == 'res'"),
+            "sum",
+            "electricity_unspecified",
         )
         assert math.isclose(actual_ca_res, expected_ca_res)
         return True
@@ -1552,7 +1551,7 @@ class QueryTestUnitMapping(QueryTestBase):
             df.filter(
                 f"comstock_building_type == '{subsector}' and county == '{expected_cooling.geography}' and model_year == '2020'"
             )
-            .sort("2012_hourly_est")
+            .sort("hourly_est_2012")
             .limit(1)
             .collect()[0]
         )
@@ -1561,15 +1560,15 @@ class QueryTestUnitMapping(QueryTestBase):
         return True
 
 
-def perform_op(df, column, operation):
-    return df.select(column).agg(operation(column).alias("tmp_col")).collect()[0].tmp_col
+# TODO DT: unused?
+# def perform_op(df, column, operation):
+# return aggregate_single_value(df.select(column), operation, column)
 
 
 def validate_electricity_use_by_county(
     op, results_path, raw_stats, datasets, expected_county_count
 ):
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
-    results = spark.read.parquet(str(results_path))
+    results = read_parquet(results_path)
     counties = [str(x.county) for x in results.select("county").distinct().collect()]
     assert len(counties) == expected_county_count, counties
     stats = raw_stats["by_county"]
@@ -1586,8 +1585,7 @@ def validate_electricity_use_by_state(op, results_path: DataFrame | Path, raw_st
     if isinstance(results_path, DataFrame):
         results = results_path
     else:
-        spark = SparkSession.builder.appName("dgrid").getOrCreate()
-        results = spark.read.parquet(str(results_path))
+        results = read_parquet(results_path)
     if op == "sum":
         exp_ca = get_expected_ca_sum_electricity(raw_stats, datasets)
         exp_ny = get_expected_ny_sum_electricity(raw_stats, datasets)

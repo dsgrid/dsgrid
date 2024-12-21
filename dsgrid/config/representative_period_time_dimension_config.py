@@ -4,8 +4,6 @@ import logging
 from datetime import datetime, timedelta
 from typing import Type
 
-from pyspark.sql.types import StructType, StructField, IntegerType
-import pyspark.sql.functions as F
 import pandas as pd
 
 from dsgrid.dimension.time import (
@@ -15,13 +13,31 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.dimension.time_utils import shift_time_interval
 from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.spark.functions import (
+    create_temp_view,
+    join_multiple_columns,
+    make_temp_view_name,
+    select_expr,
+    shift_time_zone,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+    F,
+    StructType,
+    StructField,
+    IntegerType,
+    use_duckdb,
+)
 from dsgrid.time.types import (
     OneWeekPerMonthByHourType,
     OneWeekdayDayAndOneWeekendDayPerMonthByHourType,
 )
-from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.timing import track_timing, timer_stats_collector
+from dsgrid.utils.spark import (
+    get_spark_session,
+    set_session_time_zone,
+)
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -98,6 +114,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         assert "time_zone" in df.columns, df.columns
         geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
         assert geo_tz_values
+        geo_tz_values.sort()
         geo_tz_to_map = [TimeZone(tz) for tz in geo_tz_values]
         geo_tz_to_map = [tz.tz_name for tz in geo_tz_to_map]  # covert to tz_name
 
@@ -107,16 +124,25 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         # and only UTC seems to convert to local_time correctly for DF.show().
         # Even though UTC does not always lead to correct time output when DF.toPandas()
         # the underlying time data is correctly stored when saved to file
-        spark = get_spark_session()
-        session_tz_orig = spark.conf.get("spark.sql.session.timeZone")
-        spark.conf.set("spark.sql.session.timeZone", "UTC")
-        session_tz = spark.conf.get("spark.sql.session.timeZone")
-        if session_tz is None:
-            msg = "Failed to get spark.sql.session.timeZone"
-            raise Exception(msg)
+
+        # Spark
+        #   - dayofweek: Ranges from 1 for a Sunday through to 7 for a Saturday.
+        #   - weekday: (0 = Monday, 1 = Tuesday, …, 6 = Sunday)
+        # DuckDB / PostgreSQL
+        #   - dayofweek/dow/weekday: Day of the week (Sunday = 0, Saturday = 6)
+        #   - isodow: ISO day of the week (Monday = 1, Sunday = 7)
+        # Python
+        #   - datetime.weekday: Monday == 0 ... Sunday == 6
+        if use_duckdb():
+            weekday_func = "ISODOW"
+            weekday_modifier = " - 1"
+        else:
+            weekday_func = "WEEKDAY"
+            weekday_modifier = ""
 
         time_df = None
-        try:
+        session_tz = "UTC"
+        with set_session_time_zone(session_tz):
             project_time_df = project_time_dim.build_time_dataframe()
             map_time = "timestamp_to_map"
             project_time_df = shift_time_interval(
@@ -129,39 +155,40 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
             )
 
             for tz_value, tz_name in zip(geo_tz_values, geo_tz_to_map):
-                local_time_df = project_time_df.withColumn(
-                    "time_zone", F.lit(tz_value)
-                ).withColumn(
-                    "local_time",
-                    F.from_utc_timestamp(F.to_utc_timestamp(F.col(map_time), session_tz), tz_name),
+                local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_value))
+                local_time_df = shift_time_zone(
+                    local_time_df, map_time, session_tz, tz_name, "local_time"
                 )
                 select = [ptime_col, "time_zone"]
                 for col in time_cols:
-                    func = col.replace("_", "")
-                    expr = f"{func}(local_time) AS {col}"
                     if col == "day_of_week":
-                        expr = f"weekday(local_time) AS {col}"
+                        select.append(f"{weekday_func}(local_time) {weekday_modifier} AS {col}")
                     elif col == "is_weekday":
-                        expr = f"(weekday(local_time) < 5) AS {col}"
-                    select.append(expr)
-                local_time_df = local_time_df.selectExpr(*select)
+                        select.append(
+                            f"({weekday_func}(local_time) {weekday_modifier} < 5) AS {col}"
+                        )
+                    else:
+                        if "_" in col:
+                            assert False, col
+                        select.append(f"{col}(local_time) AS {col}")
+
+                local_time_df = select_expr(local_time_df, select)
                 if time_df is None:
                     time_df = local_time_df
                 else:
                     time_df = time_df.union(local_time_df)
-        finally:
-            # reset session timezone
-            spark.conf.set("spark.sql.session.timeZone", session_tz_orig)
-            assert spark.conf.get("spark.sql.session.timeZone") == session_tz_orig
+            assert isinstance(time_df, DataFrame)
+            if use_duckdb():
+                # DuckDB does not persist the hour value unless we create a table.
+                view = create_temp_view(time_df)
+                table = make_temp_view_name()
+                spark = get_spark_session()
+                spark.sql(f"CREATE TABLE {table} AS SELECT * FROM {view}")
+                time_df = spark.sql(f"SELECT * FROM {table}")
 
         # join all
         join_keys = time_cols + ["time_zone"]
-        select = [
-            col if col not in time_cols else F.col(col).cast(IntegerType()) for col in df.columns
-        ]
-        df = df.select(*select).join(time_df, on=join_keys).drop(*time_cols)
-
-        return df
+        return join_multiple_columns(df, time_df, join_keys).drop(*time_cols)
 
     def get_frequency(self):
         return self._format_handler.get_frequency()

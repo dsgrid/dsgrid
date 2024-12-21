@@ -2,8 +2,6 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from pyspark.sql import DataFrame
-
 from dsgrid.dataset.models import (
     TableFormatType,
     UnpivotedTableFormatModel,
@@ -12,6 +10,7 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.dataset.models import PivotedTableFormatModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.project_config import ProjectConfig
+from dsgrid.spark.functions import drop_temp_tables_and_views
 from dsgrid.utils.spark import get_spark_session
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from .models import ColumnType, DatasetMetadataModel, DimensionMetadataModel, ProjectQueryModel
@@ -25,7 +24,7 @@ class QueryContext:
 
     def __init__(self, model: ProjectQueryModel, scratch_dir_context: ScratchDirContext):
         self._model = model
-        self._record_ids_by_dimension_type: dict[DimensionType, DataFrame] = {}
+        self._record_ids_by_dimension_type: dict[DimensionType, list[tuple[str]]] = {}
         self._metadata = DatasetMetadataModel(table_format=self.model.result.table_format)
         self._dataset_metadata: dict[str, DatasetMetadataModel] = {}
         self._scratch_dir_context = scratch_dir_context
@@ -58,6 +57,10 @@ class QueryContext:
                     if key not in keys:
                         main_metadata.append(metadata)
                         keys.add(key)
+
+    def finalize(self):
+        """Perform cleanup."""
+        drop_temp_tables_and_views()
 
     def get_value_columns(self) -> set[str]:
         """Return the value columns in the final dataset."""
@@ -224,7 +227,10 @@ class QueryContext:
 
     def get_record_ids(self):
         spark = get_spark_session()
-        return {k: spark.createDataFrame(v) for k, v in self._record_ids_by_dimension_type.items()}
+        return {
+            k: spark.createDataFrame(v, ["id"])
+            for k, v in self._record_ids_by_dimension_type.items()
+        }
 
     def try_get_record_ids_by_dimension_type(self, dimension_type):
         records = self._record_ids_by_dimension_type.get(dimension_type)
@@ -232,8 +238,10 @@ class QueryContext:
             return records
 
         spark = get_spark_session()
-        return spark.createDataFrame(records)
+        return spark.createDataFrame(records, [dimension_type.value])
 
     def set_record_ids_by_dimension_type(self, dimension_type, record_ids):
         # Can't keep the dataframes in memory because of spark restarts.
-        self._record_ids_by_dimension_type[dimension_type] = record_ids.collect()
+        self._record_ids_by_dimension_type[dimension_type] = [
+            (x.id,) for x in record_ids.collect()
+        ]

@@ -57,6 +57,7 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
 
     # Registering duplicates is allowed.
     result = runner.invoke(cli, cmd)
+    assert result.exit_code == 0
 
     cmd = [
         "--url",
@@ -112,6 +113,7 @@ def test_register_project_and_dataset(tmp_registry_db):
             "log",
         ],
     )
+    assert result.exit_code == 0
     conn = DatabaseConnection(url=url)
     manager = RegistryManager.load(conn, offline_mode=True)
     mappings = map_dimension_names_to_ids(manager.dimension_manager)

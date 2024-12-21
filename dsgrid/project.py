@@ -5,8 +5,6 @@ import logging
 import shutil
 from pathlib import Path
 from typing import Optional
-
-from pyspark.sql import SparkSession
 from semver import VersionInfo
 from sqlalchemy import Connection
 
@@ -28,12 +26,16 @@ from dsgrid.query.models import (
     ColumnType,
 )
 from dsgrid.utils.files import compute_hash
+from dsgrid.spark.functions import (
+    is_dataframe_empty,
+)
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     read_dataframe,
     try_read_dataframe,
     restart_spark_with_custom_conf,
     write_dataframe_and_auto_partition,
+    get_active_session,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing, Timer
 
@@ -45,7 +47,7 @@ class Project:
     """Interface to a dsgrid project."""
 
     def __init__(self, config, version, dataset_configs, dimension_mgr, dimension_mapping_mgr):
-        self._spark = SparkSession.getActiveSession()
+        self._spark = get_active_session()
         self._config: ProjectConfig = config
         self._version = version
         self._dataset_configs = dataset_configs
@@ -242,13 +244,14 @@ class Project:
                     )
                     df = (
                         mapping_records.join(df, on=mapping_records.to_id == df.id)
-                        .selectExpr("from_id AS id")
+                        .select("from_id")
+                        .withColumnRenamed("from_id", "id")
                         .distinct()
                     )
 
             if dim_type in record_ids:
-                df = record_ids[dim_type].intersect(df)
-            if df.rdd.isEmpty():
+                df = record_ids[dim_type].join(df, "id")
+            if is_dataframe_empty(df):
                 raise DSGInvalidQuery(f"Query filter produced empty records: {dim_filter}")
             record_ids[dim_type] = df
 

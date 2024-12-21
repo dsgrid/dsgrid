@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
 
-from pyspark.sql import DataFrame
 from semver import VersionInfo
 
 from dsgrid.common import VALUE_COLUMN
@@ -20,6 +19,8 @@ from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
+from dsgrid.spark.functions import pivot
+from dsgrid.spark.types import DataFrame
 from dsgrid.project import Project
 from dsgrid.utils.spark import (
     custom_spark_conf,
@@ -29,7 +30,7 @@ from dsgrid.utils.spark import (
     write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.files import compute_hash, load_data
+from dsgrid.utils.files import delete_if_exists, compute_hash, load_data
 from dsgrid.query.models import (
     ProjectQueryModel,
     ColumnType,
@@ -323,7 +324,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     self.project.config.get_dimension
                 )
                 column = next(iter(column_names))
-                df = df.join(records.select("id"), on=df[column] == records["id"]).drop("id")
+                df = df.join(
+                    records.select("id"), on=getattr(df, column) == getattr(records, "id")
+                ).drop("id")
             else:
                 query_name = dim_filter.dimension_query_name
                 if query_name not in df.columns:
@@ -362,7 +365,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             if repartition:
                 df = write_dataframe_and_auto_partition(df, filename)
             else:
-                df.write.mode("overwrite").parquet(str(filename))
+                delete_if_exists(filename)
+                write_dataframe(df, filename, overwrite=True)
         else:
             raise NotImplementedError(f"Unsupported output_format={suffix}")
         self.query_filename(output_dir).write_text(context.model.serialize()[1])
@@ -417,14 +421,16 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
             # as well. This change won't persist Spark session restarts.
             conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
             with custom_spark_conf(conf):
-                return self._run_query(
+                df, context = self._run_query(
                     scratch_dir_context,
                     model,
                     load_cached_table,
                     persist_intermediate_table=persist_intermediate_table,
                     zip_file=zip_file,
                     force=force,
-                )[0]
+                )
+                context.finalize()
+                return df
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
@@ -455,8 +461,10 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
-            # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
-            # you add a new customization.
+            # Ensure that queries that aggregate time reflect the project's time zone instead
+            # of the local computer.
+            # If any other settings get customized here, handle them in restart_spark()
+            # as well. This change won't persist Spark session restarts.
             conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
             with custom_spark_conf(conf):
                 df, context = self._run_query(
@@ -467,6 +475,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
                     force=force,
                 )
                 self._save_composite_dataset(context, df, not persist_intermediate_table)
+                context.finalize()
 
     @track_timing(timer_stats_collector)
     def submit(
@@ -492,6 +501,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
             with custom_spark_conf(conf):
                 self._process_aggregations_and_save(df, context, repartition=False)
+            context.finalize()
 
     def _load_composite_dataset_query(self, dataset_id):
         filename = self._composite_datasets_dir() / dataset_id / "query.json5"
@@ -517,5 +527,4 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
 
 def _pivot_table(df: DataFrame, context: QueryContext):
     pivoted_column = context.convert_to_pivoted()
-    ids = [x for x in df.columns if x not in {pivoted_column, VALUE_COLUMN}]
-    return df.groupBy(*ids).pivot(pivoted_column).sum(VALUE_COLUMN)
+    return pivot(df, pivoted_column, VALUE_COLUMN)

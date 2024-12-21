@@ -1,14 +1,8 @@
 import logging
 
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    TimestampType,
-)
-import pyspark.sql.functions as F
-
 from dsgrid.dimension.time import DatetimeRange, DatetimeFormat, TimeZone
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
+from dsgrid.spark.types import F, StructType, StructField, TimestampType
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.scratch_dir_context import ScratchDirContext

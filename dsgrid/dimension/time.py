@@ -154,13 +154,13 @@ class TimeZone(DSGEnum):
         value="HawaiiAleutianStandard",
         description="Hawaii Standard Time (UTC=-10). No daylight saving shifts.",
         tz=ZoneInfo("US/Hawaii"),
-        tz_name="-10:00",
+        tz_name="Etc/GMT+10",
     )
     AST = EnumValue(
         value="AlaskaStandard",
         description="Alaskan Standard Time (UTC=-9). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+9"),
-        tz_name="-09:00",
+        tz_name="Etc/GMT+9",
     )
     APT = EnumValue(
         value="AlaskaPrevailing",
@@ -173,7 +173,7 @@ class TimeZone(DSGEnum):
         value="PacificStandard",
         description="Pacific Standard Time (UTC=-8). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+8"),
-        tz_name="-08:00",
+        tz_name="Etc/GMT+8",
     )
     PPT = EnumValue(
         value="PacificPrevailing",
@@ -186,7 +186,7 @@ class TimeZone(DSGEnum):
         value="MountainStandard",
         description="Mountain Standard Time (UTC=-7). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+7"),
-        tz_name="-07:00",
+        tz_name="Etc/GMT+7",
     )
     MPT = EnumValue(
         value="MountainPrevailing",
@@ -199,7 +199,7 @@ class TimeZone(DSGEnum):
         value="CentralStandard",
         description="Central Standard Time (UTC=-6). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+6"),
-        tz_name="-06:00",
+        tz_name="Etc/GMT+6",
     )
     CPT = EnumValue(
         value="CentralPrevailing",
@@ -212,7 +212,7 @@ class TimeZone(DSGEnum):
         value="EasternStandard",
         description="Eastern Standard Time (UTC=-5). No daylight saving shifts.",
         tz=ZoneInfo("Etc/GMT+5"),
-        tz_name="-05:00",
+        tz_name="Etc/GMT+5",
     )
     EPT = EnumValue(
         value="EasternPrevailing",

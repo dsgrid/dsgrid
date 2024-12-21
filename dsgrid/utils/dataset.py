@@ -2,15 +2,26 @@ import logging
 import os
 from typing import Iterable
 
-import pyspark
-from pyspark.sql import DataFrame
-import pyspark.sql.functions as F
-
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
+from dsgrid.spark.functions import (
+    count_distinct_on_group_by,
+    read_parquet,
+    is_dataframe_empty,
+    join,
+    join_multiple_columns,
+    unpivot,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+    F,
+    use_duckdb,
+)
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import check_for_nulls, read_parquet
+from dsgrid.utils.spark import (
+    check_for_nulls,
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -22,14 +33,13 @@ def map_and_reduce_stacked_dimension(df, records, column, drop_column=True, to_c
         df = df.withColumn("fraction", F.lit(1.0))
     # map and consolidate from_fraction only
     records = records.filter("to_id IS NOT NULL")
-
-    df = df.join(records, on=df[column] == records.from_id, how="inner").drop("from_id")
+    df = join(df, records, column, "from_id", how="inner").drop("from_id")
     if drop_column:
         df = df.drop(column)
     df = df.withColumnRenamed("to_id", to_column_)
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
-    df = df.fillna(1.0, subset=["from_fraction"]).selectExpr(
-        *nonfraction_cols, "fraction*from_fraction AS fraction"
+    df = df.select(
+        *nonfraction_cols, (F.col("fraction") * F.col("from_fraction")).alias("fraction")
     )
     return df
 
@@ -54,9 +64,11 @@ def add_time_zone(load_data_df, geography_dim):
 
 
 def add_column_from_records(df, dimension_records, dimension_name, column_to_add):
-    df = df.join(
+    df = join(
+        df,
         dimension_records.select(F.col("id").alias("record_id"), column_to_add),
-        on=F.col(dimension_name) == F.col("record_id"),
+        dimension_name,
+        "record_id",
         how="inner",
     ).drop("record_id")
     return df
@@ -70,7 +82,7 @@ def apply_scaling_factor(
         df = df.withColumn(
             column,
             F.when(
-                F.col(scaling_factor_column).isNotNull(),
+                F.col(scaling_factor_column) > 0,
                 F.col(column) * F.col(scaling_factor_column),
             ).otherwise(F.col(column)),
         )
@@ -119,14 +131,15 @@ def check_null_value_in_dimension_rows(dim_table, exclude_columns=None):
         )
 
 
-def is_noop_mapping(records: pyspark.sql.DataFrame) -> bool:
+def is_noop_mapping(records: DataFrame) -> bool:
     """Return True if the mapping is a no-op."""
-    return records.filter(
-        (records.to_id.isNull() & ~records.from_id.isNull())
-        | (~records.to_id.isNull() & records.from_id.isNull())
-        | (records.from_id != records.to_id)
-        | (records.from_fraction != 1.0)
-    ).rdd.isEmpty()
+    return is_dataframe_empty(
+        records.filter(
+            "(to_id IS NULL and from_id IS NOT NULL) or "
+            "(to_id IS NOT NULL and from_id IS NULL) or "
+            "(from_id != to_id) or (from_fraction != 1.0)"
+        )
+    )
 
 
 def ordered_subset_columns(df, subset: set[str]) -> list[str]:
@@ -143,9 +156,10 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
     orig_columns = df.columns
     stacked = list(stacked_columns)
     return (
-        df.join(
-            df.groupBy(*stacked).agg(F.count_distinct(time_column).alias("count_time")),
-            on=stacked,
+        join_multiple_columns(
+            df,
+            count_distinct_on_group_by(df, stacked, time_column, "count_time"),
+            stacked,
         )
         .filter(f"{time_column} IS NOT NULL or count_time == 0")
         .select(orig_columns)
@@ -159,6 +173,9 @@ def repartition_if_needed_by_mapping(
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Repartition the dataframe if the mapping might cause data skew."""
+    if use_duckdb():
+        return df
+
     # We experienced an issue with the DECARB buildings dataset where the disaggregation of
     # region to county caused a major issue where one Spark executor thread got stuck,
     # seemingly indefinitely. A message like this was repeated continually.
@@ -207,12 +224,7 @@ def unpivot_dataframe(
     """Unpivot the dataframe, accounting for time columns."""
     values = value_columns if isinstance(value_columns, set) else set(value_columns)
     ids = [x for x in df.columns if x != VALUE_COLUMN and x not in values]
-    df = df.unpivot(
-        ids,
-        value_columns,
-        variable_column,
-        VALUE_COLUMN,
-    )
+    df = unpivot(df, value_columns, variable_column, VALUE_COLUMN)
     cols = set(df.columns).difference(time_columns)
     new_rows = df.filter(f"{VALUE_COLUMN} IS NULL").select(*cols).distinct()
     for col in time_columns:

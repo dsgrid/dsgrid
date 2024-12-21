@@ -4,7 +4,6 @@ import os
 import shutil
 from pathlib import Path
 
-import pyspark
 import pytest
 from click.testing import CliRunner
 from pydantic import ValidationError
@@ -33,6 +32,7 @@ from dsgrid.registry.common import (
 from dsgrid.registry.registry_auto_updater import RegistryAutoUpdater
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.spark.types import DataFrame
 from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
@@ -250,7 +250,10 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
             f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
         )
         if missing_record_file.exists():
-            shutil.rmtree(missing_record_file)
+            if missing_record_file.is_dir():
+                shutil.rmtree(missing_record_file)
+            else:
+                missing_record_file.unlink()
 
     assert manager.dimension_manager.list_ids() == orig_dimension_ids
     assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids
@@ -523,7 +526,7 @@ def test_auto_updates(mutable_cached_registry: tuple[RegistryManager, Path]):
     orig_dim_version = dimension.model.version
 
     # Test that we can convert records to a Spark DataFrame. Unrelated to the rest.
-    assert isinstance(dimension.get_records_dataframe(), pyspark.sql.DataFrame)
+    assert isinstance(dimension.get_records_dataframe(), DataFrame)
 
     dimension.model.description += "; test update"
     update_type = VersionUpdateType.MINOR

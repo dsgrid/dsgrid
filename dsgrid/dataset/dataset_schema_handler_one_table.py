@@ -1,13 +1,14 @@
 import logging
 from pathlib import Path
 
-from pyspark.sql import DataFrame
-from pyspark.sql.types import StringType
-
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
+from dsgrid.spark.types import (
+    DataFrame,
+    StringType,
+)
 from dsgrid.utils.spark import (
     read_dataframe,
     get_unique_values,
@@ -33,7 +34,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @classmethod
     def load(cls, config: DatasetConfig, *args, **kwargs):
-        load_data_df = config.add_trivial_dimensions(read_dataframe(config.load_data_path))
+        df = read_dataframe(config.load_data_path)
+        load_data_df = config.add_trivial_dimensions(df)
         time_dim = config.get_dimension(DimensionType.TIME)
         load_data_df = time_dim.convert_time_format(load_data_df)
         return cls(load_data_df, config, *args, **kwargs)
@@ -135,7 +137,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         for dim in dimensions:
             column = dim.dimension_type.value
             if column in df_columns:
-                load_df = load_df.filter(load_df[column].isin(dim.record_ids))
+                load_df = load_df.filter(getattr(load_df, column).isin(dim.record_ids))
                 stacked_columns.add(column)
 
         pivoted_columns_to_remove = set()

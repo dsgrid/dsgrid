@@ -28,6 +28,7 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
+from dsgrid.spark.functions import join
 from dsgrid.spark.types import DataFrame, F
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
@@ -186,8 +187,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         )
         for col in time_cols:
             load_data_df = load_data_df.filter(f"{col} is not null")
-        tmp = load_data_df.groupBy(*time_cols).count()
-        counts = tmp.select("count")
+        counts = load_data_df.groupBy(*time_cols).count().select("count")
         distinct_counts = counts.select("count").distinct().collect()
         if len(distinct_counts) != 1:
             raise DSGInvalidDataset(
@@ -298,10 +298,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 dataset_record_ids = project_record_ids
             else:
                 dataset_record_ids = (
-                    dataset_mapping.withColumnRenamed("from_id", "dataset_record_id")
-                    .join(
+                    join(
+                        dataset_mapping.withColumnRenamed("from_id", "dataset_record_id"),
                         project_record_ids,
-                        on=dataset_mapping.to_id == project_record_ids.id,
+                        "to_id",
+                        "id",
                     )
                     .select("dataset_record_id")
                     .withColumnRenamed("dataset_record_id", "id")
@@ -342,9 +343,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if dim_type.value not in df.columns:
                 # This dimensions is stored in another table (e.g., lookup or load_data)
                 continue
-            df = df.join(tmp, on=getattr(df, dim_type.value) == tmp.dataset_record_id).drop(
-                "dataset_record_id"
-            )
+            df = join(df, tmp, dim_type.value, "dataset_record_id").drop("dataset_record_id")
 
         return df
 
@@ -376,9 +375,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             )
             records = mapping_config.get_records_dataframe()
             if filtered_records is not None and dim_type in filtered_records:
-                records = records.join(
-                    filtered_records[dim_type], on=records.to_id == filtered_records[dim_type].id
-                ).drop("id")
+                records = join(records, filtered_records[dim_type], "to_id", "id").drop("id")
 
             if is_noop_mapping(records):
                 logger.info("Skip no-op mapping %s.", ref.mapping_id)

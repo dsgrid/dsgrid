@@ -8,8 +8,6 @@ from pathlib import Path
 from IPython.display import display, HTML
 import ipywidgets as widgets
 
-# from pyspark.sql import SparkSession
-
 from dsgrid.common import REMOTE_REGISTRY, LOCAL_REGISTRY
 from dsgrid.exceptions import DSGBaseException
 from dsgrid.registry.registry_database import DatabaseConnection

@@ -13,7 +13,7 @@ from dsgrid.spark.functions import (
     cross_join,
     except_all,
     get_current_time_zone,
-    interval,
+    perform_interval_op,
     is_dataframe_empty,
     join_multiple_columns,
     pivot,
@@ -155,7 +155,9 @@ def test_is_dataframe_empty(dataframe):
 def test_interval(time_dataframe):
     res = [
         x.timestamp2
-        for x in interval(time_dataframe, "timestamp", "+", 3600, "SECONDS", "timestamp2")
+        for x in perform_interval_op(
+            time_dataframe, "timestamp", "+", 3600, "SECONDS", "timestamp2"
+        )
         .select("timestamp2")
         .distinct()
         .sort("timestamp2")

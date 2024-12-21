@@ -112,7 +112,6 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
 
             logger.info("4. with a duplicated pivot col: ")
             _modify_data_file(data_dir, duplicate_col="elec_heating")
-            # with pytest.raises(DSGInvalidDimension, match=r"column.*is not expected"):
             with pytest.raises((ValueError, DSGInvalidDimension)):
                 _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 

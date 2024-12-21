@@ -2,6 +2,7 @@ import abc
 import logging
 from datetime import timedelta
 from typing import Optional
+from uuid import uuid4
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import (
@@ -21,8 +22,7 @@ from dsgrid.config.dimensions import TimeRangeModel
 from dsgrid.spark.functions import (
     aggregate,
     except_all,
-    interval,
-    make_temp_view_name,
+    perform_interval_op,
     select_expr,
     unpersist,
 )
@@ -237,8 +237,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             df.select(time_col).distinct().select(time_col, F.col(time_col).alias("orig_ts"))
         )
         if use_duckdb():
-            # TODO DT
-            time_map.relation = time_map.relation.set_alias(make_temp_view_name())
+            # TODO duckdb: There must be a join somewhere above here.
+            # Tests don't trigger this code block.
+            time_map.relation = time_map.relation.set_alias(f"relation_{uuid4()}")
         else:
             time_map.cache()
             time_map.count()
@@ -259,7 +260,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         )
         if time_map_diff != [Row(diff=timedelta(0))]:
             other_cols = [x for x in df.columns if x != time_col]
-            # TODO duckdb: something is wrong here
             df = (
                 df.select(time_col, *other_cols)
                 .withColumnRenamed(time_col, "orig_ts")
@@ -302,20 +302,15 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
             if dtime_interval == TimeIntervalType.PERIOD_BEGINNING:
                 df_change = df.join(aggregate(df, "max", time_col, time_col), time_col)
-                df = interval(df_change, time_col, "-", time_delta, "SECONDS", time_col).union(
-                    except_all(df, df_change)
-                )
-                df = (
-                    interval(df_change, time_col, "-", time_delta, "SECONDS", time_col)
-                    .union(except_all(df, df_change))
-                    .union(except_all(df, df_change))
-                )
+                df = perform_interval_op(
+                    df_change, time_col, "-", time_delta, "SECONDS", time_col
+                ).union(except_all(df, df_change))
             elif dtime_interval == TimeIntervalType.PERIOD_ENDING:
                 df2 = aggregate(df, "min", time_col, time_col)
                 df_change = df.join(df2, time_col).select(*df.columns)
-                df = interval(df_change, time_col, "+", time_delta, "SECONDS", time_col).union(
-                    except_all(df, df_change)
-                )
+                df = perform_interval_op(
+                    df_change, time_col, "+", time_delta, "SECONDS", time_col
+                ).union(except_all(df, df_change))
         return df
 
     def _build_time_ranges(

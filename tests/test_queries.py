@@ -49,6 +49,7 @@ from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.functions import (
     aggregate_single_value,
+    read_csv,
 )
 from dsgrid.spark.types import (
     DataFrame,
@@ -67,7 +68,7 @@ from dsgrid.tests.common import (
 )
 from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
-from dsgrid.utils.spark import custom_spark_conf, get_spark_session
+from dsgrid.utils.spark import custom_spark_conf
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
@@ -1187,8 +1188,7 @@ class QueryTestAnnualElectricityUseByState(QueryTestBase):
 
     def validate(self, expected_values):
         filename = self.output_dir / self.name / "table.csv"
-        spark = get_spark_session()
-        df = spark.read.csv(str(filename), header=True, inferSchema=True)
+        df = read_csv(filename)
         years = df.select("year").distinct().collect()
         assert len(years) == 1
         assert years[0].year == 2012

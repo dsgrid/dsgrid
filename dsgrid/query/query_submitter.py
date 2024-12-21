@@ -527,6 +527,4 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
 
 def _pivot_table(df: DataFrame, context: QueryContext):
     pivoted_column = context.convert_to_pivoted()
-    # ids = [x for x in df.columns if x not in {pivoted_column, VALUE_COLUMN}]
-    # return df.groupBy(*ids).pivot(pivoted_column).sum(VALUE_COLUMN)
     return pivot(df, pivoted_column, VALUE_COLUMN)

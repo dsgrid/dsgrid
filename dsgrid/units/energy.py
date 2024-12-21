@@ -3,7 +3,7 @@
 import logging
 
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.spark.functions import except_all, is_dataframe_empty
+from dsgrid.spark.functions import except_all, is_dataframe_empty, join
 from dsgrid.spark.types import DataFrame, F
 
 
@@ -190,7 +190,7 @@ def convert_units_unpivoted(
     else:
         tmp2 = from_to_records.select("from_id", "to_id")
         unit_df = (
-            tmp1.join(tmp2, on=tmp1.id == tmp2.from_id)
+            join(tmp1, tmp2, "id", "from_id")
             .select(F.col("to_id").alias("id"), "from_unit")
             .distinct()
         )
@@ -200,9 +200,9 @@ def convert_units_unpivoted(
         logger.info("Return early because the units match.")
         return df
 
-    df = df.join(unit_df, on=getattr(df, metric_column) == unit_df.id).drop("id")
+    df = join(df, unit_df, metric_column, "id").drop("id")
     tmp3 = to_unit_records.select("id", "unit").withColumnRenamed(unit_col, "to_unit")
-    df = df.join(tmp3, on=getattr(df, metric_column) == tmp3.id).drop("id")
+    df = join(df, tmp3, metric_column, "id").drop("id")
     logger.info("Converting units from column %s", metric_column)
     return df.withColumn(VALUE_COLUMN, from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)).drop(
         "from_unit", "to_unit"

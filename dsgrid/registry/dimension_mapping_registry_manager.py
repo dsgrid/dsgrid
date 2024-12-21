@@ -217,9 +217,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     ):
         mapping_df = models_to_dataframe(mapping_records)
         mapping_sum_df = (
-            mapping_df.groupBy(group_by).agg(F.sum("from_fraction").alias("sum_fraction"))
-            # TODO duckdb: not supported, do we really need descending?
-            .sort("sum_fraction", group_by)  # , ascending=False
+            mapping_df.groupBy(group_by)
+            .agg(F.sum("from_fraction").alias("sum_fraction"))
+            .sort("sum_fraction", group_by)
         )
         fracs_greater_than_one = mapping_sum_df.filter((F.col("sum_fraction") - 1.0) > tolerance)
         fracs_less_than_one = mapping_sum_df.filter(1.0 - F.col("sum_fraction") > tolerance)

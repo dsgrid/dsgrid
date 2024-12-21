@@ -42,7 +42,9 @@ def aggregate(df: DataFrame, agg_func: str, column: str, alias: str) -> DataFram
 
 
 def aggregate_single_value(df: DataFrame, agg_func: str, column: str) -> Any:
-    """Run an aggregate function on the dataframe."""
+    """Run an aggregate function on the dataframe that will produce a single value, such as max.
+    Return that single value.
+    """
     alias = "__tmp__"
     if use_duckdb():
         return df.relation.aggregate(f"{agg_func}({column}) as {alias}").df().values[0][0]
@@ -70,7 +72,7 @@ def coalesce(df: DataFrame, num_partitions: int) -> DataFrame:
 
 
 def collect_list(df: DataFrame, column: str) -> list:
-    """Collect the dataframe into a list."""
+    """Collect the dataframe column into a list."""
     if use_duckdb():
         return [x[column] for x in df.collect()]
 
@@ -143,7 +145,7 @@ def cross_join(df1: DataFrame, df2: DataFrame) -> DataFrame:
         view1 = create_temp_view(df1)
         view2 = create_temp_view(df2)
         spark = get_spark_session()
-        return spark.sql(f"SELECT {view1}.*, {view2}.* FROM {view1} CROSS JOIN {view2}")
+        return spark.sql(f"SELECT * from {view1} CROSS JOIN {view2}")
 
     return df1.crossJoin(df2)
 
@@ -339,7 +341,9 @@ def is_dataframe_empty(df: DataFrame) -> bool:
     return df.rdd.isEmpty()
 
 
-def interval(df: DataFrame, time_column, op: str, val: Any, unit: str, alias: str) -> DataFrame:
+def perform_interval_op(
+    df: DataFrame, time_column, op: str, val: Any, unit: str, alias: str
+) -> DataFrame:
     """Perform an interval operation ('-' or '+') on a time column."""
     if use_duckdb():
         view = create_temp_view(df)
@@ -362,6 +366,17 @@ def interval(df: DataFrame, time_column, op: str, val: Any, unit: str, alias: st
             msg = f"{op=} is not supported"
             raise NotImplementedError(msg)
     return df.withColumn(alias, expr)
+
+
+def join(df1: DataFrame, df2: DataFrame, column1: str, column2: str, how="inner") -> DataFrame:
+    """Join two dataframes on multiple columns."""
+    df = df1.join(df2, on=df1[column1] == df2[column2], how=how)
+    if use_duckdb():
+        # DuckDB sets the relation alias to "relation", which causes problems with future
+        # joins. They declined to address this in https://github.com/duckdb/duckdb/issues/12959
+        df.relation = df.relation.set_alias(f"relation_{uuid4()}")
+
+    return df
 
 
 def join_multiple_columns(
@@ -411,6 +426,7 @@ def read_csv(path: Path | str) -> DataFrame:
             path_str = str(files[0])
         else:
             path_str = str(path_)
+        # TODO duckdb
         # df = spark.read.csv(path_str, header=True)
         # for field in df.schema:
         #    if field.dataType is TimestampNTZType():
@@ -530,3 +546,17 @@ def _unpivot_spark(
         name_column,
         value_column,
     )
+
+
+def write_csv(
+    df: DataFrame, path: Path | str, header: bool = True, overwrite: bool = False
+) -> None:
+    """Write a DataFrame to a CSV file, handling special cases with duckdb."""
+    path_str = path if isinstance(path, str) else str(path)
+    if use_duckdb():
+        df.relation.write_csv(path_str, header=header, overwrite=overwrite)
+    else:
+        if overwrite:
+            df.write.options(header=True).mode("overwrite").csv(path_str)
+        else:
+            df.write.options(header=True).csv(path_str)

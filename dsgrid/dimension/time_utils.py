@@ -21,7 +21,7 @@ from dsgrid.dimension.time import (
 from dsgrid.config.dimensions import TimeRangeModel
 from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.spark.functions import (
-    interval,
+    perform_interval_op,
     prepare_timestamps_for_dataframe,
 )
 from dsgrid.spark.types import (
@@ -552,9 +552,13 @@ def shift_time_interval(
 
     match (from_time_interval, to_time_interval):
         case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
-            df = interval(df, time_column, "+", time_step.seconds, "SECONDS", new_time_column)
+            df = perform_interval_op(
+                df, time_column, "+", time_step.seconds, "SECONDS", new_time_column
+            )
         case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
-            df = interval(df, time_column, "-", time_step.seconds, "SECONDS", new_time_column)
+            df = perform_interval_op(
+                df, time_column, "-", time_step.seconds, "SECONDS", new_time_column
+            )
 
     return df
 
@@ -608,7 +612,7 @@ def apply_time_wrap(df, project_time_dim, diff: set):
     # time-wrap by "changing" the year with time_delta
     diff2 = prepare_timestamps_for_dataframe(diff)
     df1 = df.filter(getattr(df, time_col).isin(diff2))
-    df2 = interval(df1, time_col, "+", int(time_delta), "SECONDS", time_col)
+    df2 = perform_interval_op(df1, time_col, "+", int(time_delta), "SECONDS", time_col)
     df3 = df.filter(~(getattr(df, time_col).isin(diff2)))
     df4 = df2.union(df3)
 

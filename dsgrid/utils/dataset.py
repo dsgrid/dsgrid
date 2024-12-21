@@ -9,6 +9,7 @@ from dsgrid.spark.functions import (
     count_distinct_on_group_by,
     read_parquet,
     is_dataframe_empty,
+    join,
     join_multiple_columns,
     unpivot,
 )
@@ -32,14 +33,11 @@ def map_and_reduce_stacked_dimension(df, records, column, drop_column=True, to_c
         df = df.withColumn("fraction", F.lit(1.0))
     # map and consolidate from_fraction only
     records = records.filter("to_id IS NOT NULL")
-    df = df.join(records, on=getattr(df, column) == records.from_id, how="inner").drop("from_id")
+    df = join(df, records, column, "from_id", how="inner").drop("from_id")
     if drop_column:
         df = df.drop(column)
     df = df.withColumnRenamed("to_id", to_column_)
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
-    # TODO DT: DuckDB doesn't have fillna. Do we even need it?
-    # Could use SQL directly.
-    # df = df.fillna(1.0, subset=["from_fraction"]).select(
     df = df.select(
         *nonfraction_cols, (F.col("fraction") * F.col("from_fraction")).alias("fraction")
     )
@@ -66,9 +64,11 @@ def add_time_zone(load_data_df, geography_dim):
 
 
 def add_column_from_records(df, dimension_records, dimension_name, column_to_add):
-    df = df.join(
+    df = join(
+        df,
         dimension_records.select(F.col("id").alias("record_id"), column_to_add),
-        on=F.col(dimension_name) == F.col("record_id"),
+        dimension_name,
+        "record_id",
         how="inner",
     ).drop("record_id")
     return df
@@ -82,9 +82,6 @@ def apply_scaling_factor(
         df = df.withColumn(
             column,
             F.when(
-                # getattr(df, scaling_factor_column).isNotNull(),
-                # F.col(scaling_factor_column).isNotNull(),
-                # df[scaling_factor_column].isNotNull(),
                 F.col(scaling_factor_column) > 0,
                 F.col(column) * F.col(scaling_factor_column),
             ).otherwise(F.col(column)),

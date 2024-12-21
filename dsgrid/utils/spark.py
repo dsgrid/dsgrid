@@ -365,9 +365,7 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
                 spark_type = PYTHON_TO_SPARK_TYPES[python_type]()
                 struct_fields.append(StructField(f, spark_type, nullable=True))
             dct[f] = val
-        # TODO: is this change ok?
         rows.append(tuple(dct.values()))
-        # rows.append(Row(**dct))
 
     schema = StructType(struct_fields)
     df = spark.createDataFrame(rows, schema=schema)

@@ -59,6 +59,7 @@ def test_restart_spark():
         assert new_spark.conf.get("spark.rdd.compress") == new_compress
 
 
+@pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB")
 def test_custom_spark_conf():
     orig_session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
     assert orig_session_tz != "UTC"

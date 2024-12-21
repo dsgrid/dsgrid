@@ -67,6 +67,7 @@ from dsgrid.spark.functions import (
     except_all,
     is_dataframe_empty,
     unpersist,
+    write_csv,
 )
 from dsgrid.spark.types import (
     DataFrame,
@@ -1179,9 +1180,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         dataset_id = dataset_config.config_id
         out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
         cache(diff)
-        # TODO duckdb
-        diff.write.csv(out_file, header=True)
-        # diff.write.options(header=True).mode("overwrite").csv(out_file)
+        write_csv(diff, out_file, header=True, overwrite=True)
         logger.error(
             "Dataset %s is missing required dimension records from project %s. "
             "Recorded missing records in %s",

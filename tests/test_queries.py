@@ -68,7 +68,7 @@ from dsgrid.tests.common import (
 )
 from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
-from dsgrid.utils.spark import custom_spark_conf
+from dsgrid.utils.spark import custom_time_zone
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
@@ -120,7 +120,7 @@ def la_expected_electricity_hour_16(tmp_path_factory):
         .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
     )
     tz = project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
-    with custom_spark_conf({"spark.sql.session.timeZone": tz.tz_name}):
+    with custom_time_zone(tz.tz_name):
         expected = (
             df.groupBy("county", F.hour("time_est").alias("hour"))
             .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
@@ -408,7 +408,6 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
     assert five_year_years == [2010, 2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050]
 
     def get_pivoted_value_sum(df):
-        # TODO DT: single query?
         return aggregate_single_value(df, "sum", "cooling") + aggregate_single_value(
             df, "sum", "fans"
         )
@@ -1066,6 +1065,8 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
             .filter(f"end_uses_by_fuel_type == '{end_use}'")
             .collect()
         )
+
+        df.filter(f"county == '{county}' and end_uses_by_fuel_type == '{end_use}'").show()
         assert len(filtered_values) == 1
         assert math.isclose(filtered_values[0].value, expected_values["la_electricity_hour_16"])
         return True
@@ -1558,11 +1559,6 @@ class QueryTestUnitMapping(QueryTestBase):
         assert actual.fans == expected_fans[VALUE_COLUMN] * 0.9
         assert actual.cooling == expected_cooling[VALUE_COLUMN] * 1000
         return True
-
-
-# TODO DT: unused?
-# def perform_op(df, column, operation):
-# return aggregate_single_value(df.select(column), operation, column)
 
 
 def validate_electricity_use_by_county(

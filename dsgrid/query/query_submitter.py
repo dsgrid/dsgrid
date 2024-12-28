@@ -23,7 +23,7 @@ from dsgrid.spark.functions import pivot
 from dsgrid.spark.types import DataFrame
 from dsgrid.project import Project
 from dsgrid.utils.spark import (
-    custom_spark_conf,
+    custom_time_zone,
     read_dataframe,
     try_read_dataframe,
     write_dataframe,
@@ -419,8 +419,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
             # of the local computer.
             # If any other settings get customized here, handle them in restart_spark()
             # as well. This change won't persist Spark session restarts.
-            conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
-            with custom_spark_conf(conf):
+            with custom_time_zone(tz.tz_name):
                 df, context = self._run_query(
                     scratch_dir_context,
                     model,
@@ -465,8 +464,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             # of the local computer.
             # If any other settings get customized here, handle them in restart_spark()
             # as well. This change won't persist Spark session restarts.
-            conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
-            with custom_spark_conf(conf):
+            with custom_time_zone(tz.tz_name):
                 df, context = self._run_query(
                     scratch_dir_context,
                     model,
@@ -498,8 +496,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             df, context.metadata = self._read_dataset(query.dataset_id)
             # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
             # you add a new customization.
-            conf = {} if tz is None else {"spark.sql.session.timeZone": tz.tz_name}
-            with custom_spark_conf(conf):
+            with custom_time_zone(tz.tz_name):
                 self._process_aggregations_and_save(df, context, repartition=False)
             context.finalize()
 

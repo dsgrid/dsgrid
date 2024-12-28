@@ -633,7 +633,7 @@ def write_dataframe(df: DataFrame, filename: str | Path, overwrite: bool = False
 
 
 @track_timing(timer_stats_collector)
-def persist_intermediate_table(df: DataFrame, context: ScratchDirContext, tag=None) -> DataFrame:
+def persist_intermediate_table(df: DataFrame, context: ScratchDirContext, tag=None) -> Path:
     """Persist a table to the scratch directory. This can be helpful to avoid multiple
     evaluations of the same query.
     """
@@ -642,9 +642,8 @@ def persist_intermediate_table(df: DataFrame, context: ScratchDirContext, tag=No
     path = context.get_temp_filename(suffix=".parquet")
     logger.info("Start persist_intermediate_table %s %s", path, tag or "")
     write_dataframe(df, path)
-    df = read_dataframe(path)
     logger.info("Completed persist_intermediate_table %s %s", path, tag or "")
-    return df
+    return path
 
 
 def sql(query: str) -> DataFrame:
@@ -812,6 +811,19 @@ def custom_spark_conf(conf):
         spark = get_spark_session()
         for key, val in orig_settings.items():
             spark.conf.set(key, val)
+
+
+@contextmanager
+def custom_time_zone(time_zone: str):
+    """Apply a custom Spark time zone for the duration of a code block."""
+    orig_time_zone = get_current_time_zone()
+    try:
+        set_current_time_zone(time_zone)
+        yield
+    finally:
+        # Note that the user code could have restarted the session.
+        # This will function will get the current one.
+        set_current_time_zone(orig_time_zone)
 
 
 @contextmanager

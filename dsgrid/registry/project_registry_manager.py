@@ -81,6 +81,7 @@ from dsgrid.utils.spark import (
     models_to_dataframe,
     get_unique_values,
     persist_intermediate_table,
+    read_dataframe,
 )
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from dsgrid.registry.registry_interface import ProjectRegistryInterface
@@ -1217,9 +1218,9 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         logger.info("Make dimension association table for %s", dataset_id)
         df = config.make_dimension_association_table(dataset_id, context)
-        df = persist_intermediate_table(df, context)
+        path = persist_intermediate_table(df, context)
         logger.info("Wrote dimension associations for dataset %s", dataset_id)
-        return df
+        return read_dataframe(path)
 
     def update_from_file(
         self,

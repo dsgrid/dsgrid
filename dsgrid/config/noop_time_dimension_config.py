@@ -1,6 +1,6 @@
 from datetime import timedelta
 
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.spark.types import DataFrame
 from .dimensions import NoOpTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -21,15 +21,7 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     pass
 
-    def convert_dataframe(
-        self,
-        df,
-        project_time_dim,
-        value_columns: set[str],
-        scratch_dir_context: ScratchDirContext,
-        wrap_time_allowed=False,
-        time_based_data_adjustment=None,
-    ):
+    def convert_dataframe(self, df: DataFrame, *args, **kwargs) -> DataFrame:
         return df
 
     def get_frequency(self):

@@ -1,9 +1,15 @@
 import logging
 import os
+from pathlib import Path
 from typing import Iterable
+
+import chronify
 
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
+from dsgrid.chronify import create_store
+from dsgrid.dimension.time import TimeZone
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
 from dsgrid.spark.functions import (
     count_distinct_on_group_by,
@@ -13,6 +19,7 @@ from dsgrid.spark.functions import (
     join_multiple_columns,
     unpivot,
 )
+from dsgrid.spark.functions import get_spark_session
 from dsgrid.spark.types import (
     DataFrame,
     F,
@@ -21,6 +28,7 @@ from dsgrid.spark.types import (
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     check_for_nulls,
+    read_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
@@ -57,9 +65,18 @@ def add_time_zone(load_data_df, geography_dim):
     pyspark.sql.DataFrame
 
     """
-    geo_records = geography_dim.get_records_dataframe()
+    spark = get_spark_session()
+    dsg_geo_records = geography_dim.get_records_dataframe()
+    tz_map_table = spark.createDataFrame(
+        [(x.value, x.tz_name) for x in TimeZone], ("dsgrid_name", "tz_name")
+    )
+    geo_records = (
+        join(dsg_geo_records, tz_map_table, "time_zone", "dsgrid_name")
+        .drop("time_zone", "dsgrid_name")
+        .withColumnRenamed("tz_name", "time_zone")
+    )
+    assert dsg_geo_records.count() == geo_records.count()
     geo_name = geography_dim.model.dimension_type.value
-    assert "time_zone" not in load_data_df.columns
     return add_column_from_records(load_data_df, geo_records, geo_name, "time_zone")
 
 
@@ -140,6 +157,49 @@ def is_noop_mapping(records: DataFrame) -> bool:
             "(from_id != to_id) or (from_fraction != 1.0)"
         )
     )
+
+
+def map_time_dimension_with_chronify(
+    df: DataFrame,
+    value_column: str,
+    filename: Path,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+    scratch_dir_context: ScratchDirContext,
+) -> DataFrame:
+    time_array_id_columns = [
+        x
+        for x in df.columns
+        if x
+        in set(df.columns).difference(from_time_dim.get_load_data_time_columns()) - {value_column}
+    ]
+    src_schema = chronify.TableSchema(
+        name="dsgrid_src",
+        time_config=from_time_dim.to_chronify(),
+        time_array_id_columns=time_array_id_columns,
+        value_column=value_column,
+    )
+    dst_schema = chronify.TableSchema(
+        name="dsgrid_dst",
+        time_config=to_time_dim.to_chronify(),
+        time_array_id_columns=time_array_id_columns,
+        value_column=value_column,
+    )
+    store_file = scratch_dir_context.get_temp_filename(suffix=".db")
+    with create_store(store_file) as store:
+        store.create_view_from_parquet(filename, src_schema)
+
+        store.map_table_time_config(
+            src_schema.name, dst_schema, scratch_dir=scratch_dir_context.scratch_dir
+        )
+        out_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+        store.write_table_to_parquet(dst_schema.name, out_file)
+        df = read_dataframe(out_file)
+        store.drop_table(dst_schema.name)
+    # TODO:
+    # 1. is time_zone handled automatically?
+    # 3. What about wrap_time_allowed?
+    return df
 
 
 def ordered_subset_columns(df, subset: set[str]) -> list[str]:

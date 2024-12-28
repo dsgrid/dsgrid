@@ -1,16 +1,20 @@
 import abc
 import logging
 import os
-from typing import Optional
+from pathlib import Path
+from typing import Iterable, Optional
 
+import chronify
 from sqlalchemy import Connection
+from dsgrid.chronify import create_store
 
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     map_annual_time_to_date_time,
 )
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
-
+from dsgrid.config.project_config import ProjectConfig
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig, InputDatasetType
@@ -35,11 +39,12 @@ from dsgrid.utils.dataset import (
     is_noop_mapping,
     map_and_reduce_stacked_dimension,
     add_time_zone,
+    map_time_dimension_with_chronify,
     ordered_subset_columns,
     repartition_if_needed_by_mapping,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import persist_intermediate_table
+from dsgrid.utils.spark import persist_intermediate_table, read_dataframe
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -165,6 +170,48 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if time_dim.model.time_type != TimeDimensionType.NOOP:
             self._check_dataset_time_consistency_by_time_array(time_cols, load_data_df)
         self._check_model_year_time_consistency(load_data_df)
+
+    @track_timing(timer_stats_collector)
+    def _check_dataset_time_consistency_with_chronify(self):
+        """Check dataset time consistency such that:
+        1. time range(s) match time config record;
+        2. all dimension combinations return the same set of time range(s).
+
+        """
+        if os.environ.get("__DSGRID_SKIP_CHECK_DATASET_TIME_CONSISTENCY__"):
+            logger.warning("Skip dataset time consistency checks.")
+            return
+
+        logger.info("Check dataset time consistency.")
+        path = Path(self._config.load_data_path)
+        assert path.exists()
+        load_data_df = read_dataframe(path)
+        schema = self._get_chronify_schema(load_data_df)
+        scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
+        with ScratchDirContext(scratch_dir) as context:
+            store_file = context.get_temp_filename(suffix=".db")
+            with create_store(store_file) as store:
+                # This performs all of the checks.
+                store.create_view_from_parquet(path, schema)
+                store.drop_view(schema.name)
+
+        self._check_model_year_time_consistency(load_data_df)
+
+    def _get_chronify_schema(self, df: DataFrame):
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        time_cols = time_dim.get_load_data_time_columns()
+        time_array_id_columns = [
+            x
+            for x in df.columns
+            if x
+            in set(df.columns).difference(time_cols).difference(self._config.get_value_columns())
+        ]
+        return chronify.TableSchema(
+            name="dsgrid_view",
+            time_config=time_dim.to_chronify(),
+            time_array_id_columns=time_array_id_columns,
+            value_column=VALUE_COLUMN,
+        )
 
     def _check_model_year_time_consistency(self, df: DataFrame):
         time_dim = self._config.get_dimension(DimensionType.TIME)
@@ -408,11 +455,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(
         self,
-        load_data_df,
-        project_config,
-        value_columns: set[str],
+        load_data_df: DataFrame,
+        project_config: ProjectConfig,
+        value_column: str | Iterable[str],
         scratch_dir_context: ScratchDirContext,
     ):
+        if not isinstance(value_column, str):
+            if len(list(value_column)) != 1:
+                msg = "Bug: There can only be one value column."
+                raise Exception(msg)
+            value_column = next(iter(value_column))
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
         time_based_data_adjustment = input_dataset_model.time_based_data_adjustment
@@ -435,23 +487,30 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 load_data_df,
                 time_dim,
                 project_time_dim,
-                value_columns,
+                {value_column},
             )
-
-        # In many cases we need to persist the current query before mapping time.
-        # This has been true for DECARB industrial and transportation.
-        load_data_df = persist_intermediate_table(
+        filename = persist_intermediate_table(
             load_data_df, scratch_dir_context, tag="query before mapping time"
         )
-
-        load_data_df = time_dim.convert_dataframe(
-            load_data_df,
-            self._project_time_dim,
-            value_columns,
-            scratch_dir_context,
-            wrap_time_allowed=wrap_time_allowed,
-            time_based_data_adjustment=time_based_data_adjustment,
-        )
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        if time_dim.supports_chronify():
+            load_data_df = map_time_dimension_with_chronify(
+                df=load_data_df,
+                value_column=value_column,
+                filename=filename,
+                from_time_dim=time_dim,
+                to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
+                scratch_dir_context=scratch_dir_context,
+            )
+        else:
+            load_data_df = time_dim.convert_dataframe(
+                load_data_df,
+                self._project_time_dim,
+                {value_column},
+                scratch_dir_context,
+                wrap_time_allowed=wrap_time_allowed,
+                time_based_data_adjustment=time_based_data_adjustment,
+            )
 
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")

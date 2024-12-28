@@ -9,6 +9,7 @@ from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.functions import (
     cross_join,
+    read_csv,
 )
 from dsgrid.spark.types import (
     F,
@@ -25,7 +26,7 @@ from dsgrid.utils.spark import (
     get_spark_session,
 )
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
-from dsgrid.tests.utils import read_csv_single_table_format, read_parquet_two_table_format
+from dsgrid.tests.utils import read_parquet_two_table_format
 
 
 REGISTRY_PATH = Path("dsgrid-test-data/filtered_registries/simple_standard_scenarios")
@@ -48,7 +49,7 @@ def build_expected_datasets():
         map_aeo_com_county_to_comstock_county(
             duplicate_aeo_com_census_division_to_county(
                 apply_load_mapping_aeo_com(
-                    read_csv_single_table_format(
+                    read_csv(
                         path
                         / "data"
                         / "aeo2021_reference_commercial_energy_use_growth_factors"
@@ -60,7 +61,7 @@ def build_expected_datasets():
         )
     )
     aeo_res = apply_load_mapping_aeo_res(
-        read_csv_single_table_format(
+        read_csv(
             path
             / "data"
             / "aeo2021_reference_residential_energy_use_growth_factors"

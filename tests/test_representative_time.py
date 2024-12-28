@@ -21,7 +21,11 @@ from dsgrid.config.date_time_dimension_config import (
 from dsgrid.config.representative_period_time_dimension_config import (
     RepresentativePeriodTimeDimensionConfig,
 )
-from dsgrid.dimension.time import MeasurementType, TimeIntervalType, RepresentativePeriodFormat
+from dsgrid.dimension.time import (
+    MeasurementType,
+    TimeIntervalType,
+    RepresentativePeriodFormat,
+)
 from dsgrid.spark.functions import (
     aggregate_single_value,
     is_dataframe_empty,
@@ -36,6 +40,7 @@ from dsgrid.spark.types import (
     StructField,
     use_duckdb,
 )
+from dsgrid.utils.dataset import map_time_dimension_with_chronify
 from dsgrid.utils.spark import (
     get_spark_session,
 )
@@ -132,12 +137,19 @@ def test_time_mapping(
     # It uses Pacific Prevailing Time to make the checks consistent with the dataset.
     df = one_weekday_day_and_one_weekend_day_per_month_by_hour_table
     # This dataset has only California counties.
-    df = df.withColumn("time_zone", F.lit("PacificPrevailing"))
+    df = df.withColumn("time_zone", F.lit("America/Los_Angeles"))
     config = make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config()
     project_time_config = make_date_time_config()
-    value_columns = {VALUE_COLUMN}
-    mapped_df = config.convert_dataframe(
-        df, project_time_config, value_columns, scratch_dir_context
+    # value_columns = {VALUE_COLUMN}
+    parquet_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+    df.write.parquet(str(parquet_file))
+    mapped_df = map_time_dimension_with_chronify(
+        df,
+        VALUE_COLUMN,
+        parquet_file,
+        config,
+        project_time_config,
+        scratch_dir_context,
     )
     timestamps = mapped_df.select("timestamp").distinct().sort("timestamp").collect()
     zi = ZoneInfo("EST")

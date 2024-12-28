@@ -1,5 +1,6 @@
-from pathlib import Path
+import enum
 import os
+from pathlib import Path
 
 # AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 REMOTE_REGISTRY = "s3://nrel-dsgrid-registry"
@@ -25,3 +26,10 @@ DEFAULT_SCRATCH_DIR = "__dsgrid_scratch__"
 SCALING_FACTOR_COLUMN = "scaling_factor"
 SYNC_EXCLUDE_LIST = ["*.DS_Store", "**/*.lock"]
 VALUE_COLUMN = "value"
+
+
+class BackendEngine(enum.StrEnum):
+    """Supported backend SQL processing engines"""
+
+    DUCKDB = "duckdb"
+    SPARK = "spark"

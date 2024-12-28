@@ -196,54 +196,6 @@ def shift_time_zone(
     )
 
 
-# TODO duckdb: these next two functions are likely incorrect.
-# Usage in the codebase is questionable.
-def from_utc_timestamp(
-    df: DataFrame, time_column: str, time_zone: str, new_column: str
-) -> DataFrame:
-    """Refer to pyspark.sql.functions.from_utc_timestamp."""
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = df.columns[:]
-        if time_column == new_column:
-            cols.remove(time_column)
-        cols_str = ",".join(cols)
-        query = f"""
-            SELECT
-                {cols_str},
-                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
-            FROM {view}
-        """
-        df2 = get_spark_session().sql(query)
-        return df2
-
-    df2 = df.withColumn(new_column, F.from_utc_timestamp(time_column, time_zone))
-    return df2
-
-
-def to_utc_timestamp(
-    df: DataFrame, time_column: str, time_zone: str, new_column: str
-) -> DataFrame:
-    """Refer to pyspark.sql.functions.to_utc_timestamp."""
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = df.columns[:]
-        if time_column == new_column:
-            cols.remove(time_column)
-        cols_str = ",".join(cols)
-        query = f"""
-            SELECT
-                {cols_str},
-                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
-            FROM {view}
-        """
-        df2 = get_spark_session().sql(query)
-        return df2
-
-    df2 = df.withColumn(new_column, F.to_utc_timestamp(time_column, time_zone))
-    return df2
-
-
 def get_duckdb_spark_session() -> SparkSession | None:
     """Return the active DuckDB Spark Session if it is set."""
     return g_spark
@@ -414,26 +366,22 @@ def prepare_timestamps_for_dataframe(timestamps: Iterable[datetime]) -> Iterable
     return timestamps
 
 
-def read_csv(path: Path | str) -> DataFrame:
+def read_csv(path: Path | str, cast_timestamp: bool = True) -> DataFrame:
     """Return a DataFrame from a CSV file, handling special cases with duckdb."""
     spark = get_spark_session()
     if use_duckdb():
         path_ = path if isinstance(path, Path) else Path(path)
         if path_.is_dir():
-            # path_str = str(path_) + "**/*.csv"
-            files = list(path_.glob("*.csv"))
-            assert len(files) == 1, files
-            path_str = str(files[0])
+            path_str = str(path_) + "**/*.csv"
         else:
             path_str = str(path_)
-        # TODO duckdb
-        # df = spark.read.csv(path_str, header=True)
-        # for field in df.schema:
-        #    if field.dataType is TimestampNTZType():
-        #        df = df.withColumn(field.name, F.col(field.name).cast(TimestampType()))
         df = spark.createDataFrame(pd.read_csv(path_str))
-        if "timestamp" in df.columns:
-            # TODO duckdb: do something better
+        if cast_timestamp and "timestamp" in df.columns:
+            if "PYTEST_VERSION" not in os.environ:
+                msg = "cast_timestamp in read_csv can only be set in a test environment: {path=}"
+                raise Exception(msg)
+            # TODO: need a better way of guessing and setting the correct type.
+            # Why is CSV used for this sort of thing?
             df = df.withColumn("timestamp", F.col("timestamp").cast(TimestampType()))
         dup_cols = [x for x in df.columns if x.endswith(".1")]
         if dup_cols:
@@ -454,6 +402,7 @@ def read_json(path: Path | str) -> DataFrame:
     if use_duckdb():
         with NamedTemporaryFile(suffix=".json") as f:
             f.close()
+            # TODO duckdb: look for something more efficient. Not a big deal right now.
             data = load_line_delimited_json(path)
             dump_data(data, f.name)
             return spark.read.json(f.name)

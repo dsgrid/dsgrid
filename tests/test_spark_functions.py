@@ -15,6 +15,7 @@ from dsgrid.spark.functions import (
     get_current_time_zone,
     perform_interval_op,
     is_dataframe_empty,
+    join,
     join_multiple_columns,
     pivot,
     select_expr,
@@ -164,6 +165,20 @@ def test_interval(time_dataframe):
         .collect()
     ]
     assert res == [datetime(2020, 1, 1, 1), datetime(2020, 1, 1, 2)]
+
+
+def test_join(spark, dataframe):
+    df2 = spark.createDataFrame(
+        [
+            ("Boulder", 0),
+            ("Jefferson", 100),
+        ],
+        ["county", "index2"],
+    )
+    df3 = join(dataframe, df2, "index", "index2")
+    assert not is_dataframe_empty(df3.filter("county = 'Boulder'"))
+    assert is_dataframe_empty(df3.filter("county = 'Jefferson'"))
+    assert aggregate_single_value(df3, "sum", "value") == 1.0 + 2.0
 
 
 def test_join_multiple_columns(spark, dataframe):

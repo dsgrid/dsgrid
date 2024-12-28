@@ -59,8 +59,14 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(self):
         self._check_lookup_data_consistency()
-        self._check_dataset_time_consistency(self._load_data.join(self._load_data_lookup, on="id"))
         self._check_dataset_internal_consistency()
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        if time_dim.supports_chronify():
+            self._check_dataset_time_consistency_with_chronify()
+        else:
+            self._check_dataset_time_consistency(
+                self._load_data.join(self._load_data_lookup, on="id")
+            )
 
     def make_dimension_association_table(self) -> DataFrame:
         lk_df = self._load_data_lookup.filter("id is not NULL")
@@ -83,16 +89,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         # TODO: This might need to handle data skew in the future.
         null_lk_df = self._remap_dimension_columns(null_lk_df)
         ld_df = self._remap_dimension_columns(ld_df, scratch_dir_context=scratch_dir_context)
-        value_columns = {VALUE_COLUMN}
         if SCALING_FACTOR_COLUMN in ld_df.columns:
-            ld_df = apply_scaling_factor(ld_df, value_columns)
-        ld_df = self._apply_fraction(ld_df, value_columns)
+            ld_df = apply_scaling_factor(ld_df, {VALUE_COLUMN})
+        ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
         project_metric_records = project_config.get_base_dimension(
             DimensionType.METRIC
         ).get_records_dataframe()
-        ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
+        ld_df = self._convert_units(ld_df, project_metric_records, {VALUE_COLUMN})
         ld_df = self._convert_time_dimension(
-            ld_df, project_config, value_columns, scratch_dir_context
+            ld_df, project_config, VALUE_COLUMN, scratch_dir_context
         )
         return self._add_null_values(ld_df, null_lk_df)
 
@@ -112,20 +117,19 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             handle_data_skew=True,
             scratch_dir_context=context.scratch_dir_context,
         )
-        value_columns = {VALUE_COLUMN}
         if "scaling_factor" in ld_df.columns:
-            ld_df = apply_scaling_factor(ld_df, value_columns)
+            ld_df = apply_scaling_factor(ld_df, {VALUE_COLUMN})
 
-        ld_df = self._apply_fraction(ld_df, value_columns)
+        ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
         project_metric_records = project_config.get_base_dimension(
             DimensionType.METRIC
         ).get_records_dataframe()
-        ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
+        ld_df = self._convert_units(ld_df, project_metric_records, {VALUE_COLUMN})
         null_lk_df = self._remap_dimension_columns(
             null_lk_df, filtered_records=context.get_record_ids()
         )
         ld_df = self._convert_time_dimension(
-            ld_df, project_config, value_columns, context.scratch_dir_context
+            ld_df, project_config, VALUE_COLUMN, context.scratch_dir_context
         )
         ld_df = self._add_null_values(ld_df, null_lk_df)
         return self._finalize_table(context, ld_df, project_config)
@@ -199,11 +203,31 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def _check_dataset_internal_consistency(self):
         """Check load_data dimensions and id series."""
         logger.info("Check dataset internal consistency.")
-        match self._config.get_table_format_type():
-            case TableFormatType.PIVOTED:
-                self._check_load_data_pivoted_columns()
-            case TableFormatType.UNPIVOTED:
-                self._check_load_data_unpivoted_value_column(self._load_data)
+        assert (
+            self._config.get_table_format_type() == TableFormatType.UNPIVOTED
+        ), self._config.get_table_format_type()
+        self._check_load_data_unpivoted_value_column(self._load_data)
+
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        time_columns = set(time_dim.get_load_data_time_columns())
+        allowed_columns = (
+            DimensionType.get_allowed_dimension_column_names()
+            .union(time_columns)
+            .union({VALUE_COLUMN, "id", "scaling_factor"})
+        )
+
+        found_id = False
+        for column in self._load_data.columns:
+            if column not in allowed_columns:
+                msg = f"{column=} is not expected in load_data"
+                raise DSGInvalidDataset(msg)
+            if column == "id":
+                found_id = True
+
+        if not found_id:
+            msg = "load_data does not include an 'id' column"
+            raise DSGInvalidDataset(msg)
+
         ld_ids = self._load_data.select("id").distinct()
         ldl_ids = self._load_data_lookup.select("id").distinct()
 
@@ -242,35 +266,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     )
             raise DSGInvalidDataset(
                 f"Data IDs for {self._config.config_id} data/lookup are inconsistent"
-            )
-
-    def _check_load_data_pivoted_columns(self):
-        logger.info("Check load data pivoted columns.")
-        dim_type = self._config.get_pivoted_dimension_type()
-        dimension_records = set(self._config.get_pivoted_dimension_columns())
-        time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_columns = set(time_dim.get_load_data_time_columns())
-
-        found_id = False
-        pivoted_cols = set()
-        for col in self._load_data.columns:
-            if col == "id":
-                found_id = True
-                continue
-            if col in time_columns:
-                continue
-            if col in dimension_records:
-                pivoted_cols.add(col)
-            else:
-                raise DSGInvalidDataset(f"column={col} is not expected in load_data.")
-
-        if not found_id:
-            raise DSGInvalidDataset("load_data does not include an 'id' column")
-
-        if dimension_records != pivoted_cols:
-            missing = dimension_records.difference(pivoted_cols)
-            raise DSGInvalidDataset(
-                f"load_data is missing {missing} columns for dimension={dim_type.value} based on records."
             )
 
     @track_timing(timer_stats_collector)

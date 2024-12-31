@@ -253,12 +253,11 @@ dimension["records"] = dimension["records"][:-1]
 ```
 
 ```python
-with engine.connect() as conn:
+with engine.begin() as conn:
     stmt = (
         update(table)
         .where(table.c.id == 1)
         .values(model=dimension)
     )
     conn.execute(stmt)
-    conn.commit()
 ```

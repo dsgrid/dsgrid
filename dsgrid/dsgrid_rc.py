@@ -2,6 +2,7 @@
 
 import logging
 import os
+import socket
 import sys
 from pathlib import Path
 from typing import Any, Optional
@@ -93,7 +94,11 @@ class DsgridRuntimeConfig(DSGBaseModel):
 
     def get_thrift_server_start_command(self) -> str:
         """Return a command that can be used to start a Thrift server."""
-        return f"{self.thrift_server_exec} --master={self.spark_cluster_url}"
+        if "<localhost>" in self.spark_cluster_url:
+            url = self.spark_cluster_url.replace("<localhost>", socket.gethostname())
+        else:
+            url = self.spark_cluster_url
+        return f"{self.thrift_server_exec} --master={url}"
 
     def get_thrift_server_stop_command(self) -> str:
         """Return a command that can be used to stop a Thrift server."""

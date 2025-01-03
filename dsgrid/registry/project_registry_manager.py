@@ -72,6 +72,7 @@ from dsgrid.spark.functions import (
 from dsgrid.spark.types import (
     DataFrame,
     F,
+    use_duckdb,
 )
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.files import load_data, in_other_dir
@@ -81,7 +82,6 @@ from dsgrid.utils.spark import (
     models_to_dataframe,
     get_unique_values,
     persist_intermediate_table,
-    read_dataframe,
 )
 from dsgrid.utils.utilities import check_uniqueness, display_table
 from dsgrid.registry.registry_interface import ProjectRegistryInterface
@@ -1218,9 +1218,12 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         logger.info("Make dimension association table for %s", dataset_id)
         df = config.make_dimension_association_table(dataset_id, context)
-        path = persist_intermediate_table(df, context)
+        if use_duckdb():
+            df2 = df
+        else:
+            df2 = persist_intermediate_table(df, context, "dimension_associations")
         logger.info("Wrote dimension associations for dataset %s", dataset_id)
-        return read_dataframe(path)
+        return df2
 
     def update_from_file(
         self,

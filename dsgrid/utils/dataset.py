@@ -1,14 +1,14 @@
 import logging
 import os
-from pathlib import Path
 from typing import Iterable
 
 import chronify
+from chronify.models import TableSchema
 
+import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.chronify import create_store
 from dsgrid.dimension.time import TimeZone
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
 from dsgrid.spark.functions import (
@@ -28,7 +28,6 @@ from dsgrid.spark.types import (
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     check_for_nulls,
-    read_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
@@ -159,14 +158,58 @@ def is_noop_mapping(records: DataFrame) -> bool:
     )
 
 
-def map_time_dimension_with_chronify(
+def map_time_dimension_with_chronify_duckdb(
     df: DataFrame,
     value_column: str,
-    filename: Path,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
+    src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
+    store = chronify.Store.create_in_memory_db()
+    store.ingest_table(df.relation, src_schema, bypass_checks=True)
+    store.map_table_time_config(
+        src_schema.name, dst_schema, scratch_dir=scratch_dir_context.scratch_dir
+    )
+    pandas_df = store.read_table(dst_schema.name)
+    store.drop_table(dst_schema.name)
+    return df.session.createDataFrame(pandas_df)
+
+
+def map_time_dimension_with_chronify_spark(
+    df: DataFrame,
+    table_name: str,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+    scratch_dir_context: ScratchDirContext,
+) -> DataFrame:
+    src_schema, dst_schema = _get_mapping_schemas(
+        df, value_column, from_time_dim, to_time_dim, src_name=table_name
+    )
+    # TODO DT: confirm that the table is there
+    store = chronify.Store.create_new_hive_store(
+        dsgrid.runtime_config.thrift_server_url, drop_schema=True
+    )
+    with store.engine.begin() as conn:
+        # This bypasses checks because the table should already be valid.
+        store.schema_manager.add_schema(conn, src_schema)
+    store.map_table_time_config(
+        src_schema.name, dst_schema, scratch_dir=scratch_dir_context.scratch_dir
+    )
+    # TODO:
+    # 1. is time_zone handled automatically?
+    # 3. What about wrap_time_allowed?
+    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
+
+
+def _get_mapping_schemas(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+    src_name: str = "dsgrid_src",
+) -> tuple[TableSchema, TableSchema]:
     time_array_id_columns = [
         x
         for x in df.columns
@@ -174,7 +217,7 @@ def map_time_dimension_with_chronify(
         in set(df.columns).difference(from_time_dim.get_load_data_time_columns()) - {value_column}
     ]
     src_schema = chronify.TableSchema(
-        name="dsgrid_src",
+        name=src_name,
         time_config=from_time_dim.to_chronify(),
         time_array_id_columns=time_array_id_columns,
         value_column=value_column,
@@ -185,21 +228,7 @@ def map_time_dimension_with_chronify(
         time_array_id_columns=time_array_id_columns,
         value_column=value_column,
     )
-    store_file = scratch_dir_context.get_temp_filename(suffix=".db")
-    with create_store(store_file) as store:
-        store.create_view_from_parquet(filename, src_schema)
-
-        store.map_table_time_config(
-            src_schema.name, dst_schema, scratch_dir=scratch_dir_context.scratch_dir
-        )
-        out_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-        store.write_table_to_parquet(dst_schema.name, out_file)
-        df = read_dataframe(out_file)
-        store.drop_table(dst_schema.name)
-    # TODO:
-    # 1. is time_zone handled automatically?
-    # 3. What about wrap_time_allowed?
-    return df
+    return src_schema, dst_schema
 
 
 def ordered_subset_columns(df, subset: set[str]) -> list[str]:

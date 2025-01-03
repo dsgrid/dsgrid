@@ -40,7 +40,7 @@ from dsgrid.spark.types import (
     StructField,
     use_duckdb,
 )
-from dsgrid.utils.dataset import map_time_dimension_with_chronify
+from dsgrid.utils.dataset import map_time_dimension_with_chronify_duckdb
 from dsgrid.utils.spark import (
     get_spark_session,
 )
@@ -132,6 +132,7 @@ def test_time_mapping(
     spark_time_zone,
     scratch_dir_context,
 ):
+    assert use_duckdb()
     # This test sets the Spark session time zone so that it can check times consistently
     # across computers.
     # It uses Pacific Prevailing Time to make the checks consistent with the dataset.
@@ -140,13 +141,14 @@ def test_time_mapping(
     df = df.withColumn("time_zone", F.lit("America/Los_Angeles"))
     config = make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config()
     project_time_config = make_date_time_config()
+    # TODO DT: how to test with Spark?
     # value_columns = {VALUE_COLUMN}
-    parquet_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    df.write.parquet(str(parquet_file))
-    mapped_df = map_time_dimension_with_chronify(
+    # parquet_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+    # df.write.parquet(str(parquet_file))
+    mapped_df = map_time_dimension_with_chronify_duckdb(
         df,
         VALUE_COLUMN,
-        parquet_file,
+        # parquet_file,
         config,
         project_time_config,
         scratch_dir_context,

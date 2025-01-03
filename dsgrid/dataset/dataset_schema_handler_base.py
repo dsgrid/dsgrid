@@ -33,18 +33,19 @@ from dsgrid.dimension.time import (
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.spark.functions import join
-from dsgrid.spark.types import DataFrame, F
+from dsgrid.spark.types import DataFrame, F, use_duckdb
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
     is_noop_mapping,
     map_and_reduce_stacked_dimension,
     add_time_zone,
-    map_time_dimension_with_chronify,
+    map_time_dimension_with_chronify_duckdb,
+    map_time_dimension_with_chronify_spark,
     ordered_subset_columns,
     repartition_if_needed_by_mapping,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import persist_intermediate_table, read_dataframe
+from dsgrid.utils.spark import read_dataframe, save_to_warehouse
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -190,10 +191,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as context:
             store_file = context.get_temp_filename(suffix=".db")
-            with create_store(store_file) as store:
-                # This performs all of the checks.
-                store.create_view_from_parquet(path, schema)
-                store.drop_view(schema.name)
+            store = create_store(store_file)
+            # This performs all of the checks.
+            store.create_view_from_parquet(path, schema)
+            store.drop_view(schema.name)
 
         self._check_model_year_time_consistency(load_data_df)
 
@@ -489,19 +490,32 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 project_time_dim,
                 {value_column},
             )
-        filename = persist_intermediate_table(
-            load_data_df, scratch_dir_context, tag="query before mapping time"
-        )
         time_dim = self._config.get_dimension(DimensionType.TIME)
+
+        if use_duckdb():
+            table_name = None
+        else:
+            load_data_df, table_name = save_to_warehouse(load_data_df)
+
         if time_dim.supports_chronify():
-            load_data_df = map_time_dimension_with_chronify(
-                df=load_data_df,
-                value_column=value_column,
-                filename=filename,
-                from_time_dim=time_dim,
-                to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
-                scratch_dir_context=scratch_dir_context,
-            )
+            if use_duckdb():
+                load_data_df = map_time_dimension_with_chronify_duckdb(
+                    df=load_data_df,
+                    value_column=value_column,
+                    from_time_dim=time_dim,
+                    to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
+                    scratch_dir_context=scratch_dir_context,
+                )
+            else:
+                assert table_name is not None
+                load_data_df = map_time_dimension_with_chronify_spark(
+                    df=load_data_df,
+                    table_name=table_name,
+                    value_column=value_column,
+                    from_time_dim=time_dim,
+                    to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
+                    scratch_dir_context=scratch_dir_context,
+                )
         else:
             load_data_df = time_dim.convert_dataframe(
                 load_data_df,

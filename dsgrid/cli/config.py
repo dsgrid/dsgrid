@@ -10,7 +10,6 @@ from dsgrid.dsgrid_rc import (
     DsgridRuntimeConfig,
     DEFAULT_THRIFT_SERVER_URL,
     DEFAULT_BACKEND,
-    DEFAULT_CHRONFIY_BACKEND,
 )
 
 
@@ -37,13 +36,6 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
     type=BackendEngine,
     default=DEFAULT_BACKEND,
     help="Backend engine for SQL processing",
-)
-@click.option(
-    "-c",
-    "--chronify-backend-engine",
-    type=BackendEngine,
-    default=DEFAULT_CHRONFIY_BACKEND,
-    help="Backend engine for SQL processing in chronify",
 )
 @click.option(
     "-t",
@@ -116,7 +108,6 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
 def create(
     url,
     backend_engine,
-    chronify_backend_engine,
     thrift_server_url,
     timings,
     # username,
@@ -130,7 +121,6 @@ def create(
     """Create a local dsgrid runtime configuration file."""
     dsgrid_config = DsgridRuntimeConfig(
         backend_engine=backend_engine,
-        chronify_backend_engine=chronify_backend_engine,
         thrift_server_url=thrift_server_url,
         timings=timings,
         database_url=url,

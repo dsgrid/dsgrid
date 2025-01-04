@@ -31,9 +31,7 @@ FROM python:3.11-slim
 USER root
 
 ARG VERSION
-ARG SPARK_VERSION=3.5.2
-ARG HADOOP_VERSION=3
-ARG FULL_STR=spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}
+ARG SPARK_VERSION=3.5.4
 
 RUN if [ -z "$VERSION" ]; then echo "VERSION must be specified"; exit 1; fi
 ENV CONTAINER_VERSION ${VERSION}
@@ -68,16 +66,19 @@ RUN echo "$VERSION" > /opt/version.txt
 
 WORKDIR /opt
 ENV SPARK_HOME=/opt/spark
-RUN wget https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/${FULL_STR}.tgz \
-	&& tar -xzf ${FULL_STR}.tgz \
-	&& rm ${FULL_STR}.tgz \
-	&& mv /opt/${FULL_STR} ${SPARK_HOME} \
+
+RUN wget --no-check-certificate https://dlcdn.apache.org/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz \
+	&& tar -xzf spark-${SPARK_VERSION}-bin-hadoop3.tgz \
+	&& rm spark-${SPARK_VERSION}-bin-hadoop3.tgz \
+	&& mv spark-${SPARK_VERSION}-bin-hadoop3 ${SPARK_HOME} \
 	&& cp ${SPARK_HOME}/conf/spark-defaults.conf.template ${SPARK_HOME}/conf/spark-defaults.conf \
 	&& cp ${SPARK_HOME}/conf/spark-env.sh.template ${SPARK_HOME}/conf/spark-env.sh \
 	&& cp ${SPARK_HOME}/kubernetes/dockerfiles/spark/entrypoint.sh /opt/entrypoint.sh \
 	&& chmod +x ${SPARK_HOME}/conf/spark-env.sh
 
-RUN wget https://github.com/duckdb/duckdb/releases/download/v1.0.0/duckdb_cli-linux-amd64.zip \
+COPY postgresql-42.7.4.jar ${SPARK_HOME}/jars
+
+RUN wget --no-check-certificate https://github.com/duckdb/duckdb/releases/download/v1.0.0/duckdb_cli-linux-amd64.zip \
     && unzip duckdb_cli-linux-amd64.zip \
     && rm duckdb_cli-linux-amd64.zip \
     && mv duckdb /usr/local/bin
@@ -90,8 +91,5 @@ ENV PYSPARK_DRIVER_PYTHON=ipython
 
 RUN touch $HOME/.profile \
     && rm -rf $HOME/.cache
-
-WORKDIR ${SPARK_HOME}/work-dir
-RUN chmod g+w ${SPARK_HOME}/work-dir
 
 ENTRYPOINT [ "/opt/entrypoint.sh" ]

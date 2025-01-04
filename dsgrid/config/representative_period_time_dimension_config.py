@@ -4,39 +4,26 @@ import logging
 from datetime import datetime, timedelta
 from typing import Type
 
+import chronify
 import pandas as pd
 
 from dsgrid.dimension.time import (
-    TimeZone,
     RepresentativePeriodFormat,
     DatetimeRange,
 )
-from dsgrid.dimension.time_utils import shift_time_interval
 from dsgrid.exceptions import DSGInvalidDataset
-from dsgrid.spark.functions import (
-    create_temp_view,
-    join_multiple_columns,
-    make_temp_view_name,
-    select_expr,
-    shift_time_zone,
-)
 from dsgrid.spark.types import (
-    DataFrame,
-    F,
     StructType,
     StructField,
     IntegerType,
-    use_duckdb,
 )
 from dsgrid.time.types import (
     OneWeekPerMonthByHourType,
     OneWeekdayDayAndOneWeekendDayPerMonthByHourType,
 )
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 from dsgrid.utils.spark import (
     get_spark_session,
-    set_session_time_zone,
 )
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -63,6 +50,30 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                 msg = self.model.format.value
                 raise NotImplementedError(msg)
 
+    def supports_chronify(self) -> bool:
+        return True
+
+    def to_chronify(self) -> chronify.RepresentativePeriodTime:
+        if len(self._model.ranges) != 1:
+            msg = (
+                "Mapping RepresentativePeriodTime with chronify is only supported with one range: "
+                f"{self._model.ranges}"
+            )
+            raise NotImplementedError(msg)
+        range_ = self._model.ranges[0]
+        if range_.start != 1 or range_.end != 12:
+            msg = (
+                "Mapping RepresentativePeriodTime with chronify is only supported with a full year: "
+                f"{range_}"
+            )
+            raise NotImplementedError(msg)
+
+        return chronify.RepresentativePeriodTime(
+            measurement_type=self._model.measurement_type,
+            interval_type=self._model.time_interval_type,
+            time_format=chronify.RepresentativePeriodFormat(self._model.format.value),
+        )
+
     @staticmethod
     def model_class():
         return RepresentativePeriodTimeDimensionModel
@@ -88,107 +99,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     return self.build_time_dataframe()
 
-    def convert_dataframe(
-        self,
-        df,
-        project_time_dim,
-        value_columns: set[str],
-        scratch_dir_context: ScratchDirContext,
-        wrap_time_allowed=False,
-        time_based_data_adjustment=None,
-    ):
-        """Time interval type alignment is done in the mapping process."""
-        if project_time_dim is None:
-            return df
-        if (
-            project_time_dim.list_expected_dataset_timestamps()
-            == self.list_expected_dataset_timestamps()
-        ):
-            return df
-
-        time_cols = self.get_load_data_time_columns()
-        ptime_col = project_time_dim.get_load_data_time_columns()
-        assert len(ptime_col) == 1, ptime_col
-        ptime_col = ptime_col[0]
-
-        assert "time_zone" in df.columns, df.columns
-        geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
-        assert geo_tz_values
-        geo_tz_values.sort()
-        geo_tz_to_map = [TimeZone(tz) for tz in geo_tz_values]
-        geo_tz_to_map = [tz.tz_name for tz in geo_tz_to_map]  # covert to tz_name
-
-        # create time map
-        # temporarily set session time to UTC for timeinfo extraction
-        # Note: timeinfo is extracted from local_time column exactly in DF.show(),
-        # and only UTC seems to convert to local_time correctly for DF.show().
-        # Even though UTC does not always lead to correct time output when DF.toPandas()
-        # the underlying time data is correctly stored when saved to file
-
-        # Spark
-        #   - dayofweek: Ranges from 1 for a Sunday through to 7 for a Saturday.
-        #   - weekday: (0 = Monday, 1 = Tuesday, …, 6 = Sunday)
-        # DuckDB / PostgreSQL
-        #   - dayofweek/dow/weekday: Day of the week (Sunday = 0, Saturday = 6)
-        #   - isodow: ISO day of the week (Monday = 1, Sunday = 7)
-        # Python
-        #   - datetime.weekday: Monday == 0 ... Sunday == 6
-        if use_duckdb():
-            weekday_func = "ISODOW"
-            weekday_modifier = " - 1"
-        else:
-            weekday_func = "WEEKDAY"
-            weekday_modifier = ""
-
-        time_df = None
-        session_tz = "UTC"
-        with set_session_time_zone(session_tz):
-            project_time_df = project_time_dim.build_time_dataframe()
-            map_time = "timestamp_to_map"
-            project_time_df = shift_time_interval(
-                project_time_df,
-                ptime_col,
-                project_time_dim.get_time_interval_type(),
-                self.get_time_interval_type(),
-                project_time_dim.get_frequency(),
-                new_time_column=map_time,
-            )
-
-            for tz_value, tz_name in zip(geo_tz_values, geo_tz_to_map):
-                local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_value))
-                local_time_df = shift_time_zone(
-                    local_time_df, map_time, session_tz, tz_name, "local_time"
-                )
-                select = [ptime_col, "time_zone"]
-                for col in time_cols:
-                    if col == "day_of_week":
-                        select.append(f"{weekday_func}(local_time) {weekday_modifier} AS {col}")
-                    elif col == "is_weekday":
-                        select.append(
-                            f"({weekday_func}(local_time) {weekday_modifier} < 5) AS {col}"
-                        )
-                    else:
-                        if "_" in col:
-                            assert False, col
-                        select.append(f"{col}(local_time) AS {col}")
-
-                local_time_df = select_expr(local_time_df, select)
-                if time_df is None:
-                    time_df = local_time_df
-                else:
-                    time_df = time_df.union(local_time_df)
-            assert isinstance(time_df, DataFrame)
-            if use_duckdb():
-                # DuckDB does not persist the hour value unless we create a table.
-                view = create_temp_view(time_df)
-                table = make_temp_view_name()
-                spark = get_spark_session()
-                spark.sql(f"CREATE TABLE {table} AS SELECT * FROM {view}")
-                time_df = spark.sql(f"SELECT * FROM {table}")
-
-        # join all
-        join_keys = time_cols + ["time_zone"]
-        return join_multiple_columns(df, time_df, join_keys).drop(*time_cols)
+    def convert_dataframe(self, *args, **kwargs):
+        msg = f"{self.__class__.__name__}.convert_dataframe is implemented through chronify"
+        raise NotImplementedError(msg)
 
     def get_frequency(self):
         return self._format_handler.get_frequency()

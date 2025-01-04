@@ -102,7 +102,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
 
             logger.info("2. with unexpected col: ")
             _modify_data_file(data_dir, export_index=True)
-            with pytest.raises(DSGInvalidDimension, match=r"column.*is not expected"):
+            with pytest.raises(DSGInvalidDataset, match=r"column.*is not expected"):
                 _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("3. with a duplicated dimension: ")

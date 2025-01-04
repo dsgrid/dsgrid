@@ -1262,6 +1262,13 @@ $ dsgrid registry datasets update \\ \n
     help="reason for submission",
 )
 @click.option(
+    "-p",
+    "--dataset-path",
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="New dataset path. If not set, use existing dataset.",
+)
+@click.option(
     "-t",
     "--update-type",
     required=True,
@@ -1278,7 +1285,14 @@ $ dsgrid registry datasets update \\ \n
 @click.pass_obj
 @click.pass_context
 def update_dataset(
-    ctx, registry_manager, dataset_config_file, dataset_id, log_message, update_type, version
+    ctx: click.Context,
+    registry_manager: RegistryManager,
+    dataset_config_file: Path,
+    dataset_id: str,
+    log_message: str,
+    dataset_path: Optional[Path],
+    update_type: VersionUpdateType,
+    version: str,
 ):
     """Update an existing dataset in the registry. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
@@ -1295,6 +1309,7 @@ def update_dataset(
         update_type,
         log_message,
         version,
+        dataset_path=dataset_path,
     )
     if res[1] != 0:
         ctx.exit(res[1])

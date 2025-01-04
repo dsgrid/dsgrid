@@ -7,7 +7,6 @@ from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.spark.functions import is_dataframe_empty
 from dsgrid.utils.timing import track_timing, timer_stats_collector
-from dsgrid.registry.registry_interface import commit_manager
 from .registry_manager import RegistryManager
 
 
@@ -27,7 +26,7 @@ class FilterRegistryManager(RegistryManager):
             Filter all configs and data according to this model.
         """
         if conn is None:
-            with commit_manager(self.project_manager.db.engine) as conn:
+            with self.project_manager.db.engine.begin() as conn:
                 self._filter(conn, simple_model)
         else:
             self._filter(conn, simple_model)

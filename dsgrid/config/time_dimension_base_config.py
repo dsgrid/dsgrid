@@ -2,7 +2,8 @@ import abc
 import logging
 from datetime import timedelta
 from typing import Optional
-from uuid import uuid4
+
+import chronify
 
 from .dimension_config import DimensionBaseConfigWithoutFiles
 from dsgrid.dimension.time import (
@@ -40,6 +41,17 @@ logger = logging.getLogger(__name__)
 
 class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
     """Base class for all time dimension configs"""
+
+    def supports_chronify(self) -> bool:
+        """Return True if the config can be converted to chronify."""
+        return False
+
+    # @abc.abstractmethod
+    def to_chronify(self) -> chronify.TimeBaseModel:
+        """Return the chronify version of the time model."""
+        # This is likely temporary until we can use chronify models directly.
+        msg = f"{type(self)}.to_chronify"
+        raise NotImplementedError(msg)
 
     @abc.abstractmethod
     def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]) -> None:
@@ -208,7 +220,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
         """
 
-    def convert_time_format(self, df: DataFrame) -> DataFrame:
+    def convert_time_format(self, df: DataFrame, update_model: bool = False) -> DataFrame:
         """Convert time from str format to datetime if exists."""
         return df
 
@@ -236,11 +248,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         time_map = (
             df.select(time_col).distinct().select(time_col, F.col(time_col).alias("orig_ts"))
         )
-        if use_duckdb():
-            # TODO duckdb: There must be a join somewhere above here.
-            # Tests don't trigger this code block.
-            time_map.relation = time_map.relation.set_alias(f"relation_{uuid4()}")
-        else:
+        if not use_duckdb():
             time_map.cache()
             time_map.count()
 

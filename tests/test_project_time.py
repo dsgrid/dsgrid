@@ -14,12 +14,10 @@ from dsgrid.dimension.time_utils import shift_time_interval
 from dsgrid.spark.functions import (
     create_temp_view,
     make_temp_view_name,
-    from_utc_timestamp,
     get_current_time_zone,
     join_multiple_columns,
     select_expr,
     set_current_time_zone,
-    to_utc_timestamp,
 )
 from dsgrid.spark.types import (
     DataFrame,
@@ -28,7 +26,7 @@ from dsgrid.spark.types import (
     use_duckdb,
 )
 from dsgrid.utils.dataset import add_time_zone
-from dsgrid.utils.spark import get_spark_session
+from dsgrid.utils.spark import get_spark_session, get_unique_values
 from dsgrid.exceptions import DSGDatasetConfigError
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
 
@@ -107,21 +105,6 @@ def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
         tempo,
         raw_data=tempo_data_with_tz,
         converted_data=tempo_data_mapped_time,
-    )
-
-
-def test_convert_time_for_comstock(project, comstock, scratch_dir_context):
-    comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
-
-    comstock_data = comstock._handler._load_data.join(comstock._handler._load_data_lookup, on="id")
-    comstock_data_with_tz = add_time_zone(
-        comstock_data, comstock._handler.config.get_dimension(DimensionType.GEOGRAPHY)
-    )
-    comstock_time_dim.convert_dataframe(
-        comstock_data_with_tz,
-        project.config.get_base_dimension(DimensionType.TIME),
-        comstock._handler.config.get_value_columns(),
-        scratch_dir_context,
     )
 
 
@@ -335,18 +318,16 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
                 project_time_dim.get_frequency()
             )
 
-    geo_tz_values = [row.time_zone for row in raw_data.select("time_zone").distinct().collect()]
-    assert geo_tz_values
-    geo_tz_values.sort()
-    geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
+    geo_tz_names = sorted(get_unique_values(raw_data, "time_zone"))
+    assert geo_tz_names
 
     model_time_df = []
-    for tzv, tz in zip(geo_tz_values, geo_tz_names):
+    for tz_name in geo_tz_names:
         model_time_tz = model_time.copy()
-        model_time_tz["time_zone"] = tzv
+        model_time_tz["time_zone"] = tz_name
         # for pd.dt.tz_convert(), always convert to UTC before converting to another tz
         model_time_tz["UTC"] = model_time_tz["map_time"].dt.tz_convert("UTC")
-        model_time_tz["local_time"] = model_time_tz["UTC"].dt.tz_convert(tz)
+        model_time_tz["local_time"] = model_time_tz["UTC"].dt.tz_convert(tz_name)
         for col in time_cols:
             if col == "hour":
                 model_time_tz[col] = model_time_tz["local_time"].dt.hour
@@ -395,8 +376,8 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
         else:
             weekday_func = "WEEKDAY"
             weekday_modifier = ""
-        for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
-            local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_value))
+        for tz_name in geo_tz_names:
+            local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_name))
             local_time_df = to_utc_timestamp(local_time_df, "map_time", session_tz, "UTC")
             local_time_df = from_utc_timestamp(local_time_df, "UTC", tz_name, "local_time")
             select = [ptime_col, "map_time", "time_zone", "UTC", "local_time"]
@@ -544,3 +525,55 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     assert (
         len(mismatch) == 0
     ), f"Mismatch:\nn_model={n_model}, n_project={n_project}, n_tempo={n_tempo}\n{mismatch}"
+
+
+# The duckdb implementations of the next two functions may not be fully correct or ideal.
+# We don't need them in the dsgrid package because time mapping is performed in chronify.
+# There are some extensive tests in this file that rely on them, and so we are keeping them
+# here.
+
+
+def from_utc_timestamp(
+    df: DataFrame, time_column: str, time_zone: str, new_column: str
+) -> DataFrame:
+    """Refer to pyspark.sql.functions.from_utc_timestamp."""
+    if use_duckdb():
+        view = create_temp_view(df)
+        cols = df.columns[:]
+        if time_column == new_column:
+            cols.remove(time_column)
+        cols_str = ",".join(cols)
+        query = f"""
+            SELECT
+                {cols_str},
+                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
+            FROM {view}
+        """
+        df2 = get_spark_session().sql(query)
+        return df2
+
+    df2 = df.withColumn(new_column, F.from_utc_timestamp(time_column, time_zone))
+    return df2
+
+
+def to_utc_timestamp(
+    df: DataFrame, time_column: str, time_zone: str, new_column: str
+) -> DataFrame:
+    """Refer to pyspark.sql.functions.to_utc_timestamp."""
+    if use_duckdb():
+        view = create_temp_view(df)
+        cols = df.columns[:]
+        if time_column == new_column:
+            cols.remove(time_column)
+        cols_str = ",".join(cols)
+        query = f"""
+            SELECT
+                {cols_str},
+                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
+            FROM {view}
+        """
+        df2 = get_spark_session().sql(query)
+        return df2
+
+    df2 = df.withColumn(new_column, F.to_utc_timestamp(time_column, time_zone))
+    return df2

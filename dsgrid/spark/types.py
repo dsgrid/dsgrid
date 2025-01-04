@@ -1,11 +1,12 @@
 # flake8: noqa
 
-import os
+import dsgrid
+from dsgrid.common import BackendEngine
 
 
 def use_duckdb() -> bool:
     """Return True if the environment is set to use DuckDB instead of Spark."""
-    return os.getenv("USE_DUCKDB", "false").lower() == "true"
+    return dsgrid.runtime_config.backend_engine == BackendEngine.DUCKDB
 
 
 if use_duckdb():

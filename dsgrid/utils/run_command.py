@@ -25,7 +25,7 @@ def check_run_command(*args, **kwargs):
         raise DSGRuntimeError(f"command returned error code: {ret}")
 
 
-def run_command(cmd, output=None, cwd=None):
+def run_command(cmd: str, output=None, cwd=None):
     """Runs a command as a subprocess.
 
     Caution: Capturing stdout and stderr in memory can be hazardous with

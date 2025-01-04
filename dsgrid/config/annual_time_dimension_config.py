@@ -21,7 +21,6 @@ from dsgrid.spark.types import (
     StringType,
     F,
 )
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.spark import (
     get_spark_session,
@@ -58,7 +57,11 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         expected_timestamps = time_range.list_time_range()
         actual_timestamps = [
             pd.Timestamp(str(x[time_col]), tz=self.get_tzinfo()).to_pydatetime()
-            for x in load_data_df.select(time_col).distinct().sort(time_col).collect()
+            for x in load_data_df.select(time_col)
+            .distinct()
+            .filter(f"{time_col} IS NOT NULL")
+            .sort(time_col)
+            .collect()
         ]
         if expected_timestamps != actual_timestamps:
             mismatch = sorted(
@@ -81,17 +84,11 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     return self.build_time_dataframe()
 
-    def convert_dataframe(
-        self,
-        df,
-        project_time_dim,
-        value_columns: set[str],
-        scratch_dir_context: ScratchDirContext,
-        wrap_time_allowed=False,
-        time_based_data_adjustment=None,
-    ):
+    def convert_dataframe(self, *args, **kwargs):
         # Currently, only map_annual_time_to_date_time is supported.
-        raise NotImplementedError("AnnualTimeDimensionConfig.convert_dataframe")
+        # TODO: implement through chronify
+        msg = f"{self.__class__.__name__}.convert_dataframe"
+        raise NotImplementedError(msg)
 
     def get_frequency(self):
         return timedelta(days=365)

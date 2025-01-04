@@ -586,7 +586,6 @@ def test_auto_updates(mutable_cached_registry: tuple[RegistryManager, Path]):
     )
     assert project_mgr.get_latest_version(project_id) == "1.3.1"
 
-    # And again if we update the dataset.
     dataset.model.description += "test update"
     original_version = dataset.model.version
     dataset_mgr.update(dataset, VersionUpdateType.PATCH, "test update")

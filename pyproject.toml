@@ -34,6 +34,7 @@ dependencies = [
     # "awscliv2",
     # "boto3",
     # "s3path",
+    "chronify @ git+https://github.com/NREL/chronify/@dt/hive-support",
     "click>=8",
     "dash",
     "dash_bootstrap_components",
@@ -44,7 +45,6 @@ dependencies = [
     "prettytable",
     "pyarrow",
     "pydantic~=2.9.2",
-    "pyspark==3.5.2",  # Keep this synced with the spark version in Dockerfile.
     "requests",
     "rich_click",
     "semver",
@@ -60,6 +60,14 @@ path = "dsgrid/__init__.py"
 allow-direct-references = true
 
 [project.optional-dependencies]
+spark = [
+    "chronify[spark] @ git+https://github.com/NREL/chronify/@dt/hive-support",
+    "pyhive @ git+https://github.com/apache/kyuubi.git#egg=pyhive&subdirectory=python",
+    "pyspark==3.5.4",  # Keep this synced with the spark version in Dockerfile.
+    "thrift",
+    "thrift_sasl",
+]
+
 dev = [
     "httpx",  # starlette, used by fastapi, requires this as an optional dependency for testing.
     "pytest",

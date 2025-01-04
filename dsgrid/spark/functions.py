@@ -238,7 +238,7 @@ def set_current_time_zone(time_zone: str) -> None:
     spark.conf.set("spark.sql.session.timeZone", time_zone)
 
 
-def init_spark(name="dsgrid", check_env=True, spark_conf=None):
+def init_spark(name="dsgrid", check_env=True, spark_conf=None) -> SparkSession:
     """Initialize a SparkSession.
 
     Parameters
@@ -274,7 +274,7 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf.setMaster(cluster)
-    spark = SparkSession.builder.config(conf=conf).getOrCreate()
+    spark = SparkSession.builder.config(conf=conf).enableHiveSupport().getOrCreate()
 
     with disable_console_logging():
         log_spark_conf(spark)

@@ -32,7 +32,7 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
-from dsgrid.spark.functions import join
+from dsgrid.spark.functions import join, make_temp_view_name
 from dsgrid.spark.types import DataFrame, F, use_duckdb
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
@@ -490,12 +490,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 project_time_dim,
                 {value_column},
             )
-        time_dim = self._config.get_dimension(DimensionType.TIME)
+        # time_dim = self._config.get_dimension(DimensionType.TIME)
 
         if use_duckdb():
             table_name = None
         else:
-            load_data_df, table_name = save_to_warehouse(load_data_df)
+            # This does two things:
+            # - Save the table to the warehouse so that chronify can load it.
+            # - Persist the query before mapping time in non-chronify cases.
+            #   With some datasets, the query gets too complicated to complete.
+            table_name = make_temp_view_name()
+            load_data_df = save_to_warehouse(load_data_df, table_name)
 
         if time_dim.supports_chronify():
             if use_duckdb():
@@ -504,7 +509,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
-                    scratch_dir_context=scratch_dir_context,
                 )
             else:
                 assert table_name is not None

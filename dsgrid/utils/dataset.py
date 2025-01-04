@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Iterable
+from typing import Iterable, Optional
 
 import chronify
 from chronify.models import TableSchema
@@ -13,6 +13,7 @@ from dsgrid.dimension.time import TimeZone
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
 from dsgrid.spark.functions import (
     count_distinct_on_group_by,
+    make_temp_view_name,
     read_parquet,
     is_dataframe_empty,
     join,
@@ -163,14 +164,11 @@ def map_time_dimension_with_chronify_duckdb(
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
-    scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
     store = chronify.Store.create_in_memory_db()
     store.ingest_table(df.relation, src_schema, bypass_checks=True)
-    store.map_table_time_config(
-        src_schema.name, dst_schema, scratch_dir=scratch_dir_context.scratch_dir
-    )
+    store.map_table_time_config(src_schema.name, dst_schema)
     pandas_df = store.read_table(dst_schema.name)
     store.drop_table(dst_schema.name)
     return df.session.createDataFrame(pandas_df)
@@ -187,19 +185,18 @@ def map_time_dimension_with_chronify_spark(
     src_schema, dst_schema = _get_mapping_schemas(
         df, value_column, from_time_dim, to_time_dim, src_name=table_name
     )
-    # TODO DT: confirm that the table is there
-    store = chronify.Store.create_new_hive_store(
-        dsgrid.runtime_config.thrift_server_url, drop_schema=True
-    )
+    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     with store.engine.begin() as conn:
         # This bypasses checks because the table should already be valid.
         store.schema_manager.add_schema(conn, src_schema)
-    store.map_table_time_config(
-        src_schema.name, dst_schema, scratch_dir=scratch_dir_context.scratch_dir
-    )
-    # TODO:
-    # 1. is time_zone handled automatically?
-    # 3. What about wrap_time_allowed?
+    try:
+        # TODO: What about wrap_time_allowed?
+        store.map_table_time_config(
+            src_schema.name, dst_schema, scratch_dir=scratch_dir_context.scratch_dir
+        )
+    finally:
+        with store.engine.begin() as conn:
+            store.schema_manager.remove_schema(conn, src_schema.name)
     return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
 
 
@@ -208,8 +205,9 @@ def _get_mapping_schemas(
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
-    src_name: str = "dsgrid_src",
+    src_name: Optional[str] = None,
 ) -> tuple[TableSchema, TableSchema]:
+    src = src_name or "src_" + make_temp_view_name()
     time_array_id_columns = [
         x
         for x in df.columns
@@ -217,13 +215,13 @@ def _get_mapping_schemas(
         in set(df.columns).difference(from_time_dim.get_load_data_time_columns()) - {value_column}
     ]
     src_schema = chronify.TableSchema(
-        name=src_name,
+        name=src,
         time_config=from_time_dim.to_chronify(),
         time_array_id_columns=time_array_id_columns,
         value_column=value_column,
     )
     dst_schema = chronify.TableSchema(
-        name="dsgrid_dst",
+        name="dst_" + make_temp_view_name(),
         time_config=to_time_dim.to_chronify(),
         time_array_id_columns=time_array_id_columns,
         value_column=value_column,

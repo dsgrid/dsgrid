@@ -28,7 +28,9 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.spark.functions import (
     aggregate_single_value,
+    init_spark,
     is_dataframe_empty,
+    make_temp_view_name,
 )
 from dsgrid.spark.types import (
     BooleanType,
@@ -40,9 +42,13 @@ from dsgrid.spark.types import (
     StructField,
     use_duckdb,
 )
-from dsgrid.utils.dataset import map_time_dimension_with_chronify_duckdb
+from dsgrid.utils.dataset import (
+    map_time_dimension_with_chronify_duckdb,
+    map_time_dimension_with_chronify_spark,
+)
 from dsgrid.utils.spark import (
     get_spark_session,
+    save_to_warehouse,
 )
 
 
@@ -56,7 +62,7 @@ ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE = (
 
 @pytest.fixture(scope="module")
 def one_weekday_day_and_one_weekend_day_per_month_by_hour_table():
-    spark = get_spark_session()
+    spark = init_spark()
     schema = StructType(
         [
             StructField("scenario", StringType(), False),
@@ -132,7 +138,6 @@ def test_time_mapping(
     spark_time_zone,
     scratch_dir_context,
 ):
-    assert use_duckdb()
     # This test sets the Spark session time zone so that it can check times consistently
     # across computers.
     # It uses Pacific Prevailing Time to make the checks consistent with the dataset.
@@ -141,18 +146,23 @@ def test_time_mapping(
     df = df.withColumn("time_zone", F.lit("America/Los_Angeles"))
     config = make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config()
     project_time_config = make_date_time_config()
-    # TODO DT: how to test with Spark?
-    # value_columns = {VALUE_COLUMN}
-    # parquet_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-    # df.write.parquet(str(parquet_file))
-    mapped_df = map_time_dimension_with_chronify_duckdb(
-        df,
-        VALUE_COLUMN,
-        # parquet_file,
-        config,
-        project_time_config,
-        scratch_dir_context,
-    )
+    if use_duckdb():
+        mapped_df = map_time_dimension_with_chronify_duckdb(
+            df,
+            VALUE_COLUMN,
+            config,
+            project_time_config,
+        )
+    else:
+        table_name = make_temp_view_name()
+        mapped_df = map_time_dimension_with_chronify_spark(
+            save_to_warehouse(df, table_name),
+            table_name,
+            VALUE_COLUMN,
+            config,
+            project_time_config,
+            scratch_dir_context,
+        )
     timestamps = mapped_df.select("timestamp").distinct().sort("timestamp").collect()
     zi = ZoneInfo("EST")
     est_timestamps = [x.timestamp.astimezone(zi) for x in timestamps]

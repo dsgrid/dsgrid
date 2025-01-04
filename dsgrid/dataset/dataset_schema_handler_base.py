@@ -6,8 +6,9 @@ from typing import Iterable, Optional
 
 import chronify
 from sqlalchemy import Connection
-from dsgrid.chronify import create_store
 
+import dsgrid
+from dsgrid.chronify import create_store
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     map_annual_time_to_date_time,
@@ -16,7 +17,7 @@ from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 import dsgrid.units.energy as energy
-from dsgrid.common import VALUE_COLUMN
+from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import DatasetConfig, InputDatasetType
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
@@ -32,20 +33,26 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
-from dsgrid.spark.functions import join
-from dsgrid.spark.types import DataFrame, F, use_duckdb
+from dsgrid.spark.functions import join, make_temp_view_name
+from dsgrid.spark.types import DataFrame, F
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
     is_noop_mapping,
     map_and_reduce_stacked_dimension,
     add_time_zone,
     map_time_dimension_with_chronify_duckdb,
-    map_time_dimension_with_chronify_spark,
+    map_time_dimension_with_chronify_spark_hive,
+    map_time_dimension_with_chronify_spark_path,
     ordered_subset_columns,
     repartition_if_needed_by_mapping,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import read_dataframe, save_to_warehouse
+from dsgrid.utils.spark import (
+    persist_intermediate_table,
+    read_dataframe,
+    save_to_warehouse,
+    write_dataframe,
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
@@ -90,6 +97,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         Check all data consistencies, including data columns, dataset to dimension records, and time
         """
+
+    @abc.abstractmethod
+    def check_time_consistency(self):
+        """Check the time consistency of the dataset."""
 
     @abc.abstractmethod
     def make_dimension_association_table(self) -> DataFrame:
@@ -190,10 +201,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
         schema = self._get_chronify_schema(load_data_df)
         scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as context:
+            if path.suffix == ".parquet":
+                src_path = path
+            else:
+                src_path = context.get_temp_filename(suffix=".parquet")
+                write_dataframe(load_data_df, src_path)
+
             store_file = context.get_temp_filename(suffix=".db")
             store = create_store(store_file)
             # This performs all of the checks.
-            store.create_view_from_parquet(path, schema)
+            store.create_view_from_parquet(src_path, schema)
             store.drop_view(schema.name)
 
         self._check_model_year_time_consistency(load_data_df)
@@ -207,11 +224,18 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if x
             in set(df.columns).difference(time_cols).difference(self._config.get_value_columns())
         ]
+        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+            ignore_columns = list(self._config.get_pivoted_dimension_columns())
+            value_column = ignore_columns.pop()
+        else:
+            value_column = VALUE_COLUMN
+            ignore_columns = []
         return chronify.TableSchema(
             name="dsgrid_view",
             time_config=time_dim.to_chronify(),
             time_array_id_columns=time_array_id_columns,
-            value_column=VALUE_COLUMN,
+            value_column=value_column,
+            ignore_columns=ignore_columns,
         )
 
     def _check_model_year_time_consistency(self, df: DataFrame):
@@ -490,41 +514,64 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 project_time_dim,
                 {value_column},
             )
-        time_dim = self._config.get_dimension(DimensionType.TIME)
 
-        if use_duckdb():
-            table_name = None
-        else:
-            load_data_df, table_name = save_to_warehouse(load_data_df)
+        config = dsgrid.runtime_config
+        match (config.backend_engine, config.use_hive_metastore, time_dim.supports_chronify()):
+            case (BackendEngine.SPARK, True, True):
+                table_name = make_temp_view_name()
+                load_data_df = map_time_dimension_with_chronify_spark_hive(
+                    df=save_to_warehouse(load_data_df, table_name),
+                    table_name=table_name,
+                    value_column=value_column,
+                    from_time_dim=time_dim,
+                    to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
+                )
 
-        if time_dim.supports_chronify():
-            if use_duckdb():
+            case (BackendEngine.SPARK, False, True):
+                filename = persist_intermediate_table(
+                    load_data_df,
+                    scratch_dir_context,
+                    tag="query before time mapping",
+                )
+                load_data_df = map_time_dimension_with_chronify_spark_path(
+                    df=read_dataframe(filename),
+                    filename=filename,
+                    value_column=value_column,
+                    from_time_dim=time_dim,
+                    to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
+                    scratch_dir_context=scratch_dir_context,
+                )
+            case (BackendEngine.SPARK, _, False):
+                filename = persist_intermediate_table(
+                    load_data_df,
+                    scratch_dir_context,
+                    tag="query before time mapping",
+                )
+                load_data_df = time_dim.convert_dataframe(
+                    load_data_df,
+                    self._project_time_dim,
+                    {value_column},
+                    scratch_dir_context,
+                    wrap_time_allowed=wrap_time_allowed,
+                    time_based_data_adjustment=time_based_data_adjustment,
+                )
+            case (BackendEngine.DUCKDB, _, True):
+                table_name = None
                 load_data_df = map_time_dimension_with_chronify_duckdb(
                     df=load_data_df,
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
-                    scratch_dir_context=scratch_dir_context,
                 )
-            else:
-                assert table_name is not None
-                load_data_df = map_time_dimension_with_chronify_spark(
-                    df=load_data_df,
-                    table_name=table_name,
-                    value_column=value_column,
-                    from_time_dim=time_dim,
-                    to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
-                    scratch_dir_context=scratch_dir_context,
+            case (BackendEngine.DUCKDB, _, False):
+                load_data_df = time_dim.convert_dataframe(
+                    load_data_df,
+                    self._project_time_dim,
+                    {value_column},
+                    scratch_dir_context,
+                    wrap_time_allowed=wrap_time_allowed,
+                    time_based_data_adjustment=time_based_data_adjustment,
                 )
-        else:
-            load_data_df = time_dim.convert_dataframe(
-                load_data_df,
-                self._project_time_dim,
-                {value_column},
-                scratch_dir_context,
-                wrap_time_allowed=wrap_time_allowed,
-                time_based_data_adjustment=time_based_data_adjustment,
-            )
 
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")

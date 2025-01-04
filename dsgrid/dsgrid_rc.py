@@ -30,6 +30,7 @@ class DsgridRuntimeConfig(DSGBaseModel):
     offline: bool = True
     backend_engine: BackendEngine = DEFAULT_BACKEND
     thrift_server_url: str = DEFAULT_THRIFT_SERVER_URL
+    use_hive_metastore: bool = False
     console_level: str = "info"
     file_level: str = "info"
     timings: bool = False

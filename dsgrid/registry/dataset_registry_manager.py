@@ -229,6 +229,19 @@ class DatasetRegistryManager(RegistryManagerBase):
         dataset_path: Path,
         context: RegistrationContext,
     ):
+        # Explanation for this order of operations:
+        # 1. Check time consistency in the original dataset format.
+        #    Many datasets are stored in pivoted format and have many value columns. If we
+        #    check timestamps after unpivoting the dataset, we will multiply the required work
+        #    by the number of columns.
+        # 2. Write to the registry in unpivoted format before running the other checks.
+        #    The final data is always stored in unpivoted format. We can reduce code if we
+        #    transform pivoted tables first.
+        #    In the nominal case where the dataset is valid, there is no difference in performance.
+        #    In the failure case where the dataset is invalid, it will take longer to detect the
+        #    errors.
+        self._check_time_consistency(config, context)
+
         config.model.version = "1.0.0"
         dataset_registry_dir = self.get_registry_data_directory(config.model.dataset_id)
         if not dataset_registry_dir.parent.exists():
@@ -242,18 +255,6 @@ class DatasetRegistryManager(RegistryManagerBase):
         dataset_path = dataset_registry_dir / config.model.version
         self.fs_interface.mkdir(dataset_path)
 
-        # The order of this logic may seem backwards at first.
-        # We write data to the registry BEFORE running checks for these reasons:
-        # - The final data is always stored in unpivoted format. We can reduce code if we
-        #   transform pivoted tables first.
-        # - We use Chronify to perform time checks. Chronify only supports views with unpivoted
-        #   tables. We can avoid an extra copy of data if we write the transformed data first.
-        # - We can convert CSV and JSON to Parquet in one place before we give the data to
-        #   Chronify.
-        # - We can convert timestamps-as-strings to real timestamps.
-        # In the nominal case where the dataset is valid, there is no difference in performance.
-        # In the failure case where the dataset is invalid, it will take longer to detect the
-        # errors.
         config = self._write_to_registry(context.connection, config, dataset_path)
 
         try:
@@ -269,6 +270,16 @@ class DatasetRegistryManager(RegistryManagerBase):
             config.model.dataset_id,
             config.model.version,
         )
+
+    def _check_time_consistency(
+        self,
+        config: DatasetConfig,
+        context: RegistrationContext,
+    ) -> None:
+        schema_handler = make_dataset_schema_handler(
+            context.connection, config, self._dimension_mgr, self._dimension_mapping_mgr
+        )
+        schema_handler.check_time_consistency()
 
     def _write_to_registry(
         self,

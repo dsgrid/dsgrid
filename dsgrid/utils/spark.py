@@ -28,7 +28,6 @@ from dsgrid.spark.functions import (
     get_spark_session,
     get_duckdb_spark_session,
     get_current_time_zone,
-    make_temp_view_name,
     set_current_time_zone,
     init_spark,
     is_dataframe_empty,
@@ -649,17 +648,16 @@ def persist_intermediate_table(df: DataFrame, context: ScratchDirContext, tag=No
 
 
 @track_timing(timer_stats_collector)
-def save_to_warehouse(df: DataFrame) -> tuple[DataFrame, str]:
+def save_to_warehouse(df: DataFrame, table_name: str) -> DataFrame:
     """Save a table to the Spark warehouse. Not supported when using DuckDB."""
     if use_duckdb():
         msg = "save_to_warehouse is not supported when using DuckDB"
         raise DSGInvalidOperation(msg)
 
-    table_name = make_temp_view_name()
     logger.info("Start saveAsTable to warehouse %s", table_name)
     df.write.saveAsTable(table_name)
     logger.info("Completed saveAsTable %s", table_name)
-    return df.sparkSession.sql(f"select * from {table_name}"), table_name
+    return df.sparkSession.sql(f"select * from {table_name}")
 
 
 def sql(query: str) -> DataFrame:

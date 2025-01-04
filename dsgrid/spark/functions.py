@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+import dsgrid
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.loggers import disable_console_logging
 from dsgrid.spark.types import (
@@ -117,26 +118,29 @@ def drop_temp_tables_and_views() -> None:
 
 def drop_temp_tables() -> None:
     """Drop all temporary tables."""
-    if not use_duckdb():
-        return
-
     spark = get_spark_session()
-    query = f"SELECT * FROM pg_tables WHERE tablename LIKE '{TEMP_TABLE_PREFIX}%'"
-    for row in spark.sql(query).collect():
-        spark.sql(f"DROP TABLE {row.tablename}")
-        logger.debug("Dropped temp table %s", row.tablename)
+    if use_duckdb():
+        query = f"SELECT * FROM pg_tables WHERE tablename LIKE '%{TEMP_TABLE_PREFIX}%'"
+        for row in spark.sql(query).collect():
+            spark.sql(f"DROP TABLE {row.tablename}")
+    else:
+        for row in spark.sql(f"SHOW TABLES LIKE '*{TEMP_TABLE_PREFIX}*'").collect():
+            spark.sql(f"DROP TABLE {row.tableName}")
 
 
 def drop_temp_views() -> None:
     """Drop all temporary views."""
-    if not use_duckdb():
-        return
-
     spark = get_spark_session()
-    query = "SELECT view_name FROM duckdb_views() WHERE NOT internal AND view_name LIKE '{TEMP_TABLE_PREFIX}%'"
-    for row in spark.sql(query).collect():
-        spark.sql(f"DROP VIEW {row.view_name}")
-        logger.debug("Dropped temp view %s", row.view_name)
+    if use_duckdb():
+        query = """
+            SELECT view_name FROM duckdb_views()
+            WHERE NOT internal AND view_name LIKE '%{TEMP_TABLE_PREFIX}%'
+        """
+        for row in spark.sql(query).collect():
+            spark.sql(f"DROP VIEW {row.view_name}")
+    else:
+        for row in spark.sql(f"SHOW VIEWS LIKE '*{TEMP_TABLE_PREFIX}*'").collect():
+            spark.sql(f"DROP VIEW {row.viewName}")
 
 
 def cross_join(df1: DataFrame, df2: DataFrame) -> DataFrame:
@@ -215,6 +219,20 @@ def get_spark_session() -> SparkSession:
     return spark
 
 
+def get_spark_warehouse_dir() -> Path:
+    """Return the Spark warehouse directory. Not valid with DuckDB."""
+    assert not use_duckdb()
+    val = get_spark_session().conf.get("spark.sql.warehouse.dir")
+    assert isinstance(val, str)
+    if not val:
+        msg = "Bug: spark.sql.warehouse.dir is not set"
+        raise Exception(msg)
+    if not val.startswith("file:"):
+        msg = f"get_spark_warehouse_dir only supports local file paths currently: {val}"
+        raise NotImplementedError(msg)
+    return Path(val.split("file:")[1])
+
+
 def get_current_time_zone() -> str:
     """Return the current time zone."""
     spark = get_spark_session()
@@ -238,7 +256,7 @@ def set_current_time_zone(time_zone: str) -> None:
     spark.conf.set("spark.sql.session.timeZone", time_zone)
 
 
-def init_spark(name="dsgrid", check_env=True, spark_conf=None):
+def init_spark(name="dsgrid", check_env=True, spark_conf=None) -> SparkSession:
     """Initialize a SparkSession.
 
     Parameters
@@ -274,7 +292,11 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf.setMaster(cluster)
-    spark = SparkSession.builder.config(conf=conf).getOrCreate()
+
+    config = SparkSession.builder.config(conf=conf)
+    if dsgrid.runtime_config.use_hive_metastore:
+        config = config.enableHiveSupport()
+    spark = config.getOrCreate()
 
     with disable_console_logging():
         log_spark_conf(spark)

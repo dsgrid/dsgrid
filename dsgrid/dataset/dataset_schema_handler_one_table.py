@@ -42,6 +42,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(self):
         self._check_one_table_data_consistency()
+
+    @track_timing(timer_stats_collector)
+    def check_time_consistency(self):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if time_dim.supports_chronify():
             self._check_dataset_time_consistency_with_chronify()

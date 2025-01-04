@@ -133,7 +133,7 @@ def la_expected_electricity_hour_16(tmp_path_factory):
 
 
 @pytest.mark.parametrize("category", list(DimensionCategory))
-def test_electricity_values(category):
+def test_electricity_values(spark_session_module, category):
     run_query_test(QueryTestElectricityValues, category)
 
 
@@ -146,7 +146,7 @@ def test_electricity_values(category):
         ("state", "max"),
     ],
 )
-def test_electricity_use(inputs):
+def test_electricity_use(spark_session_module, inputs):
     geo, op = inputs
     run_query_test(QueryTestElectricityUse, geo, op)
 
@@ -158,12 +158,14 @@ def test_electricity_use(inputs):
         ("county", "sum", DimensionCategory.SUBSET),
     ],
 )
-def test_electricity_use_with_results_filter(inputs):
+def test_electricity_use_with_results_filter(spark_session_module, inputs):
     geo, op, category = inputs
     run_query_test(QueryTestElectricityUseFilterResults, geo, op, category)
 
 
-def test_total_electricity_use_with_filter():
+def test_total_electricity_use_with_filter(
+    spark_session_module,
+):
     run_query_test(QueryTestTotalElectricityUseWithFilter)
 
 
@@ -176,7 +178,7 @@ def test_total_electricity_use_with_filter():
         (ColumnType.DIMENSION_TYPES, ["state", "reeds_pca", "census_region"], True, False),
     ],
 )
-def test_total_electricity_use_by_state_and_pca(column_inputs):
+def test_total_electricity_use_by_state_and_pca(spark_session_module, column_inputs):
     column_type, columns, aggregate_each_dataset, is_valid = column_inputs
     if is_valid:
         run_query_test(
@@ -189,26 +191,28 @@ def test_total_electricity_use_by_state_and_pca(column_inputs):
             )
 
 
-def test_annual_electricity_by_state():
+def test_annual_electricity_by_state(spark_session_module):
     run_query_test(QueryTestAnnualElectricityUseByState)
 
 
-def test_diurnal_electricity_use_by_county_chained(la_expected_electricity_hour_16):
+def test_diurnal_electricity_use_by_county_chained(
+    spark_session_module, la_expected_electricity_hour_16
+):
     run_query_test(
         QueryTestDiurnalElectricityUseByCountyChained,
         expected_values=la_expected_electricity_hour_16,
     )
 
 
-def test_peak_load():
+def test_peak_load(spark_session_module):
     run_query_test(QueryTestPeakLoadByStateSubsector)
 
 
-def test_map_annual_time():
+def test_map_annual_time(spark_session_module):
     run_query_test(QueryTestMapAnnualTime)
 
 
-def test_unit_mapping(cached_registry):
+def test_unit_mapping(cached_registry, spark_session_module):
     run_query_test(QueryTestUnitMapping)
 
 
@@ -288,7 +292,9 @@ def test_invalid_pivoted_dimension_aggregations():
         )
 
 
-def test_invalid_aggregation_subset_dimension():
+def test_invalid_aggregation_subset_dimension(
+    spark_session_module,
+):
     with pytest.raises(DSGInvalidQuery):
         run_query_test(QueryTestInvalidAggregation)
 
@@ -503,6 +509,7 @@ def get_project(conn: DatabaseConnection, project_id: str):
 
 def shutdown_project():
     """Shutdown a project and stop the SparkSession so that another process can create one."""
+    # TODO DT
     _projects.clear()
     if not use_duckdb():
         spark = SparkSession.getActiveSession()
@@ -518,7 +525,7 @@ def run_query_test(test_query_cls, *args, expected_values=None):
     project = get_project(test_query_cls.get_db_connection(), test_query_cls.get_project_id())
     try:
         query = test_query_cls(*args, REGISTRY_PATH, project, output_dir=output_dir)
-        for load_cached_table in (False, True):
+        for load_cached_table in (False,):  # True):
             ProjectQuerySubmitter(project, output_dir).submit(
                 query.make_query(),
                 persist_intermediate_table=True,

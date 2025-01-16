@@ -221,21 +221,22 @@ class DatasetSchemaHandlerBase(abc.ABC):
         time_array_id_columns = [
             x
             for x in df.columns
+            # If there are multiple weather years:
+            #   - that are continuous, weather year needs to be excluded.
+            #   - that are not continuous, weather year probably needs to be included.
+            # if x != DimensionType.WEATHER_YEAR.value and
             if x
             in set(df.columns).difference(time_cols).difference(self._config.get_value_columns())
         ]
         if self._config.get_table_format_type() == TableFormatType.PIVOTED:
-            ignore_columns = list(self._config.get_pivoted_dimension_columns())
-            value_column = ignore_columns.pop()
+            value_column = next(iter(self._config.get_pivoted_dimension_columns()))
         else:
             value_column = VALUE_COLUMN
-            ignore_columns = []
         return chronify.TableSchema(
             name="dsgrid_view",
             time_config=time_dim.to_chronify(),
             time_array_id_columns=time_array_id_columns,
             value_column=value_column,
-            ignore_columns=ignore_columns,
         )
 
     def _check_model_year_time_consistency(self, df: DataFrame):

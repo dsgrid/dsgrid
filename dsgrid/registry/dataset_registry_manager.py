@@ -304,9 +304,8 @@ class DatasetRegistryManager(RegistryManagerBase):
             assert config.dataset_path is not None
             path = Path(config.dataset_path) / filename
             if path.exists():
-                name = os.path.splitext(filename)[0]
                 # Always write Parquet.
-                dst = dataset_path / (name + ".parquet")
+                dst = dataset_path / (path.stem + ".parquet")
                 # Writing with Spark is much faster than copying or rsync if there are
                 # multiple nodes in the cluster - much more parallelism.
                 df = read_dataframe(path)

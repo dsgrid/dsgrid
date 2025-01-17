@@ -198,7 +198,7 @@ def map_time_dimension_with_chronify_spark_hive(
         # This bypasses checks because the table should already be valid.
         store.schema_manager.add_schema(conn, src_schema)
     try:
-        # TODO: What about wrap_time_allowed?
+        # TODO: https://github.com/NREL/chronify/issues/37
         store.map_table_time_config(
             src_schema.name,
             dst_schema,

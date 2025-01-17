@@ -400,10 +400,9 @@ def read_csv(path: Path | str, cast_timestamp: bool = True) -> DataFrame:
         df = spark.createDataFrame(pd.read_csv(path_str))
         if cast_timestamp and "timestamp" in df.columns:
             if "PYTEST_VERSION" not in os.environ:
-                msg = "cast_timestamp in read_csv can only be set in a test environment: {path=}"
+                msg = f"cast_timestamp in read_csv can only be set in a test environment: {path=}"
                 raise Exception(msg)
             # TODO: need a better way of guessing and setting the correct type.
-            # Why is CSV used for this sort of thing?
             df = df.withColumn("timestamp", F.col("timestamp").cast(TimestampType()))
         dup_cols = [x for x in df.columns if x.endswith(".1")]
         if dup_cols:

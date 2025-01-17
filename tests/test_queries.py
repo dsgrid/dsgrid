@@ -509,7 +509,6 @@ def get_project(conn: DatabaseConnection, project_id: str):
 
 def shutdown_project():
     """Shutdown a project and stop the SparkSession so that another process can create one."""
-    # TODO DT
     _projects.clear()
     if not use_duckdb():
         spark = SparkSession.getActiveSession()
@@ -525,7 +524,7 @@ def run_query_test(test_query_cls, *args, expected_values=None):
     project = get_project(test_query_cls.get_db_connection(), test_query_cls.get_project_id())
     try:
         query = test_query_cls(*args, REGISTRY_PATH, project, output_dir=output_dir)
-        for load_cached_table in (False,):  # True):
+        for load_cached_table in (False, True):
             ProjectQuerySubmitter(project, output_dir).submit(
                 query.make_query(),
                 persist_intermediate_table=True,

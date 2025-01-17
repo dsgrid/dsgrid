@@ -29,6 +29,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         time_cols = self.get_load_data_time_columns()
         assert len(self._model.ranges) == 1
         assert len(time_cols) == 1
+        # TODO: issue #341
         timestamps = self.list_expected_dataset_timestamps()
         return chronify.DatetimeRange(
             time_column=time_cols[0],
@@ -209,8 +210,8 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             F.to_timestamp(time_col, self.model.datetime_format.data_str_format),
         )
         if update_model:
-            # TODO
+            # TODO: The code doesn't support DatetimeFormat.LOCAL.
             # self.model.datetime_format.format_type = DatetimeFormat.LOCAL
-            msg = "not sure what should be done here. aligned? local?"
+            msg = "convert_time_format DatetimeFormat.LOCAL_AS_STRINGS update_model=True"
             raise NotImplementedError(msg)
         return df

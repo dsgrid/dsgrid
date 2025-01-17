@@ -230,6 +230,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
             in set(df.columns).difference(time_cols).difference(self._config.get_value_columns())
         ]
         if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+            # We can ignore all pivoted columns but one for time checking.
+            # Looking at the rest would be redundant.
             value_column = next(iter(self._config.get_pivoted_dimension_columns()))
         else:
             value_column = VALUE_COLUMN

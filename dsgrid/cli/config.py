@@ -1,13 +1,16 @@
 """CLI commands to manage the dsgrid runtime configuration"""
 
-import getpass
 import logging
 
 import rich_click as click
 
-from dsgrid.common import DEFAULT_DB_PASSWORD
+from dsgrid.common import BackendEngine
 from dsgrid.cli.common import handle_scratch_dir
-from dsgrid.dsgrid_rc import DsgridRuntimeConfig
+from dsgrid.dsgrid_rc import (
+    DsgridRuntimeConfig,
+    DEFAULT_THRIFT_SERVER_URL,
+    DEFAULT_BACKEND,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -28,28 +31,51 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
 @click.command(epilog=_config_epilog)
 @click.argument("url")
 @click.option(
+    "-b",
+    "--backend-engine",
+    type=BackendEngine,
+    default=DEFAULT_BACKEND,
+    help="Backend engine for SQL processing",
+)
+@click.option(
+    "-t",
+    "--thrift-server-url",
+    type=str,
+    default=DEFAULT_THRIFT_SERVER_URL,
+    help="URL for the Apache Thrift Server to be used by chronify. "
+    "Only applies if Spark is the backend engine.",
+)
+@click.option(
+    "-m",
+    "--use-hive-metastore",
+    is_flag=True,
+    default=False,
+    help="Set to true to use a Hive metastore when sharing data with chronify. "
+    "Only applies if Spark is the backend engine.",
+)
+@click.option(
     "--timings/--no-timings",
     default=False,
     is_flag=True,
     show_default=True,
     help="Enable tracking of function timings.",
 )
-@click.option(
-    "-U",
-    "--username",
-    type=str,
-    default=getpass.getuser(),
-    help="Database username",
-)
-@click.option(
-    "-P",
-    "--password",
-    prompt=True,
-    hide_input=True,
-    type=str,
-    default=DEFAULT_DB_PASSWORD,
-    help="Database username",
-)
+# @click.option(
+#    "-U",
+#    "--username",
+#    type=str,
+#    default=getpass.getuser(),
+#    help="Database username",
+# )
+# @click.option(
+#    "-P",
+#    "--password",
+#    prompt=True,
+#    hide_input=True,
+#    type=str,
+#    default=DEFAULT_DB_PASSWORD,
+#    help="Database username",
+# )
 @click.option(
     "-o",
     "--offline",
@@ -90,9 +116,12 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
 )
 def create(
     url,
+    backend_engine,
+    thrift_server_url,
+    use_hive_metastore,
     timings,
-    username,
-    password,
+    # username,
+    # password,
     offline,
     console_level,
     file_level,
@@ -101,10 +130,13 @@ def create(
 ):
     """Create a local dsgrid runtime configuration file."""
     dsgrid_config = DsgridRuntimeConfig(
+        backend_engine=backend_engine,
+        thrift_server_url=thrift_server_url,
+        use_hive_metastore=use_hive_metastore,
         timings=timings,
         database_url=url,
-        database_user=username,
-        database_password=password,
+        # database_user=username,
+        # database_password=password,
         offline=offline,
         console_level=console_level,
         file_level=file_level,

@@ -1,18 +1,28 @@
 import logging
 import os
-from typing import Iterable
+from pathlib import Path
+from typing import Iterable, Optional
 
+import chronify
+from chronify.models import TableSchema
+
+import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
+from dsgrid.dimension.time import TimeZone
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
 from dsgrid.spark.functions import (
     count_distinct_on_group_by,
+    get_spark_warehouse_dir,
+    make_temp_view_name,
     read_parquet,
     is_dataframe_empty,
     join,
     join_multiple_columns,
     unpivot,
 )
+from dsgrid.spark.functions import get_spark_session
 from dsgrid.spark.types import (
     DataFrame,
     F,
@@ -57,9 +67,18 @@ def add_time_zone(load_data_df, geography_dim):
     pyspark.sql.DataFrame
 
     """
-    geo_records = geography_dim.get_records_dataframe()
+    spark = get_spark_session()
+    dsg_geo_records = geography_dim.get_records_dataframe()
+    tz_map_table = spark.createDataFrame(
+        [(x.value, x.tz_name) for x in TimeZone], ("dsgrid_name", "tz_name")
+    )
+    geo_records = (
+        join(dsg_geo_records, tz_map_table, "time_zone", "dsgrid_name")
+        .drop("time_zone", "dsgrid_name")
+        .withColumnRenamed("tz_name", "time_zone")
+    )
+    assert dsg_geo_records.count() == geo_records.count()
     geo_name = geography_dim.model.dimension_type.value
-    assert "time_zone" not in load_data_df.columns
     return add_column_from_records(load_data_df, geo_records, geo_name, "time_zone")
 
 
@@ -140,6 +159,112 @@ def is_noop_mapping(records: DataFrame) -> bool:
             "(from_id != to_id) or (from_fraction != 1.0)"
         )
     )
+
+
+def map_time_dimension_with_chronify_duckdb(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+) -> DataFrame:
+    """Create a time-mapped table with chronify and DuckDB.
+    All operations are performed in memory.
+    """
+    src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
+    store = chronify.Store.create_in_memory_db()
+    store.ingest_table(df.relation, src_schema, bypass_checks=True)
+    store.map_table_time_config(src_schema.name, dst_schema)
+    pandas_df = store.read_table(dst_schema.name)
+    store.drop_table(dst_schema.name)
+    return df.session.createDataFrame(pandas_df)
+
+
+def map_time_dimension_with_chronify_spark_hive(
+    df: DataFrame,
+    table_name: str,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+) -> DataFrame:
+    """Create a time-mapped table with chronify and Spark and a Hive Metastore.
+    The source data must already be stored in the metastore.
+    Chronify will store the mapped table in the metastore.
+    """
+    src_schema, dst_schema = _get_mapping_schemas(
+        df, value_column, from_time_dim, to_time_dim, src_name=table_name
+    )
+    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    with store.engine.begin() as conn:
+        # This bypasses checks because the table should already be valid.
+        store.schema_manager.add_schema(conn, src_schema)
+    try:
+        # TODO: https://github.com/NREL/chronify/issues/37
+        store.map_table_time_config(
+            src_schema.name,
+            dst_schema,
+            check_mapped_timestamps=False,
+            scratch_dir=get_spark_warehouse_dir(),
+        )
+    finally:
+        with store.engine.begin() as conn:
+            store.schema_manager.remove_schema(conn, src_schema.name)
+
+    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
+
+
+def map_time_dimension_with_chronify_spark_path(
+    df: DataFrame,
+    filename: Path,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+    scratch_dir_context: ScratchDirContext,
+) -> DataFrame:
+    """Create a time-mapped table with chronify and Spark using the local filesystem.
+    Chronify will store the mapped table in a Parquet file within scratch_dir_context.
+    """
+    src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
+    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
+    # TODO: What about wrap_time_allowed?
+    output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+    store.map_table_time_config(
+        src_schema.name,
+        dst_schema,
+        check_mapped_timestamps=False,
+        scratch_dir=scratch_dir_context.scratch_dir,
+        output_file=output_file,
+    )
+    return df.sparkSession.read.load(str(output_file))
+
+
+def _get_mapping_schemas(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+    src_name: Optional[str] = None,
+) -> tuple[TableSchema, TableSchema]:
+    src = src_name or "src_" + make_temp_view_name()
+    time_array_id_columns = [
+        x
+        for x in df.columns
+        if x
+        in set(df.columns).difference(from_time_dim.get_load_data_time_columns()) - {value_column}
+    ]
+    src_schema = chronify.TableSchema(
+        name=src,
+        time_config=from_time_dim.to_chronify(),
+        time_array_id_columns=time_array_id_columns,
+        value_column=value_column,
+    )
+    dst_schema = chronify.TableSchema(
+        name="dst_" + make_temp_view_name(),
+        time_config=to_time_dim.to_chronify(),
+        time_array_id_columns=time_array_id_columns,
+        value_column=value_column,
+    )
+    return src_schema, dst_schema
 
 
 def ordered_subset_columns(df, subset: set[str]) -> list[str]:

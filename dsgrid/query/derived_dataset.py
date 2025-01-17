@@ -211,7 +211,7 @@ def _make_dataset_config(
             "data_schema_type": DataSchemaType.ONE_TABLE.value,
             "table_format": table_format,
         },
-        "dataset_version": "1.0.0",
+        "version": "1.0.0",
         "description": "",
         "origin_creator": "",
         "origin_organization": "",

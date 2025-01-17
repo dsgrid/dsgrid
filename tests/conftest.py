@@ -13,7 +13,11 @@ from dsgrid.cli.dsgrid import cli as cli
 from dsgrid.cli.dsgrid_admin import cli as cli_admin
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.spark.functions import get_current_time_zone, set_current_time_zone
+from dsgrid.spark.functions import (
+    drop_temp_tables_and_views,
+    get_current_time_zone,
+    set_current_time_zone,
+)
 from dsgrid.spark.types import use_duckdb
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.utils.run_command import check_run_command
@@ -46,6 +50,9 @@ def pytest_sessionstart(session):
     path = Path("metastore_db")
     if path.exists():
         shutil.rmtree(path)
+
+    yield
+    drop_temp_tables_and_views()
 
 
 @pytest.fixture(scope="session")
@@ -135,6 +142,14 @@ def _get_latest_commit():
 
 
 def spark_session():
+    spark = init_spark("dsgrid_test")
+    yield spark
+    if not use_duckdb():
+        spark.stop()
+
+
+@pytest.fixture(scope="module")
+def spark_session_module():
     spark = init_spark("dsgrid_test")
     yield spark
     if not use_duckdb():

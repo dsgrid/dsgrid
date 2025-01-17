@@ -9,6 +9,7 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
+import dsgrid
 from dsgrid.exceptions import DSGInvalidDimension
 from dsgrid.loggers import disable_console_logging
 from dsgrid.spark.types import (
@@ -117,26 +118,29 @@ def drop_temp_tables_and_views() -> None:
 
 def drop_temp_tables() -> None:
     """Drop all temporary tables."""
-    if not use_duckdb():
-        return
-
     spark = get_spark_session()
-    query = f"SELECT * FROM pg_tables WHERE tablename LIKE '{TEMP_TABLE_PREFIX}%'"
-    for row in spark.sql(query).collect():
-        spark.sql(f"DROP TABLE {row.tablename}")
-        logger.debug("Dropped temp table %s", row.tablename)
+    if use_duckdb():
+        query = f"SELECT * FROM pg_tables WHERE tablename LIKE '%{TEMP_TABLE_PREFIX}%'"
+        for row in spark.sql(query).collect():
+            spark.sql(f"DROP TABLE {row.tablename}")
+    else:
+        for row in spark.sql(f"SHOW TABLES LIKE '*{TEMP_TABLE_PREFIX}*'").collect():
+            spark.sql(f"DROP TABLE {row.tableName}")
 
 
 def drop_temp_views() -> None:
     """Drop all temporary views."""
-    if not use_duckdb():
-        return
-
     spark = get_spark_session()
-    query = "SELECT view_name FROM duckdb_views() WHERE NOT internal AND view_name LIKE '{TEMP_TABLE_PREFIX}%'"
-    for row in spark.sql(query).collect():
-        spark.sql(f"DROP VIEW {row.view_name}")
-        logger.debug("Dropped temp view %s", row.view_name)
+    if use_duckdb():
+        query = f"""
+            SELECT view_name FROM duckdb_views()
+            WHERE NOT internal AND view_name LIKE '%{TEMP_TABLE_PREFIX}%'
+        """
+        for row in spark.sql(query).collect():
+            spark.sql(f"DROP VIEW {row.view_name}")
+    else:
+        for row in spark.sql(f"SHOW VIEWS LIKE '*{TEMP_TABLE_PREFIX}*'").collect():
+            spark.sql(f"DROP VIEW {row.viewName}")
 
 
 def cross_join(df1: DataFrame, df2: DataFrame) -> DataFrame:
@@ -196,54 +200,6 @@ def shift_time_zone(
     )
 
 
-# TODO duckdb: these next two functions are likely incorrect.
-# Usage in the codebase is questionable.
-def from_utc_timestamp(
-    df: DataFrame, time_column: str, time_zone: str, new_column: str
-) -> DataFrame:
-    """Refer to pyspark.sql.functions.from_utc_timestamp."""
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = df.columns[:]
-        if time_column == new_column:
-            cols.remove(time_column)
-        cols_str = ",".join(cols)
-        query = f"""
-            SELECT
-                {cols_str},
-                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
-            FROM {view}
-        """
-        df2 = get_spark_session().sql(query)
-        return df2
-
-    df2 = df.withColumn(new_column, F.from_utc_timestamp(time_column, time_zone))
-    return df2
-
-
-def to_utc_timestamp(
-    df: DataFrame, time_column: str, time_zone: str, new_column: str
-) -> DataFrame:
-    """Refer to pyspark.sql.functions.to_utc_timestamp."""
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = df.columns[:]
-        if time_column == new_column:
-            cols.remove(time_column)
-        cols_str = ",".join(cols)
-        query = f"""
-            SELECT
-                {cols_str},
-                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
-            FROM {view}
-        """
-        df2 = get_spark_session().sql(query)
-        return df2
-
-    df2 = df.withColumn(new_column, F.to_utc_timestamp(time_column, time_zone))
-    return df2
-
-
 def get_duckdb_spark_session() -> SparkSession | None:
     """Return the active DuckDB Spark Session if it is set."""
     return g_spark
@@ -261,6 +217,20 @@ def get_spark_session() -> SparkSession:
         spark = SparkSession.builder.getOrCreate()
         log_spark_conf(spark)
     return spark
+
+
+def get_spark_warehouse_dir() -> Path:
+    """Return the Spark warehouse directory. Not valid with DuckDB."""
+    assert not use_duckdb()
+    val = get_spark_session().conf.get("spark.sql.warehouse.dir")
+    assert isinstance(val, str)
+    if not val:
+        msg = "Bug: spark.sql.warehouse.dir is not set"
+        raise Exception(msg)
+    if not val.startswith("file:"):
+        msg = f"get_spark_warehouse_dir only supports local file paths currently: {val}"
+        raise NotImplementedError(msg)
+    return Path(val.split("file:")[1])
 
 
 def get_current_time_zone() -> str:
@@ -286,7 +256,7 @@ def set_current_time_zone(time_zone: str) -> None:
     spark.conf.set("spark.sql.session.timeZone", time_zone)
 
 
-def init_spark(name="dsgrid", check_env=True, spark_conf=None):
+def init_spark(name="dsgrid", check_env=True, spark_conf=None) -> SparkSession:
     """Initialize a SparkSession.
 
     Parameters
@@ -322,7 +292,11 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None):
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
         conf.setMaster(cluster)
-    spark = SparkSession.builder.config(conf=conf).getOrCreate()
+
+    config = SparkSession.builder.config(conf=conf)
+    if dsgrid.runtime_config.use_hive_metastore:
+        config = config.enableHiveSupport()
+    spark = config.getOrCreate()
 
     with disable_console_logging():
         log_spark_conf(spark)
@@ -414,26 +388,21 @@ def prepare_timestamps_for_dataframe(timestamps: Iterable[datetime]) -> Iterable
     return timestamps
 
 
-def read_csv(path: Path | str) -> DataFrame:
+def read_csv(path: Path | str, cast_timestamp: bool = True) -> DataFrame:
     """Return a DataFrame from a CSV file, handling special cases with duckdb."""
     spark = get_spark_session()
     if use_duckdb():
         path_ = path if isinstance(path, Path) else Path(path)
         if path_.is_dir():
-            # path_str = str(path_) + "**/*.csv"
-            files = list(path_.glob("*.csv"))
-            assert len(files) == 1, files
-            path_str = str(files[0])
+            path_str = str(path_) + "**/*.csv"
         else:
             path_str = str(path_)
-        # TODO duckdb
-        # df = spark.read.csv(path_str, header=True)
-        # for field in df.schema:
-        #    if field.dataType is TimestampNTZType():
-        #        df = df.withColumn(field.name, F.col(field.name).cast(TimestampType()))
         df = spark.createDataFrame(pd.read_csv(path_str))
-        if "timestamp" in df.columns:
-            # TODO duckdb: do something better
+        if cast_timestamp and "timestamp" in df.columns:
+            if "PYTEST_VERSION" not in os.environ:
+                msg = f"cast_timestamp in read_csv can only be set in a test environment: {path=}"
+                raise Exception(msg)
+            # TODO: need a better way of guessing and setting the correct type.
             df = df.withColumn("timestamp", F.col("timestamp").cast(TimestampType()))
         dup_cols = [x for x in df.columns if x.endswith(".1")]
         if dup_cols:
@@ -454,6 +423,7 @@ def read_json(path: Path | str) -> DataFrame:
     if use_duckdb():
         with NamedTemporaryFile(suffix=".json") as f:
             f.close()
+            # TODO duckdb: look for something more efficient. Not a big deal right now.
             data = load_line_delimited_json(path)
             dump_data(data, f.name)
             return spark.read.json(f.name)

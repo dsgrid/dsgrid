@@ -21,9 +21,14 @@ from dsgrid.config.date_time_dimension_config import (
 from dsgrid.config.representative_period_time_dimension_config import (
     RepresentativePeriodTimeDimensionConfig,
 )
-from dsgrid.dimension.time import MeasurementType, TimeIntervalType, RepresentativePeriodFormat
+from dsgrid.dimension.time import (
+    MeasurementType,
+    TimeIntervalType,
+    RepresentativePeriodFormat,
+)
 from dsgrid.spark.functions import (
     aggregate_single_value,
+    init_spark,
     is_dataframe_empty,
 )
 from dsgrid.spark.types import (
@@ -36,8 +41,14 @@ from dsgrid.spark.types import (
     StructField,
     use_duckdb,
 )
+from dsgrid.utils.dataset import (
+    map_time_dimension_with_chronify_duckdb,
+    map_time_dimension_with_chronify_spark_path,
+)
 from dsgrid.utils.spark import (
     get_spark_session,
+    persist_intermediate_table,
+    read_dataframe,
 )
 
 
@@ -51,7 +62,7 @@ ONE_WEEKDAY_DAY_AND_ONE_WEEKEND_DAY_PER_MONTH_BY_HOUR_FILE = (
 
 @pytest.fixture(scope="module")
 def one_weekday_day_and_one_weekend_day_per_month_by_hour_table():
-    spark = get_spark_session()
+    spark = init_spark()
     schema = StructType(
         [
             StructField("scenario", StringType(), False),
@@ -132,13 +143,30 @@ def test_time_mapping(
     # It uses Pacific Prevailing Time to make the checks consistent with the dataset.
     df = one_weekday_day_and_one_weekend_day_per_month_by_hour_table
     # This dataset has only California counties.
-    df = df.withColumn("time_zone", F.lit("PacificPrevailing"))
+    df = df.withColumn("time_zone", F.lit("America/Los_Angeles"))
     config = make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config()
     project_time_config = make_date_time_config()
-    value_columns = {VALUE_COLUMN}
-    mapped_df = config.convert_dataframe(
-        df, project_time_config, value_columns, scratch_dir_context
-    )
+    if use_duckdb():
+        mapped_df = map_time_dimension_with_chronify_duckdb(
+            df,
+            VALUE_COLUMN,
+            config,
+            project_time_config,
+        )
+    else:
+        filename = persist_intermediate_table(
+            df,
+            scratch_dir_context,
+            tag="tmp query",
+        )
+        mapped_df = map_time_dimension_with_chronify_spark_path(
+            df=read_dataframe(filename),
+            filename=filename,
+            value_column=VALUE_COLUMN,
+            from_time_dim=config,
+            to_time_dim=project_time_config,
+            scratch_dir_context=scratch_dir_context,
+        )
     timestamps = mapped_df.select("timestamp").distinct().sort("timestamp").collect()
     zi = ZoneInfo("EST")
     est_timestamps = [x.timestamp.astimezone(zi) for x in timestamps]

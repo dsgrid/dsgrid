@@ -1,11 +1,12 @@
 import logging
 
+import chronify
+
 from dsgrid.dimension.time import DatetimeRange, DatetimeFormat, TimeZone
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
-from dsgrid.spark.types import F, StructType, StructField, TimestampType
+from dsgrid.spark.types import DataFrame, F, StructType, StructField, TimestampType
 from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -20,6 +21,24 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     @staticmethod
     def model_class():
         return DateTimeDimensionModel
+
+    def supports_chronify(self) -> bool:
+        return True
+
+    def to_chronify(self) -> chronify.DatetimeRange:
+        time_cols = self.get_load_data_time_columns()
+        assert len(self._model.ranges) == 1
+        assert len(time_cols) == 1
+        # TODO: issue #341
+        timestamps = self.list_expected_dataset_timestamps()
+        return chronify.DatetimeRange(
+            time_column=time_cols[0],
+            start=timestamps[0].timestamp,
+            length=len(timestamps),
+            resolution=self._model.frequency,
+            measurement_type=self._model.measurement_type,
+            interval_type=self._model.time_interval_type,
+        )
 
     @track_timing(timer_stats_collector)
     def check_dataset_time_consistency(self, load_data_df, time_columns):
@@ -132,31 +151,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     #     )
     #     return df2
 
-    def convert_dataframe(
-        self,
-        df,
-        project_time_dim,
-        value_columns: set[str],
-        scratch_dir_context: ScratchDirContext,
-        wrap_time_allowed=False,
-        time_based_data_adjustment=None,
-    ):
-        time_col = self.get_load_data_time_columns()
-        assert len(time_col) == 1, time_col
-        time_col = time_col[0]
-
-        ptime_col = project_time_dim.get_load_data_time_columns()
-        assert len(ptime_col) == 1, ptime_col
-        ptime_col = ptime_col[0]
-
-        df = self._convert_time_to_project_time(
-            df,
-            project_time_dim,
-            scratch_dir_context,
-            wrap_time=wrap_time_allowed,
-            time_based_data_adjustment=time_based_data_adjustment,
-        )
-        return df
+    def convert_dataframe(self, *args, **kwargs):
+        msg = f"{self.__class__.__name__}.convert_dataframe is implemented through chronify"
+        raise NotImplementedError(msg)
 
     def get_frequency(self):
         return self.model.frequency
@@ -202,7 +199,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps
 
-    def convert_time_format(self, df):
+    def convert_time_format(self, df: DataFrame, update_model: bool = False) -> DataFrame:
         if self.model.datetime_format.format_type != DatetimeFormat.LOCAL_AS_STRINGS:
             return df
         time_col = self.get_load_data_time_columns()
@@ -212,4 +209,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             time_col,
             F.to_timestamp(time_col, self.model.datetime_format.data_str_format),
         )
+        if update_model:
+            # TODO: The code doesn't support DatetimeFormat.LOCAL.
+            # self.model.datetime_format.format_type = DatetimeFormat.LOCAL
+            msg = "convert_time_format DatetimeFormat.LOCAL_AS_STRINGS update_model=True"
+            raise NotImplementedError(msg)
         return df

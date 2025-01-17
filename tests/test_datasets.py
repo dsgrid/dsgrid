@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from chronify import InvalidTable
 
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.utils.id_remappings import (
@@ -27,8 +28,6 @@ logger = logging.getLogger()
 
 PROJECT_ID = "test_efs"
 DATASET_ID = "test_efs_comstock"
-
-# TODO duckdb: need to pass newline_delimited to spark.read.json somehow
 
 
 def make_registry(base_dir, test_project_dir, test_data_dir):
@@ -188,8 +187,8 @@ def test_invalid_load_data_missing_timestamp(register_dataset):
                 f_out.write(line)
                 f_out.write("\n")
 
-    expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = r"load_data timestamps do not match expected times"
+    expected_errors["exception"] = InvalidTable
+    expected_errors["match_msg"] = r"Actual timestamps do not match expected timestamps"
 
 
 def test_invalid_load_data_id_missing_timestamp(register_dataset):
@@ -198,10 +197,8 @@ def test_invalid_load_data_id_missing_timestamp(register_dataset):
     # Remove one row/timestamp for one load data array.
     text = "\n".join(data_file.read_text().splitlines()[:-1])
     data_file.write_text(text)
-    expected_errors["exception"] = DSGInvalidDataset
-    expected_errors[
-        "match_msg"
-    ] = r"All time arrays must be repeated the same number of times: unique timestamp repeats =.*"
+    expected_errors["exception"] = InvalidTable
+    expected_errors["match_msg"] = r"The count of time values in each time array must be"
 
 
 def test_invalid_load_data_id_extra_timestamp(register_dataset):
@@ -217,8 +214,8 @@ def test_invalid_load_data_id_extra_timestamp(register_dataset):
     with open(data_file, "a") as f_out:
         f_out.write(",".join([str(x) for x in new_row]))
         f_out.write("\n")
-    expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = r"load_data timestamps do not match expected times"
+    expected_errors["exception"] = InvalidTable
+    expected_errors["match_msg"] = r"Actual timestamps do not match expected timestamps"
 
 
 def test_invalid_load_data_null_id(register_dataset):

@@ -68,7 +68,7 @@ from dsgrid.tests.common import (
 )
 from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
-from dsgrid.utils.spark import custom_spark_conf
+from dsgrid.utils.spark import custom_time_zone
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
 
 
@@ -120,7 +120,7 @@ def la_expected_electricity_hour_16(tmp_path_factory):
         .agg(F.sum(VALUE_COLUMN).alias(VALUE_COLUMN))
     )
     tz = project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
-    with custom_spark_conf({"spark.sql.session.timeZone": tz.tz_name}):
+    with custom_time_zone(tz.tz_name):
         expected = (
             df.groupBy("county", F.hour("time_est").alias("hour"))
             .agg(F.mean(VALUE_COLUMN).alias(VALUE_COLUMN))
@@ -133,7 +133,7 @@ def la_expected_electricity_hour_16(tmp_path_factory):
 
 
 @pytest.mark.parametrize("category", list(DimensionCategory))
-def test_electricity_values(category):
+def test_electricity_values(spark_session_module, category):
     run_query_test(QueryTestElectricityValues, category)
 
 
@@ -146,7 +146,7 @@ def test_electricity_values(category):
         ("state", "max"),
     ],
 )
-def test_electricity_use(inputs):
+def test_electricity_use(spark_session_module, inputs):
     geo, op = inputs
     run_query_test(QueryTestElectricityUse, geo, op)
 
@@ -158,12 +158,14 @@ def test_electricity_use(inputs):
         ("county", "sum", DimensionCategory.SUBSET),
     ],
 )
-def test_electricity_use_with_results_filter(inputs):
+def test_electricity_use_with_results_filter(spark_session_module, inputs):
     geo, op, category = inputs
     run_query_test(QueryTestElectricityUseFilterResults, geo, op, category)
 
 
-def test_total_electricity_use_with_filter():
+def test_total_electricity_use_with_filter(
+    spark_session_module,
+):
     run_query_test(QueryTestTotalElectricityUseWithFilter)
 
 
@@ -176,7 +178,7 @@ def test_total_electricity_use_with_filter():
         (ColumnType.DIMENSION_TYPES, ["state", "reeds_pca", "census_region"], True, False),
     ],
 )
-def test_total_electricity_use_by_state_and_pca(column_inputs):
+def test_total_electricity_use_by_state_and_pca(spark_session_module, column_inputs):
     column_type, columns, aggregate_each_dataset, is_valid = column_inputs
     if is_valid:
         run_query_test(
@@ -189,26 +191,28 @@ def test_total_electricity_use_by_state_and_pca(column_inputs):
             )
 
 
-def test_annual_electricity_by_state():
+def test_annual_electricity_by_state(spark_session_module):
     run_query_test(QueryTestAnnualElectricityUseByState)
 
 
-def test_diurnal_electricity_use_by_county_chained(la_expected_electricity_hour_16):
+def test_diurnal_electricity_use_by_county_chained(
+    spark_session_module, la_expected_electricity_hour_16
+):
     run_query_test(
         QueryTestDiurnalElectricityUseByCountyChained,
         expected_values=la_expected_electricity_hour_16,
     )
 
 
-def test_peak_load():
+def test_peak_load(spark_session_module):
     run_query_test(QueryTestPeakLoadByStateSubsector)
 
 
-def test_map_annual_time():
+def test_map_annual_time(spark_session_module):
     run_query_test(QueryTestMapAnnualTime)
 
 
-def test_unit_mapping(cached_registry):
+def test_unit_mapping(cached_registry, spark_session_module):
     run_query_test(QueryTestUnitMapping)
 
 
@@ -288,7 +292,9 @@ def test_invalid_pivoted_dimension_aggregations():
         )
 
 
-def test_invalid_aggregation_subset_dimension():
+def test_invalid_aggregation_subset_dimension(
+    spark_session_module,
+):
     with pytest.raises(DSGInvalidQuery):
         run_query_test(QueryTestInvalidAggregation)
 
@@ -408,7 +414,6 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
     assert five_year_years == [2010, 2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050]
 
     def get_pivoted_value_sum(df):
-        # TODO DT: single query?
         return aggregate_single_value(df, "sum", "cooling") + aggregate_single_value(
             df, "sum", "fans"
         )
@@ -1066,6 +1071,8 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
             .filter(f"end_uses_by_fuel_type == '{end_use}'")
             .collect()
         )
+
+        df.filter(f"county == '{county}' and end_uses_by_fuel_type == '{end_use}'").show()
         assert len(filtered_values) == 1
         assert math.isclose(filtered_values[0].value, expected_values["la_electricity_hour_16"])
         return True
@@ -1558,11 +1565,6 @@ class QueryTestUnitMapping(QueryTestBase):
         assert actual.fans == expected_fans[VALUE_COLUMN] * 0.9
         assert actual.cooling == expected_cooling[VALUE_COLUMN] * 1000
         return True
-
-
-# TODO DT: unused?
-# def perform_op(df, column, operation):
-# return aggregate_single_value(df.select(column), operation, column)
 
 
 def validate_electricity_use_by_county(

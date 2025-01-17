@@ -1,6 +1,5 @@
 from pathlib import Path
 
-from dsgrid.spark.functions import read_csv
 from dsgrid.spark.types import use_duckdb
 from dsgrid.utils.spark import get_spark_session
 
@@ -16,10 +15,6 @@ def read_parquet(filename: Path):
         df.cache()
         df.count()
     return df
-
-
-def read_csv_single_table_format(path: Path):
-    return read_csv(path)
 
 
 def read_parquet_two_table_format(path: Path):

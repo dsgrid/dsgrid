@@ -132,7 +132,7 @@ def drop_temp_views() -> None:
     """Drop all temporary views."""
     spark = get_spark_session()
     if use_duckdb():
-        query = """
+        query = f"""
             SELECT view_name FROM duckdb_views()
             WHERE NOT internal AND view_name LIKE '%{TEMP_TABLE_PREFIX}%'
         """

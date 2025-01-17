@@ -224,8 +224,10 @@ def build_tempo():
     lookup = tempo._handler._load_data_lookup
     load_data = tempo._handler._load_data
     value_columns = tempo._handler.config.get_value_columns()
+    assert len(value_columns) == 1
+    value_column = next(iter(value_columns))
     tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-        load_data.join(lookup, on="id").drop("id"), project.config, value_columns, ["L1andL2"]
+        load_data.join(lookup, on="id").drop("id"), project.config, value_column, ["L1andL2"]
     )
     return tempo_data_mapped_time
 

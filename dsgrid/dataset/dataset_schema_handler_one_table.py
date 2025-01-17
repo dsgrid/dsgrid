@@ -76,7 +76,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 raise DSGInvalidDataset(msg)
             if not (column in time_columns or column == VALUE_COLUMN):
                 dim_type = DimensionType.from_column(column)
-                if not schema[column].dataType is StringType():
+                if schema[column].dataType is not StringType():
                     msg = f"dimension column {column} must have data type = StringType"
                     raise DSGInvalidDataset(msg)
                 dimension_types.add(dim_type)

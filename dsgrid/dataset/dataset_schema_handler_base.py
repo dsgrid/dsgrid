@@ -2,7 +2,7 @@ import abc
 import logging
 import os
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Optional
 
 import chronify
 from sqlalchemy import Connection
@@ -222,10 +222,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
             x
             for x in df.columns
             # If there are multiple weather years:
-            #   - that are continuous, weather year needs to be excluded.
-            #   - that are not continuous, weather year probably needs to be included.
-            # if x != DimensionType.WEATHER_YEAR.value and
-            if x
+            #   - that are continuous, weather year needs to be excluded (one overall range).
+            #   - that are not continuous, weather year needs to be included and chronify
+            #     needs additional support. TODO
+            if x != DimensionType.WEATHER_YEAR.value
+            and x
             in set(df.columns).difference(time_cols).difference(self._config.get_value_columns())
         ]
         if self._config.get_table_format_type() == TableFormatType.PIVOTED:
@@ -233,7 +234,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         else:
             value_column = VALUE_COLUMN
         return chronify.TableSchema(
-            name="dsgrid_view",
+            name=make_temp_view_name(),
             time_config=time_dim.to_chronify(),
             time_array_id_columns=time_array_id_columns,
             value_column=value_column,
@@ -483,14 +484,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         self,
         load_data_df: DataFrame,
         project_config: ProjectConfig,
-        value_column: str | Iterable[str],
+        value_column: str,
         scratch_dir_context: ScratchDirContext,
     ):
-        if not isinstance(value_column, str):
-            if len(list(value_column)) != 1:
-                msg = "Bug: There can only be one value column."
-                raise Exception(msg)
-            value_column = next(iter(value_column))
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
         time_based_data_adjustment = input_dataset_model.time_based_data_adjustment
@@ -557,7 +553,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     time_based_data_adjustment=time_based_data_adjustment,
                 )
             case (BackendEngine.DUCKDB, _, True):
-                table_name = None
                 load_data_df = map_time_dimension_with_chronify_duckdb(
                     df=load_data_df,
                     value_column=value_column,

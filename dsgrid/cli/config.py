@@ -76,16 +76,16 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
 #    default=DEFAULT_DB_PASSWORD,
 #    help="Database username",
 # )
-@click.option(
-    "-o",
-    "--offline",
-    is_flag=True,
-    default=False,
-    show_default=True,
-    help="Run registry commands in offline mode. WARNING: any commands you perform in offline "
-    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
-    "commands will not be officially synced with the remote registry",
-)
+# @click.option(
+#    "-o",
+#    "--offline",
+#    is_flag=True,
+#    default=False,
+#    show_default=True,
+#    help="Run registry commands in offline mode. WARNING: any commands you perform in offline "
+#    "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
+#    "commands will not be officially synced with the remote registry",
+# )
 @click.option(
     "--console-level",
     default="info",
@@ -122,7 +122,7 @@ def create(
     timings,
     # username,
     # password,
-    offline,
+    # offline,
     console_level,
     file_level,
     reraise_exceptions,
@@ -137,7 +137,7 @@ def create(
         database_url=url,
         # database_user=username,
         # database_password=password,
-        offline=offline,
+        offline=True,
         console_level=console_level,
         file_level=file_level,
         reraise_exceptions=reraise_exceptions,

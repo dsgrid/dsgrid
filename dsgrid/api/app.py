@@ -371,7 +371,7 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
             f"--offline "
             f"--url={DSGRID_REGISTRY_DATABASE_URL} "
             f"query project run "
-            f"--output={output_dir} --zip-file --force {fp.name}"
+            f"--output={output_dir} --zip-file --overwrite {fp.name}"
         )
         if spark_query.use_spark_submit:
             # Need to find the full path to pass to spark-submit.

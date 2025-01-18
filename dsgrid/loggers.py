@@ -5,6 +5,8 @@ import logging.config
 import os
 from contextlib import contextmanager
 
+import chronify.loggers
+
 
 # ETH@20210325 - What if you want to set up logging for all loggers, or for all
 # dsgrid loggers? What name should be provided? Should that be the default?
@@ -86,6 +88,10 @@ def setup_logging(
     logging.config.dictConfig(log_config)
     logger = logging.getLogger(name)
 
+    # TODO: more consideration is warranted, but this is usually what we want.
+    # If we migrate dsgrid to use loguru, it will be easier. We could use the TRACE level
+    # in dsgrid.
+    chronify.loggers.setup_logging(console_level="WARNING", file_level="DEBUG", filename=filename)
     return logger
 
 

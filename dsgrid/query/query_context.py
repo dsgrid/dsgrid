@@ -215,7 +215,7 @@ class QueryContext:
         self._get_metadata(dataset_id).dimensions.replace_metadata(
             dimension_type, dimension_metadata
         )
-        logger.info(
+        logger.debug(
             "Replaced dimension for %s: %s dataset_id=%s",
             dimension_type,
             dimension_metadata,

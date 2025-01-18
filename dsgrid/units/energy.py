@@ -197,13 +197,13 @@ def convert_units_unpivoted(
     if is_dataframe_empty(
         except_all(unit_df, to_unit_records.select("id", F.col("unit").alias("from_unit")))
     ):
-        logger.info("Return early because the units match.")
+        logger.debug("Return early because the units match.")
         return df
 
     df = join(df, unit_df, metric_column, "id").drop("id")
     tmp3 = to_unit_records.select("id", "unit").withColumnRenamed(unit_col, "to_unit")
     df = join(df, tmp3, metric_column, "id").drop("id")
-    logger.info("Converting units from column %s", metric_column)
+    logger.debug("Converting units from column %s", metric_column)
     return df.withColumn(VALUE_COLUMN, from_any_to_any("from_unit", "to_unit", VALUE_COLUMN)).drop(
         "from_unit", "to_unit"
     )

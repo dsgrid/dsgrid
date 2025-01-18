@@ -232,7 +232,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             context.metadata.model_dump_json(indent=2), encoding="utf-8"
         )
         self.query_filename(cached_dir).write_text(text, encoding="utf-8")
-        logger.info("Persisted intermediate table to %s", filename)
+        logger.debug("Persisted intermediate table to %s", filename)
         return df
 
     def _postprocess_datasets(

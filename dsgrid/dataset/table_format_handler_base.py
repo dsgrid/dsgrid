@@ -243,5 +243,5 @@ class TableFormatHandlerBase(abc.ABC):
                 df = persist_intermediate_query(df, context.scratch_dir_context)
                 stacked_columns = set(df.columns) - value_columns.union(time_columns)
                 df = remove_invalid_null_timestamps(df, time_columns, stacked_columns)
-                logger.info("Removed any rows with invalid null timestamps")
+                logger.debug("Removed any rows with invalid null timestamps")
         return df

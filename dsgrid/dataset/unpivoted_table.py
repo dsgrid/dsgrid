@@ -90,7 +90,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
                     to_unit_records,
                 )
 
-            logger.info(
+            logger.debug(
                 "Aggregated dimensions with groupBy %s and operation %s",
                 group_by_cols,
                 op.__name__,

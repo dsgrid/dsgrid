@@ -563,7 +563,7 @@ def write_dataframe_and_auto_partition(
     duration_first_write = end_initial_write - start_initial_write
 
     if use_duckdb():
-        logger.info("write_dataframe_and_auto_partition is not optimized for DuckDB")
+        logger.debug("write_dataframe_and_auto_partition is not optimized for DuckDB")
         return df
 
     partition_size_bytes = partition_size_mb * 1024 * 1024

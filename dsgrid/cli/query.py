@@ -81,7 +81,7 @@ _COMMON_RUN_OPTIONS = (
         help="Try to load a cached table if one exists.",
     ),
     click.option(
-        "--force",
+        "--overwrite",
         is_flag=True,
         default=False,
         show_default=True,
@@ -132,7 +132,7 @@ $ dsgrid query project create --default-result-aggregation my_query_result_name 
     help="Add default result aggregration.",
 )
 @click.option(
-    "--force",
+    "--overwrite",
     is_flag=True,
     default=False,
     show_default=True,
@@ -149,16 +149,16 @@ def create_project_query(
     aggregation_function,
     query_file,
     default_result_aggregation,
-    force,
+    overwrite,
     remote_path,
 ):
     """Create a default query file for a dsgrid project."""
     if query_file.exists():
-        if force:
+        if overwrite:
             query_file.unlink()
         else:
             print(
-                f"{query_file} already exists. Choose a different name or pass --force to overwrite it.",
+                f"{query_file} already exists. Choose a different name or pass --overwrite to overwrite it.",
                 file=sys.stderr,
             )
             return 1
@@ -291,7 +291,7 @@ def run_project_query(
     remote_path,
     output,
     load_cached_table,
-    force,
+    overwrite,
 ):
     """Run a query on a dsgrid project."""
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
@@ -315,7 +315,7 @@ def run_project_query(
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
         zip_file=zip_file,
-        force=force,
+        force=overwrite,
     )
     if res[1] != 0:
         ctx.exit(res[1])
@@ -331,7 +331,7 @@ def create_composite_dataset(
     remote_path,
     output,
     load_cached_table,
-    force,
+    overwrite,
 ):
     """Run a query to create a composite dataset."""
     CreateCompositeDatasetQueryModel.from_file(query_definition_file)
@@ -350,7 +350,7 @@ def create_composite_dataset(
     #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
-    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
+    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=overwrite)
 
 
 @click.command("run")
@@ -363,7 +363,7 @@ def query_composite_dataset(
     remote_path,
     output,
     load_cached_table,
-    force,
+    overwrite,
 ):
     """Run a query on a composite dataset."""
     CompositeDatasetQueryModel.from_file(query_definition_file)
@@ -382,7 +382,7 @@ def query_composite_dataset(
     #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
-    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
+    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, overwrite=overwrite)
 
 
 _create_derived_dataset_config_epilog = """
@@ -396,14 +396,14 @@ $ dsgrid query project create-derived-dataset-config query_output/my_query_resul
 @click.argument("dst")
 @add_options(_COMMON_REGISTRY_OPTIONS)
 @click.option(
-    "--force",
+    "--overwrite",
     is_flag=True,
     default=False,
     show_default=True,
     help="Overwrite results directory if it exists.",
 )
 @click.pass_context
-def create_derived_dataset_config(ctx, src, dst, remote_path, force):
+def create_derived_dataset_config(ctx, src, dst, remote_path, overwrite):
     """Create a derived dataset configuration and dimensions from a query result."""
     fs_interface = make_filesystem_interface(src)
     src_path = fs_interface.path(src)
@@ -411,7 +411,7 @@ def create_derived_dataset_config(ctx, src, dst, remote_path, force):
         print(f"{src} does not exist", file=sys.stderr)
         return 1
     dst_path = fs_interface.path(dst)
-    check_output_directory(dst_path, fs_interface, force)
+    check_output_directory(dst_path, fs_interface, overwrite)
 
     conn = DatabaseConnection(
         url=get_value_from_context(ctx, "url"),

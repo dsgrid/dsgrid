@@ -345,7 +345,7 @@ def test_query_cli_create_validate(tmp_path):
         "supplemental_column_operator",
         "-F",
         "expression_raw",
-        "--force",
+        "--overwrite",
         "my_query",
         "dsgrid_conus_2022",
         "projected_dg_conus_2022",

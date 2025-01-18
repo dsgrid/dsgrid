@@ -277,6 +277,7 @@ def remove_datasets(registry_manager: RegistryManager, dataset_ids: list[str]):
 )
 @click.option(
     "-f",
+    "--overwrite",
     "--force",
     default=False,
     is_flag=True,
@@ -291,7 +292,7 @@ def make_filtered_registry(
     dst_data_path: Path,
     config_file: Path,
     mode,
-    force,
+    overwrite,
 ):
     """Make a filtered registry for testing purposes."""
     simple_model = RegistrySimpleModel(**load_data(config_file))
@@ -312,7 +313,7 @@ def make_filtered_registry(
         dst_conn,
         dst_data_path,
         mode=mode,
-        force=force,
+        force=overwrite,
     )
     mgr = FilterRegistryManager.load(dst_conn, offline_mode=True, use_remote_data=False)
     mgr.filter(simple_model=simple_model)

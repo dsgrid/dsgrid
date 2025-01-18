@@ -100,7 +100,7 @@ def test_create_derived_dataset_config(tmp_path):
             str(RESSTOCK_PROJECTION_QUERY),
             "-o",
             str(query_output_base),
-            "--force",
+            "--overwrite",
         ],
     )
     assert result.exit_code == 0
@@ -137,7 +137,7 @@ def test_create_derived_dataset_config(tmp_path):
             "create-derived-dataset-config",
             str(query_output),
             str(dataset_dir),
-            "--force",
+            "--overwrite",
         ],
     )
     assert result.exit_code == 0

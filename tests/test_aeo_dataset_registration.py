@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory, gettempdir
 
 import pandas as pd
 import pytest
+from dsgrid.spark.types import use_duckdb
 
 from dsgrid.tests.common import (
     TEST_PROJECT_PATH,
@@ -107,12 +108,18 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
 
             logger.info("3. with a duplicated dimension: ")
             _modify_data_file(data_dir, duplicate_col="subsector")
-            with pytest.raises((ValueError, DSGInvalidDimension)):
+            # This is not really a valuable test any more.
+            # Spark doesn't allow duplicate columns in CSV files. Maybe previous versions did.
+            # It appends the column index to each duplicate column name.
+            # DuckDB appends ".1" to the duplicate, and our code catches that.
+            exc = DSGInvalidDimension if use_duckdb() else DSGInvalidDataset
+            with pytest.raises((ValueError, exc)):
                 _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("4. with a duplicated pivot col: ")
             _modify_data_file(data_dir, duplicate_col="elec_heating")
-            with pytest.raises((ValueError, DSGInvalidDimension)):
+            exc = DSGInvalidDimension if use_duckdb() else DSGInvalidDataset
+            with pytest.raises((ValueError, exc)):
                 _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("5. End Uses dataset only - missing time ")

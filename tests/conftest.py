@@ -149,14 +149,6 @@ def spark_session():
 
 
 @pytest.fixture(scope="module")
-def spark_session_module():
-    spark = init_spark("dsgrid_test")
-    yield spark
-    if not use_duckdb():
-        spark.stop()
-
-
-@pytest.fixture(scope="module")
 def make_test_project_dir_module():
     tmpdir = _make_project_dir(TEST_PROJECT_REPO)
     yield tmpdir / "dsgrid_project"

@@ -100,7 +100,7 @@ class TableFormatHandlerBase(abc.ABC):
 
         if "fraction" in df.columns:
             for column in value_columns:
-                df = df.withColumn(column, getattr(df, column) * getattr(df, "fraction"))
+                df = df.withColumn(column, df[column] * df["fraction"])
             df = df.drop("fraction")
 
         return df
@@ -162,7 +162,7 @@ class TableFormatHandlerBase(abc.ABC):
                 continue
             records = dim_config.get_records_dataframe().select("id", "name")
             df = (
-                df.join(records, on=getattr(df, dimension_query_name) == getattr(records, "id"))
+                df.join(records, on=df[dimension_query_name] == records["id"])
                 .drop("id", dimension_query_name)
                 .withColumnRenamed("name", dimension_query_name)
             )

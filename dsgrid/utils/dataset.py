@@ -170,6 +170,11 @@ def map_time_dimension_with_chronify_duckdb(
     """Create a time-mapped table with chronify and DuckDB.
     All operations are performed in memory.
     """
+    # This will only work if the source and destination tables will fit in memory.
+    # We could potentially use a file-based DuckDB database for larger-than memory datasets.
+    # However, time checks and unpivot operations have failed with out-of-memory errors,
+    # and so we have never reached this point.
+    # If we solve those problems, this code could be modified.
     src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
     store = chronify.Store.create_in_memory_db()
     store.ingest_table(df.relation, src_schema, bypass_checks=True)

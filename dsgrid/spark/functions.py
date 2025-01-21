@@ -26,9 +26,9 @@ logger = logging.getLogger(__name__)
 
 
 if use_duckdb():
-    g_spark = SparkSession.builder.getOrCreate()
+    g_duckdb_spark = SparkSession.builder.getOrCreate()
 else:
-    g_spark = None
+    g_duckdb_spark = None
 
 
 TEMP_TABLE_PREFIX = "tmp_dsgrid"
@@ -53,20 +53,20 @@ def aggregate_single_value(df: DataFrame, agg_func: str, column: str) -> Any:
 
 
 def cache(df: DataFrame) -> DataFrame:
-    """Cache the dataframe."""
+    """Cache the dataframe. This is a no-op for DuckDB."""
     if use_duckdb():
         return df
     return df.cache()
 
 
 def unpersist(df: DataFrame) -> None:
-    """Unpersist the dataframe."""
+    """Unpersist a dataframe that was previously cached. This is a no-op for DuckDB."""
     if not use_duckdb():
         df.unpersist()
 
 
 def coalesce(df: DataFrame, num_partitions: int) -> DataFrame:
-    """Coalesce the dataframe into num_partitions partitions."""
+    """Coalesce the dataframe into num_partitions partitions. This is a no-op for DuckDB."""
     if use_duckdb():
         return df
     return df.coalesce(num_partitions)
@@ -84,7 +84,6 @@ def count_distinct_on_group_by(
     df: DataFrame, group_by_columns: list[str], agg_column: str, alias: str
 ) -> DataFrame:
     """Perform a count distinct on one column after grouping."""
-    # This could be more customizable.
     if use_duckdb():
         view = create_temp_view(df)
         cols = ",".join(group_by_columns)
@@ -176,6 +175,29 @@ def _except_all_spark(df1: DataFrame, df2: DataFrame) -> DataFrame:
     return df1.exceptAll(df2)
 
 
+def intersect(df1: DataFrame, df2: DataFrame) -> DataFrame:
+    """Return an intersection of rows. Duplicates are not returned"""
+    # Could add intersect all if duplicated are needed.
+    method = _intersect_duckdb if use_duckdb() else _intersect_spark
+    return method(df1, df2)
+
+
+def _intersect_duckdb(df1: DataFrame, df2: DataFrame) -> DataFrame:
+    view1 = create_temp_view(df1)
+    view2 = create_temp_view(df2)
+    query = f"""
+        SELECT * FROM {view1}
+        INTERSECT
+        SELECT * FROM {view2}
+    """
+    spark = get_spark_session()
+    return spark.sql(query)
+
+
+def _intersect_spark(df1: DataFrame, df2: DataFrame) -> DataFrame:
+    return df1.intersect(df2)
+
+
 def shift_time_zone(
     df: DataFrame, time_column: str, from_time_zone: str, to_time_zone: str, new_column: str
 ) -> DataFrame:
@@ -202,7 +224,7 @@ def shift_time_zone(
 
 def get_duckdb_spark_session() -> SparkSession | None:
     """Return the active DuckDB Spark Session if it is set."""
-    return g_spark
+    return g_duckdb_spark
 
 
 def get_spark_session() -> SparkSession:
@@ -271,7 +293,7 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None) -> SparkSession:
 
     """
     if use_duckdb():
-        return g_spark
+        return g_duckdb_spark
 
     cluster = os.environ.get("SPARK_CLUSTER")
     conf = SparkConf().setAppName(name)
@@ -343,7 +365,9 @@ def perform_interval_op(
 
 
 def join(df1: DataFrame, df2: DataFrame, column1: str, column2: str, how="inner") -> DataFrame:
-    """Join two dataframes on multiple columns."""
+    """Join two dataframes on one column. Use this method whenever the result may be joined
+    with another dataframe in order to workaround a DuckDB issue.
+    """
     df = df1.join(df2, on=df1[column1] == df2[column2], how=how)
     if use_duckdb():
         # DuckDB sets the relation alias to "relation", which causes problems with future
@@ -368,6 +392,7 @@ def join_multiple_columns(
             {how} JOIN {view2}
             ON {on_str}
         """
+        # This does not have the alias="relation" issue discussed above.
         return get_spark_session().sql(query)
 
     return df1.join(df2, columns, how=how)

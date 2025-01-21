@@ -125,7 +125,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         for dim in dimensions:
             column = dim.dimension_type.value
             if column in df_columns:
-                load_df = load_df.filter(getattr(load_df, column).isin(dim.record_ids))
+                load_df = load_df.filter(load_df[column].isin(dim.record_ids))
                 stacked_columns.add(column)
 
         drop_columns = []

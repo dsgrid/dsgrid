@@ -430,7 +430,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 base_records = base_dim.get_records_dataframe()
                 self._check_subset_dimension_consistency(subset_dimension, base_records)
                 for selector in subset_dimension.selectors:
-                    new_records = base_records.filter(F.col("id").isin(selector.records))
+                    new_records = base_records.filter(base_records["id"].isin(selector.records))
                     filename = tmp_path / f"{subset_dimension.name}_{selector.name}.csv"
                     new_records.toPandas().to_csv(filename, index=False)
                     dim = DimensionModel(
@@ -1222,6 +1222,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         if use_duckdb():
             df2 = df
         else:
+            # This operation is slow with Spark. Ensure that we only evaluate the query once.
             df2 = read_dataframe(persist_intermediate_table(df, context, "dimension_associations"))
         logger.info("Wrote dimension associations for dataset %s", dataset_id)
         return df2

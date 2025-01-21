@@ -27,6 +27,7 @@ from sqlalchemy import (
 from dsgrid.exceptions import (
     DSGValueNotRegistered,
     DSGInvalidOperation,
+    DSGInvalidParameter,
     DSGValueNotStored,
     DSGDuplicateValueRegistered,
 )
@@ -62,8 +63,11 @@ class RegistryDatabase:
         """Create a new registry database."""
         filename = conn.get_filename()
         if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
+            msg = (
+                f"Failed to parse '{filename}' into a SQLite URL. "
+                "The SQLite file path must be specified in the format 'sqlite:///<filename.db>'."
+            )
+            raise DSGInvalidParameter(msg)
         if filename.exists():
             if overwrite:
                 filename.unlink()

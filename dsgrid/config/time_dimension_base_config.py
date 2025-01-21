@@ -25,7 +25,6 @@ from dsgrid.spark.functions import (
     except_all,
     perform_interval_op,
     select_expr,
-    unpersist,
 )
 from dsgrid.spark.types import (
     DataFrame,
@@ -275,7 +274,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                 .drop("orig_ts")
             )
 
-        unpersist(time_map)
+        if not use_duckdb():
+            time_map.unpersist()
         return df
 
     def _align_time_interval_type(self, df, project_time_dim):

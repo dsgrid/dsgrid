@@ -97,7 +97,7 @@ def apply_annual_multiplier(
     for column in df.columns:
         if column in value_columns:
             gr_column = renamed(column)
-            df = df.withColumn(column, getattr(df, column) * getattr(df, gr_column))
+            df = df.withColumn(column, df[column] * df[gr_column])
 
     return df.select(*orig_columns)
 

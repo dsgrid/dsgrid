@@ -14,6 +14,7 @@ from dsgrid.spark.functions import (
     except_all,
     get_current_time_zone,
     perform_interval_op,
+    intersect,
     is_dataframe_empty,
     join,
     join_multiple_columns,
@@ -125,6 +126,14 @@ def test_except_all(dataframe):
     assert len(res) == 2
     for row in res:
         assert row.metric == "cooling"
+
+
+def test_intersect(dataframe):
+    df2 = dataframe.filter("metric = 'heating'")
+    res = intersect(dataframe, df2).collect()
+    assert len(res) == 2
+    for row in res:
+        assert row.metric == "heating"
 
 
 def test_shift_time_zone(spark):

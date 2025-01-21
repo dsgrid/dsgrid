@@ -29,7 +29,9 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         time_cols = self.get_load_data_time_columns()
         assert len(self._model.ranges) == 1
         assert len(time_cols) == 1
-        # TODO: issue #341
+        # TODO: issue #341: this is actually tied to the weather_year problem #340
+        # If there are no ranges, all of this must be dynamic.
+        # The two issues should be solved together.
         timestamps = self.list_expected_dataset_timestamps()
         return chronify.DatetimeRange(
             time_column=time_cols[0],

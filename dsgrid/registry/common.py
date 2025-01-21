@@ -74,7 +74,10 @@ class DatabaseConnection(DSGBaseModel):
         match = regex.search(self.url)
         if not match:
             return None
-            # msg = f"Failed to find a filename in {self.url}"
+            # msg = (
+            #    f"Failed to parse '{filename}' into a SQLite URL. "
+            #    "The SQLite file path must be specified in the format 'sqlite:///<filename.db>'."
+            # )
             # raise DSGInvalidParameter(msg)
         return Path(match.group(1))
 

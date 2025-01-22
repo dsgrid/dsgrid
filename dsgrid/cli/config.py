@@ -1,6 +1,7 @@
 """CLI commands to manage the dsgrid runtime configuration"""
 
 import logging
+import sys
 
 import rich_click as click
 
@@ -11,6 +12,8 @@ from dsgrid.dsgrid_rc import (
     DEFAULT_THRIFT_SERVER_URL,
     DEFAULT_BACKEND,
 )
+from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.registry.common import DatabaseConnection
 
 
 logger = logging.getLogger(__name__)
@@ -22,6 +25,9 @@ def config():
 
 
 _config_epilog = """
+Create a dsgrid configuration file to store registry connection settings and
+other dsgrid parameters.
+
 Examples:\n
 $ dsgrid config create sqlite:///./registry.db\n
 $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/registry.db\n
@@ -33,7 +39,7 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
 @click.option(
     "-b",
     "--backend-engine",
-    type=BackendEngine,
+    type=click.Choice([x.value for x in BackendEngine]),
     default=DEFAULT_BACKEND,
     help="Backend engine for SQL processing",
 )
@@ -59,6 +65,13 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
     is_flag=True,
     show_default=True,
     help="Enable tracking of function timings.",
+)
+@click.option(
+    "--use-absolute-db-path/--no-use-absolute-db-path",
+    default=True,
+    is_flag=True,
+    show_default=True,
+    help="Convert the SQLite database file path to an absolute path.",
 )
 # @click.option(
 #    "-U",
@@ -120,6 +133,7 @@ def create(
     thrift_server_url,
     use_hive_metastore,
     timings,
+    use_absolute_db_path,
     # username,
     # password,
     # offline,
@@ -129,12 +143,26 @@ def create(
     scratch_dir,
 ):
     """Create a local dsgrid runtime configuration file."""
+    conn = DatabaseConnection(url=url)
+    try:
+        db_filename = conn.get_filename()
+        if use_absolute_db_path and not db_filename.is_absolute():
+            conn.url = f"sqlite:///{db_filename.resolve()}"
+
+    except DSGInvalidParameter as exc:
+        print(str(exc), file=sys.stderr)
+        sys.exit(1)
+
+    if not db_filename.exists():
+        print(f"The registry database file {db_filename} does not exist.", file=sys.stderr)
+        sys.exit(1)
+
     dsgrid_config = DsgridRuntimeConfig(
         backend_engine=backend_engine,
         thrift_server_url=thrift_server_url,
         use_hive_metastore=use_hive_metastore,
         timings=timings,
-        database_url=url,
+        database_url=conn.url,
         # database_user=username,
         # database_password=password,
         offline=True,

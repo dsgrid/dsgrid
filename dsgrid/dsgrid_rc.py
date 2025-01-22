@@ -12,7 +12,6 @@ from pydantic import model_validator
 
 from dsgrid.common import BackendEngine, DEFAULT_DB_PASSWORD, DEFAULT_SCRATCH_DIR
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.utils.files import dump_data
 
 RC_FILENAME = ".dsgrid.json5"
 DEFAULT_BACKEND = BackendEngine.DUCKDB
@@ -72,7 +71,11 @@ class DsgridRuntimeConfig(DSGBaseModel):
     def dump(self) -> None:
         """Dump the config to the user's home directory."""
         path = self.path()
-        dump_data(self.model_dump(), path, indent=2)
+        data = self.model_dump()
+        data.pop("database_user")
+        data.pop("database_password")
+        with open(path, "w") as f_out:
+            json5.dump(data, f_out, indent=2)
         print(f"Wrote dsgrid config to {path}", file=sys.stderr)
 
     @staticmethod

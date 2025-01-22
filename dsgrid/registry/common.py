@@ -11,6 +11,7 @@ from typing import Optional
 from pydantic import Field
 
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.utils.versioning import make_version
 
 
@@ -68,17 +69,30 @@ class DatabaseConnection(DSGBaseModel):
     # port = match.group(2)
     # return cls(hostname=hostname, port=port, **kwargs)
 
-    def get_filename(self) -> Path | None:
+    def get_filename(self) -> Path:
+        """Return the filename from the URL. Only valid for SQLite databases.
+
+        Raises
+        ------
+        DSGInvalidParameter
+            Raised if the URL does not conform to the SQLite format.
+        """
+        # All call sites will need to be changed if/when we support Postgres.
+        filename = self.try_get_filename()
+        if filename is None:
+            msg = (
+                f"Failed to parse '{self.url}' into a SQLite URL. "
+                "The SQLite file path must be specified in the format 'sqlite:///</path/to/db_file.db>'. "
+            )
+            raise DSGInvalidParameter(msg)
+        return filename
+
+    def try_get_filename(self) -> Path | None:
         """Return the filename from the URL, if file-based, otherwise None."""
         regex = re.compile(r"sqlite:\/\/\/(.*)")
         match = regex.search(self.url)
         if not match:
             return None
-            # msg = (
-            #    f"Failed to parse '{filename}' into a SQLite URL. "
-            #    "The SQLite file path must be specified in the format 'sqlite:///<filename.db>'."
-            # )
-            # raise DSGInvalidParameter(msg)
         return Path(match.group(1))
 
 

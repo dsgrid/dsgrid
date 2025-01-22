@@ -27,7 +27,6 @@ from sqlalchemy import (
 from dsgrid.exceptions import (
     DSGValueNotRegistered,
     DSGInvalidOperation,
-    DSGInvalidParameter,
     DSGValueNotStored,
     DSGDuplicateValueRegistered,
 )
@@ -62,12 +61,6 @@ class RegistryDatabase:
     ) -> "RegistryDatabase":
         """Create a new registry database."""
         filename = conn.get_filename()
-        if filename is None:
-            msg = (
-                f"Failed to parse '{filename}' into a SQLite URL. "
-                "The SQLite file path must be specified in the format 'sqlite:///<filename.db>'."
-            )
-            raise DSGInvalidParameter(msg)
         if filename.exists():
             if overwrite:
                 filename.unlink()
@@ -88,9 +81,6 @@ class RegistryDatabase:
     ) -> "RegistryDatabase":
         """Create a new registry database with existing registry data."""
         filename = conn.get_filename()
-        if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
         if filename.exists():
             if overwrite:
                 filename.unlink()
@@ -108,10 +98,8 @@ class RegistryDatabase:
         **connect_kwargs: Any,
     ) -> "RegistryDatabase":
         """Load an existing registry database."""
-        filename = conn.get_filename()
-        if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
+        # This tests the connection.
+        conn.get_filename()
         db = RegistryDatabase(engine=create_engine(conn.url, **connect_kwargs))
         db.update_sqlalchemy_metadata()
         return db
@@ -216,9 +204,6 @@ class RegistryDatabase:
     def delete(conn: DatabaseConnection) -> None:
         """Delete the dsgrid database."""
         filename = conn.get_filename()
-        if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
         if filename.exists():
             filename.unlink()
 
@@ -226,9 +211,6 @@ class RegistryDatabase:
     def has_database(conn: DatabaseConnection) -> bool:
         """Return True if the database exists."""
         filename = conn.get_filename()
-        if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
         return filename.exists()
 
     def _get_model_id(self, model_type: RegistryType, model: dict[str, Any]) -> str:

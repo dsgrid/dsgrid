@@ -1,5 +1,7 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
+
+import pandas as pd
 
 from dsgrid.dimension.time import (
     IndexTimeRange,
@@ -16,6 +18,7 @@ from dsgrid.spark.functions import (
     join_multiple_columns,
 )
 from dsgrid.spark.types import (
+    DataFrame,
     DoubleType,
     F,
     IntegerType,
@@ -33,6 +36,7 @@ from dsgrid.utils.spark import (
 from .dimensions import IndexTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.config.dimensions import TimeRangeModel
+from dsgrid.dimension.time import TimeIntervalType
 
 
 logger = logging.getLogger(__name__)
@@ -42,11 +46,11 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     """Provides an interface to a IndexTimeDimensionModel."""
 
     @staticmethod
-    def model_class():
+    def model_class() -> IndexTimeDimensionModel:
         return IndexTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df, time_columns):
+    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
         logger.info("Check IndexTimeDimensionConfig dataset time consistency.")
         if len(time_columns) > 1:
             msg = f"IndexTimeDimensionConfig expects only one time column, but has {time_columns=}"
@@ -75,7 +79,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def build_time_dataframe(self):
+    def build_time_dataframe(self) -> DataFrame:
         # shows time as indices
 
         time_col = self.get_load_data_time_columns()
@@ -99,7 +103,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         scratch_dir_context: ScratchDirContext,
         wrap_time_allowed=False,
         time_based_data_adjustment=None,
-    ):
+    ) -> DataFrame:
         if not value_columns:
             raise Exception("convert_dataframe requires value_columns to be populated")
         df = self._map_index_time_to_datetime(
@@ -119,7 +123,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def _map_index_time_to_datetime(
         self, df, project_time_dim, value_columns, time_based_data_adjustment=None
-    ):
+    ) -> DataFrame:
         if time_based_data_adjustment is None:
             time_based_data_adjustment = TimeBasedDataAdjustmentModel()
         idx_col = self.get_load_data_time_columns()
@@ -172,10 +176,10 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         )
         return df
 
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return self.model.frequency
 
-    def get_time_ranges(self):
+    def get_time_ranges(self) -> list[IndexTimeRange]:
         dt_ranges = self._create_represented_time_ranges()
         ranges = []
         time_ranges = self._build_time_ranges(
@@ -193,7 +197,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return ranges
 
-    def _get_represented_time_ranges(self):
+    def _get_represented_time_ranges(self) -> list[DatetimeRange]:
         dt_ranges = self._create_represented_time_ranges()
         ranges = []
         for start, end in self._build_time_ranges(
@@ -209,33 +213,45 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return ranges
 
-    def get_load_data_time_columns(self):
+    def get_start_times(self) -> list[pd.Timestamp]:
+        """get represented start times"""
+        start_times = []
+        for ts in self.model.starting_timestamps:
+            start = datetime.strptime(ts, self.model.str_format)
+            tz = self.get_tzinfo()
+            start_times.append(pd.Timestamp(start, tz=tz))
+        return []
+
+    def get_lengths(self) -> list[int]:
+        return [range.end - range.start + 1 for range in self.model.ranges]
+
+    def get_load_data_time_columns(self) -> list[str]:
         return list(IndexTimestampType._fields)
 
     def get_time_zone(self) -> None:
         return None
 
-    def get_tzinfo(self):
+    def get_tzinfo(self) -> None:
         return None
 
-    def get_time_interval_type(self):
+    def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(self) -> list[IndexTimestampType]:
         # list timestamps as indices
         indices = []
         for index_range in self.get_time_ranges():
             indices += [IndexTimestampType(x) for x in index_range.list_time_range()]
         return indices
 
-    def _list_represented_dataset_timestamps(self):
+    def _list_represented_dataset_timestamps(self) -> list[DatetimeTimestampType]:
         timestamps = []
         for time_range in self.get_time_ranges():
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]
         return timestamps
 
-    def _create_represented_time_ranges(self):
-        """create datetime ranges from index ranges."""
+    def _create_represented_time_ranges(self) -> list[TimeRangeModel]:
+        """create datetime range models from index ranges."""
         ranges = []
         for ts, range in zip(self.model.starting_timestamps, self.model.ranges):
             start = datetime.strptime(ts, self.model.str_format)

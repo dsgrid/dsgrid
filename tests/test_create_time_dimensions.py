@@ -215,6 +215,22 @@ def df_date_time():
     yield df
 
 
+def check_start_time_and_length(time_dimension_model):
+    config = DateTimeDimensionConfig(time_dimension_model)  # TimeDimensionConfig
+    ts1 = pd.date_range(
+        start=config.model.ranges[0].start,
+        end=config.model.ranges[0].end,
+        freq=config.get_frequency(),
+        tz=config.get_tzinfo(),
+    )
+    ts2 = pd.date_range(
+        start=config.get_start_times()[0],
+        periods=config.get_lengths()[0],
+        freq=config.get_frequency(),
+    )
+    assert ts1.equals(ts2)
+
+
 def check_date_range_creation(time_dimension_model, time_based_data_adjustment=None):
     if time_based_data_adjustment is None:
         time_based_data_adjustment = TimeBasedDataAdjustmentModel()
@@ -419,26 +435,31 @@ def local_time_conversion_tests(config, project_time_dim, df, scratch_dir_contex
 # -- Test funcs --
 def test_time_dimension_model0(time_dimension_model0):
     check_date_range_creation(time_dimension_model0)
+    check_start_time_and_length(time_dimension_model0)
 
 
 def test_time_dimension_model1(time_dimension_model1):
     check_date_range_creation(time_dimension_model1)
     check_validation_error_365_days(time_dimension_model1)
+    check_start_time_and_length(time_dimension_model1)
 
 
 def test_time_dimension_model2(time_dimension_model2):
     check_date_range_creation(time_dimension_model2)
+    check_start_time_and_length(time_dimension_model2)
 
 
 def test_time_dimension_model3(time_dimension_model3):
     check_date_range_creation(time_dimension_model3)
+    check_start_time_and_length(time_dimension_model3)
 
 
 def test_time_dimension_model5(representative_time_dimension_model):
     config = RepresentativePeriodTimeDimensionConfig(representative_time_dimension_model)
     if config.model.format.value == "one_week_per_month_by_hour":
         n_times = len(config.list_expected_dataset_timestamps())
-        assert n_times == 24 * 7 * 12, n_times
+        truth = 24 * 7 * 12
+        assert config.get_lengths()[0] == n_times == truth
         assert config.get_frequency() == datetime.timedelta(hours=1)
 
     config.get_time_ranges()

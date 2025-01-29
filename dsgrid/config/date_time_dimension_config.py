@@ -1,4 +1,8 @@
 import logging
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+
+import pandas as pd
 
 import chronify
 
@@ -6,6 +10,7 @@ from dsgrid.dimension.time import DatetimeRange, DatetimeFormat, TimeZone
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.spark.types import DataFrame, F, StructType, StructField, TimestampType
 from dsgrid.time.types import DatetimeTimestampType
+from dsgrid.dimension.time import TimeIntervalType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.spark import get_spark_session
 from .dimensions import DateTimeDimensionModel
@@ -19,7 +24,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     """Provides an interface to a DateTimeDimensionModel."""
 
     @staticmethod
-    def model_class():
+    def model_class() -> DateTimeDimensionModel:
         return DateTimeDimensionModel
 
     def supports_chronify(self) -> bool:
@@ -43,7 +48,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         )
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df, time_columns):
+    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
         logger.info("Check DateTimeDimensionConfig dataset time consistency.")
         if len(time_columns) > 1:
             msg = f"DateTimeDimensionConfig expects only one time column, but has {time_columns=}"
@@ -83,7 +88,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def _check_local_time_for_alignment(self, load_data_df, time_col):
+    def _check_local_time_for_alignment(self, load_data_df, time_col) -> None:
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
         time_range = time_ranges[0]
@@ -116,7 +121,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
             )
         return
 
-    def build_time_dataframe(self):
+    def build_time_dataframe(self) -> DataFrame:
         # Note: DF.show() displays time in session time, which may be confusing.
         # But timestamps are stored correctly here
 
@@ -157,10 +162,10 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         msg = f"{self.__class__.__name__}.convert_dataframe is implemented through chronify"
         raise NotImplementedError(msg)
 
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return self.model.frequency
 
-    def get_time_ranges(self):
+    def get_time_ranges(self) -> list[DatetimeRange]:
         ranges = []
         for start, end in self._build_time_ranges(
             self.model.ranges, self.model.str_format, tz=self.get_tzinfo()
@@ -175,7 +180,26 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return ranges
 
-    def get_load_data_time_columns(self):
+    def get_start_times(self) -> list[pd.Timestamp]:
+        start_times = []
+        for range in self.model.ranges:
+            start = datetime.strptime(range.start, self.model.str_format)
+            tz = self.get_tzinfo()
+            start_times.append(pd.Timestamp(start, tz=tz))
+        return start_times
+
+    def get_lengths(self) -> list[int]:
+        lengths = []
+        for range in self.model.ranges:
+            start = datetime.strptime(range.start, self.model.str_format)
+            end = datetime.strptime(range.end, self.model.str_format)
+            freq = self.get_frequency()
+            length = (end - start) / freq + 1
+            assert length % 1 == 0, f"{length=} is not a whole number"
+            lengths.append(int(length))
+        return lengths
+
+    def get_load_data_time_columns(self) -> list[str]:
         return list(DatetimeTimestampType._fields)
 
     def get_time_zone(self) -> TimeZone | None:
@@ -186,16 +210,16 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         msg = f"Undefined time zone for {self.model.datetime_format.format_type=}"
         raise NotImplementedError(msg)
 
-    def get_tzinfo(self):
+    def get_tzinfo(self) -> ZoneInfo:
         time_zone = self.get_time_zone()
         if time_zone is None:
             return None
         return time_zone.tz
 
-    def get_time_interval_type(self):
+    def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(self) -> list[DatetimeTimestampType]:
         timestamps = []
         for time_range in self.get_time_ranges():
             timestamps += [DatetimeTimestampType(x) for x in time_range.list_time_range()]

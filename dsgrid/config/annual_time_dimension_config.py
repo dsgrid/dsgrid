@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta
+from datetime import timedelta, datetime
 
 import pandas as pd
 
@@ -37,11 +37,11 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     """Provides an interface to an AnnualTimeDimensionModel."""
 
     @staticmethod
-    def model_class():
+    def model_class() -> AnnualTimeDimensionModel:
         return AnnualTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df, time_columns):
+    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
         logger.info("Check AnnualTimeDimensionConfig dataset time consistency.")
         if len(time_columns) > 1:
             raise ValueError(
@@ -71,7 +71,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def build_time_dataframe(self):
+    def build_time_dataframe(self) -> DataFrame:
         time_col = self.get_load_data_time_columns()
         assert len(time_col) == 1, time_col
         time_col = time_col[0]
@@ -90,10 +90,10 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         msg = f"{self.__class__.__name__}.convert_dataframe"
         raise NotImplementedError(msg)
 
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return timedelta(days=365)
 
-    def get_time_ranges(self):
+    def get_time_ranges(self) -> list[AnnualTimeRange]:
         ranges = []
         frequency = self.get_frequency()
         for start, end in self._build_time_ranges(
@@ -111,19 +111,36 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return ranges
 
-    def get_load_data_time_columns(self):
+    def get_start_times(self) -> list[pd.Timestamp]:
+        start_times = []
+        for range in self.model.ranges:
+            start = datetime.strptime(range.start, self.model.str_format)
+            tz = self.get_tzinfo()
+            start_times.append(pd.Timestamp(start, tz=tz))
+
+        return start_times
+
+    def get_lengths(self) -> list[int]:
+        lengths = []
+        for range in self.model.ranges:
+            start = datetime.strptime(range.start, self.model.str_format)
+            end = datetime.strptime(range.end, self.model.str_format)
+            lengths.append(end - start + 1)
+        return lengths
+
+    def get_load_data_time_columns(self) -> list[str]:
         return list(AnnualTimestampType._fields)
 
     def get_time_zone(self) -> None:
         return None
 
-    def get_tzinfo(self):
+    def get_tzinfo(self) -> None:
         return None
 
-    def get_time_interval_type(self):
+    def get_time_interval_type(self) -> None:
         return None
 
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(self) -> list[AnnualTimestampType]:
         timestamps = []
         for time_range in self.model.ranges:
             start, end = (int(time_range.start), int(time_range.end))

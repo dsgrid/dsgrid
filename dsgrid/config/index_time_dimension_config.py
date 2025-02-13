@@ -1,6 +1,7 @@
 import logging
 from datetime import datetime, timedelta
 
+import chronify
 import pandas as pd
 
 from dsgrid.dimension.time import (
@@ -48,6 +49,28 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     @staticmethod
     def model_class() -> IndexTimeDimensionModel:
         return IndexTimeDimensionModel
+
+    def supports_chronify(self) -> bool:
+        return True
+
+    def to_chronify(self) -> chronify.IndexTimeRangeBase:
+        time_cols = self.get_load_data_time_columns()
+        assert len(self._model.ranges) == 1
+        assert len(time_cols) == 1
+
+        # IndexTimeDimensionModel does not map to IndexTimeRangeNTZ and TZ at the moment
+        assert self.get_time_zone() is None
+        config = chronify.IndexTimeRangeLocalTime(
+            time_column=time_cols[0],
+            start=self._model.ranges[0].start,
+            length=self.get_lengths()[0],
+            start_timestamp=self.get_start_times()[0],
+            resolution=self._model.frequency,
+            time_zone_column="time_zone",
+            measurement_type=self._model.measurement_type,
+            interval_type=self._model.time_interval_type,
+        )
+        return config
 
     @track_timing(timer_stats_collector)
     def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:

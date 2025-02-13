@@ -37,11 +37,10 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         # TODO: issue #341: this is actually tied to the weather_year problem #340
         # If there are no ranges, all of this must be dynamic.
         # The two issues should be solved together.
-        timestamps = self.list_expected_dataset_timestamps()
         return chronify.DatetimeRange(
             time_column=time_cols[0],
-            start=timestamps[0].timestamp,
-            length=len(timestamps),
+            start=self.get_start_times()[0],
+            length=self.get_lengths()[0],
             resolution=self._model.frequency,
             measurement_type=self._model.measurement_type,
             interval_type=self._model.time_interval_type,

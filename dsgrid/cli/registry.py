@@ -608,13 +608,13 @@ $ dsgrid registry projects submit-dataset \\ \n
 )
 @click.pass_obj
 def submit_dataset(
-    registry_manager,
-    dataset_id,
-    project_id,
-    dimension_mapping_file,
-    dimension_mapping_references_file,
-    autogen_reverse_supplemental_mappings,
-    log_message,
+    registry_manager: RegistryManager,
+    dataset_id: str,
+    project_id: str,
+    dimension_mapping_file: Path,
+    dimension_mapping_references_file: Path,
+    autogen_reverse_supplemental_mappings: list[DimensionType],
+    log_message: str,
 ):
     """Submit a dataset to a dsgrid project."""
     submitter = getpass.getuser()
@@ -1116,7 +1116,7 @@ def list_project_dimension_query_names(
         ctx.exit(res[1])
 
     project_config = res[0]
-    base = None if exclude_base else project_config.get_base_dimension_to_query_name_mapping()
+    base = None if exclude_base else project_config.get_dimension_type_to_base_query_name_mapping()
     sub = None if exclude_subset else project_config.get_subset_dimension_to_query_name_mapping()
     supp = (
         None
@@ -1129,7 +1129,8 @@ def list_project_dimension_query_names(
     for dim_type in dimensions:
         lines.append(f"  {dim_type.value}:")
         if base:
-            lines.append(f"    base: {base[dim_type]}")
+            base_str = " ".join(base[dim_type])
+            lines.append(f"    base: {base_str}")
         if sub:
             lines.append("    subset: " + " ".join(sub[dim_type]))
         if supp:

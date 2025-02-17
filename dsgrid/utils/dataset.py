@@ -37,7 +37,13 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 logger = logging.getLogger(__name__)
 
 
-def map_and_reduce_stacked_dimension(df, records, column, drop_column=True, to_column=None):
+def map_and_reduce_stacked_dimension(
+    df: DataFrame,
+    records: DataFrame,
+    column: str,
+    drop_column: bool = True,
+    to_column: Optional[str] = None,
+) -> DataFrame:
     to_column_ = to_column or column
     if "fraction" not in df.columns:
         df = df.withColumn("fraction", F.lit(1.0))

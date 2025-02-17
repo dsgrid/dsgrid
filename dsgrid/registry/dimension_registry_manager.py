@@ -3,19 +3,20 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 from uuid import uuid4
 
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
 from dsgrid.config.dimension_config_factory import get_dimension_config, load_dimension_config
-from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionConfig
 from dsgrid.config.dimensions_config import DimensionsConfig
 from dsgrid.config.dimensions import (
     TimeDimensionBaseModel,
     DimensionReferenceModel,
 )
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.common import ConfigKey, RegistryType, VersionUpdateType
 from dsgrid.registry.registry_interface import DimensionRegistryInterface
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
@@ -130,12 +131,15 @@ class DimensionRegistryManager(RegistryManagerBase):
         self._dimensions[key] = config
         return config
 
-    def list_ids(self, dimension_type=None, conn: Optional[Connection] = None):
+    def list_ids(
+        self, dimension_type: Optional[DimensionType] = None, conn: Optional[Connection] = None
+    ) -> list[str]:
         """Return the dimension ids for the given type.
 
         Parameters
         ----------
-        dimension_type : DimensionType
+        dimension_type
+            If not provided, return all dimension ids.
 
         Returns
         -------
@@ -154,20 +158,23 @@ class DimensionRegistryManager(RegistryManagerBase):
         ids.sort()
         return ids
 
-    def load_dimensions(self, dimension_references, conn: Optional[Connection] = None):
+    def load_dimensions(
+        self,
+        dimension_references: Sequence[DimensionReferenceModel],
+        conn: Optional[Connection] = None,
+    ) -> dict[ConfigKey, DimensionBaseConfig]:
         """Load dimensions from the database.
 
         Parameters
         ----------
-        dimension_references : list
-            iterable of DimensionReferenceModel instances
-
+        dimension_references
+        conn
+            Connection to the database, optional. If not provided, a new connection will be created.
 
         Returns
         -------
         dict
             ConfigKey to DimensionConfig
-
         """
         dimensions = {}
         for dim in dimension_references:

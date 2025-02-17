@@ -76,6 +76,7 @@ dev = [
     "pre-commit",
     "devtools",
     "flake8",
+    "mypy",
     "pyarrow",
 ]
 
@@ -83,6 +84,7 @@ doc = [
     "furo",
     "ghp-import",
     "numpydoc",
+    "pandas-stubs",
     "sphinx~=7.2",
     "sphinx-click~=5.0",
     "sphinx-copybutton~=0.5.2",

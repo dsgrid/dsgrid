@@ -69,9 +69,11 @@ class FilterRegistryManager(RegistryManager):
                 project_config.model.datasets.pop(index)
                 changed_project = True
             for simple_dim in project.dimensions.base_dimensions:
-                dim = project_config.get_base_dimension(simple_dim.dimension_type)
-                dim.model.records = handle_dimension(simple_dim, dim)
-                self.dimension_manager.db.replace(conn, dim.model)
+                for dim in project_config.list_base_dimensions(
+                    dimension_type=simple_dim.dimension_type
+                ):
+                    dim.model.records = handle_dimension(simple_dim, dim)
+                    self.dimension_manager.db.replace(conn, dim.model)
 
             for simple_dim in project.dimensions.supplemental_dimensions:
                 for dim in project_config.list_supplemental_dimensions(simple_dim.dimension_type):

@@ -273,6 +273,12 @@ class DimensionMappingPreRegisteredBaseModel(DSGBaseModel):
         description="Tolerance value to apply to the to_fraction column",
         default=1e-6,
     )
+    from_dimension_name: Optional[str] = Field(
+        default=None,
+        description="Name of the base dimension for which the mapping is being registered. "
+        "This is required in cases where the project has multiple base dimensions of the same "
+        "type. If None, there must only be one base dimension of this type in the project.",
+    )
 
 
 class DimensionMappingDatasetToProjectBaseModel(DimensionMappingPreRegisteredBaseModel):

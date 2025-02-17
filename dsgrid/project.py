@@ -9,11 +9,13 @@ from semver import VersionInfo
 from sqlalchemy import Connection
 
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dataset.growth_rates import apply_exponential_growth_rate, apply_annual_multiplier
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
+    DimensionFilterSingleQueryNameBaseModel,
     SubsetDimensionFilterModel,
 )
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
@@ -25,10 +27,13 @@ from dsgrid.query.models import (
     DatasetConstructionMethod,
     ColumnType,
 )
+from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.utils.files import compute_hash
 from dsgrid.spark.functions import (
     is_dataframe_empty,
 )
+from dsgrid.spark.types import DataFrame
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     read_dataframe,
@@ -46,9 +51,16 @@ logger = logging.getLogger(__name__)
 class Project:
     """Interface to a dsgrid project."""
 
-    def __init__(self, config, version, dataset_configs, dimension_mgr, dimension_mapping_mgr):
+    def __init__(
+        self,
+        config: ProjectConfig,
+        version: str,
+        dataset_configs,
+        dimension_mgr: DimensionRegistryManager,
+        dimension_mapping_mgr: DimensionMappingRegistryManager,
+    ):
         self._spark = get_active_session()
-        self._config: ProjectConfig = config
+        self._config = config
         self._version = version
         self._dataset_configs = dataset_configs
         self._datasets = {}
@@ -146,7 +158,7 @@ class Project:
             self._dimension_mgr,
             self._dimension_mapping_mgr,
             mapping_references=input_dataset.mapping_references,
-            project_time_dim=self._config.get_base_dimension(DimensionType.TIME),
+            project_time_dim=self._config.get_base_time_dimension(),
             conn=conn,
         )
         self._datasets[dataset_id] = dataset
@@ -218,7 +230,7 @@ class Project:
         return df_filenames
 
     def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
-        record_ids = {}
+        record_ids: dict[DimensionType, DataFrame] = {}
         for dim_filter in context.model.project.dataset.params.dimension_filters:
             dim_type = dim_filter.dimension_type
             if dim_type == DimensionType.TIME:
@@ -230,18 +242,42 @@ class Project:
                     "id"
                 )
             else:
+                query_name = dim_filter.dimension_query_name
+                records = self._config.get_dimension_records(query_name)
+                df = dim_filter.apply_filter(records).select("id")
                 supp_query_names = set(
                     self._config.list_dimension_query_names(
                         category=DimensionCategory.SUPPLEMENTAL
                     )
                 )
-                records = self._config.get_dimension_records(dim_filter.dimension_query_name)
-                df = dim_filter.apply_filter(records).select("id")
-                query_name = dim_filter.dimension_query_name
                 if query_name in supp_query_names:
-                    mapping_records = self._config.get_base_to_supplemental_mapping_records(
-                        query_name
+                    assert isinstance(dim_filter, DimensionFilterSingleQueryNameBaseModel)
+                    supp_dim = self._config.get_dimension(query_name)
+                    mapping_configs = self._config.list_base_to_supplemental_mapping_configs(
+                        supplemental_dimension_id=supp_dim.model.dimension_id,
                     )
+                    mapping_config: MappingTableConfig
+                    if len(mapping_configs) > 1:
+                        if dim_filter.base_dimension_query_name is None:
+                            msg = (
+                                "There is more than one base-to-supplemental mapping config for "
+                                f"{supp_dim.model.label}. Please specify base_dimension_query_name "
+                                "in the filter."
+                            )
+                            raise DSGInvalidQuery(msg)
+                        for mapping_config_ in mapping_configs:
+                            base_dim = self._dimension_mgr.get_by_id(
+                                mapping_config_.model.from_dimension.dimension_id
+                            )
+                            if (
+                                base_dim.model.dimension_query_name
+                                == dim_filter.base_dimension_query_name
+                            ):
+                                mapping_config = mapping_config_
+                                break
+                    else:
+                        mapping_config = mapping_configs[0]
+                    mapping_records = mapping_config.get_records_dataframe()
                     df = (
                         mapping_records.join(df, on=mapping_records.to_id == df.id)
                         .select("from_id")

@@ -1,16 +1,17 @@
 import logging
 
-import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.query.models import (
     AggregationModel,
+    ColumnModel,
     ColumnType,
     DatasetDimensionsMetadataModel,
 )
 from dsgrid.query.query_context import QueryContext
 from dsgrid.spark.types import DataFrame
-from .table_format_handler_base import TableFormatHandlerBase
+from dsgrid.units.convert import convert_units_unpivoted
+from dsgrid.dataset.table_format_handler_base import TableFormatHandlerBase
 
 
 logger = logging.getLogger(__name__)
@@ -47,12 +48,14 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
             return df
 
         final_metadata = DatasetDimensionsMetadataModel()
-        dim_type_to_query_name = self.project_config.get_base_dimension_to_query_name_mapping()
-        column_to_dim_type = {}
+        dim_type_to_base_query_name = (
+            self.project_config.get_dimension_type_to_base_query_name_mapping()
+        )
+        column_to_dim_type: dict[str, DimensionType] = {}
         dropped_dimensions = set()
         for agg in aggregations:
             metric_query_name = None
-            columns = []
+            columns: list[ColumnModel] = []
             for dim_type, column in agg.iter_dimensions_to_keep():
                 assert dim_type not in dropped_dimensions, dim_type
                 columns.append(column)
@@ -61,31 +64,38 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
                     metric_query_name = column.dimension_query_name
 
             if metric_query_name is None:
-                raise Exception(f"Bug: A metric dimension is not included in {agg}")
+                msg = f"Bug: A metric dimension is not included in {agg}"
+                raise Exception(msg)
 
             dropped_dimensions.update(set(agg.list_dropped_dimensions()))
             if not columns:
                 continue
 
             df = self.add_columns(df, columns, context, [VALUE_COLUMN])
-            group_by_cols = self._build_group_by_columns(
-                columns, context, column_to_dim_type, dim_type_to_query_name, final_metadata
-            )
+            group_by_cols = self._build_group_by_columns(columns, context, final_metadata)
             op = agg.aggregation_function
             df = df.groupBy(*group_by_cols).agg(op(VALUE_COLUMN).alias(VALUE_COLUMN))
 
-            if metric_query_name != dim_type_to_query_name[DimensionType.METRIC]:
-                dim_config = self.project_config.get_dimension(metric_query_name)
-                mapping_records = self.project_config.get_base_to_supplemental_mapping_records(
-                    metric_query_name
+            if metric_query_name not in dim_type_to_base_query_name[DimensionType.METRIC]:
+                to_dim_config = self.project_config.get_dimension_with_records(metric_query_name)
+                mapping_configs = self.project_config.list_base_to_supplemental_mapping_configs(
+                    supplemental_dimension_id=to_dim_config.model.dimension_id,
                 )
-                to_unit_records = dim_config.get_records_dataframe()
-                df = energy.convert_units_unpivoted(
+                if len(mapping_configs) > 1:
+                    msg = (
+                        "More than one base-to-supplemental mapping config for "
+                        f"{to_dim_config.model.dimension_id}"
+                    )
+                    raise NotImplementedError(msg)
+                mapping_config = mapping_configs[0]
+                from_dim_id = mapping_config.model.from_dimension.dimension_id
+                from_records = self.project_config.get_base_dimension_records_by_id(from_dim_id)
+                mapping_records = mapping_config.get_records_dataframe()
+                to_unit_records = to_dim_config.get_records_dataframe()
+                df = convert_units_unpivoted(
                     df,
                     _get_metric_column_name(context, metric_query_name),
-                    self._project_config.get_base_dimension(
-                        DimensionType.METRIC
-                    ).get_records_dataframe(),
+                    from_records,
                     mapping_records,
                     to_unit_records,
                 )

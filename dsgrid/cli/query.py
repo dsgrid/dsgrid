@@ -231,9 +231,10 @@ def create_project_query(
         query.project.dataset.params.dimension_filters.append(flt)
 
     if default_result_aggregation:
-        default_aggs = {}
-        for dim_type, name in project.config.get_base_dimension_to_query_name_mapping().items():
-            default_aggs[dim_type.value] = [name]
+        default_aggs = {
+            k.value: v
+            for k, v in project.config.get_dimension_type_to_base_query_name_mapping().items()
+        }
         if default_result_aggregation:
             query.result.aggregations = [
                 AggregationModel(

@@ -136,27 +136,27 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             return df, DatasetMetadataModel.from_file(metadata_file)
         return None, None
 
-    def _run_checks(self, model):
+    def _run_checks(self, model: ProjectQueryModel):
         subsets = set(self.project.config.list_dimension_query_names(DimensionCategory.SUBSET))
         for agg in model.result.aggregations:
             for _, column in agg.iter_dimensions_to_keep():
                 dimension_query_name = column.dimension_query_name
                 if dimension_query_name in subsets:
-                    dim_type = self._project.config.get_dimension(
-                        dimension_query_name
-                    ).model.dimension_type
-                    base_name = self._project.config.get_base_dimension(
-                        dim_type
-                    ).model.dimension_query_name
+                    subset_dim = self._project.config.get_dimension(dimension_query_name)
+                    dim_type = subset_dim.model.dimension_type
                     supp_names = " ".join(
                         self._project.config.get_supplemental_dimension_to_query_name_mapping()[
                             dim_type
                         ]
                     )
+                    base_names = [
+                        x.model.dimension_query_name
+                        for x in self._project.config.list_base_dimensions(dimension_type=dim_type)
+                    ]
                     raise DSGInvalidQuery(
                         f"Subset dimensions cannot be used in aggregations: "
                         f"{dimension_query_name=}. Only base and supplemental dimensions are "
-                        f"allowed. base={base_name} supplemental={supp_names}"
+                        f"allowed. base={base_names} supplemental={supp_names}"
                     )
 
         for report_inputs in model.result.reports:
@@ -166,7 +166,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     def _run_query(
         self,
         scratch_dir_context: ScratchDirContext,
-        model,
+        model: ProjectQueryModel,
         load_cached_table,
         persist_intermediate_table,
         zip_file=False,
@@ -412,7 +412,8 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         DSGInvalidQuery
             Raised if the query is invalid
         """
-        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
+        tz = self._project.config.get_base_time_dimension().get_time_zone()
+        assert tz is not None, "Project base time dimension must have a time zone"
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             # Ensure that queries that aggregate time reflect the project's time zone instead
@@ -457,7 +458,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             If True, overwrite any existing output directory.
 
         """
-        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
+        tz = self._project.config.get_base_time_dimension().get_time_zone()
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             # Ensure that queries that aggregate time reflect the project's time zone instead
@@ -488,7 +489,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         query : CompositeDatasetQueryModel
         scratch_dir : Optional[Path]
         """
-        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
+        tz = self._project.config.get_base_time_dimension().get_time_zone()
         scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         # orig_query = self._load_composite_dataset_query(query.dataset_id)
         with ScratchDirContext(scratch_dir) as scratch_dir_context:

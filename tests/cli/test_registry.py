@@ -8,7 +8,11 @@ from dsgrid.cli.dsgrid_admin import cli as admin_cli
 from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import TEST_DATASET_DIRECTORY, TEST_EFS_REGISTRATION_FILE
+from dsgrid.tests.common import (
+    TEST_DATASET_DIRECTORY,
+    TEST_EFS_REGISTRATION_FILE,
+    TEST_PROJECT_PATH,
+)
 from dsgrid.utils.files import dump_data, load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.id_remappings import (
@@ -329,3 +333,88 @@ def test_bulk_register(tmp_registry_db):
     )
     assert result.exit_code == 0
     assert not journal_file.exists()
+
+
+def test_register_multiple_metric_dimensions(tmp_registry_db):
+    _, tmpdir, url = tmp_registry_db
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        admin_cli,
+        [
+            "create-registry",
+            url,
+            "-p",
+            str(tmpdir),
+            "--force",
+        ],
+    )
+    assert result.exit_code == 0
+    base = TEST_PROJECT_PATH / "filtered_registries" / "dgen_multiple_metrics"
+    project_dir = base / "dsgrid-project-IEF"
+    project_config_file = project_dir / "project" / "project.json5"
+    profiles_config_file = project_dir / "datasets" / "modeled" / "dgen" / "dataset.json5"
+    profiles_mapping_file = (
+        project_dir / "datasets" / "modeled" / "dgen" / "dimension_mappings.json5"
+    )
+    capacities_config_file = (
+        project_dir / "datasets" / "modeled" / "dgen_capacities" / "dataset.json5"
+    )
+    capacities_mapping_file = (
+        project_dir / "datasets" / "modeled" / "dgen_capacities" / "dimension_mappings.json5"
+    )
+    profiles_data = base / "dgen_profiles_data/"
+    capacities_data = base / "dgen_capacities_data"
+
+    cmd = [
+        "--url",
+        url,
+        "--offline",
+        "registry",
+        "projects",
+        "register",
+        str(project_config_file),
+        "-l",
+        "log",
+    ]
+    result = runner.invoke(cli, cmd)
+    assert result.exit_code == 0
+
+    cmds = (
+        [
+            "-u",
+            url,
+            "registry",
+            "projects",
+            "register-and-submit-dataset",
+            "-c",
+            str(profiles_config_file),
+            "-d",
+            str(profiles_data),
+            "-p",
+            "US_DOE_DECARB_2023",
+            "-m",
+            str(profiles_mapping_file),
+            "-l",
+            "Register and submit dgen profiles",
+        ],
+        [
+            "-u",
+            url,
+            "registry",
+            "projects",
+            "register-and-submit-dataset",
+            "-c",
+            str(capacities_config_file),
+            "-d",
+            str(capacities_data),
+            "-p",
+            "US_DOE_DECARB_2023",
+            "-m",
+            str(capacities_mapping_file),
+            "-l",
+            "Register and submit dgen profiles",
+        ],
+    )
+    for cmd in cmds:
+        result = runner.invoke(cli, cmd)
+        assert result.exit_code == 0

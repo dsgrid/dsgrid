@@ -11,6 +11,7 @@ from dsgrid.dataset.models import PivotedTableFormatModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.spark.functions import drop_temp_tables_and_views
+from dsgrid.spark.types import DataFrame
 from dsgrid.utils.spark import get_spark_session
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from .models import ColumnType, DatasetMetadataModel, DimensionMetadataModel, ProjectQueryModel
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 class QueryContext:
     """Maintains context of the query as it is processed through the stack."""
 
-    def __init__(self, model: ProjectQueryModel, scratch_dir_context: ScratchDirContext):
+    def __init__(self, model: ProjectQueryModel, scratch_dir_context: ScratchDirContext) -> None:
         self._model = model
         self._record_ids_by_dimension_type: dict[DimensionType, list[tuple[str]]] = {}
         self._metadata = DatasetMetadataModel(table_format=self.model.result.table_format)
@@ -34,11 +35,11 @@ class QueryContext:
         return self._metadata
 
     @metadata.setter
-    def metadata(self, val: DatasetMetadataModel):
+    def metadata(self, val: DatasetMetadataModel) -> None:
         self._metadata = val
 
     @property
-    def model(self):
+    def model(self) -> ProjectQueryModel:
         return self._model
 
     @property
@@ -46,7 +47,7 @@ class QueryContext:
         """Return the context for managing scratch directories."""
         return self._scratch_dir_context
 
-    def consolidate_dataset_metadata(self):
+    def consolidate_dataset_metadata(self) -> None:
         for dim_type in DimensionType:
             main_metadata = self._metadata.dimensions.get_metadata(dim_type)
             main_metadata.clear()
@@ -58,7 +59,7 @@ class QueryContext:
                         main_metadata.append(metadata)
                         keys.add(key)
 
-    def finalize(self):
+    def finalize(self) -> None:
         """Perform cleanup."""
         drop_temp_tables_and_views()
 
@@ -73,17 +74,22 @@ class QueryContext:
                 msg = str(self.get_table_format_type())
                 raise NotImplementedError(msg)
 
+    def get_query_base_metric_dimension(self) -> str:
+        """Return the dimension query name of the base metric dimension in the query."""
+
     def get_pivoted_columns(self) -> set[str]:
         if self.get_table_format_type() != TableFormatType.PIVOTED:
             raise Exception("Bug: get_pivoted_columns is only supported on a pivoted table")
         metadata = self._get_metadata()
+        assert isinstance(metadata.table_format, PivotedTableFormatModel)
         return self.get_dimension_column_names(metadata.table_format.pivoted_dimension_type)
 
-    def get_pivoted_dimension_type(self):
+    def get_pivoted_dimension_type(self) -> DimensionType:
         if self.get_table_format_type() != TableFormatType.PIVOTED:
             msg = "Bug: get_pivoted_dimension_type is only supported on a pivoted table"
             raise Exception(msg)
         metadata = self._get_metadata()
+        assert isinstance(metadata.table_format, PivotedTableFormatModel)
         return metadata.table_format.pivoted_dimension_type
 
     def get_table_format_type(self, dataset_id=None) -> TableFormatType:
@@ -92,19 +98,20 @@ class QueryContext:
             val = TableFormatType(val)
         return val
 
-    def set_table_format_type(self, val: TableFormatType):
+    def set_table_format_type(self, val: TableFormatType) -> None:
         if not isinstance(val, TableFormatType):
             val = TableFormatType(val)
         self._metadata.table_format.format_type = val
 
     def get_dimension_column_names(
-        self, dimension_type: DimensionType, dataset_id=None
+        self, dimension_type: DimensionType, dataset_id: Optional[str] = None
     ) -> set[str]:
+        """Return the load data column names for the dimension."""
         return self._get_metadata(dataset_id).dimensions.get_column_names(dimension_type)
 
     def get_all_dimension_column_names(
         self, dataset_id: Optional[str] = None, exclude: Optional[set[DimensionType]] = None
-    ):
+    ) -> set[str]:
         names = set()
         for dimension_type in DimensionType:
             if exclude is not None and dimension_type in exclude:
@@ -113,13 +120,13 @@ class QueryContext:
         return names
 
     def get_dimension_query_names(
-        self, dimension_type: DimensionType, dataset_id=None
+        self, dimension_type: DimensionType, dataset_id: Optional[str] = None
     ) -> set[str]:
         return self._get_metadata(dataset_id).dimensions.get_dimension_query_names(dimension_type)
 
     def get_all_dimension_query_names(
         self, dataset_id: Optional[str] = None, exclude: Optional[set[DimensionType]] = None
-    ):
+    ) -> set[str]:
         names = set()
         for dimension_type in DimensionType:
             if exclude is not None and dimension_type in exclude:
@@ -132,27 +139,31 @@ class QueryContext:
         dataset_id: str,
         column_type: ColumnType,
         project_config: ProjectConfig,
-    ):
+    ) -> None:
         table_format = UnpivotedTableFormatModel()
         self._dataset_metadata[dataset_id] = DatasetMetadataModel(table_format=table_format)
-        for dim_type, name in project_config.get_base_dimension_to_query_name_mapping().items():
-            match (column_type, dim_type):
-                case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
-                    # This uses the project dimension because the dataset is being mapped.
-                    time_columns = project_config.get_load_data_time_columns(name)
-                    column_names = time_columns
-                case (ColumnType.DIMENSION_QUERY_NAMES, _):
-                    column_names = [name]
-                case (ColumnType.DIMENSION_TYPES, _):
-                    column_names = [dim_type.value]
-                case _:
-                    msg = f"Bug: need to support {column_type=} {dim_type=}"
-                    raise NotImplementedError(msg)
-            self.add_dimension_metadata(
-                dim_type,
-                DimensionMetadataModel(dimension_query_name=name, column_names=column_names),
-                dataset_id=dataset_id,
-            )
+        for (
+            dim_type,
+            names,
+        ) in project_config.get_dimension_type_to_base_query_name_mapping().items():
+            for name in names:
+                match (column_type, dim_type):
+                    case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
+                        # This uses the project dimension because the dataset is being mapped.
+                        time_columns = project_config.get_load_data_time_columns(name)
+                        column_names = time_columns
+                    case (ColumnType.DIMENSION_QUERY_NAMES, _):
+                        column_names = [name]
+                    case (ColumnType.DIMENSION_TYPES, _):
+                        column_names = [dim_type.value]
+                    case _:
+                        msg = f"Bug: need to support {column_type=} {dim_type=}"
+                        raise NotImplementedError(msg)
+                self.add_dimension_metadata(
+                    dim_type,
+                    DimensionMetadataModel(dimension_query_name=name, column_names=column_names),
+                    dataset_id=dataset_id,
+                )
 
     def convert_to_pivoted(self) -> str:
         assert isinstance(self.model.result.table_format, PivotedTableFormatModel)
@@ -169,10 +180,10 @@ class QueryContext:
             raise Exception(msg)
         return next(iter(columns))
 
-    def serialize_dataset_metadata_to_file(self, dataset_id, filename: Path):
+    def serialize_dataset_metadata_to_file(self, dataset_id, filename: Path) -> None:
         filename.write_text(self._dataset_metadata[dataset_id].model_dump_json(indent=2))
 
-    def set_dataset_metadata_from_file(self, dataset_id, filename: Path):
+    def set_dataset_metadata_from_file(self, dataset_id: str, filename: Path) -> None:
         assert dataset_id not in self._dataset_metadata, dataset_id
         self._dataset_metadata[dataset_id] = DatasetMetadataModel.from_file(filename)
 
@@ -181,7 +192,7 @@ class QueryContext:
         dimension_type: DimensionType,
         dimension_metadata: DimensionMetadataModel,
         dataset_id=None,
-    ):
+    ) -> None:
         self._get_metadata(dataset_id).dimensions.add_metadata(dimension_type, dimension_metadata)
         logger.debug(
             "Added dimension query name for %s: %s dataset_id=%s",
@@ -194,9 +205,9 @@ class QueryContext:
         self,
         dimension_type: DimensionType,
         query_name: str,
-        dataset_id=None,
-    ) -> str:
-        """Return the load data column name for the dimension."""
+        dataset_id: Optional[str] = None,
+    ) -> list[str]:
+        """Return the load data column names for the dimension."""
         for metadata in self.get_dimension_metadata(dimension_type, dataset_id=dataset_id):
             if metadata.dimension_query_name == query_name:
                 return metadata.column_names
@@ -205,13 +216,16 @@ class QueryContext:
     def get_dimension_metadata(
         self,
         dimension_type: DimensionType,
-        dataset_id=None,
-    ):
+        dataset_id: Optional[str] = None,
+    ) -> list[DimensionMetadataModel]:
         return self._get_metadata(dataset_id).dimensions.get_metadata(dimension_type)
 
     def replace_dimension_metadata(
-        self, dimension_type: DimensionType, dimension_metadata, dataset_id=None
-    ):
+        self,
+        dimension_type: DimensionType,
+        dimension_metadata: list[DimensionMetadataModel],
+        dataset_id: Optional[str] = None,
+    ) -> None:
         self._get_metadata(dataset_id).dimensions.replace_metadata(
             dimension_type, dimension_metadata
         )
@@ -222,26 +236,26 @@ class QueryContext:
             dataset_id,
         )
 
-    def _get_metadata(self, dataset_id=None):
+    def _get_metadata(self, dataset_id: Optional[str] = None) -> DatasetMetadataModel:
         return self._metadata if dataset_id is None else self._dataset_metadata[dataset_id]
 
-    def get_record_ids(self):
+    def get_record_ids(self) -> dict[DimensionType, DataFrame]:
         spark = get_spark_session()
         return {
             k: spark.createDataFrame(v, ["id"])
             for k, v in self._record_ids_by_dimension_type.items()
         }
 
-    def try_get_record_ids_by_dimension_type(self, dimension_type):
-        records = self._record_ids_by_dimension_type.get(dimension_type)
+    def try_get_record_ids_by_dimension_type(self, dim_type: DimensionType) -> Optional[DataFrame]:
+        records = self._record_ids_by_dimension_type.get(dim_type)
         if records is None:
             return records
 
         spark = get_spark_session()
-        return spark.createDataFrame(records, [dimension_type.value])
+        return spark.createDataFrame(records, [dim_type.value])
 
-    def set_record_ids_by_dimension_type(self, dimension_type, record_ids):
+    def set_record_ids_by_dimension_type(
+        self, dim_type: DimensionType, record_ids: DataFrame
+    ) -> None:
         # Can't keep the dataframes in memory because of spark restarts.
-        self._record_ids_by_dimension_type[dimension_type] = [
-            (x.id,) for x in record_ids.collect()
-        ]
+        self._record_ids_by_dimension_type[dim_type] = [(x.id,) for x in record_ids.collect()]

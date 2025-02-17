@@ -1,7 +1,7 @@
 import abc
 import logging
 from enum import Enum
-from typing import Any, Union, Literal
+from typing import Any, Optional, Union, Literal
 
 from pydantic import field_validator, model_validator, Field
 
@@ -56,13 +56,19 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
 
 
 class DimensionFilterSingleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
-    """Base model for all filters based on expressions"""
+    """Base model for all filters based on expressions with a single dimension."""
 
     dimension_query_name: str
+    base_dimension_query_name: Optional[str] = Field(
+        default=None,
+        title="base_dimension_query_name",
+        description="Base dimension query name to identify the mapping. This is required if the "
+        "project has multiple base dimensions that map to the same supplemental dimension.",
+    )
 
 
 class DimensionFilterMultipleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
-    """Base model for all filters based on expressions"""
+    """Base model for all filters based on expressions with multiple dimensions."""
 
     dimension_query_names: list[str]
 

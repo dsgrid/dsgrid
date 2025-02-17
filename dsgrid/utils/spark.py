@@ -9,7 +9,7 @@ import shutil
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Generator, Iterable, Type, Union, get_origin, get_args
+from typing import Any, Generator, Iterable, Sequence, Type, Union, get_origin, get_args
 
 import duckdb
 import pandas as pd
@@ -313,7 +313,7 @@ def cross_join_dfs(dfs: list[DataFrame]) -> DataFrame:
     return df
 
 
-def get_unique_values(df: DataFrame, columns: str | list[str]) -> set:
+def get_unique_values(df: DataFrame, columns: Sequence[str]) -> set[str]:
     """Return the unique values of a dataframe in one column or a list of columns."""
     dfc = df.select(columns).distinct().collect()
     if isinstance(columns, list):

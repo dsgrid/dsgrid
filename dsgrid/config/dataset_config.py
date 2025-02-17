@@ -6,9 +6,11 @@ from typing import Any, Optional, Literal, Union
 from pydantic import field_validator, model_validator, Field
 
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionBaseConfigWithFiles
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
-from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidParameter, DSGValueNotRegistered
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
@@ -520,22 +522,33 @@ class DatasetConfig(ConfigBase):
     def dimensions(self):
         return self._dimensions
 
-    def get_dimension(self, dimension_type: DimensionType):
-        """Return the dimension matching dimension_type.
-
-        Parameters
-        ----------
-        dimension_type : DimensionType
-
-        Returns
-        -------
-        DimensionConfig
-
-        """
+    def get_dimension(self, dimension_type: DimensionType) -> DimensionBaseConfig:
+        """Return the dimension matching dimension_type."""
         for dim_config in self.dimensions.values():
             if dim_config.model.dimension_type == dimension_type:
                 return dim_config
-        assert False, dimension_type
+
+        msg = f"Dimension {dimension_type} not found in dataset {self.config_id}"
+        raise DSGValueNotRegistered(msg)
+
+    def get_time_dimension(self) -> TimeDimensionBaseConfig:
+        """Return the dimension matching dimension_type."""
+        dim = self.get_dimension(DimensionType.TIME)
+        assert isinstance(dim, TimeDimensionBaseConfig)
+        return dim
+
+    def get_dimension_with_records(
+        self, dimension_type: DimensionType
+    ) -> DimensionBaseConfigWithFiles:
+        """Return the dimension matching dimension_type."""
+        for dim_config in self.dimensions.values():
+            if dim_config.model.dimension_type == dimension_type and isinstance(
+                dim_config, DimensionBaseConfigWithFiles
+            ):
+                return dim_config
+
+        msg = f"Dimension {dimension_type} not found in dataset {self.config_id}"
+        raise DSGValueNotRegistered(msg)
 
     def get_pivoted_dimension_type(self) -> DimensionType | None:
         """Return the table's pivoted dimension type or None if the table isn't pivoted."""
@@ -550,7 +563,7 @@ class DatasetConfig(ConfigBase):
         if self.get_table_format_type() != TableFormatType.PIVOTED:
             return []
         dim_type = self.model.data_schema.table_format.pivoted_dimension_type
-        return sorted(list(self.get_dimension(dim_type).get_unique_ids()))
+        return sorted(list(self.get_dimension_with_records(dim_type).get_unique_ids()))
 
     def get_value_columns(self) -> list[str]:
         """Return the table's columns that contain values."""

@@ -9,14 +9,17 @@ from dsgrid.config.dataset_config import (
     InputDatasetType,
 )
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles, DimensionConfig
 from dsgrid.config.dimensions import DimensionModel
+from dsgrid.config.project_config import ProjectConfig
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
 from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.spark.types import DataFrame
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 
@@ -84,6 +87,7 @@ def create_derived_dataset_config_from_query(
         dim_query_name = next(iter(dimension_query_names))
         dim = project.config.get_dimension(dim_query_name)
         if dim_type == DimensionType.TIME:
+            assert isinstance(dim, TimeDimensionBaseConfig)
             is_valid = _does_time_dimension_match(dim, df)
             if not is_valid:
                 logger.warning(
@@ -94,6 +98,7 @@ def create_derived_dataset_config_from_query(
                 continue
             unique_data_records = None
         else:
+            assert isinstance(dim, DimensionBaseConfigWithFiles)
             if (
                 format_type == TableFormatType.PIVOTED
                 and metadata.table_format.pivoted_dimension_type == dim_type
@@ -168,7 +173,7 @@ def does_query_support_a_derived_dataset(query: ProjectQueryModel):
     return is_valid
 
 
-def _does_time_dimension_match(dim_config, df):
+def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: DataFrame):
     try:
         dim_config.check_dataset_time_consistency(df, dim_config.get_load_data_time_columns())
     except DSGInvalidDataset:
@@ -176,7 +181,9 @@ def _does_time_dimension_match(dim_config, df):
     return True
 
 
-def _is_dimension_valid_for_dataset(dim_config, unique_data_records):
+def _is_dimension_valid_for_dataset(
+    dim_config: DimensionBaseConfigWithFiles, unique_data_records: DataFrame
+):
     records = dim_config.get_records_dataframe()
     dim_values = get_unique_values(records, "id")
     diff = dim_values.symmetric_difference(unique_data_records)
@@ -186,7 +193,9 @@ def _is_dimension_valid_for_dataset(dim_config, unique_data_records):
     return False
 
 
-def _get_matching_supplemental_dimension(project_config, dimension_type, unique_data_records):
+def _get_matching_supplemental_dimension(
+    project_config: ProjectConfig, dimension_type: DimensionType, unique_data_records: DataFrame
+):
     for dim_config in project_config.list_supplemental_dimensions(dimension_type):
         if _is_dimension_valid_for_dataset(dim_config, unique_data_records):
             return dim_config.model
@@ -317,12 +326,21 @@ def _get_dimension_reference(dim_model: DimensionModel, project_config):
     return dim_ref.serialize()
 
 
-def _get_supplemental_dimension_mapping_reference(dim_model: DimensionModel, project_config):
-    key, _ = project_config.get_base_to_supplemental_config(dim_model.dimension_query_name)
+def _get_supplemental_dimension_mapping_reference(
+    dim_model: DimensionModel, project_config: ProjectConfig
+):
+    mapping_configs = project_config.list_base_to_supplemental_mapping_configs(
+        supplemental_dimension_id=dim_model.dimension_id
+    )
+    if len(mapping_configs) > 1:
+        msg = "More than one base-to-supplemental mapping config for {dim_model.label}"
+        raise NotImplementedError(msg)
+
+    mapping_config = mapping_configs[0]
     # Use dictionaries to avoid validation and be consistent with dimension definition.
     return {
-        "mapping_id": key.id,
+        "mapping_id": mapping_config.model.mapping_id,
         "from_dimension_type": dim_model.dimension_type.value,
         "to_dimension_type": dim_model.dimension_type.value,
-        "version": str(key.version),
+        "version": str(mapping_config.model.version),
     }

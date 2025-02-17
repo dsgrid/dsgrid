@@ -228,6 +228,11 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
             info.data["class_name"],
         )
 
+    @property
+    def label(self) -> str:
+        """Return a label for the dimension to be used in user messages."""
+        return f"{self.dimension_type} {self.dimension_query_name}"
+
 
 class DimensionModel(DimensionBaseModel):
     """Defines a non-time dimension"""
@@ -557,7 +562,8 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
             ),
         },
     )
-    ranges: list[TimeRangeModel] = Field(
+    ranges: Optional[list[TimeRangeModel]] = Field(
+        default=None,
         title="time_ranges",
         description="Defines the contiguous ranges of time in the data, inclusive of start and end time.",
     )
@@ -855,7 +861,7 @@ class ProjectDimensionModel(DimensionCommonModel):
     category: DimensionCategory
 
 
-def create_dimension_common_model(model):
+def create_dimension_common_model(model) -> DimensionCommonModel:
     """Constructs an instance of DimensionBaseModel from subclasses in order to give the API
     one common model for all dimensions. Avoids the complexity of dealing with
     DimensionBaseModel validators.
@@ -865,13 +871,13 @@ def create_dimension_common_model(model):
     return DimensionCommonModel(**data)
 
 
-def create_project_dimension_model(model, category: DimensionCategory):
+def create_project_dimension_model(model, category: DimensionCategory) -> ProjectDimensionModel:
     data = create_dimension_common_model(model).model_dump()
     data["category"] = category.value
     return ProjectDimensionModel(**data)
 
 
-def check_display_name(display_name: str):
+def check_display_name(display_name: str) -> str:
     """Check that a dimension display name meets all requirements.
 
     Raises

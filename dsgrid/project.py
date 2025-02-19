@@ -2,7 +2,8 @@
 
 import json
 import logging
-import shutil
+
+from chronify.utils.path_utils import check_overwrite
 from pathlib import Path
 from typing import Optional
 from semver import VersionInfo
@@ -19,7 +20,7 @@ from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
 )
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.exceptions import DSGInvalidQuery, DSGValueNotRegistered, DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidQuery, DSGValueNotRegistered
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import (
     StandaloneDatasetModel,
@@ -174,29 +175,23 @@ class Project:
         """
         self._datasets.pop(dataset_id, None)
 
-    def transform_dataset(
+    def map_dataset(
         self,
         dataset_id: str,
         output_dir: Path,
         overwrite=False,
         scratch_dir: Optional[Path] = None,
     ) -> Path:
-        """Transform a dataset by mapping its dimensions to the project's dimensions and write it
-        to the filesystem.
-        """
+        """Map a dataset to the project's dimensions and write it to the filesystem."""
         output_file = output_dir / "table.parquet"
-        if output_file.exists():
-            if not overwrite:
-                msg = f"{output_file=} already exists. Set overwrite=True or pass a different base directory."
-                raise DSGInvalidParameter(msg)
-            shutil.rmtree(output_file)
-
+        check_overwrite(output_file, overwrite)
         output_dir.mkdir(exist_ok=True)
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         dataset = self.get_dataset(dataset_id)
         with ScratchDirContext(scratch_dir) as context:
             df = dataset.make_project_dataframe(self._config, context)
             write_dataframe_and_auto_partition(df, output_file)
+            logger.info("Wrote mapped dataset %s to %s", dataset_id, output_file)
             return output_file
 
     def _iter_datasets(self):

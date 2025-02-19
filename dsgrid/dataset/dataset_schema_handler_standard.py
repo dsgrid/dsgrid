@@ -103,6 +103,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._convert_time_dimension(
             ld_df, project_config, VALUE_COLUMN, scratch_dir_context
         )
+        # TODO DT: this has a bug...does not account for duplicates
         return self._add_null_values(ld_df, null_lk_df)
 
     def make_project_dataframe_from_query(

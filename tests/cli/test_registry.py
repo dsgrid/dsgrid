@@ -418,3 +418,23 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
     for cmd in cmds:
         result = runner.invoke(cli, cmd)
         assert result.exit_code == 0
+
+    for dataset_id in ("decarb_2023_dgen", "decarb_2023_dgen_capacities"):
+        cmd = [
+            "-u",
+            url,
+            "query",
+            "project",
+            "map-dataset",
+            "US_DOE_DECARB_2023",
+            dataset_id,
+            "-o",
+            str(tmpdir),
+        ]
+        result = runner.invoke(cli, cmd)
+        assert result.exit_code == 0
+        match = re.search(r"Wrote mapped dataset [\w-]+ to (.*parquet)", result.stderr)
+        assert match
+        path = Path(match.group(1))
+        assert path.exists()
+        # Correctness of map_dataset is tested elsewhere.

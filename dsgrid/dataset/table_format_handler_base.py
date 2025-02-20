@@ -169,7 +169,7 @@ class TableFormatHandlerBase(abc.ABC):
         assert not {"id", "name"}.intersection(df.columns), df.columns
         orig = df
         all_query_names = self._project_config.get_dimension_query_names_mapped_to_type()
-        for dimension_query_name in set(df.columns).intersection(all_query_names):
+        for dimension_query_name in set(df.columns).intersection(all_query_names.keys()):
             if all_query_names[dimension_query_name] != DimensionType.TIME:
                 # Time doesn't have records.
                 dim_config = self._project_config.get_dimension_with_records(dimension_query_name)

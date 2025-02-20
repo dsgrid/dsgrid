@@ -112,20 +112,21 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         return ranges
 
     def get_start_times(self) -> list[pd.Timestamp]:
+        tz = self.get_tzinfo()
         start_times = []
-        for range in self.model.ranges:
-            start = datetime.strptime(range.start, self.model.str_format)
-            tz = self.get_tzinfo()
-            start_times.append(pd.Timestamp(start, tz=tz))
+        for trange in self.model.ranges:
+            start = datetime.strptime(trange.start, self.model.str_format)
+            assert start.tzinfo is None
+            start_times.append(start.replace(tzinfo=tz))
 
         return start_times
 
     def get_lengths(self) -> list[int]:
         lengths = []
-        for range in self.model.ranges:
-            start = datetime.strptime(range.start, self.model.str_format)
-            end = datetime.strptime(range.end, self.model.str_format)
-            lengths.append(end - start + 1)
+        for trange in self.model.ranges:
+            start = datetime.strptime(trange.start, self.model.str_format)
+            end = datetime.strptime(trange.end, self.model.str_format)
+            lengths.append(end.year - start.year + 1)
         return lengths
 
     def get_load_data_time_columns(self) -> list[str]:

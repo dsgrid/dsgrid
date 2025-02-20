@@ -262,8 +262,8 @@ class DimensionsModel(DSGBaseModel):
         description="List of registry references for a project's supplemental dimensions.",
         json_schema_extra={
             "requirements": (
-                "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType` "
-                " are allowed for supplemental dimension references (i.e., multiple `Geography` types "
+                "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType`"
+                " are allowed for supplemental dimension references (i.e., multiple `Geography` types"
                 " are allowed).",
             ),
             "notes": (
@@ -438,7 +438,7 @@ class RequiredDimensionsModel(DSGBaseModel):
             if req.defines_dimension_requirement():
                 single_dimensional.add(field)
 
-        dim_combos: tuple[str, ...] = set()
+        dim_combos: set[str] = set()
         for item in self.multi_dimensional:
             dims = []
             for field in RequiredDimensionRecordsModel.model_fields:
@@ -735,7 +735,7 @@ class ProjectConfig(ConfigBase):
         """
         if dimension_query_name is None:
             return self._get_single_base_dimension(dimension_type)
-        for dim in self.base_dimensions.values():
+        for dim in self._iter_base_dimensions():
             if (
                 dim.model.dimension_type == dimension_type
                 and dim.model.dimension_query_name == dimension_query_name
@@ -753,7 +753,7 @@ class ProjectConfig(ConfigBase):
     def _get_single_base_dimension(self, dimension_type: DimensionType) -> DimensionBaseConfig:
         """Return the base dimension."""
         dims = [
-            x for x in self.base_dimensions.values() if x.model.dimension_type == dimension_type
+            x for x in self._iter_base_dimensions() if x.model.dimension_type == dimension_type
         ]
         if not dims:
             msg = f"base dimension {dimension_type=} not found"
@@ -808,7 +808,7 @@ class ProjectConfig(ConfigBase):
     def get_dimension_with_records(
         self, dimension_query_name: str
     ) -> DimensionBaseConfigWithFiles:
-        """Return an instance of DimensionBaseConfig."""
+        """Return a dimension config matching dimension_query_name that has records."""
         dim = self._dimensions_by_query_name.get(dimension_query_name)
         if dim is None:
             raise DSGInvalidDimension(f"{dimension_query_name=} is not stored")
@@ -846,9 +846,9 @@ class ProjectConfig(ConfigBase):
         get_base_dimension
         """
         if dimension_type is None:
-            return list(self.base_dimensions.values())
+            return list(self._iter_base_dimensions())
         return [
-            x for x in self.base_dimensions.values() if x.model.dimension_type == dimension_type
+            x for x in self._iter_base_dimensions() if x.model.dimension_type == dimension_type
         ]
 
     def list_base_dimensions_with_records(
@@ -862,21 +862,10 @@ class ProjectConfig(ConfigBase):
         """
         return [
             x
-            for x in self.base_dimensions.values()
+            for x in self._iter_base_dimensions()
             if x.model.dimension_type == dimension_type
             and isinstance(x, DimensionBaseConfigWithFiles)
         ]
-
-    def list_base_dimension_types_with_multiple_dimensions(self) -> list[DimensionType]:
-        """Return the dimension types with multiple base dimensions."""
-        base_dim_types: set[DimensionType] = set()
-        dim_types_with_multiple_base_dims: list[DimensionType] = []
-        for dim in self.base_dimensions.values():
-            if dim.model.dimension_type in base_dim_types:
-                dim_types_with_multiple_base_dims.append(dim.model.dimension_type)
-            else:
-                base_dim_types.add(dim.model.dimension_type)
-        return dim_types_with_multiple_base_dims
 
     def list_supplemental_dimensions(
         self, dimension_type: DimensionType, sort_by=None
@@ -982,7 +971,7 @@ class ProjectConfig(ConfigBase):
 
     def get_base_dimension_by_id(self, dimension_id: str) -> DimensionBaseConfig:
         """Return the base dimension with dimension_id."""
-        for dim in self.base_dimensions.values():
+        for dim in self._iter_base_dimensions():
             if dim.model.dimension_id == dimension_id:
                 return dim
         msg = f"Did not find a dimension with {dimension_id=}"
@@ -1321,11 +1310,11 @@ class ProjectConfig(ConfigBase):
             df = create_dataframe_from_product(columns, context)
             df = df.select(*sorted(df.columns))
 
-            dim_combo = tuple(sorted(dim_combo))
-            if dim_combo in dfs_by_dim_combo:
-                dfs_by_dim_combo[dim_combo] = dfs_by_dim_combo[dim_combo].union(df)
+            dim_combo_tp = tuple(sorted(dim_combo))
+            if dim_combo_tp in dfs_by_dim_combo:
+                dfs_by_dim_combo[dim_combo_tp] = dfs_by_dim_combo[dim_combo_tp].union(df)
             else:
-                dfs_by_dim_combo[dim_combo] = df
+                dfs_by_dim_combo[dim_combo_tp] = df
 
         return list(dfs_by_dim_combo.values())
 

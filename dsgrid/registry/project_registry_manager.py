@@ -1094,14 +1094,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         new_mappings = []
         for from_id, from_version in needs_mapping:
             from_dim = self._dimension_mgr.get_by_id(from_id, version=from_version, conn=conn)
-            if from_dim.model.dimension_type == DimensionType.METRIC:
-                to_dim, to_version = project_config.get_base_dimension_and_version(
-                    from_dim.model.dimension_type
-                )
-            else:
-                to_dim, to_version = project_config.get_base_metric_dimension_and_version(
-                    from_dim.model.dimension_type
-                )
+            to_dim, to_version = project_config.get_base_dimension_and_version(
+                from_dim.model.dimension_type
+            )
             mapping, version = self._try_get_mapping(
                 project_config, from_dim, from_version, to_dim, to_version, context
             )

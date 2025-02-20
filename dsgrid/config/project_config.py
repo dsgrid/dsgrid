@@ -24,7 +24,6 @@ from dsgrid.dimension.base_models import (
 from dsgrid.exceptions import (
     DSGInvalidField,
     DSGInvalidDimension,
-    DSGInvalidOperation,
     DSGInvalidParameter,
     DSGInvalidDimensionAssociation,
     DSGValueNotRegistered,
@@ -792,14 +791,18 @@ class ProjectConfig(ConfigBase):
         """Return the dimension with dimension_query_name."""
         dim = self._dimensions_by_query_name.get(dimension_query_name)
         if dim is None:
-            raise DSGInvalidDimension(f"dimension_query_name={dimension_query_name} is not stored")
+            raise DSGValueNotRegistered(
+                f"dimension_query_name={dimension_query_name} is not stored"
+            )
         return dim
 
     def get_time_dimension(self, dimension_query_name: str) -> TimeDimensionBaseConfig:
         """Return the time dimension with dimension_query_name."""
         dim = self._dimensions_by_query_name.get(dimension_query_name)
         if dim is None:
-            raise DSGInvalidDimension(f"dimension_query_name={dimension_query_name} is not stored")
+            raise DSGValueNotRegistered(
+                f"dimension_query_name={dimension_query_name} is not stored"
+            )
         if not isinstance(dim, TimeDimensionBaseConfig):
             msg = f"{dim.model.label} is not a time dimension"
             raise DSGInvalidParameter(msg)
@@ -929,7 +932,7 @@ class ProjectConfig(ConfigBase):
                 return mapping
 
         msg = f"No mapping is stored for base = {base_dim.model.label}, supplemental = {supp_dim.model.label}"
-        raise DSGInvalidParameter(msg)
+        raise DSGValueNotRegistered(msg)
 
     def list_base_to_supplemental_mapping_configs(
         self,
@@ -982,7 +985,7 @@ class ProjectConfig(ConfigBase):
         dim = self.get_base_dimension_by_id(dimension_id)
         if not isinstance(dim, DimensionBaseConfigWithFiles):
             msg = f"{dim.model.label} does not have records"
-            raise DSGInvalidOperation(msg)
+            raise DSGInvalidParameter(msg)
         return dim.get_records_dataframe()
 
     def _check_not_base_dimension(self, dim: DimensionBaseConfig) -> None:

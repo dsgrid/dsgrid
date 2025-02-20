@@ -352,9 +352,9 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
     base = TEST_PROJECT_PATH / "filtered_registries" / "dgen_multiple_metrics"
     project_dir = base / "dsgrid-project-IEF"
     project_config_file = project_dir / "project" / "project.json5"
-    profiles_config_file = project_dir / "datasets" / "modeled" / "dgen" / "dataset.json5"
+    profiles_config_file = project_dir / "datasets" / "modeled" / "dgen_profiles" / "dataset.json5"
     profiles_mapping_file = (
-        project_dir / "datasets" / "modeled" / "dgen" / "dimension_mappings.json5"
+        project_dir / "datasets" / "modeled" / "dgen_profiles" / "dimension_mappings.json5"
     )
     capacities_config_file = (
         project_dir / "datasets" / "modeled" / "dgen_capacities" / "dataset.json5"

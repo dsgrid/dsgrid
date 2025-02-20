@@ -498,14 +498,25 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
 
         return values
 
-    @model_validator(mode="after")
-    def check_frequency(self) -> "DateTimeDimensionModel":
-        if self.frequency in [timedelta(days=365), timedelta(days=366)]:
-            raise ValueError(
-                f"frequency={self.frequency}, datetime config does not allow 365 or 366 days frequency, "
+    # @model_validator(mode="after")
+    # def check_frequency(self) -> "DateTimeDimensionModel":
+    #     if self.frequency in [timedelta(days=365), timedelta(days=366)]:
+    #         raise ValueError(
+    #             f"frequency={self.frequency}, datetime config does not allow 365 or 366 days frequency, "
+    #             "use class=AnnualTime, time_type=annual to specify a year series."
+    #         )
+    #     return self
+
+    @field_validator("frequency")
+    @classmethod
+    def check_frequency(cls, frequency: timedelta) -> timedelta:
+        if frequency in [timedelta(days=365), timedelta(days=366)]:
+            msg = (
+                f"{frequency=}, datetime config does not allow 365 or 366 days frequency, "
                 "use class=AnnualTime, time_type=annual to specify a year series."
             )
-        return self
+            raise ValueError(msg)
+        return frequency
 
     @field_validator("ranges")
     @classmethod
@@ -561,9 +572,7 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     def check_times(
         cls, ranges: list[TimeRangeModel], info: ValidationInfo
     ) -> list[TimeRangeModel]:
-        if "str_format" not in info.data or "frequency" not in info.data:
-            return ranges
-        return _check_time_ranges(ranges, info.data["str_format"], timedelta(days=365))
+        return _check_annual_ranges(ranges, info.data["str_format"])
 
     @field_validator("measurement_type")
     @classmethod
@@ -789,24 +798,41 @@ DimensionsListModel = Annotated[
 
 def _check_time_ranges(ranges: list[TimeRangeModel], str_format: str, frequency: timedelta):
     assert isinstance(frequency, timedelta)
-    for time_range in ranges:
+    for trange in ranges:
         # Make sure start and end time parse.
-        start = datetime.strptime(time_range.start, str_format)
-        end = datetime.strptime(time_range.end, str_format)
-        if str_format == "%Y":
-            if frequency != timedelta(days=365):
-                raise ValueError(f"str_format={str_format} is inconsistent with {frequency}")
-        # There may be other special cases to handle.
-        elif (end - start) % frequency != timedelta(0):
-            raise ValueError(f"time range {time_range} is inconsistent with {frequency}")
+        start = datetime.strptime(trange.start, str_format)
+        end = datetime.strptime(trange.end, str_format)
+        # Make sure start and end is tz-naive.
+        if start.tzinfo is not None or end.tzinfo is not None:
+            msg = f"datetime range {trange} start and end need to be tz-naive. Pass in the time zone info via datetime_format"
+            raise ValueError(msg)
+        if end < start:
+            msg = f"datetime range {trange} end must not be less than start."
+            raise ValueError(msg)
+        if (end - start) % frequency != timedelta(0):
+            msg = f"datetime range {trange} is inconsistent with {frequency}"
+            raise ValueError(msg)
+
+    return ranges
+
+
+def _check_annual_ranges(ranges: list[TimeRangeModel], str_format: str):
+    for trange in ranges:
+        # Make sure start and end time parse.
+        start = datetime.strptime(trange.start, str_format)
+        end = datetime.strptime(trange.end, str_format)
+        if end < start:
+            msg = f"annual time range {trange} end must not be less than start."
+            raise ValueError(msg)
 
     return ranges
 
 
 def _check_index_ranges(ranges: list[IndexRangeModel]):
-    for range in ranges:
-        if range.end <= range.start:
-            raise ValueError(f"index range {range} end point must be greater than start point.")
+    for trange in ranges:
+        if trange.end < trange.start:
+            msg = f"index range {trange} end must not be less than start."
+            raise ValueError(msg)
 
     return ranges
 

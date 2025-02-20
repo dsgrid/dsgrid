@@ -180,20 +180,26 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return ranges
 
     def get_start_times(self) -> list[pd.Timestamp]:
+        tz = self.get_tzinfo()
         start_times = []
-        for range in self.model.ranges:
-            start = datetime.strptime(range.start, self.model.str_format)
-            tz = self.get_tzinfo()
-            start_times.append(pd.Timestamp(start, tz=tz))
+        for trange in self.model.ranges:
+            start = datetime.strptime(trange.start, self.model.str_format)
+            assert start.tzinfo is None
+            start_times.append(start.replace(tzinfo=tz))
         return start_times
 
     def get_lengths(self) -> list[int]:
+        tz = self.get_tzinfo()
         lengths = []
-        for range in self.model.ranges:
-            start = datetime.strptime(range.start, self.model.str_format)
-            end = datetime.strptime(range.end, self.model.str_format)
+        for trange in self.model.ranges:
+            start = datetime.strptime(trange.start, self.model.str_format)
+            end = datetime.strptime(trange.end, self.model.str_format)
+            assert start.tzinfo is None
+            assert end.tzinfo is None
+            start_utc = start.replace(tzinfo=tz).astimezone(tz=ZoneInfo("UTC"))
+            end_utc = end.replace(tzinfo=tz).astimezone(tz=ZoneInfo("UTC"))
             freq = self.get_frequency()
-            length = (end - start) / freq + 1
+            length = (end_utc - start_utc) / freq + 1
             assert length % 1 == 0, f"{length=} is not a whole number"
             lengths.append(int(length))
         return lengths

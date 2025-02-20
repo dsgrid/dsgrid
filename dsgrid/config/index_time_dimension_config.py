@@ -238,15 +238,16 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def get_start_times(self) -> list[pd.Timestamp]:
         """get represented start times"""
+        tz = self.get_tzinfo()
         start_times = []
         for ts in self.model.starting_timestamps:
             start = datetime.strptime(ts, self.model.str_format)
-            tz = self.get_tzinfo()
-            start_times.append(pd.Timestamp(start, tz=tz))
-        return []
+            assert start.tzinfo is None
+            start_times.append(start.replace(tzinfo=tz))
+        return start_times
 
     def get_lengths(self) -> list[int]:
-        return [range.end - range.start + 1 for range in self.model.ranges]
+        return [trange.end - trange.start + 1 for trange in self.model.ranges]
 
     def get_load_data_time_columns(self) -> list[str]:
         return list(IndexTimestampType._fields)

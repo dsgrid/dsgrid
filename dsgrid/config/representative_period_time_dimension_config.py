@@ -51,7 +51,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def supports_chronify(self) -> bool:
         return True
 
-    def to_chronify(self) -> chronify.RepresentativePeriodTime:
+    def to_chronify(self) -> chronify.RepresentativePeriodTimeBase:
         if len(self._model.ranges) != 1:
             msg = (
                 "Mapping RepresentativePeriodTime with chronify is only supported with one range: "
@@ -65,12 +65,20 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"{range_}"
             )
             raise NotImplementedError(msg)
+        # RepresentativePeriodTimeDimensionModel does not map to NTZ at the moment
+        if isinstance(self._format_handler, OneWeekPerMonthByHourHandler) or isinstance(
+            self._format_handler, OneWeekdayDayAndWeekendDayPerMonthByHourHandler
+        ):
 
-        return chronify.RepresentativePeriodTime(
-            measurement_type=self._model.measurement_type,
-            interval_type=self._model.time_interval_type,
-            time_format=chronify.RepresentativePeriodFormat(self._model.format.value),
-        )
+            return chronify.RepresentativePeriodTimeTZ(
+                measurement_type=self._model.measurement_type,
+                interval_type=self._model.time_interval_type,
+                time_format=chronify.RepresentativePeriodFormat(self._model.format.value),
+                time_zone_column="time_zone",
+            )
+
+        msg = f"Cannot chronify time_config for {self._format_handler}"
+        raise NotImplementedError(msg)
 
     @staticmethod
     def model_class() -> RepresentativePeriodTimeDimensionModel:

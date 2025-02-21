@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timedelta
+from typing import Union
 
 import chronify
 import pandas as pd
@@ -53,7 +54,11 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     def supports_chronify(self) -> bool:
         return True
 
-    def to_chronify(self) -> chronify.IndexTimeRangeBase:
+    def to_chronify(
+        self,
+    ) -> Union[
+        chronify.IndexTimeRangeTZ, chronify.IndexTimeRangeNTZ, chronify.IndexTimeRangeLocalTime
+    ]:
         time_cols = self.get_load_data_time_columns()
         assert len(self._model.ranges) == 1
         assert len(time_cols) == 1

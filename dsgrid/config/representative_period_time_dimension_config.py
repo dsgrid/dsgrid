@@ -2,7 +2,7 @@ import abc
 import calendar
 import logging
 from datetime import datetime, timedelta
-from typing import Type, Any
+from typing import Type, Any, Union
 
 import chronify
 import pandas as pd
@@ -51,7 +51,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def supports_chronify(self) -> bool:
         return True
 
-    def to_chronify(self) -> chronify.RepresentativePeriodTimeBase:
+    def to_chronify(
+        self,
+    ) -> Union[chronify.RepresentativePeriodTimeTZ, chronify.RepresentativePeriodTimeNTZ]:
         if len(self._model.ranges) != 1:
             msg = (
                 "Mapping RepresentativePeriodTime with chronify is only supported with one range: "

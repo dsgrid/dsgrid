@@ -6,7 +6,7 @@
 	path = dsgrid-project-StandardScenarios
 	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
 	branch = duckdb
-[submodule "dsgrid-project-DECARB"]
-	path = dsgrid-project-DECARB
-	url = https://github.com/dsgrid/dsgrid-project-DECARB
+[submodule "dsgrid-project-IEF"]
+	path = dsgrid-project-IEF
+	url = https://github.com/dsgrid/dsgrid-project-IEF
 	branch = main

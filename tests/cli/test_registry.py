@@ -21,7 +21,7 @@ from dsgrid.utils.id_remappings import (
 )
 
 STANDARD_SCENARIOS_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-StandardScenarios"
-DECARB_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-DECARB"
+IEF_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-IEF"
 
 
 def test_register_dimensions_and_mappings(tmp_registry_db):
@@ -245,7 +245,7 @@ def test_register_dsgrid_projects(tmp_registry_db):
 
     project_configs = (
         STANDARD_SCENARIOS_PROJECT_REPO / "dsgrid_project" / "project.json5",
-        DECARB_PROJECT_REPO / "project" / "project.json5",
+        IEF_PROJECT_REPO / "project" / "project.json5",
     )
 
     # Test these together because they share dimensions and mappings.

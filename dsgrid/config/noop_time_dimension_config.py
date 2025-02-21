@@ -9,10 +9,10 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     """Provides an interface to an NoOpTimeDimensionModel."""
 
     @staticmethod
-    def model_class():
+    def model_class() -> NoOpTimeDimensionModel:
         return NoOpTimeDimensionModel
 
-    def check_dataset_time_consistency(self, load_data_df, time_columns):
+    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
         pass
 
     def build_time_dataframe(self):
@@ -24,23 +24,29 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def convert_dataframe(self, df: DataFrame, *args, **kwargs) -> DataFrame:
         return df
 
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return timedelta(days=0)
 
-    def get_time_ranges(self):
+    def get_time_ranges(self) -> list:
         return []
 
-    def get_load_data_time_columns(self):
+    def get_start_times(self) -> list:
+        return []
+
+    def get_lengths(self) -> list:
+        return []
+
+    def get_load_data_time_columns(self) -> list:
         return []
 
     def get_time_zone(self) -> None:
         return None
 
-    def get_tzinfo(self):
+    def get_tzinfo(self) -> None:
         return None
 
-    def get_time_interval_type(self):
+    def get_time_interval_type(self) -> None:
         return None
 
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(self) -> list:
         return []

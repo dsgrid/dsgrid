@@ -1,7 +1,7 @@
 import abc
 import logging
 from datetime import timedelta
-from typing import Optional
+from typing import Optional, Any
 
 import chronify
 
@@ -171,13 +171,33 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         return df.withColumnRenamed(time_col, self.model.dimension_query_name)
 
     @abc.abstractmethod
-    def get_time_ranges(self):
+    def get_time_ranges(self) -> list[Any]:
         """Return time ranges with timezone applied.
 
         Returns
         -------
         list
             list of DatetimeRange
+        """
+
+    @abc.abstractmethod
+    def get_start_times(self) -> list[Any]:
+        """Return the list of starting timestamp (with tzinfo) for this dimension.
+        One per time range.
+
+        Returns
+        -------
+        list[Any]
+        """
+
+    @abc.abstractmethod
+    def get_lengths(self) -> list[int]:
+        """Return the list of time range length (number of time steps) for this dimension.
+        One per time range.
+
+        Returns
+        -------
+        list[Any]
         """
 
     @abc.abstractmethod

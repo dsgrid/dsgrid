@@ -2,17 +2,15 @@ import abc
 import calendar
 import logging
 from datetime import datetime, timedelta
-from typing import Type
+from typing import Type, Any, Union
 
 import chronify
 import pandas as pd
 
-from dsgrid.dimension.time import (
-    RepresentativePeriodFormat,
-    DatetimeRange,
-)
+from dsgrid.dimension.time import RepresentativePeriodFormat, DatetimeRange, TimeIntervalType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.spark.types import (
+    DataFrame,
     StructType,
     StructField,
     IntegerType,
@@ -53,7 +51,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     def supports_chronify(self) -> bool:
         return True
 
-    def to_chronify(self) -> chronify.RepresentativePeriodTime:
+    def to_chronify(
+        self,
+    ) -> Union[chronify.RepresentativePeriodTimeTZ, chronify.RepresentativePeriodTimeNTZ]:
         if len(self._model.ranges) != 1:
             msg = (
                 "Mapping RepresentativePeriodTime with chronify is only supported with one range: "
@@ -67,26 +67,34 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"{range_}"
             )
             raise NotImplementedError(msg)
+        # RepresentativePeriodTimeDimensionModel does not map to NTZ at the moment
+        if isinstance(self._format_handler, OneWeekPerMonthByHourHandler) or isinstance(
+            self._format_handler, OneWeekdayDayAndWeekendDayPerMonthByHourHandler
+        ):
 
-        return chronify.RepresentativePeriodTime(
-            measurement_type=self._model.measurement_type,
-            interval_type=self._model.time_interval_type,
-            time_format=chronify.RepresentativePeriodFormat(self._model.format.value),
-        )
+            return chronify.RepresentativePeriodTimeTZ(
+                measurement_type=self._model.measurement_type,
+                interval_type=self._model.time_interval_type,
+                time_format=chronify.RepresentativePeriodFormat(self._model.format.value),
+                time_zone_column="time_zone",
+            )
+
+        msg = f"Cannot chronify time_config for {self._format_handler}"
+        raise NotImplementedError(msg)
 
     @staticmethod
-    def model_class():
+    def model_class() -> RepresentativePeriodTimeDimensionModel:
         return RepresentativePeriodTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df, time_columns):
+    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
         self._format_handler.check_dataset_time_consistency(
             self._format_handler.list_expected_dataset_timestamps(self.model.ranges),
             load_data_df,
             time_columns,
         )
 
-    def build_time_dataframe(self):
+    def build_time_dataframe(self) -> DataFrame:
         time_cols = self.get_load_data_time_columns()
         schema = StructType(
             [StructField(time_col, IntegerType(), False) for time_col in time_cols]
@@ -103,29 +111,39 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         msg = f"{self.__class__.__name__}.convert_dataframe is implemented through chronify"
         raise NotImplementedError(msg)
 
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return self._format_handler.get_frequency()
 
-    def get_time_ranges(self):
+    def get_time_ranges(
+        self,
+    ) -> list[OneWeekPerMonthByHourType] | list[OneWeekdayDayAndOneWeekendDayPerMonthByHourType]:
         return self._format_handler.get_time_ranges(
             self.model.ranges,
             self.model.time_interval_type,
             self.get_tzinfo(),
         )
 
-    def get_load_data_time_columns(self):
+    def get_start_times(self) -> list[Any]:
+        return self._format_handler.get_start_times(self.model.ranges)
+
+    def get_lengths(self) -> list[int]:
+        return self._format_handler.get_lengths(self.model.ranges)
+
+    def get_load_data_time_columns(self) -> list[str]:
         return self._format_handler.get_load_data_time_columns()
 
     def get_time_zone(self) -> None:
         return None
 
-    def get_tzinfo(self):
+    def get_tzinfo(self) -> None:
         return None
 
-    def get_time_interval_type(self):
+    def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type
 
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(
+        self,
+    ) -> list[OneWeekPerMonthByHourType] | list[OneWeekdayDayAndOneWeekendDayPerMonthByHourType]:
         return self._format_handler.list_expected_dataset_timestamps(self.model.ranges)
 
 
@@ -232,13 +250,13 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     """Handler for format with hourly data that includes one week per month."""
 
     @staticmethod
-    def get_representative_time_type():
+    def get_representative_time_type() -> OneWeekPerMonthByHourType:
         return OneWeekPerMonthByHourType
 
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, time_interval_type, _):
+    def get_time_ranges(self, ranges, time_interval_type, _) -> list[DatetimeRange]:
         # TODO: This method may have some problems but is currently unused.
         # How to handle year? Leap year?
         time_ranges = []
@@ -257,10 +275,27 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
         return time_ranges
 
     @staticmethod
-    def get_load_data_time_columns():
+    def get_start_times(ranges) -> list[OneWeekPerMonthByHourType]:
+        """Get the starting combination of (month, day_of_week, hour) based on sorted order"""
+        start_times = []
+        for model in ranges:
+            start_times.append(OneWeekPerMonthByHourType(month=model.start, day_of_week=0, hour=0))
+        return start_times
+
+    @staticmethod
+    def get_lengths(ranges) -> list[int]:
+        """Get the number of unique combinations of (month, day_of_week, hour)"""
+        lengths = []
+        for model in ranges:
+            n_months = model.end - model.start + 1
+            lengths.append(n_months * 7 * 24)
+        return lengths
+
+    @staticmethod
+    def get_load_data_time_columns() -> list[str]:
         return list(OneWeekPerMonthByHourType._fields)
 
-    def list_expected_dataset_timestamps(self, ranges):
+    def list_expected_dataset_timestamps(self, ranges) -> list[OneWeekPerMonthByHourType]:
         timestamps = []
         for model in ranges:
             for month in range(model.start, model.end + 1):
@@ -279,25 +314,48 @@ class OneWeekdayDayAndWeekendDayPerMonthByHourHandler(RepresentativeTimeFormatHa
     """
 
     @staticmethod
-    def get_representative_time_type():
+    def get_representative_time_type() -> OneWeekdayDayAndOneWeekendDayPerMonthByHourType:
         return OneWeekdayDayAndOneWeekendDayPerMonthByHourType
 
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return timedelta(hours=1)
 
     def get_time_ranges(self, ranges, time_interval_type, _):
         raise NotImplementedError("get_time_ranges")
 
     @staticmethod
-    def get_load_data_time_columns():
+    def get_start_times(ranges) -> list[OneWeekdayDayAndOneWeekendDayPerMonthByHourType]:
+        """Get the starting combination of (month, hour, is_weekday) based on sorted order"""
+        start_times = []
+        for model in ranges:
+            start_times.append(
+                OneWeekdayDayAndOneWeekendDayPerMonthByHourType(
+                    month=model.start, hour=0, is_weekday=False
+                )
+            )
+        return start_times
+
+    @staticmethod
+    def get_lengths(ranges) -> list[int]:
+        """Get the number of unique combinations of (month, hour, is_weekday)"""
+        lengths = []
+        for model in ranges:
+            n_months = model.end - model.start + 1
+            lengths.append(n_months * 24 * 2)
+        return lengths
+
+    @staticmethod
+    def get_load_data_time_columns() -> list[str]:
         return list(OneWeekdayDayAndOneWeekendDayPerMonthByHourType._fields)
 
-    def list_expected_dataset_timestamps(self, ranges):
+    def list_expected_dataset_timestamps(
+        self, ranges
+    ) -> list[OneWeekdayDayAndOneWeekendDayPerMonthByHourType]:
         timestamps = []
         for model in ranges:
             for month in range(model.start, model.end + 1):
                 # This is sorted because we sort time columns in the load data.
-                for is_weekday in sorted((False, True)):
+                for is_weekday in (False, True):
                     for hour in range(24):
                         ts = OneWeekdayDayAndOneWeekendDayPerMonthByHourType(
                             month=month, hour=hour, is_weekday=is_weekday

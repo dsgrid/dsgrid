@@ -103,8 +103,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._convert_time_dimension(
             ld_df, project_config, VALUE_COLUMN, scratch_dir_context
         )
-        # TODO: this has a bug...does not account for duplicates
-        # Also, the metric column is showing up as null.
         return self._add_null_values(ld_df, null_lk_df)
 
     def make_project_dataframe_from_query(
@@ -143,9 +141,13 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @staticmethod
     def _add_null_values(ld_df, null_lk_df):
         if not is_dataframe_empty(null_lk_df):
-            for col in set(ld_df.columns).difference(null_lk_df.columns):
-                null_lk_df = null_lk_df.withColumn(col, F.lit(None))
-            ld_df = ld_df.union(null_lk_df.select(*ld_df.columns))
+            intersect_cols = set(null_lk_df.columns).intersection(ld_df.columns)
+            null_rows_to_add = except_all(
+                null_lk_df.select(*intersect_cols), ld_df.select(*intersect_cols)
+            )
+            for col in set(ld_df.columns).difference(null_rows_to_add.columns):
+                null_rows_to_add = null_rows_to_add.withColumn(col, F.lit(None))
+            ld_df = ld_df.union(null_rows_to_add.select(*ld_df.columns))
 
         return ld_df
 

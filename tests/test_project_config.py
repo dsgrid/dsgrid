@@ -146,7 +146,7 @@ def test_invalid_multi_dimensional_requirement_base_and_base_missing():
             "subsector": {"base": ["subsector1"]},
         },
     ]
-    with pytest.raises(ValueError, match="base and base_missing cannot both be set"):
+    with pytest.raises(ValueError, match="base and base_missing cannot both contain"):
         RequiredDimensionsModel(
             multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
         )

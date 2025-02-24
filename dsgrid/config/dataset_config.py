@@ -547,7 +547,7 @@ class DatasetConfig(ConfigBase):
             ):
                 return dim_config
 
-        msg = f"Dimension {dimension_type} not found in dataset {self.config_id}"
+        msg = f"Dimension {dimension_type} not found in dataset {self.config_id} or does not have records"
         raise DSGValueNotRegistered(msg)
 
     def get_pivoted_dimension_type(self) -> DimensionType | None:

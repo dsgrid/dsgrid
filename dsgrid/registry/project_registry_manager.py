@@ -54,6 +54,8 @@ from dsgrid.config.project_config import (
     DatasetBaseDimensionQueryNamesModel,
     ProjectConfig,
     ProjectConfigModel,
+    RequiredBaseDimensionModel,
+    RequiredDimensionRecordsByTypeModel,
     RequiredDimensionRecordsModel,
     SubsetDimensionGroupModel,
     SubsetDimensionGroupListModel,
@@ -387,19 +389,19 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         for dim, ref in zip(dimensions, dimension_references):
             base_dim: Optional[DimensionBaseConfig] = None
-            if dim.mapping.from_dimension_name is None:
+            if dim.mapping.project_base_dimension_name is None:
                 base_dims = base_dim_mapping[ref.dimension_type]
                 if len(base_dims) > 1:
                     msg = (
                         "If there are multiple base dimenions for a dimension type, each "
-                        "supplemental dimension mapping must supply a from_dimension_name. "
+                        "supplemental dimension mapping must supply a project_base_dimension_name. "
                         f"{dim.model.dimension_type.value}/{dim.model.name}"
                     )
                     raise DSGInvalidDimensionMapping(msg)
                 base_dim = base_dims[0]
             else:
                 for base_dim_ in base_dim_mapping[dim.dimension_type]:
-                    if base_dim_.model.name == dim.mapping.from_dimension_name:
+                    if base_dim_.model.name == dim.mapping.project_base_dimension_name:
                         if base_dim is not None:
                             msg = (
                                 "A supplemental dimension can only be mapped to one base dimension:"
@@ -410,9 +412,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                             raise DSGInvalidDimensionMapping(msg)
                         base_dim = base_dim_
                 if base_dim is None:
-                    msg = (
-                        f"Bug: unable to find base dimension for {dim.mapping.from_dimension_name}"
-                    )
+                    msg = f"Bug: unable to find base dimension for {dim.mapping.project_base_dimension_name}"
                     raise Exception(msg)
             with in_other_dir(src_dir):
                 assert base_dim is not None
@@ -667,7 +667,6 @@ class ProjectRegistryManager(RegistryManagerBase):
                 context,
             )
 
-    @track_timing(timer_stats_collector)
     def _register(self, config: ProjectConfig, context: RegistrationContext):
         self._run_checks(config)
 
@@ -681,13 +680,11 @@ class ProjectRegistryManager(RegistryManagerBase):
             config.model.version,
         )
 
-    @track_timing(timer_stats_collector)
     def _run_checks(self, config: ProjectConfig):
         dims = [x for x in config.iter_dimensions()]
         check_uniqueness((x.model.name for x in dims), "dimension name")
         check_uniqueness((x.model.display_name for x in dims), "dimension display name")
         self._check_base_dimensions(config)
-        self._check_base_dimension_record_uniqueness(config)
 
         for dataset_id in config.list_unregistered_dataset_ids():
             for field in RequiredDimensionRecordsModel.model_fields:
@@ -704,20 +701,78 @@ class ProjectRegistryManager(RegistryManagerBase):
                     raise DSGInvalidDimension(msg)
                 found_time = True
 
-    def _check_base_dimension_record_uniqueness(self, config: ProjectConfig) -> None:
-        for dimension_type in DimensionType:
-            if dimension_type == DimensionType.TIME:
-                continue
-            record_ids: set[str] = set()
-            for dim in config.list_base_dimensions_with_records(dimension_type):
-                ids = get_unique_values(dim.get_records_dataframe(), "id")
-                if intersect := record_ids.intersection(ids):
-                    msg = (
-                        "Record IDs across base dimensions of the same type must be unique: "
-                        f"{sorted(intersect)}"
+        assert found_time
+        self._set_dataset_record_requirement_definitions_names(config)
+        self._check_dataset_record_requirement_definitions(config)
+
+    def _set_dataset_record_requirement_definitions_names(
+        self,
+        config: ProjectConfig,
+    ) -> None:
+        def set_dimension_query_name(req: RequiredBaseDimensionModel) -> None:
+            if req.dimension_query_name is None and req.dimension_name is not None:
+                dim = config.get_dimension_by_name(req.dimension_name)
+                req.dimension_name = None
+                req.dimension_query_name = dim.model.dimension_query_name
+
+        for dataset in config.model.datasets:
+            dim_type_as_fields = RequiredDimensionRecordsModel.model_fields.keys()
+            for field in dim_type_as_fields:
+                req = getattr(dataset.required_dimensions.single_dimensional, field)
+                for base_field in ("base", "base_missing"):
+                    set_dimension_query_name(getattr(req, base_field))
+                for multi_dim in dataset.required_dimensions.multi_dimensional:
+                    req = getattr(multi_dim, field)
+                    for base_field in ("base", "base_missing"):
+                        set_dimension_query_name(getattr(req, base_field))
+
+    def _check_dataset_record_requirement_definitions(
+        self,
+        config: ProjectConfig,
+    ) -> None:
+        for dataset in config.model.datasets:
+            dim_type_as_fields = RequiredDimensionRecordsModel.model_fields.keys()
+            for dim_type_as_field in dim_type_as_fields:
+                dim_type = DimensionType(dim_type_as_field)
+                required_dimension_records = getattr(
+                    dataset.required_dimensions.single_dimensional, dim_type_as_field
+                )
+                self._check_base_dimension_record_requirements(
+                    required_dimension_records, dim_type, config, dataset.dataset_id
+                )
+                for multi_dim in dataset.required_dimensions.multi_dimensional:
+                    required_dimension_records = getattr(multi_dim, dim_type_as_field)
+                    self._check_base_dimension_record_requirements(
+                        required_dimension_records, dim_type, config, dataset.dataset_id
                     )
-                    raise DSGInvalidDimension(msg)
-                record_ids.update(ids)
+
+    def _check_base_dimension_record_requirements(
+        self,
+        req_dim_records: RequiredDimensionRecordsByTypeModel,
+        dim_type: DimensionType,
+        config: ProjectConfig,
+        dataset_id: str,
+    ) -> None:
+        base_dims = config.list_base_dimensions(dimension_type=dim_type)
+        for base_field in ("base", "base_missing"):
+            reqs = getattr(req_dim_records, base_field)
+            if reqs.record_ids and reqs.dimension_query_name is None:
+                if len(base_dims) == 1:
+                    reqs.dimension_query_name = base_dims[0].model.dimension_query_name
+                    logger.debug(
+                        "Assigned dimension_query_name=%s for %s dataset_id=%s",
+                        reqs.dimension_query_name,
+                        dim_type,
+                        dataset_id,
+                    )
+                else:
+                    msg = (
+                        f"{dataset_id=} requires a base dimension query name for "
+                        f"{dim_type} because the project has {len(base_dims)} base dimensions."
+                    )
+                    raise DSGInvalidDimensionMapping(msg)
+            # Only one of base and base_missing can be set, and that was already checked.
+            break
 
     @track_timing(timer_stats_collector)
     def register_and_submit_dataset(
@@ -1003,22 +1058,22 @@ class ProjectRegistryManager(RegistryManagerBase):
         mapping_tables = []
         for mapping in mappings:
             base_dim: Optional[DimensionBaseConfig] = None
-            if mapping.from_dimension_name is None:
+            if mapping.project_base_dimension_name is None:
                 base_dims = project_mapping[mapping.dimension_type]
                 if len(base_dims) > 1:
                     msg = (
                         "If there are multiple project base dimensions for a dimension type, the "
-                        "dataset dimension mapping must supply a from_dimension_name. "
+                        "dataset dimension mapping must supply a project_base_dimension_name. "
                         f"{dim.model.label}"
                     )
                     raise DSGInvalidDimensionMapping(msg)
                 base_dim = base_dims[0]
             else:
                 for base_dim_ in project_mapping[dim.model.dimension_type]:
-                    if base_dim_.model.name == mapping.from_dimension_name:
+                    if base_dim_.model.name == mapping.project_base_dimension_name:
                         base_dim = base_dim_
                 if base_dim is None:
-                    msg = f"Bug: unable to find base dimension for {mapping.from_dimension_name}"
+                    msg = f"Bug: unable to find base dimension for {mapping.project_base_dimension_name}"
                     raise Exception(msg)
             with in_other_dir(src_dir):
                 assert base_dim is not None

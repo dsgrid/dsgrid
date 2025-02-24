@@ -22,6 +22,7 @@ from dsgrid.dimension.base_models import (
     DimensionType,
 )
 from dsgrid.exceptions import (
+    DSGInvalidDataset,
     DSGInvalidField,
     DSGInvalidDimension,
     DSGInvalidParameter,
@@ -370,27 +371,60 @@ class RequiredSupplementalDimensionRecordsModel(DSGBaseModel):
     )
 
 
+class RequiredBaseDimensionModel(DSGBaseModel):
+
+    record_ids: list[str] = []
+    dimension_name: Optional[str] = Field(
+        default=None,
+        description="Identifies the dimension before the dimension_query_name has been "
+        "auto-generated.",
+    )
+    dimension_query_name: Optional[str] = Field(
+        default=None,
+        description="Identifies which base dimension contains the record IDs. Required if there "
+        "is more than one base dimension for a given dimension type.",
+    )
+
+    @model_validator(mode="after")
+    def check_dimension_query_name(self) -> "RequiredBaseDimensionModel":
+        if self.dimension_name and self.dimension_query_name:
+            msg = f"{self.dimension_name=} and {self.dimension_query_name=} cannot both be set"
+            raise ValueError(msg)
+        return self
+
+
 class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
 
-    base: list[str] = []
-    base_missing: list[str] = []
+    base: RequiredBaseDimensionModel = RequiredBaseDimensionModel()
+    base_missing: RequiredBaseDimensionModel = RequiredBaseDimensionModel()
     subset: list[RequiredSubsetDimensionRecordsModel] = []
-    supplemental: list[RequiredSupplementalDimensionRecordsModel] = []
+
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_format(cls, values: dict[str, Any]) -> dict[str, Any]:
+        # 1. base and base_missing used to be list[str] because we used to allow a single base
+        #    dimension.
+        # 2. We used to allow supplemental dimension requirements.
+        # This allows backwards compatibility with old files and databases.
+        # This can be removed once we've updated existing dsgrid project repositories.
+        for field in ("base", "base_missing"):
+            if field in values and isinstance(values[field], list):
+                values[field] = {"record_ids": values[field]}
+
+        values.pop("supplemental", None)
+        return values
 
     @model_validator(mode="after")
     def check_base(self) -> "RequiredDimensionRecordsByTypeModel":
-        if self.base and self.base_missing:
-            msg = f"base and base_missing cannot both be set: {self.base=} {self.base_missing=}"
+        if self.base.record_ids and self.base_missing.record_ids:
+            msg = f"base and base_missing cannot both contain record_ids: {self.base=} {self.base_missing=}"
             raise ValueError(msg)
         return self
 
     def defines_dimension_requirement(self) -> bool:
         """Returns True if the model defines a dimension requirement."""
         return (
-            bool(self.base)
-            or bool(self.base_missing)
-            or bool(self.subset)
-            or bool(self.supplemental)
+            bool(self.base.record_ids) or bool(self.base_missing.record_ids) or bool(self.subset)
         )
 
 
@@ -411,10 +445,44 @@ class RequiredDimensionRecordsModel(DSGBaseModel):
 
 class RequiredDimensionsModel(DSGBaseModel):
     """Defines required record IDs that must exist for each dimension in a dataset.
-    Record IDs can reside in the project's base, subset, or supplemental dimensions. Using subset
-    dimensions is recommended. dsgrid will substitute base records for mapped subset records
-    at runtime. If no records are listed for a dimension then all project base records are
-    required.
+    Record IDs can reside in the project's base or subset dimensions.
+
+    Requirements can be specified for a single dimension or a combination of dimensions.
+    For example, if a project include commercial, residential, and transportation sectors but the
+    dataset has only transporation sector records, it should specify a single_dimensional
+    requirement that is a subset of of the project's base dimension.
+    `{"single_dimensional": "sector": {"base": {"record_ids": ["transportation"]}}}`.
+
+    If a dataset's requirements span multiple dimensions, such as if it does not have some
+    metric records for some geography records, then a multi_dimensional requirement should be
+    specified. (By default, a full cross join is assumed to be present.)
+    `{"multi_dimensional": {
+        "geography": {"base": {"record_ids": ["12345"]}}
+        "metric": {"base": {"record_ids": ["electricity_cooling"]}}
+      }
+    }`
+
+    If a dataset specifies a dimension type within a multi_dimensional section and wants to use
+    all records from a project base dimension, it can specify `base.record_ids = ["__all__"]
+    as a shorthand notation.
+
+    Requirements for a dimension cannot be defined in both single_dimensional and multi_dimensional
+    sections.
+
+    If no records are listed for a dimension then all project base records are required.
+
+    It might be easier for a dataset to specify what it does not have rather than what it does have.
+    In that case, it is recommended to use the RequiredDimensionRecordsModel.base_missing field.
+    dsgrid will compute the difference of the base dimension records and the base_missing records
+    to determine the dataset's required records.
+
+    If a project has multiple base dimensions of the same type, the
+    RequiredDimensionRecordsModel.dimension_name must be specified to identify the base
+    dimension that contains the record IDs.
+
+    If a dataset contains a subset of project base dimension records that are defined in the
+    project's subset dimensions, it is recommended to use that specification. dsgrid will
+    substitute base records for mapped subset records at runtime.
     """
 
     single_dimensional: RequiredDimensionRecordsModel = Field(
@@ -430,14 +498,21 @@ class RequiredDimensionsModel(DSGBaseModel):
 
     @model_validator(mode="after")
     def check_for_duplicates(self) -> "RequiredDimensionsModel":
-        single_dimensional = set()
+        """
+        1. Ensure that the same dimension does not have requirements in both single and multi
+           dimensional sections.
+        2. Set any dimensions that do not have specifications to require all base dimension
+           records (as long as there is only one project base dimension).
+        """
+        single_dimensional: set[str] = set()
+        multi_dimensional: set[str] = set()
 
         for field in RequiredDimensionRecordsModel.model_fields:
             req = getattr(self.single_dimensional, field)
             if req.defines_dimension_requirement():
                 single_dimensional.add(field)
 
-        dim_combos: set[str] = set()
+        dim_combos: set[tuple[str, ...]] = set()
         for item in self.multi_dimensional:
             dims = []
             for field in RequiredDimensionRecordsModel.model_fields:
@@ -450,6 +525,7 @@ class RequiredDimensionsModel(DSGBaseModel):
                         )
                         raise ValueError(msg)
                     dims.append(field)
+                    multi_dimensional.add(field)
 
             if len(dims) < 2:
                 msg = (
@@ -470,11 +546,17 @@ class RequiredDimensionsModel(DSGBaseModel):
                         raise ValueError(msg)
             dim_combos.add(dim_combo)
 
+        not_covered = (
+            set([x.value for x in DimensionType]) - multi_dimensional - single_dimensional
+        )
+        for field in not_covered:
+            if field != DimensionType.TIME.value:
+                getattr(self.single_dimensional, field).base.record_ids = ["__all__"]
         return self
 
 
 class DatasetBaseDimensionQueryNamesModel(DSGBaseModel):
-    """Defines the query names for project base dimensions represented in a dataset.
+    """Defines the query names for project base dimensions to which datasets will be mapped.
     This is important for cases where a project has multiple base dimensions of the same type.
     """
 
@@ -539,7 +621,7 @@ class InputDatasetModel(DSGBaseModel):
     )
     base_dimension_query_names: DatasetBaseDimensionQueryNamesModel = Field(
         title="base_dimension_query_names",
-        description="Defines the project base dimensions represented in the dataset. "
+        description="Defines the project base dimensions to which the dataset will map itself. "
         "Auto-populated during submission.",
         default=DatasetBaseDimensionQueryNamesModel(),
     )
@@ -740,7 +822,7 @@ class ProjectConfig(ConfigBase):
                 and dim.model.dimension_query_name == dimension_query_name
             ):
                 return dim
-        msg = f"Did not find a dimension with {dimension_query_name=}"
+        msg = f"Did not find a dimension of {dimension_type=} with {dimension_query_name=}"
         raise DSGValueNotRegistered(msg)
 
     def get_base_time_dimension(self) -> TimeDimensionBaseConfig:
@@ -781,11 +863,11 @@ class ProjectConfig(ConfigBase):
         msg = f"Did not find a dimension with {dimension_type=} {dimension_query_name=}"
         raise DSGValueNotRegistered(msg)
 
-    def _get_base_dimension_record_ids(self, dimension_type: DimensionType) -> set[str]:
-        record_ids: set[str] = set()
-        for dim in self.list_base_dimensions_with_records(dimension_type):
-            record_ids.update(dim.get_unique_ids())
-        return record_ids
+    # def _get_base_dimension_record_ids(self, dimension_type: DimensionType) -> set[str]:
+    #     record_ids: set[str] = set()
+    #     for dim in self.list_base_dimensions_with_records(dimension_type):
+    #         record_ids.update(dim.get_unique_ids())
+    #     return record_ids
 
     def get_dimension(self, dimension_query_name: str) -> DimensionBaseConfig:
         """Return the dimension with dimension_query_name."""
@@ -808,6 +890,15 @@ class ProjectConfig(ConfigBase):
             raise DSGInvalidParameter(msg)
         return dim
 
+    def get_dimension_by_name(self, name: str) -> DimensionBaseConfig:
+        """Return the dimension with dimension_query_name."""
+        for dim in self._iter_base_dimensions():
+            if dim.model.name == name:
+                return dim
+
+        msg = f"No base dimension with {name=} is stored."
+        raise DSGValueNotRegistered(msg)
+
     def get_dimension_with_records(
         self, dimension_query_name: str
     ) -> DimensionBaseConfigWithFiles:
@@ -827,6 +918,11 @@ class ProjectConfig(ConfigBase):
             msg = f"{dim.model.label} does not have records"
             raise DSGInvalidParameter(msg)
         return dim.get_records_dataframe()
+
+    def get_dimension_record_ids(self, dimension_query_name: str) -> set[str]:
+        """Return the record IDs for the dimension identified by dimension_query_name."""
+        dim = self.get_dimension_with_records(dimension_query_name)
+        return dim.get_unique_ids()
 
     def get_dimension_reference(self, dimension_id: str) -> DimensionReferenceModel:
         """Return the reference of the dimension matching dimension_id."""
@@ -872,7 +968,7 @@ class ProjectConfig(ConfigBase):
 
     def list_supplemental_dimensions(
         self, dimension_type: DimensionType, sort_by=None
-    ) -> list[DimensionBaseConfig]:
+    ) -> list[DimensionBaseConfigWithFiles]:
         """Return the supplemental dimensions matching dimension (if any).
 
         Parameters
@@ -977,7 +1073,7 @@ class ProjectConfig(ConfigBase):
         for dim in self._iter_base_dimensions():
             if dim.model.dimension_id == dimension_id:
                 return dim
-        msg = f"Did not find a dimension with {dimension_id=}"
+        msg = f"Did not find a base dimension with {dimension_id=}"
         raise DSGValueNotRegistered(msg)
 
     def get_base_dimension_records_by_id(self, dimension_id: str) -> DataFrame:
@@ -992,10 +1088,7 @@ class ProjectConfig(ConfigBase):
         """Check that the dimension is not a base dimension."""
         for base_dim in self.list_base_dimensions(dimension_type=dim.model.dimension_type):
             if dim.model.dimension_id == base_dim.model.dimension_id:
-                msg = (
-                    "Cannot pass base dimension: "
-                    f"{dim.model.dimension_type.value}/{dim.model.dimension_query_name}"
-                )
+                msg = f"Cannot pass base dimension: {dim.model.label}"
                 raise DSGInvalidParameter(msg)
 
     @staticmethod
@@ -1255,22 +1348,11 @@ class ProjectConfig(ConfigBase):
     ) -> set[str]:
         """Return the required base dimension record IDs for the dataset and dimension type."""
         dataset = self.get_dataset(dataset_id)
-        requirements = getattr(
-            dataset.required_dimensions.single_dimensional, dimension_type.value
-        )
-        record_ids = self._get_required_record_ids_from_base(requirements, dimension_type)
-        record_ids.update(self._get_required_record_ids_from_subsets(requirements))
-        record_ids.update(
-            self._get_required_record_ids_from_supplementals(requirements, dimension_type)
-        )
-
+        req = getattr(dataset.required_dimensions.single_dimensional, dimension_type.value)
+        record_ids = self._get_required_dimension_record_ids(req)
         for multi_req in dataset.required_dimensions.multi_dimensional:
             req = getattr(multi_req, dimension_type.value)
-            record_ids.update(req.base)
-            record_ids.update(self._get_required_record_ids_from_subsets(req))
-            record_ids.update(
-                self._get_required_record_ids_from_supplementals(req, dimension_type)
-            )
+            record_ids.update(self._get_required_dimension_record_ids(req))
 
         return record_ids
 
@@ -1296,16 +1378,7 @@ class ProjectConfig(ConfigBase):
             for field in sorted(RequiredDimensionRecordsModel.model_fields):
                 dim_type = DimensionType(field)
                 req = getattr(multi_req, field)
-                if req.base == ["__all__"]:
-                    record_ids = self._get_base_dimension_record_ids(dim_type)
-                elif req.base_missing:
-                    record_ids = self._get_base_dimension_record_ids(dim_type).difference(
-                        req.base_missing
-                    )
-                else:
-                    record_ids = set(req.base)
-                record_ids.update(self._get_required_record_ids_from_subsets(req))
-                record_ids.update(self._get_required_record_ids_from_supplementals(req, dim_type))
+                record_ids = self._get_required_dimension_record_ids(req)
                 if record_ids:
                     columns[field] = list(record_ids)
                     dim_combo.append(dim_type.value)
@@ -1321,15 +1394,55 @@ class ProjectConfig(ConfigBase):
 
         return list(dfs_by_dim_combo.values())
 
-    def _get_required_record_ids_from_base(
-        self, req: RequiredDimensionRecordsByTypeModel, dimension_type: DimensionType
-    ):
-        if req.base:
-            record_ids = set(req.base)
-        elif not req.subset and not req.supplemental:
-            record_ids = self._get_base_dimension_record_ids(dimension_type)
-        else:
-            record_ids = set()
+    def _get_required_dimension_record_ids(
+        self, reqs: RequiredDimensionRecordsByTypeModel
+    ) -> set[str]:
+        """Return the required record IDs for a dimension based on the specification in the
+        project config.
+        """
+        record_ids = self._get_required_base_dimension_record_ids(reqs)
+        record_ids.update(self._get_required_record_ids_from_subsets(reqs))
+        return record_ids
+
+    def _get_required_base_dimension_record_ids(
+        self, reqs: RequiredDimensionRecordsByTypeModel
+    ) -> set[str]:
+        """Return the required record IDs for a base dimension based on the specification in the
+        project config.
+        """
+        record_ids: set[str] = set()
+        if not reqs.base.record_ids and not reqs.base_missing.record_ids:
+            return record_ids
+
+        base_dim_query_name = (
+            reqs.base.dimension_query_name or reqs.base_missing.dimension_query_name
+        )
+        assert base_dim_query_name is not None
+        all_base_record_ids = self.get_dimension_record_ids(base_dim_query_name)
+
+        if reqs.base.record_ids == ["__all__"]:
+            assert reqs.base.dimension_query_name is not None
+            record_ids = all_base_record_ids
+        elif reqs.base.record_ids:
+            record_ids = set(reqs.base.record_ids)
+            if diff := record_ids - all_base_record_ids:
+                msg = (
+                    "The project config requires these these record IDs in the dataset's 'base' "
+                    "field, but they are not in the base dimension records: "
+                    f"dimension_query_name={base_dim_query_name}: {diff=}"
+                )
+                raise DSGInvalidDataset(msg)
+        elif reqs.base_missing.record_ids:
+            assert reqs.base_missing.dimension_query_name is not None
+            missing_ids = set(reqs.base_missing.record_ids)
+            if diff := missing_ids - all_base_record_ids:
+                msg = (
+                    "The project config requires these these record IDs in the dataset's "
+                    "'base_missing' field, but they are not in the base dimension "
+                    f"dimension_query_name={base_dim_query_name}: {diff=}"
+                )
+                raise DSGInvalidDataset(msg)
+            record_ids = all_base_record_ids - missing_ids
 
         return record_ids
 
@@ -1353,38 +1466,39 @@ class ProjectConfig(ConfigBase):
                 record_ids.update(self._get_subset_dimension_records(subset.name, selector_name))
         return record_ids
 
-    def _get_required_record_ids_from_supplementals(
-        self, req: RequiredDimensionRecordsByTypeModel, dimension_type: DimensionType
-    ):
-        record_ids = set()
-        supp_name_to_dim = {
-            x.model.name: x for x in self.list_supplemental_dimensions(dimension_type)
-        }
+    # def _get_required_record_ids_from_supplementals(
+    #     self, req: RequiredDimensionRecordsByTypeModel, dimension_type: DimensionType
+    # ):
+    #     record_ids = set()
+    #     supp_name_to_dim = {
+    #         x.model.name: x for x in self.list_supplemental_dimensions(dimension_type)
+    #     }
 
-        for supp in req.supplemental:
-            dim = supp_name_to_dim.get(supp.name)
-            if dim is None:
-                raise DSGInvalidDimensionAssociation(
-                    f"Supplemental dimension of type={dimension_type} with name={supp.name} "
-                    "does not exist"
-                )
-            supp_replacements = self._get_record_ids_from_one_supplemental(supp, dim)
-            record_ids.update(supp_replacements)
+    #     for supp_req in req.supplemental:
+    #         supp_dim = supp_name_to_dim.get(supp_req.name)
+    #         if supp_dim is None:
+    #             raise DSGInvalidDimensionAssociation(
+    #                 f"Supplemental dimension of type={dimension_type} with name={supp_req.name} "
+    #                 "does not exist"
+    #             )
+    #         supp_replacements = self._get_record_ids_from_one_supplemental(supp_req, supp_dim)
+    #         record_ids.update(supp_replacements)
 
-        return record_ids
+    #     return record_ids
 
-    def _get_record_ids_from_one_supplemental(
-        self, req: RequiredSupplementalDimensionRecordsModel, dim: DimensionBaseConfigWithFiles
-    ):
-        record_ids = set()
-        for supplemental_record_id in req.record_ids:
-            base_record_ids = self._map_supplemental_record_to_base_records(
-                dim,
-                supplemental_record_id,
-            )
-            record_ids.update(base_record_ids)
+    # def _get_record_ids_from_one_supplemental(
+    #     self, req: RequiredSupplementalDimensionRecordsModel, dim: DimensionBaseConfigWithFiles
+    # ):
+    #     record_ids = set()
+    #     for supplemental_record_id in req.record_ids:
+    #         # TODO DT: dig into this
+    #         base_record_ids = self._map_supplemental_record_to_base_records(
+    #             dim,
+    #             supplemental_record_id,
+    #         )
+    #         record_ids.update(base_record_ids)
 
-        return record_ids
+    #     return record_ids
 
     @track_timing(timer_stats_collector)
     def make_dimension_association_table(
@@ -1406,13 +1520,8 @@ class ProjectConfig(ConfigBase):
 
         single_dfs = {}
         for field in (x for x in RequiredDimensionRecordsModel.model_fields if x not in existing):
-            dimension_type = DimensionType(field)
             req = getattr(required_dimensions.single_dimensional, field)
-            record_ids = self._get_required_record_ids_from_base(req, dimension_type)
-            record_ids.update(self._get_required_record_ids_from_subsets(req))
-            record_ids.update(
-                self._get_required_record_ids_from_supplementals(req, dimension_type)
-            )
+            record_ids = self._get_required_dimension_record_ids(req)
             single_dfs[field] = list(record_ids)
 
         single_df = create_dataframe_from_product(single_dfs, context)
@@ -1426,8 +1535,8 @@ class ProjectConfig(ConfigBase):
         )
         mapping_records: Optional[DataFrame] = None
         for mapping_config in mapping_configs:
-            mapping_records_ = (
-                mapping_configs[0].get_records_dataframe().filter(f"to_id == '{supplemental_id}'")
+            mapping_records_ = mapping_config.get_records_dataframe().filter(
+                f"to_id == '{supplemental_id}'"
             )
             if not is_dataframe_empty(mapping_records_):
                 if mapping_records is not None:

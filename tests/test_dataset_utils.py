@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 
 import pytest
 
@@ -13,6 +14,7 @@ from dsgrid.spark.functions import (
 )
 from dsgrid.spark.types import use_duckdb
 from dsgrid.utils.dataset import (
+    add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
     is_noop_mapping,
     remove_invalid_null_timestamps,
@@ -211,6 +213,27 @@ def test_is_noop_mapping_false():
     ):
         df = create_dataframe_from_dicts(records)
         assert not is_noop_mapping(df)
+
+
+def test_add_null_rows_from_load_data_lookup():
+    df = create_dataframe_from_dicts(
+        [
+            {"timestamp": datetime(2018, 1, 1, 1), "model_year": 2030, "geography": "Jefferson"},
+            {"timestamp": datetime(2018, 1, 1, 2), "model_year": 2030, "geography": "Jefferson"},
+            {"timestamp": datetime(2018, 1, 1, 3), "model_year": 2030, "geography": "Jefferson"},
+        ]
+    )
+    lookup = create_dataframe_from_dicts(
+        [
+            {"id": None, "model_year": 2030, "geography": "Jefferson"},
+            {"id": None, "model_year": 2030, "geography": "Boulder"},
+        ]
+    )
+    result = add_null_rows_from_load_data_lookup(df, lookup)
+    assert result.count() == 4
+    null_rows = result.filter("timestamp is NULL").collect()
+    assert len(null_rows) == 1
+    assert null_rows[0].geography == "Boulder"
 
 
 def test_remove_invalid_null_timestamps():

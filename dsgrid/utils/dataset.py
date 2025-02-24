@@ -22,7 +22,7 @@ from dsgrid.spark.functions import (
     join_multiple_columns,
     unpivot,
 )
-from dsgrid.spark.functions import get_spark_session
+from dsgrid.spark.functions import except_all, get_spark_session
 from dsgrid.spark.types import (
     DataFrame,
     F,
@@ -96,6 +96,26 @@ def add_column_from_records(df, dimension_records, dimension_name, column_to_add
         "record_id",
         how="inner",
     ).drop("record_id")
+    return df
+
+
+def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> DataFrame:
+    """Add null rows from the nulled load data lookup table to data table.
+
+    Parameters
+    ----------
+    df
+        load data table
+    lookup
+        load data lookup table that has been filtered for nulls and mapped to project dimensions.
+    """
+    if not is_dataframe_empty(lookup):
+        intersect_cols = set(lookup.columns).intersection(df.columns)
+        null_rows_to_add = except_all(lookup.select(*intersect_cols), df.select(*intersect_cols))
+        for col in set(df.columns).difference(null_rows_to_add.columns):
+            null_rows_to_add = null_rows_to_add.withColumn(col, F.lit(None))
+        df = df.union(null_rows_to_add.select(*df.columns))
+
     return df
 
 

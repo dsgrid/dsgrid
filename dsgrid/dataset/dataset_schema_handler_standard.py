@@ -22,10 +22,10 @@ from dsgrid.spark.functions import (
 )
 from dsgrid.spark.types import (
     DataFrame,
-    F,
     StringType,
 )
 from dsgrid.utils.dataset import (
+    add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -81,7 +81,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         null_lk_df = self._remap_dimension_columns(
             self._load_data_lookup.filter("id is NULL")
         ).drop("fraction")
-        return self._add_null_values(df, cross_join(null_lk_df, df.select(*dim_cols).distinct()))
+        return add_null_rows_from_load_data_lookup(
+            df, cross_join(null_lk_df, df.select(*dim_cols).distinct())
+        )
 
     def make_project_dataframe(
         self, project_config: ProjectConfig, scratch_dir_context: ScratchDirContext
@@ -103,7 +105,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._convert_time_dimension(
             ld_df, project_config, VALUE_COLUMN, scratch_dir_context
         )
-        return self._add_null_values(ld_df, null_lk_df)
+        return add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
 
     def make_project_dataframe_from_query(
         self, context: QueryContext, project_config: ProjectConfig
@@ -135,21 +137,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._convert_time_dimension(
             ld_df, project_config, VALUE_COLUMN, context.scratch_dir_context
         )
-        ld_df = self._add_null_values(ld_df, null_lk_df)
+        ld_df = add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
         return self._finalize_table(context, ld_df, project_config)
-
-    @staticmethod
-    def _add_null_values(ld_df, null_lk_df):
-        if not is_dataframe_empty(null_lk_df):
-            intersect_cols = set(null_lk_df.columns).intersection(ld_df.columns)
-            null_rows_to_add = except_all(
-                null_lk_df.select(*intersect_cols), ld_df.select(*intersect_cols)
-            )
-            for col in set(ld_df.columns).difference(null_rows_to_add.columns):
-                null_rows_to_add = null_rows_to_add.withColumn(col, F.lit(None))
-            ld_df = ld_df.union(null_rows_to_add.select(*ld_df.columns))
-
-        return ld_df
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):

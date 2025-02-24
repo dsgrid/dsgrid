@@ -6,6 +6,7 @@ from pydantic import field_validator, model_validator, Field, field_serializer, 
 from semver import VersionInfo
 from typing_extensions import Annotated
 
+from dsgrid.config.project_config import DatasetBaseDimensionQueryNamesModel
 from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dataset.models import (
     TableFormatModel,
@@ -255,6 +256,10 @@ class DatasetMetadataModel(DSGBaseModel):
 
     dimensions: DatasetDimensionsMetadataModel = DatasetDimensionsMetadataModel()
     table_format: TableFormatModel
+    # This will be set at the query context level but not per-dataset.
+    base_dimension_query_names: DatasetBaseDimensionQueryNamesModel = (
+        DatasetBaseDimensionQueryNamesModel()
+    )
 
     def get_table_format_type(self) -> TableFormatType:
         """Return the format type of the table."""

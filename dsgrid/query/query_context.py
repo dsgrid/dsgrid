@@ -9,7 +9,7 @@ from dsgrid.dataset.models import (
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dataset.models import PivotedTableFormatModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.config.project_config import ProjectConfig
+from dsgrid.config.project_config import DatasetBaseDimensionQueryNamesModel, ProjectConfig
 from dsgrid.spark.functions import drop_temp_tables_and_views
 from dsgrid.spark.types import DataFrame
 from dsgrid.utils.spark import get_spark_session
@@ -23,10 +23,18 @@ logger = logging.getLogger(__name__)
 class QueryContext:
     """Maintains context of the query as it is processed through the stack."""
 
-    def __init__(self, model: ProjectQueryModel, scratch_dir_context: ScratchDirContext) -> None:
+    def __init__(
+        self,
+        model: ProjectQueryModel,
+        base_dimension_query_names: DatasetBaseDimensionQueryNamesModel,
+        scratch_dir_context: ScratchDirContext,
+    ) -> None:
         self._model = model
         self._record_ids_by_dimension_type: dict[DimensionType, list[tuple[str]]] = {}
-        self._metadata = DatasetMetadataModel(table_format=self.model.result.table_format)
+        self._metadata = DatasetMetadataModel(
+            table_format=self.model.result.table_format,
+            base_dimension_query_names=base_dimension_query_names,
+        )
         self._dataset_metadata: dict[str, DatasetMetadataModel] = {}
         self._scratch_dir_context = scratch_dir_context
 
@@ -41,6 +49,10 @@ class QueryContext:
     @property
     def model(self) -> ProjectQueryModel:
         return self._model
+
+    @property
+    def base_dimension_query_names(self) -> DatasetBaseDimensionQueryNamesModel:
+        return self._metadata.base_dimension_query_names
 
     @property
     def scratch_dir_context(self) -> ScratchDirContext:
@@ -73,9 +85,6 @@ class QueryContext:
             case _:
                 msg = str(self.get_table_format_type())
                 raise NotImplementedError(msg)
-
-    def get_query_base_metric_dimension(self) -> str:
-        """Return the dimension query name of the base metric dimension in the query."""
 
     def get_pivoted_columns(self) -> set[str]:
         if self.get_table_format_type() != TableFormatType.PIVOTED:
@@ -180,7 +189,7 @@ class QueryContext:
             raise Exception(msg)
         return next(iter(columns))
 
-    def serialize_dataset_metadata_to_file(self, dataset_id, filename: Path) -> None:
+    def serialize_dataset_metadata_to_file(self, dataset_id: str, filename: Path) -> None:
         filename.write_text(self._dataset_metadata[dataset_id].model_dump_json(indent=2))
 
     def set_dataset_metadata_from_file(self, dataset_id: str, filename: Path) -> None:

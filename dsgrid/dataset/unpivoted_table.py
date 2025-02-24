@@ -77,21 +77,18 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
             df = df.groupBy(*group_by_cols).agg(op(VALUE_COLUMN).alias(VALUE_COLUMN))
 
             if metric_query_name not in dim_type_to_base_query_name[DimensionType.METRIC]:
-                to_dim_config = self.project_config.get_dimension_with_records(metric_query_name)
-                mapping_configs = self.project_config.list_base_to_supplemental_mapping_configs(
-                    supplemental_dimension_id=to_dim_config.model.dimension_id,
+                to_dim = self.project_config.get_dimension_with_records(metric_query_name)
+                assert context.base_dimension_query_names.metric is not None
+                mapping = self.project_config.get_base_to_supplemental_config(
+                    self.project_config.get_dimension_with_records(
+                        context.base_dimension_query_names.metric
+                    ),
+                    to_dim,
                 )
-                if len(mapping_configs) > 1:
-                    msg = (
-                        "More than one base-to-supplemental mapping config for "
-                        f"{to_dim_config.model.dimension_id}"
-                    )
-                    raise NotImplementedError(msg)
-                mapping_config = mapping_configs[0]
-                from_dim_id = mapping_config.model.from_dimension.dimension_id
+                from_dim_id = mapping.model.from_dimension.dimension_id
                 from_records = self.project_config.get_base_dimension_records_by_id(from_dim_id)
-                mapping_records = mapping_config.get_records_dataframe()
-                to_unit_records = to_dim_config.get_records_dataframe()
+                mapping_records = mapping.get_records_dataframe()
+                to_unit_records = to_dim.get_records_dataframe()
                 df = convert_units_unpivoted(
                     df,
                     _get_metric_column_name(context, metric_query_name),

@@ -1019,29 +1019,6 @@ class ProjectConfig(ConfigBase):
         msg = f"No mapping is stored for base = {base_dim.model.label}, supplemental = {supp_dim.model.label}"
         raise DSGValueNotRegistered(msg)
 
-    def list_base_to_supplemental_mapping_configs(
-        self,
-        base_dimension_id: Optional[str] = None,
-        supplemental_dimension_id: Optional[str] = None,
-    ) -> list[MappingTableConfig]:
-        """Return all base-to-supplemental dimension mapping configs, optionally filtering by
-        dimension IDs."""
-        configs = []
-        for config in self._base_to_supplemental_mappings.values():
-            if (
-                base_dimension_id is not None
-                and config.model.from_dimension.dimension_id != base_dimension_id
-            ):
-                continue
-            if (
-                supplemental_dimension_id is not None
-                and config.model.to_dimension.dimension_id != supplemental_dimension_id
-            ):
-                continue
-            configs.append(config)
-
-        return configs
-
     def get_base_to_supplemental_mapping_records(
         self, base_dim: DimensionBaseConfigWithFiles, supp_dim: DimensionBaseConfigWithFiles
     ) -> DataFrame:

@@ -379,8 +379,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 msg = (
                     "The dataset's base_dimension_query_names value is not set and "
                     "there are multiple metric dimensions in the project. Please re-register the "
+                    f"dataset with dataset_id={self._config.model.dataset_id}."
                 )
-                f"dataset with dataset_id={self._config.model.dataset_id}."
                 raise DSGInvalidDataset(msg)
             metric_dim_query_name = metric_dims[0].model.dimension_query_name
         return project_config.get_dimension_records(metric_dim_query_name)

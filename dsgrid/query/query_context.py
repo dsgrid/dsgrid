@@ -51,7 +51,7 @@ class QueryContext:
         return self._model
 
     @property
-    def base_dimension_query_names(self) -> DatasetBaseDimensionQueryNamesModel:
+    def base_dimension_query_names(self) -> DatasetMetadataModel:
         return self._metadata.base_dimension_query_names
 
     @property

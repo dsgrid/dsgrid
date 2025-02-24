@@ -1,6 +1,5 @@
 import logging
 import os
-from datetime import datetime
 
 import pytest
 
@@ -218,9 +217,9 @@ def test_is_noop_mapping_false():
 def test_add_null_rows_from_load_data_lookup():
     df = create_dataframe_from_dicts(
         [
-            {"timestamp": datetime(2018, 1, 1, 1), "model_year": 2030, "geography": "Jefferson"},
-            {"timestamp": datetime(2018, 1, 1, 2), "model_year": 2030, "geography": "Jefferson"},
-            {"timestamp": datetime(2018, 1, 1, 3), "model_year": 2030, "geography": "Jefferson"},
+            {"timestamp": "2018-01-01 01:00:00", "model_year": 2030, "geography": "Jefferson"},
+            {"timestamp": "2018-01-01 02:00:00", "model_year": 2030, "geography": "Jefferson"},
+            {"timestamp": "2018-01-01 03:00:00", "model_year": 2030, "geography": "Jefferson"},
         ]
     )
     lookup = create_dataframe_from_dicts(

@@ -26,7 +26,6 @@ from dsgrid.exceptions import (
     DSGInvalidField,
     DSGInvalidDimension,
     DSGInvalidParameter,
-    DSGInvalidDimensionAssociation,
     DSGValueNotRegistered,
 )
 from dsgrid.registry.common import (
@@ -35,9 +34,6 @@ from dsgrid.registry.common import (
     DatasetRegistryStatus,
     check_config_id_strict,
 )
-from dsgrid.spark.functions import (
-    is_dataframe_empty,
-)
 from dsgrid.spark.types import (
     DataFrame,
 )
@@ -45,7 +41,6 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     cross_join_dfs,
     create_dataframe_from_product,
-    get_unique_values,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import check_uniqueness
@@ -863,12 +858,6 @@ class ProjectConfig(ConfigBase):
         msg = f"Did not find a dimension with {dimension_type=} {dimension_query_name=}"
         raise DSGValueNotRegistered(msg)
 
-    # def _get_base_dimension_record_ids(self, dimension_type: DimensionType) -> set[str]:
-    #     record_ids: set[str] = set()
-    #     for dim in self.list_base_dimensions_with_records(dimension_type):
-    #         record_ids.update(dim.get_unique_ids())
-    #     return record_ids
-
     def get_dimension(self, dimension_query_name: str) -> DimensionBaseConfig:
         """Return the dimension with dimension_query_name."""
         dim = self._dimensions_by_query_name.get(dimension_query_name)
@@ -1056,7 +1045,9 @@ class ProjectConfig(ConfigBase):
     def get_base_to_supplemental_mapping_records(
         self, base_dim: DimensionBaseConfigWithFiles, supp_dim: DimensionBaseConfigWithFiles
     ) -> DataFrame:
-        """Return the project's base-to-supplemental dimension mapping records."""
+        """Return the project's base-to-supplemental dimension mapping records.
+        Excludes rows with NULL to_id values.
+        """
         config = self.get_base_to_supplemental_config(base_dim, supp_dim)
         return config.get_records_dataframe().filter("to_id is not NULL")
 
@@ -1466,40 +1457,6 @@ class ProjectConfig(ConfigBase):
                 record_ids.update(self._get_subset_dimension_records(subset.name, selector_name))
         return record_ids
 
-    # def _get_required_record_ids_from_supplementals(
-    #     self, req: RequiredDimensionRecordsByTypeModel, dimension_type: DimensionType
-    # ):
-    #     record_ids = set()
-    #     supp_name_to_dim = {
-    #         x.model.name: x for x in self.list_supplemental_dimensions(dimension_type)
-    #     }
-
-    #     for supp_req in req.supplemental:
-    #         supp_dim = supp_name_to_dim.get(supp_req.name)
-    #         if supp_dim is None:
-    #             raise DSGInvalidDimensionAssociation(
-    #                 f"Supplemental dimension of type={dimension_type} with name={supp_req.name} "
-    #                 "does not exist"
-    #             )
-    #         supp_replacements = self._get_record_ids_from_one_supplemental(supp_req, supp_dim)
-    #         record_ids.update(supp_replacements)
-
-    #     return record_ids
-
-    # def _get_record_ids_from_one_supplemental(
-    #     self, req: RequiredSupplementalDimensionRecordsModel, dim: DimensionBaseConfigWithFiles
-    # ):
-    #     record_ids = set()
-    #     for supplemental_record_id in req.record_ids:
-    #         # TODO DT: dig into this
-    #         base_record_ids = self._map_supplemental_record_to_base_records(
-    #             dim,
-    #             supplemental_record_id,
-    #         )
-    #         record_ids.update(base_record_ids)
-
-    #     return record_ids
-
     @track_timing(timer_stats_collector)
     def make_dimension_association_table(
         self, dataset_id, context: ScratchDirContext
@@ -1526,40 +1483,6 @@ class ProjectConfig(ConfigBase):
 
         single_df = create_dataframe_from_product(single_dfs, context)
         return cross_join_dfs(multi_dfs + [single_df])
-
-    def _map_supplemental_record_to_base_records(
-        self, dim: DimensionBaseConfigWithFiles, supplemental_id: str
-    ):
-        mapping_configs = self.list_base_to_supplemental_mapping_configs(
-            supplemental_dimension_id=dim.model.dimension_id
-        )
-        mapping_records: Optional[DataFrame] = None
-        for mapping_config in mapping_configs:
-            mapping_records_ = mapping_config.get_records_dataframe().filter(
-                f"to_id == '{supplemental_id}'"
-            )
-            if not is_dataframe_empty(mapping_records_):
-                if mapping_records is not None:
-                    msg = (
-                        f"Found multiple mappings for supplemental dimension {dim.model.label} "
-                        f"with record ID {supplemental_id}"
-                    )
-                    raise DSGInvalidDimensionAssociation(msg)
-                mapping_records = mapping_records_
-                break
-
-        if mapping_records is None:
-            raise DSGInvalidDimensionAssociation(
-                f"Did not find {dim.model.dimension_type} supplemental dimension with record ID "
-                f"{supplemental_id} while attempting to substitute the records with base records."
-            )
-
-        if get_unique_values(mapping_records, "from_fraction") != {1}:
-            raise DSGInvalidDimensionAssociation(
-                "Supplemental dimensions used for associations must all have fraction=1"
-            )
-
-        return get_unique_values(mapping_records, "from_id")
 
     def are_all_datasets_submitted(self) -> bool:
         """Return True if all datasets have been submitted."""

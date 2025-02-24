@@ -10,7 +10,6 @@ from semver import VersionInfo
 from sqlalchemy import Connection
 
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.config.mapping_tables import MappingTableConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dataset.growth_rates import apply_exponential_growth_rate, apply_annual_multiplier
@@ -247,32 +246,14 @@ class Project:
                 )
                 if query_name in supp_query_names:
                     assert isinstance(dim_filter, DimensionFilterSingleQueryNameBaseModel)
-                    supp_dim = self._config.get_dimension(query_name)
-                    mapping_configs = self._config.list_base_to_supplemental_mapping_configs(
-                        supplemental_dimension_id=supp_dim.model.dimension_id,
+                    base_query_name = getattr(
+                        context.base_dimension_query_names, dim_filter.dimension_type.value
                     )
-                    mapping_config: MappingTableConfig
-                    if len(mapping_configs) > 1:
-                        if dim_filter.base_dimension_query_name is None:
-                            msg = (
-                                "There is more than one base-to-supplemental mapping config for "
-                                f"{supp_dim.model.label}. Please specify base_dimension_query_name "
-                                "in the filter."
-                            )
-                            raise DSGInvalidQuery(msg)
-                        for mapping_config_ in mapping_configs:
-                            base_dim = self._dimension_mgr.get_by_id(
-                                mapping_config_.model.from_dimension.dimension_id
-                            )
-                            if (
-                                base_dim.model.dimension_query_name
-                                == dim_filter.base_dimension_query_name
-                            ):
-                                mapping_config = mapping_config_
-                                break
-                    else:
-                        mapping_config = mapping_configs[0]
-                    mapping_records = mapping_config.get_records_dataframe()
+                    base_dim = self._config.get_dimension(base_query_name)
+                    supp_dim = self._config.get_dimension(query_name)
+                    mapping_records = self._config.get_base_to_supplemental_mapping_records(
+                        base_dim, supp_dim
+                    )
                     df = (
                         mapping_records.join(df, on=mapping_records.to_id == df.id)
                         .select("from_id")

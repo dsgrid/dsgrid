@@ -6,14 +6,11 @@ import dsgrid.units.power as power
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.spark.functions import except_all, is_dataframe_empty, join
 from dsgrid.spark.types import DataFrame, F
-from dsgrid.units.constants import KWH, MWH, GWH, TWH, THERM, MBTU, KW, MW, GW, TW
+from dsgrid.units.constants import ENERGY_UNITS, POWER_UNITS
 from dsgrid.utils.spark import get_unique_values
 
 
 logger = logging.getLogger(__name__)
-
-ENERGY_UNITS = (KWH, MWH, GWH, TWH, THERM, MBTU)
-POWER_UNITS = (KW, MW, GW, TW)
 
 
 def convert_units_unpivoted(

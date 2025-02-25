@@ -562,7 +562,7 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
             ),
         },
     )
-    ranges: Optional[list[TimeRangeModel]] = Field(
+    ranges: list[TimeRangeModel] = Field(
         default=None,
         title="time_ranges",
         description="Defines the contiguous ranges of time in the data, inclusive of start and end time.",

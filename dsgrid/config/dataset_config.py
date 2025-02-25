@@ -532,7 +532,7 @@ class DatasetConfig(ConfigBase):
         raise DSGValueNotRegistered(msg)
 
     def get_time_dimension(self) -> TimeDimensionBaseConfig:
-        """Return the dimension matching dimension_type."""
+        """Return the time dimension of the dataset."""
         dim = self.get_dimension(DimensionType.TIME)
         assert isinstance(dim, TimeDimensionBaseConfig)
         return dim

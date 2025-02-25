@@ -1148,20 +1148,20 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         new_mappings = []
         for from_id, from_version in needs_mapping:
-            from_dim = self._dimension_mgr.get_by_id(from_id, version=from_version, conn=conn)
-            to_dim, to_version = project_config.get_base_dimension_and_version(
-                from_dim.model.dimension_type
+            to_dim = self._dimension_mgr.get_by_id(from_id, version=from_version, conn=conn)
+            from_dim, to_version = project_config.get_base_dimension_and_version(
+                to_dim.model.dimension_type
             )
             mapping, version = self._try_get_mapping(
-                project_config, from_dim, from_version, to_dim, to_version, context
+                project_config, to_dim, from_version, from_dim, to_version, context
             )
             if mapping is None:
                 p_mapping, _ = self._try_get_mapping(
-                    project_config, to_dim, to_version, from_dim, from_version, context
+                    project_config, from_dim, to_version, to_dim, from_version, context
                 )
                 assert (
                     p_mapping is not None
-                ), f"from={to_dim.model.dimension_id} to={from_dim.model.dimension_id}"
+                ), f"from={from_dim.model.dimension_id} to={to_dim.model.dimension_id}"
                 records = models_to_dataframe(p_mapping.model.records)
                 fraction_vals = get_unique_values(records, "from_fraction")
                 if len(fraction_vals) != 1 and next(iter(fraction_vals)) != 1.0:
@@ -1178,7 +1178,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 dst = Path(tempfile.gettempdir()) / f"reverse_{p_mapping.config_id}.csv"
                 # Use pandas because spark creates a CSV directory.
                 reverse_records.to_csv(dst, index=False)
-                dimension_type = from_dim.model.dimension_type.value
+                dimension_type = to_dim.model.dimension_type.value
                 new_mappings.append(
                     {
                         "description": f"Maps {dataset_config.config_id} {dimension_type} to project",
@@ -1189,8 +1189,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                 )
             else:
                 reference = DimensionMappingReferenceModel(
-                    from_dimension_type=from_dim.model.dimension_type,
-                    to_dimension_type=from_dim.model.dimension_type,
+                    from_dimension_type=to_dim.model.dimension_type,
+                    to_dimension_type=to_dim.model.dimension_type,
                     mapping_id=mapping.model.mapping_id,
                     version=version,
                 )

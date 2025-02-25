@@ -25,6 +25,7 @@ from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidField,
     DSGInvalidDimension,
+    DSGInvalidOperation,
     DSGInvalidParameter,
     DSGValueNotRegistered,
 )
@@ -443,7 +444,7 @@ class RequiredDimensionsModel(DSGBaseModel):
     Record IDs can reside in the project's base or subset dimensions.
 
     Requirements can be specified for a single dimension or a combination of dimensions.
-    For example, if a project include commercial, residential, and transportation sectors but the
+    For example, if a project includes commercial, residential, and transportation sectors but the
     dataset has only transporation sector records, it should specify a single_dimensional
     requirement that is a subset of of the project's base dimension.
     `{"single_dimensional": "sector": {"base": {"record_ids": ["transportation"]}}}`.
@@ -848,15 +849,25 @@ class ProjectConfig(ConfigBase):
         self, dimension_type: DimensionType, dimension_query_name: Optional[str] = None
     ) -> tuple[DimensionBaseConfig, str]:
         """Return the base dimension and version matching dimension_type."""
+        res: tuple[DimensionBaseConfig, str] | None = None
         for key, dim in self.base_dimensions.items():
             if dim.model.dimension_type == dimension_type:
                 if (
                     dimension_query_name is None
                     or dim.model.dimension_query_name == dimension_query_name
                 ):
-                    return dim, key.version
-        msg = f"Did not find a dimension with {dimension_type=} {dimension_query_name=}"
-        raise DSGValueNotRegistered(msg)
+                    if res is not None:
+                        msg = (
+                            f"Found multiple base dimensions for {dimension_type=}. "
+                            "You must specify a dimension query name to remove ambiguity."
+                        )
+                        raise DSGInvalidOperation(msg)
+                    res = dim, key.version
+
+        if res is None:
+            msg = f"Did not find a dimension with {dimension_type=} {dimension_query_name=}"
+            raise DSGValueNotRegistered(msg)
+        return res
 
     def get_dimension(self, dimension_query_name: str) -> DimensionBaseConfig:
         """Return the dimension with dimension_query_name."""
@@ -869,18 +880,14 @@ class ProjectConfig(ConfigBase):
 
     def get_time_dimension(self, dimension_query_name: str) -> TimeDimensionBaseConfig:
         """Return the time dimension with dimension_query_name."""
-        dim = self._dimensions_by_query_name.get(dimension_query_name)
-        if dim is None:
-            raise DSGValueNotRegistered(
-                f"dimension_query_name={dimension_query_name} is not stored"
-            )
+        dim = self.get_dimension(dimension_query_name)
         if not isinstance(dim, TimeDimensionBaseConfig):
             msg = f"{dim.model.label} is not a time dimension"
             raise DSGInvalidParameter(msg)
         return dim
 
     def get_dimension_by_name(self, name: str) -> DimensionBaseConfig:
-        """Return the dimension with dimension_query_name."""
+        """Return the dimension with name."""
         for dim in self._iter_base_dimensions():
             if dim.model.name == name:
                 return dim
@@ -902,16 +909,11 @@ class ProjectConfig(ConfigBase):
 
     def get_dimension_records(self, dimension_query_name: str) -> DataFrame:
         """Return a DataFrame containing the records for a dimension."""
-        dim = self.get_dimension(dimension_query_name)
-        if not isinstance(dim, DimensionBaseConfigWithFiles):
-            msg = f"{dim.model.label} does not have records"
-            raise DSGInvalidParameter(msg)
-        return dim.get_records_dataframe()
+        return self.get_dimension_with_records(dimension_query_name).get_records_dataframe()
 
     def get_dimension_record_ids(self, dimension_query_name: str) -> set[str]:
         """Return the record IDs for the dimension identified by dimension_query_name."""
-        dim = self.get_dimension_with_records(dimension_query_name)
-        return dim.get_unique_ids()
+        return self.get_dimension_with_records(dimension_query_name).get_unique_ids()
 
     def get_dimension_reference(self, dimension_id: str) -> DimensionReferenceModel:
         """Return the reference of the dimension matching dimension_id."""

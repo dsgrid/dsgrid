@@ -58,9 +58,14 @@ TWH_TO_MBTU = 1 / MBTU_TO_TWH
 MBTU_TO_THERM = 10.0
 THERM_TO_MBTU = 1 / MBTU_TO_THERM
 
+ENERGY_UNITS = (KWH, MWH, GWH, TWH, THERM, MBTU)
+POWER_UNITS = (KW, MW, GW, TW)
+
 
 # Constants for unit conversions
 __all__ = (
+    "ENERGY_UNITS",
+    "POWER_UNITS",
     "KILO",
     "MEGA",
     "GIGA",

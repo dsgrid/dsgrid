@@ -1,11 +1,12 @@
 import abc
 from enum import Enum
-from typing import Any, Optional, Union, Literal, TypeAlias
+from typing import Any, Generator, Optional, Union, Literal, TypeAlias
 
 from pydantic import field_validator, model_validator, Field, field_serializer, ValidationInfo
 from semver import VersionInfo
 from typing_extensions import Annotated
 
+from dsgrid.config.project_config import DatasetBaseDimensionQueryNamesModel
 from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dataset.models import (
     TableFormatModel,
@@ -158,13 +159,13 @@ class AggregationModel(DSGBaseModel):
     def serialize_aggregation_function(self, function, _):
         return function.__name__
 
-    def iter_dimensions_to_keep(self):
+    def iter_dimensions_to_keep(self) -> Generator[tuple[DimensionType, ColumnModel], None, None]:
         """Yield the dimension type and ColumnModel for each dimension to keep."""
         for field in DimensionQueryNamesModel.model_fields:
             for val in getattr(self.dimensions, field):
                 yield DimensionType(field), val
 
-    def list_dropped_dimensions(self):
+    def list_dropped_dimensions(self) -> list[DimensionType]:
         """Return a list of dimension types that will be dropped by the aggregation."""
         return [
             DimensionType(x)
@@ -212,19 +213,21 @@ class DatasetDimensionsMetadataModel(DSGBaseModel):
     time: list[DimensionMetadataModel] = []
     weather_year: list[DimensionMetadataModel] = []
 
-    def add_metadata(self, dimension_type: DimensionType, metadata: DimensionMetadataModel):
+    def add_metadata(
+        self, dimension_type: DimensionType, metadata: DimensionMetadataModel
+    ) -> None:
         """Add dimension metadata. Skip duplicates."""
         container = getattr(self, dimension_type.value)
         if metadata.make_key() not in {x.make_key() for x in container}:
             container.append(metadata)
 
-    def get_metadata(self, dimension_type: DimensionType):
+    def get_metadata(self, dimension_type: DimensionType) -> list[DimensionMetadataModel]:
         """Return the dimension metadata."""
         return getattr(self, dimension_type.value)
 
     def replace_metadata(
         self, dimension_type: DimensionType, metadata: list[DimensionMetadataModel]
-    ):
+    ) -> None:
         """Replace the dimension metadata."""
         setattr(self, dimension_type.value, metadata)
 
@@ -235,11 +238,11 @@ class DatasetDimensionsMetadataModel(DSGBaseModel):
             column_names.update(item.column_names)
         return column_names
 
-    def get_dimension_query_names(self, dimension_type: DimensionType):
+    def get_dimension_query_names(self, dimension_type: DimensionType) -> set[str]:
         """Return the dimension query names for the given dimension type."""
         return {x.dimension_query_name for x in getattr(self, dimension_type.value)}
 
-    def remove_metadata(self, dimension_type: DimensionType, dimension_query_name):
+    def remove_metadata(self, dimension_type: DimensionType, dimension_query_name: str) -> None:
         """Remove the dimension metadata for the given dimension query name."""
         container = getattr(self, dimension_type.value)
         for i, metadata in enumerate(container):
@@ -253,6 +256,10 @@ class DatasetMetadataModel(DSGBaseModel):
 
     dimensions: DatasetDimensionsMetadataModel = DatasetDimensionsMetadataModel()
     table_format: TableFormatModel
+    # This will be set at the query context level but not per-dataset.
+    base_dimension_query_names: DatasetBaseDimensionQueryNamesModel = (
+        DatasetBaseDimensionQueryNamesModel()
+    )
 
     def get_table_format_type(self) -> TableFormatType:
         """Return the format type of the table."""

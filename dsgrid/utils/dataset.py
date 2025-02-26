@@ -22,7 +22,7 @@ from dsgrid.spark.functions import (
     join_multiple_columns,
     unpivot,
 )
-from dsgrid.spark.functions import get_spark_session
+from dsgrid.spark.functions import except_all, get_spark_session
 from dsgrid.spark.types import (
     DataFrame,
     F,
@@ -37,7 +37,13 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 logger = logging.getLogger(__name__)
 
 
-def map_and_reduce_stacked_dimension(df, records, column, drop_column=True, to_column=None):
+def map_and_reduce_stacked_dimension(
+    df: DataFrame,
+    records: DataFrame,
+    column: str,
+    drop_column: bool = True,
+    to_column: Optional[str] = None,
+) -> DataFrame:
     to_column_ = to_column or column
     if "fraction" not in df.columns:
         df = df.withColumn("fraction", F.lit(1.0))
@@ -90,6 +96,26 @@ def add_column_from_records(df, dimension_records, dimension_name, column_to_add
         "record_id",
         how="inner",
     ).drop("record_id")
+    return df
+
+
+def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> DataFrame:
+    """Add null rows from the nulled load data lookup table to data table.
+
+    Parameters
+    ----------
+    df
+        load data table
+    lookup
+        load data lookup table that has been filtered for nulls and mapped to project dimensions.
+    """
+    if not is_dataframe_empty(lookup):
+        intersect_cols = set(lookup.columns).intersection(df.columns)
+        null_rows_to_add = except_all(lookup.select(*intersect_cols), df.select(*intersect_cols))
+        for col in set(df.columns).difference(null_rows_to_add.columns):
+            null_rows_to_add = null_rows_to_add.withColumn(col, F.lit(None))
+        df = df.union(null_rows_to_add.select(*df.columns))
+
     return df
 
 

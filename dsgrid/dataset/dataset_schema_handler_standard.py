@@ -3,6 +3,7 @@ from pathlib import Path
 
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -21,10 +22,10 @@ from dsgrid.spark.functions import (
 )
 from dsgrid.spark.types import (
     DataFrame,
-    F,
     StringType,
 )
 from dsgrid.utils.dataset import (
+    add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -80,9 +81,13 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         null_lk_df = self._remap_dimension_columns(
             self._load_data_lookup.filter("id is NULL")
         ).drop("fraction")
-        return self._add_null_values(df, cross_join(null_lk_df, df.select(*dim_cols).distinct()))
+        return add_null_rows_from_load_data_lookup(
+            df, cross_join(null_lk_df, df.select(*dim_cols).distinct())
+        )
 
-    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
+    def make_project_dataframe(
+        self, project_config: ProjectConfig, scratch_dir_context: ScratchDirContext
+    ):
         # TODO: Can we remove NULLs at registration time?
         null_lk_df = self._load_data_lookup.filter("id is NULL")
         lk_df = self._load_data_lookup.filter("id is not NULL")
@@ -95,16 +100,16 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if SCALING_FACTOR_COLUMN in ld_df.columns:
             ld_df = apply_scaling_factor(ld_df, {VALUE_COLUMN})
         ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
-        project_metric_records = project_config.get_base_dimension(
-            DimensionType.METRIC
-        ).get_records_dataframe()
-        ld_df = self._convert_units(ld_df, project_metric_records, {VALUE_COLUMN})
+        project_metric_records = self._get_project_metric_records(project_config)
+        ld_df = self._convert_units(ld_df, project_metric_records)
         ld_df = self._convert_time_dimension(
             ld_df, project_config, VALUE_COLUMN, scratch_dir_context
         )
-        return self._add_null_values(ld_df, null_lk_df)
+        return add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
 
-    def make_project_dataframe_from_query(self, context: QueryContext, project_config):
+    def make_project_dataframe_from_query(
+        self, context: QueryContext, project_config: ProjectConfig
+    ):
         lk_df = self._load_data_lookup
         ld_df = self._load_data
 
@@ -124,27 +129,16 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = apply_scaling_factor(ld_df, {VALUE_COLUMN})
 
         ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
-        project_metric_records = project_config.get_base_dimension(
-            DimensionType.METRIC
-        ).get_records_dataframe()
-        ld_df = self._convert_units(ld_df, project_metric_records, {VALUE_COLUMN})
+        project_metric_records = self._get_project_metric_records(project_config)
+        ld_df = self._convert_units(ld_df, project_metric_records)
         null_lk_df = self._remap_dimension_columns(
             null_lk_df, filtered_records=context.get_record_ids()
         )
         ld_df = self._convert_time_dimension(
             ld_df, project_config, VALUE_COLUMN, context.scratch_dir_context
         )
-        ld_df = self._add_null_values(ld_df, null_lk_df)
+        ld_df = add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
         return self._finalize_table(context, ld_df, project_config)
-
-    @staticmethod
-    def _add_null_values(ld_df, null_lk_df):
-        if not is_dataframe_empty(null_lk_df):
-            for col in set(ld_df.columns).difference(null_lk_df.columns):
-                null_lk_df = null_lk_df.withColumn(col, F.lit(None))
-            ld_df = ld_df.union(null_lk_df.select(*ld_df.columns))
-
-        return ld_df
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):

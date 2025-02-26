@@ -145,10 +145,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         # TODO: This might need to handle data skew in the future.
         ld_df = self._remap_dimension_columns(ld_df, scratch_dir_context=scratch_dir_context)
         ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
-        project_metric_records = project_config.get_base_dimension(
-            DimensionType.METRIC
-        ).get_records_dataframe()
-        ld_df = self._convert_units(ld_df, project_metric_records, {VALUE_COLUMN})
+        project_metric_records = self._get_project_metric_records(project_config)
+        ld_df = self._convert_units(ld_df, project_metric_records)
         return self._convert_time_dimension(
             ld_df, project_config, VALUE_COLUMN, scratch_dir_context
         )
@@ -164,10 +162,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             scratch_dir_context=context.scratch_dir_context,
         )
         ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
-        project_metric_records = project_config.get_base_dimension(
-            DimensionType.METRIC
-        ).get_records_dataframe()
-        ld_df = self._convert_units(ld_df, project_metric_records, {VALUE_COLUMN})
+        project_metric_records = self._get_project_metric_records(project_config)
+        ld_df = self._convert_units(ld_df, project_metric_records)
         ld_df = self._convert_time_dimension(
             ld_df, project_config, VALUE_COLUMN, context.scratch_dir_context
         )

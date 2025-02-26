@@ -1,12 +1,12 @@
 [submodule "dsgrid-test-data"]
 	path = dsgrid-test-data
 	url = https://github.com/dsgrid/dsgrid-test-data
-	branch = duckdb
+	branch = multiple-metric-dimensions
 [submodule "dsgrid-project-StandardScenarios"]
 	path = dsgrid-project-StandardScenarios
 	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
-	branch = duckdb
-[submodule "dsgrid-project-DECARB"]
+	branch = main
+[submodule "dsgrid-project-IEF"]
 	path = dsgrid-project-DECARB
-	url = https://github.com/dsgrid/dsgrid-project-DECARB
+	url = https://github.com/dsgrid/dsgrid-project-IEF
 	branch = main

@@ -56,13 +56,13 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
 
 
 class DimensionFilterSingleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
-    """Base model for all filters based on expressions"""
+    """Base model for all filters based on expressions with a single dimension."""
 
     dimension_query_name: str
 
 
 class DimensionFilterMultipleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
-    """Base model for all filters based on expressions"""
+    """Base model for all filters based on expressions with multiple dimensions."""
 
     dimension_query_names: list[str]
 

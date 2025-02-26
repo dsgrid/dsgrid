@@ -8,11 +8,20 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.spark.functions import (
     aggregate_single_value,
     cache,
+    get_spark_session,
     is_dataframe_empty,
     unpersist,
 )
-from dsgrid.spark.types import use_duckdb
+from dsgrid.spark.types import (
+    StructField,
+    StructType,
+    DoubleType,
+    IntegerType,
+    StringType,
+    use_duckdb,
+)
 from dsgrid.utils.dataset import (
+    add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
     is_noop_mapping,
     remove_invalid_null_timestamps,
@@ -211,6 +220,43 @@ def test_is_noop_mapping_false():
     ):
         df = create_dataframe_from_dicts(records)
         assert not is_noop_mapping(df)
+
+
+def test_add_null_rows_from_load_data_lookup():
+    spark = get_spark_session()
+    df = spark.createDataFrame(
+        [
+            ("2018-01-01 01:00:00", 2030, "Jefferson", 1.0),
+            ("2018-01-01 02:00:00", 2030, "Jefferson", 2.0),
+            ("2018-01-01 03:00:00", 2030, "Jefferson", 3.0),
+        ],
+        StructType(
+            [
+                StructField("timestamp", StringType(), True),
+                StructField("model_year", IntegerType(), False),
+                StructField("geography", StringType(), False),
+                StructField("value", DoubleType(), True),
+            ],
+        ),
+    )
+    lookup = spark.createDataFrame(
+        [
+            (None, 2030, "Jefferson"),
+            (None, 2030, "Boulder"),
+        ],
+        StructType(
+            [
+                StructField("id", IntegerType(), True),
+                StructField("model_year", IntegerType(), False),
+                StructField("geography", StringType(), False),
+            ],
+        ),
+    )
+    result = add_null_rows_from_load_data_lookup(df, lookup)
+    assert result.count() == 4
+    null_rows = result.filter("timestamp is NULL").collect()
+    assert len(null_rows) == 1
+    assert null_rows[0].geography == "Boulder"
 
 
 def test_remove_invalid_null_timestamps():

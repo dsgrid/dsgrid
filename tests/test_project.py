@@ -1,9 +1,14 @@
 import pytest
 
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
-from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimensionMapping
+from dsgrid.exceptions import (
+    DSGInvalidParameter,
+    DSGValueNotRegistered,
+    DSGInvalidDimensionMapping,
+)
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -11,6 +16,14 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 PROJECT_ID = "test_efs"
 DATASET_ID = "test_efs_comstock"
+
+
+@pytest.fixture(scope="module")
+def project_config(cached_registry) -> ProjectConfig:
+    conn = cached_registry
+    mgr = RegistryManager.load(conn, offline_mode=True)
+    project = mgr.project_manager.load_project(PROJECT_ID)
+    return project.config
 
 
 def test_project_load(cached_registry):
@@ -42,6 +55,119 @@ def test_project_load(cached_registry):
     with pytest.raises(DSGValueNotRegistered):
         project = mgr.project_manager.load_project(PROJECT_ID, version="0.0.0")
         assert isinstance(project, Project)
+
+
+def test_list_base_dimensions(project_config: ProjectConfig):
+    assert len(project_config.list_base_dimensions()) == len(DimensionType)
+    geos = project_config.list_base_dimensions(dimension_type=DimensionType.GEOGRAPHY)
+    assert len(geos) == 1
+    assert geos[0].model.dimension_query_name == "county"
+    geos = project_config.list_base_dimensions_with_records(dimension_type=DimensionType.GEOGRAPHY)
+    assert len(geos) == 1
+    assert geos[0].model.dimension_query_name == "county"
+
+
+def test_get_base_dimension(project_config: ProjectConfig):
+    geo = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
+    assert geo.model.dimension_query_name == "county"
+    assert (
+        project_config.get_base_dimension(
+            DimensionType.GEOGRAPHY, dimension_query_name="county"
+        ).model.dimension_query_name
+        == "county"
+    )
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_base_dimension(DimensionType.GEOGRAPHY, dimension_query_name="state")
+
+
+def test_get_base_time_dimension(project_config: ProjectConfig):
+    dim = project_config.get_base_dimension(DimensionType.TIME)
+    assert dim.model.dimension_query_name == "hourly_est_2012"
+
+
+def test_get_base_dimension_and_version(project_config: ProjectConfig):
+    dim, version = project_config.get_base_dimension_and_version(DimensionType.GEOGRAPHY)
+    assert dim.model.dimension_query_name == "county"
+    assert version == "1.0.0"
+    dim, version = project_config.get_base_dimension_and_version(
+        DimensionType.GEOGRAPHY, dimension_query_name="county"
+    )
+    assert dim.model.dimension_query_name == "county"
+    assert version == "1.0.0"
+
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_base_dimension_and_version(
+            DimensionType.GEOGRAPHY, dimension_query_name="state"
+        )
+
+
+def test_get_dimension(project_config: ProjectConfig):
+    assert project_config.get_dimension("county").model.dimension_query_name == "county"
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_dimension("invalid")
+
+
+def test_get_time_dimension(project_config: ProjectConfig):
+    assert project_config.get_base_time_dimension().model.dimension_query_name == "hourly_est_2012"
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_time_dimension("invalid")
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_time_dimension("county")
+
+
+def test_get_dimension_with_records(project_config: ProjectConfig):
+    assert (
+        project_config.get_dimension_with_records("county").model.dimension_query_name == "county"
+    )
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_dimension_with_records("hourly_est_2012")
+
+
+def test_get_dimension_records(project_config: ProjectConfig):
+    assert project_config.get_dimension_records("county").count() == 8
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_dimension_records("hourly_est_2012")
+
+
+def test_get_base_to_supplemental_config(project_config: ProjectConfig):
+    base_dim = project_config.get_dimension_with_records("county")
+    supp_dim = project_config.get_dimension_with_records("state")
+    mapping = project_config.get_base_to_supplemental_config(base_dim, supp_dim)
+    assert mapping.model.from_dimension.dimension_id == base_dim.model.dimension_id
+    assert mapping.model.to_dimension.dimension_id == supp_dim.model.dimension_id
+
+    subsector_dim = project_config.get_dimension_with_records("commercial_subsectors")
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_base_to_supplemental_config(base_dim, subsector_dim)
+
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_base_to_supplemental_config(base_dim, base_dim)
+
+
+def test_get_base_dimension_by_id(project_config: ProjectConfig):
+    county = project_config.get_dimension("county")
+    assert (
+        project_config.get_base_dimension_by_id(
+            county.model.dimension_id
+        ).model.dimension_query_name
+        == "county"
+    )
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_base_dimension_by_id("invalid")
+
+
+def test_get_base_dimension_records_by_id(project_config: ProjectConfig):
+    county = project_config.get_dimension("county")
+    assert project_config.get_base_dimension_records_by_id(county.model.dimension_id).count() == 8
+    assert (
+        project_config.get_base_dimension_by_id(
+            county.model.dimension_id
+        ).model.dimension_query_name
+        == "county"
+    )
+    time_dim = project_config.get_base_dimension(DimensionType.TIME)
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_base_dimension_records_by_id(time_dim.model.dimension_id)
 
 
 def test_dataset_load(cached_registry, scratch_dir_context):

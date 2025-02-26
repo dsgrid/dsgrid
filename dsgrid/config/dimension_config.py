@@ -19,6 +19,17 @@ class DimensionBaseConfigWithFiles(ConfigWithRecordFileBase, abc.ABC):
     def config_id(self):
         return self.model.dimension_id
 
+    def get_unique_ids(self):
+        """Return the unique IDs in a dimension's records.
+
+        Returns
+        -------
+        set
+            set of str
+
+        """
+        return {x.id for x in self.model.records}
+
 
 class DimensionBaseConfigWithoutFiles(ConfigBase, abc.ABC):
     """Base class for dimension configs"""
@@ -38,17 +49,6 @@ class DimensionConfig(DimensionBaseConfigWithFiles):
     @staticmethod
     def model_class():
         return DimensionModel
-
-    def get_unique_ids(self):
-        """Return the unique IDs in a dimension's records.
-
-        Returns
-        -------
-        set
-            set of str
-
-        """
-        return {x.id for x in self.model.records}
 
 
 DimensionBaseConfig = Union[DimensionBaseConfigWithFiles, DimensionBaseConfigWithoutFiles]

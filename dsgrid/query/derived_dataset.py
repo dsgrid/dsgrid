@@ -9,14 +9,17 @@ from dsgrid.config.dataset_config import (
     InputDatasetType,
 )
 from dsgrid.config.dataset_config import DatasetConfig
-from dsgrid.config.dimension_config import DimensionConfig
+from dsgrid.config.dimension_config import DimensionBaseConfigWithFiles, DimensionConfig
 from dsgrid.config.dimensions import DimensionModel
+from dsgrid.config.project_config import ProjectConfig
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
 from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.spark.types import DataFrame
 from dsgrid.utils.files import dump_data
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 
@@ -82,33 +85,32 @@ def create_derived_dataset_config_from_query(
         dimension_query_names = metadata.dimensions.get_dimension_query_names(dim_type)
         assert len(dimension_query_names) == 1, dimension_query_names
         dim_query_name = next(iter(dimension_query_names))
-        dim = project.config.get_dimension(dim_query_name)
         if dim_type == DimensionType.TIME:
-            is_valid = _does_time_dimension_match(dim, df)
+            time_dim = project.config.get_time_dimension(dim_query_name)
+            is_valid = _does_time_dimension_match(time_dim, df)
             if not is_valid:
                 logger.warning(
                     "The dataset does not match the project's time dimension. "
                     "If this is expected, add a new time dimension to the dataset config file "
                     "and create an appropriate dimension mapping."
                 )
-                continue
-            unique_data_records = None
+            continue
+
+        dim = project.config.get_dimension_with_records(dim_query_name)
+        if (
+            format_type == TableFormatType.PIVOTED
+            and metadata.table_format.pivoted_dimension_type == dim_type
+        ):
+            unique_data_records = metadata.dimensions.get_column_names(dim_type)
         else:
-            if (
-                format_type == TableFormatType.PIVOTED
-                and metadata.table_format.pivoted_dimension_type == dim_type
-            ):
-                unique_data_records = metadata.dimensions.get_column_names(dim_type)
-            else:
-                unique_data_records = _get_unique_data_records(
-                    df, dim.model, query.result.column_type
-                )
-            is_valid = _is_dimension_valid_for_dataset(dim, unique_data_records)
+            unique_data_records = _get_unique_data_records(df, dim.model, query.result.column_type)
+        is_valid = _is_dimension_valid_for_dataset(dim, unique_data_records)
+
         if is_valid:
-            dimension_references.append(_get_dimension_reference(dim.model, project.config))
+            dimension_references.append(_get_dimension_reference(dim, project.config))
             if dim_query_name not in base_dim_query_names:
                 dimension_mapping_references.append(
-                    _get_supplemental_dimension_mapping_reference(dim.model, project.config)
+                    _get_supplemental_dimension_mapping_reference(dim, project.config, metadata)
                 )
         else:
             subset_dim_ref = project.config.get_matching_subset_dimension(
@@ -130,7 +132,9 @@ def create_derived_dataset_config_from_query(
             else:
                 dimension_references.append(_get_dimension_reference(supp_dim, project.config))
                 dimension_mapping_references.append(
-                    _get_supplemental_dimension_mapping_reference(supp_dim, project.config)
+                    _get_supplemental_dimension_mapping_reference(
+                        supp_dim, project.config, metadata
+                    )
                 )
 
     if dimension_mapping_references:
@@ -168,7 +172,7 @@ def does_query_support_a_derived_dataset(query: ProjectQueryModel):
     return is_valid
 
 
-def _does_time_dimension_match(dim_config, df):
+def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: DataFrame):
     try:
         dim_config.check_dataset_time_consistency(df, dim_config.get_load_data_time_columns())
     except DSGInvalidDataset:
@@ -176,7 +180,9 @@ def _does_time_dimension_match(dim_config, df):
     return True
 
 
-def _is_dimension_valid_for_dataset(dim_config, unique_data_records):
+def _is_dimension_valid_for_dataset(
+    dim_config: DimensionBaseConfigWithFiles, unique_data_records: DataFrame
+):
     records = dim_config.get_records_dataframe()
     dim_values = get_unique_values(records, "id")
     diff = dim_values.symmetric_difference(unique_data_records)
@@ -186,10 +192,12 @@ def _is_dimension_valid_for_dataset(dim_config, unique_data_records):
     return False
 
 
-def _get_matching_supplemental_dimension(project_config, dimension_type, unique_data_records):
+def _get_matching_supplemental_dimension(
+    project_config: ProjectConfig, dimension_type: DimensionType, unique_data_records: DataFrame
+) -> DimensionBaseConfigWithFiles | None:
     for dim_config in project_config.list_supplemental_dimensions(dimension_type):
         if _is_dimension_valid_for_dataset(dim_config, unique_data_records):
-            return dim_config.model
+            return dim_config
 
     return None
 
@@ -312,17 +320,25 @@ def _get_unique_data_records(df, dim_model: DimensionModel, column_type: ColumnT
     return get_unique_values(df, column)
 
 
-def _get_dimension_reference(dim_model: DimensionModel, project_config):
-    dim_ref = project_config.get_dimension_reference(dim_model.dimension_id)
+def _get_dimension_reference(dim: DimensionBaseConfigWithFiles, project_config: ProjectConfig):
+    dim_ref = project_config.get_dimension_reference(dim.model.dimension_id)
     return dim_ref.serialize()
 
 
-def _get_supplemental_dimension_mapping_reference(dim_model: DimensionModel, project_config):
-    key, _ = project_config.get_base_to_supplemental_config(dim_model.dimension_query_name)
+def _get_supplemental_dimension_mapping_reference(
+    supp_dim: DimensionBaseConfigWithFiles,
+    project_config: ProjectConfig,
+    metadata: DatasetMetadataModel,
+):
+    base_dim_query_name = getattr(
+        metadata.base_dimension_query_names, supp_dim.model.dimension_type.value
+    )
+    base_dim = project_config.get_dimension_with_records(base_dim_query_name)
+    mapping_config = project_config.get_base_to_supplemental_config(base_dim, supp_dim)
     # Use dictionaries to avoid validation and be consistent with dimension definition.
     return {
-        "mapping_id": key.id,
-        "from_dimension_type": dim_model.dimension_type.value,
-        "to_dimension_type": dim_model.dimension_type.value,
-        "version": str(key.version),
+        "mapping_id": mapping_config.model.mapping_id,
+        "from_dimension_type": base_dim.model.dimension_type.value,
+        "to_dimension_type": supp_dim.model.dimension_type.value,
+        "version": str(mapping_config.model.version),
     }

@@ -16,7 +16,6 @@ from dsgrid.config.annual_time_dimension_config import (
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-import dsgrid.units.energy as energy
 from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import DatasetConfig, InputDatasetType
 from dsgrid.config.dimension_mapping_base import (
@@ -35,6 +34,7 @@ from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.spark.functions import join, make_temp_view_name
 from dsgrid.spark.types import DataFrame, F
+from dsgrid.units.convert import convert_units_unpivoted
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
     is_noop_mapping,
@@ -46,6 +46,7 @@ from dsgrid.utils.dataset import (
     ordered_subset_columns,
     repartition_if_needed_by_mapping,
 )
+
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     persist_intermediate_table,
@@ -283,7 +284,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if VALUE_COLUMN not in df.columns:
             raise DSGInvalidDataset(f"value_column={VALUE_COLUMN} is not in columns={df.columns}")
 
-    def _convert_units(self, df, project_metric_records, value_columns):
+    def _convert_units(self, df: DataFrame, project_metric_records: DataFrame):
         if not self._config.model.enable_unit_conversion:
             return df
 
@@ -298,8 +299,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 ).get_records_dataframe()
                 break
 
-        dataset_records = self._config.get_dimension(DimensionType.METRIC).get_records_dataframe()
-        return energy.convert_units_unpivoted(
+        dataset_dim = self._config.get_dimension_with_records(DimensionType.METRIC)
+        dataset_records = dataset_dim.get_records_dataframe()
+        return convert_units_unpivoted(
             df,
             DimensionType.METRIC.value,
             dataset_records,
@@ -314,14 +316,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
             dataset_id=self.dataset_id,
         )
 
-        if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
-            df = table_handler.convert_columns_to_query_names(df)
-
         context.set_dataset_metadata(
             self.dataset_id,
             context.model.result.column_type,
             project_config,
         )
+
+        if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
+            df = table_handler.convert_columns_to_query_names(
+                df, self._config.model.dataset_id, context
+            )
 
         return df
 
@@ -361,6 +365,25 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if ref.from_dimension_type == dimension_type:
                 return ref
         return
+
+    def _get_project_metric_records(self, project_config: ProjectConfig) -> DataFrame:
+        metric_dim_query_name = getattr(
+            project_config.get_dataset_base_dimension_query_names(self._config.model.dataset_id),
+            DimensionType.METRIC.value,
+        )
+        if metric_dim_query_name is None:
+            # This is a workaround for dsgrid projects created before the field
+            # base_dimension_query_names was added to InputDatasetModel.
+            metric_dims = project_config.list_base_dimensions(dimension_type=DimensionType.METRIC)
+            if len(metric_dims) > 1:
+                msg = (
+                    "The dataset's base_dimension_query_names value is not set and "
+                    "there are multiple metric dimensions in the project. Please re-register the "
+                    f"dataset with dataset_id={self._config.model.dataset_id}."
+                )
+                raise DSGInvalidDataset(msg)
+            metric_dim_query_name = metric_dims[0].model.dimension_query_name
+        return project_config.get_dimension_records(metric_dim_query_name)
 
     def _get_time_dimension_columns(self):
         time_dim = self._config.get_dimension(DimensionType.TIME)
@@ -523,7 +546,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     table_name=table_name,
                     value_column=value_column,
                     from_time_dim=time_dim,
-                    to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
+                    to_time_dim=project_config.get_base_time_dimension(),
                 )
 
             case (BackendEngine.SPARK, False, True):
@@ -537,7 +560,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     filename=filename,
                     value_column=value_column,
                     from_time_dim=time_dim,
-                    to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
+                    to_time_dim=project_config.get_base_time_dimension(),
                     scratch_dir_context=scratch_dir_context,
                 )
             case (BackendEngine.SPARK, _, False):
@@ -559,7 +582,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     df=load_data_df,
                     value_column=value_column,
                     from_time_dim=time_dim,
-                    to_time_dim=project_config.get_base_dimension(DimensionType.TIME),
+                    to_time_dim=project_config.get_base_time_dimension(),
                 )
             case (BackendEngine.DUCKDB, _, False):
                 load_data_df = time_dim.convert_dataframe(

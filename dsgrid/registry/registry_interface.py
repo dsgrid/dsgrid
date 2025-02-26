@@ -11,7 +11,7 @@ from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.config.dimensions import DimensionBaseModel, handle_dimension_union
 from dsgrid.config.mapping_tables import MappingTableModel
 from dsgrid.config.project_config import ProjectConfigModel
-from dsgrid.data_models import DSGBaseDatabaseModel
+from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel
 from dsgrid.registry.common import (
     DatasetRegistryStatus,
     MODEL_TYPE_TO_ID_FIELD_MAPPING,
@@ -69,7 +69,7 @@ class RegistryInterfaceBase(abc.ABC):
         """Return the model by version"""
         return self._make_dsgrid_model(self._get_by_version(conn, model_id, version))
 
-    def get_latest(self, conn: Optional[Connection], model_id) -> DSGBaseDatabaseModel:
+    def get_latest(self, conn: Optional[Connection], model_id) -> DSGBaseModel:
         """Return the model with the latest version."""
         return self._make_dsgrid_model(self._get_latest(conn, model_id))
 
@@ -122,7 +122,7 @@ class RegistryInterfaceBase(abc.ABC):
         conn: Optional[Connection],
         model: DSGBaseDatabaseModel,
         registration: RegistrationModel,
-    ) -> DSGBaseDatabaseModel:
+    ) -> DSGBaseModel:
         """Add a new model in the database."""
         if conn is None:
             with self._db.engine.begin() as conn:
@@ -131,7 +131,7 @@ class RegistryInterfaceBase(abc.ABC):
 
     def _insert(
         self, conn: Connection, model: DSGBaseDatabaseModel, registration: RegistrationModel
-    ) -> DSGBaseDatabaseModel:
+    ) -> DSGBaseModel:
         new_model = self._make_dsgrid_model(
             self._db.insert_model(
                 conn, self._model_type(), model.model_dump(mode="json"), registration

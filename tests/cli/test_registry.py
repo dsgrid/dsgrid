@@ -8,7 +8,11 @@ from dsgrid.cli.dsgrid_admin import cli as admin_cli
 from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import TEST_DATASET_DIRECTORY, TEST_EFS_REGISTRATION_FILE
+from dsgrid.tests.common import (
+    TEST_DATASET_DIRECTORY,
+    TEST_EFS_REGISTRATION_FILE,
+    TEST_PROJECT_PATH,
+)
 from dsgrid.utils.files import dump_data, load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.id_remappings import (
@@ -17,7 +21,7 @@ from dsgrid.utils.id_remappings import (
 )
 
 STANDARD_SCENARIOS_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-StandardScenarios"
-DECARB_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-DECARB"
+IEF_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-DECARB"
 
 
 def test_register_dimensions_and_mappings(tmp_registry_db):
@@ -241,7 +245,7 @@ def test_register_dsgrid_projects(tmp_registry_db):
 
     project_configs = (
         STANDARD_SCENARIOS_PROJECT_REPO / "dsgrid_project" / "project.json5",
-        DECARB_PROJECT_REPO / "project" / "project.json5",
+        IEF_PROJECT_REPO / "project" / "project.json5",
     )
 
     # Test these together because they share dimensions and mappings.
@@ -329,3 +333,108 @@ def test_bulk_register(tmp_registry_db):
     )
     assert result.exit_code == 0
     assert not journal_file.exists()
+
+
+def test_register_multiple_metric_dimensions(tmp_registry_db):
+    _, tmpdir, url = tmp_registry_db
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        admin_cli,
+        [
+            "create-registry",
+            url,
+            "-p",
+            str(tmpdir),
+            "--force",
+        ],
+    )
+    assert result.exit_code == 0
+    base = TEST_PROJECT_PATH / "filtered_registries" / "dgen_multiple_metrics"
+    project_dir = base / "dsgrid-project-IEF"
+    project_config_file = project_dir / "project" / "project.json5"
+    profiles_config_file = project_dir / "datasets" / "modeled" / "dgen_profiles" / "dataset.json5"
+    profiles_mapping_file = (
+        project_dir / "datasets" / "modeled" / "dgen_profiles" / "dimension_mappings.json5"
+    )
+    capacities_config_file = (
+        project_dir / "datasets" / "modeled" / "dgen_capacities" / "dataset.json5"
+    )
+    capacities_mapping_file = (
+        project_dir / "datasets" / "modeled" / "dgen_capacities" / "dimension_mappings.json5"
+    )
+    profiles_data = base / "dgen_profiles_data/"
+    capacities_data = base / "dgen_capacities_data"
+
+    cmd = [
+        "--url",
+        url,
+        "--offline",
+        "registry",
+        "projects",
+        "register",
+        str(project_config_file),
+        "-l",
+        "log",
+    ]
+    result = runner.invoke(cli, cmd)
+    assert result.exit_code == 0
+
+    cmds = (
+        [
+            "-u",
+            url,
+            "registry",
+            "projects",
+            "register-and-submit-dataset",
+            "-c",
+            str(profiles_config_file),
+            "-d",
+            str(profiles_data),
+            "-p",
+            "US_DOE_DECARB_2023",
+            "-m",
+            str(profiles_mapping_file),
+            "-l",
+            "Register and submit dgen profiles",
+        ],
+        [
+            "-u",
+            url,
+            "registry",
+            "projects",
+            "register-and-submit-dataset",
+            "-c",
+            str(capacities_config_file),
+            "-d",
+            str(capacities_data),
+            "-p",
+            "US_DOE_DECARB_2023",
+            "-m",
+            str(capacities_mapping_file),
+            "-l",
+            "Register and submit dgen profiles",
+        ],
+    )
+    for cmd in cmds:
+        result = runner.invoke(cli, cmd)
+        assert result.exit_code == 0
+
+    for dataset_id in ("decarb_2023_dgen", "decarb_2023_dgen_capacities"):
+        cmd = [
+            "-u",
+            url,
+            "query",
+            "project",
+            "map-dataset",
+            "US_DOE_DECARB_2023",
+            dataset_id,
+            "-o",
+            str(tmpdir),
+        ]
+        result = runner.invoke(cli, cmd)
+        assert result.exit_code == 0
+        match = re.search(r"Wrote mapped dataset [\w-]+ to (.*parquet)", result.stderr)
+        assert match
+        path = Path(match.group(1))
+        assert path.exists()
+        # Correctness of map_dataset is tested elsewhere.

@@ -261,8 +261,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         return config
 
     def load_dimension_mappings(
-        self, dimension_mapping_references, conn: Optional[Connection] = None
-    ):
+        self,
+        dimension_mapping_references: list[DimensionMappingReferenceModel],
+        conn: Optional[Connection] = None,
+    ) -> dict[ConfigKey, MappingTableConfig]:
         """Load dimension_mappings from files.
 
         Parameters
@@ -276,7 +278,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             ConfigKey to DimensionMappingConfig
 
         """
-        mappings = {}
+        mappings: dict[ConfigKey, MappingTableConfig] = {}
         for ref in dimension_mapping_references:
             key = ConfigKey(ref.mapping_id, ref.version)
             mappings[key] = self.get_by_id(key.id, version=key.version, conn=conn)
@@ -285,7 +287,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
     def make_dimension_mapping_references(
         self, mapping_ids: list[str], conn: Optional[Connection] = None
-    ):
+    ) -> list[DimensionMappingReferenceModel]:
         """Return a list of dimension mapping references from a list of registered mapping IDs.
 
         Parameters
@@ -317,7 +319,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             config = DimensionMappingsConfig.load(config_file)
             return self.register_from_config(config, context)
 
-    @track_timing(timer_stats_collector)
     def register_from_config(
         self,
         config: DimensionMappingsConfig,

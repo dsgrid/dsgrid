@@ -468,14 +468,28 @@ def test_replace_dataset_dimension_requirements(mutable_cached_registry, tmp_pat
     config = project_mgr.get_by_id(project_id)
     requirements_file = tmp_path / "requirements.json5"
     dataset = config.model.datasets[1]
+    com_record_ids = [
+        "FullServiceRestaurant",
+        "Hospital",
+        "LargeHotel",
+        "LargeOffice",
+        "MediumOffice",
+        "Outpatient",
+        "PrimarySchool",
+        "QuickServiceRestaurant",
+        "SmallHotel",
+        "SmallOffice",
+        "StandaloneRetail",
+        "StripMall",
+        "Warehouse",
+    ]
+
     assert dataset.status == DatasetRegistryStatus.REGISTERED
     assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
     reqs = dataset.required_dimensions
-    assert reqs.multi_dimensional[0].subsector.supplemental[0].record_ids == [
-        "commercial_subsectors"
-    ]
-    reqs.multi_dimensional[0].subsector.supplemental[0].record_ids = ["residential_subsectors"]
-    reqs.multi_dimensional[0].subsector.supplemental[0].name = "Residential Subsector"
+    assert reqs.multi_dimensional[0].subsector.subset[0].selectors == ["commercial_subsectors2"]
+    reqs.multi_dimensional[0].subsector.subset.clear()
+    reqs.multi_dimensional[0].subsector.base.record_ids = com_record_ids
     model = InputDatasetDimensionRequirementsListModel(
         dataset_dimension_requirements=[
             InputDatasetDimensionRequirementsModel(
@@ -507,9 +521,7 @@ def test_replace_dataset_dimension_requirements(mutable_cached_registry, tmp_pat
     config = project_mgr.get_by_id(project_id)
     assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
     assert config.model.datasets[1].status == DatasetRegistryStatus.UNREGISTERED
-    assert reqs.multi_dimensional[0].subsector.supplemental[0].record_ids == [
-        "residential_subsectors"
-    ]
+    assert reqs.multi_dimensional[0].subsector.base.record_ids == com_record_ids
 
 
 def test_auto_updates(mutable_cached_registry: tuple[RegistryManager, Path]):

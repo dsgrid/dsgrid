@@ -53,9 +53,9 @@ logger = setup_logging(__name__, "dsgrid_api.log")
 DSGRID_REGISTRY_DATABASE_URL = os.environ.get("DSGRID_REGISTRY_DATABASE_URL")
 if DSGRID_REGISTRY_DATABASE_URL is None:
     raise Exception("The environment variable DSGRID_REGISTRY_DATABASE_URL must be set.")
-QUERY_OUTPUT_DIR = os.environ.get("DSGRID_QUERY_OUTPUT_DIR")
-if QUERY_OUTPUT_DIR is None:
+if "DSGRID_QUERY_OUTPUT_DIR" not in os.environ:
     raise Exception("The environment variable DSGRID_QUERY_OUTPUT_DIR must be set.")
+QUERY_OUTPUT_DIR = os.environ["DSGRID_QUERY_OUTPUT_DIR"]
 API_SERVER_STORE_DIR = os.environ.get("DSGRID_API_SERVER_STORE_DIR")
 if API_SERVER_STORE_DIR is None:
     raise Exception("The environment variable DSGRID_API_SERVER_STORE_DIR must be set.")
@@ -132,9 +132,11 @@ async def list_project_dimensions(project_id: str):
     project = mgr.get_by_id(project_id)
     dimensions = []
     for item in project.get_dimension_query_names_model().model_dump().values():
-        dimension = create_project_dimension_model(
-            project.get_dimension(item["base"]).model, DimensionCategory.BASE
-        )
+        for query_name in item["base"]:
+            dimension = create_project_dimension_model(
+                project.get_dimension(query_name).model, DimensionCategory.BASE
+            )
+            dimensions.append(dimension)
         dimensions.append(dimension)
         for query_name in item["subset"]:
             dimension = create_project_dimension_model(

@@ -446,7 +446,7 @@ def test_transform_unpivoted_dataset(tmp_path):
         DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB),
         "dsgrid_conus_2022",
     )
-    path = project.transform_dataset("comstock_conus_2022_projected", tmp_path)
+    path = project.map_dataset("comstock_conus_2022_projected", tmp_path)
     df = read_parquet(path)
     actual = aggregate_single_value(
         df.filter("geography == '06037'").filter(
@@ -464,7 +464,7 @@ def test_transform_pivoted_dataset(tmp_path):
         DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB),
         "dsgrid_conus_2022",
     )
-    path = project.transform_dataset("resstock_conus_2022_projected", tmp_path)
+    path = project.map_dataset("resstock_conus_2022_projected", tmp_path)
     df = read_parquet(path).filter("geography == '06037'")
     cooling = aggregate_single_value(
         df.filter("metric = 'electricity_cooling'").select(VALUE_COLUMN),

@@ -9,13 +9,14 @@ from zipfile import ZipFile
 from semver import VersionInfo
 
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.project_config import DatasetBaseDimensionQueryNamesModel
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionCategory, DimensionType
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
-from dsgrid.exceptions import DSGInvalidParameter, DSGInvalidQuery
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
@@ -37,6 +38,8 @@ from dsgrid.query.models import (
     CreateCompositeDatasetQueryModel,
     CompositeDatasetQueryModel,
     DatasetMetadataModel,
+    ProjectionDatasetModel,
+    StandaloneDatasetModel,
 )
 
 
@@ -50,6 +53,7 @@ class QuerySubmitterBase:
         self._output_dir = output_dir
         self._cached_tables_dir().mkdir(exist_ok=True, parents=True)
         self._composite_datasets_dir().mkdir(exist_ok=True, parents=True)
+        self._project_mapped_datasets_dir().mkdir(exist_ok=True, parents=True)
 
         # TODO #186: This location will need more consideration.
         # We might want to store cached datasets in the spark-warehouse and let Spark manage it
@@ -70,8 +74,16 @@ class QuerySubmitterBase:
         return self._output_dir / "cached_tables"
 
     def _cached_project_mapped_datasets_dir(self):
-        """Directory for intermediate project-mapped datasets."""
+        """Directory for intermediate project-mapped datasets.
+        Data could be filtered.
+        """
         return self._output_dir / "cached_project_mapped_datasets"
+
+    def _project_mapped_datasets_dir(self):
+        """Directory for datasets mapped to project base or supplemental dimensions.
+        Data cannot be filtered.
+        """
+        return self._output_dir / "project_mapped_datasets"
 
     @staticmethod
     def metadata_filename(path: Path):
@@ -136,44 +148,104 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             return df, DatasetMetadataModel.from_file(metadata_file)
         return None, None
 
-    def _run_checks(self, model):
+    def _run_checks(self, model: ProjectQueryModel) -> DatasetBaseDimensionQueryNamesModel:
         subsets = set(self.project.config.list_dimension_query_names(DimensionCategory.SUBSET))
         for agg in model.result.aggregations:
             for _, column in agg.iter_dimensions_to_keep():
                 dimension_query_name = column.dimension_query_name
                 if dimension_query_name in subsets:
-                    dim_type = self._project.config.get_dimension(
-                        dimension_query_name
-                    ).model.dimension_type
-                    base_name = self._project.config.get_base_dimension(
-                        dim_type
-                    ).model.dimension_query_name
+                    subset_dim = self._project.config.get_dimension(dimension_query_name)
+                    dim_type = subset_dim.model.dimension_type
                     supp_names = " ".join(
                         self._project.config.get_supplemental_dimension_to_query_name_mapping()[
                             dim_type
                         ]
                     )
+                    base_names = [
+                        x.model.dimension_query_name
+                        for x in self._project.config.list_base_dimensions(dimension_type=dim_type)
+                    ]
                     raise DSGInvalidQuery(
                         f"Subset dimensions cannot be used in aggregations: "
                         f"{dimension_query_name=}. Only base and supplemental dimensions are "
-                        f"allowed. base={base_name} supplemental={supp_names}"
+                        f"allowed. base={base_names} supplemental={supp_names}"
                     )
 
         for report_inputs in model.result.reports:
             report = make_report(report_inputs.report_type)
             report.check_query(model)
 
+        return self._check_datasets(model)
+
+    def _check_datasets(self, model: ProjectQueryModel) -> DatasetBaseDimensionQueryNamesModel:
+        base_dimension_query_names: Optional[DatasetBaseDimensionQueryNamesModel] = None
+        dataset_ids: list[str] = []
+        query_names: list[DatasetBaseDimensionQueryNamesModel] = []
+        for dataset in model.project.dataset.source_datasets:
+            if isinstance(dataset, StandaloneDatasetModel):
+                query_names.append(
+                    self._project.config.get_dataset_base_dimension_query_names(dataset.dataset_id)
+                )
+                dataset_ids.append(dataset.dataset_id)
+            elif isinstance(dataset, ProjectionDatasetModel):
+                dataset_ids += [dataset.initial_value_dataset_id, dataset.growth_rate_dataset_id]
+                query_names += [
+                    self._project.config.get_dataset_base_dimension_query_names(
+                        dataset.initial_value_dataset_id
+                    ),
+                    self._project.config.get_dataset_base_dimension_query_names(
+                        dataset.growth_rate_dataset_id
+                    ),
+                ]
+            else:
+                msg = f"Unhandled dataset type: {dataset=}"
+                raise NotImplementedError(msg)
+
+            for dataset_id, names in zip(dataset_ids, query_names):
+                self._fix_legacy_base_dimension_query_names(names, dataset_id)
+                if base_dimension_query_names is None:
+                    base_dimension_query_names = names
+                elif base_dimension_query_names != names:
+                    msg = (
+                        "Datasets in a query must have the same base dimension query names: "
+                        f"{dataset=} {base_dimension_query_names} {names}"
+                    )
+                    raise DSGInvalidQuery(msg)
+
+        assert base_dimension_query_names is not None
+        return base_dimension_query_names
+
+    def _fix_legacy_base_dimension_query_names(
+        self, names: DatasetBaseDimensionQueryNamesModel, dataset_id: str
+    ) -> None:
+        for dim_type in DimensionType:
+            val = getattr(names, dim_type.value)
+            if val is None:
+                # This is a workaround for dsgrid projects created before the field
+                # base_dimension_query_names was added to InputDatasetModel.
+                dims = self._project.config.list_base_dimensions(dimension_type=dim_type)
+                if len(dims) > 1:
+                    msg = (
+                        "The dataset's base_dimension_query_names value is not set and "
+                        f"there are multiple base dimensions of type {dim_type} in the project. "
+                        f"Please re-register the dataset with {dataset_id=}."
+                    )
+                    raise DSGInvalidDataset(msg)
+                setattr(names, dim_type.value, dims[0].model.dimension_query_name)
+
     def _run_query(
         self,
         scratch_dir_context: ScratchDirContext,
-        model,
+        model: ProjectQueryModel,
         load_cached_table,
         persist_intermediate_table,
         zip_file=False,
         force=False,
     ):
-        self._run_checks(model)
-        context = QueryContext(model, scratch_dir_context=scratch_dir_context)
+        base_dimension_query_names = self._run_checks(model)
+        context = QueryContext(
+            model, base_dimension_query_names, scratch_dir_context=scratch_dir_context
+        )
         context.model.project.version = str(self._project.version)
         output_dir = self._output_dir / context.model.name
         if output_dir.exists() and not force:
@@ -412,7 +484,8 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         DSGInvalidQuery
             Raised if the query is invalid
         """
-        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
+        tz = self._project.config.get_base_time_dimension().get_time_zone()
+        assert tz is not None, "Project base time dimension must have a time zone"
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             # Ensure that queries that aggregate time reflect the project's time zone instead
@@ -430,6 +503,59 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
                 )
                 context.finalize()
                 return df
+
+
+class DatasetMapper(ProjectBasedQuerySubmitter):
+    """Map a dataset to a project's dimensions."""
+
+    def __init__(self, project: Project, dataset_id: str, *args, **kwargs):
+        super().__init__(project, *args, **kwargs)
+        self._dataset_id = dataset_id
+
+    @track_timing(timer_stats_collector)
+    def submit(
+        self,
+        scratch_dir: Optional[Path] = None,
+        overwrite: bool = False,
+    ) -> Path:
+        """Map a dataset to the project's base dimensions.
+
+        Parameters
+        ----------
+        dataset_id
+        load_cached_table : bool, optional
+            Load a cached consolidated table if the query matches an existing query.
+        zip_file : bool, optional
+            Create a zip file with all output files.
+        overwrite : bool
+            If True, overwrite any existing output directory.
+        """
+        tz = self._project.config.get_base_time_dimension().get_time_zone()
+        assert tz is not None, "Project base time dimension must have a time zone"
+        text, hash_value = self._make_dataset_hash()
+        # Ensure that queries that aggregate time reflect the project's time zone instead
+        # of the local computer.
+        # If any other settings get customized here, handle them in restart_spark()
+        # as well. This change won't persist Spark session restarts.
+        with custom_time_zone(tz.tz_name):
+            dir_name = self._project_mapped_datasets_dir() / hash_value / self._dataset_id
+            dir_name.mkdir(exist_ok=True, parents=True)
+            output_file = self._project.map_dataset(
+                self._dataset_id,
+                output_dir=dir_name,
+                overwrite=overwrite,
+                scratch_dir=scratch_dir,
+            )
+            metadata_file = dir_name / "metadata.json5"
+            metadata_file.write_text(text, encoding="utf-8")
+            return output_file
+
+    def _make_dataset_hash(self) -> tuple[str, str]:
+        # This will change when issue #343 is implemented to support supplemental dimensions.
+        query_names = self._project.config.get_dataset_base_dimension_query_names(self._dataset_id)
+        text = json.dumps({"dimension_query_names": query_names.model_dump(mode="json")}, indent=2)
+        hash_value = compute_hash(text.encode())
+        return text, hash_value
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
@@ -457,7 +583,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             If True, overwrite any existing output directory.
 
         """
-        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
+        tz = self._project.config.get_base_time_dimension().get_time_zone()
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             # Ensure that queries that aggregate time reflect the project's time zone instead
@@ -488,12 +614,24 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         query : CompositeDatasetQueryModel
         scratch_dir : Optional[Path]
         """
-        tz = self._project.config.get_base_dimension(DimensionType.TIME).get_time_zone()
+        tz = self._project.config.get_base_time_dimension().get_time_zone()
         scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         # orig_query = self._load_composite_dataset_query(query.dataset_id)
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
-            context = QueryContext(query, scratch_dir_context)
-            df, context.metadata = self._read_dataset(query.dataset_id)
+            df, metadata = self._read_dataset(query.dataset_id)
+            base_dimension_query_names = DatasetBaseDimensionQueryNamesModel()
+            for dim_type in DimensionType:
+                field = dim_type.value
+                query_names = getattr(metadata.dimensions, field)
+                if len(query_names) > 1:
+                    msg = (
+                        "Composite datasets must have a single query name for each dimension: "
+                        f"{dim_type} {query_names}"
+                    )
+                    raise DSGInvalidQuery(msg)
+                setattr(base_dimension_query_names, field, query_names[0].dimension_query_name)
+            context = QueryContext(query, base_dimension_query_names, scratch_dir_context)
+            context.metadata = metadata
             # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
             # you add a new customization.
             with custom_time_zone(tz.tz_name):
@@ -504,7 +642,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         filename = self._composite_datasets_dir() / dataset_id / "query.json5"
         return CreateCompositeDatasetQueryModel.from_file(filename)
 
-    def _read_dataset(self, dataset_id):
+    def _read_dataset(self, dataset_id) -> tuple[DataFrame, DatasetMetadataModel]:
         filename = self._composite_datasets_dir() / dataset_id / "table.parquet"
         if not filename.exists():
             raise DSGInvalidParameter(

@@ -606,13 +606,17 @@ def apply_time_wrap(df, project_time_dim, diff: set):
     time_delta = (
         max(project_time) - min(project_time) + project_time_dim.get_frequency()
     ).total_seconds()
+    # BUG: This won't work when some of the diff requires + and some -, e.g., wrapping unaligned time in EST and PST to MST.
+    # This is fixed in Chronify (need to add appropriate test https://github.com/NREL/chronify/issues/40)
     if min(diff) > max(project_time):
-        time_delta *= -1
+        op = "-"
+    else:
+        op = "+"
 
     # time-wrap by "changing" the year with time_delta
     diff2 = prepare_timestamps_for_dataframe(diff)
     df1 = df.filter(getattr(df, time_col).isin(diff2))
-    df2 = perform_interval_op(df1, time_col, "+", int(time_delta), "SECONDS", time_col)
+    df2 = perform_interval_op(df1, time_col, op, int(time_delta), "SECONDS", time_col)
     df3 = df.filter(~(getattr(df, time_col).isin(diff2)))
     df4 = df2.union(df3)
 

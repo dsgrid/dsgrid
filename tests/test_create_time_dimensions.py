@@ -149,8 +149,8 @@ def create_index_time_dataframe(interval="1h"):
         ]
     )
     df = get_spark_session().createDataFrame([], schema=schema)
-    geography = ["Colorado", "Wyoming", "Arizona"]
-    time_zones = ["MountainPrevailing", "MountainPrevailing", "USArizona"]
+    geography = ["Colorado", "California", "Arizona"]
+    time_zones = ["MountainPrevailing", "PacificPrevailing", "USArizona"]
     if interval == "1h":
         indices = np.arange(0, 8784).tolist()
         values = np.arange(0.0, 8784.0).tolist()
@@ -191,8 +191,8 @@ def df_date_time():
         ]
     )
     df = get_spark_session().createDataFrame([], schema=schema)
-    geography = ["Colorado", "Wyoming", "Arizona"]
-    time_zones = ["MountainPrevailing", "MountainPrevailing", "USArizona"]
+    geography = ["Colorado", "California", "Arizona"]
+    time_zones = ["MountainPrevailing", "PacificPrevailing", "USArizona"]
     ts_pt = pd.date_range(
         "2012-01-01", "2012-12-31 23:00:00", freq="1h", tz=ZoneInfo("US/Mountain")
     )
@@ -322,16 +322,28 @@ def to_utc(time_change):
 def industrial_model_time_conversion_tests(config, project_time_dim, df, scratch_dir_context):
     values = np.arange(0.0, 8784.0).tolist()
     n_df = df.count()
+    value_columns = {VALUE_COLUMN}
+
+    # [0] No adjustment
+    df1 = config.convert_dataframe(
+        df,
+        project_time_dim,
+        value_columns,
+        scratch_dir_context,
+        wrap_time_allowed=True,
+        time_based_data_adjustment=None,
+    )
+    f1 = df1.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    f1["value"].unique().tolist() == values
+    f1["value"].value_counts().unique().tolist() == [3]
 
     # [1] Duplicating fallback 1AM
-    # This has the same behavior as time_based_data_adjustment = None
     time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
             "fall_back_hour": "duplicate",
         }
     )
-    value_columns = {VALUE_COLUMN}
     df2 = config.convert_dataframe(
         df,
         project_time_dim,
@@ -352,19 +364,6 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df, scratch
     assert 1682 not in f2_filtered, "value 1682 is found for CO, expecting it missing."
     dup_val = 7393
     assert dup_val in f2_filtered, f"Expecting duplicated value {dup_val} for CO, but not found."
-
-    df3 = config.convert_dataframe(
-        df,
-        project_time_dim,
-        value_columns,
-        scratch_dir_context,
-        wrap_time_allowed=True,
-        time_based_data_adjustment=None,
-    )
-    f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
-    assert (
-        len(f2.compare(f3)) == 0
-    ), f"LocalModel_time.convert_dataframe() with time_based_data_adjustment=None should have the same behavior as with {time_based_data_adjustment=}"
 
     # [2] Interpolating fallback between 1 and 2AM
     time_based_data_adjustment = TimeBasedDataAdjustmentModel(
@@ -399,16 +398,28 @@ def industrial_model_time_conversion_tests(config, project_time_dim, df, scratch
 
 def local_time_conversion_tests(config, project_time_dim, df, scratch_dir_context):
     values = np.arange(0.0, 8784.0).tolist()
+    value_columns = {VALUE_COLUMN}
+
+    # [0] No adjustment
+    df1 = config.convert_dataframe(
+        df,
+        project_time_dim,
+        value_columns,
+        scratch_dir_context,
+        wrap_time_allowed=True,
+        time_based_data_adjustment=None,
+    )
+    f1 = df1.sort(F.col("geography"), F.col("timestamp")).toPandas()
+    f1["value"].unique().tolist() == values
+    f1["value"].value_counts().unique().tolist() == [3]
 
     # [1] Duplicating fallback 1AM
-    # This has the same behavior as time_based_data_adjustment = None
     time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
             "fall_back_hour": "duplicate",
         }
     )
-    value_columns = {VALUE_COLUMN}
     df2 = config.convert_dataframe(
         df,
         project_time_dim,
@@ -422,18 +433,6 @@ def local_time_conversion_tests(config, project_time_dim, df, scratch_dir_contex
         assert (
             f2.loc[f2["geography"] == geo, "value"].to_list() == values
         ), f"Expecting no change in 'value' column for {geo=}"
-    df3 = config.convert_dataframe(
-        df,
-        project_time_dim,
-        value_columns,
-        scratch_dir_context,
-        wrap_time_allowed=True,
-        time_based_data_adjustment=None,
-    )
-    f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
-    assert (
-        len(f2.compare(f3)) == 0
-    ), f"Local_time.convert_dataframe() with time_based_data_adjustment=None should have the same behavior as with {time_based_data_adjustment=}"
 
 
 # -- Test funcs --
@@ -747,7 +746,6 @@ def test_index_time_conversion_subhourly(
     n_df = df.count()
 
     # [1] Duplicating fallback 1AM
-    # This has the same behavior as time_based_data_adjustment = None
     time_based_data_adjustment = TimeBasedDataAdjustmentModel(
         daylight_saving_adjustment={
             "spring_forward_hour": "drop",
@@ -778,19 +776,6 @@ def test_index_time_conversion_subhourly(
         assert (
             dup_val in f2_filtered
         ), f"Expecting duplicated value {dup_val} for CO, but not found."
-
-    df3 = config.convert_dataframe(
-        df,
-        project_time_dim,
-        value_columns,
-        scratch_dir_context,
-        wrap_time_allowed=True,
-        time_based_data_adjustment=None,
-    )
-    f3 = df3.sort(F.col("geography"), F.col("timestamp")).toPandas()
-    assert (
-        len(f2.compare(f3)) == 0
-    ), f"LocalModel_time.convert_dataframe() with time_based_data_adjustment=None should have the same behavior as with {time_based_data_adjustment=}"
 
     # [2] Interpolating fallback between 1 and 2AM
     time_based_data_adjustment = TimeBasedDataAdjustmentModel(

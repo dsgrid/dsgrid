@@ -9,7 +9,6 @@ from dsgrid.dimension.time import (
     IndexTimeRange,
     DatetimeRange,
     TimeZone,
-    TimeBasedDataAdjustmentModel,
 )
 from dsgrid.dimension.time_utils import (
     create_adjustment_map_from_model_time,
@@ -152,8 +151,6 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     def _map_index_time_to_datetime(
         self, df, project_time_dim, value_columns, time_based_data_adjustment=None
     ) -> DataFrame:
-        if time_based_data_adjustment is None:
-            time_based_data_adjustment = TimeBasedDataAdjustmentModel()
         idx_col = self.get_load_data_time_columns()
         assert len(idx_col) == 1, idx_col
         idx_col = idx_col[0]
@@ -172,6 +169,27 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
         # indices correspond to clock time laid out like Standard Time
         geo_tz2 = [tz.get_standard_time() for tz in geo_tz]
 
+        schema = StructType(
+            [
+                StructField(idx_col, IntegerType(), False),
+                StructField(time_col, TimestampType(), False),
+                StructField("time_zone", StringType(), False),
+            ]
+        )
+        time_map = get_spark_session().createDataFrame([], schema=schema)
+
+        if time_based_data_adjustment is None:
+            for tz, tz2 in zip(geo_tz, geo_tz2):
+                index_map = build_index_time_map(self, timezone=tz.tz)
+                index_map = index_map.withColumn("time_zone", F.lit(tz.value))
+                time_map = time_map.union(index_map.select(schema.names))
+            df = join_multiple_columns(df, time_map, [idx_col, "time_zone"]).drop(
+                idx_col, "time_zone"
+            )
+            select_cols = [x for x in df.columns if x not in value_columns] + list(value_columns)
+            return df.select(select_cols)
+
+        # With time_based_data_adjustment
         schema = StructType(
             [
                 StructField(idx_col, IntegerType(), False),

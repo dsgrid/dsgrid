@@ -39,7 +39,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         # The two issues should be solved together.
         return chronify.DatetimeRange(
             time_column=time_cols[0],
-            start=self.get_start_times()[0],
+            start=pd.Timestamp(self.get_start_times()[0]),
             length=self.get_lengths()[0],
             resolution=self._model.frequency,
             measurement_type=self._model.measurement_type,

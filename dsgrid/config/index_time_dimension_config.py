@@ -68,7 +68,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
             time_column=time_cols[0],
             start=self._model.ranges[0].start,
             length=self.get_lengths()[0],
-            start_timestamp=self.get_start_times()[0],
+            start_timestamp=pd.Timestamp(self.get_start_times()[0]),
             resolution=self._model.frequency,
             time_zone_column="time_zone",
             measurement_type=self._model.measurement_type,

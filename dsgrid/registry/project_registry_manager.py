@@ -395,7 +395,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     msg = (
                         "If there are multiple base dimenions for a dimension type, each "
                         "supplemental dimension mapping must supply a project_base_dimension_name. "
-                        f"{dim.model.dimension_type.value}/{dim.model.name}"
+                        f"{dim.label}"
                     )
                     raise DSGInvalidDimensionMapping(msg)
                 base_dim = base_dims[0]
@@ -405,7 +405,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         if base_dim is not None:
                             msg = (
                                 "A supplemental dimension can only be mapped to one base dimension:"
-                                f" supplemental dimension = {dim.model.label} "
+                                f" supplemental dimension = {dim.label} "
                                 f"base dimensions = {base_dim.model.label} and "
                                 f"{base_dim_.model.label}"
                             )

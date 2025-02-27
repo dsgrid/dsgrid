@@ -1064,12 +1064,12 @@ class ProjectRegistryManager(RegistryManagerBase):
                     msg = (
                         "If there are multiple project base dimensions for a dimension type, the "
                         "dataset dimension mapping must supply a project_base_dimension_name. "
-                        f"{dim.model.label}"
+                        f"{mapping}"
                     )
                     raise DSGInvalidDimensionMapping(msg)
                 base_dim = base_dims[0]
             else:
-                for base_dim_ in project_mapping[dim.model.dimension_type]:
+                for base_dim_ in project_mapping[mapping.dimension_type]:
                     if base_dim_.model.name == mapping.project_base_dimension_name:
                         base_dim = base_dim_
                 if base_dim is None:

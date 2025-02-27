@@ -7,6 +7,6 @@
 	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
 	branch = main
 [submodule "dsgrid-project-IEF"]
-	path = dsgrid-project-DECARB
+	path = dsgrid-project-IEF
 	url = https://github.com/dsgrid/dsgrid-project-IEF
 	branch = main

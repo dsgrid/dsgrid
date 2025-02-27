@@ -332,7 +332,7 @@ def repartition_if_needed_by_mapping(
     if use_duckdb():
         return df
 
-    # We experienced an issue with the DECARB buildings dataset where the disaggregation of
+    # We experienced an issue with the IEF buildings dataset where the disaggregation of
     # region to county caused a major issue where one Spark executor thread got stuck,
     # seemingly indefinitely. A message like this was repeated continually.
     # UnsafeExternalSorter: Thread 152 spilling sort data of 4.0 GiB to disk (0  time so far)

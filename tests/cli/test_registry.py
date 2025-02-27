@@ -21,7 +21,7 @@ from dsgrid.utils.id_remappings import (
 )
 
 STANDARD_SCENARIOS_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-StandardScenarios"
-IEF_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-DECARB"
+IEF_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-IEF"
 
 
 def test_register_dimensions_and_mappings(tmp_registry_db):

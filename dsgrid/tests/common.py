@@ -23,6 +23,8 @@ TEST_EFS_REGISTRATION_FILE = Path("tests/data/test_efs_registration.json5")
 # AWS_PROFILE_NAME = "nrel-aws-dsgrid"
 TEST_REMOTE_REGISTRY = "s3://nrel-dsgrid-registry-test"
 CACHED_TEST_REGISTRY_DB = f"sqlite:///{TEST_REGISTRY_BASE_PATH}/cached_registry.db"
+STANDARD_SCENARIOS_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-StandardScenarios"
+IEF_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-IEF"
 SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB = (
     f"sqlite:///{TEST_PROJECT_PATH}/filtered_registries/simple_standard_scenarios/registry.db"
 )

@@ -156,8 +156,13 @@ class TableFormatHandlerBase(abc.ABC):
             elif dim_type.value in columns:
                 existing_col = dim_type.value
                 new_cols = context.get_dimension_column_names(dim_type, dataset_id=dataset_id)
-                assert len(new_cols) == 1, f"{dim_type=} {new_cols=}"
-                new_col = next(iter(new_cols))
+                if len(new_cols) > 1:
+                    new_col = getattr(context.base_dimension_query_names, dim_type.value)
+                    if new_col not in new_cols:
+                        msg = f"Bug: {new_col=} not in {new_cols=}"
+                        raise Exception(msg)
+                else:
+                    new_col = next(iter(new_cols))
                 if existing_col != new_col:
                     df = df.withColumnRenamed(existing_col, new_col)
                     logger.debug("Converted column from %s to %s", existing_col, new_col)

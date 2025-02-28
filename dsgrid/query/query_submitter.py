@@ -326,7 +326,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         # All dataset columns need to be in the same order.
         context.consolidate_dataset_metadata()
         datasets = self._convert_datasets(context, df_filenames)
-        return evaluate_expression(context.model.project.dataset.expression, datasets).df
+        if len(datasets) > 1:
+            return evaluate_expression(context.model.project.dataset.expression, datasets).df
+        return next(iter(datasets.values())).df
 
     def _convert_datasets(self, context: QueryContext, filenames: dict[str, Path]):
         dim_columns, time_columns = self._get_dimension_columns(context)

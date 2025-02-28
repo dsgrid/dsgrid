@@ -1339,8 +1339,8 @@ class ProjectRegistryManager(RegistryManagerBase):
         for ref in mapping_references:
             mapping = self._dimension_mapping_mgr.get_by_id(ref.mapping_id, version=ref.version)
             base_dim = self._dimension_mgr.get_by_id(
-                mapping.model.from_dimension.dimension_id,
-                version=mapping.model.from_dimension.version,
+                mapping.model.to_dimension.dimension_id,
+                version=mapping.model.to_dimension.version,
             ).model
             base_dimension_query_names[base_dim.dimension_type] = base_dim.dimension_query_name
 

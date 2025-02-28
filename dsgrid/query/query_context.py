@@ -151,28 +151,26 @@ class QueryContext:
     ) -> None:
         table_format = UnpivotedTableFormatModel()
         self._dataset_metadata[dataset_id] = DatasetMetadataModel(table_format=table_format)
-        for (
-            dim_type,
-            names,
-        ) in project_config.get_dimension_type_to_base_query_name_mapping().items():
-            for name in names:
-                match (column_type, dim_type):
-                    case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
-                        # This uses the project dimension because the dataset is being mapped.
-                        time_columns = project_config.get_load_data_time_columns(name)
-                        column_names = time_columns
-                    case (ColumnType.DIMENSION_QUERY_NAMES, _):
-                        column_names = [name]
-                    case (ColumnType.DIMENSION_TYPES, _):
-                        column_names = [dim_type.value]
-                    case _:
-                        msg = f"Bug: need to support {column_type=} {dim_type=}"
-                        raise NotImplementedError(msg)
-                self.add_dimension_metadata(
-                    dim_type,
-                    DimensionMetadataModel(dimension_query_name=name, column_names=column_names),
-                    dataset_id=dataset_id,
-                )
+        for dim_type in DimensionType:
+            name = getattr(self.base_dimension_query_names, dim_type.value)
+            match (column_type, dim_type):
+                case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
+                    # This uses the project dimension because the dataset is being mapped.
+                    time_columns = project_config.get_load_data_time_columns(name)
+                    column_names = time_columns
+                case (ColumnType.DIMENSION_QUERY_NAMES, _):
+                    column_names = [name]
+                case (ColumnType.DIMENSION_TYPES, _):
+                    column_names = [dim_type.value]
+                case _:
+                    msg = f"Bug: need to support {column_type=} {dim_type=}"
+                    raise NotImplementedError(msg)
+
+            self.add_dimension_metadata(
+                dim_type,
+                DimensionMetadataModel(dimension_query_name=name, column_names=column_names),
+                dataset_id=dataset_id,
+            )
 
     def convert_to_pivoted(self) -> str:
         assert isinstance(self.model.result.table_format, PivotedTableFormatModel)

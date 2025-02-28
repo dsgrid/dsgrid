@@ -6,7 +6,7 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Optional, Type, Union
+from typing import Any, Optional, Type, Union
 
 import json5
 import pandas as pd
@@ -548,13 +548,27 @@ class ProjectRegistryManager(RegistryManagerBase):
                 if not subset_dimension_group.create_supplemental_dimension:
                     continue
                 dimension_type = subset_dimension_group.dimension_type
-                base_dim = None
+                base_dims: list[DimensionBaseConfigWithFiles] = []
                 for ref in model.dimensions.base_dimension_references:
                     if ref.dimension_type == dimension_type:
                         base_dim = self._dimension_mgr.get_by_id(ref.dimension_id, conn=conn)
-                        break
-                assert base_dim is not None, subset_dimension_group
-                records = {"id": [], "name": []}
+                        if (
+                            subset_dimension_group.base_dimension_name is None
+                            or base_dim.model.name == subset_dimension_group.base_dimension_name
+                        ):
+                            base_dims.append(base_dim)
+                            break
+                if len(base_dims) == 0:
+                    msg = f"Did not find a base dimension for {subset_dimension_group=}"
+                    raise Exception(msg)
+                elif len(base_dims) > 1:
+                    msg = (
+                        f"Found multiple base dimensions for {dimension_type=}. Please specify "
+                        f"'base_dimension_name' in {subset_dimension_group=}"
+                    )
+                    raise DSGInvalidParameter(msg)
+                base_dim = base_dims[0]
+                records: dict[str, list[Any]] = {"id": [], "name": []}
                 mapping_records = []
                 dim_record_ids = set()
                 # The pydantic validator has already checked consistency of these columns.
@@ -592,6 +606,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         filename=str(map_record_file),
                         mapping_type=DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS,
                         description=f"Aggregation map for {subset_dimension_group.name}",
+                        project_base_dimension_name=base_dim.model.name,
                     ),
                 )
                 dimensions.append(dim)

@@ -135,6 +135,13 @@ class SubsetDimensionGroupModel(DSGBaseModel):
         "the subsets.",
         default=True,
     )
+    base_dimension_name: Optional[str] = Field(
+        default=None,
+        title="base_dimension_name",
+        description="Name of base dimension for the supplemental dimension mapping, if "
+        "create_supplemental_dimension is true. Required if there are multiple base dimensions "
+        "for this type.",
+    )
     record_ids: set[str] = set()
 
     @field_validator("display_name")

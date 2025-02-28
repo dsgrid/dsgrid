@@ -547,6 +547,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_time_dimension(),
+                    time_based_data_adjustment=time_based_data_adjustment,
+                    wrap_time_allowed=wrap_time_allowed,
                 )
 
             case (BackendEngine.SPARK, False, True):
@@ -561,6 +563,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_time_dimension(),
+                    time_based_data_adjustment=time_based_data_adjustment,
+                    wrap_time_allowed=wrap_time_allowed,
                     scratch_dir_context=scratch_dir_context,
                 )
             case (BackendEngine.SPARK, _, False):
@@ -583,6 +587,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_time_dimension(),
+                    time_based_data_adjustment=time_based_data_adjustment,
+                    wrap_time_allowed=wrap_time_allowed,
                 )
             case (BackendEngine.DUCKDB, _, False):
                 load_data_df = time_dim.convert_dataframe(

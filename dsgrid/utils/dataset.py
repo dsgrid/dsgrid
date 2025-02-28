@@ -10,7 +10,12 @@ import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dimension.time import TimeZone
+from dsgrid.dimension.time import (
+    DaylightSavingFallBackType,
+    DaylightSavingSpringForwardType,
+    TimeBasedDataAdjustmentModel,
+    TimeZone,
+)
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
 from dsgrid.spark.functions import (
     count_distinct_on_group_by,
@@ -192,6 +197,8 @@ def map_time_dimension_with_chronify_duckdb(
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
+    wrap_time_allowed: bool = False,
+    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
 ) -> DataFrame:
     """Create a time-mapped table with chronify and DuckDB.
     All operations are performed in memory.
@@ -204,7 +211,12 @@ def map_time_dimension_with_chronify_duckdb(
     src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
     store = chronify.Store.create_in_memory_db()
     store.ingest_table(df.relation, src_schema, bypass_checks=True)
-    store.map_table_time_config(src_schema.name, dst_schema)
+    store.map_table_time_config(
+        src_schema.name,
+        dst_schema,
+        wrap_time_allowed=wrap_time_allowed,
+        data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
+    )
     pandas_df = store.read_table(dst_schema.name)
     store.drop_table(dst_schema.name)
     return df.session.createDataFrame(pandas_df)
@@ -216,6 +228,8 @@ def map_time_dimension_with_chronify_spark_hive(
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
+    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    wrap_time_allowed: bool = False,
 ) -> DataFrame:
     """Create a time-mapped table with chronify and Spark and a Hive Metastore.
     The source data must already be stored in the metastore.
@@ -235,6 +249,8 @@ def map_time_dimension_with_chronify_spark_hive(
             dst_schema,
             check_mapped_timestamps=False,
             scratch_dir=get_spark_warehouse_dir(),
+            wrap_time_allowed=wrap_time_allowed,
+            data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
         )
     finally:
         with store.engine.begin() as conn:
@@ -250,6 +266,8 @@ def map_time_dimension_with_chronify_spark_path(
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
+    wrap_time_allowed: bool = False,
+    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
 ) -> DataFrame:
     """Create a time-mapped table with chronify and Spark using the local filesystem.
     Chronify will store the mapped table in a Parquet file within scratch_dir_context.
@@ -257,7 +275,6 @@ def map_time_dimension_with_chronify_spark_path(
     src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
     store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
-    # TODO: What about wrap_time_allowed?
     output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
     store.map_table_time_config(
         src_schema.name,
@@ -265,8 +282,44 @@ def map_time_dimension_with_chronify_spark_path(
         check_mapped_timestamps=False,
         scratch_dir=scratch_dir_context.scratch_dir,
         output_file=output_file,
+        wrap_time_allowed=wrap_time_allowed,
+        data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
     )
     return df.sparkSession.read.load(str(output_file))
+
+
+def _to_chronify_time_based_data_adjustment(
+    adj: Optional[TimeBasedDataAdjustmentModel],
+) -> Optional[chronify.TimeBasedDataAdjustment]:
+    if adj is None:
+        return None
+    if (
+        adj.daylight_saving_adjustment.spring_forward_hour == DaylightSavingSpringForwardType.NONE
+        and adj.daylight_saving_adjustment.fall_back_hour == DaylightSavingFallBackType.NONE
+    ):
+        chronify_dst_adjustment = chronify.time.DaylightSavingAdjustmentType.NONE
+    elif (
+        adj.daylight_saving_adjustment.spring_forward_hour == DaylightSavingSpringForwardType.DROP
+        and adj.daylight_saving_adjustment.fall_back_hour == DaylightSavingFallBackType.DUPLICATE
+    ):
+        chronify_dst_adjustment = (
+            chronify.time.DaylightSavingAdjustmentType.DROP_SPRING_FORWARD_DUPLICATE_FALLBACK
+        )
+    elif (
+        adj.daylight_saving_adjustment.spring_forward_hour == DaylightSavingSpringForwardType.DROP
+        and adj.daylight_saving_adjustment.fall_back_hour == DaylightSavingFallBackType.INTERPOLATE
+    ):
+        chronify_dst_adjustment = (
+            chronify.time.DaylightSavingAdjustmentType.DROP_SPRING_FORWARD_INTERPOLATE_FALLBACK
+        )
+    else:
+        msg = f"dsgrid time_based_data_adjustment = {adj}"
+        raise NotImplementedError(msg)
+
+    return chronify.TimeBasedDataAdjustment(
+        leap_day_adjustment=adj.leap_day_adjustment.value,
+        daylight_saving_adjustment=chronify_dst_adjustment,
+    )
 
 
 def _get_mapping_schemas(

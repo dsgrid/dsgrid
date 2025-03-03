@@ -1,5 +1,6 @@
 import copy
 import getpass
+import json
 import logging
 import os
 import shutil
@@ -11,6 +12,7 @@ import pandas as pd
 import pytest
 from chronify import InvalidTable
 
+from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
@@ -23,6 +25,9 @@ from dsgrid.utils.files import (
     delete_if_exists,
 )
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
+from dsgrid.tests.common import (
+    STANDARD_SCENARIOS_PROJECT_REPO,
+)
 
 logger = logging.getLogger()
 
@@ -330,3 +335,22 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
             f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
         )
         delete_if_exists(missing_record_file)
+
+
+def test_invalid_dataset_id(tmp_path):
+    config_file = (
+        STANDARD_SCENARIOS_PROJECT_REPO
+        / "dsgrid_project"
+        / "datasets"
+        / "modeled"
+        / "comstock"
+        / "dataset.json5"
+    )
+    DatasetConfigModel.load(config_file)
+
+    data = load_data(config_file)
+    data["dataset_id"] = "123invalid"
+    filename = tmp_path / "dataset.json5"
+    filename.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError):
+        DatasetConfigModel.load(filename)

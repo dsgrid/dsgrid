@@ -9,6 +9,8 @@ from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
+    IEF_PROJECT_REPO,
+    STANDARD_SCENARIOS_PROJECT_REPO,
     TEST_DATASET_DIRECTORY,
     TEST_EFS_REGISTRATION_FILE,
     TEST_PROJECT_PATH,
@@ -19,9 +21,6 @@ from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )
-
-STANDARD_SCENARIOS_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-StandardScenarios"
-IEF_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-IEF"
 
 
 def test_register_dimensions_and_mappings(tmp_registry_db):

@@ -22,8 +22,10 @@ REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
 REGEX_VALID_REGISTRY_DISPLAY_NAME = re.compile(r"^[\w -]+$")
 # Allows letters, numbers, underscores, dashes
 REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE = re.compile(r"^[\w/-]+$")
-# Allows letters, numbers, underscores
-REGEX_VALID_REGISTRY_CONFIG_ID_STRICT = re.compile(r"^[\w]+$")
+# Allows letters, numbers, underscores.
+# dataset_id cannot start with a number because of uses in DatasetExpressionHandler
+# It's likely a good rule everywhere else.
+REGEX_VALID_REGISTRY_CONFIG_ID_STRICT = re.compile(r"^[a-zA-Z][\w]+$")
 
 REGISTRY_ID_DELIMITER = "__"
 
@@ -42,7 +44,8 @@ def check_config_id_strict(config_id, tag):
     # Raises ValueError because this is used in Pydantic models.
     if not REGEX_VALID_REGISTRY_CONFIG_ID_STRICT.search(config_id):
         raise ValueError(
-            f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, and underscores."
+            f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, and underscores. "
+            "Cannot start with a number."
         )
 
 

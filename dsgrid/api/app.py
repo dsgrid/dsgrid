@@ -32,8 +32,8 @@ from .response_models import (
     GetAsyncTaskResponse,
     GetDatasetResponse,
     GetDimensionResponse,
-    GetProjectBaseDimensionQueryNameResponse,
-    GetProjectDimensionQueryNamesResponse,
+    GetProjectBaseDimensionNameResponse,
+    GetProjectDimensionNamesResponse,
     ListProjectDimensionsResponse,
     GetProjectResponse,
     ListAsyncTasksResponse,
@@ -41,7 +41,7 @@ from .response_models import (
     ListDimensionRecordsResponse,
     ListDimensionTypesResponse,
     ListDimensionsResponse,
-    ListProjectSupplementalDimensionQueryNames,
+    ListProjectSupplementalDimensionNames,
     ListProjectsResponse,
     ListReportTypesResponse,
     ListTableFormatTypesResponse,
@@ -131,7 +131,7 @@ async def list_project_dimensions(project_id: str):
     mgr = manager.project_manager
     project = mgr.get_by_id(project_id)
     dimensions = []
-    for item in project.get_dimension_query_names_model().model_dump().values():
+    for item in project.get_dimension_names_model().model_dump().values():
         for query_name in item["base"]:
             dimension = create_project_dimension_model(
                 project.get_dimension(query_name).model, DimensionCategory.BASE
@@ -153,66 +153,64 @@ async def list_project_dimensions(project_id: str):
 
 
 @app.get(
-    "/projects/{project_id}/dimensions/dimension_query_names",
-    response_model=GetProjectDimensionQueryNamesResponse,
+    "/projects/{project_id}/dimensions/dimension_names",
+    response_model=GetProjectDimensionNamesResponse,
 )
-async def get_project_dimension_query_names(project_id: str):
+async def get_project_dimension_names(project_id: str):
     """List the base and supplemental dimension query names for the project by type."""
     mgr = manager.project_manager
     project = mgr.get_by_id(project_id)
-    return GetProjectDimensionQueryNamesResponse(
+    return GetProjectDimensionNamesResponse(
         project_id=project_id,
-        dimension_query_names=project.get_dimension_query_names_model(),
+        dimension_names=project.get_dimension_names_model(),
     )
 
 
 @app.get(
-    "/projects/{project_id}/dimensions/base_dimension_query_name/{dimension_type}",
-    response_model=GetProjectBaseDimensionQueryNameResponse,
+    "/projects/{project_id}/dimensions/base_dimension_name/{dimension_type}",
+    response_model=GetProjectBaseDimensionNameResponse,
 )
-async def get_project_base_dimension_query_name(project_id: str, dimension_type: DimensionType):
+async def get_project_base_dimension_name(project_id: str, dimension_type: DimensionType):
     """Get the project's base dimension query name for the given dimension type."""
     mgr = manager.project_manager
     config = mgr.get_by_id(project_id)
-    return GetProjectBaseDimensionQueryNameResponse(
+    return GetProjectBaseDimensionNameResponse(
         project_id=project_id,
         dimension_type=dimension_type,
-        dimension_query_name=config.get_base_dimension(dimension_type).model.dimension_query_name,
+        dimension_name=config.get_base_dimension(dimension_type).model.name,
     )
 
 
 @app.get(
-    "/projects/{project_id}/dimensions/supplemental_dimension_query_names/{dimension_type}",
-    response_model=ListProjectSupplementalDimensionQueryNames,
+    "/projects/{project_id}/dimensions/supplemental_dimension_names/{dimension_type}",
+    response_model=ListProjectSupplementalDimensionNames,
 )
-async def list_project_supplemental_dimension_query_names(
+async def list_project_supplemental_dimension_names(
     project_id: str, dimension_type: DimensionType
 ):
     """list the project's supplemental dimension query names for the given dimension type."""
     mgr = manager.project_manager
     config = mgr.get_by_id(project_id)
-    return ListProjectSupplementalDimensionQueryNames(
+    return ListProjectSupplementalDimensionNames(
         project_id=project_id,
         dimension_type=dimension_type,
-        dimension_query_names=[
-            x.model.dimension_query_name
-            for x in config.list_supplemental_dimensions(
-                dimension_type, sort_by="dimension_query_name"
-            )
+        dimension_names=[
+            x.model.name
+            for x in config.list_supplemental_dimensions(dimension_type, sort_by="name")
         ],
     )
 
 
 @app.get(
-    "/projects/{project_id}/dimensions/dimensions_by_query_name/{dimension_query_name}",
+    "/projects/{project_id}/dimensions/dimensions_by_query_name/{dimension_name}",
     response_model=GetDimensionResponse,
 )
-async def get_project_dimension(project_id: str, dimension_query_name: str):
+async def get_project_dimension(project_id: str, dimension_name: str):
     """Get the project's dimension for the given dimension query name."""
     mgr = manager.project_manager
     config = mgr.get_by_id(project_id)
     return GetDimensionResponse(
-        dimension=create_dimension_common_model(config.get_dimension(dimension_query_name).model)
+        dimension=create_dimension_common_model(config.get_dimension(dimension_name).model)
     )
 
 

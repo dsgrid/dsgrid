@@ -78,13 +78,13 @@ def create_derived_dataset_config_from_query(
     dimension_references = []
     dimension_mapping_references = []
     base_dim_query_names = set(
-        project.config.list_dimension_query_names(category=DimensionCategory.BASE)
+        project.config.list_dimension_names(category=DimensionCategory.BASE)
     )
     num_new_supplemental_dimensions = 0
     for dim_type in DimensionType:
-        dimension_query_names = metadata.dimensions.get_dimension_query_names(dim_type)
-        assert len(dimension_query_names) == 1, dimension_query_names
-        dim_query_name = next(iter(dimension_query_names))
+        dimension_names = metadata.dimensions.get_dimension_names(dim_type)
+        assert len(dimension_names) == 1, dimension_names
+        dim_query_name = next(iter(dimension_names))
         if dim_type == DimensionType.TIME:
             time_dim = project.config.get_time_dimension(dim_query_name)
             is_valid = _does_time_dimension_match(time_dim, df)
@@ -280,7 +280,6 @@ def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path:
     new_dim = {
         "type": orig_dim_config.model.dimension_type.value,
         "name": "",
-        "display_name": "",
         "module": orig_dim_config.model.module,
         "class_name": orig_dim_config.model.class_name,
         "description": "",
@@ -310,8 +309,8 @@ def _make_dimension_mapping_references_file(dimension_mapping_references, path: 
 
 def _get_unique_data_records(df, dim_model: DimensionModel, column_type: ColumnType):
     match column_type:
-        case ColumnType.DIMENSION_QUERY_NAMES:
-            column = dim_model.dimension_query_name
+        case ColumnType.DIMENSION_NAMES:
+            column = dim_model.name
         case ColumnType.DIMENSION_TYPES:
             column = dim_model.dimension_type.value
         case _:
@@ -330,10 +329,8 @@ def _get_supplemental_dimension_mapping_reference(
     project_config: ProjectConfig,
     metadata: DatasetMetadataModel,
 ):
-    base_dim_query_name = getattr(
-        metadata.base_dimension_query_names, supp_dim.model.dimension_type.value
-    )
-    base_dim = project_config.get_dimension_with_records(base_dim_query_name)
+    base_dim_name = getattr(metadata.base_dimension_names, supp_dim.model.dimension_type.value)
+    base_dim = project_config.get_dimension_with_records(base_dim_name)
     mapping_config = project_config.get_base_to_supplemental_config(base_dim, supp_dim)
     # Use dictionaries to avoid validation and be consistent with dimension definition.
     return {

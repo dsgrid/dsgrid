@@ -86,9 +86,9 @@ def count_distinct_on_group_by(
     """Perform a count distinct on one column after grouping."""
     if use_duckdb():
         view = create_temp_view(df)
-        cols = ",".join(group_by_columns)
+        cols = ",".join([f'"{x}"' for x in group_by_columns])
         query = f"""
-            SELECT {cols}, COUNT(DISTINCT {agg_column}) AS {alias}
+            SELECT {cols}, COUNT(DISTINCT "{agg_column}") AS "{alias}"
             FROM {view}
             GROUP BY {cols}
         """
@@ -175,6 +175,13 @@ def _except_all_spark(df1: DataFrame, df2: DataFrame) -> DataFrame:
     return df1.exceptAll(df2)
 
 
+def handle_column_spaces(column: str) -> str:
+    """Return a column string suitable for the backend."""
+    if use_duckdb():
+        return f'"{column}"'
+    return f"`{column}`"
+
+
 def intersect(df1: DataFrame, df2: DataFrame) -> DataFrame:
     """Return an intersection of rows. Duplicates are not returned"""
     # Could add intersect all if duplicated are needed.
@@ -207,7 +214,7 @@ def shift_time_zone(
         cols = df.columns[:]
         if time_column == new_column:
             cols.remove(time_column)
-        cols_str = ",".join(cols)
+        cols_str = ",".join([f'"{x}"' for x in cols])
         query = f"""
             SELECT
                 {cols_str},
@@ -333,7 +340,7 @@ def is_dataframe_empty(df: DataFrame) -> bool:
         view = create_temp_view(df)
         spark = get_spark_session()
         col = df.columns[0]
-        return spark.sql(f"SELECT {col} FROM {view} LIMIT 1").count() == 0
+        return spark.sql(f'SELECT "{col}" FROM {view} LIMIT 1').count() == 0
     return df.rdd.isEmpty()
 
 
@@ -346,9 +353,9 @@ def perform_interval_op(
         cols = df.columns[:]
         if alias == time_column:
             cols.remove(time_column)
-        cols_str = ",".join(cols)
+        cols_str = ",".join([f'"{x}"' for x in cols])
         query = (
-            f"SELECT {time_column} {op} INTERVAL {val} {unit} AS {alias}, {cols_str} from {view}"
+            f'SELECT "{time_column}" {op} INTERVAL {val} {unit} AS {alias}, {cols_str} from {view}'
         )
         return get_spark_session().sql(query)
 
@@ -384,8 +391,8 @@ def join_multiple_columns(
     if use_duckdb():
         view1 = create_temp_view(df1)
         view2 = create_temp_view(df2)
-        view2_columns = ",".join((f"{view2}.{x}" for x in df2.columns if x not in columns))
-        on_str = " AND ".join((f"{view1}.{x} = {view2}.{x}" for x in columns))
+        view2_columns = ",".join((f'{view2}."{x}"' for x in df2.columns if x not in columns))
+        on_str = " AND ".join((f'{view1}."{x}" = {view2}."{x}"' for x in columns))
         query = f"""
             SELECT {view1}.*, {view2_columns}
             FROM {view1}
@@ -466,6 +473,9 @@ def read_parquet(path: Path | str) -> DataFrame:
 
 
 def select_expr(df: DataFrame, exprs: list[str]) -> DataFrame:
+    """Execute the SQL SELECT expression. It is the caller's responsibility to handle column
+    names with spaces or special characters.
+    """
     if use_duckdb():
         view = create_temp_view(df)
         spark = get_spark_session()
@@ -497,7 +507,7 @@ def _pivot_duckdb(df: DataFrame, name_column: str, value_column: str) -> DataFra
     view = create_temp_view(df)
     query = f"""
         PIVOT {view}
-        ON {name_column}
+        ON "{name_column}"
         USING SUM({value_column})
     """
     return get_spark_session().sql(query)
@@ -518,12 +528,12 @@ def _unpivot_duckdb(
     df: DataFrame, pivoted_columns, name_column: str, value_column: str
 ) -> DataFrame:
     view = create_temp_view(df)
-    cols = ",".join(pivoted_columns)
+    cols = ",".join([f'"{x}"' for x in pivoted_columns])
     query = f"""
         SELECT * FROM {view}
         UNPIVOT INCLUDE NULLS (
-            {value_column}
-            FOR {name_column} in ({cols})
+            "{value_column}"
+            FOR "{name_column}" in ({cols})
         )
     """
     spark = get_spark_session()

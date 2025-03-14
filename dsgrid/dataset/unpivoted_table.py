@@ -48,9 +48,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
             return df
 
         final_metadata = DatasetDimensionsMetadataModel()
-        dim_type_to_base_query_name = (
-            self.project_config.get_dimension_type_to_base_query_name_mapping()
-        )
+        dim_type_to_base_query_name = self.project_config.get_dimension_type_to_base_name_mapping()
         column_to_dim_type: dict[str, DimensionType] = {}
         dropped_dimensions = set()
         for agg in aggregations:
@@ -61,7 +59,7 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
                 columns.append(column)
                 self._add_column_to_dim_type(column, dim_type, column_to_dim_type)
                 if dim_type == DimensionType.METRIC:
-                    metric_query_name = column.dimension_query_name
+                    metric_query_name = column.dimension_name
 
             if metric_query_name is None:
                 msg = f"Bug: A metric dimension is not included in {agg}"
@@ -78,10 +76,10 @@ class UnpivotedTableHandler(TableFormatHandlerBase):
 
             if metric_query_name not in dim_type_to_base_query_name[DimensionType.METRIC]:
                 to_dim = self.project_config.get_dimension_with_records(metric_query_name)
-                assert context.base_dimension_query_names.metric is not None
+                assert context.base_dimension_names.metric is not None
                 mapping = self.project_config.get_base_to_supplemental_config(
                     self.project_config.get_dimension_with_records(
-                        context.base_dimension_query_names.metric
+                        context.base_dimension_names.metric
                     ),
                     to_dim,
                 )
@@ -115,7 +113,7 @@ def _get_metric_column_name(context: QueryContext, metric_query_name):
     match context.model.result.column_type:
         case ColumnType.DIMENSION_TYPES:
             metric_column = DimensionType.METRIC.value
-        case ColumnType.DIMENSION_QUERY_NAMES:
+        case ColumnType.DIMENSION_NAMES:
             metric_column = metric_query_name
         case _:
             raise NotImplementedError(f"Bug: unhandled: {context.model.result.column_type}")

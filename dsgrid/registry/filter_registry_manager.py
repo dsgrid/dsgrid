@@ -77,7 +77,7 @@ class FilterRegistryManager(RegistryManager):
 
             for simple_dim in project.dimensions.supplemental_dimensions:
                 for dim in project_config.list_supplemental_dimensions(simple_dim.dimension_type):
-                    if dim.model.dimension_query_name == simple_dim.dimension_query_name:
+                    if dim.model.name == simple_dim.dimension_name:
                         dim.model.records = handle_dimension(simple_dim, dim)
                         self.dimension_manager.db.replace(conn, dim.model)
             if changed_project:

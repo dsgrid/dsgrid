@@ -9,7 +9,7 @@ from dsgrid.dataset.models import (
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dataset.models import PivotedTableFormatModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.config.project_config import DatasetBaseDimensionQueryNamesModel, ProjectConfig
+from dsgrid.config.project_config import DatasetBaseDimensionNamesModel, ProjectConfig
 from dsgrid.spark.functions import drop_temp_tables_and_views
 from dsgrid.spark.types import DataFrame
 from dsgrid.utils.spark import get_spark_session
@@ -26,14 +26,14 @@ class QueryContext:
     def __init__(
         self,
         model: ProjectQueryModel,
-        base_dimension_query_names: DatasetBaseDimensionQueryNamesModel,
+        base_dimension_names: DatasetBaseDimensionNamesModel,
         scratch_dir_context: ScratchDirContext,
     ) -> None:
         self._model = model
         self._record_ids_by_dimension_type: dict[DimensionType, list[tuple[str]]] = {}
         self._metadata = DatasetMetadataModel(
             table_format=self.model.result.table_format,
-            base_dimension_query_names=base_dimension_query_names,
+            base_dimension_names=base_dimension_names,
         )
         self._dataset_metadata: dict[str, DatasetMetadataModel] = {}
         self._scratch_dir_context = scratch_dir_context
@@ -51,8 +51,8 @@ class QueryContext:
         return self._model
 
     @property
-    def base_dimension_query_names(self) -> DatasetBaseDimensionQueryNamesModel:
-        return self._metadata.base_dimension_query_names
+    def base_dimension_names(self) -> DatasetMetadataModel:
+        return self._metadata.base_dimension_names
 
     @property
     def scratch_dir_context(self) -> ScratchDirContext:
@@ -128,19 +128,19 @@ class QueryContext:
             names.update(self.get_dimension_column_names(dimension_type, dataset_id=dataset_id))
         return names
 
-    def get_dimension_query_names(
+    def get_dimension_names(
         self, dimension_type: DimensionType, dataset_id: Optional[str] = None
     ) -> set[str]:
-        return self._get_metadata(dataset_id).dimensions.get_dimension_query_names(dimension_type)
+        return self._get_metadata(dataset_id).dimensions.get_dimension_names(dimension_type)
 
-    def get_all_dimension_query_names(
+    def get_all_dimension_names(
         self, dataset_id: Optional[str] = None, exclude: Optional[set[DimensionType]] = None
     ) -> set[str]:
         names = set()
         for dimension_type in DimensionType:
             if exclude is not None and dimension_type in exclude:
                 continue
-            names.update(self.get_dimension_query_names(dimension_type, dataset_id=dataset_id))
+            names.update(self.get_dimension_names(dimension_type, dataset_id=dataset_id))
         return names
 
     def set_dataset_metadata(
@@ -151,38 +151,40 @@ class QueryContext:
     ) -> None:
         table_format = UnpivotedTableFormatModel()
         self._dataset_metadata[dataset_id] = DatasetMetadataModel(table_format=table_format)
-        for dim_type in DimensionType:
-            name = getattr(self.base_dimension_query_names, dim_type.value)
-            match (column_type, dim_type):
-                case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
-                    # This uses the project dimension because the dataset is being mapped.
-                    time_columns = project_config.get_load_data_time_columns(name)
-                    column_names = time_columns
-                case (ColumnType.DIMENSION_QUERY_NAMES, _):
-                    column_names = [name]
-                case (ColumnType.DIMENSION_TYPES, _):
-                    column_names = [dim_type.value]
-                case _:
-                    msg = f"Bug: need to support {column_type=} {dim_type=}"
-                    raise NotImplementedError(msg)
-
-            self.add_dimension_metadata(
-                dim_type,
-                DimensionMetadataModel(dimension_query_name=name, column_names=column_names),
-                dataset_id=dataset_id,
-            )
+        for (
+            dim_type,
+            names,
+        ) in project_config.get_dimension_type_to_base_name_mapping().items():
+            for name in names:
+                match (column_type, dim_type):
+                    case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
+                        # This uses the project dimension because the dataset is being mapped.
+                        time_columns = project_config.get_load_data_time_columns(name)
+                        column_names = time_columns
+                    case (ColumnType.DIMENSION_NAMES, _):
+                        column_names = [name]
+                    case (ColumnType.DIMENSION_TYPES, _):
+                        column_names = [dim_type.value]
+                    case _:
+                        msg = f"Bug: need to support {column_type=} {dim_type=}"
+                        raise NotImplementedError(msg)
+                self.add_dimension_metadata(
+                    dim_type,
+                    DimensionMetadataModel(dimension_name=name, column_names=column_names),
+                    dataset_id=dataset_id,
+                )
 
     def convert_to_pivoted(self) -> str:
         assert isinstance(self.model.result.table_format, PivotedTableFormatModel)
         pivoted_dimension_type = self.model.result.table_format.pivoted_dimension_type
         self.set_table_format_type(TableFormatType.PIVOTED)
         columns = self.get_dimension_column_names(pivoted_dimension_type)
-        query_names = self.get_dimension_query_names(pivoted_dimension_type)
-        if len(columns) != 1 or len(query_names) != 1:
+        names = self.get_dimension_names(pivoted_dimension_type)
+        if len(columns) != 1 or len(names) != 1:
             # This is checked in the query model and so this should never happen.
             msg = (
-                "Bug: The pivoted dimension can only have 1 column and 1 query name: "
-                f"{columns=} {query_names=}"
+                "Bug: The pivoted dimension can only have 1 column and 1 name: "
+                f"{columns=} {names=}"
             )
             raise Exception(msg)
         return next(iter(columns))
@@ -202,23 +204,23 @@ class QueryContext:
     ) -> None:
         self._get_metadata(dataset_id).dimensions.add_metadata(dimension_type, dimension_metadata)
         logger.debug(
-            "Added dimension query name for %s: %s dataset_id=%s",
+            "Added dimension name for %s: %s dataset_id=%s",
             dimension_type,
             dimension_metadata,
             dataset_id,
         )
 
-    def get_dimension_column_names_by_query_name(
+    def get_dimension_column_names_by_name(
         self,
         dimension_type: DimensionType,
-        query_name: str,
+        name: str,
         dataset_id: Optional[str] = None,
     ) -> list[str]:
         """Return the load data column names for the dimension."""
         for metadata in self.get_dimension_metadata(dimension_type, dataset_id=dataset_id):
-            if metadata.dimension_query_name == query_name:
+            if metadata.dimension_name == name:
                 return metadata.column_names
-        raise Exception(f"No dimension match: {dimension_type=} {query_name=}")
+        raise Exception(f"No dimension match: {dimension_type=} {name=}")
 
     def get_dimension_metadata(
         self,

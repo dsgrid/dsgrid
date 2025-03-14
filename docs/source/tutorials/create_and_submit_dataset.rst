@@ -113,7 +113,7 @@ instructions on how to assign values in this file.
     }
 
 Follow the instructions at :ref:`project-viewer` to start the viewer. Once you have the data table
-loaded in your browser, type ``transportation`` in the filter row of the ``dimension_query_name``
+loaded in your browser, type ``transportation`` in the filter row of the ``dimension_name``
 column and then select ``transportation_subsectors`` or ``transportation_end_uses``. The dimension
 record table will get populated with record IDs.
 
@@ -168,7 +168,6 @@ Alteratively, you can browse the source files, such as `this records file
         "class": "County",
         type: "geography",
         name: "ACS County 2018",
-        display_name: "County",
         file: "dimensions/counties.csv",
         description: "American Community Survey US counties, 2018.",
       },

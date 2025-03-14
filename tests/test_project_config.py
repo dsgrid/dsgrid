@@ -8,7 +8,7 @@ from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
 from dsgrid.config.project_config import (
     ProjectConfigModel,
-    ProjectDimensionQueryNamesModel,
+    ProjectDimensionNamesModel,
     RequiredDimensionsModel,
     RequiredDimensionRecordsModel,
 )
@@ -88,10 +88,8 @@ def test_project_duplicate_type(config_as_dict):
         ProjectConfigModel(**config)
 
 
-def test_project_dimension_query_names_model():
-    assert not {x.value for x in DimensionType}.difference(
-        ProjectDimensionQueryNamesModel.model_fields
-    )
+def test_project_dimension_names_model():
+    assert not {x.value for x in DimensionType}.difference(ProjectDimensionNamesModel.model_fields)
 
 
 def test_duplicate_dimension_requirements():

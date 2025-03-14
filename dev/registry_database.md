@@ -135,19 +135,18 @@ sqlite> SELECT
     id,
     model_id,
     version,
-    model->>'$.name' AS name,
-    model->>'$.dimension_query_name' AS dimension_query_name
+    model->>'$.dimension_name' AS dimension_name
 FROM models
 WHERE
     model_type = 'dimension' AND
     model->>'$.type' = 'geography'
-ORDER BY dimension_query_name;
+ORDER BY dimension_name;
 ```
 ```
-+-----+--------------------------------------+---------+-----------------------------------+----------------------+
-| id  |               model_id               | version |               name                | dimension_query_name |
-+-----+--------------------------------------+---------+-----------------------------------+----------------------+
-| 39  | 15a14d95-e1e3-47ff-9b4f-32fd3d42167f | 1.0.0   | all_dsgrid_conus_2022_geographies | all_geographies      |
++-----+--------------------------------------+---------+-----------------------------------+----------------+
+| id  |               model_id               | version |               name                | dimension_name |
++-----+--------------------------------------+---------+-----------------------------------+----------------+
+| 39  | 15a14d95-e1e3-47ff-9b4f-32fd3d42167f | 1.0.0   | all_dsgrid_conus_2022_geographies | all_geographies|
 | 31  | 93cfccef-e574-4e69-90b2-5cc93ec2a66f | 1.0.0   | US Census Divisions               | census_division      |
 | 30  | 759ce37a-954c-4a17-9750-d240b0116ed8 | 1.0.0   | US Census Regions                 | census_region        |
 | 71  | 55da1339-fdb7-49c2-bc50-5fce3f2929f8 | 1.0.0   | contiguous-United-States          | conus                |

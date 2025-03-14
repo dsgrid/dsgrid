@@ -58,13 +58,13 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
 class DimensionFilterSingleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
     """Base model for all filters based on expressions with a single dimension."""
 
-    dimension_query_name: str
+    dimension_name: str
 
 
 class DimensionFilterMultipleQueryNameBaseModel(DimensionFilterBaseModel, abc.ABC):
     """Base model for all filters based on expressions with multiple dimensions."""
 
-    dimension_query_names: list[str]
+    dimension_names: list[str]
 
 
 class _DimensionFilterWithWhereClauseModel(DimensionFilterSingleQueryNameBaseModel, abc.ABC):
@@ -93,7 +93,7 @@ class DimensionFilterExpressionModel(_DimensionFilterWithWhereClauseModel):
     Example:
         DimensionFilterExpressionModel(
             dimension_type=DimensionType.GEOGRAPHY,
-            dimension_query_name="county",
+            dimension_name="county",
             operator="==",
             value="06037",
         ),
@@ -120,7 +120,7 @@ class DimensionFilterExpressionRawModel(_DimensionFilterWithWhereClauseModel):
     Example:
         DimensionFilterExpressionRawModel(
             dimension_type=DimensionType.GEOGRAPHY,
-            dimension_query_name="county",
+            dimension_name="county",
             value="== '06037'",
         ),
     is equivalent to
@@ -232,15 +232,15 @@ class DimensionFilterBetweenColumnOperatorModel(DimensionFilterSingleQueryNameBa
 class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
     """Filters base dimension records that match a subset dimension."""
 
-    dimension_query_names: list[str]
+    dimension_names: list[str]
     filter_type: Literal[DimensionFilterType.SUBSET] = DimensionFilterType.SUBSET
 
-    @field_validator("dimension_query_names")
+    @field_validator("dimension_names")
     @classmethod
-    def check_dimension_query_names(cls, dimension_query_names):
-        if not dimension_query_names:
-            raise ValueError("dimension_query_names cannot be empty")
-        return dimension_query_names
+    def check_dimension_names(cls, dimension_names):
+        if not dimension_names:
+            raise ValueError("dimension_names cannot be empty")
+        return dimension_names
 
     def apply_filter(self, df, column=None):
         raise NotImplementedError(f"apply_filter must not be called on {self.__class__.__name__}")
@@ -249,7 +249,7 @@ class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
         """Return a dataframe containing the filter records."""
         df = None
         dim_type = None
-        for query_name in self.dimension_query_names:
+        for query_name in self.dimension_names:
             dim = dimension_accessor(query_name)
             records = dim.get_records_dataframe()
             if df is None:

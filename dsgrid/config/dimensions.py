@@ -21,7 +21,7 @@ from dsgrid.dimension.time import (
     RepresentativePeriodFormat,
     DatetimeFormat,
 )
-from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME, REGEX_VALID_REGISTRY_DISPLAY_NAME
+from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
 
@@ -45,30 +45,6 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
             ),
             "updateable": False,
         },
-    )
-    display_name: str = Field(
-        title="display_name",
-        description="Display name. Source for auto-generated dimension_query_name.",
-        json_schema_extra={
-            "note": "Dimension display names should be singular noun phrases that are concise and "
-            "distinguish the dimension across all dimensions within a project, inclusive of dataset "
-            "dimensions, project base dimensions, and project supplemental dimensions. This uniqueness "
-            "requirement applies unless the dimension is trivial, that is, contains only a single "
-            "record. For trivial dimensions, if the dimension represents a single slice of the data, "
-            "e.g., all electricity use or model year 2018, then the convention is to list that "
-            "'record' name as the display name, e.g.,'Electricity Use' or '2018'.",
-            "notes": (
-                "Only alphanumeric characters, underscores, and spaces are supported (no "
-                "special characters).",
-                "The :meth:`~dsgrid.config.dimensions.check_display_name` validator is used to "
-                "enforce valid dimension display names.",
-            ),
-        },
-    )
-    dimension_query_name: Optional[str] = Field(
-        default=None,
-        title="dimension_query_name",
-        description="Auto-generated query name for SQL queries.",
     )
     dimension_type: DimensionType = Field(
         title="dimension_type",
@@ -140,12 +116,16 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
 
     @field_validator("name")
     @classmethod
-    def check_name(cls, name):
-        if name == "":
-            raise ValueError(f'Empty name field for dimension: "{cls}"')
-
+    def check_name(cls, name: str) -> str:
         if REGEX_VALID_REGISTRY_NAME.search(name) is None:
             raise ValueError(f"dimension name={name} does not meet the requirements")
+        return name
+
+    @field_validator("description")
+    @classmethod
+    def check_description(cls, description):
+        if description == "":
+            raise ValueError(f'Empty name field for dimension: "{cls}"')
 
         # TODO: improve validation for allowable dimension record names.
         prohibited_names = [x.value.replace("_", "") for x in DimensionType] + [
@@ -162,29 +142,17 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
             "dimension",
         ]
         prohibited_names = prohibited_names + [x + "s" for x in prohibited_names]
-        if name.lower().replace(" ", "-") in prohibited_names:
+        if description.lower().replace(" ", "-") in prohibited_names:
             raise ValueError(
                 f"""
-                 Dimension name '{name}' is not descriptive enough for a dimension record name.
-                 Please be more descriptive in your naming.
+                 Dimension description '{description}' is insufficient. Please be more descriptive.
                  Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable,
                  identifiable, and reusable for other datasets and projects.
-                 e.g., 'time-2012-est-hourly-periodending-nodst-noleapdayadjustment-mean' is a good descriptive name.
+                 e.g., 'Time dimension, 2012 hourly EST, period-beginning, no DST, no Leap Day Adjustment, total value'
+                 is a good description.
                  """
             )
-        return name
-
-    @field_validator("display_name")
-    @classmethod
-    def check_display_name(cls, display_name):
-        return check_display_name(display_name)
-
-    @field_validator("dimension_query_name")
-    @classmethod
-    def check_query_name(cls, dimension_query_name, info: ValidationInfo):
-        if "display_name" not in info.data:
-            return dimension_query_name
-        return generate_dimension_query_name(dimension_query_name, info.data["display_name"])
+        return description
 
     @field_validator("module")
     @classmethod
@@ -231,7 +199,7 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
     @property
     def label(self) -> str:
         """Return a label for the dimension to be used in user messages."""
-        return f"{self.dimension_type} {self.dimension_query_name}"
+        return f"{self.dimension_type} {self.name}"
 
 
 class DimensionModel(DimensionBaseModel):
@@ -694,7 +662,7 @@ class IndexTimeDimensionModel(TimeDimensionBaseModel):
     def check_indices(cls, ranges: list[IndexRangeModel]) -> list[IndexRangeModel]:
         return _check_index_ranges(ranges)
 
-    def is_time_zone_required_in_geography(self):
+    def is_time_zone_required_in_geography(self) -> bool:
         return True
 
 
@@ -703,7 +671,7 @@ class NoOpTimeDimensionModel(TimeDimensionBaseModel):
 
     time_type: TimeDimensionType = TimeDimensionType.NOOP
 
-    def is_time_zone_required_in_geography(self):
+    def is_time_zone_required_in_geography(self) -> bool:
         return False
 
 
@@ -847,8 +815,6 @@ class DimensionCommonModel(DSGBaseModel):
     """Common attributes for all dimensions"""
 
     name: str
-    display_name: str
-    dimension_query_name: str
     dimension_type: DimensionType
     dimension_id: str
     class_name: str
@@ -875,35 +841,3 @@ def create_project_dimension_model(model, category: DimensionCategory) -> Projec
     data = create_dimension_common_model(model).model_dump()
     data["category"] = category.value
     return ProjectDimensionModel(**data)
-
-
-def check_display_name(display_name: str) -> str:
-    """Check that a dimension display name meets all requirements.
-
-    Raises
-    ------
-    ValueError
-        Raised if the display_name is invalid.
-    """
-    if display_name == "":
-        raise ValueError("display_name cannot be empty")
-    if REGEX_VALID_REGISTRY_DISPLAY_NAME.search(display_name) is None:
-        raise ValueError(f"{display_name=} does not meet the requirements")
-    return display_name
-
-
-def generate_dimension_query_name(dimension_query_name: str, display_name: str) -> str:
-    """Generate a dimension query name from a display name.
-
-    Raises
-    ------
-    ValueError
-        Raised if the dimension_query_name was set by the user and does not match the generated
-        name.
-    """
-    generated_query_name = display_name.lower().replace(" ", "_").replace("-", "_")
-
-    if dimension_query_name is not None and dimension_query_name != generated_query_name:
-        raise ValueError(f"dimension_query_name cannot be set by the user: {dimension_query_name}")
-
-    return generated_query_name

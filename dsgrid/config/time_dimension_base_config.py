@@ -23,6 +23,7 @@ from dsgrid.config.dimensions import TimeRangeModel
 from dsgrid.spark.functions import (
     aggregate,
     except_all,
+    handle_column_spaces,
     perform_interval_op,
     select_expr,
 )
@@ -145,7 +146,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         list[str]
         """
         # This may need to be re-implemented by child classes.
-        return [self.model.dimension_query_name]
+        return [self.model.name]
 
     def map_timestamp_load_data_columns_for_query_name(self, df) -> DataFrame:
         """Map the timestamp columns in the load data table to those specified by the query name.
@@ -168,7 +169,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         time_col = time_cols[0]
         if time_col not in df.columns:
             return df
-        return df.withColumnRenamed(time_col, self.model.dimension_query_name)
+        return df.withColumnRenamed(time_col, self.model.name)
 
     @abc.abstractmethod
     def get_time_ranges(self) -> list[Any]:
@@ -283,7 +284,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
                 logger.warning("wrap_time is not required, no time misalignment found.")
 
         time_map_diff = (
-            select_expr(time_map, [f"{time_col} - orig_ts AS diff"]).distinct().collect()
+            select_expr(time_map, [f"{handle_column_spaces(time_col)} - orig_ts AS diff"])
+            .distinct()
+            .collect()
         )
         if time_map_diff != [Row(diff=timedelta(0))]:
             other_cols = [x for x in df.columns if x != time_col]

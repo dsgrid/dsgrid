@@ -20,7 +20,6 @@ from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.common import ConfigKey, RegistryType, VersionUpdateType
 from dsgrid.registry.registry_interface import DimensionRegistryInterface
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.utilities import display_table
 from .registration_context import RegistrationContext
 from .dimension_update_checker import DimensionUpdateChecker
@@ -75,16 +74,15 @@ class DimensionRegistryManager(RegistryManagerBase):
                     if (
                         dim.dimension_type == existing.dimension_type
                         and dim.name == existing.name
-                        and dim.display_name == existing.display_name
+                        and dim.description == existing.description
                     ):
                         replace_dim = True
                         break
                 if not replace_dim:
                     logger.info(
                         "Register new dimension even though records are duplicate with "
-                        "one or more existing dimensions. New name/display_name=%s/%s",
+                        "one or more existing dimensions. New name=%s",
                         dim.name,
-                        dim.display_name,
                     )
             if replace_dim:
                 assert existing is not None
@@ -183,7 +181,6 @@ class DimensionRegistryManager(RegistryManagerBase):
 
         return dimensions
 
-    @track_timing(timer_stats_collector)
     def register_from_config(
         self,
         config: DimensionsConfig,
@@ -191,7 +188,6 @@ class DimensionRegistryManager(RegistryManagerBase):
     ) -> list[str]:
         return self._register(config, context)
 
-    @track_timing(timer_stats_collector)
     def register(self, config_file, submitter: str, log_message: str) -> list[str]:
         with RegistrationContext(
             self.db, log_message, VersionUpdateType.MAJOR, submitter
@@ -317,7 +313,7 @@ class DimensionRegistryManager(RegistryManagerBase):
 
             all_fields = (
                 model.dimension_type.value,
-                model.dimension_query_name,
+                model.name,
                 model.dimension_id,
                 model.version,
                 registration.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
@@ -355,7 +351,6 @@ class DimensionRegistryManager(RegistryManagerBase):
             self._check_update(context.connection, config, dimension_id, version)
             self.update_with_context(config, context)
 
-    @track_timing(timer_stats_collector)
     def update(
         self,
         config,

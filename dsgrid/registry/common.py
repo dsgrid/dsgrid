@@ -17,9 +17,8 @@ from dsgrid.utils.versioning import make_version
 
 REGISTRY_LOG_FILE = "dsgrid_registry.log"
 # Allows letters, numbers, underscores, spaces, dashes
-REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
 # Allows letters, numbers, underscores, dashes, spaces
-REGEX_VALID_REGISTRY_DISPLAY_NAME = re.compile(r"^[\w -]+$")
+REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
 # Allows letters, numbers, underscores, dashes
 REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE = re.compile(r"^[\w/-]+$")
 # Allows letters, numbers, underscores.

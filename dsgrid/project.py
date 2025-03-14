@@ -236,18 +236,16 @@ class Project:
                     "id"
                 )
             else:
-                query_name = dim_filter.dimension_query_name
+                query_name = dim_filter.dimension_name
                 records = self._config.get_dimension_records(query_name)
                 df = dim_filter.apply_filter(records).select("id")
                 supp_query_names = set(
-                    self._config.list_dimension_query_names(
-                        category=DimensionCategory.SUPPLEMENTAL
-                    )
+                    self._config.list_dimension_names(category=DimensionCategory.SUPPLEMENTAL)
                 )
                 if query_name in supp_query_names:
                     assert isinstance(dim_filter, DimensionFilterSingleQueryNameBaseModel)
                     base_query_name = getattr(
-                        context.base_dimension_query_names, dim_filter.dimension_type.value
+                        context.base_dimension_names, dim_filter.dimension_type.value
                     )
                     base_dim = self._config.get_dimension(base_query_name)
                     supp_dim = self._config.get_dimension(query_name)
@@ -359,7 +357,7 @@ class Project:
             match context.model.result.column_type:
                 case ColumnType.DIMENSION_TYPES:
                     return DimensionType.MODEL_YEAR.value
-                case ColumnType.DIMENSION_QUERY_NAMES:
+                case ColumnType.DIMENSION_NAMES:
                     pass
                 case _:
                     raise NotImplementedError(
@@ -389,7 +387,7 @@ class Project:
                 f"{model_year_column=} {model_year_column_gr=}"
             )
         match context.model.result.column_type:
-            case ColumnType.DIMENSION_QUERY_NAMES:
+            case ColumnType.DIMENSION_NAMES:
                 time_columns = context.get_dimension_column_names(
                     DimensionType.TIME, dataset_id=dataset.initial_value_dataset_id
                 )

@@ -20,6 +20,7 @@ from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGIn
 from dsgrid.spark.functions import (
     count_distinct_on_group_by,
     get_spark_warehouse_dir,
+    handle_column_spaces,
     make_temp_view_name,
     read_parquet,
     is_dataframe_empty,
@@ -210,7 +211,7 @@ def map_time_dimension_with_chronify_duckdb(
     # If we solve those problems, this code could be modified.
     src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
     store = chronify.Store.create_in_memory_db()
-    store.ingest_table(df.relation, src_schema, bypass_checks=True)
+    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
     store.map_table_time_config(
         src_schema.name,
         dst_schema,
@@ -366,11 +367,9 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
     stacked = list(stacked_columns)
     return (
         join_multiple_columns(
-            df,
-            count_distinct_on_group_by(df, stacked, time_column, "count_time"),
-            stacked,
+            df, count_distinct_on_group_by(df, stacked, time_column, "count_time"), stacked
         )
-        .filter(f"{time_column} IS NOT NULL or count_time == 0")
+        .filter(f"{handle_column_spaces(time_column)} IS NOT NULL OR count_time = 0")
         .select(orig_columns)
     )
 

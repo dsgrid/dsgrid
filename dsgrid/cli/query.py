@@ -27,7 +27,7 @@ from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
     AggregationModel,
-    DimensionQueryNamesModel,
+    DimensionNamesModel,
     ProjectQueryModel,
     ProjectQueryParamsModel,
     CreateCompositeDatasetQueryModel,
@@ -195,39 +195,39 @@ def create_project_query(
             case DimensionFilterType.EXPRESSION:
                 flt = DimensionFilterExpressionModel(
                     dimension_type=DimensionType.GEOGRAPHY,
-                    dimension_query_name="county",
+                    dimension_name="county",
                     operator="==",
                     value="",
                 )
             case DimensionFilterType.BETWEEN_COLUMN_OPERATOR:
                 flt = DimensionFilterBetweenColumnOperatorModel(
                     dimension_type=DimensionType.TIME,
-                    dimension_query_name="time_est",
+                    dimension_name="time_est",
                     lower_bound="",
                     upper_bound="",
                 )
             case DimensionFilterType.COLUMN_OPERATOR:
                 flt = DimensionFilterColumnOperatorModel(
                     dimension_type=DimensionType.GEOGRAPHY,
-                    dimension_query_name="county",
+                    dimension_name="county",
                     value="",
                     operator="contains",
                 )
             case DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR:
                 flt = SupplementalDimensionFilterColumnOperatorModel(
                     dimension_type=DimensionType.GEOGRAPHY,
-                    dimension_query_name="state",
+                    dimension_name="state",
                 )
             case DimensionFilterType.EXPRESSION_RAW:
                 flt = DimensionFilterExpressionRawModel(
                     dimension_type=DimensionType.GEOGRAPHY,
-                    dimension_query_name="county",
+                    dimension_name="county",
                     value="== '06037'",
                 )
             case DimensionFilterType.SUBSET:
                 flt = SubsetDimensionFilterModel(
                     dimension_type=DimensionType.SUBSECTOR,
-                    dimension_query_names=["commercial_subsectors", "residential_subsectors"],
+                    dimension_names=["commercial_subsectors", "residential_subsectors"],
                 )
             case _:
                 raise NotImplementedError(f"Bug: {filter_type}")
@@ -235,13 +235,12 @@ def create_project_query(
 
     if default_result_aggregation:
         default_aggs = {
-            k.value: v
-            for k, v in project.config.get_dimension_type_to_base_query_name_mapping().items()
+            k.value: v for k, v in project.config.get_dimension_type_to_base_name_mapping().items()
         }
         if default_result_aggregation:
             query.result.aggregations = [
                 AggregationModel(
-                    dimensions=DimensionQueryNamesModel(**default_aggs),
+                    dimensions=DimensionNamesModel(**default_aggs),
                     aggregation_function=aggregation_function,
                 ),
             ]

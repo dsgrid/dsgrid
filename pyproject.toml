@@ -9,7 +9,7 @@ copyright = "Copyright 2023, The Alliance for Sustainable Energy, LLC"
 description = "Python API for accessing demand-side grid model (dsgrid) datasets"
 url = "https://github.com/dsgrid/dsgrid"
 requires-python = ">=3.11"
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 readme = "README.md"
 keywords = ["dsgrid"]
 authors = [
@@ -18,9 +18,7 @@ authors = [
     {name = "Meghan Mooney", email = "meghan.mooney@nrel.gov"},
     {name = "Daniel Thom", email = "daniel.thom@nrel.gov"},
 ]
-maintainers = [
-    {name = "Elaine Hale", email = "elaine.hale@nrel.gov"}
-]
+maintainers = [{name = "Elaine Hale", email = "elaine.hale@nrel.gov"}]
 include_package_data = true
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -94,11 +92,7 @@ doc = [
     "autodoc_pydantic[erdantic]~=2.0",
 ]
 
-release = [
-    "twine",
-    "setuptools",
-    "wheel",
-]
+release = ["twine", "setuptools", "wheel"]
 
 [project.scripts]
 dsgrid = "dsgrid.cli.dsgrid:cli"
@@ -110,10 +104,11 @@ dsgrid-admin = "dsgrid.cli.dsgrid_admin:cli"
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra"
-testpaths = [
-    "tests",
-]
+testpaths = ["tests"]
 
 [tool.black]
 line-length = 99
 target-version = ['py311']
+
+[tool.mypy]
+plugins = "pydantic.mypy"

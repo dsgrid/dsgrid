@@ -206,7 +206,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     assert result.exit_code == 0
 
 
-def test_list_project_dimension_query_names(cached_registry):
+def test_list_project_dimension_names(cached_registry):
     conn = cached_registry
     runner = CliRunner(mix_stderr=False)
     cmd = [
@@ -215,15 +215,18 @@ def test_list_project_dimension_query_names(cached_registry):
         "--offline",
         "registry",
         "projects",
-        "list-dimension-query-names",
+        "list-dimension-names",
         "test_efs",
     ]
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
-    assert "base: county" in result.stdout
+    assert "base: US Counties" in result.stdout
     assert "subset: commercial_subsectors2 residential_subsectors" in result.stdout
-    assert "supplemental: all_subsectors commercial_subsectors" in result.stdout
-    assert "supplemental: all_geographies census_division census_region state" in result.stdout
+    assert (
+        "supplemental: Commercial Subsectors Subsectors by Sector all_test_efs_subsectors"
+        in result.stdout
+    )
+    assert "supplemental: US Census Divisions US Census Regions US States" in result.stdout
 
 
 def test_register_dsgrid_projects(tmp_registry_db):
@@ -291,7 +294,7 @@ def test_bulk_register(tmp_registry_db):
     # Inject an error so that registration of the second dataset fails.
     dataset_config_file = test_project_dir / "datasets" / "modeled" / "comstock" / "dataset.json5"
     config = load_data(dataset_config_file)
-    config["dimensions"][0]["display_name"] += "!@#$%"
+    config["dimensions"][0]["name"] += "!@#$%"
     dump_data(config, dataset_config_file)
     registration = RegistrationModel.from_file(TEST_EFS_REGISTRATION_FILE)
     registration.datasets[1].config_file = dataset_config_file

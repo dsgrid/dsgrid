@@ -322,7 +322,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             project_config,
         )
 
-        if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
+        if context.model.result.column_type == ColumnType.DIMENSION_NAMES:
             df = table_handler.convert_columns_to_query_names(
                 df, self._config.model.dataset_id, context
             )
@@ -334,10 +334,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         context: QueryContext, pivoted_dimension_type: DimensionType, project_config
     ):
         match context.model.result.column_type:
-            case ColumnType.DIMENSION_QUERY_NAMES:
+            case ColumnType.DIMENSION_NAMES:
                 pivoted_column_name = project_config.get_base_dimension(
                     pivoted_dimension_type
-                ).model.dimension_query_name
+                ).model.name
             case ColumnType.DIMENSION_TYPES:
                 pivoted_column_name = pivoted_dimension_type.value
             case _:
@@ -368,21 +368,21 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _get_project_metric_records(self, project_config: ProjectConfig) -> DataFrame:
         metric_dim_query_name = getattr(
-            project_config.get_dataset_base_dimension_query_names(self._config.model.dataset_id),
+            project_config.get_dataset_base_dimension_names(self._config.model.dataset_id),
             DimensionType.METRIC.value,
         )
         if metric_dim_query_name is None:
             # This is a workaround for dsgrid projects created before the field
-            # base_dimension_query_names was added to InputDatasetModel.
+            # base_dimension_names was added to InputDatasetModel.
             metric_dims = project_config.list_base_dimensions(dimension_type=DimensionType.METRIC)
             if len(metric_dims) > 1:
                 msg = (
-                    "The dataset's base_dimension_query_names value is not set and "
+                    "The dataset's base_dimension_names value is not set and "
                     "there are multiple metric dimensions in the project. Please re-register the "
                     f"dataset with dataset_id={self._config.model.dataset_id}."
                 )
                 raise DSGInvalidDataset(msg)
-            metric_dim_query_name = metric_dims[0].model.dimension_query_name
+            metric_dim_query_name = metric_dims[0].model.name
         return project_config.get_dimension_records(metric_dim_query_name)
 
     def _get_time_dimension_columns(self):

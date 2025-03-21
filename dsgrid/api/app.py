@@ -202,7 +202,7 @@ async def list_project_supplemental_dimension_names(
 
 
 @app.get(
-    "/projects/{project_id}/dimensions/dimensions_by_query_name/{dimension_name}",
+    "/projects/{project_id}/dimensions/dimensions_by_name/{dimension_name}",
     response_model=GetDimensionResponse,
 )
 async def get_project_dimension(project_id: str, dimension_name: str):

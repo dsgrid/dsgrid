@@ -168,7 +168,7 @@ def test_list_dimension_records(client):
     ).dimension_name
     dimension = GetDimensionResponse(
         **check_response(
-            client, f"/projects/{PROJECT_ID}/dimensions/dimensions_by_query_name/{query_name}"
+            client, f"/projects/{PROJECT_ID}/dimensions/dimensions_by_name/{query_name}"
         ).json()
     ).dimension
     records = ListDimensionRecordsResponse(

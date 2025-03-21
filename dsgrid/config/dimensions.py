@@ -128,7 +128,7 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
             raise ValueError(f'Empty name field for dimension: "{cls}"')
 
         # TODO: improve validation for allowable dimension record names.
-        prohibited_names = [x.value.replace("_", "") for x in DimensionType] + [
+        prohibited_names = [x.value for x in DimensionType] + [
             "county",
             "counties",
             "year",
@@ -142,7 +142,7 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
             "dimension",
         ]
         prohibited_names = prohibited_names + [x + "s" for x in prohibited_names]
-        if description.lower().replace(" ", "-") in prohibited_names:
+        if description.lower() in prohibited_names:
             raise ValueError(
                 f"""
                  Dimension description '{description}' is insufficient. Please be more descriptive.

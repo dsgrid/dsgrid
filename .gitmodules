@@ -1,12 +1,12 @@
 [submodule "dsgrid-test-data"]
 	path = dsgrid-test-data
 	url = https://github.com/dsgrid/dsgrid-test-data
-	branch = dt/remove-dimension-query-name
+	branch = duckdb
 [submodule "dsgrid-project-StandardScenarios"]
 	path = dsgrid-project-StandardScenarios
 	url = https://github.com/dsgrid/dsgrid-project-StandardScenarios
-	branch = dt/remove-dimension-query-name
+	branch = main
 [submodule "dsgrid-project-IEF"]
 	path = dsgrid-project-IEF
 	url = https://github.com/dsgrid/dsgrid-project-IEF
-	branch = dt/remove-dimension-query-name
+	branch = main

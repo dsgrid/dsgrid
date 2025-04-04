@@ -58,7 +58,7 @@ ssh to a login node to begin the tutorial.
             "dimension_filters": [
               {
                 "dimension_type": "model_year",
-                "dimension_query_name": "model_year",
+                "dimension_name": "model_year",
                 "column": "id",
                 "operator": "isin",
                 "value": [
@@ -80,41 +80,41 @@ ssh to a login node to begin the tutorial.
             "dimensions": {
               "geography": [
                 {
-                  "dimension_query_name": "state",
+                  "dimension_name": "state",
                 }
               ],
               "metric": [
                 {
-                  "dimension_query_name": "end_uses_by_fuel_type",
+                  "dimension_name": "end_uses_by_fuel_type",
                 }
               ],
               "model_year": [
                 {
-                  "dimension_query_name": "model_year",
+                  "dimension_name": "model_year",
                 }
               ],
               "scenario": [
                 {
-                  "dimension_query_name": "scenario",
+                  "dimension_name": "scenario",
                 }
               ],
               "sector": [
                 {
-                  "dimension_query_name": "sector",
+                  "dimension_name": "sector",
                 }
               ],
               "subsector": [
               ],
               "time": [
                 {
-                  "dimension_query_name": "time_est",
+                  "dimension_name": "time_est",
                   "function": "year",
                   "alias": "year"
                 }
               ],
               "weather_year": [
                 {
-                  "dimension_query_name": "weather_2012",
+                  "dimension_name": "weather_2012",
                 }
               ]
             }
@@ -136,7 +136,7 @@ params:
             "dimension_filters": [
               {
                 "dimension_type": "metric",
-                "dimension_query_name": "end_uses_by_fuel_type",
+                "dimension_name": "end_uses_by_fuel_type",
                 "column": "fuel_id",
                 "value": [
                   "electricity",

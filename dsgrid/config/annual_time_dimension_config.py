@@ -11,6 +11,7 @@ from dsgrid.time.types import AnnualTimestampType
 from dsgrid.dimension.time_utils import is_leap_year
 from dsgrid.spark.functions import (
     cross_join,
+    handle_column_spaces,
     select_expr,
 )
 from dsgrid.spark.types import (
@@ -163,7 +164,11 @@ def map_annual_time_to_date_time(
 
     # Note that MeasurementType.TOTAL has already been verified.
     with set_session_time_zone(dt_dim.model.datetime_format.timezone.tz_name):
-        years = select_expr(dt_df, [f"YEAR({dt_col}) AS year"]).distinct().collect()
+        years = (
+            select_expr(dt_df, [f"YEAR({handle_column_spaces(dt_col)}) AS year"])
+            .distinct()
+            .collect()
+        )
         if len(years) != 1:
             msg = "DateTime dimension has more than one year: {years=}"
             raise NotImplementedError(msg)

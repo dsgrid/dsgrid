@@ -14,6 +14,7 @@ from semver import VersionInfo
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.registration_models import RegistrationModel, RegistrationJournal
 from dsgrid.registry.common import DatabaseConnection, VersionUpdateType
 from dsgrid.registry.registry_manager import RegistryManager
@@ -1056,17 +1057,15 @@ def replace_dataset_dimension_requirements(
         ctx.exit(res[1])
 
 
-_list_project_dimension_query_names_epilog = """
+_list_project_dimension_names_epilog = """
 Examples:\n
-$ dsgrid registry projects list-dimension-query-names my_project_id\n
-$ dsgrid registry projects list-dimension-query-names --exclude-subset my_project_id\n
-$ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_project_id\n
+$ dsgrid registry projects list-dimension-names my_project_id\n
+$ dsgrid registry projects list-dimension-names --exclude-subset my_project_id\n
+$ dsgrid registry projects list-dimension-names --exclude-supplemental my_project_id\n
 """
 
 
-@click.command(
-    name="list-dimension-query-names", epilog=_list_project_dimension_query_names_epilog
-)
+@click.command(name="list-dimension-names", epilog=_list_project_dimension_names_epilog)
 @click.argument("project-id")
 @click.option(
     "-b",
@@ -1074,7 +1073,7 @@ $ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_
     is_flag=True,
     default=False,
     show_default=True,
-    help="Exclude base dimension query names.",
+    help="Exclude base dimension names.",
 )
 @click.option(
     "-S",
@@ -1082,7 +1081,7 @@ $ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_
     is_flag=True,
     default=False,
     show_default=True,
-    help="Exclude subset dimension query names.",
+    help="Exclude subset dimension names.",
 )
 @click.option(
     "-s",
@@ -1090,11 +1089,11 @@ $ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_
     is_flag=True,
     default=False,
     show_default=True,
-    help="Exclude supplemental dimension query names.",
+    help="Exclude supplemental dimension names.",
 )
 @click.pass_obj
 @click.pass_context
-def list_project_dimension_query_names(
+def list_project_dimension_names(
     ctx,
     registry_manager: RegistryManager,
     project_id,
@@ -1102,7 +1101,7 @@ def list_project_dimension_query_names(
     exclude_subset,
     exclude_supplemental,
 ):
-    """List the project's dimension query names."""
+    """List the project's dimension names."""
     if exclude_base and exclude_subset and exclude_supplemental:
         print(
             "exclude_base, exclude_subset, and exclude_supplemental cannot all be set",
@@ -1116,12 +1115,13 @@ def list_project_dimension_query_names(
         ctx.exit(res[1])
 
     project_config = res[0]
-    base = None if exclude_base else project_config.get_dimension_type_to_base_query_name_mapping()
-    sub = None if exclude_subset else project_config.get_subset_dimension_to_query_name_mapping()
+    assert isinstance(project_config, ProjectConfig)
+    base = None if exclude_base else project_config.get_dimension_type_to_base_name_mapping()
+    sub = None if exclude_subset else project_config.get_subset_dimension_to_name_mapping()
     supp = (
         None
         if exclude_supplemental
-        else project_config.get_supplemental_dimension_to_query_name_mapping()
+        else project_config.get_supplemental_dimension_to_name_mapping()
     )
 
     dimensions = sorted(DimensionType, key=lambda x: x.value)
@@ -1135,7 +1135,7 @@ def list_project_dimension_query_names(
             lines.append("    subset: " + " ".join(sub[dim_type]))
         if supp:
             lines.append("    supplemental: " + " ".join(supp[dim_type]))
-    print("Dimension query names:")
+    print("Dimension names:")
     for line in lines:
         print(line)
 
@@ -1537,7 +1537,7 @@ projects.add_command(register_subset_dimensions)
 projects.add_command(register_supplemental_dimensions)
 projects.add_command(add_dataset_requirements)
 projects.add_command(replace_dataset_dimension_requirements)
-projects.add_command(list_project_dimension_query_names)
+projects.add_command(list_project_dimension_names)
 
 datasets.add_command(list_datasets)
 datasets.add_command(register_dataset)

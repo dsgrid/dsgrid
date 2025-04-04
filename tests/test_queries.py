@@ -32,7 +32,7 @@ from dsgrid.query.models import (
     CompositeDatasetQueryModel,
     CreateCompositeDatasetQueryModel,
     DatasetModel,
-    DimensionQueryNamesModel,
+    DimensionNamesModel,
     ProjectQueryDatasetParamsModel,
     ProjectQueryParamsModel,
     ProjectQueryModel,
@@ -170,7 +170,7 @@ def test_total_electricity_use_with_filter():
 @pytest.mark.parametrize(
     "column_inputs",
     [
-        (ColumnType.DIMENSION_QUERY_NAMES, ["state", "reeds_pca", "census_region"], True, True),
+        (ColumnType.DIMENSION_NAMES, ["state", "reeds_pca", "census_region"], True, True),
         (ColumnType.DIMENSION_TYPES, ["reeds_pca"], False, True),
         (ColumnType.DIMENSION_TYPES, ["state"], False, True),
         (ColumnType.DIMENSION_TYPES, ["state", "reeds_pca", "census_region"], True, False),
@@ -215,7 +215,7 @@ def test_unit_mapping(cached_registry):
 def test_invalid_drop_metric_dimension():
     with pytest.raises(ValueError):
         AggregationModel(
-            dimensions=DimensionQueryNamesModel(
+            dimensions=DimensionNamesModel(
                 geography=["county"],
                 metric=[],
                 model_year=["model_year"],
@@ -234,7 +234,7 @@ def test_invalid_pivoted_dimension_aggregations():
         QueryResultParamsModel(
             aggregations=[
                 AggregationModel(
-                    dimensions=DimensionQueryNamesModel(
+                    dimensions=DimensionNamesModel(
                         geography=["county"],
                         metric=["electricity_end_uses", "natural_gas_end_uses"],
                         model_year=["model_year"],
@@ -254,7 +254,7 @@ def test_invalid_pivoted_dimension_aggregations():
         QueryResultParamsModel(
             aggregations=[
                 AggregationModel(
-                    dimensions=DimensionQueryNamesModel(
+                    dimensions=DimensionNamesModel(
                         geography=["county"],
                         metric=["end_uses_by_fuel_type"],
                         model_year=["model_year"],
@@ -267,7 +267,7 @@ def test_invalid_pivoted_dimension_aggregations():
                     aggregation_function="sum",
                 ),
                 AggregationModel(
-                    dimensions=DimensionQueryNamesModel(
+                    dimensions=DimensionNamesModel(
                         geography=["county"],
                         metric=[],
                         model_year=[],
@@ -275,9 +275,7 @@ def test_invalid_pivoted_dimension_aggregations():
                         sector=[],
                         subsector=[],
                         time=[
-                            ColumnModel(
-                                dimension_query_name="time_est", function="hour", alias="hour"
-                            )
+                            ColumnModel(dimension_name="time_est", function="hour", alias="hour")
                         ],
                         weather_year=[],
                     ),
@@ -395,14 +393,17 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
 
     baseline_df = read_parquet(output_dir / "baseline" / "table.parquet")
     baseline_years = sorted(
-        (int(x.model_year) for x in baseline_df.select("model_year").distinct().collect())
+        (
+            int(x["Model Years 2010 to 2050"])
+            for x in baseline_df.select("Model Years 2010 to 2050").distinct().collect()
+        )
     )
     assert baseline_years == [2010, 2020, 2030, 2040, 2050]
     five_year_df = read_parquet(output_dir / "five_year_intervals" / "table.parquet")
     five_year_years = sorted(
         (
-            int(x.five_year_intervals)
-            for x in five_year_df.select("five_year_intervals").distinct().collect()
+            int(x["Five Year Intervals"])
+            for x in five_year_df.select("Five Year Intervals").distinct().collect()
         )
     )
     assert five_year_years == [2010, 2015, 2020, 2025, 2030, 2035, 2040, 2045, 2050]
@@ -423,20 +424,20 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
     baseline_sum = get_value_sum(baseline_df)
     baseline_years_str = [str(x) for x in baseline_years]
     five_year_sum = get_value_sum(
-        five_year_df.filter(F.col("five_year_intervals").isin(baseline_years_str))
+        five_year_df.filter(F.col("Five Year Intervals").isin(baseline_years_str))
     )
     assert math.isclose(five_year_sum, baseline_sum)
 
-    val1 = get_value_sum(five_year_df.filter("five_year_intervals == '2020'"))
-    val2 = get_value_sum(five_year_df.filter("five_year_intervals == '2030'"))
-    interpolated_val = get_value_sum(five_year_df.filter("five_year_intervals == '2025'"))
+    val1 = get_value_sum(five_year_df.filter(F.col("Five Year Intervals") == "2020"))
+    val2 = get_value_sum(five_year_df.filter(F.col("Five Year Intervals") == "2030"))
+    interpolated_val = get_value_sum(five_year_df.filter(F.col("Five Year Intervals") == "2025"))
     assert math.isclose(interpolated_val, val1 / 2 + val2 / 2)
 
 
-def test_dimension_query_names_model():
+def test_dimension_names_model():
     # Test that this model is defined with all dimension types.
     diff = {x.value for x in DimensionType}.symmetric_difference(
-        set(DimensionQueryNamesModel.model_fields)
+        set(DimensionNamesModel.model_fields)
     )
     assert not diff
 
@@ -613,7 +614,7 @@ class QueryTestBase(abc.ABC):
 
     def get_filtered_county_id(self):
         filters = self._model.project.dataset_params.dimension_filters
-        counties = [x.value for x in filters if x.dimension_query_name == "county"]
+        counties = [x.value for x in filters if x.name == "county"]
         assert len(counties) == 1, f"Unexpected length of filtered counties: {len(counties)}"
         return counties[0]
 
@@ -657,13 +658,13 @@ class QueryTestElectricityValues(QueryTestBase):
                             # dimension filters.
                             DimensionFilterColumnOperatorModel(
                                 dimension_type=DimensionType.GEOGRAPHY,
-                                dimension_query_name="county",
+                                dimension_name="county",
                                 operator="isin",
                                 value=["06037", "36047"],
                             ),
                             DimensionFilterExpressionModel(
                                 dimension_type=DimensionType.GEOGRAPHY,
-                                dimension_query_name="state",
+                                dimension_name="state",
                                 operator="==",
                                 column="name",
                                 value="California",
@@ -681,7 +682,7 @@ class QueryTestElectricityValues(QueryTestBase):
             case DimensionCategory.BASE:
                 filter_model = DimensionFilterExpressionModel(
                     dimension_type=DimensionType.METRIC,
-                    dimension_query_name="end_use",
+                    dimension_name="end_use",
                     operator="==",
                     column="fuel_id",
                     value="electricity",
@@ -689,12 +690,12 @@ class QueryTestElectricityValues(QueryTestBase):
             case DimensionCategory.SUBSET:
                 filter_model = SubsetDimensionFilterModel(
                     dimension_type=DimensionType.METRIC,
-                    dimension_query_names=["electricity_end_uses"],
+                    dimension_names=["electricity_end_uses"],
                 )
             case DimensionCategory.SUPPLEMENTAL:
                 filter_model = SupplementalDimensionFilterColumnOperatorModel(
                     dimension_type=DimensionType.METRIC,
-                    dimension_query_name="end_uses_by_fuel_type",
+                    dimension_name="end_uses_by_fuel_type",
                     operator="isin",
                     column="fuel_id",
                     value=["electricity"],
@@ -716,7 +717,7 @@ class QueryTestElectricityValues(QueryTestBase):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
         assert "natural_gas_heating" not in df.columns
         non_value_columns = set(
-            self._project.config.list_dimension_query_names(category=DimensionCategory.BASE)
+            self._project.config.list_dimension_names(category=DimensionCategory.BASE)
         )
         non_value_columns.update({"id", "timestamp"})
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
@@ -765,7 +766,7 @@ class QueryTestElectricityUse(QueryTestBase):
                         dimension_filters=[
                             SupplementalDimensionFilterColumnOperatorModel(
                                 dimension_type=DimensionType.METRIC,
-                                dimension_query_name="end_uses_by_fuel_type",
+                                dimension_name="end_uses_by_fuel_type",
                                 operator="isin",
                                 column="fuel_id",
                                 value=["electricity"],
@@ -777,7 +778,7 @@ class QueryTestElectricityUse(QueryTestBase):
             result=QueryResultParamsModel(
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=[self._geography],
                             metric=["end_uses_by_fuel_type"],
                             model_year=[],
@@ -844,7 +845,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                         dimension_filters=[
                             SupplementalDimensionFilterColumnOperatorModel(
                                 dimension_type=DimensionType.METRIC,
-                                dimension_query_name="end_uses_by_fuel_type",
+                                dimension_name="end_uses_by_fuel_type",
                                 operator="isin",
                                 column="fuel_id",
                                 value=["electricity", "natural_gas"],
@@ -856,7 +857,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
             result=QueryResultParamsModel(
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=[self._geography],
                             metric=["end_uses_by_fuel_type"],
                             model_year=[],
@@ -872,13 +873,13 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                 dimension_filters=[
                     DimensionFilterColumnOperatorModel(
                         dimension_type=DimensionType.GEOGRAPHY,
-                        dimension_query_name=self._geography,
+                        dimension_name=self._geography,
                         operator="isin",
                         value=["06037", "36047"] if self._geography == "county" else ["CA", "NY"],
                     ),
                     SubsetDimensionFilterModel(
                         dimension_type=DimensionType.SUBSECTOR,
-                        dimension_query_names=["commercial_subsectors"],
+                        dimension_names=["commercial_subsectors"],
                     ),
                 ],
                 output_format="parquet",
@@ -891,7 +892,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                 self._model.result.dimension_filters.append(
                     DimensionFilterColumnOperatorModel(
                         dimension_type=DimensionType.METRIC,
-                        dimension_query_name="end_use",
+                        dimension_name="end_use",
                         operator="isin",
                         value=["electricity_cooling", "electricity_heating"],
                     ),
@@ -900,7 +901,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                 self._model.result.dimension_filters.append(
                     SubsetDimensionFilterModel(
                         dimension_type=DimensionType.METRIC,
-                        dimension_query_names=["electricity_end_uses"],
+                        dimension_names=["electricity_end_uses"],
                     ),
                 )
             case _:
@@ -950,7 +951,7 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                 dimension_filters=[
                     DimensionFilterExpressionModel(
                         dimension_type=DimensionType.GEOGRAPHY,
-                        dimension_query_name="county",
+                        dimension_name="county",
                         operator="==",
                         value="06037",
                         column="county",
@@ -958,7 +959,7 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                 ],
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=["county"],
                             metric=["end_uses_by_fuel_type"],
                             model_year=[],
@@ -1008,7 +1009,7 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
             result=QueryResultParamsModel(
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=["county"],
                             metric=["end_uses_by_fuel_type"],
                             model_year=["model_year"],
@@ -1021,7 +1022,7 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                         aggregation_function="sum",
                     ),
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=["county"],
                             metric=["end_uses_by_fuel_type"],
                             model_year=[],
@@ -1030,7 +1031,7 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                             subsector=[],
                             time=[
                                 ColumnModel(
-                                    dimension_query_name="time_est", function="hour", alias="hour"
+                                    dimension_name="time_est", function="hour", alias="hour"
                                 )
                             ],
                             weather_year=[],
@@ -1108,7 +1109,7 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
                 aggregate_each_dataset=self._aggregate_each_dataset,
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=self._geography_columns,
                             metric=["end_uses_by_fuel_type"],
                             model_year=["model_year"],
@@ -1129,15 +1130,15 @@ class QueryTestElectricityUseByStateAndPCA(QueryTestBase):
     def validate(self, expected_values=None):
         df = read_parquet(self.output_dir / self.name / "table.parquet")
         match self._column_type:
-            case ColumnType.DIMENSION_QUERY_NAMES:
+            case ColumnType.DIMENSION_NAMES:
                 assert "time_est" in df.columns
                 for column in self._geography_columns:
-                    assert column.dimension_query_name in df.columns
+                    assert column.dimension_name in df.columns
             case ColumnType.DIMENSION_TYPES:
                 assert "timestamp" in df.columns
                 assert "geography" in df.columns
                 for column in self._geography_columns:
-                    assert column.dimension_query_name not in df.columns
+                    assert column.dimension_name not in df.columns
             case _:
                 assert False, f"Bug: add support for {self._column_type}"
         return True
@@ -1163,7 +1164,7 @@ class QueryTestAnnualElectricityUseByState(QueryTestBase):
             result=QueryResultParamsModel(
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=["state"],
                             metric=["end_uses_by_fuel_type"],
                             model_year=["model_year"],
@@ -1172,7 +1173,7 @@ class QueryTestAnnualElectricityUseByState(QueryTestBase):
                             subsector=["subsector"],
                             time=[
                                 ColumnModel(
-                                    dimension_query_name="time_est", function="year", alias="year"
+                                    dimension_name="time_est", function="year", alias="year"
                                 )
                             ],
                             weather_year=["weather_2012"],
@@ -1223,7 +1224,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
                         dimension_filters=[
                             SupplementalDimensionFilterColumnOperatorModel(
                                 dimension_type=DimensionType.METRIC,
-                                dimension_query_name="end_uses_by_fuel_type",
+                                dimension_name="end_uses_by_fuel_type",
                                 operator="isin",
                                 column="fuel_id",
                                 value=["electricity"],
@@ -1235,7 +1236,7 @@ class QueryTestPeakLoadByStateSubsector(QueryTestBase):
             result=QueryResultParamsModel(
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=["state"],
                             metric=["end_uses_by_fuel_type"],
                             model_year=["model_year"],
@@ -1305,7 +1306,7 @@ class QueryTestMapAnnualTime(QueryTestBase):
             result=QueryResultParamsModel(
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=["state"],
                             metric=["end_use"],
                             model_year=["model_year"],
@@ -1358,7 +1359,7 @@ class QueryTestInvalidAggregation(QueryTestBase):
             result=QueryResultParamsModel(
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=["county"],
                             metric=["electricity_end_uses"],
                             model_year=[],
@@ -1403,7 +1404,7 @@ class QueryTestElectricityValuesCompositeDataset(QueryTestBase):
                         dimension_filters=[
                             SupplementalDimensionFilterColumnOperatorModel(
                                 dimension_type=DimensionType.METRIC,
-                                dimension_query_name="end_uses_by_fuel_type",
+                                dimension_name="end_uses_by_fuel_type",
                                 operator="isin",
                                 column="fuel_id",
                                 value=["electricity"],
@@ -1451,7 +1452,7 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
             result=QueryResultParamsModel(
                 aggregations=[
                     AggregationModel(
-                        dimensions=DimensionQueryNamesModel(
+                        dimensions=DimensionNamesModel(
                             geography=[self._geography],
                             metric=["end_uses_by_fuel_type"],
                             model_year=[],
@@ -1549,10 +1550,10 @@ class QueryTestUnitMapping(QueryTestBase):
         )
         subsector = expected_cooling.subsector.replace("com__", "")
         actual = (
-            df.filter(
-                f"comstock_building_type == '{subsector}' and county == '{expected_cooling.geography}' and model_year == '2020'"
-            )
-            .sort("hourly_est_2012")
+            df.filter(F.col("ComStock Subsectors EFS") == subsector)
+            .filter(F.col("US Counties 2010 - ComStock Only") == expected_cooling.geography)
+            .filter(F.col("Model Years 2010 to 2050") == "2020")
+            .sort("Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total")
             .limit(1)
             .collect()[0]
         )
@@ -1671,7 +1672,7 @@ def calc_expected_eia_861_ca_res_load_value():
 
 
 def run_query(
-    dimension_query_name,
+    dimension_name,
     registry_path=REGISTRY_PATH,
     operation="sum",
     output_dir=Path("queries"),
@@ -1686,10 +1687,10 @@ def run_query(
         offline_mode=True,
         registry_path=registry_path,
     )
-    if dimension_query_name == QueryTestElectricityValues.NAME:
+    if dimension_name == QueryTestElectricityValues.NAME:
         query = QueryTestElectricityValues(True, registry_path, project, output_dir=output_dir)
     else:
-        raise Exception(f"no query for {dimension_query_name}")
+        raise Exception(f"no query for {dimension_name}")
 
     ProjectQuerySubmitter(project, output_dir).submit(
         query.make_query(),

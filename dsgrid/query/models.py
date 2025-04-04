@@ -6,7 +6,7 @@ from pydantic import field_validator, model_validator, Field, field_serializer, 
 from semver import VersionInfo
 from typing_extensions import Annotated
 
-from dsgrid.config.project_config import DatasetBaseDimensionQueryNamesModel
+from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dataset.models import (
     TableFormatModel,
@@ -49,7 +49,7 @@ class FilteredDatasetModel(DSGBaseModel):
 class ColumnModel(DSGBaseModel):
     """Defines one column in a SQL aggregation statement."""
 
-    dimension_query_name: str
+    dimension_name: str
     function: Any = Field(
         default=None, description="Function or name of function in pyspark.sql.functions."
     )
@@ -75,7 +75,7 @@ class ColumnModel(DSGBaseModel):
             return alias
         func = info.data.get("function")
         if func is not None:
-            name = info.data["dimension_query_name"]
+            name = info.data["dimension_name"]
             return f"{func.__name__}__{name}"
 
         return alias
@@ -90,18 +90,18 @@ class ColumnModel(DSGBaseModel):
         if self.alias is not None:
             return self.alias
         if self.function is None:
-            return self.dimension_query_name
-        return f"{self.function.__name__}__{self.dimension_query_name})"
+            return self.dimension_name
+        return f"{self.function.__name__}__{self.dimension_name})"
 
 
 class ColumnType(str, Enum):
     """Defines what the columns of a dataset table represent."""
 
     DIMENSION_TYPES = "dimension_types"
-    DIMENSION_QUERY_NAMES = "dimension_query_names"
+    DIMENSION_NAMES = "dimension_names"
 
 
-class DimensionQueryNamesModel(DSGBaseModel):
+class DimensionNamesModel(DSGBaseModel):
     """Defines the list of dimensions to which the value columns should be aggregated.
     If a value is empty, that dimension will be aggregated and dropped from the table.
     """
@@ -124,7 +124,7 @@ class DimensionQueryNamesModel(DSGBaseModel):
             container = values[field]
             for i, item in enumerate(container):
                 if isinstance(item, str):
-                    container[i] = ColumnModel(dimension_query_name=item)
+                    container[i] = ColumnModel(dimension_name=item)
         return values
 
 
@@ -135,7 +135,7 @@ class AggregationModel(DSGBaseModel):
         default=None,
         description="Must be a function name in pyspark.sql.functions",
     )
-    dimensions: DimensionQueryNamesModel = Field(description="Dimensions on which to aggregate")
+    dimensions: DimensionNamesModel = Field(description="Dimensions on which to aggregate")
 
     @field_validator("aggregation_function")
     @classmethod
@@ -161,7 +161,7 @@ class AggregationModel(DSGBaseModel):
 
     def iter_dimensions_to_keep(self) -> Generator[tuple[DimensionType, ColumnModel], None, None]:
         """Yield the dimension type and ColumnModel for each dimension to keep."""
-        for field in DimensionQueryNamesModel.model_fields:
+        for field in DimensionNamesModel.model_fields:
             for val in getattr(self.dimensions, field):
                 yield DimensionType(field), val
 
@@ -169,7 +169,7 @@ class AggregationModel(DSGBaseModel):
         """Return a list of dimension types that will be dropped by the aggregation."""
         return [
             DimensionType(x)
-            for x in DimensionQueryNamesModel.model_fields
+            for x in DimensionNamesModel.model_fields
             if not getattr(self.dimensions, x)
         ]
 
@@ -188,15 +188,15 @@ class ReportInputModel(DSGBaseModel):
 class DimensionMetadataModel(DSGBaseModel):
     """Defines the columns in a table for a dimension."""
 
-    dimension_query_name: str
+    dimension_name: str
     column_names: list[str] = Field(
-        description="Columns associated with this dimension. Could be a dimension query name, "
+        description="Columns associated with this dimension. Could be a dimension name, "
         "the string-ified DimensionType, multiple strings as can happen with time, or dimension "
         "record IDS if the dimension is pivoted."
     )
 
     def make_key(self):
-        return "__".join([self.dimension_query_name] + self.column_names)
+        return "__".join([self.dimension_name] + self.column_names)
 
 
 class DatasetDimensionsMetadataModel(DSGBaseModel):
@@ -238,15 +238,15 @@ class DatasetDimensionsMetadataModel(DSGBaseModel):
             column_names.update(item.column_names)
         return column_names
 
-    def get_dimension_query_names(self, dimension_type: DimensionType) -> set[str]:
-        """Return the dimension query names for the given dimension type."""
-        return {x.dimension_query_name for x in getattr(self, dimension_type.value)}
+    def get_dimension_names(self, dimension_type: DimensionType) -> set[str]:
+        """Return the dimension names for the given dimension type."""
+        return {x.dimension_name for x in getattr(self, dimension_type.value)}
 
-    def remove_metadata(self, dimension_type: DimensionType, dimension_query_name: str) -> None:
-        """Remove the dimension metadata for the given dimension query name."""
+    def remove_metadata(self, dimension_type: DimensionType, dimension_name: str) -> None:
+        """Remove the dimension metadata for the given dimension name."""
         container = getattr(self, dimension_type.value)
         for i, metadata in enumerate(container):
-            if metadata.dimension_query_name == dimension_query_name:
+            if metadata.dimension_name == dimension_name:
                 container.pop(i)
                 break
 
@@ -257,9 +257,7 @@ class DatasetMetadataModel(DSGBaseModel):
     dimensions: DatasetDimensionsMetadataModel = DatasetDimensionsMetadataModel()
     table_format: TableFormatModel
     # This will be set at the query context level but not per-dataset.
-    base_dimension_query_names: DatasetBaseDimensionQueryNamesModel = (
-        DatasetBaseDimensionQueryNamesModel()
-    )
+    base_dimension_names: DatasetBaseDimensionNamesModel = DatasetBaseDimensionNamesModel()
 
     def get_table_format_type(self) -> TableFormatType:
         """Return the format type of the table."""
@@ -464,14 +462,14 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     )
     column_type: ColumnType = Field(
         description="Whether to make the result table columns dimension types. Default behavior "
-        "is to use dimension query names. In order to register a result table as a derived "
+        "is to use dimension names. In order to register a result table as a derived "
         f"dataset, this must be set to {ColumnType.DIMENSION_TYPES.value}.",
-        default=ColumnType.DIMENSION_QUERY_NAMES,
+        default=ColumnType.DIMENSION_NAMES,
     )
     table_format: TableFormatModel = UnpivotedTableFormatModel()
     output_format: str = Field(description="Output file format: csv or parquet", default="parquet")
     sort_columns: list[str] = Field(
-        description="Sort the results by these dimension query names.",
+        description="Sort the results by these dimension names.",
         default=[],
     )
     dimension_filters: list[DimensionFilters] = Field(
@@ -500,7 +498,7 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
                 elif len(names) > 1:
                     msg = (
                         f"The pivoted dimension ({pivoted_dim_type}) "
-                        "cannot have more than one dimension query name: {names}"
+                        "cannot have more than one dimension name: {names}"
                     )
                     raise ValueError(msg)
         return self

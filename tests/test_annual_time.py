@@ -119,7 +119,6 @@ def annual_time_dimension():
             module="dsgrid.dimension.standard",
             name="annual_time",
             description="test annual time",
-            display_name="Annual",
             ranges=[
                 TimeRangeModel(start="2010", end="2020"),
             ],
@@ -141,7 +140,6 @@ def date_time_dimension():
             timezone=TimeZone.EST,
             name="datetime",
             description="example date time",
-            display_name="time_est",
             ranges=[
                 TimeRangeModel(start="2012-02-01 00:00:00", end="2012-02-07 23:00:00"),
             ],

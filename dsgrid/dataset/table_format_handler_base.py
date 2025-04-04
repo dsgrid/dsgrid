@@ -47,19 +47,17 @@ class TableFormatHandlerBase(abc.ABC):
             Columns in the dataframe that contain load values.
         """
         columns = set(df.columns)
-        all_base_query_names = self.project_config.list_dimension_query_names(
-            category=DimensionCategory.BASE
-        )
+        all_base_names = self.project_config.list_dimension_names(category=DimensionCategory.BASE)
         for column in column_models:
-            query_name = column.dimension_query_name
-            if query_name in all_base_query_names or query_name in columns:
+            name = column.dimension_name
+            if name in all_base_names or name in columns:
                 continue
-            supp_dim = self._project_config.get_dimension_with_records(query_name)
+            supp_dim = self._project_config.get_dimension_with_records(name)
             existing_metadata = context.get_dimension_metadata(
                 supp_dim.model.dimension_type, dataset_id=self._dataset_id
             )
             existing_base_metadata = [
-                x for x in existing_metadata if x.dimension_query_name in all_base_query_names
+                x for x in existing_metadata if x.dimension_name in all_base_names
             ]
             if len(existing_base_metadata) != 1:
                 msg = (
@@ -67,11 +65,11 @@ class TableFormatHandlerBase(abc.ABC):
                     "{existing_base_metadata}"
                 )
                 raise Exception(msg)
-            base_dim_query_name = existing_base_metadata[0].dimension_query_name
-            if base_dim_query_name not in all_base_query_names:
-                msg = f"Bug: Expected {base_dim_query_name} to be a base dimension."
+            base_dim_name = existing_base_metadata[0].dimension_name
+            if base_dim_name not in all_base_names:
+                msg = f"Bug: Expected {base_dim_name} to be a base dimension."
                 raise Exception(msg)
-            base_dim = self._project_config.get_dimension_with_records(base_dim_query_name)
+            base_dim = self._project_config.get_dimension_with_records(base_dim_name)
             records = self._project_config.get_base_to_supplemental_mapping_records(
                 base_dim, supp_dim
             )
@@ -79,11 +77,11 @@ class TableFormatHandlerBase(abc.ABC):
             if column.function is not None:
                 # TODO #200: Do we want to allow this?
                 raise NotImplementedError(
-                    f"Applying a SQL function to added column={query_name} is not supported yet"
+                    f"Applying a SQL function to added column={name} is not supported yet"
                 )
-            expected_base_dim_cols = context.get_dimension_column_names_by_query_name(
+            expected_base_dim_cols = context.get_dimension_column_names_by_name(
                 supp_dim.model.dimension_type,
-                base_dim.model.dimension_query_name,
+                base_dim.model.name,
                 dataset_id=self._dataset_id,
             )
             if len(expected_base_dim_cols) > 1:
@@ -96,16 +94,16 @@ class TableFormatHandlerBase(abc.ABC):
                 records,
                 expected_base_dim_col,
                 drop_column=False,
-                to_column=query_name,
+                to_column=name,
             )
-            if context.model.result.column_type == ColumnType.DIMENSION_QUERY_NAMES:
+            if context.model.result.column_type == ColumnType.DIMENSION_NAMES:
                 assert supp_dim.model.dimension_type != DimensionType.TIME
-                column_names = [query_name]
+                column_names = [name]
             else:
                 column_names = [expected_base_dim_col]
             context.add_dimension_metadata(
                 supp_dim.model.dimension_type,
-                DimensionMetadataModel(dimension_query_name=query_name, column_names=column_names),
+                DimensionMetadataModel(dimension_name=name, column_names=column_names),
                 dataset_id=self.dataset_id,
             )
 
@@ -168,16 +166,16 @@ class TableFormatHandlerBase(abc.ABC):
         """Replace dimension record IDs with names."""
         assert not {"id", "name"}.intersection(df.columns), df.columns
         orig = df
-        all_query_names = self._project_config.get_dimension_query_names_mapped_to_type()
-        for dimension_query_name in set(df.columns).intersection(all_query_names.keys()):
-            if all_query_names[dimension_query_name] != DimensionType.TIME:
+        all_query_names = self._project_config.get_dimension_names_mapped_to_type()
+        for name in set(df.columns).intersection(all_query_names.keys()):
+            if all_query_names[name] != DimensionType.TIME:
                 # Time doesn't have records.
-                dim_config = self._project_config.get_dimension_with_records(dimension_query_name)
+                dim_config = self._project_config.get_dimension_with_records(name)
                 records = dim_config.get_records_dataframe().select("id", "name")
                 df = (
-                    df.join(records, on=df[dimension_query_name] == records["id"])
-                    .drop("id", dimension_query_name)
-                    .withColumnRenamed("name", dimension_query_name)
+                    df.join(records, on=df[name] == records["id"])
+                    .drop("id", name)
+                    .withColumnRenamed("name", name)
                 )
         assert df.count() == orig.count(), f"counts changed {df.count()} {orig.count()}"
         return df
@@ -199,25 +197,25 @@ class TableFormatHandlerBase(abc.ABC):
     ):
         group_by_cols: list[str] = []
         for column in columns:
-            dim = self._project_config.get_dimension(column.dimension_query_name)
+            dim = self._project_config.get_dimension(column.dimension_name)
             dim_type = dim.model.dimension_type
             match context.model.result.column_type:
                 case ColumnType.DIMENSION_TYPES:
-                    column_names = context.get_dimension_column_names_by_query_name(
-                        dim_type, column.dimension_query_name, dataset_id=self._dataset_id
+                    column_names = context.get_dimension_column_names_by_name(
+                        dim_type, column.dimension_name, dataset_id=self._dataset_id
                     )
                     if dim_type == DimensionType.TIME:
                         group_by_cols += column_names
                     else:
                         group_by_cols.append(dim_type.value)
-                case ColumnType.DIMENSION_QUERY_NAMES:
+                case ColumnType.DIMENSION_NAMES:
                     column_names = [column.get_column_name()]
                     expr = self._make_group_by_column_expr(column)
                     group_by_cols.append(expr)
-                    if not isinstance(expr, str) or expr != column.dimension_query_name:
+                    if not isinstance(expr, str) or expr != column.dimension_name:
                         # In this case we are replacing any existing query name with an expression
                         # or alias, and so the old name must be removed.
-                        final_metadata.remove_metadata(dim_type, column.dimension_query_name)
+                        final_metadata.remove_metadata(dim_type, column.dimension_name)
                 case _:
                     raise NotImplementedError(
                         f"Bug: unhandled: {context.model.result.column_type}"
@@ -225,7 +223,7 @@ class TableFormatHandlerBase(abc.ABC):
             final_metadata.add_metadata(
                 dim_type,
                 DimensionMetadataModel(
-                    dimension_query_name=column.dimension_query_name, column_names=column_names
+                    dimension_name=column.dimension_name, column_names=column_names
                 ),
             )
         return group_by_cols
@@ -233,9 +231,9 @@ class TableFormatHandlerBase(abc.ABC):
     @staticmethod
     def _make_group_by_column_expr(column):
         if column.function is None:
-            expr = column.dimension_query_name
+            expr = column.dimension_name
         else:
-            expr = column.function(column.dimension_query_name)
+            expr = column.function(column.dimension_name)
             if column.alias is not None:
                 expr = expr.alias(column.alias)
         return expr

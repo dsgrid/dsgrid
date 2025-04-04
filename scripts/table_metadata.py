@@ -12,7 +12,7 @@ from typing_extensions import Annotated
 class DimensionMetadata(BaseModel):
     """Defines the columns in a table for a dimension."""
 
-    dimension_query_name: str
+    dimension_name: str
     column_names: list[str] = Field(
         description="Columns associated with this dimension. Could be a dimension query name, "
         "the string-ified DimensionType, multiple strings as can happen with time, or dimension "

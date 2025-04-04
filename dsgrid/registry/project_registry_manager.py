@@ -51,7 +51,7 @@ from dsgrid.config.mapping_tables import (
     DatasetBaseToProjectMappingTableListModel,
 )
 from dsgrid.config.project_config import (
-    DatasetBaseDimensionQueryNamesModel,
+    DatasetBaseDimensionNamesModel,
     ProjectConfig,
     ProjectConfigModel,
     RequiredBaseDimensionModel,
@@ -480,7 +480,6 @@ class ProjectRegistryManager(RegistryManagerBase):
                     dim = DimensionModel(
                         filename=str(filename),
                         name=selector.name,
-                        display_name=selector.name,
                         dimension_type=subset_dimension.dimension_type,
                         module=base_dim.model.module,
                         class_name=base_dim.model.class_name,
@@ -584,20 +583,17 @@ class ProjectRegistryManager(RegistryManagerBase):
                         mapping_records.append({"from_id": record_id, "to_id": selector.name})
                         dim_record_ids.add(record_id)
 
-                filename = tmp_path / f"{subset_dimension_group.dimension_query_name}.csv"
+                filename = tmp_path / f"{subset_dimension_group.name}.csv"
                 pd.DataFrame(records).to_csv(filename, index=False)
 
                 for record_id in base_dim.get_unique_ids().difference(dim_record_ids):
                     mapping_records.append({"from_id": record_id, "to_id": ""})
-                map_record_file = (
-                    tmp_path / f"{subset_dimension_group.dimension_query_name}_mapping.csv"
-                )
+                map_record_file = tmp_path / f"{subset_dimension_group.name}_mapping.csv"
                 pd.DataFrame.from_records(mapping_records).to_csv(map_record_file, index=False)
 
                 dim = SupplementalDimensionModel(
                     filename=str(filename),
                     name=subset_dimension_group.name,
-                    display_name=subset_dimension_group.display_name,
                     dimension_type=dimension_type,
                     module=base_dim.model.module,
                     class_name=base_dim.model.class_name,
@@ -662,7 +658,6 @@ class ProjectRegistryManager(RegistryManagerBase):
                     new_dim = SupplementalDimensionModel(
                         filename=str(dim_record_file),
                         name=dim_name,
-                        display_name=dim_name_formal,
                         dimension_type=dimension_type,
                         module="dsgrid.dimension.base_models",
                         class_name="DimensionRecordBaseModel",
@@ -698,7 +693,6 @@ class ProjectRegistryManager(RegistryManagerBase):
     def _run_checks(self, config: ProjectConfig):
         dims = [x for x in config.iter_dimensions()]
         check_uniqueness((x.model.name for x in dims), "dimension name")
-        check_uniqueness((x.model.display_name for x in dims), "dimension display name")
         self._check_base_dimensions(config)
 
         for dataset_id in config.list_unregistered_dataset_ids():
@@ -724,22 +718,22 @@ class ProjectRegistryManager(RegistryManagerBase):
         self,
         config: ProjectConfig,
     ) -> None:
-        def set_dimension_query_name(req: RequiredBaseDimensionModel) -> None:
-            if req.dimension_query_name is None and req.dimension_name is not None:
+        def set_dimension_name(req: RequiredBaseDimensionModel) -> None:
+            if req.dimension_name is None and req.dimension_name is not None:
                 dim = config.get_dimension_by_name(req.dimension_name)
                 req.dimension_name = None
-                req.dimension_query_name = dim.model.dimension_query_name
+                req.dimension_name = dim.model.name
 
         for dataset in config.model.datasets:
             dim_type_as_fields = RequiredDimensionRecordsModel.model_fields.keys()
             for field in dim_type_as_fields:
                 req = getattr(dataset.required_dimensions.single_dimensional, field)
                 for base_field in ("base", "base_missing"):
-                    set_dimension_query_name(getattr(req, base_field))
+                    set_dimension_name(getattr(req, base_field))
                 for multi_dim in dataset.required_dimensions.multi_dimensional:
                     req = getattr(multi_dim, field)
                     for base_field in ("base", "base_missing"):
-                        set_dimension_query_name(getattr(req, base_field))
+                        set_dimension_name(getattr(req, base_field))
 
     def _check_dataset_record_requirement_definitions(
         self,
@@ -771,18 +765,18 @@ class ProjectRegistryManager(RegistryManagerBase):
         base_dims = config.list_base_dimensions(dimension_type=dim_type)
         for base_field in ("base", "base_missing"):
             reqs = getattr(req_dim_records, base_field)
-            if reqs.record_ids and reqs.dimension_query_name is None:
+            if reqs.record_ids and reqs.dimension_name is None:
                 if len(base_dims) == 1:
-                    reqs.dimension_query_name = base_dims[0].model.dimension_query_name
+                    reqs.dimension_name = base_dims[0].model.name
                     logger.debug(
-                        "Assigned dimension_query_name=%s for %s dataset_id=%s",
-                        reqs.dimension_query_name,
+                        "Assigned dimension_name=%s for %s dataset_id=%s",
+                        reqs.dimension_name,
                         dim_type,
                         dataset_id,
                     )
                 else:
                     msg = (
-                        f"{dataset_id=} requires a base dimension query name for "
+                        f"{dataset_id=} requires a base dimension name for "
                         f"{dim_type} because the project has {len(base_dims)} base dimensions."
                     )
                     raise DSGInvalidDimensionMapping(msg)
@@ -1265,9 +1259,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         context: RegistrationContext,
     ):
         project_config.add_dataset_dimension_mappings(dataset_config, mapping_references)
-        project_config.add_dataset_base_dimension_query_names(
+        project_config.add_dataset_base_dimension_names(
             dataset_config.model.dataset_id,
-            self._id_base_dimension_query_names_in_dataset(
+            self._id_base_dimension_names_in_dataset(
                 project_config, dataset_config, mapping_references
             ),
         )
@@ -1344,20 +1338,20 @@ class ProjectRegistryManager(RegistryManagerBase):
                     diff, mapped_dataset_table, dataset_config, project_config.config_id
                 )
 
-    def _id_base_dimension_query_names_in_dataset(
+    def _id_base_dimension_names_in_dataset(
         self,
         project_config: ProjectConfig,
         dataset_config: DatasetConfig,
         mapping_references: list[DimensionMappingReferenceModel],
-    ) -> DatasetBaseDimensionQueryNamesModel:
-        base_dimension_query_names: dict[DimensionType, str] = {}
+    ) -> DatasetBaseDimensionNamesModel:
+        base_dimension_names: dict[DimensionType, str] = {}
         for ref in mapping_references:
             mapping = self._dimension_mapping_mgr.get_by_id(ref.mapping_id, version=ref.version)
             base_dim = self._dimension_mgr.get_by_id(
                 mapping.model.to_dimension.dimension_id,
                 version=mapping.model.to_dimension.version,
             ).model
-            base_dimension_query_names[base_dim.dimension_type] = base_dim.dimension_query_name
+            base_dimension_names[base_dim.dimension_type] = base_dim.name
 
         project_base_dims_by_type: dict[DimensionType, list[DimensionBaseConfig]] = defaultdict(
             list
@@ -1369,11 +1363,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         for dim_type in DimensionType:
             if dim_type == DimensionType.TIME:
                 assert len(project_base_dims_by_type[dim_type]) == 1
-                base_dimension_query_names[dim_type] = project_base_dims_by_type[dim_type][
-                    0
-                ].model.dimension_query_name
+                base_dimension_names[dim_type] = project_base_dims_by_type[dim_type][0].model.name
                 continue
-            if dim_type not in base_dimension_query_names:
+            if dim_type not in base_dimension_names:
                 project_base_dims = project_base_dims_by_type[dim_type]
                 if len(project_base_dims) > 1:
                     for project_dim in project_base_dims:
@@ -1384,17 +1376,17 @@ class ProjectRegistryManager(RegistryManagerBase):
                         dataset_records = dataset_dim.get_records_dataframe()
                         dataset_record_ids = get_unique_values(dataset_records, "id")
                         if dataset_record_ids.issubset(project_record_ids):
-                            project_query_name = project_dim.model.dimension_query_name
-                            if dim_type in base_dimension_query_names:
+                            project_dim_name = project_dim.model.name
+                            if dim_type in base_dimension_names:
                                 msg = (
                                     f"Found multiple project base dimensions for {dataset_id=} "
-                                    f"and {dim_type=}: {base_dimension_query_names[dim_type]} and "
-                                    f"{project_query_name}. Please specify a mapping."
+                                    f"and {dim_type=}: {base_dimension_names[dim_type]} and "
+                                    f"{project_dim_name}. Please specify a mapping."
                                 )
                                 raise DSGInvalidDataset(msg)
 
-                            base_dimension_query_names[dim_type] = project_query_name
-                    if dim_type not in base_dimension_query_names:
+                            base_dimension_names[dim_type] = project_dim_name
+                    if dim_type not in base_dimension_names:
                         msg = (
                             f"Bug: {dim_type} has multiple base dimensions in the project, dataset "
                             f"{dataset_id} does not specify a mapping, and dsgrid could not "
@@ -1402,12 +1394,10 @@ class ProjectRegistryManager(RegistryManagerBase):
                         )
                         raise DSGInvalidDataset(msg)
                 else:
-                    base_dimension_query_names[dim_type] = project_base_dims[
-                        0
-                    ].model.dimension_query_name
+                    base_dimension_names[dim_type] = project_base_dims[0].model.name
 
-        data = {k.value: v for k, v in base_dimension_query_names.items()}
-        return DatasetBaseDimensionQueryNamesModel(**data)
+        data = {k.value: v for k, v in base_dimension_names.items()}
+        return DatasetBaseDimensionNamesModel(**data)
 
     def _handle_dimension_association_errors(
         self, diff, mapped_dataset_table, dataset_config, project_id

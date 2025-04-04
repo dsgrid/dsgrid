@@ -18,7 +18,7 @@
       "dimension_filters": [
         {
           "dimension_type": "geography",
-          "dimension_query_name": "county",
+          "dimension_name": "county",
           "column": "id",
           "operator": "isin",
           "value": [
@@ -29,7 +29,7 @@
         },
         {
           "dimension_type": "subsector",
-          "dimension_query_name": "subsector",
+          "dimension_name": "subsector",
           "column": "id",
           "operator": "isin",
           "value": [
@@ -40,7 +40,7 @@
         },
         {
           "dimension_type": "metric",
-          "dimension_query_name": "electricity_end_uses",
+          "dimension_name": "electricity_end_uses",
           "column": "id",
           "value": "%",
           "operator": "like",

@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Generator, Iterable, Optional, Type
 
 import pandas as pd
-from pydantic import conlist, field_validator, model_validator, Field, ValidationInfo
+from pydantic import conlist, field_validator, model_validator, Field
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import (
@@ -53,8 +53,6 @@ from dsgrid.config.dimensions import (
     DimensionsListModel,
     DimensionReferenceModel,
     DimensionModel,
-    check_display_name,
-    generate_dimension_query_name,
 )
 from dsgrid.dimension.time import (
     TimeBasedDataAdjustmentModel,
@@ -98,12 +96,6 @@ class SubsetDimensionGroupModel(DSGBaseModel):
     """Defines one or more subset dimension selectors for a dimension type."""
 
     name: str
-    display_name: str
-    dimension_query_name: Optional[str] = Field(
-        default=None,
-        title="dimension_query_name",
-        description="Auto-generated query name for SQL queries.",
-    )
     description: str
     dimension_type: DimensionType = Field(
         title="dimension_type",
@@ -143,18 +135,6 @@ class SubsetDimensionGroupModel(DSGBaseModel):
         "for this type.",
     )
     record_ids: set[str] = set()
-
-    @field_validator("display_name")
-    @classmethod
-    def check_display_name(cls, display_name):
-        return check_display_name(display_name)
-
-    @field_validator("dimension_query_name")
-    @classmethod
-    def check_query_name(cls, dimension_query_name, info: ValidationInfo):
-        if "display_name" not in info.data:
-            return dimension_query_name
-        return generate_dimension_query_name(dimension_query_name, info.data["display_name"])
 
     @field_validator("selectors")
     @classmethod
@@ -331,29 +311,26 @@ class DimensionsModel(DSGBaseModel):
     @field_validator("subset_dimensions")
     @classmethod
     def check_subset_dimensions(cls, subset_dimensions):
-        """Check that each subset dimension has a unique name and display_name."""
+        """Check that each subset dimension has a unique name."""
         check_uniqueness([x.name for x in subset_dimensions], "subset dimensions name")
-        check_uniqueness(
-            [x.display_name for x in subset_dimensions], "subset dimensions display_name"
-        )
         return subset_dimensions
 
     @model_validator(mode="after")
-    def check_dimension_query_names(self) -> "DimensionsModel":
+    def check_dimension_names(self) -> "DimensionsModel":
         """Check that all dimension query names are unique."""
-        query_names = set()
+        names: set[str] = set()
 
         def add_name(name):
-            if name in query_names:
-                raise ValueError(f"dimension_query_name={name} is not unique in the project")
-            query_names.add(name)
+            if name in names:
+                raise ValueError(f"dimension_name={name} is not unique in the project")
+            names.add(name)
 
         for dim in self.base_dimensions:
-            add_name(dim.dimension_query_name)
+            add_name(dim.name)
         for dim in self.supplemental_dimensions:
-            add_name(dim.dimension_query_name)
+            add_name(dim.name)
         for group in self.subset_dimensions:
-            add_name(group.display_name)
+            add_name(group.name)
             for selector in group.selectors:
                 add_name(selector.name)
 
@@ -379,21 +356,9 @@ class RequiredBaseDimensionModel(DSGBaseModel):
     record_ids: list[str] = []
     dimension_name: Optional[str] = Field(
         default=None,
-        description="Identifies the dimension before the dimension_query_name has been "
-        "auto-generated.",
-    )
-    dimension_query_name: Optional[str] = Field(
-        default=None,
         description="Identifies which base dimension contains the record IDs. Required if there "
         "is more than one base dimension for a given dimension type.",
     )
-
-    @model_validator(mode="after")
-    def check_dimension_query_name(self) -> "RequiredBaseDimensionModel":
-        if self.dimension_name and self.dimension_query_name:
-            msg = f"{self.dimension_name=} and {self.dimension_query_name=} cannot both be set"
-            raise ValueError(msg)
-        return self
 
 
 class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
@@ -558,7 +523,7 @@ class RequiredDimensionsModel(DSGBaseModel):
         return self
 
 
-class DatasetBaseDimensionQueryNamesModel(DSGBaseModel):
+class DatasetBaseDimensionNamesModel(DSGBaseModel):
     """Defines the query names for project base dimensions to which datasets will be mapped.
     This is important for cases where a project has multiple base dimensions of the same type.
     """
@@ -622,11 +587,11 @@ class InputDatasetModel(DSGBaseModel):
         "Auto-populated during submission.",
         default=[],
     )
-    base_dimension_query_names: DatasetBaseDimensionQueryNamesModel = Field(
-        title="base_dimension_query_names",
+    base_dimension_names: DatasetBaseDimensionNamesModel = Field(
+        title="base_dimension_names",
         description="Defines the project base dimensions to which the dataset will map itself. "
         "Auto-populated during submission.",
-        default=DatasetBaseDimensionQueryNamesModel(),
+        default=DatasetBaseDimensionNamesModel(),
     )
     status: DatasetRegistryStatus = Field(
         title="status",
@@ -769,7 +734,7 @@ class DimensionsByCategoryModel(DSGBaseModel):
     supplemental: list[str]
 
 
-class ProjectDimensionQueryNamesModel(DSGBaseModel):
+class ProjectDimensionNamesModel(DSGBaseModel):
     """Defines the query names for all base and supplemental dimensions in the project."""
 
     # This is here because Pydantic doesn't like fields that start with 'model_'
@@ -796,7 +761,7 @@ class ProjectConfig(ConfigBase):
         ] = {}
         self._supplemental_dimensions: dict[ConfigKey, DimensionBaseConfig] = {}
         self._base_to_supplemental_mappings: dict[ConfigKey, MappingTableConfig] = {}
-        self._dimensions_by_query_name: dict[str, DimensionBaseConfig] = {}
+        self._dimensions_by_name: dict[str, DimensionBaseConfig] = {}
 
     @staticmethod
     def model_class() -> Type:
@@ -807,25 +772,22 @@ class ProjectConfig(ConfigBase):
         return "project.json5"
 
     def get_base_dimension(
-        self, dimension_type: DimensionType, dimension_query_name: Optional[str] = None
+        self, dimension_type: DimensionType, dimension_name: Optional[str] = None
     ) -> DimensionBaseConfig:
         """Return the base dimension matching dimension_type.
-        If there is more than one base dimension of the given type, dimension_query_name is
+        If there is more than one base dimension of the given type, dimension_name is
         required.
 
         See also
         --------
         list_base_dimensions
         """
-        if dimension_query_name is None:
+        if dimension_name is None:
             return self._get_single_base_dimension(dimension_type)
         for dim in self._iter_base_dimensions():
-            if (
-                dim.model.dimension_type == dimension_type
-                and dim.model.dimension_query_name == dimension_query_name
-            ):
+            if dim.model.dimension_type == dimension_type and dim.model.name == dimension_name:
                 return dim
-        msg = f"Did not find a dimension of {dimension_type=} with {dimension_query_name=}"
+        msg = f"Did not find a dimension of {dimension_type=} with {dimension_name=}"
         raise DSGValueNotRegistered(msg)
 
     def get_base_time_dimension(self) -> TimeDimensionBaseConfig:
@@ -844,25 +806,22 @@ class ProjectConfig(ConfigBase):
             raise DSGValueNotRegistered(msg)
 
         if len(dims) > 1:
-            qnames = " ".join([x.model.dimension_query_name for x in dims])
+            qnames = " ".join([x.model.name for x in dims])
             msg = (
                 f"Found multiple base dimensions for {dimension_type=}: {qnames}. "
-                "Call get_base_dimension() with a specific dimension_query_name."
+                "Call get_base_dimension() with a specific name."
             )
             raise DSGInvalidDimension(msg)
         return dims[0]
 
     def get_base_dimension_and_version(
-        self, dimension_type: DimensionType, dimension_query_name: Optional[str] = None
+        self, dimension_type: DimensionType, dimension_name: Optional[str] = None
     ) -> tuple[DimensionBaseConfig, str]:
         """Return the base dimension and version matching dimension_type."""
         res: tuple[DimensionBaseConfig, str] | None = None
         for key, dim in self.base_dimensions.items():
             if dim.model.dimension_type == dimension_type:
-                if (
-                    dimension_query_name is None
-                    or dim.model.dimension_query_name == dimension_query_name
-                ):
+                if dimension_name is None or dim.model.name == dimension_name:
                     if res is not None:
                         msg = (
                             f"Found multiple base dimensions for {dimension_type=}. "
@@ -872,22 +831,20 @@ class ProjectConfig(ConfigBase):
                     res = dim, key.version
 
         if res is None:
-            msg = f"Did not find a dimension with {dimension_type=} {dimension_query_name=}"
+            msg = f"Did not find a dimension with {dimension_type=} {dimension_name=}"
             raise DSGValueNotRegistered(msg)
         return res
 
-    def get_dimension(self, dimension_query_name: str) -> DimensionBaseConfig:
-        """Return the dimension with dimension_query_name."""
-        dim = self._dimensions_by_query_name.get(dimension_query_name)
+    def get_dimension(self, name: str) -> DimensionBaseConfig:
+        """Return the dimension with name."""
+        dim = self._dimensions_by_name.get(name)
         if dim is None:
-            raise DSGValueNotRegistered(
-                f"dimension_query_name={dimension_query_name} is not stored"
-            )
+            raise DSGValueNotRegistered(f"dimension_name={name} is not stored")
         return dim
 
-    def get_time_dimension(self, dimension_query_name: str) -> TimeDimensionBaseConfig:
-        """Return the time dimension with dimension_query_name."""
-        dim = self.get_dimension(dimension_query_name)
+    def get_time_dimension(self, name: str) -> TimeDimensionBaseConfig:
+        """Return the time dimension with dimension_name."""
+        dim = self.get_dimension(name)
         if not isinstance(dim, TimeDimensionBaseConfig):
             msg = f"{dim.model.label} is not a time dimension"
             raise DSGInvalidParameter(msg)
@@ -902,25 +859,23 @@ class ProjectConfig(ConfigBase):
         msg = f"No base dimension with {name=} is stored."
         raise DSGValueNotRegistered(msg)
 
-    def get_dimension_with_records(
-        self, dimension_query_name: str
-    ) -> DimensionBaseConfigWithFiles:
-        """Return a dimension config matching dimension_query_name that has records."""
-        dim = self._dimensions_by_query_name.get(dimension_query_name)
+    def get_dimension_with_records(self, name: str) -> DimensionBaseConfigWithFiles:
+        """Return a dimension config matching name that has records."""
+        dim = self._dimensions_by_name.get(name)
         if dim is None:
-            raise DSGInvalidDimension(f"{dimension_query_name=} is not stored")
+            raise DSGInvalidDimension(f"{name=} is not stored")
         if not isinstance(dim, DimensionBaseConfigWithFiles):
             msg = f"{dim.model.label} does not have records"
             raise DSGInvalidParameter(msg)
         return dim
 
-    def get_dimension_records(self, dimension_query_name: str) -> DataFrame:
+    def get_dimension_records(self, name: str) -> DataFrame:
         """Return a DataFrame containing the records for a dimension."""
-        return self.get_dimension_with_records(dimension_query_name).get_records_dataframe()
+        return self.get_dimension_with_records(name).get_records_dataframe()
 
-    def get_dimension_record_ids(self, dimension_query_name: str) -> set[str]:
-        """Return the record IDs for the dimension identified by dimension_query_name."""
-        return self.get_dimension_with_records(dimension_query_name).get_unique_ids()
+    def get_dimension_record_ids(self, name: str) -> set[str]:
+        """Return the record IDs for the dimension identified by name."""
+        return self.get_dimension_with_records(name).get_unique_ids()
 
     def get_dimension_reference(self, dimension_id: str) -> DimensionReferenceModel:
         """Return the reference of the dimension matching dimension_id."""
@@ -1080,7 +1035,7 @@ class ProjectConfig(ConfigBase):
                 return True
         return False
 
-    def list_dimension_query_names(self, category: DimensionCategory | None = None) -> list[str]:
+    def list_dimension_names(self, category: DimensionCategory | None = None) -> list[str]:
         """Return query names for all dimensions in the project.
 
         Parameters
@@ -1089,7 +1044,7 @@ class ProjectConfig(ConfigBase):
             Optionally, filter return by category.
         """
         if category is None:
-            return sorted(self._dimensions_by_query_name.keys())
+            return sorted(self._dimensions_by_name.keys())
 
         match category:
             case DimensionCategory.BASE:
@@ -1101,67 +1056,62 @@ class ProjectConfig(ConfigBase):
             case _:
                 raise NotImplementedError(f"{category=}")
 
-        return sorted((x.model.dimension_query_name for x in method()))
+        return sorted((x.model.name for x in method()))
 
-    def list_dimension_query_names_by_type(self, dimension_type: DimensionType) -> list[str]:
+    def list_dimension_names_by_type(self, dimension_type: DimensionType) -> list[str]:
         """List the query names available for a dimension type."""
         return [
-            x.model.dimension_query_name
+            x.model.name
             for x in self.iter_dimensions()
             if x.model.dimension_type == dimension_type
         ]
 
-    def get_dimension_query_names_mapped_to_type(self) -> dict[str, DimensionType]:
+    def get_dimension_names_mapped_to_type(self) -> dict[str, DimensionType]:
         """Return a dict of query names mapped to their dimension type."""
-        return {
-            x.model.dimension_query_name: x.model.dimension_type for x in self.iter_dimensions()
-        }
+        return {x.model.name: x.model.dimension_type for x in self.iter_dimensions()}
 
-    def get_dimension_type_to_base_query_name_mapping(self) -> dict[DimensionType, list[str]]:
+    def get_dimension_type_to_base_name_mapping(self) -> dict[DimensionType, list[str]]:
         """Return a mapping of DimensionType to query names for base dimensions."""
         query_names: dict[DimensionType, list[str]] = {}
         for dimension_type in DimensionType:
             query_names[dimension_type] = [
-                x.model.dimension_query_name
-                for x in self.list_base_dimensions(dimension_type=dimension_type)
+                x.model.name for x in self.list_base_dimensions(dimension_type=dimension_type)
             ]
         return query_names
 
-    def get_subset_dimension_to_query_name_mapping(self) -> dict[DimensionType, list[str]]:
+    def get_subset_dimension_to_name_mapping(self) -> dict[DimensionType, list[str]]:
         """Return a mapping of DimensionType to query name for subset dimensions."""
         query_names = defaultdict(list)
         for dimension_type in DimensionType:
             if dimension_type in self._subset_dimensions:
                 for selectors in self._subset_dimensions[dimension_type].values():
                     for dim in selectors.values():
-                        query_names[dimension_type].append(dim.model.dimension_query_name)
+                        query_names[dimension_type].append(dim.model.name)
         return query_names
 
-    def get_supplemental_dimension_to_query_name_mapping(self) -> dict[DimensionType, list[str]]:
+    def get_supplemental_dimension_to_name_mapping(self) -> dict[DimensionType, list[str]]:
         """Return a mapping of DimensionType to query name for supplemental dimensions."""
         query_names = {}
         for dimension_type in DimensionType:
             query_names[dimension_type] = [
-                x.model.dimension_query_name
-                for x in self.list_supplemental_dimensions(
-                    dimension_type, sort_by="dimension_query_name"
-                )
+                x.model.name
+                for x in self.list_supplemental_dimensions(dimension_type, sort_by="name")
             ]
         return query_names
 
-    def get_dimension_query_names_model(self) -> ProjectDimensionQueryNamesModel:
-        """Return an instance of ProjectDimensionQueryNamesModel for the project."""
-        base_query_names_by_type = self.get_dimension_type_to_base_query_name_mapping()
-        subset_query_names_by_type = self.get_subset_dimension_to_query_name_mapping()
-        supp_query_names_by_type = self.get_supplemental_dimension_to_query_name_mapping()
+    def get_dimension_names_model(self) -> ProjectDimensionNamesModel:
+        """Return an instance of ProjectDimensionNamesModel for the project."""
+        base_names_by_type = self.get_dimension_type_to_base_name_mapping()
+        subset_names_by_type = self.get_subset_dimension_to_name_mapping()
+        supp_names_by_type = self.get_supplemental_dimension_to_name_mapping()
         model: dict[str, Any] = {}
         for dimension_type in DimensionType:
             model[dimension_type.value] = {
-                "base": base_query_names_by_type[dimension_type],
-                "subset": subset_query_names_by_type[dimension_type],
-                "supplemental": supp_query_names_by_type[dimension_type],
+                "base": base_names_by_type[dimension_type],
+                "subset": subset_names_by_type[dimension_type],
+                "supplemental": supp_names_by_type[dimension_type],
             }
-        return ProjectDimensionQueryNamesModel(**model)
+        return ProjectDimensionNamesModel(**model)
 
     def set_dimensions(
         self,
@@ -1177,14 +1127,13 @@ class ProjectConfig(ConfigBase):
         self._base_dimensions.update(base_dimensions)
         self._subset_dimensions.update(subset_dimensions)
         self._supplemental_dimensions.update(supplemental_dimensions)
-        self._dimensions_by_query_name.clear()
+        self._dimensions_by_name.clear()
         for dim in self.iter_dimensions():
-            if dim.model.dimension_query_name in self._dimensions_by_query_name:
+            if dim.model.name in self._dimensions_by_name:
                 raise DSGInvalidDimension(
-                    f"dimension_query_name={dim.model.dimension_query_name} exists multiple times in project "
-                    f"{self.config_id}"
+                    f"name={dim.model.name} exists multiple times in project " f"{self.config_id}"
                 )
-            self._dimensions_by_query_name[dim.model.dimension_query_name] = dim
+            self._dimensions_by_name[dim.model.name] = dim
 
     def set_dimension_mappings(
         self, base_to_supplemental_mappings: dict[ConfigKey, MappingTableConfig]
@@ -1218,22 +1167,20 @@ class ProjectConfig(ConfigBase):
                     reference.mapping_id,
                 )
 
-    def add_dataset_base_dimension_query_names(
-        self, dataset_id: str, base_dimension_query_names: DatasetBaseDimensionQueryNamesModel
+    def add_dataset_base_dimension_names(
+        self, dataset_id: str, base_dimension_names: DatasetBaseDimensionNamesModel
     ):
         """Add project base dimension query names represented in the dataset."""
-        for field in base_dimension_query_names.model_fields:
-            if getattr(base_dimension_query_names, field) is None:
-                msg = f"DatasetBaseDimensionQueryNamesModel {field} cannot be None"
+        for field in base_dimension_names.model_fields:
+            if getattr(base_dimension_names, field) is None:
+                msg = f"DatasetBaseDimensionNamesModel {field} cannot be None"
                 raise DSGInvalidParameter(msg)
         dataset = self.get_dataset(dataset_id)
-        dataset.base_dimension_query_names = base_dimension_query_names
+        dataset.base_dimension_names = base_dimension_names
 
-    def get_dataset_base_dimension_query_names(
-        self, dataset_id: str
-    ) -> DatasetBaseDimensionQueryNamesModel:
+    def get_dataset_base_dimension_names(self, dataset_id: str) -> DatasetBaseDimensionNamesModel:
         """Return the project base dimension query names represented in the dataset."""
-        return self.get_dataset(dataset_id).base_dimension_query_names
+        return self.get_dataset(dataset_id).base_dimension_names
 
     @property
     def config_id(self) -> str:
@@ -1267,9 +1214,9 @@ class ProjectConfig(ConfigBase):
         # TODO: what about benchmark and historical?
         return False
 
-    def get_load_data_time_columns(self, dimension_query_name: str) -> list[str]:
+    def get_load_data_time_columns(self, name: str) -> list[str]:
         """Return the time dimension columns expected in the load data table for this query name."""
-        dim = self.get_time_dimension(dimension_query_name)
+        dim = self.get_time_dimension(name)
         time_columns = dim.get_load_data_time_columns()
         return time_columns
 
@@ -1391,14 +1338,12 @@ class ProjectConfig(ConfigBase):
         if not reqs.base.record_ids and not reqs.base_missing.record_ids:
             return record_ids
 
-        base_dim_query_name = (
-            reqs.base.dimension_query_name or reqs.base_missing.dimension_query_name
-        )
+        base_dim_query_name = reqs.base.dimension_name or reqs.base_missing.dimension_name
         assert base_dim_query_name is not None
         all_base_record_ids = self.get_dimension_record_ids(base_dim_query_name)
 
         if reqs.base.record_ids == ["__all__"]:
-            assert reqs.base.dimension_query_name is not None
+            assert reqs.base.dimension_name is not None
             record_ids = all_base_record_ids
         elif reqs.base.record_ids:
             record_ids = set(reqs.base.record_ids)
@@ -1406,17 +1351,17 @@ class ProjectConfig(ConfigBase):
                 msg = (
                     "The project config requires these these record IDs in the dataset's 'base' "
                     "field, but they are not in the base dimension records: "
-                    f"dimension_query_name={base_dim_query_name}: {diff=}"
+                    f"name={base_dim_query_name}: {diff=}"
                 )
                 raise DSGInvalidDataset(msg)
         elif reqs.base_missing.record_ids:
-            assert reqs.base_missing.dimension_query_name is not None
+            assert reqs.base_missing.dimension_name is not None
             missing_ids = set(reqs.base_missing.record_ids)
             if diff := missing_ids - all_base_record_ids:
                 msg = (
                     "The project config requires these these record IDs in the dataset's "
                     "'base_missing' field, but they are not in the base dimension "
-                    f"dimension_query_name={base_dim_query_name}: {diff=}"
+                    f"name={base_dim_query_name}: {diff=}"
                 )
                 raise DSGInvalidDataset(msg)
             record_ids = all_base_record_ids - missing_ids

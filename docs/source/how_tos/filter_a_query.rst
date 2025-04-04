@@ -34,7 +34,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters: [
         {
           dimension_type: "geography",
-          dimension_query_name: "county",
+          dimension_name: "county",
           operator: "==",
           value: "06037",
           filter_type: "expression",
@@ -47,7 +47,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters=[
           DimensionFilterExpressionModel(
               dimension_type=DimensionType.GEOGRAPHY",
-              dimension_query_name="county",
+              dimension_name="county",
               operator="==",
               value="06037",
               negate=False,
@@ -73,7 +73,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters: [
         {
           dimension_type: "geography",
-          dimension_query_name: "county",
+          dimension_name: "county",
           value: "== '06037'",
           filter_type: "expression_raw",
           negate: false,
@@ -85,7 +85,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters=[
           DimensionFilterExpressionRawModel(
               dimension_type=DimensionType.GEOGRAPHY",
-              dimension_query_name="county",
+              dimension_name="county",
               value="== '06037'",
               negate=False,
           ),
@@ -106,7 +106,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters: [
         {
           dimension_type: "model_year",
-          dimension_query_name: "model_year",
+          dimension_name: "model_year",
           column: "id",
           operator: "isin",
           value: [
@@ -119,7 +119,7 @@ the table is the load data dataframe with time-series information.
         },
         {
           dimension_type: "sector",
-          dimension_query_name: "sector",
+          dimension_name: "sector",
           column: "id",
           operator: "startswith",
           value: "com",
@@ -133,7 +133,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters=[
           DimensionFilterColumnOperatorModel(
               dimension_type=DimensionType.MODEL_YEAR,
-              dimension_query_name="model_year",
+              dimension_name="model_year",
               column=id,
               operator="isin",
               value=[
@@ -145,7 +145,7 @@ the table is the load data dataframe with time-series information.
           ),
           DimensionFilterColumnOperatorModel(
               dimension_type="sector",
-              dimension_query_name="sector",
+              dimension_name="sector",
               column="id",
               operator="startswith",
               value="com",
@@ -200,7 +200,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters: [
         {
           dimension_type: "geography",
-          dimension_query_name: "state",
+          dimension_name: "state",
           column: "id",
           operator: "isin",
           value: ["CO", "NM"],
@@ -213,7 +213,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters=[
           SupplementalDimensionFilterColumnOperatorModel(
               dimension_type=DimensionType.GEOGRAPHY,
-              dimension_query_name="state",
+              dimension_name="state",
               column="id",
               operator="isin",
               value=["CO", "NM"],
@@ -233,7 +233,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters: [
         {
           dimension_type: "time",
-          dimension_query_name: "time_est",
+          dimension_name: "time_est",
           column: "time_est",
           lower_bound: "2012-07-01 00:00:00",
           upper_bound: "2012-08-01 00:00:00",
@@ -247,7 +247,7 @@ the table is the load data dataframe with time-series information.
       dimension_filters=[
           DimensionFilterBetweenColumnOperatorModel(
               dimension_type=DimensionType.TIME,
-              dimension_query_name="time_est",
+              dimension_name="time_est",
               column="time_est",
               lower_bound="2012-07-01 00:00:00",
               upper_bound="2012-08-01 00:00:00",

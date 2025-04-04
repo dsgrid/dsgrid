@@ -85,7 +85,6 @@ def make_date_time_config():
     return DateTimeDimensionConfig(
         DateTimeDimensionModel(
             name="Time EST",
-            display_name="Time EST",
             description="test",
             class_name="Time",
             type=DimensionType.TIME,
@@ -109,7 +108,6 @@ def make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config():
     return RepresentativePeriodTimeDimensionConfig(
         RepresentativePeriodTimeDimensionModel(
             name="one_weekday_day_and_one_weekend_day_per_month_by_hour",
-            display_name="Hourly for representative days",
             description="test",
             class_name="Time",
             type=DimensionType.TIME,

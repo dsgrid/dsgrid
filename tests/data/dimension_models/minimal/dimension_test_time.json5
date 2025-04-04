@@ -7,7 +7,6 @@
       description: "Time dimension, 2012 hourly MST, period-beginning, total value\n",
       frequency: "01:00:00",
       name: "Time-2012-EST-hourly-periodBeginning-total",
-      display_name: "2012 Hourly MST",
       time_interval_type: "period_beginning",
       ranges: [
         {
@@ -29,7 +28,6 @@
       description: "Daily time 2018\n",
       frequency: "P1D",
       name: "daily_time",
-      display_name: "Daily",
       time_interval_type: "instantaneous",
       ranges: [
         {
@@ -51,7 +49,6 @@
       description: "Time dimension, 2016 hourly EPT, period-ending, total value\n",
       frequency: "06:00:00",
       name: "Time-2016-EPT-hourly-periodEnding-total",
-      display_name: "2016 6-Hour Timestep EPT",
       time_interval_type: "period_ending",
       ranges: [
         {
@@ -73,7 +70,6 @@
       description: "Time dimension, 2012 15-min UTC, period-ending, total value\n",
       frequency: "00:15:00",
       name: "Time-2012-UTC-model-15min-periodEnding-total",
-      display_name: "time",
       time_interval_type: "period_ending",
       ranges: [
         {
@@ -95,7 +91,6 @@
       description: "Annual time",
       module: "dsgrid.dimension.standard",
       name: "Annual-time-with-leap-year",
-      display_name: "Annual",
       ranges: [
         {
           start: "2020",
@@ -110,7 +105,6 @@
       "class": "Time",
       type: "time",
       name: "Time of Week by Month",
-      display_name: "Hourly for Representative Weeks",
       ranges: [
         {
           start: 1,
@@ -127,7 +121,6 @@
       "class": "Time",
       type: "time",
       name: "Local-model-time-2012-index",
-      display_name: "time",
       time_type: "index",
       ranges: [
 	      {
@@ -151,7 +144,6 @@
       description: "Industrial time, stitched from representative diurnal profiles in county local clock time that is laid out like standard time. Both the data and timestamps need daylight saving adjustment to local prevailing time.",
       frequency: "01:00:00",
       name: "Local-model-time-2012",
-      display_name: "time",
       time_interval_type: "period_beginning",
       ranges: [
         {

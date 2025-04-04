@@ -1,7 +1,7 @@
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.config.dimensions import DimensionCommonModel, ProjectDimensionModel
-from dsgrid.config.project_config import ProjectConfigModel, ProjectDimensionQueryNamesModel
+from dsgrid.config.project_config import ProjectConfigModel, ProjectDimensionNamesModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.query.models import ReportType
@@ -39,27 +39,27 @@ class ListProjectDimensionsResponse(DSGBaseModel):
     dimensions: list[ProjectDimensionModel]
 
 
-class GetProjectDimensionQueryNamesResponse(DSGBaseModel):
-    """Defines the reponse to the get_project_dimension_query_names command."""
+class GetProjectDimensionNamesResponse(DSGBaseModel):
+    """Defines the reponse to the get_project_dimension_names command."""
 
     project_id: str
-    dimension_query_names: ProjectDimensionQueryNamesModel
+    dimension_names: ProjectDimensionNamesModel
 
 
-class GetProjectBaseDimensionQueryNameResponse(DSGBaseModel):
-    """Defines the reponse to the get_project_dimension_query_name command."""
-
-    project_id: str
-    dimension_type: DimensionType
-    dimension_query_name: str
-
-
-class ListProjectSupplementalDimensionQueryNames(DSGBaseModel):
-    """Defines the response to the list_project_supplemental_dimension_query_names command"""
+class GetProjectBaseDimensionNameResponse(DSGBaseModel):
+    """Defines the reponse to the get_project_dimension_name command."""
 
     project_id: str
     dimension_type: DimensionType
-    dimension_query_names: list[str]
+    dimension_name: str
+
+
+class ListProjectSupplementalDimensionNames(DSGBaseModel):
+    """Defines the response to the list_project_supplemental_dimension_names command"""
+
+    project_id: str
+    dimension_type: DimensionType
+    dimension_names: list[str]
 
 
 class ListDimensionTypesResponse(DSGBaseModel):

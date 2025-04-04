@@ -9,7 +9,7 @@ from zipfile import ZipFile
 from semver import VersionInfo
 
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.config.project_config import DatasetBaseDimensionQueryNamesModel
+from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
@@ -148,26 +148,24 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             return df, DatasetMetadataModel.from_file(metadata_file)
         return None, None
 
-    def _run_checks(self, model: ProjectQueryModel) -> DatasetBaseDimensionQueryNamesModel:
-        subsets = set(self.project.config.list_dimension_query_names(DimensionCategory.SUBSET))
+    def _run_checks(self, model: ProjectQueryModel) -> DatasetBaseDimensionNamesModel:
+        subsets = set(self.project.config.list_dimension_names(DimensionCategory.SUBSET))
         for agg in model.result.aggregations:
             for _, column in agg.iter_dimensions_to_keep():
-                dimension_query_name = column.dimension_query_name
-                if dimension_query_name in subsets:
-                    subset_dim = self._project.config.get_dimension(dimension_query_name)
+                dimension_name = column.dimension_name
+                if dimension_name in subsets:
+                    subset_dim = self._project.config.get_dimension(dimension_name)
                     dim_type = subset_dim.model.dimension_type
                     supp_names = " ".join(
-                        self._project.config.get_supplemental_dimension_to_query_name_mapping()[
-                            dim_type
-                        ]
+                        self._project.config.get_supplemental_dimension_to_name_mapping()[dim_type]
                     )
                     base_names = [
-                        x.model.dimension_query_name
+                        x.model.name
                         for x in self._project.config.list_base_dimensions(dimension_type=dim_type)
                     ]
                     raise DSGInvalidQuery(
                         f"Subset dimensions cannot be used in aggregations: "
-                        f"{dimension_query_name=}. Only base and supplemental dimensions are "
+                        f"{dimension_name=}. Only base and supplemental dimensions are "
                         f"allowed. base={base_names} supplemental={supp_names}"
                     )
 
@@ -177,23 +175,23 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
         return self._check_datasets(model)
 
-    def _check_datasets(self, model: ProjectQueryModel) -> DatasetBaseDimensionQueryNamesModel:
-        base_dimension_query_names: Optional[DatasetBaseDimensionQueryNamesModel] = None
+    def _check_datasets(self, model: ProjectQueryModel) -> DatasetBaseDimensionNamesModel:
+        base_dimension_names: Optional[DatasetBaseDimensionNamesModel] = None
         dataset_ids: list[str] = []
-        query_names: list[DatasetBaseDimensionQueryNamesModel] = []
+        query_names: list[DatasetBaseDimensionNamesModel] = []
         for dataset in model.project.dataset.source_datasets:
             if isinstance(dataset, StandaloneDatasetModel):
                 query_names.append(
-                    self._project.config.get_dataset_base_dimension_query_names(dataset.dataset_id)
+                    self._project.config.get_dataset_base_dimension_names(dataset.dataset_id)
                 )
                 dataset_ids.append(dataset.dataset_id)
             elif isinstance(dataset, ProjectionDatasetModel):
                 dataset_ids += [dataset.initial_value_dataset_id, dataset.growth_rate_dataset_id]
                 query_names += [
-                    self._project.config.get_dataset_base_dimension_query_names(
+                    self._project.config.get_dataset_base_dimension_names(
                         dataset.initial_value_dataset_id
                     ),
-                    self._project.config.get_dataset_base_dimension_query_names(
+                    self._project.config.get_dataset_base_dimension_names(
                         dataset.growth_rate_dataset_id
                     ),
                 ]
@@ -202,36 +200,36 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 raise NotImplementedError(msg)
 
             for dataset_id, names in zip(dataset_ids, query_names):
-                self._fix_legacy_base_dimension_query_names(names, dataset_id)
-                if base_dimension_query_names is None:
-                    base_dimension_query_names = names
-                elif base_dimension_query_names != names:
+                self._fix_legacy_base_dimension_names(names, dataset_id)
+                if base_dimension_names is None:
+                    base_dimension_names = names
+                elif base_dimension_names != names:
                     msg = (
                         "Datasets in a query must have the same base dimension query names: "
-                        f"{dataset=} {base_dimension_query_names} {names}"
+                        f"{dataset=} {base_dimension_names} {names}"
                     )
                     raise DSGInvalidQuery(msg)
 
-        assert base_dimension_query_names is not None
-        return base_dimension_query_names
+        assert base_dimension_names is not None
+        return base_dimension_names
 
-    def _fix_legacy_base_dimension_query_names(
-        self, names: DatasetBaseDimensionQueryNamesModel, dataset_id: str
+    def _fix_legacy_base_dimension_names(
+        self, names: DatasetBaseDimensionNamesModel, dataset_id: str
     ) -> None:
         for dim_type in DimensionType:
             val = getattr(names, dim_type.value)
             if val is None:
                 # This is a workaround for dsgrid projects created before the field
-                # base_dimension_query_names was added to InputDatasetModel.
+                # base_dimension_names was added to InputDatasetModel.
                 dims = self._project.config.list_base_dimensions(dimension_type=dim_type)
                 if len(dims) > 1:
                     msg = (
-                        "The dataset's base_dimension_query_names value is not set and "
+                        "The dataset's base_dimension_names value is not set and "
                         f"there are multiple base dimensions of type {dim_type} in the project. "
                         f"Please re-register the dataset with {dataset_id=}."
                     )
                     raise DSGInvalidDataset(msg)
-                setattr(names, dim_type.value, dims[0].model.dimension_query_name)
+                setattr(names, dim_type.value, dims[0].model.name)
 
     def _run_query(
         self,
@@ -242,9 +240,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         zip_file=False,
         force=False,
     ):
-        base_dimension_query_names = self._run_checks(model)
+        base_dimension_names = self._run_checks(model)
         context = QueryContext(
-            model, base_dimension_query_names, scratch_dir_context=scratch_dir_context
+            model, base_dimension_names, scratch_dir_context=scratch_dir_context
         )
         context.model.project.version = str(self._project.version)
         output_dir = self._output_dir / context.model.name
@@ -346,7 +344,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     def _get_dimension_columns(self, context: QueryContext) -> tuple[list[str], list[str]]:
         match context.model.result.column_type:
-            case ColumnType.DIMENSION_QUERY_NAMES:
+            case ColumnType.DIMENSION_NAMES:
                 dim_columns = context.get_all_dimension_column_names(exclude={DimensionType.TIME})
                 time_columns = context.get_dimension_column_names(DimensionType.TIME)
             case ColumnType.DIMENSION_TYPES:
@@ -400,7 +398,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                     records.select("id"), on=getattr(df, column) == getattr(records, "id")
                 ).drop("id")
             else:
-                query_name = dim_filter.dimension_query_name
+                query_name = dim_filter.dimension_name
                 if query_name not in df.columns:
                     # Consider catching this exception and still write to a file.
                     # It could mean writing a lot of data the user doesn't want.
@@ -552,8 +550,8 @@ class DatasetMapper(ProjectBasedQuerySubmitter):
 
     def _make_dataset_hash(self) -> tuple[str, str]:
         # This will change when issue #343 is implemented to support supplemental dimensions.
-        query_names = self._project.config.get_dataset_base_dimension_query_names(self._dataset_id)
-        text = json.dumps({"dimension_query_names": query_names.model_dump(mode="json")}, indent=2)
+        query_names = self._project.config.get_dataset_base_dimension_names(self._dataset_id)
+        text = json.dumps({"dimension_names": query_names.model_dump(mode="json")}, indent=2)
         hash_value = compute_hash(text.encode())
         return text, hash_value
 
@@ -619,7 +617,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         # orig_query = self._load_composite_dataset_query(query.dataset_id)
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             df, metadata = self._read_dataset(query.dataset_id)
-            base_dimension_query_names = DatasetBaseDimensionQueryNamesModel()
+            base_dimension_names = DatasetBaseDimensionNamesModel()
             for dim_type in DimensionType:
                 field = dim_type.value
                 query_names = getattr(metadata.dimensions, field)
@@ -629,8 +627,8 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
                         f"{dim_type} {query_names}"
                     )
                     raise DSGInvalidQuery(msg)
-                setattr(base_dimension_query_names, field, query_names[0].dimension_query_name)
-            context = QueryContext(query, base_dimension_query_names, scratch_dir_context)
+                setattr(base_dimension_names, field, query_names[0].dimension_name)
+            context = QueryContext(query, base_dimension_names, scratch_dir_context)
             context.metadata = metadata
             # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
             # you add a new customization.

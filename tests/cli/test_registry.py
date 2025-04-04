@@ -267,10 +267,10 @@ def test_register_dsgrid_projects(tmp_registry_db):
 
     conn = DatabaseConnection(url=url)
     manager = RegistryManager.load(conn, offline_mode=True)
-    project = manager.project_manager.load_project("US_DOE_DECARB_2023")
+    project = manager.project_manager.load_project("US_DOE_IEF_2023")
     config = project.config
     context = ScratchDirContext(tmpdir)
-    config.make_dimension_association_table("decarb_2023_transport", context)
+    config.make_dimension_association_table("ief_2023_transport", context)
 
 
 def test_bulk_register(tmp_registry_db):
@@ -390,7 +390,7 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
             "-d",
             str(profiles_data),
             "-p",
-            "US_DOE_DECARB_2023",
+            "US_DOE_IEF_2023",
             "-m",
             str(profiles_mapping_file),
             "-l",
@@ -407,7 +407,7 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
             "-d",
             str(capacities_data),
             "-p",
-            "US_DOE_DECARB_2023",
+            "US_DOE_IEF_2023",
             "-m",
             str(capacities_mapping_file),
             "-l",
@@ -425,7 +425,7 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
             "query",
             "project",
             "map-dataset",
-            "US_DOE_DECARB_2023",
+            "US_DOE_IEF_2023",
             dataset_id,
             "-o",
             str(tmpdir),

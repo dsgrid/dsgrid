@@ -133,7 +133,7 @@ def apply_scaling_factor(
         df = df.withColumn(
             column,
             F.when(
-                F.col(scaling_factor_column) > 0,
+                F.col(scaling_factor_column).isNotNull(),
                 F.col(column) * F.col(scaling_factor_column),
             ).otherwise(F.col(column)),
         )

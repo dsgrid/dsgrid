@@ -285,18 +285,17 @@ def test_remove_invalid_null_timestamps():
 def test_apply_scaling_factor():
     df = create_dataframe_from_dicts(
         [
-            {"a": 1, "b": 2, "bystander": 1, "scaling_factor": 5},
-            {"a": 2, "b": 3, "bystander": 1, "scaling_factor": 6},
-            {"a": 3, "b": 4, "bystander": 1, "scaling_factor": None},
+            {"value": 1, "bystander": 1, "scaling_factor": 5},
+            {"value": 2, "bystander": 1, "scaling_factor": 6},
+            {"value": 3, "bystander": 1, "scaling_factor": 0},
+            {"value": 4, "bystander": 1, "scaling_factor": None},
         ],
     )
-    df2 = apply_scaling_factor(df, ("a", "b"))
-    expected_sum_a = 1 * 5 + 2 * 6 + 3
-    expected_sum_b = 2 * 5 + 3 * 6 + 4
-    expected_sum_bystander = 1 + 1 + 1
+    df2 = apply_scaling_factor(df, "value")
+    expected_sum = 1 * 5 + 2 * 6 + 0 + 4
+    expected_sum_bystander = 1 + 1 + 1 + 1
 
-    assert aggregate_single_value(df2, "sum", "a") == expected_sum_a
-    assert aggregate_single_value(df2, "sum", "b") == expected_sum_b
+    assert aggregate_single_value(df2, "sum", "value") == expected_sum
     assert aggregate_single_value(df2, "sum", "bystander") == expected_sum_bystander
 
 

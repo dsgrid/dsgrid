@@ -19,6 +19,7 @@ from dsgrid.dimension.time import (
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
 from dsgrid.spark.functions import (
     count_distinct_on_group_by,
+    create_temp_view,
     get_spark_warehouse_dir,
     handle_column_spaces,
     make_temp_view_name,
@@ -126,17 +127,34 @@ def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> Dat
 
 
 def apply_scaling_factor(
-    df: DataFrame, value_columns, scaling_factor_column=SCALING_FACTOR_COLUMN
+    df: DataFrame, value_column: str, scaling_factor_column: str = SCALING_FACTOR_COLUMN
 ) -> DataFrame:
     """Apply the scaling factor to all value columns and then drop the scaling factor column."""
-    for column in value_columns:
-        df = df.withColumn(
-            column,
-            F.when(
-                F.col(scaling_factor_column).isNotNull(),
-                F.col(column) * F.col(scaling_factor_column),
-            ).otherwise(F.col(column)),
-        )
+    if use_duckdb():
+        # Workaround for the fact that duckdb doesn't support
+        # F.col(scaling_factor_column).isNotNull()
+        cols = (x for x in df.columns if x not in (value_column, scaling_factor_column))
+        cols_str = ",".join(cols)
+        view = create_temp_view(df)
+        query = f"""
+            SELECT
+                {cols_str},
+                (
+                    CASE WHEN {scaling_factor_column} IS NULL THEN {value_column}
+                    ELSE {value_column} * {scaling_factor_column} END
+                ) AS {value_column}
+            FROM {view}
+        """
+        spark = get_spark_session()
+        return spark.sql(query)
+
+    df = df.withColumn(
+        value_column,
+        F.when(
+            F.col(scaling_factor_column).isNotNull(),
+            F.col(value_column) * F.col(scaling_factor_column),
+        ).otherwise(F.col(value_column)),
+    )
     return df.drop(scaling_factor_column)
 
 

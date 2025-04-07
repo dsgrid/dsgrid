@@ -98,7 +98,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         null_lk_df = self._remap_dimension_columns(null_lk_df)
         ld_df = self._remap_dimension_columns(ld_df, scratch_dir_context=scratch_dir_context)
         if SCALING_FACTOR_COLUMN in ld_df.columns:
-            ld_df = apply_scaling_factor(ld_df, {VALUE_COLUMN})
+            ld_df = apply_scaling_factor(ld_df, VALUE_COLUMN)
         ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
         project_metric_records = self._get_project_metric_records(project_config)
         ld_df = self._convert_units(ld_df, project_metric_records)
@@ -126,7 +126,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             scratch_dir_context=context.scratch_dir_context,
         )
         if "scaling_factor" in ld_df.columns:
-            ld_df = apply_scaling_factor(ld_df, {VALUE_COLUMN})
+            ld_df = apply_scaling_factor(ld_df, VALUE_COLUMN)
 
         ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
         project_metric_records = self._get_project_metric_records(project_config)

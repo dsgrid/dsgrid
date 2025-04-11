@@ -137,7 +137,6 @@ async def list_project_dimensions(project_id: str):
                 project.get_dimension(query_name).model, DimensionCategory.BASE
             )
             dimensions.append(dimension)
-        dimensions.append(dimension)
         for query_name in item["subset"]:
             dimension = create_project_dimension_model(
                 project.get_dimension(query_name).model, DimensionCategory.SUBSET

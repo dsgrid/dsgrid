@@ -606,8 +606,6 @@ def apply_time_wrap(df, project_time_dim, diff: set):
     time_delta = (
         max(project_time) - min(project_time) + project_time_dim.get_frequency()
     ).total_seconds()
-    # BUG: This won't work when some of the diff requires + and some -, e.g., wrapping unaligned time in EST and PST to MST.
-    # This is fixed in Chronify (need to add appropriate test https://github.com/NREL/chronify/issues/40)
 
     upper_diff, lower_diff = set(), set()
     for x in list(diff):

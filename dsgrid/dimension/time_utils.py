@@ -608,21 +608,27 @@ def apply_time_wrap(df, project_time_dim, diff: set):
     ).total_seconds()
     # BUG: This won't work when some of the diff requires + and some -, e.g., wrapping unaligned time in EST and PST to MST.
     # This is fixed in Chronify (need to add appropriate test https://github.com/NREL/chronify/issues/40)
-    if min(diff) > max(project_time):
-        op = "-"
-    else:
-        op = "+"
 
+    upper_diff, lower_diff = set(), set()
+    for x in list(diff):
+        if x > max(project_time):
+            upper_diff.add(x)
+        if x < min(project_time):
+            lower_diff.add(x)
+
+    dfo = df
     # time-wrap by "changing" the year with time_delta
-    diff2 = prepare_timestamps_for_dataframe(diff)
-    df1 = df.filter(getattr(df, time_col).isin(diff2))
-    df2 = perform_interval_op(df1, time_col, op, int(time_delta), "SECONDS", time_col)
-    df3 = df.filter(~(getattr(df, time_col).isin(diff2)))
-    df4 = df2.union(df3)
+    for diff_, op in zip([upper_diff, lower_diff], ["-", "+"]):
+        if diff_:
+            diff_2 = prepare_timestamps_for_dataframe(diff_)
+            df1 = dfo.filter(getattr(dfo, time_col).isin(diff_2))
+            df2 = perform_interval_op(df1, time_col, op, int(time_delta), "SECONDS", time_col)
+            df3 = dfo.filter(~(getattr(dfo, time_col).isin(diff_2)))
+            dfo = df2.union(df3)
 
     dataset_time = {
         row[0]
-        for row in df4.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
+        for row in dfo.select(time_col).filter(f"{time_col} IS NOT NULL").distinct().collect()
     }
     # check
     if dataset_time.symmetric_difference(project_time):
@@ -635,7 +641,7 @@ def apply_time_wrap(df, project_time_dim, diff: set):
             f"Dataset time cannot be processed to match project time. {left_msg}{right_msg}"
         )
 
-    return df4
+    return dfo
 
 
 def is_leap_year(year: int) -> bool:

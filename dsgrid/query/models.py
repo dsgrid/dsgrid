@@ -1,6 +1,7 @@
 import abc
+import itertools
 from enum import Enum
-from typing import Any, Generator, Optional, Union, Literal, TypeAlias
+from typing import Any, Generator, Optional, Union, Literal, Self, TypeAlias
 
 from pydantic import field_validator, model_validator, Field, field_serializer, ValidationInfo
 from semver import VersionInfo
@@ -21,6 +22,9 @@ from dsgrid.dimension.dimension_filters import (
     DimensionFilterBetweenColumnOperatorModel,
     SubsetDimensionFilterModel,
     SupplementalDimensionFilterColumnOperatorModel,
+)
+from dsgrid.query.dataset_mapping_plan import (
+    DatasetMappingPlan,
 )
 from dsgrid.spark.types import F
 from dsgrid.utils.files import compute_hash
@@ -312,6 +316,10 @@ class DatasetBaseModel(DSGBaseModel, abc.ABC):
         str
         """
 
+    @abc.abstractmethod
+    def list_source_dataset_ids(self) -> list[str]:
+        """Return a list of all source dataset IDs."""
+
 
 class StandaloneDatasetModel(DatasetBaseModel):
     """A dataset with energy use data."""
@@ -321,6 +329,9 @@ class StandaloneDatasetModel(DatasetBaseModel):
 
     def get_dataset_id(self) -> str:
         return self.dataset_id
+
+    def list_source_dataset_ids(self) -> list[str]:
+        return [self.dataset_id]
 
 
 class ProjectionDatasetModel(DatasetBaseModel):
@@ -345,6 +356,9 @@ class ProjectionDatasetModel(DatasetBaseModel):
 
     def get_dataset_id(self) -> str:
         return self.initial_value_dataset_id
+
+    def list_source_dataset_ids(self) -> list[str]:
+        return [self.initial_value_dataset_id, self.growth_rate_dataset_id]
 
 
 AbstractDatasetModel = Annotated[
@@ -394,6 +408,10 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
         description="Version of project or dataset on which the query is based. "
         "Should not be set by the user",
     )
+    mapping_plan: list[DatasetMappingPlan] = Field(
+        default=[],
+        description="Defines the order in which to map the dimensions of datasets.",
+    )
     spark_conf_per_dataset: list[SparkConfByDataset] = Field(
         description="Apply these Spark configuration settings while a dataset is being processed.",
         default=[],
@@ -410,7 +428,45 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
             raise ValueError("excluded_dataset_ids is not supported yet")
         return values
 
-    def get_spark_conf(self, dataset_id) -> dict[str, Any]:
+    @model_validator(mode="after")
+    def check_dataset_ids(self) -> Self:
+        source_dataset_ids: set[str] = set()
+        for src_dataset in self.dataset.source_datasets:
+            source_dataset_ids.update(src_dataset.list_source_dataset_ids())
+        for item in itertools.chain(self.mapping_plan, self.spark_conf_per_dataset):
+            if item.dataset_id not in source_dataset_ids:
+                msg = f"Dataset {item.dataset_id} is not a source dataset"
+                raise ValueError(msg)
+        return self
+
+    @field_validator("mapping_plan", "spark_conf_per_dataset")
+    @classmethod
+    def check_duplicate_dataset_ids(cls, value: list) -> list:
+        dataset_ids: set[str] = set()
+        for item in value:
+            if item.dataset_id in dataset_ids:
+                msg = f"{item.dataset_id} is stored multiple times"
+                raise ValueError(msg)
+            dataset_ids.add(item.dataset_id)
+        return value
+
+    def set_dataset_mapper(self, new_mapper: DatasetMappingPlan) -> None:
+        for i, mapper in enumerate(self.mapping_plan):
+            if mapper.dataset_id == new_mapper.dataset_id:
+                self.mapping_plan[i] = new_mapper
+                return
+        self.mapping_plan.append(new_mapper)
+
+    def get_dataset_mapper(self, dataset_id: str) -> DatasetMappingPlan | None:
+        """Return the mapper object for this dataset_id or None if the user did not
+        specify one.
+        """
+        for mapper in self.mapping_plan:
+            if dataset_id == mapper.dataset_id:
+                return mapper
+        return None
+
+    def get_spark_conf(self, dataset_id: str) -> dict[str, Any]:
         """Return the Spark settings to apply while processing dataset_id."""
         for dataset in self.spark_conf_per_dataset:
             if dataset.dataset_id == dataset_id:

@@ -307,7 +307,7 @@ def test_repartition_if_needed_by_mapping(tmp_path, caplog, dataframes):
     df = dataframes[0]
     context = ScratchDirContext(tmp_path)
     with caplog.at_level(logging.INFO):
-        df = repartition_if_needed_by_mapping(
+        df, _ = repartition_if_needed_by_mapping(
             df,
             DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
             context,
@@ -322,7 +322,7 @@ def test_repartition_if_needed_by_mapping_override(tmp_path, caplog, dataframes)
     os.environ["DSGRID_SKIP_MAPPING_SKEW_REPARTITION"] = "true"
     try:
         with caplog.at_level(logging.INFO):
-            df = repartition_if_needed_by_mapping(
+            df, _ = repartition_if_needed_by_mapping(
                 df,
                 DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
                 context,
@@ -337,7 +337,7 @@ def test_repartition_if_needed_by_mapping_not_needed(tmp_path, caplog, dataframe
     df = dataframes[0]
     context = ScratchDirContext(tmp_path)
     with caplog.at_level(logging.DEBUG):
-        df = repartition_if_needed_by_mapping(
+        df, _ = repartition_if_needed_by_mapping(
             df,
             DimensionMappingType.ONE_TO_ONE,
             context,

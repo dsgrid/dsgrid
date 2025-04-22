@@ -56,7 +56,7 @@ $ dsgrid config create sqlite:////projects/dsgrid/registries/standard-scenarios/
     "--use-hive-metastore",
     is_flag=True,
     default=False,
-    help="Set to true to use a Hive metastore when sharing data with chronify. "
+    help="Set this flag to use a Hive metastore when sharing data with chronify. "
     "Only applies if Spark is the backend engine.",
 )
 @click.option(

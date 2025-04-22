@@ -125,7 +125,7 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
     @classmethod
     def check_description(cls, description):
         if description == "":
-            raise ValueError(f'Empty name field for dimension: "{cls}"')
+            raise ValueError(f'Empty description field for dimension: "{cls}"')
 
         # TODO: improve validation for allowable dimension record names.
         prohibited_names = [x.value for x in DimensionType] + [

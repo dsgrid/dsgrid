@@ -32,7 +32,7 @@ dependencies = [
     # "awscliv2",
     # "boto3",
     # "s3path",
-    "chronify ~= 0.2.1",
+    "chronify ~= 0.3.0",
     "click>=8",
     "dash",
     "dash_bootstrap_components",

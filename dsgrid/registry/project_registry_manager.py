@@ -1331,12 +1331,24 @@ class ProjectRegistryManager(RegistryManagerBase):
             mapped_dataset_table = handler.make_dimension_association_table()
             project_table = self._make_dimension_associations(project_config, dataset_id, scontext)
             cols = sorted(project_table.columns)
+            cache(mapped_dataset_table)
+            diff: DataFrame | None = None
 
-            diff = except_all(project_table.select(*cols), mapped_dataset_table.select(*cols))
-            if not is_dataframe_empty(diff):
-                self._handle_dimension_association_errors(
-                    diff, mapped_dataset_table, dataset_config, project_config.config_id
-                )
+            try:
+                # This check is relatively short and will show the user clear errors.
+                _check_distinct_column_values(project_table, mapped_dataset_table)
+                # This check is long and will produce a full table of differences.
+                # It may require some effort from the user.
+                diff = except_all(project_table.select(*cols), mapped_dataset_table.select(*cols))
+                cache(diff)
+                if not is_dataframe_empty(diff):
+                    _handle_dimension_association_errors(
+                        diff, mapped_dataset_table, dataset_config, project_config.config_id
+                    )
+            finally:
+                unpersist(mapped_dataset_table)
+                if diff is not None:
+                    unpersist(diff)
 
     def _id_base_dimension_names_in_dataset(
         self,
@@ -1398,40 +1410,6 @@ class ProjectRegistryManager(RegistryManagerBase):
 
         data = {k.value: v for k, v in base_dimension_names.items()}
         return DatasetBaseDimensionNamesModel(**data)
-
-    def _handle_dimension_association_errors(
-        self, diff, mapped_dataset_table, dataset_config, project_id
-    ):
-        dataset_id = dataset_config.config_id
-        out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
-        cache(diff)
-        write_csv(diff, out_file, header=True, overwrite=True)
-        logger.error(
-            "Dataset %s is missing required dimension records from project %s. "
-            "Recorded missing records in %s",
-            dataset_id,
-            project_id,
-            out_file,
-        )
-        diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
-        unpersist(diff)
-        cache(mapped_dataset_table)
-        dataset_counts = {}
-        for col in diff.columns:
-            dataset_counts[col] = mapped_dataset_table.select(col).distinct().count()
-            if dataset_counts[col] != diff_counts[col]:
-                logger.error(
-                    "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
-                    col,
-                    dataset_counts[col],
-                    diff_counts[col],
-                )
-        unpersist(mapped_dataset_table)
-
-        raise DSGInvalidDataset(
-            f"Dataset {dataset_config.config_id} is missing required dimension records. "
-            "Please look in the log file for more information."
-        )
 
     @track_timing(timer_stats_collector)
     def _make_dimension_associations(
@@ -1598,3 +1576,66 @@ class ProjectRegistryManager(RegistryManagerBase):
         if return_table:
             return table
         display_table(table)
+
+
+def _check_distinct_column_values(project_table: DataFrame, mapped_dataset_table: DataFrame):
+    """Ensure that the mapped dataset has the same distinct values as the project for all
+    columns. This should be called before running a full comparison of the two tables.
+    """
+    has_mismatch = False
+    for column in project_table.columns:
+        project_distinct = {x[column] for x in project_table.select(column).distinct().collect()}
+        dataset_distinct = {
+            x[column] for x in mapped_dataset_table.select(column).distinct().collect()
+        }
+        if diff_values := project_distinct.difference(dataset_distinct):
+            has_mismatch = True
+            logger.error(
+                "The mapped dataset has different distinct values than the project "
+                "for column=%s: diff=%s",
+                column,
+                diff_values,
+            )
+
+    if has_mismatch:
+        msg = (
+            "The mapped dataset has different distinct values than the project for one or "
+            "more columns. Please look in the log file for the exact records."
+        )
+        raise DSGInvalidDataset(msg)
+
+
+def _handle_dimension_association_errors(
+    diff: DataFrame,
+    mapped_dataset_table: DataFrame,
+    dataset_config: DatasetConfig,
+    project_id: str,
+):
+    dataset_id = dataset_config.config_id
+    out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
+    write_csv(diff, out_file, header=True, overwrite=True)
+    logger.error(
+        "Dataset %s is missing required dimension records from project %s. "
+        "Recorded missing records in %s",
+        dataset_id,
+        project_id,
+        out_file,
+    )
+    _look_for_error_contributors(diff, mapped_dataset_table)
+    raise DSGInvalidDataset(
+        f"Dataset {dataset_config.config_id} is missing required dimension records. "
+        "Please look in the log file for more information."
+    )
+
+
+def _look_for_error_contributors(diff: DataFrame, mapped_dataset_table: DataFrame) -> None:
+    diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
+    for col in diff.columns:
+        dataset_count = mapped_dataset_table.select(col).distinct().count()
+        if dataset_count != diff_counts[col]:
+            logger.error(
+                "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
+                col,
+                dataset_count,
+                diff_counts[col],
+            )

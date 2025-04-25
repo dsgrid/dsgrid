@@ -134,8 +134,13 @@ def datasets(registry_manager: RegistryManager):
 Registry Commands
 """
 
+_create_epilog = """
+Examples:\n
+$ dsgrid-admin registry create sqlite:////projects/dsgrid/my_project/registry.db -p /projects/dsgrid/my_project/registry-data\n
+"""
 
-@click.command()
+
+@click.command(epilog=_create_epilog)
 @click.argument("url")
 @click.option(
     "-p",
@@ -143,7 +148,7 @@ Registry Commands
     default=LOCAL_REGISTRY,
     show_default=True,
     callback=lambda *x: Path(x[2]),
-    help="local dsgrid registry data path.",
+    help="Local dsgrid registry data path. Must not contain the registry file listed in URL.",
 )
 @click.option(
     "-f",

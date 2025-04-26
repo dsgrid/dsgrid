@@ -7,6 +7,7 @@ from typing import Any, Generator, Iterable, Optional, Type
 import pandas as pd
 from pydantic import conlist, field_validator, model_validator, Field
 
+from dsgrid.config.common import make_base_dimension_template
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import (
     DimensionBaseConfig,
@@ -724,6 +725,34 @@ class ProjectConfigModel(DSGBaseDatabaseModel):
 
         check_config_id_strict(project_id, "Project")
         return project_id
+
+
+def make_unvalidated_project_config(
+    project_id: str,
+    dataset_ids: Iterable[str],
+    name: str | None = None,
+    description: str | None = None,
+) -> dict[str, Any]:
+    """Create a project config as a dictionary, skipping validation."""
+    return {
+        "project_id": project_id,
+        "name": name or "",
+        "description": description or "",
+        "dimensions": {
+            "base_dimensions": make_base_dimension_template(),
+            "subset_dimensions": [],
+            "supplemental_dimensions": [],
+        },
+        "datasets": [
+            {
+                "dataset_id": x,
+                "dataset_type": "",
+                "version": "",
+                "required_dimensions": {},
+            }
+            for x in dataset_ids
+        ],
+    }
 
 
 class DimensionsByCategoryModel(DSGBaseModel):

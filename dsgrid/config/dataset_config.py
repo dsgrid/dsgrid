@@ -1,3 +1,4 @@
+from dsgrid.dataset.models import UnpivotedTableFormatModel
 import logging
 from enum import Enum
 from pathlib import Path
@@ -5,7 +6,8 @@ from typing import Any, Optional, Literal, Union
 
 from pydantic import field_validator, model_validator, Field
 
-from dsgrid.common import VALUE_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
+from dsgrid.config.common import make_base_dimension_template
 from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionBaseConfigWithFiles
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
@@ -18,6 +20,7 @@ from dsgrid.spark.types import (
     DataFrame,
     F,
 )
+from dsgrid.utils.spark import get_unique_values, read_dataframe
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
@@ -40,16 +43,16 @@ ALLOWED_DATA_FILES = ALLOWED_LOAD_DATA_FILENAMES + ALLOWED_LOAD_DATA_LOOKUP_FILE
 logger = logging.getLogger(__name__)
 
 
-def check_load_data_filename(path: str) -> str:
+def check_load_data_filename(path: str | Path) -> Path:
     """Return the load_data filename in path. Supports Parquet and CSV.
 
     Parameters
     ----------
-    path : str
+    path : str | Path
 
     Returns
     -------
-    str
+    Path
 
     Raises
     ------
@@ -57,29 +60,30 @@ def check_load_data_filename(path: str) -> str:
         Raised if no supported load data filename exists.
 
     """
-    if path.startswith("s3://"):
+    path_ = path if isinstance(path, Path) else Path(path)
+    if str(path_).startswith("s3://"):
         # Only Parquet is supported on AWS.
-        return path + "/load_data.parquet"
+        return path_ / "/load_data.parquet"
 
     for allowed_name in ALLOWED_LOAD_DATA_FILENAMES:
-        filename = Path(path) / allowed_name
+        filename = path_ / allowed_name
         if filename.exists():
-            return str(filename)
+            return filename
 
     # Use ValueError because this gets called in Pydantic model validation.
-    raise ValueError(f"no load_data file exists in {path}")
+    raise ValueError(f"no load_data file exists in {path_}")
 
 
-def check_load_data_lookup_filename(path: str):
+def check_load_data_lookup_filename(path: str | Path) -> Path:
     """Return the load_data_lookup filename in path. Supports Parquet, CSV, and JSON.
 
     Parameters
     ----------
-    path : str
+    path : Path
 
     Returns
     -------
-    str
+    Path
 
     Raises
     ------
@@ -87,17 +91,18 @@ def check_load_data_lookup_filename(path: str):
         Raised if no supported load data lookup filename exists.
 
     """
-    if path.startswith("s3://"):
+    path_ = path if isinstance(path, Path) else Path(path)
+    if str(path_).startswith("s3://"):
         # Only Parquet is supported on AWS.
-        return path + "/load_data_lookup.parquet"
+        return path_ / "/load_data_lookup.parquet"
 
     for allowed_name in ALLOWED_LOAD_DATA_LOOKUP_FILENAMES:
-        filename = Path(path) / allowed_name
+        filename = path_ / allowed_name
         if filename.exists():
-            return str(filename)
+            return filename
 
     # Use ValueError because this gets called in Pydantic model validation.
-    raise ValueError(f"no load_data_lookup file exists in {path}")
+    raise ValueError(f"no load_data_lookup file exists in {path_}")
 
 
 class InputDatasetType(DSGEnum):
@@ -447,6 +452,47 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         return self
 
 
+def make_unvalidated_dataset_config(
+    dataset_id,
+    table_format: dict[str, str] | None = None,
+    data_classification=DataClassificationType.MODERATE.value,
+    dataset_type=InputDatasetType.MODELED,
+    use_project_geography_time_zone=False,
+    dimension_references: list[DimensionReferenceModel] | None = None,
+    trivial_dimensions: list[DimensionType] | None = None,
+) -> dict[str, Any]:
+    """Create a dataset config as a dictionary, skipping validation."""
+    table_format_ = table_format or UnpivotedTableFormatModel().model_dump()
+    trivial_dimensions_ = trivial_dimensions or []
+    exclude_dimension_types = {x.dimension_type for x in dimension_references or []}
+    exclude_dimension_types.add(DimensionType.TIME)
+    dimensions = make_base_dimension_template(exclude_dimension_types)
+    return {
+        "dataset_id": dataset_id,
+        "dataset_type": dataset_type.value,
+        "data_schema": {
+            "data_schema_type": DataSchemaType.ONE_TABLE.value,
+            "table_format": table_format_,
+        },
+        "version": "1.0.0",
+        "description": "",
+        "origin_creator": "",
+        "origin_organization": "",
+        "origin_date": "",
+        "origin_project": "",
+        "origin_version": "",
+        "data_source": "",
+        "source": "",
+        "data_classification": data_classification,
+        "use_project_geography_time_zone": True,
+        "dimensions": dimensions,
+        "dimension_references": [x.model_dump(mode="json") for x in dimension_references or []],
+        "tags": [],
+        "user_defined_metadata": {},
+        "trivial_dimensions": [x.value for x in trivial_dimensions_],
+    }
+
+
 class DatasetConfig(ConfigBase):
     """Provides an interface to a DatasetConfigModel."""
 
@@ -604,3 +650,40 @@ class DatasetConfig(ConfigBase):
             raise DSGInvalidDimension(
                 f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
             )
+
+
+def get_unique_dimension_ids(
+    path: Path,
+    schema_type: DataSchemaType,
+    pivoted_dimension_type: DimensionType | None,
+    time_columns: set[str],
+) -> dict[DimensionType, list[str]]:
+    """Get the unique dimension IDs from a table."""
+    if schema_type == DataSchemaType.STANDARD:
+        ld = read_dataframe(check_load_data_filename(path))
+        lk = read_dataframe(check_load_data_lookup_filename(path))
+        df = ld.join(lk, on="id").drop("id")
+    elif schema_type == DataSchemaType.ONE_TABLE:
+        ld_path = check_load_data_filename(path)
+        df = read_dataframe(ld_path)
+    else:
+        msg = f"Unsupported schema type: {schema_type}"
+        raise NotImplementedError(msg)
+
+    ids_by_dimension_type: dict[DimensionType, list[str]] = {}
+    for dimension_type in DimensionType:
+        if dimension_type.value in df.columns:
+            ids_by_dimension_type[dimension_type] = sorted(
+                get_unique_values(df, dimension_type.value)
+            )
+    if pivoted_dimension_type is not None:
+        if pivoted_dimension_type.value in df.columns:
+            msg = f"{pivoted_dimension_type=} cannot be in the dataframe columns."
+            raise DSGInvalidParameter(msg)
+        dimension_type_columns = {x.value for x in DimensionType}
+        dimension_type_columns.update(time_columns)
+        dimension_type_columns.update({"id", SCALING_FACTOR_COLUMN})
+        pivoted_columns = set(df.columns) - dimension_type_columns
+        ids_by_dimension_type[pivoted_dimension_type] = sorted(pivoted_columns)
+
+    return ids_by_dimension_type

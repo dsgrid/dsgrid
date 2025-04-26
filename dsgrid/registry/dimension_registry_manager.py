@@ -3,14 +3,18 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional, Sequence, Union
+from typing import Generator, Optional, Sequence, Union
 from uuid import uuid4
 
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
 from dsgrid.config.dimension_config_factory import get_dimension_config, load_dimension_config
-from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionConfig
+from dsgrid.config.dimension_config import (
+    DimensionBaseConfig,
+    DimensionBaseConfigWithFiles,
+    DimensionConfig,
+)
 from dsgrid.config.dimensions_config import DimensionsConfig
 from dsgrid.config.dimensions import (
     TimeDimensionBaseModel,
@@ -249,6 +253,17 @@ class DimensionRegistryManager(RegistryManagerBase):
                 )
             )
         return refs
+
+    def find_matching_dimensions(
+        self, sorted_record_ids: list[str], dimension_type: DimensionType
+    ) -> Generator[DimensionBaseConfigWithFiles, None, None]:
+        """Yield all dimensions that match the given record IDs and dimension type."""
+        with self.db.engine.connect() as conn:
+            filter_config = {"dimension_type": dimension_type}
+            for model in self.db.iter_models(filter_config=filter_config, conn=conn):
+                config = self.get_by_id(model.dimension_id, conn=conn)
+                if sorted_record_ids == sorted(config.get_unique_ids()):
+                    yield config
 
     def show(
         self,

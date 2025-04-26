@@ -709,23 +709,6 @@ class DimensionReferenceModel(DSGBaseModel):
     )
 
 
-class DimensionReferenceByNameModel(DSGBaseModel):
-    """Reference to a dimension that has yet to be registered."""
-
-    dimension_type: DimensionType = Field(
-        title="dimension_type",
-        alias="type",
-        description="Type of the dimension",
-        json_schema_extra={
-            "options": DimensionType.format_for_docs(),
-        },
-    )
-    name: str = Field(
-        title="name",
-        description="Dimension name",
-    )
-
-
 def handle_dimension_union(values):
     values = copy.deepcopy(values)
     for i, value in enumerate(values):

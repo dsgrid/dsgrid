@@ -205,30 +205,6 @@ def _intersect_spark(df1: DataFrame, df2: DataFrame) -> DataFrame:
     return df1.intersect(df2)
 
 
-def shift_time_zone(
-    df: DataFrame, time_column: str, from_time_zone: str, to_time_zone: str, new_column: str
-) -> DataFrame:
-    """Shift the time zone of the time_column. new_column can be the same as time_column."""
-    if use_duckdb():
-        view = create_temp_view(df)
-        cols = df.columns[:]
-        if time_column == new_column:
-            cols.remove(time_column)
-        cols_str = ",".join([f'"{x}"' for x in cols])
-        query = f"""
-            SELECT
-                {cols_str},
-                CAST(timezone('{to_time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
-            FROM {view}
-        """
-        return get_spark_session().sql(query)
-
-    return df.withColumn(
-        new_column,
-        F.from_utc_timestamp(F.to_utc_timestamp(F.col(time_column), from_time_zone), to_time_zone),
-    )
-
-
 def get_duckdb_spark_session() -> SparkSession | None:
     """Return the active DuckDB Spark Session if it is set."""
     return g_duckdb_spark

@@ -1,6 +1,5 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Generator
-from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -12,7 +11,6 @@ from dsgrid.spark.functions import (
     count_distinct_on_group_by,
     cross_join,
     except_all,
-    get_current_time_zone,
     perform_interval_op,
     intersect,
     is_dataframe_empty,
@@ -20,15 +18,12 @@ from dsgrid.spark.functions import (
     join_multiple_columns,
     pivot,
     select_expr,
-    set_current_time_zone,
-    shift_time_zone,
     sql_from_df,
     unpersist,
     unpivot,
 )
 from dsgrid.spark.types import (
     DataFrame,
-    F,
     SparkSession,
 )
 from dsgrid.utils.spark import (
@@ -134,27 +129,6 @@ def test_intersect(dataframe):
     assert len(res) == 2
     for row in res:
         assert row.metric == "heating"
-
-
-def test_shift_time_zone(spark):
-    orig_tz = get_current_time_zone()
-    session_tz = "UTC"
-    set_current_time_zone(session_tz)
-    try:
-        start = datetime(year=2024, month=3, day=1, hour=0)
-        num_hours = 24 * 30
-        timestamps = [
-            (start + i * timedelta(hours=1)).astimezone(ZoneInfo("UTC")) for i in range(num_hours)
-        ]
-        df = spark.createDataFrame([(x,) for x in timestamps], ["timestamp"])
-        res = shift_time_zone(df, "timestamp", session_tz, "US/Pacific", "local_time")
-        res2 = res.withColumn("delta", F.col("timestamp") - F.col("local_time"))
-        distinct_delta = sorted([x.delta for x in res2.select("delta").distinct().collect()])
-        assert len(distinct_delta) == 2
-        assert distinct_delta[0] == timedelta(hours=7)
-        assert distinct_delta[1] == timedelta(hours=8)
-    finally:
-        set_current_time_zone(orig_tz)
 
 
 def test_is_dataframe_empty(dataframe):

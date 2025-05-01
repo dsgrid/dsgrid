@@ -42,7 +42,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         return AnnualTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
+    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:  # DND
         logger.info("Check AnnualTimeDimensionConfig dataset time consistency.")
         if len(time_columns) > 1:
             raise ValueError(
@@ -85,16 +85,16 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     return self.build_time_dataframe()
 
-    def convert_dataframe(self, *args, **kwargs):
-        # Currently, only map_annual_time_to_date_time is supported.
-        # TODO: implement through chronify
-        msg = f"{self.__class__.__name__}.convert_dataframe"
-        raise NotImplementedError(msg)
+    # def convert_dataframe(self, *args, **kwargs):
+    #     # Currently, only map_annual_time_to_date_time is supported.
+    #     # TODO: implement through chronify
+    #     msg = f"{self.__class__.__name__}.convert_dataframe"
+    #     raise NotImplementedError(msg)
 
-    def get_frequency(self) -> timedelta:
+    def get_frequency(self) -> timedelta:  # DND
         return timedelta(days=365)
 
-    def get_time_ranges(self) -> list[AnnualTimeRange]:
+    def get_time_ranges(self) -> list[AnnualTimeRange]:  # DND
         ranges = []
         frequency = self.get_frequency()
         for start, end in self._build_time_ranges(
@@ -136,7 +136,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_zone(self) -> None:
         return None
 
-    def get_tzinfo(self) -> None:
+    def get_tzinfo(self) -> None:  # DND
         return None
 
     def get_time_interval_type(self) -> None:

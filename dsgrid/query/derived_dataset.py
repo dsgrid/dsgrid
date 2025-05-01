@@ -174,7 +174,9 @@ def does_query_support_a_derived_dataset(query: ProjectQueryModel):
 
 def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: DataFrame):
     try:
-        dim_config.check_dataset_time_consistency(df, dim_config.get_load_data_time_columns())
+        dim_config.check_dataset_time_consistency(
+            df, dim_config.get_load_data_time_columns()
+        )  # DND
     except DSGInvalidDataset:
         return False
     return True

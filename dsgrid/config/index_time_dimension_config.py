@@ -8,29 +8,32 @@ import pandas as pd
 from dsgrid.dimension.time import (
     IndexTimeRange,
     DatetimeRange,
-    TimeZone,
+    # TimeZone,
 )
-from dsgrid.dimension.time_utils import (
-    create_adjustment_map_from_model_time,
-    build_index_time_map,
-)
+
+# from dsgrid.dimension.time_utils import (
+#     create_adjustment_map_from_model_time,
+#     build_index_time_map,
+# )
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
-from dsgrid.spark.functions import (
-    join_multiple_columns,
-)
+
+# from dsgrid.spark.functions import (
+#     join_multiple_columns,
+# )
 from dsgrid.spark.types import (
     DataFrame,
-    DoubleType,
-    F,
+    # DoubleType,
+    # F,
     IntegerType,
-    StringType,
+    # StringType,
     StructField,
     StructType,
-    TimestampType,
+    # TimestampType,
 )
 from dsgrid.time.types import DatetimeTimestampType, IndexTimestampType
 from dsgrid.utils.timing import timer_stats_collector, track_timing
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
+
+# from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     get_spark_session,
 )
@@ -122,105 +125,105 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return df_time
 
-    def convert_dataframe(
-        self,
-        df,
-        project_time_dim,
-        value_columns: set[str],
-        scratch_dir_context: ScratchDirContext,
-        wrap_time_allowed=False,
-        time_based_data_adjustment=None,
-    ) -> DataFrame:
-        if not value_columns:
-            raise Exception("convert_dataframe requires value_columns to be populated")
-        df = self._map_index_time_to_datetime(
-            df,
-            project_time_dim,
-            value_columns,
-            time_based_data_adjustment=time_based_data_adjustment,
-        )
-        df = self._convert_time_to_project_time(
-            df,
-            project_time_dim,
-            scratch_dir_context,
-            wrap_time=wrap_time_allowed,
-        )
+    # def convert_dataframe(
+    #     self,
+    #     df,
+    #     project_time_dim,
+    #     value_columns: set[str],
+    #     scratch_dir_context: ScratchDirContext,
+    #     wrap_time_allowed=False,
+    #     time_based_data_adjustment=None,
+    # ) -> DataFrame:
+    #     if not value_columns:
+    #         raise Exception("convert_dataframe requires value_columns to be populated")
+    #     df = self._map_index_time_to_datetime(
+    #         df,
+    #         project_time_dim,
+    #         value_columns,
+    #         time_based_data_adjustment=time_based_data_adjustment,
+    #     )
+    #     df = self._convert_time_to_project_time(
+    #         df,
+    #         project_time_dim,
+    #         scratch_dir_context,
+    #         wrap_time=wrap_time_allowed,
+    #     )
 
-        return df
+    #     return df
 
-    def _map_index_time_to_datetime(
-        self, df, project_time_dim, value_columns, time_based_data_adjustment=None
-    ) -> DataFrame:
-        idx_col = self.get_load_data_time_columns()
-        assert len(idx_col) == 1, idx_col
-        idx_col = idx_col[0]
+    # def _map_index_time_to_datetime(
+    #     self, df, project_time_dim, value_columns, time_based_data_adjustment=None
+    # ) -> DataFrame:
+    #     idx_col = self.get_load_data_time_columns()
+    #     assert len(idx_col) == 1, idx_col
+    #     idx_col = idx_col[0]
 
-        time_col = DatetimeTimestampType._fields[0]
+    #     time_col = DatetimeTimestampType._fields[0]
 
-        ptime_col = project_time_dim.get_load_data_time_columns()
-        assert len(ptime_col) == 1, ptime_col
-        ptime_col = ptime_col[0]
+    #     ptime_col = project_time_dim.get_load_data_time_columns()
+    #     assert len(ptime_col) == 1, ptime_col
+    #     ptime_col = ptime_col[0]
 
-        # local time zones, create time zone map to covert
-        assert "time_zone" in df.columns, df.columns
-        geo_tz = [TimeZone(row.time_zone) for row in df.select("time_zone").distinct().collect()]
-        assert geo_tz
+    #     # local time zones, create time zone map to covert
+    #     assert "time_zone" in df.columns, df.columns
+    #     geo_tz = [TimeZone(row.time_zone) for row in df.select("time_zone").distinct().collect()]
+    #     assert geo_tz
 
-        # indices correspond to clock time laid out like Standard Time
-        geo_tz2 = [tz.get_standard_time() for tz in geo_tz]
+    #     # indices correspond to clock time laid out like Standard Time
+    #     geo_tz2 = [tz.get_standard_time() for tz in geo_tz]
 
-        schema = StructType(
-            [
-                StructField(idx_col, IntegerType(), False),
-                StructField(time_col, TimestampType(), False),
-                StructField("time_zone", StringType(), False),
-            ]
-        )
-        time_map = get_spark_session().createDataFrame([], schema=schema)
+    #     schema = StructType(
+    #         [
+    #             StructField(idx_col, IntegerType(), False),
+    #             StructField(time_col, TimestampType(), False),
+    #             StructField("time_zone", StringType(), False),
+    #         ]
+    #     )
+    #     time_map = get_spark_session().createDataFrame([], schema=schema)
 
-        if time_based_data_adjustment is None:
-            for tz, tz2 in zip(geo_tz, geo_tz2):
-                index_map = build_index_time_map(self, timezone=tz.tz)
-                index_map = index_map.withColumn("time_zone", F.lit(tz.value))
-                time_map = time_map.union(index_map.select(schema.names))
-            df = join_multiple_columns(df, time_map, [idx_col, "time_zone"]).drop(
-                idx_col, "time_zone"
-            )
-            select_cols = [x for x in df.columns if x not in value_columns] + list(value_columns)
-            return df.select(select_cols)
+    #     if time_based_data_adjustment is None:
+    #         for tz, tz2 in zip(geo_tz, geo_tz2):
+    #             index_map = build_index_time_map(self, timezone=tz.tz)
+    #             index_map = index_map.withColumn("time_zone", F.lit(tz.value))
+    #             time_map = time_map.union(index_map.select(schema.names))
+    #         df = join_multiple_columns(df, time_map, [idx_col, "time_zone"]).drop(
+    #             idx_col, "time_zone"
+    #         )
+    #         select_cols = [x for x in df.columns if x not in value_columns] + list(value_columns)
+    #         return df.select(select_cols)
 
-        # With time_based_data_adjustment
-        schema = StructType(
-            [
-                StructField(idx_col, IntegerType(), False),
-                StructField(time_col, TimestampType(), False),
-                StructField("multiplier", DoubleType(), False),
-                StructField("time_zone", StringType(), False),
-            ]
-        )
-        time_map = get_spark_session().createDataFrame([], schema=schema)
-        for tz, tz2 in zip(geo_tz, geo_tz2):
-            # table is built in standard time but listed as prevailing
-            index_map = build_index_time_map(
-                self, timezone=tz2.tz, time_based_data_adjustment=time_based_data_adjustment
-            )
-            index_map = index_map.withColumn("time_zone", F.lit(tz.value))
+    #     # With time_based_data_adjustment
+    #     schema = StructType(
+    #         [
+    #             StructField(idx_col, IntegerType(), False),
+    #             StructField(time_col, TimestampType(), False),
+    #             StructField("multiplier", DoubleType(), False),
+    #             StructField("time_zone", StringType(), False),
+    #         ]
+    #     )
+    #     time_map = get_spark_session().createDataFrame([], schema=schema)
+    #     for tz, tz2 in zip(geo_tz, geo_tz2):
+    #         # table is built in standard time but listed as prevailing
+    #         index_map = build_index_time_map(
+    #             self, timezone=tz2.tz, time_based_data_adjustment=time_based_data_adjustment
+    #         )
+    #         index_map = index_map.withColumn("time_zone", F.lit(tz.value))
 
-            # time_based_data_adjustment mapping table
-            table = create_adjustment_map_from_model_time(self, time_based_data_adjustment, tz)
-            index_map = (
-                index_map.select(idx_col, "time_zone", F.col(time_col).alias("model_time"))
-                .join(table, ["model_time"], "right")
-                .drop("model_time")
-            )
-            time_map = time_map.union(index_map.select(schema.names))
+    #         # time_based_data_adjustment mapping table
+    #         table = create_adjustment_map_from_model_time(self, time_based_data_adjustment, tz)
+    #         index_map = (
+    #             index_map.select(idx_col, "time_zone", F.col(time_col).alias("model_time"))
+    #             .join(table, ["model_time"], "right")
+    #             .drop("model_time")
+    #         )
+    #         time_map = time_map.union(index_map.select(schema.names))
 
-        df = join_multiple_columns(df, time_map, [idx_col, "time_zone"]).drop(idx_col, "time_zone")
-        groupby = [x for x in df.columns if x not in value_columns.union({"multiplier"})]
-        df = df.groupBy(*groupby).agg(
-            *[F.sum(F.col(col) * F.col("multiplier")).alias(col) for col in value_columns]
-        )
-        return df
+    #     df = join_multiple_columns(df, time_map, [idx_col, "time_zone"]).drop(idx_col, "time_zone")
+    #     groupby = [x for x in df.columns if x not in value_columns.union({"multiplier"})]
+    #     df = df.groupBy(*groupby).agg(
+    #         *[F.sum(F.col(col) * F.col("multiplier")).alias(col) for col in value_columns]
+    #     )
+    #     return df
 
     def get_frequency(self) -> timedelta:
         return self.model.frequency

@@ -1295,17 +1295,17 @@ class ProjectRegistryManager(RegistryManagerBase):
             config.model.project_id,
         )
 
-    def _check_dataset_time_interval_type(
-        self, project_config: ProjectConfig, dataset_config: DatasetConfig
-    ):
-        dtime = dataset_config.get_dimension(DimensionType.TIME)
-        ptime = project_config.get_base_time_dimension()
+    # def _check_dataset_time_interval_type(
+    #     self, project_config: ProjectConfig, dataset_config: DatasetConfig
+    # ):
+    #     dtime = dataset_config.get_dimension(DimensionType.TIME)
+    #     ptime = project_config.get_base_time_dimension()
 
-        dataset_id = dataset_config.model.dataset_id
-        wrap_time = project_config.get_dataset(dataset_id).wrap_time_allowed
+    #     dataset_id = dataset_config.model.dataset_id
+    #     wrap_time = project_config.get_dataset(dataset_id).wrap_time_allowed
 
-        df = dtime.build_time_dataframe()
-        dtime._convert_time_to_project_time(df, ptime, wrap_time=wrap_time)
+    #     df = dtime.build_time_dataframe()
+    #     dtime._convert_time_to_project_time(df, ptime, wrap_time=wrap_time)
 
     @track_timing(timer_stats_collector)
     def _check_dataset_base_to_project_base_mappings(

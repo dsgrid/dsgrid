@@ -567,20 +567,20 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     wrap_time_allowed=wrap_time_allowed,
                     scratch_dir_context=scratch_dir_context,
                 )
-            case (BackendEngine.SPARK, _, False):
-                filename = persist_intermediate_table(
-                    load_data_df,
-                    scratch_dir_context,
-                    tag="query before time mapping",
-                )
-                load_data_df = time_dim.convert_dataframe(
-                    load_data_df,
-                    self._project_time_dim,
-                    {value_column},
-                    scratch_dir_context,
-                    wrap_time_allowed=wrap_time_allowed,
-                    time_based_data_adjustment=time_based_data_adjustment,
-                )
+            # case (BackendEngine.SPARK, _, False):
+            #     filename = persist_intermediate_table(
+            #         load_data_df,
+            #         scratch_dir_context,
+            #         tag="query before time mapping",
+            #     )
+            #     load_data_df = time_dim.convert_dataframe(
+            #         load_data_df,
+            #         self._project_time_dim,
+            #         {value_column},
+            #         scratch_dir_context,
+            #         wrap_time_allowed=wrap_time_allowed,
+            #         time_based_data_adjustment=time_based_data_adjustment,
+            #     )
             case (BackendEngine.DUCKDB, _, True):
                 load_data_df = map_time_dimension_with_chronify_duckdb(
                     df=load_data_df,
@@ -590,15 +590,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
-            case (BackendEngine.DUCKDB, _, False):
-                load_data_df = time_dim.convert_dataframe(
-                    load_data_df,
-                    self._project_time_dim,
-                    {value_column},
-                    scratch_dir_context,
-                    wrap_time_allowed=wrap_time_allowed,
-                    time_based_data_adjustment=time_based_data_adjustment,
-                )
+            # case (BackendEngine.DUCKDB, _, False):
+            #     load_data_df = time_dim.convert_dataframe(
+            #         load_data_df,
+            #         self._project_time_dim,
+            #         {value_column},
+            #         scratch_dir_context,
+            #         wrap_time_allowed=wrap_time_allowed,
+            #         time_based_data_adjustment=time_based_data_adjustment,
+            #     )
 
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")

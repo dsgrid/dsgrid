@@ -411,7 +411,7 @@ class DatetimeRange:
         n_tail = ", ".join([str(x) for x in output[-n_show:]])
         return n_head + ",\n ... , \n" + n_tail
 
-    def _iter_timestamps(self):
+    def _iter_timestamps(self):  # DND
         """Return a generator of datetimes for a time range ('start' and 'end' times are inclusive).
         There could be duplicates.
 
@@ -449,7 +449,7 @@ class DatetimeRange:
 
             cur += self.frequency
 
-    def list_time_range(self):
+    def list_time_range(self):  # DND
         """Return a list of timestamps for a time range.
 
         Returns

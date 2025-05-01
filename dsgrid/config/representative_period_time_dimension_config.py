@@ -87,7 +87,7 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         return RepresentativePeriodTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
+    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:  # DND
         self._format_handler.check_dataset_time_consistency(
             self._format_handler.list_expected_dataset_timestamps(self.model.ranges),
             load_data_df,
@@ -107,9 +107,9 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
     # def build_time_dataframe_with_time_zone(self):
     #     return self.build_time_dataframe()
 
-    def convert_dataframe(self, *args, **kwargs):
-        msg = f"{self.__class__.__name__}.convert_dataframe is implemented through chronify"
-        raise NotImplementedError(msg)
+    # def convert_dataframe(self, *args, **kwargs):
+    #     msg = f"{self.__class__.__name__}.convert_dataframe is implemented through chronify"
+    #     raise NotImplementedError(msg)
 
     def get_frequency(self) -> timedelta:
         return self._format_handler.get_frequency()
@@ -155,7 +155,9 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
     def get_representative_time_type() -> Type:
         """Return the time type representing the data."""
 
-    def check_dataset_time_consistency(self, expected_timestamps, load_data_df, time_columns):
+    def check_dataset_time_consistency(
+        self, expected_timestamps, load_data_df, time_columns
+    ):  # DND
         """Check consistency between time ranges from the time dimension and load data.
 
         Parameters
@@ -235,7 +237,7 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def list_expected_dataset_timestamps(self):
+    def list_expected_dataset_timestamps(self):  # DND
         """Return a list of the timestamps expected in the load_data table.
 
         Returns
@@ -295,7 +297,7 @@ class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     def get_load_data_time_columns() -> list[str]:
         return list(OneWeekPerMonthByHourType._fields)
 
-    def list_expected_dataset_timestamps(self, ranges) -> list[OneWeekPerMonthByHourType]:
+    def list_expected_dataset_timestamps(self, ranges) -> list[OneWeekPerMonthByHourType]:  # DND
         timestamps = []
         for model in ranges:
             for month in range(model.start, model.end + 1):
@@ -350,7 +352,7 @@ class OneWeekdayDayAndWeekendDayPerMonthByHourHandler(RepresentativeTimeFormatHa
 
     def list_expected_dataset_timestamps(
         self, ranges
-    ) -> list[OneWeekdayDayAndOneWeekendDayPerMonthByHourType]:
+    ) -> list[OneWeekdayDayAndOneWeekendDayPerMonthByHourType]:  # DND
         timestamps = []
         for model in ranges:
             for month in range(model.start, model.end + 1):

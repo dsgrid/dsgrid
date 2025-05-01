@@ -1,6 +1,5 @@
 from datetime import timedelta
 
-# from dsgrid.spark.types import DataFrame
 from .dimensions import NoOpTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -17,12 +16,6 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
 
     def build_time_dataframe(self):
         raise NotImplementedError(f"Cannot build a time dataframe for a {type(self)}")
-
-    # def build_time_dataframe_with_time_zone(self):
-    #     pass
-
-    # def convert_dataframe(self, df: DataFrame, *args, **kwargs) -> DataFrame:
-    #     return df
 
     def get_frequency(self) -> timedelta:
         return timedelta(days=0)

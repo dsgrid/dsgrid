@@ -29,7 +29,6 @@ from dsgrid.dataset.table_format_handler_factory import make_table_format_handle
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.dimension.time import (
-    # TimeDimensionType,
     DaylightSavingAdjustmentModel,
 )
 from dsgrid.query.query_context import QueryContext
@@ -542,11 +541,13 @@ class DatasetSchemaHandlerBase(abc.ABC):
         config = dsgrid.runtime_config
         if not time_dim.supports_chronify():
             # annual time is returned above
+            # no mapping for no-op
             assert isinstance(
                 time_dim, NoOpTimeDimensionConfig
             ), "Only NoOp and AnnualTimeDimensionConfig do not currently support Chronify"
-        match (config.backend_engine, config.use_hive_metastore, time_dim.supports_chronify()):
-            case (BackendEngine.SPARK, True, True):
+            return load_data_df
+        match (config.backend_engine, config.use_hive_metastore):
+            case (BackendEngine.SPARK, True):
                 table_name = make_temp_view_name()
                 load_data_df = map_time_dimension_with_chronify_spark_hive(
                     df=save_to_warehouse(load_data_df, table_name),
@@ -558,7 +559,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     wrap_time_allowed=wrap_time_allowed,
                 )
 
-            case (BackendEngine.SPARK, False, True):
+            case (BackendEngine.SPARK, False):
                 filename = persist_intermediate_table(
                     load_data_df,
                     scratch_dir_context,
@@ -574,21 +575,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     wrap_time_allowed=wrap_time_allowed,
                     scratch_dir_context=scratch_dir_context,
                 )
-            # case (BackendEngine.SPARK, _, False):
-            #     filename = persist_intermediate_table(
-            #         load_data_df,
-            #         scratch_dir_context,
-            #         tag="query before time mapping",
-            #     )
-            #     load_data_df = time_dim.convert_dataframe(
-            #         load_data_df,
-            #         self._project_time_dim,
-            #         {value_column},
-            #         scratch_dir_context,
-            #         wrap_time_allowed=wrap_time_allowed,
-            #         time_based_data_adjustment=time_based_data_adjustment,
-            #     )
-            case (BackendEngine.DUCKDB, _, True):
+            case (BackendEngine.DUCKDB, _):
                 load_data_df = map_time_dimension_with_chronify_duckdb(
                     df=load_data_df,
                     value_column=value_column,
@@ -597,15 +584,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
-            # case (BackendEngine.DUCKDB, _, False):
-            #     load_data_df = time_dim.convert_dataframe(
-            #         load_data_df,
-            #         self._project_time_dim,
-            #         {value_column},
-            #         scratch_dir_context,
-            #         wrap_time_allowed=wrap_time_allowed,
-            #         time_based_data_adjustment=time_based_data_adjustment,
-            #     )
 
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")

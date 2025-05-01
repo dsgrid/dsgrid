@@ -104,13 +104,6 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
 
         return df_time
 
-    # def build_time_dataframe_with_time_zone(self):
-    #     return self.build_time_dataframe()
-
-    # def convert_dataframe(self, *args, **kwargs):
-    #     msg = f"{self.__class__.__name__}.convert_dataframe is implemented through chronify"
-    #     raise NotImplementedError(msg)
-
     def get_frequency(self) -> timedelta:
         return self._format_handler.get_frequency()
 

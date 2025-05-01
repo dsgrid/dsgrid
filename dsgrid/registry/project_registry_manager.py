@@ -1001,9 +1001,6 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._raise_if_not_unregistered(project_config, dataset_id)
         dataset_config = self._dataset_mgr.get_by_id(dataset_id, conn=context.connection)
 
-        # Issue #241
-        # self._check_dataset_time_interval_type(project_config, dataset_config)
-
         references = []
         if dimension_mapping_file is not None:
             references += self._register_mappings_from_file(
@@ -1294,18 +1291,6 @@ class ProjectRegistryManager(RegistryManagerBase):
             config.model.version,
             config.model.project_id,
         )
-
-    # def _check_dataset_time_interval_type(
-    #     self, project_config: ProjectConfig, dataset_config: DatasetConfig
-    # ):
-    #     dtime = dataset_config.get_dimension(DimensionType.TIME)
-    #     ptime = project_config.get_base_time_dimension()
-
-    #     dataset_id = dataset_config.model.dataset_id
-    #     wrap_time = project_config.get_dataset(dataset_id).wrap_time_allowed
-
-    #     df = dtime.build_time_dataframe()
-    #     dtime._convert_time_to_project_time(df, ptime, wrap_time=wrap_time)
 
     @track_timing(timer_stats_collector)
     def _check_dataset_base_to_project_base_mappings(

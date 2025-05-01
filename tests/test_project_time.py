@@ -13,7 +13,6 @@ from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone, TimeIntervalType, get_zone_info_from_spark_session
 
-# from dsgrid.dimension.time_utils import shift_time_interval
 from dsgrid.spark.functions import (
     create_temp_view,
     make_temp_view_name,
@@ -32,7 +31,6 @@ from dsgrid.spark.types import (
 from dsgrid.utils.dataset import add_time_zone
 from dsgrid.utils.spark import get_spark_session, get_unique_values
 
-# from dsgrid.exceptions import DSGDatasetConfigError
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
 
 
@@ -116,154 +114,10 @@ def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     )
 
 
-# def test_convert_to_project_time_1(project, resstock, comstock, tempo, scratch_dir_context):
-#     """test convert time for different time interval type"""
-#     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
-#     resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
-#     comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
-#     tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
-#     tempo_data = tempo._handler._load_data.join(tempo._handler._load_data_lookup, on="id").drop(
-#         "id"
-#     )
-#     value_columns = tempo._handler.config.get_value_columns()
-#     assert len(value_columns) == 1
-#     value_column = next(iter(value_columns))
-#     tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-#         tempo_data, project.config, value_column, scratch_dir_context
-#     )
-
-#     # project: period-beginning, dataset: period-ending, same time range
-#     compare_time_conversion(
-#         resstock_time_dim, project_time_dim, scratch_dir_context, expect_error=False
-#     )
-#     compare_time_conversion(
-#         comstock_time_dim, project_time_dim, scratch_dir_context, expect_error=False
-#     )
-#     compare_time_conversion(
-#         tempo_time_dim,
-#         project_time_dim,
-#         scratch_dir_context,
-#         df=tempo_data_mapped_time,
-#         expect_error=False,
-#     )
-
-#     # project, dataset same time range and time interval type
-#     project_time_dim.model.time_interval_type = resstock_time_dim.model.time_interval_type
-#     compare_time_conversion(
-#         resstock_time_dim, project_time_dim, scratch_dir_context, expect_error=False
-#     )
-#     compare_time_conversion(
-#         tempo_time_dim,
-#         project_time_dim,
-#         scratch_dir_context,
-#         df=tempo_data_mapped_time,
-#         expect_error=False,
-#     )
-
-#     # project: period-ending, dataset: period-begining, same time range
-#     comstock_time_dim.model.time_interval_type = TimeIntervalType.PERIOD_BEGINNING
-#     compare_time_conversion(
-#         comstock_time_dim, project_time_dim, scratch_dir_context, expect_error=False
-#     )
-#     tempo_time_dim.model.time_interval_type = TimeIntervalType.PERIOD_BEGINNING
-#     compare_time_conversion(
-#         tempo_time_dim,
-#         project_time_dim,
-#         scratch_dir_context,
-#         df=tempo_data_mapped_time,
-#         expect_error=False,
-#     )
-
-
-# def test_convert_to_project_time_2(project, resstock, comstock, tempo, scratch_dir_context):
-#     """test convert time for different time zone"""
-#     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
-#     resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
-
-#     resstock_time_dim.model.datetime_format.timezone = TimeZone.UTC
-#     # error b/c time wrap from time_interval_type alignment is applied differently than wrap_time_allowed
-#     compare_time_conversion(
-#         resstock_time_dim, project_time_dim, scratch_dir_context, expect_error=True
-#     )
-
-#     # project, dataset same time range and time interval type but different time zone, wrap_time is needed
-#     resstock_time_dim.model.time_interval_type = project_time_dim.model.time_interval_type
-#     dataset_id = "resstock_conus_2022_reference"
-#     wrap_time = project.config.get_dataset(dataset_id).wrap_time_allowed
-#     assert wrap_time is False, f"{wrap_time=} for {dataset_id=}, expecting False"
-#     compare_time_conversion(
-#         resstock_time_dim,
-#         project_time_dim,
-#         scratch_dir_context,
-#         wrap_time=wrap_time,
-#         expect_error=True,
-#     )
-#     compare_time_conversion(
-#         resstock_time_dim,
-#         project_time_dim,
-#         scratch_dir_context,
-#         wrap_time=True,
-#         expect_error=False,
-#     )
-#     project_time_dim.model.datetime_format.timezone = TimeZone.PST
-#     compare_time_conversion(
-#         resstock_time_dim,
-#         project_time_dim,
-#         scratch_dir_context,
-#         wrap_time=True,
-#         expect_error=False,
-#     )
-
-
 def test_make_project_dataframe(project, resstock, comstock, tempo, scratch_dir_context):
     tempo.make_project_dataframe(project.config, scratch_dir_context)
     comstock.make_project_dataframe(project.config, scratch_dir_context)
     resstock.make_project_dataframe(project.config, scratch_dir_context)
-
-
-# def _compare_time_conversion(
-#     dataset_time_dim, project_time_dim, scratch_dir_context, df=None, wrap_time=False
-# ):
-#     project_time = project_time_dim.build_time_dataframe()
-#     if df is None:
-#         converted_dataset_time = dataset_time_dim._convert_time_to_project_time(
-#             dataset_time_dim.build_time_dataframe(),
-#             project_time_dim,
-#             context=scratch_dir_context,
-#             wrap_time=wrap_time,
-#         )
-#     else:
-#         converted_dataset_time = df
-#     ptime_col = project_time_dim.get_load_data_time_columns()
-#     dfp = project_time.select(ptime_col).distinct().orderBy(*ptime_col).collect()
-#     dfd = converted_dataset_time.select(ptime_col).distinct().orderBy(*ptime_col).collect()
-#     if dfp != dfd:
-#         project_delta = sorted(set(dfp).difference(dfd))
-#         dataset_delta = sorted(set(dfd).difference(dfp))
-#         msg = (
-#             "dataset time dimension converted to project requirement does not match project time dimension.\n "
-#             f"project - dataset = {project_delta}\ndataset - project {dataset_delta=}"
-#         )
-#         raise DSGDatasetConfigError(msg)
-
-
-# def compare_time_conversion(
-#     dataset_time_dim,
-#     project_time_dim,
-#     scratch_dir_context,
-#     df=None,
-#     wrap_time=False,
-#     expect_error=False,
-# ):
-#     if expect_error:
-#         with pytest.raises(DSGDatasetConfigError):
-#             _compare_time_conversion(
-#                 dataset_time_dim, project_time_dim, scratch_dir_context, df=df, wrap_time=wrap_time
-#             )
-#     else:
-#         _compare_time_conversion(
-#             dataset_time_dim, project_time_dim, scratch_dir_context, df=df, wrap_time=wrap_time
-#         )
 
 
 def shift_time_interval(

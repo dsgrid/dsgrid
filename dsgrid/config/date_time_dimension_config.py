@@ -132,35 +132,6 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
         return df_time
 
-    # def build_time_dataframe_with_time_zone(self):
-    #     time_col = self.get_load_data_time_columns()
-    #     assert len(time_col) == 1, time_col
-    #     time_col = time_col[0]
-
-    #     df_time = self.build_time_dataframe()
-    #     session_tz = _get_spark_session().conf.get("spark.sql.session.timeZone")
-    #     df_time = self._convert_time_zone(
-    #         df_time, time_col, session_tz, self.model.datetime_format.timezone.tz_name
-    #     )
-
-    #     return df_time
-
-    # @staticmethod
-    # def _convert_time_zone(df, time_col: str, from_tz, to_tz):
-    #     """convert dataframe from one single time zone to another"""
-    #     nontime_cols = [col for col in df.columns if col != time_col]
-    #     df2 = df.select(
-    #         F.from_utc_timestamp(F.to_utc_timestamp(F.col(time_col), from_tz), to_tz).alias(
-    #             time_col
-    #         ),
-    #         *nontime_cols,
-    #     )
-    #     return df2
-
-    # def convert_dataframe(self, *args, **kwargs):
-    #     msg = f"{self.__class__.__name__}.convert_dataframe is implemented through chronify"
-    #     raise NotImplementedError(msg)
-
     def get_frequency(self) -> timedelta:
         return self.model.frequency
 

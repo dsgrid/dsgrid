@@ -82,15 +82,6 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         df_time = get_spark_session().createDataFrame(model_time, schema=schema)
         return df_time
 
-    # def build_time_dataframe_with_time_zone(self):
-    #     return self.build_time_dataframe()
-
-    # def convert_dataframe(self, *args, **kwargs):
-    #     # Currently, only map_annual_time_to_date_time is supported.
-    #     # TODO: implement through chronify
-    #     msg = f"{self.__class__.__name__}.convert_dataframe"
-    #     raise NotImplementedError(msg)
-
     def get_frequency(self) -> timedelta:
         return timedelta(days=365)
 

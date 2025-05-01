@@ -47,7 +47,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         )
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:  # DND
+    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
         logger.info("Check DateTimeDimensionConfig dataset time consistency.")
         if len(time_columns) > 1:
             msg = f"DateTimeDimensionConfig expects only one time column, but has {time_columns=}"
@@ -87,7 +87,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
                 f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
             )
 
-    def _check_local_time_for_alignment(self, load_data_df, time_col) -> None:  # DND
+    def _check_local_time_for_alignment(self, load_data_df, time_col) -> None:
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
         time_range = time_ranges[0]
@@ -164,7 +164,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_frequency(self) -> timedelta:
         return self.model.frequency
 
-    def get_time_ranges(self) -> list[DatetimeRange]:  # DND
+    def get_time_ranges(self) -> list[DatetimeRange]:
         ranges = []
         for start, end in self._build_time_ranges(
             self.model.ranges, self.model.str_format, tz=self.get_tzinfo()
@@ -215,7 +215,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         msg = f"Undefined time zone for {self.model.datetime_format.format_type=}"
         raise NotImplementedError(msg)
 
-    def get_tzinfo(self) -> ZoneInfo:  # DND
+    def get_tzinfo(self) -> ZoneInfo:
         time_zone = self.get_time_zone()
         if time_zone is None:
             return None

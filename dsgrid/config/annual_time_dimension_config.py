@@ -42,7 +42,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
         return AnnualTimeDimensionModel
 
     @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:  # DND
+    def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
         logger.info("Check AnnualTimeDimensionConfig dataset time consistency.")
         if len(time_columns) > 1:
             raise ValueError(
@@ -91,10 +91,10 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     #     msg = f"{self.__class__.__name__}.convert_dataframe"
     #     raise NotImplementedError(msg)
 
-    def get_frequency(self) -> timedelta:  # DND
+    def get_frequency(self) -> timedelta:
         return timedelta(days=365)
 
-    def get_time_ranges(self) -> list[AnnualTimeRange]:  # DND
+    def get_time_ranges(self) -> list[AnnualTimeRange]:
         ranges = []
         frequency = self.get_frequency()
         for start, end in self._build_time_ranges(
@@ -136,7 +136,7 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def get_time_zone(self) -> None:
         return None
 
-    def get_tzinfo(self) -> None:  # DND
+    def get_tzinfo(self) -> None:
         return None
 
     def get_time_interval_type(self) -> None:

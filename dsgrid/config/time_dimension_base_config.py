@@ -56,7 +56,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         raise NotImplementedError(msg)
 
     @abc.abstractmethod
-    def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]) -> None:  # DND
+    def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]) -> None:
         """Check consistency of the load data with the time dimension.
 
         Parameters
@@ -352,4 +352,4 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         str_format: str,
         tz: Optional[TimeZone] = None,
     ):
-        return build_time_ranges(time_ranges, str_format, tz=tz)  # DND
+        return build_time_ranges(time_ranges, str_format, tz=tz)

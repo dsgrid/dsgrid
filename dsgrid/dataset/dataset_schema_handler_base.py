@@ -13,7 +13,9 @@ from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     map_annual_time_to_date_time,
 )
+from dsgrid.config.noop_time_dimension_config import NoOpTimeDimensionConfig
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
+from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.common import VALUE_COLUMN, BackendEngine
@@ -27,7 +29,7 @@ from dsgrid.dataset.table_format_handler_factory import make_table_format_handle
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.dimension.time import (
-    TimeDimensionType,
+    # TimeDimensionType,
     DaylightSavingAdjustmentModel,
 )
 from dsgrid.query.query_context import QueryContext
@@ -180,7 +182,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         time_cols = self._get_time_dimension_columns()
         time_dim.check_dataset_time_consistency(load_data_df, time_cols)
-        if time_dim.model.time_type != TimeDimensionType.NOOP:
+        if not isinstance(time_dim, NoOpTimeDimensionConfig):
             self._check_dataset_time_consistency_by_time_array(time_cols, load_data_df)
         self._check_model_year_time_consistency(load_data_df)
 
@@ -538,6 +540,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
             )
 
         config = dsgrid.runtime_config
+        if not time_dim.supports_chronify():
+            # annual time is returned above
+            assert isinstance(
+                time_dim, NoOpTimeDimensionConfig
+            ), "Only NoOp and AnnualTimeDimensionConfig do not currently support Chronify"
         match (config.backend_engine, config.use_hive_metastore, time_dim.supports_chronify()):
             case (BackendEngine.SPARK, True, True):
                 table_name = make_temp_view_name()
@@ -612,7 +619,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         ):
             return
         time_dim = self._config.get_dimension(DimensionType.TIME)
-        if time_dim.model.time_type != TimeDimensionType.INDEX:
+        if not isinstance(time_dim, IndexTimeDimensionConfig):
             msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.time_dim.model.time_type=} time type, it applies to INDEX time type only."
             logger.warning(msg)
 

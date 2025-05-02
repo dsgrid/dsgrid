@@ -336,17 +336,6 @@ def test_annual_time_dimension_model(annual_time_dimension_model):
         assert length == len(range(start, end + 1))
 
 
-# def test_time_dimension_model5(representative_time_dimension_model):
-#     config = RepresentativePeriodTimeDimensionConfig(representative_time_dimension_model)
-#     if config.model.format.value == "one_week_per_month_by_hour":
-#         n_times = len(config.list_expected_dataset_timestamps())
-#         truth = 24 * 7 * 12
-#         assert config.get_lengths()[0] == n_times == truth
-#         assert config.get_frequency() == datetime.timedelta(hours=1)
-
-#     config.get_time_ranges()
-
-
 def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):
     daylight_saving_adjustment = {
         "spring_forward_hour": "none",

@@ -85,16 +85,6 @@ def test_no_unexpected_timezone():
             ), f"{tzo} can either be prevailing or standard"
 
 
-@pytest.mark.skip
-def test_build_time_dataframe(project, resstock, comstock):
-    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
-    resstock_time_dim = resstock.config.get_dimension(DimensionType.TIME)
-    comstock_time_dim = comstock.config.get_dimension(DimensionType.TIME)
-    check_time_dataframe(project_time_dim)
-    check_time_dataframe(resstock_time_dim)
-    check_time_dataframe(comstock_time_dim)
-
-
 def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
 
@@ -161,24 +151,6 @@ def shift_time_interval(
             )
 
     return df
-
-
-def check_time_dataframe(time_dim):
-    session_tz = get_current_time_zone()
-    assert session_tz is not None
-    z_info = get_zone_info_from_spark_session(session_tz)
-    time_df = time_dim.build_time_dataframe().collect()
-    time_df_start = min(time_df)[0].astimezone(z_info)
-    time_df_end = max(time_df)[0].astimezone(z_info)
-    time_range = time_dim.get_time_ranges()[0]
-    time_range_start = time_range.start.tz_convert(session_tz)
-    time_range_end = time_range.end.tz_convert(session_tz)
-    assert (
-        time_df_start == time_range_start
-    ), f"Starting timestamp does not match: {time_df_start} vs. {time_range_start}"
-    assert (
-        time_df_end == time_range_end
-    ), f"Ending timestamp does not match: {time_df_end} vs. {time_range_end}"
 
 
 def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):

@@ -5,9 +5,10 @@ from typing import Optional
 from datetime import timedelta
 
 import pandas as pd
-import numpy as np
+from chronify.time_range_generator_factory import make_time_range_generator
 
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
@@ -26,6 +27,9 @@ from dsgrid.spark.types import (
     DataFrame,
     FloatType,
     F,
+    StructField,
+    StructType,
+    TimestampType,
     use_duckdb,
 )
 from dsgrid.utils.dataset import add_time_zone
@@ -91,7 +95,6 @@ def test_build_time_dataframe(project, resstock, comstock):
     check_time_dataframe(comstock_time_dim)
 
 
-@pytest.mark.skip
 def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
 
@@ -202,11 +205,8 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
     # process raw_data, get freq each values will be mapped and get sumproduct from there
     # [1] sum from raw_data, mapping via pandas
-    model_time = (
-        pd.Series(np.concatenate(project_time_dim.list_expected_dataset_timestamps()))
-        .rename(ptime_col)
-        .to_frame()
-    )
+    project_time_df, project_timestamps = make_date_time_df(project_time_dim)
+    model_time = pd.Series(project_timestamps).rename(ptime_col).to_frame()
     model_time[ptime_col] = model_time[ptime_col].dt.tz_convert(session_tz)
 
     # convert to match time interval type
@@ -265,7 +265,6 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     session_tz = get_current_time_zone()
 
     try:
-        project_time_df = project_time_dim.build_time_dataframe()
         project_time_df = shift_time_interval(
             project_time_df,
             ptime_col,
@@ -389,12 +388,8 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     assert len(time_col) == 1, time_col
     time_col = time_col[0]
 
-    model_time = (
-        pd.Series(np.concatenate(project_time_dim.list_expected_dataset_timestamps()))
-        .rename(time_col)
-        .to_frame()
-    )
-    project_time = project_time_dim.build_time_dataframe()
+    project_time, project_timestamps = make_date_time_df(project_time_dim)
+    model_time = pd.Series(project_timestamps).rename(time_col).to_frame()
     tempo_time = load_data.select(time_col).distinct().sort(time_col)
 
     # QC 1: each timestamp has the same number of occurences
@@ -482,3 +477,15 @@ def to_utc_timestamp(
 
     df2 = df.withColumn(new_column, F.to_utc_timestamp(time_column, time_zone))
     return df2
+
+
+def make_date_time_df(
+    time_config: DateTimeDimensionConfig,
+) -> tuple[DataFrame, list[pd.Timestamp]]:
+    timestamps = make_time_range_generator(time_config.to_chronify()).list_timestamps()
+    project_time_cols = time_config.get_load_data_time_columns()
+    assert len(project_time_cols) == 1, project_time_cols
+    time_col = project_time_cols[0]
+    schema = StructType([StructField(time_col, TimestampType(), False)])
+    df = get_spark_session().createDataFrame([(x,) for x in timestamps], schema=schema)
+    return df, timestamps

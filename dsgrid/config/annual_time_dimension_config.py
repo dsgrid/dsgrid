@@ -152,7 +152,6 @@ def map_annual_time_to_date_time(
     """Map a DataFrame with an annual time dimension to a DateTime time dimension."""
     annual_col = annual_dim.get_load_data_time_columns()[0]
     myear_column = DimensionType.MODEL_YEAR.value
-    dt_col = dt_dim.get_load_data_time_columns()[0]
     timestamps = make_time_range_generator(dt_dim.to_chronify()).list_timestamps()
     time_cols = dt_dim.get_load_data_time_columns()
     assert len(time_cols) == 1, time_cols
@@ -163,7 +162,7 @@ def map_annual_time_to_date_time(
     # Note that MeasurementType.TOTAL has already been verified.
     with set_session_time_zone(dt_dim.model.datetime_format.timezone.tz_name):
         years = (
-            select_expr(dt_df, [f"YEAR({handle_column_spaces(dt_col)}) AS year"])
+            select_expr(dt_df, [f"YEAR({handle_column_spaces(time_col)}) AS year"])
             .distinct()
             .collect()
         )

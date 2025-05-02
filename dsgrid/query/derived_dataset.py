@@ -1,8 +1,11 @@
 import logging
 from pathlib import Path
 
+import chronify
 import json5
 
+from dsgrid.chronify import create_store
+from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import (
     DataClassificationType,
     DataSchemaType,
@@ -15,12 +18,15 @@ from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.models import ProjectQueryModel, DatasetMetadataModel, ColumnType
 from dsgrid.query.query_submitter import QuerySubmitterBase
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.spark.functions import make_temp_view_name
 from dsgrid.spark.types import DataFrame
 from dsgrid.utils.files import dump_data
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import read_dataframe, get_unique_values
 
 
@@ -87,7 +93,7 @@ def create_derived_dataset_config_from_query(
         dim_query_name = next(iter(dimension_names))
         if dim_type == DimensionType.TIME:
             time_dim = project.config.get_time_dimension(dim_query_name)
-            is_valid = _does_time_dimension_match(time_dim, df)
+            is_valid = _does_time_dimension_match(time_dim, df, table_file)
             if not is_valid:
                 logger.warning(
                     "The dataset does not match the project's time dimension. "
@@ -172,12 +178,44 @@ def does_query_support_a_derived_dataset(query: ProjectQueryModel):
     return is_valid
 
 
-def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: DataFrame):
+def _does_time_dimension_match(dim_config: TimeDimensionBaseConfig, df: DataFrame, df_path: Path):
     try:
-        dim_config.check_dataset_time_consistency(df, dim_config.get_load_data_time_columns())
+        if dim_config.supports_chronify():
+            _check_time_dimension_with_chronify(dim_config, df, df_path)
+        else:
+            dim_config.check_dataset_time_consistency(df, dim_config.get_load_data_time_columns())
     except DSGInvalidDataset:
         return False
     return True
+
+
+def _check_time_dimension_with_chronify(
+    dim_config: TimeDimensionBaseConfig, df: DataFrame, df_path: Path
+):
+    scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
+    with ScratchDirContext(scratch_dir) as scratch_dir_context:
+        time_cols = dim_config.get_load_data_time_columns()
+        time_array_id_columns = [
+            x
+            for x in df.columns
+            # If there are multiple weather years:
+            #   - that are continuous, weather year needs to be excluded (one overall range).
+            #   - that are not continuous, weather year needs to be included and chronify
+            #     needs additional support. TODO: issue #340
+            if x != DimensionType.WEATHER_YEAR.value
+            and x in set(df.columns).difference(time_cols).difference({VALUE_COLUMN})
+        ]
+        schema = chronify.TableSchema(
+            name=make_temp_view_name(),
+            time_config=dim_config.to_chronify(),
+            time_array_id_columns=time_array_id_columns,
+            value_column=VALUE_COLUMN,
+        )
+        store_file = scratch_dir_context.get_temp_filename(suffix=".db")
+        store = create_store(store_file)
+        # This performs all of the checks.
+        store.create_view_from_parquet(df_path, schema)
+        store.drop_view(schema.name)
 
 
 def _is_dimension_valid_for_dataset(

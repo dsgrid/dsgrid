@@ -5,9 +5,10 @@ from typing import Optional
 from datetime import timedelta
 
 import pandas as pd
-import numpy as np
+from chronify.time_range_generator_factory import make_time_range_generator
 
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
@@ -26,6 +27,9 @@ from dsgrid.spark.types import (
     DataFrame,
     FloatType,
     F,
+    StructField,
+    StructType,
+    TimestampType,
     use_duckdb,
 )
 from dsgrid.utils.dataset import add_time_zone
@@ -79,15 +83,6 @@ def test_no_unexpected_timezone():
             assert (
                 tzo.is_standard() + tzo.is_prevailing() == 1
             ), f"{tzo} can either be prevailing or standard"
-
-
-def test_build_time_dataframe(project, resstock, comstock):
-    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
-    resstock_time_dim = resstock.config.get_dimension(DimensionType.TIME)
-    comstock_time_dim = comstock.config.get_dimension(DimensionType.TIME)
-    check_time_dataframe(project_time_dim)
-    check_time_dataframe(resstock_time_dim)
-    check_time_dataframe(comstock_time_dim)
 
 
 def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
@@ -158,24 +153,6 @@ def shift_time_interval(
     return df
 
 
-def check_time_dataframe(time_dim):
-    session_tz = get_current_time_zone()
-    assert session_tz is not None
-    z_info = get_zone_info_from_spark_session(session_tz)
-    time_df = time_dim.build_time_dataframe().collect()
-    time_df_start = min(time_df)[0].astimezone(z_info)
-    time_df_end = max(time_df)[0].astimezone(z_info)
-    time_range = time_dim.get_time_ranges()[0]
-    time_range_start = time_range.start.tz_convert(session_tz)
-    time_range_end = time_range.end.tz_convert(session_tz)
-    assert (
-        time_df_start == time_range_start
-    ), f"Starting timestamp does not match: {time_df_start} vs. {time_range_start}"
-    assert (
-        time_df_end == time_range_end
-    ), f"Ending timestamp does not match: {time_df_end} vs. {time_range_end}"
-
-
 def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     """check that annual sum from tempo data is the same when mapped in pyspark,
     and when mapped in pandas to get the frequency each value in raw_data gets mapped
@@ -200,11 +177,8 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
 
     # process raw_data, get freq each values will be mapped and get sumproduct from there
     # [1] sum from raw_data, mapping via pandas
-    model_time = (
-        pd.Series(np.concatenate(project_time_dim.list_expected_dataset_timestamps()))
-        .rename(ptime_col)
-        .to_frame()
-    )
+    project_time_df, project_timestamps = make_date_time_df(project_time_dim)
+    model_time = pd.Series(project_timestamps).rename(ptime_col).to_frame()
     model_time[ptime_col] = model_time[ptime_col].dt.tz_convert(session_tz)
 
     # convert to match time interval type
@@ -263,7 +237,6 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     session_tz = get_current_time_zone()
 
     try:
-        project_time_df = project_time_dim.build_time_dataframe()
         project_time_df = shift_time_interval(
             project_time_df,
             ptime_col,
@@ -387,12 +360,8 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     assert len(time_col) == 1, time_col
     time_col = time_col[0]
 
-    model_time = (
-        pd.Series(np.concatenate(project_time_dim.list_expected_dataset_timestamps()))
-        .rename(time_col)
-        .to_frame()
-    )
-    project_time = project_time_dim.build_time_dataframe()
+    project_time, project_timestamps = make_date_time_df(project_time_dim)
+    model_time = pd.Series(project_timestamps).rename(time_col).to_frame()
     tempo_time = load_data.select(time_col).distinct().sort(time_col)
 
     # QC 1: each timestamp has the same number of occurences
@@ -480,3 +449,17 @@ def to_utc_timestamp(
 
     df2 = df.withColumn(new_column, F.to_utc_timestamp(time_column, time_zone))
     return df2
+
+
+def make_date_time_df(
+    time_config: DateTimeDimensionConfig,
+) -> tuple[DataFrame, list[pd.Timestamp]]:
+    timestamps = make_time_range_generator(time_config.to_chronify()).list_timestamps()
+    project_time_cols = time_config.get_load_data_time_columns()
+    assert len(project_time_cols) == 1, project_time_cols
+    time_col = project_time_cols[0]
+    schema = StructType([StructField(time_col, TimestampType(), False)])
+    df = get_spark_session().createDataFrame(
+        [(x.to_pydatetime(),) for x in timestamps], schema=schema
+    )
+    return df, timestamps

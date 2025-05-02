@@ -16,9 +16,6 @@ from dsgrid.config.dimensions import (
 )
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.annual_time_dimension_config import AnnualTimeDimensionConfig
-from dsgrid.config.representative_period_time_dimension_config import (
-    RepresentativePeriodTimeDimensionConfig,
-)
 
 from dsgrid.dimension.time import (
     LeapDayAdjustmentType,
@@ -337,17 +334,6 @@ def test_annual_time_dimension_model(annual_time_dimension_model):
         start, end = int(time_range.start), int(time_range.end)
         assert st == datetime.datetime(year=start, month=1, day=1)
         assert length == len(range(start, end + 1))
-
-
-def test_time_dimension_model5(representative_time_dimension_model):
-    config = RepresentativePeriodTimeDimensionConfig(representative_time_dimension_model)
-    if config.model.format.value == "one_week_per_month_by_hour":
-        n_times = len(config.list_expected_dataset_timestamps())
-        truth = 24 * 7 * 12
-        assert config.get_lengths()[0] == n_times == truth
-        assert config.get_frequency() == datetime.timedelta(hours=1)
-
-    config.get_time_ranges()
 
 
 def test_time_dimension_model_lead_day_adjustment(time_dimension_model0):

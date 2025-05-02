@@ -1,6 +1,6 @@
 import abc
 import logging
-from datetime import timedelta
+from datetime import timedelta, tzinfo
 from typing import Optional, Any
 
 import chronify
@@ -38,7 +38,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         msg = f"{type(self)}.to_chronify"
         raise NotImplementedError(msg)
 
-    @abc.abstractmethod
     def check_dataset_time_consistency(self, load_data_df, time_columns: list[str]) -> None:
         """Check consistency of the load data with the time dimension.
 
@@ -51,10 +50,10 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         ------
         DSGInvalidDataset
             Raised if the dataset is inconsistent with the time dimension.
-
         """
+        msg = f"{type(self)}.check_dataset_time_consistency is not implemented"
+        raise NotImplementedError(msg)
 
-    @abc.abstractmethod
     def build_time_dataframe(self) -> DataFrame:
         """Build time dimension as specified in config in a spark dataframe.
 
@@ -62,6 +61,9 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         -------
         pyspark.sql.DataFrame
         """
+        msg = f"{self.__class__.__name__}.build_time_dataframe is not implemented"
+        breakpoint()
+        raise NotImplementedError(msg)
 
     @abc.abstractmethod
     def get_frequency(self) -> timedelta:
@@ -114,7 +116,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             return df
         return df.withColumnRenamed(time_col, self.model.name)
 
-    @abc.abstractmethod
     def get_time_ranges(self) -> list[Any]:
         """Return time ranges with timezone applied.
 
@@ -123,6 +124,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         list
             list of DatetimeRange
         """
+        msg = f"{type(self)}.get_time_ranges is not implemented"
+        raise NotImplementedError(msg)
 
     @abc.abstractmethod
     def get_start_times(self) -> list[Any]:
@@ -149,7 +152,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """Return a TimeZone instance for this dimension."""
 
     @abc.abstractmethod
-    def get_tzinfo(self):
+    def get_tzinfo(self) -> tzinfo | None:
         """Return a tzinfo instance for this dimension.
 
         Returns
@@ -166,7 +169,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         TimeIntervalType
         """
 
-    @abc.abstractmethod
     def list_expected_dataset_timestamps(
         self,
         time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
@@ -182,6 +184,8 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
             List of tuples of columns representing time in the load_data table.
 
         """
+        msg = f"{type(self)}.list_expected_dataset_timestamps is not implemented"
+        raise NotImplementedError(msg)
 
     def convert_time_format(self, df: DataFrame, update_model: bool = False) -> DataFrame:
         """Convert time from str format to datetime if exists."""

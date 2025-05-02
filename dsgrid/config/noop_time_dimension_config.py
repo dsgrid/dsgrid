@@ -14,9 +14,6 @@ class NoOpTimeDimensionConfig(TimeDimensionBaseConfig):
     def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
         pass
 
-    def build_time_dataframe(self):
-        raise NotImplementedError(f"Cannot build a time dataframe for a {type(self)}")
-
     def get_frequency(self) -> timedelta:
         return timedelta(days=0)
 

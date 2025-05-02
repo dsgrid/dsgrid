@@ -4,6 +4,12 @@
 
 ## Developer Dependencies
 
+The dsgrid codebase can be executed with either Apache Spark or DuckDB as the backend.
+The backend can be selected in the dsgrid config file (`dsgrid config create --help`).
+
+If you have a Windows computer, you may want to run only with DuckDB. Getting Spark correctly
+configured can be challenging.
+
 **pip extras**
 
 ```
@@ -11,7 +17,8 @@ pip install -e .[tests]
 
 # or
 
-pip install -e .[dev] # includes what is needed for tests and code development
+pip install -e .[dev,spark] # includes what is needed for tests and code development
+(Leave off `spark` if you don't need/want to use it.)
 
 # or
 
@@ -33,6 +40,12 @@ If you don't have java installed:
 $ conda install openjdk
 ```
 
+Alternatively, if you use a Mac, you can install it with Homebrew.
+
+```
+$ brew install openjdk
+```
+
 **Setting up pre-commit hooks**
 
 ```
@@ -47,6 +60,24 @@ pre-commit install
 You need to have some familiarity with Spark in order to run non-trivial tasks in dsgrid.
 This [page](https://dsgrid.github.io/dsgrid/spark_overview.html) provides an overview and explains
 various ways to use Spark in dsgrid.
+
+If you test dsgrid with Spark, you'll need to download Apache Thrift Server, which is included
+with the Spark installation. Chronify uses Spark through a Thrift Server to run SQL queries.
+
+You can extract this package anywhere on your filesystem. Start the server before running tests
+and shut it down afterwards.
+```
+$ wget https://dlcdn.apache.org/spark/spark-3.5.4/spark-3.5.4-bin-hadoop3.tgz
+$ tar -xzf spark-3.5.4-bin-hadoop3.tgz
+```
+
+```
+$ <your-base-path>/spark-3.5.4-bin-hadoop3/sbin/start-thrift-server.sh
+$ <your-base-path>/spark-3.5.4-bin-hadoop3/sbin/stop-thrift-server.sh
+```
+
+Refer to .github/workflows/pull_request_tests.yml to see exactly how CI is run with both DuckDB
+and Spark.
 
 ## Tests
 
@@ -110,9 +141,18 @@ SET value='dsgrid-test-data/filtered_registries/simple_standard_scenarios'
 WHERE key = 'data_path';
 ```
 
-Make a branch, commit, push it to GitHub, and open a pull request.
+4. Run this dsgrid script from the base directory of the test data repository. It shortens the
+names of the Parquet directories and files created by Spark so that they will not exceed the
+260 character limit on Windows filesystems. Adjust your path as needed.
 
-4. Run `python tests/simple_standard_scenarios_datasets.py` from the dsgrid base directory and add
+```
+$ python <your-repo-path>/dsgrid/scripts/shorten_simple_std_scns_filenames.py
+```
+
+5. Make a branch, commit, push it to GitHub, and open a pull request.
+
+6. From a dsgrid repository where the `dsgrid-test-data` submodule contains the branch created
+in the previous step, run `python tests/simple_standard_scenarios_datasets.py` and add
 the modified file
 `dsgrid-test-data/filtered_registries/simple_standard_scenarios/expected_datasets/raw_stats.json`
 to the same pull request.

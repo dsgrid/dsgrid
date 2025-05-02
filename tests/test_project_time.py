@@ -1,21 +1,40 @@
 import logging
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import FloatType
 import pytest
+from typing import Optional
+from datetime import timedelta
 
 import pandas as pd
-import numpy as np
-from dsgrid.common import VALUE_COLUMN
+from chronify.time_range_generator_factory import make_time_range_generator
 
+from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone, TimeIntervalType, get_zone_info_from_spark_session
-from dsgrid.dimension.time_utils import shift_time_interval
+
+from dsgrid.spark.functions import (
+    create_temp_view,
+    make_temp_view_name,
+    get_current_time_zone,
+    join_multiple_columns,
+    select_expr,
+    set_current_time_zone,
+    perform_interval_op,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+    FloatType,
+    F,
+    StructField,
+    StructType,
+    TimestampType,
+    use_duckdb,
+)
 from dsgrid.utils.dataset import add_time_zone
-from dsgrid.utils.spark import get_spark_session
-from dsgrid.exceptions import DSGDatasetConfigError
+from dsgrid.utils.spark import get_spark_session, get_unique_values
+
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
 
 
@@ -66,23 +85,17 @@ def test_no_unexpected_timezone():
             ), f"{tzo} can either be prevailing or standard"
 
 
-def test_build_time_dataframe(project, resstock, comstock):
-    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
-    resstock_time_dim = resstock.config.get_dimension(DimensionType.TIME)
-    comstock_time_dim = comstock.config.get_dimension(DimensionType.TIME)
-    check_time_dataframe(project_time_dim)
-    check_time_dataframe(resstock_time_dim)
-    check_time_dataframe(comstock_time_dim)
-
-
 def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
 
     tempo_data = tempo._handler._load_data.join(tempo._handler._load_data_lookup, on="id").drop(
         "id"
     )
+    value_columns = tempo._handler.config.get_value_columns()
+    assert len(value_columns) == 1
+    value_column = next(iter(value_columns))
     tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-        tempo_data, project.config, tempo._handler.config.get_value_columns(), scratch_dir_context
+        tempo_data, project.config, value_column, scratch_dir_context
     )
     tempo_data_with_tz = add_time_zone(
         tempo_data, project.config.get_base_dimension(DimensionType.GEOGRAPHY)
@@ -96,188 +109,55 @@ def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     )
 
 
-def test_convert_time_for_comstock(project, comstock, scratch_dir_context):
-    comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
-
-    comstock_data = comstock._handler._load_data.join(comstock._handler._load_data_lookup, on="id")
-    comstock_data_with_tz = add_time_zone(
-        comstock_data, comstock._handler.config.get_dimension(DimensionType.GEOGRAPHY)
-    )
-    comstock_time_dim.convert_dataframe(
-        comstock_data_with_tz,
-        project.config.get_base_dimension(DimensionType.TIME),
-        comstock._handler.config.get_value_columns(),
-        scratch_dir_context,
-    )
-
-
-def test_convert_to_project_time_1(project, resstock, comstock, tempo, scratch_dir_context):
-    """test convert time for different time interval type"""
-    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
-    resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
-    comstock_time_dim = comstock._handler.config.get_dimension(DimensionType.TIME)
-    tempo_time_dim = tempo._handler.config.get_dimension(DimensionType.TIME)
-    tempo_data = tempo._handler._load_data.join(tempo._handler._load_data_lookup, on="id").drop(
-        "id"
-    )
-    tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-        tempo_data, project.config, tempo._handler.config.get_value_columns(), scratch_dir_context
-    )
-
-    # project: period-beginning, dataset: period-ending, same time range
-    compare_time_conversion(
-        resstock_time_dim, project_time_dim, scratch_dir_context, expect_error=False
-    )
-    compare_time_conversion(
-        comstock_time_dim, project_time_dim, scratch_dir_context, expect_error=False
-    )
-    compare_time_conversion(
-        tempo_time_dim,
-        project_time_dim,
-        scratch_dir_context,
-        df=tempo_data_mapped_time,
-        expect_error=False,
-    )
-
-    # project, dataset same time range and time interval type
-    project_time_dim.model.time_interval_type = resstock_time_dim.model.time_interval_type
-    compare_time_conversion(
-        resstock_time_dim, project_time_dim, scratch_dir_context, expect_error=False
-    )
-    compare_time_conversion(
-        tempo_time_dim,
-        project_time_dim,
-        scratch_dir_context,
-        df=tempo_data_mapped_time,
-        expect_error=False,
-    )
-
-    # project: period-ending, dataset: period-begining, same time range
-    comstock_time_dim.model.time_interval_type = TimeIntervalType.PERIOD_BEGINNING
-    compare_time_conversion(
-        comstock_time_dim, project_time_dim, scratch_dir_context, expect_error=False
-    )
-    tempo_time_dim.model.time_interval_type = TimeIntervalType.PERIOD_BEGINNING
-    compare_time_conversion(
-        tempo_time_dim,
-        project_time_dim,
-        scratch_dir_context,
-        df=tempo_data_mapped_time,
-        expect_error=False,
-    )
-
-
-def test_convert_to_project_time_2(project, resstock, comstock, tempo, scratch_dir_context):
-    """test convert time for different time zone"""
-    project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
-    resstock_time_dim = resstock._handler.config.get_dimension(DimensionType.TIME)
-
-    resstock_time_dim.model.datetime_format.timezone = TimeZone.UTC
-    # error b/c time wrap from time_interval_type alignment is applied differently than wrap_time_allowed
-    compare_time_conversion(
-        resstock_time_dim, project_time_dim, scratch_dir_context, expect_error=True
-    )
-
-    # project, dataset same time range and time interval type but different time zone, wrap_time is needed
-    resstock_time_dim.model.time_interval_type = project_time_dim.model.time_interval_type
-    dataset_id = "resstock_conus_2022_reference"
-    wrap_time = project.config.get_dataset(dataset_id).wrap_time_allowed
-    assert wrap_time is False, f"{wrap_time=} for {dataset_id=}, expecting False"
-    compare_time_conversion(
-        resstock_time_dim,
-        project_time_dim,
-        scratch_dir_context,
-        wrap_time=wrap_time,
-        expect_error=True,
-    )
-    compare_time_conversion(
-        resstock_time_dim,
-        project_time_dim,
-        scratch_dir_context,
-        wrap_time=True,
-        expect_error=False,
-    )
-    project_time_dim.model.datetime_format.timezone = TimeZone.PST
-    compare_time_conversion(
-        resstock_time_dim,
-        project_time_dim,
-        scratch_dir_context,
-        wrap_time=True,
-        expect_error=False,
-    )
-
-
 def test_make_project_dataframe(project, resstock, comstock, tempo, scratch_dir_context):
     tempo.make_project_dataframe(project.config, scratch_dir_context)
     comstock.make_project_dataframe(project.config, scratch_dir_context)
     resstock.make_project_dataframe(project.config, scratch_dir_context)
 
 
-def _compare_time_conversion(
-    dataset_time_dim, project_time_dim, scratch_dir_context, df=None, wrap_time=False
+def shift_time_interval(
+    df,
+    time_column: str,
+    from_time_interval: TimeIntervalType,
+    to_time_interval: TimeIntervalType,
+    time_step: timedelta,
+    new_time_column: Optional[str] = None,
 ):
-    project_time = project_time_dim.build_time_dataframe()
-    if df is None:
-        converted_dataset_time = dataset_time_dim._convert_time_to_project_time(
-            dataset_time_dim.build_time_dataframe(),
-            project_time_dim,
-            context=scratch_dir_context,
-            wrap_time=wrap_time,
-        )
-    else:
-        converted_dataset_time = df
-    ptime_col = project_time_dim.get_load_data_time_columns()
-    dfp = set(project_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
-    dfd = set(converted_dataset_time.select(ptime_col).distinct().orderBy(ptime_col).collect())
-    if dfp != dfd:
-        raise DSGDatasetConfigError(
-            "dataset time dimension converted to project requirement does not match project time dimension. \n{delta}"
+    """
+    Shift time_column by time_step in df as needed by comparing from_time_interval
+    to to_time_interval. If new_time_column is None, time_column is shifted in
+    place, else shifted time is added as new_time_column in df.
+    """
+    assert (
+        from_time_interval != to_time_interval
+    ), f"{from_time_interval=} is the same as {to_time_interval=}"
+
+    if new_time_column is None:
+        new_time_column = time_column
+
+    if TimeIntervalType.INSTANTANEOUS in (from_time_interval, to_time_interval):
+        raise NotImplementedError(
+            "aligning time intervals with instantaneous is not yet supported"
         )
 
-
-def compare_time_conversion(
-    dataset_time_dim,
-    project_time_dim,
-    scratch_dir_context,
-    df=None,
-    wrap_time=False,
-    expect_error=False,
-):
-    if expect_error:
-        with pytest.raises(DSGDatasetConfigError):
-            _compare_time_conversion(
-                dataset_time_dim, project_time_dim, scratch_dir_context, df=df, wrap_time=wrap_time
+    match (from_time_interval, to_time_interval):
+        case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
+            df = perform_interval_op(
+                df, time_column, "+", time_step.seconds, "SECONDS", new_time_column
             )
-    else:
-        _compare_time_conversion(
-            dataset_time_dim, project_time_dim, scratch_dir_context, df=df, wrap_time=wrap_time
-        )
+        case (TimeIntervalType.PERIOD_ENDING, TimeIntervalType.PERIOD_BEGINNING):
+            df = perform_interval_op(
+                df, time_column, "-", time_step.seconds, "SECONDS", new_time_column
+            )
 
-
-def check_time_dataframe(time_dim):
-    session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
-    assert session_tz is not None
-    z_info = get_zone_info_from_spark_session(session_tz)
-    time_df = time_dim.build_time_dataframe().collect()
-    time_df_start = min(time_df)[0].astimezone(z_info)
-    time_df_end = max(time_df)[0].astimezone(z_info)
-    time_range = time_dim.get_time_ranges()[0]
-    time_range_start = time_range.start.tz_convert(session_tz)
-    time_range_end = time_range.end.tz_convert(session_tz)
-    assert (
-        time_df_start == time_range_start
-    ), f"Starting timestamp does not match: {time_df_start} vs. {time_range_start}"
-    assert (
-        time_df_end == time_range_end
-    ), f"Ending timestamp does not match: {time_df_end} vs. {time_range_end}"
+    return df
 
 
 def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     """check that annual sum from tempo data is the same when mapped in pyspark,
     and when mapped in pandas to get the frequency each value in raw_data gets mapped
     """
-    spark = get_spark_session()
-    session_tz_orig = session_tz = spark.conf.get("spark.sql.session.timeZone")
+    session_tz_orig = session_tz = get_current_time_zone()
 
     ptime_col = project_time_dim.get_load_data_time_columns()
     assert len(ptime_col) == 1, ptime_col
@@ -289,17 +169,16 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     # get sum from converted_data
     groupby_cols = [col for col in converted_data.columns if col not in [ptime_col, VALUE_COLUMN]]
     converted_sum = converted_data.groupBy(*groupby_cols).agg(
-        F.sum(F.round(VALUE_COLUMN, 3)).alias(VALUE_COLUMN)
+        F.sum(VALUE_COLUMN).alias(VALUE_COLUMN)
     )
-    converted_sum_df = converted_sum.toPandas().set_index(groupby_cols).sort_index()
+    pdf = converted_sum.toPandas()
+    pdf[VALUE_COLUMN] = pdf[VALUE_COLUMN].round(3)
+    converted_sum_df = pdf.set_index(groupby_cols).sort_index()
 
     # process raw_data, get freq each values will be mapped and get sumproduct from there
     # [1] sum from raw_data, mapping via pandas
-    model_time = (
-        pd.Series(np.concatenate(project_time_dim.list_expected_dataset_timestamps()))
-        .rename(ptime_col)
-        .to_frame()
-    )
+    project_time_df, project_timestamps = make_date_time_df(project_time_dim)
+    model_time = pd.Series(project_timestamps).rename(ptime_col).to_frame()
     model_time[ptime_col] = model_time[ptime_col].dt.tz_convert(session_tz)
 
     # convert to match time interval type
@@ -316,16 +195,16 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
                 project_time_dim.get_frequency()
             )
 
-    geo_tz_values = [row.time_zone for row in raw_data.select("time_zone").distinct().collect()]
-    geo_tz_names = [TimeZone(tz).tz_name for tz in geo_tz_values]
+    geo_tz_names = sorted(get_unique_values(raw_data, "time_zone"))
+    assert geo_tz_names
 
     model_time_df = []
-    for tzv, tz in zip(geo_tz_values, geo_tz_names):
+    for tz_name in geo_tz_names:
         model_time_tz = model_time.copy()
-        model_time_tz["time_zone"] = tzv
+        model_time_tz["time_zone"] = tz_name
         # for pd.dt.tz_convert(), always convert to UTC before converting to another tz
         model_time_tz["UTC"] = model_time_tz["map_time"].dt.tz_convert("UTC")
-        model_time_tz["local_time"] = model_time_tz["UTC"].dt.tz_convert(tz)
+        model_time_tz["local_time"] = model_time_tz["UTC"].dt.tz_convert(tz_name)
         for col in time_cols:
             if col == "hour":
                 model_time_tz[col] = model_time_tz["local_time"].dt.hour
@@ -346,18 +225,18 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
     )
     other_cols = [col for col in raw_data.columns if col != VALUE_COLUMN]
     raw_data_df = (
-        raw_data.select(other_cols + [F.round(VALUE_COLUMN, 3).alias(VALUE_COLUMN)])
+        raw_data.select(other_cols + [VALUE_COLUMN])
         .toPandas()
         .join(model_time_map, on=["time_zone"] + time_cols, how="left")
     )
+    raw_data_df[VALUE_COLUMN] = raw_data_df[VALUE_COLUMN].round(3)
 
     # [2] sum from raw_data, mapping via spark
     # temporarily set to UTC
-    spark.conf.set("spark.sql.session.timeZone", "UTC")
-    session_tz = spark.conf.get("spark.sql.session.timeZone")
+    set_current_time_zone("UTC")
+    session_tz = get_current_time_zone()
 
     try:
-        project_time_df = project_time_dim.build_time_dataframe()
         project_time_df = shift_time_interval(
             project_time_df,
             ptime_col,
@@ -367,46 +246,64 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             new_time_column="map_time",
         )
         idx = 0
-        for tz_value, tz_name in zip(geo_tz_values, geo_tz_names):
-            local_time_df = (
-                project_time_df.withColumn("time_zone", F.lit(tz_value))
-                .withColumn("UTC", F.to_utc_timestamp(F.col("map_time"), session_tz))
-                .withColumn("local_time", F.from_utc_timestamp(F.col("UTC"), tz_name))
-            )
+        if use_duckdb():
+            weekday_func = "ISODOW"
+            weekday_modifier = " - 1"
+        else:
+            weekday_func = "WEEKDAY"
+            weekday_modifier = ""
+        for tz_name in geo_tz_names:
+            local_time_df = project_time_df.withColumn("time_zone", F.lit(tz_name))
+            local_time_df = to_utc_timestamp(local_time_df, "map_time", session_tz, "UTC")
+            local_time_df = from_utc_timestamp(local_time_df, "UTC", tz_name, "local_time")
             select = [ptime_col, "map_time", "time_zone", "UTC", "local_time"]
             for col in time_cols:
                 func = col.replace("_", "")
                 expr = f"{func}(local_time) AS {col}"
                 if col == "day_of_week":
-                    expr = f"mod(dayofweek(local_time)+7-2, 7) AS {col}"
+                    expr = f"{weekday_func}(local_time) {weekday_modifier} AS {col}"
                 select.append(expr)
-            local_time_df = local_time_df.selectExpr(*select)
+            local_time_df = select_expr(local_time_df, select)
             if idx == 0:
                 time_df = local_time_df
             else:
                 time_df = time_df.union(local_time_df)
             idx += 1
+        assert isinstance(time_df, DataFrame)
+        if use_duckdb():
+            # DuckDB does not persist the hour value unless we create a table.
+            view = create_temp_view(time_df)
+            table = make_temp_view_name()
+            spark = get_spark_session()
+            spark.sql(f"CREATE TABLE {table} AS SELECT * FROM {view}")
+            time_df = spark.sql(f"SELECT * FROM {table}")
     finally:
         # reset session timezone
-        spark.conf.set("spark.sql.session.timeZone", session_tz_orig)
-        session_tz = spark.conf.get("spark.sql.session.timeZone")
+        set_current_time_zone(session_tz_orig)
+        session_tz = get_current_time_zone()
 
-    raw_data_df2 = raw_data.join(
-        time_df.groupBy(["time_zone"] + time_cols).count(),
-        on=["time_zone"] + time_cols,
+    grouped_time_df = time_df.groupBy(["time_zone"] + time_cols).count()
+
+    raw_data_df2 = join_multiple_columns(
+        raw_data,
+        grouped_time_df,
+        ["time_zone"] + time_cols,
         how="left",
     )
+
     raw_sum_df2 = raw_data_df2.groupBy(groupby_cols).agg(
-        F.sum(F.round(VALUE_COLUMN, 3) * F.col("count").cast(FloatType())).alias(VALUE_COLUMN)
+        F.sum(F.col(VALUE_COLUMN) * F.col("count").cast(FloatType())).alias(VALUE_COLUMN)
     )
     raw_sum_df2 = raw_sum_df2.toPandas().set_index(groupby_cols).sort_index()
+    raw_sum_df2[VALUE_COLUMN] = raw_sum_df2[VALUE_COLUMN].round(3)
 
     # check 1: that mapping df are the same for both spark and pandas
-    time_df2 = time_df.collect()
-    time_df2 = pd.DataFrame(time_df2, columns=time_df.columns)
-    time_df2[ptime_col] = pd.to_datetime(time_df2[ptime_col]).dt.tz_localize(
-        session_tz, ambiguous="infer"
-    )
+    time_df2 = time_df.toPandas()
+    if not use_duckdb():
+        time_df2[ptime_col] = pd.to_datetime(time_df2[ptime_col]).dt.tz_localize(
+            session_tz, ambiguous="infer"
+        )
+    # else: already tz_aware?
 
     cond = model_time_df["month"] != time_df2["month"]
     cond |= model_time_df["day_of_week"] != time_df2["day_of_week"]
@@ -463,20 +360,16 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     assert len(time_col) == 1, time_col
     time_col = time_col[0]
 
-    model_time = (
-        pd.Series(np.concatenate(project_time_dim.list_expected_dataset_timestamps()))
-        .rename(time_col)
-        .to_frame()
-    )
-    project_time = project_time_dim.build_time_dataframe()
-    tempo_time = load_data.select(time_col).distinct().sort(F.asc(time_col))
+    project_time, project_timestamps = make_date_time_df(project_time_dim)
+    model_time = pd.Series(project_timestamps).rename(time_col).to_frame()
+    tempo_time = load_data.select(time_col).distinct().sort(time_col)
 
     # QC 1: each timestamp has the same number of occurences
     freq_count = load_data.groupBy(time_col).count().select("count").distinct().collect()
     assert len(freq_count) == 1, freq_count
 
     # QC 2: model_time == project_time == tempo_time
-    session_tz = get_spark_session().conf.get("spark.sql.session.timeZone")
+    session_tz = get_current_time_zone()
     assert session_tz is not None
     z_info = get_zone_info_from_spark_session(session_tz)
     model_time[time_col] = model_time[time_col].dt.tz_convert(session_tz)
@@ -504,3 +397,69 @@ def check_exploded_tempo_time(project_time_dim, load_data):
     assert (
         len(mismatch) == 0
     ), f"Mismatch:\nn_model={n_model}, n_project={n_project}, n_tempo={n_tempo}\n{mismatch}"
+
+
+# The duckdb implementations of the next two functions may not be fully correct or ideal.
+# We don't need them in the dsgrid package because time mapping is performed in chronify.
+# There are some extensive tests in this file that rely on them, and so we are keeping them
+# here.
+
+
+def from_utc_timestamp(
+    df: DataFrame, time_column: str, time_zone: str, new_column: str
+) -> DataFrame:
+    """Refer to pyspark.sql.functions.from_utc_timestamp."""
+    if use_duckdb():
+        view = create_temp_view(df)
+        cols = df.columns[:]
+        if time_column == new_column:
+            cols.remove(time_column)
+        cols_str = ",".join(cols)
+        query = f"""
+            SELECT
+                {cols_str},
+                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
+            FROM {view}
+        """
+        df2 = get_spark_session().sql(query)
+        return df2
+
+    df2 = df.withColumn(new_column, F.from_utc_timestamp(time_column, time_zone))
+    return df2
+
+
+def to_utc_timestamp(
+    df: DataFrame, time_column: str, time_zone: str, new_column: str
+) -> DataFrame:
+    """Refer to pyspark.sql.functions.to_utc_timestamp."""
+    if use_duckdb():
+        view = create_temp_view(df)
+        cols = df.columns[:]
+        if time_column == new_column:
+            cols.remove(time_column)
+        cols_str = ",".join(cols)
+        query = f"""
+            SELECT
+                {cols_str},
+                CAST(timezone('{time_zone}', {time_column}) AS TIMESTAMPTZ) AS {new_column}
+            FROM {view}
+        """
+        df2 = get_spark_session().sql(query)
+        return df2
+
+    df2 = df.withColumn(new_column, F.to_utc_timestamp(time_column, time_zone))
+    return df2
+
+
+def make_date_time_df(
+    time_config: DateTimeDimensionConfig,
+) -> tuple[DataFrame, list[pd.Timestamp]]:
+    timestamps = make_time_range_generator(time_config.to_chronify()).list_timestamps()
+    project_time_cols = time_config.get_load_data_time_columns()
+    assert len(project_time_cols) == 1, project_time_cols
+    time_col = project_time_cols[0]
+    schema = StructType([StructField(time_col, TimestampType(), False)])
+    df = get_spark_session().createDataFrame(
+        [(x.to_pydatetime(),) for x in timestamps], schema=schema
+    )
+    return df, timestamps

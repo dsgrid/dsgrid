@@ -8,16 +8,19 @@ from dsgrid.cli.dsgrid_admin import cli as admin_cli
 from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
-from dsgrid.tests.common import TEST_DATASET_DIRECTORY, TEST_EFS_REGISTRATION_FILE
+from dsgrid.tests.common import (
+    IEF_PROJECT_REPO,
+    STANDARD_SCENARIOS_PROJECT_REPO,
+    TEST_DATASET_DIRECTORY,
+    TEST_EFS_REGISTRATION_FILE,
+    TEST_PROJECT_PATH,
+)
 from dsgrid.utils.files import dump_data, load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )
-
-STANDARD_SCENARIOS_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-StandardScenarios"
-DECARB_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-DECARB"
 
 
 def test_register_dimensions_and_mappings(tmp_registry_db):
@@ -57,6 +60,7 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
 
     # Registering duplicates is allowed.
     result = runner.invoke(cli, cmd)
+    assert result.exit_code == 0
 
     cmd = [
         "--url",
@@ -112,6 +116,7 @@ def test_register_project_and_dataset(tmp_registry_db):
             "log",
         ],
     )
+    assert result.exit_code == 0
     conn = DatabaseConnection(url=url)
     manager = RegistryManager.load(conn, offline_mode=True)
     mappings = map_dimension_names_to_ids(manager.dimension_manager)
@@ -201,7 +206,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     assert result.exit_code == 0
 
 
-def test_list_project_dimension_query_names(cached_registry):
+def test_list_project_dimension_names(cached_registry):
     conn = cached_registry
     runner = CliRunner(mix_stderr=False)
     cmd = [
@@ -210,15 +215,18 @@ def test_list_project_dimension_query_names(cached_registry):
         "--offline",
         "registry",
         "projects",
-        "list-dimension-query-names",
+        "list-dimension-names",
         "test_efs",
     ]
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
-    assert "base: county" in result.stdout
+    assert "base: US Counties" in result.stdout
     assert "subset: commercial_subsectors2 residential_subsectors" in result.stdout
-    assert "supplemental: all_subsectors commercial_subsectors" in result.stdout
-    assert "supplemental: all_geographies census_division census_region state" in result.stdout
+    assert (
+        "supplemental: Commercial Subsectors Subsectors by Sector all_test_efs_subsectors"
+        in result.stdout
+    )
+    assert "supplemental: US Census Divisions US Census Regions US States" in result.stdout
 
 
 def test_register_dsgrid_projects(tmp_registry_db):
@@ -239,7 +247,7 @@ def test_register_dsgrid_projects(tmp_registry_db):
 
     project_configs = (
         STANDARD_SCENARIOS_PROJECT_REPO / "dsgrid_project" / "project.json5",
-        DECARB_PROJECT_REPO / "project" / "project.json5",
+        IEF_PROJECT_REPO / "project" / "project.json5",
     )
 
     # Test these together because they share dimensions and mappings.
@@ -262,10 +270,10 @@ def test_register_dsgrid_projects(tmp_registry_db):
 
     conn = DatabaseConnection(url=url)
     manager = RegistryManager.load(conn, offline_mode=True)
-    project = manager.project_manager.load_project("US_DOE_DECARB_2023")
+    project = manager.project_manager.load_project("US_DOE_IEF_2023")
     config = project.config
     context = ScratchDirContext(tmpdir)
-    config.make_dimension_association_table("decarb_2023_transport", context)
+    config.make_dimension_association_table("ief_2023_transport", context)
 
 
 def test_bulk_register(tmp_registry_db):
@@ -286,7 +294,7 @@ def test_bulk_register(tmp_registry_db):
     # Inject an error so that registration of the second dataset fails.
     dataset_config_file = test_project_dir / "datasets" / "modeled" / "comstock" / "dataset.json5"
     config = load_data(dataset_config_file)
-    config["dimensions"][0]["display_name"] += "!@#$%"
+    config["dimensions"][0]["name"] += "!@#$%"
     dump_data(config, dataset_config_file)
     registration = RegistrationModel.from_file(TEST_EFS_REGISTRATION_FILE)
     registration.datasets[1].config_file = dataset_config_file
@@ -327,3 +335,108 @@ def test_bulk_register(tmp_registry_db):
     )
     assert result.exit_code == 0
     assert not journal_file.exists()
+
+
+def test_register_multiple_metric_dimensions(tmp_registry_db):
+    _, tmpdir, url = tmp_registry_db
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(
+        admin_cli,
+        [
+            "create-registry",
+            url,
+            "-p",
+            str(tmpdir),
+            "--force",
+        ],
+    )
+    assert result.exit_code == 0
+    base = TEST_PROJECT_PATH / "filtered_registries" / "dgen_multiple_metrics"
+    project_dir = base / "dsgrid-project-IEF"
+    project_config_file = project_dir / "project" / "project.json5"
+    profiles_config_file = project_dir / "datasets" / "modeled" / "dgen_profiles" / "dataset.json5"
+    profiles_mapping_file = (
+        project_dir / "datasets" / "modeled" / "dgen_profiles" / "dimension_mappings.json5"
+    )
+    capacities_config_file = (
+        project_dir / "datasets" / "modeled" / "dgen_capacities" / "dataset.json5"
+    )
+    capacities_mapping_file = (
+        project_dir / "datasets" / "modeled" / "dgen_capacities" / "dimension_mappings.json5"
+    )
+    profiles_data = base / "dgen_profiles_data/"
+    capacities_data = base / "dgen_capacities_data"
+
+    cmd = [
+        "--url",
+        url,
+        "--offline",
+        "registry",
+        "projects",
+        "register",
+        str(project_config_file),
+        "-l",
+        "log",
+    ]
+    result = runner.invoke(cli, cmd)
+    assert result.exit_code == 0
+
+    cmds = (
+        [
+            "-u",
+            url,
+            "registry",
+            "projects",
+            "register-and-submit-dataset",
+            "-c",
+            str(profiles_config_file),
+            "-d",
+            str(profiles_data),
+            "-p",
+            "US_DOE_DECARB_2023",
+            "-m",
+            str(profiles_mapping_file),
+            "-l",
+            "Register and submit dgen profiles",
+        ],
+        [
+            "-u",
+            url,
+            "registry",
+            "projects",
+            "register-and-submit-dataset",
+            "-c",
+            str(capacities_config_file),
+            "-d",
+            str(capacities_data),
+            "-p",
+            "US_DOE_DECARB_2023",
+            "-m",
+            str(capacities_mapping_file),
+            "-l",
+            "Register and submit dgen profiles",
+        ],
+    )
+    for cmd in cmds:
+        result = runner.invoke(cli, cmd)
+        assert result.exit_code == 0
+
+    for dataset_id in ("decarb_2023_dgen", "decarb_2023_dgen_capacities"):
+        cmd = [
+            "-u",
+            url,
+            "query",
+            "project",
+            "map-dataset",
+            "US_DOE_DECARB_2023",
+            dataset_id,
+            "-o",
+            str(tmpdir),
+        ]
+        result = runner.invoke(cli, cmd)
+        assert result.exit_code == 0
+        match = re.search(r"Wrote mapped dataset [\w-]+ to (.*parquet)", result.stderr)
+        assert match
+        path = Path(match.group(1))
+        assert path.exists()
+        # Correctness of map_dataset is tested elsewhere.

@@ -27,7 +27,7 @@
     "dimension_filters": [
         {
           "dimension_type": "geography",
-          "dimension_query_name": "county",
+          "dimension_name": "county",
           "column": "county",
           "operator": "isin",
           "value": [

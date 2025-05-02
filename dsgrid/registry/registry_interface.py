@@ -1,7 +1,6 @@
 import abc
 import itertools
 import logging
-from contextlib import contextmanager
 from typing import Any, Generator, Optional
 
 import pandas as pd
@@ -12,7 +11,7 @@ from dsgrid.config.dimension_mapping_base import DimensionMappingBaseModel
 from dsgrid.config.dimensions import DimensionBaseModel, handle_dimension_union
 from dsgrid.config.mapping_tables import MappingTableModel
 from dsgrid.config.project_config import ProjectConfigModel
-from dsgrid.data_models import DSGBaseDatabaseModel
+from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel
 from dsgrid.registry.common import (
     DatasetRegistryStatus,
     MODEL_TYPE_TO_ID_FIELD_MAPPING,
@@ -60,7 +59,7 @@ class RegistryInterfaceBase(abc.ABC):
     def delete_all(self, conn: Optional[Connection], model_id: str) -> None:
         """Delete all database instances with model_id."""
         if conn is None:
-            with commit_manager(self._db.engine) as conn:
+            with self._db.engine.begin() as conn:
                 return self._db.delete_models(conn, self._model_type(), model_id)
         return self._db.delete_models(conn, self._model_type(), model_id)
 
@@ -70,7 +69,7 @@ class RegistryInterfaceBase(abc.ABC):
         """Return the model by version"""
         return self._make_dsgrid_model(self._get_by_version(conn, model_id, version))
 
-    def get_latest(self, conn: Optional[Connection], model_id) -> DSGBaseDatabaseModel:
+    def get_latest(self, conn: Optional[Connection], model_id) -> DSGBaseModel:
         """Return the model with the latest version."""
         return self._make_dsgrid_model(self._get_latest(conn, model_id))
 
@@ -123,16 +122,16 @@ class RegistryInterfaceBase(abc.ABC):
         conn: Optional[Connection],
         model: DSGBaseDatabaseModel,
         registration: RegistrationModel,
-    ) -> DSGBaseDatabaseModel:
+    ) -> DSGBaseModel:
         """Add a new model in the database."""
         if conn is None:
-            with commit_manager(self._db.engine) as conn:
+            with self._db.engine.begin() as conn:
                 return self._insert(conn, model, registration)
         return self._insert(conn, model, registration)
 
     def _insert(
         self, conn: Connection, model: DSGBaseDatabaseModel, registration: RegistrationModel
-    ) -> DSGBaseDatabaseModel:
+    ) -> DSGBaseModel:
         new_model = self._make_dsgrid_model(
             self._db.insert_model(
                 conn, self._model_type(), model.model_dump(mode="json"), registration
@@ -151,7 +150,7 @@ class RegistryInterfaceBase(abc.ABC):
         database ID of registration entry
         """
         if conn is None:
-            with commit_manager(self._db.engine) as conn:
+            with self._db.engine.begin() as conn:
                 return self._db.insert_registration(conn, registration)
         return self._db.insert_registration(conn, registration)
 
@@ -258,7 +257,7 @@ class RegistryInterfaceBase(abc.ABC):
     def replace(self, conn: Optional[Connection], model: DSGBaseDatabaseModel):
         """Replace an existing model in the database."""
         if conn is None:
-            with commit_manager(self._db.engine) as conn:
+            with self._db.engine.begin() as conn:
                 return self._replace(conn, model)
         return self._replace(conn, model)
 
@@ -273,7 +272,7 @@ class RegistryInterfaceBase(abc.ABC):
     ) -> DSGBaseDatabaseModel:
         """Update an existing model in the database."""
         if conn is None:
-            with commit_manager(self._db.engine) as conn:
+            with self._db.engine.begin() as conn:
                 return self._update(conn, model, registration)
         return self._update(conn, model, registration)
 
@@ -449,19 +448,3 @@ _INTERFACE_BY_TYPE = {
     RegistryType.DIMENSION_MAPPING: DimensionMappingRegistryInterface,
 }
 assert len(_INTERFACE_BY_TYPE) == len(RegistryType)
-
-
-@contextmanager
-def commit_manager(engine: Engine):
-    failed = False
-    with engine.connect() as conn:
-        try:
-            yield conn
-        except Exception:
-            failed = True
-            raise
-        finally:
-            if failed:
-                conn.rollback()
-            else:
-                conn.commit()

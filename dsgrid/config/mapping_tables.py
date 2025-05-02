@@ -10,6 +10,7 @@ from dsgrid.config.dimension_mapping_base import (
     DimensionMappingDatasetToProjectBaseModel,
     DimensionMappingPreRegisteredBaseModel,
 )
+from dsgrid.config.dimensions import DimensionReferenceModel
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
@@ -146,7 +147,10 @@ class MappingTableModel(DimensionMappingBaseModel):
 
     @classmethod
     def from_pre_registered_model(
-        cls, model: DimensionMappingPreRegisteredBaseModel, from_dimension, to_dimension
+        cls,
+        model: MappingTableByNameModel | DatasetBaseToProjectMappingTableModel,
+        from_dimension: DimensionReferenceModel,
+        to_dimension: DimensionReferenceModel,
     ):
         return MappingTableModel(
             mapping_type=model.mapping_type,
@@ -154,7 +158,7 @@ class MappingTableModel(DimensionMappingBaseModel):
             from_dimension=from_dimension,
             to_dimension=to_dimension,
             description=model.description,
-            filename=model.filename,
+            file=model.filename,
             from_fraction_tolerance=model.from_fraction_tolerance,
             to_fraction_tolerance=model.to_fraction_tolerance,
         )

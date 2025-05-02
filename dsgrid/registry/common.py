@@ -11,18 +11,20 @@ from typing import Optional
 from pydantic import Field
 
 from dsgrid.data_models import DSGBaseModel
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.utils.versioning import make_version
 
 
 REGISTRY_LOG_FILE = "dsgrid_registry.log"
 # Allows letters, numbers, underscores, spaces, dashes
-REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
 # Allows letters, numbers, underscores, dashes, spaces
-REGEX_VALID_REGISTRY_DISPLAY_NAME = re.compile(r"^[\w -]+$")
+REGEX_VALID_REGISTRY_NAME = re.compile(r"^[\w -]+$")
 # Allows letters, numbers, underscores, dashes
 REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE = re.compile(r"^[\w/-]+$")
-# Allows letters, numbers, underscores
-REGEX_VALID_REGISTRY_CONFIG_ID_STRICT = re.compile(r"^[\w]+$")
+# Allows letters, numbers, underscores.
+# dataset_id cannot start with a number because of uses in DatasetExpressionHandler
+# It's likely a good rule everywhere else.
+REGEX_VALID_REGISTRY_CONFIG_ID_STRICT = re.compile(r"^[a-zA-Z][\w]+$")
 
 REGISTRY_ID_DELIMITER = "__"
 
@@ -41,7 +43,8 @@ def check_config_id_strict(config_id, tag):
     # Raises ValueError because this is used in Pydantic models.
     if not REGEX_VALID_REGISTRY_CONFIG_ID_STRICT.search(config_id):
         raise ValueError(
-            f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, and underscores."
+            f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, and underscores. "
+            "Cannot start with a number."
         )
 
 
@@ -68,14 +71,30 @@ class DatabaseConnection(DSGBaseModel):
     # port = match.group(2)
     # return cls(hostname=hostname, port=port, **kwargs)
 
-    def get_filename(self) -> Path | None:
+    def get_filename(self) -> Path:
+        """Return the filename from the URL. Only valid for SQLite databases.
+
+        Raises
+        ------
+        DSGInvalidParameter
+            Raised if the URL does not conform to the SQLite format.
+        """
+        # All call sites will need to be changed if/when we support Postgres.
+        filename = self.try_get_filename()
+        if filename is None:
+            msg = (
+                f"Failed to parse '{self.url}' into a SQLite URL. "
+                "The SQLite file path must be specified in the format 'sqlite:///</path/to/db_file.db>'. "
+            )
+            raise DSGInvalidParameter(msg)
+        return filename
+
+    def try_get_filename(self) -> Path | None:
         """Return the filename from the URL, if file-based, otherwise None."""
         regex = re.compile(r"sqlite:\/\/\/(.*)")
         match = regex.search(self.url)
         if not match:
             return None
-            # msg = f"Failed to find a filename in {self.url}"
-            # raise DSGInvalidParameter(msg)
         return Path(match.group(1))
 
 

@@ -3,23 +3,30 @@
 from collections import defaultdict, namedtuple
 from pathlib import Path
 
-import pyspark.sql.functions as F
-from pyspark.sql.types import IntegerType
-from pyspark.sql import SparkSession
-
 from dsgrid.config.mapping_tables import MappingTableRecordModel
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.spark.functions import (
+    cross_join,
+    read_csv,
+)
+from dsgrid.spark.types import (
+    F,
+    IntegerType,
+)
 from dsgrid.utils.files import (
     dump_data,
     load_data,
     load_line_delimited_json,
     dump_line_delimited_json,
 )
-from dsgrid.utils.spark import models_to_dataframe
+from dsgrid.utils.spark import (
+    models_to_dataframe,
+    get_spark_session,
+)
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
-from dsgrid.tests.utils import read_csv_single_table_format, read_parquet_two_table_format
+from dsgrid.tests.utils import read_parquet_two_table_format
 
 
 REGISTRY_PATH = Path("dsgrid-test-data/filtered_registries/simple_standard_scenarios")
@@ -42,7 +49,7 @@ def build_expected_datasets():
         map_aeo_com_county_to_comstock_county(
             duplicate_aeo_com_census_division_to_county(
                 apply_load_mapping_aeo_com(
-                    read_csv_single_table_format(
+                    read_csv(
                         path
                         / "data"
                         / "aeo2021_reference_commercial_energy_use_growth_factors"
@@ -54,7 +61,7 @@ def build_expected_datasets():
         )
     )
     aeo_res = apply_load_mapping_aeo_res(
-        read_csv_single_table_format(
+        read_csv(
             path
             / "data"
             / "aeo2021_reference_residential_energy_use_growth_factors"
@@ -182,10 +189,10 @@ def apply_load_mapping_aeo_res(aeo_res):
 def make_projection_df(aeo, ld_df, join_columns):
     # comstock and resstock have a single year of data for model_year 2018
     # Apply the growth rate for 2020 and 2040, the years in the filtered registry.
-    spark = SparkSession.builder.appName("dgrid").getOrCreate()
+    spark = get_spark_session()
     years_df = spark.createDataFrame([{"model_year": "2020"}, {"model_year": "2040"}])
-    aeo = aeo.crossJoin(years_df)
-    ld_df = ld_df.crossJoin(years_df)
+    aeo = cross_join(aeo, years_df)
+    ld_df = cross_join(ld_df, years_df)
     base_year = 2018
     gr_df = aeo
     pivoted_columns = BUILDING_PIVOTED_COLUMNS
@@ -217,8 +224,10 @@ def build_tempo():
     lookup = tempo._handler._load_data_lookup
     load_data = tempo._handler._load_data
     value_columns = tempo._handler.config.get_value_columns()
+    assert len(value_columns) == 1
+    value_column = next(iter(value_columns))
     tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-        load_data.join(lookup, on="id").drop("id"), project.config, value_columns, ["L1andL2"]
+        load_data.join(lookup, on="id").drop("id"), project.config, value_column, ["L1andL2"]
     )
     return tempo_data_mapped_time
 

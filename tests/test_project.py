@@ -1,9 +1,14 @@
 import pytest
 
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
-from dsgrid.exceptions import DSGValueNotRegistered, DSGInvalidDimensionMapping
+from dsgrid.exceptions import (
+    DSGInvalidParameter,
+    DSGValueNotRegistered,
+    DSGInvalidDimensionMapping,
+)
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -11,6 +16,14 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 PROJECT_ID = "test_efs"
 DATASET_ID = "test_efs_comstock"
+
+
+@pytest.fixture(scope="module")
+def project_config(cached_registry) -> ProjectConfig:
+    conn = cached_registry
+    mgr = RegistryManager.load(conn, offline_mode=True)
+    project = mgr.project_manager.load_project(PROJECT_ID)
+    return project.config
 
 
 def test_project_load(cached_registry):
@@ -31,17 +44,137 @@ def test_project_load(cached_registry):
     assert len(mappings) == 4
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SECTOR)
     assert config.has_base_to_supplemental_dimension_mapping_types(DimensionType.SUBSECTOR)
-    subset_dims = config.list_dimension_query_names(category=DimensionCategory.SUBSET)
+    subset_dims = config.list_dimension_names(category=DimensionCategory.SUBSET)
     assert subset_dims == ["commercial_subsectors2", "residential_subsectors"]
     config.get_dimension("residential_subsectors").get_unique_ids() == {"MidriseApartment"}
 
-    records = project.config.get_dimension_records("all_subsectors").collect()
+    records = project.config.get_dimension_records("all_test_efs_subsectors").collect()
     assert len(records) == 1
     assert records[0].id == "all_subsectors"
 
     with pytest.raises(DSGValueNotRegistered):
         project = mgr.project_manager.load_project(PROJECT_ID, version="0.0.0")
         assert isinstance(project, Project)
+
+
+def test_list_base_dimensions(project_config: ProjectConfig):
+    assert len(project_config.list_base_dimensions()) == len(DimensionType)
+    geos = project_config.list_base_dimensions(dimension_type=DimensionType.GEOGRAPHY)
+    assert len(geos) == 1
+    assert geos[0].model.name == "US Counties 2010 - ComStock Only"
+    geos = project_config.list_base_dimensions_with_records(dimension_type=DimensionType.GEOGRAPHY)
+    assert len(geos) == 1
+    assert geos[0].model.name == "US Counties 2010 - ComStock Only"
+
+
+def test_get_base_dimension(project_config: ProjectConfig):
+    geo = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
+    assert geo.model.name == "US Counties 2010 - ComStock Only"
+    assert (
+        project_config.get_base_dimension(
+            DimensionType.GEOGRAPHY, dimension_name="US Counties 2010 - ComStock Only"
+        ).model.name
+        == "US Counties 2010 - ComStock Only"
+    )
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_base_dimension(DimensionType.GEOGRAPHY, dimension_name="US States")
+
+
+def test_get_base_time_dimension(project_config: ProjectConfig):
+    dim = project_config.get_base_dimension(DimensionType.TIME)
+    assert dim.model.name == "Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total"
+
+
+def test_get_base_dimension_and_version(project_config: ProjectConfig):
+    dim, version = project_config.get_base_dimension_and_version(DimensionType.GEOGRAPHY)
+    assert dim.model.name == "US Counties 2010 - ComStock Only"
+    assert version == "1.0.0"
+    dim, version = project_config.get_base_dimension_and_version(
+        DimensionType.GEOGRAPHY, dimension_name="US Counties 2010 - ComStock Only"
+    )
+    assert dim.model.name == "US Counties 2010 - ComStock Only"
+    assert version == "1.0.0"
+
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_base_dimension_and_version(
+            DimensionType.GEOGRAPHY, dimension_name="US States"
+        )
+
+
+def test_get_dimension(project_config: ProjectConfig):
+    assert (
+        project_config.get_dimension("US Counties 2010 - ComStock Only").model.name
+        == "US Counties 2010 - ComStock Only"
+    )
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_dimension("invalid")
+
+
+def test_get_time_dimension(project_config: ProjectConfig):
+    assert (
+        project_config.get_base_time_dimension().model.name
+        == "Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total"
+    )
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_time_dimension("invalid")
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_time_dimension("US Counties 2010 - ComStock Only")
+
+
+def test_get_dimension_with_records(project_config: ProjectConfig):
+    assert (
+        project_config.get_dimension_with_records("US Counties 2010 - ComStock Only").model.name
+        == "US Counties 2010 - ComStock Only"
+    )
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_dimension_with_records(
+            "Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total"
+        )
+
+
+def test_get_dimension_records(project_config: ProjectConfig):
+    assert project_config.get_dimension_records("US Counties 2010 - ComStock Only").count() == 8
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_dimension_records(
+            "Time-2012-EST-hourly-periodBeginning-noDST-noLeapDayAdjustment-total"
+        )
+
+
+def test_get_base_to_supplemental_config(project_config: ProjectConfig):
+    base_dim = project_config.get_dimension_with_records("US Counties 2010 - ComStock Only")
+    supp_dim = project_config.get_dimension_with_records("US States")
+    mapping = project_config.get_base_to_supplemental_config(base_dim, supp_dim)
+    assert mapping.model.from_dimension.dimension_id == base_dim.model.dimension_id
+    assert mapping.model.to_dimension.dimension_id == supp_dim.model.dimension_id
+
+    subsector_dim = project_config.get_dimension_with_records("Commercial Subsectors")
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_base_to_supplemental_config(base_dim, subsector_dim)
+
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_base_to_supplemental_config(base_dim, base_dim)
+
+
+def test_get_base_dimension_by_id(project_config: ProjectConfig):
+    county = project_config.get_dimension("US Counties 2010 - ComStock Only")
+    assert (
+        project_config.get_base_dimension_by_id(county.model.dimension_id).model.name
+        == "US Counties 2010 - ComStock Only"
+    )
+    with pytest.raises(DSGValueNotRegistered):
+        project_config.get_base_dimension_by_id("invalid")
+
+
+def test_get_base_dimension_records_by_id(project_config: ProjectConfig):
+    county = project_config.get_dimension("US Counties 2010 - ComStock Only")
+    assert project_config.get_base_dimension_records_by_id(county.model.dimension_id).count() == 8
+    assert (
+        project_config.get_base_dimension_by_id(county.model.dimension_id).model.name
+        == "US Counties 2010 - ComStock Only"
+    )
+    time_dim = project_config.get_base_dimension(DimensionType.TIME)
+    with pytest.raises(DSGInvalidParameter):
+        project_config.get_base_dimension_records_by_id(time_dim.model.dimension_id)
 
 
 def test_dataset_load(cached_registry, scratch_dir_context):
@@ -57,17 +190,15 @@ def test_dataset_load(cached_registry, scratch_dir_context):
     assert DimensionType.METRIC.value in data.columns
     assert DimensionType.GEOGRAPHY.value in data.columns
 
-    query_names = sorted(
-        project.config.list_dimension_query_names_by_type(DimensionType.GEOGRAPHY)
-    )
+    query_names = sorted(project.config.list_dimension_names_by_type(DimensionType.GEOGRAPHY))
     assert query_names == [
-        "all_geographies",
-        "census_division",
-        "census_region",
-        "county",
-        "state",
+        "US Census Divisions",
+        "US Census Regions",
+        "US Counties 2010 - ComStock Only",
+        "US States",
+        "all_test_efs_geographies",
     ]
-    records = project.config.get_dimension_records("state")
+    records = project.config.get_dimension_records("US States")
     assert records.filter("id = 'CO'").count() > 0
 
 

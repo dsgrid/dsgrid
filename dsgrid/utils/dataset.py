@@ -1,35 +1,68 @@
 import logging
 import os
-from typing import Iterable
+from pathlib import Path
+from typing import Iterable, Optional
 
-import pyspark
-from pyspark.sql import DataFrame
-import pyspark.sql.functions as F
+import chronify
+from chronify.models import TableSchema
 
+import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
+from dsgrid.dimension.time import (
+    DaylightSavingFallBackType,
+    DaylightSavingSpringForwardType,
+    TimeBasedDataAdjustmentModel,
+    TimeZone,
+)
 from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
+from dsgrid.spark.functions import (
+    count_distinct_on_group_by,
+    create_temp_view,
+    get_spark_warehouse_dir,
+    handle_column_spaces,
+    make_temp_view_name,
+    read_parquet,
+    is_dataframe_empty,
+    join,
+    join_multiple_columns,
+    unpivot,
+)
+from dsgrid.spark.functions import except_all, get_spark_session
+from dsgrid.spark.types import (
+    DataFrame,
+    F,
+    use_duckdb,
+)
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import check_for_nulls, read_parquet
+from dsgrid.utils.spark import (
+    check_for_nulls,
+)
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 
 logger = logging.getLogger(__name__)
 
 
-def map_and_reduce_stacked_dimension(df, records, column, drop_column=True, to_column=None):
+def map_and_reduce_stacked_dimension(
+    df: DataFrame,
+    records: DataFrame,
+    column: str,
+    drop_column: bool = True,
+    to_column: Optional[str] = None,
+) -> DataFrame:
     to_column_ = to_column or column
     if "fraction" not in df.columns:
         df = df.withColumn("fraction", F.lit(1.0))
     # map and consolidate from_fraction only
     records = records.filter("to_id IS NOT NULL")
-
-    df = df.join(records, on=df[column] == records.from_id, how="inner").drop("from_id")
+    df = join(df, records, column, "from_id", how="inner").drop("from_id")
     if drop_column:
         df = df.drop(column)
     df = df.withColumnRenamed("to_id", to_column_)
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
-    df = df.fillna(1.0, subset=["from_fraction"]).selectExpr(
-        *nonfraction_cols, "fraction*from_fraction AS fraction"
+    df = df.select(
+        *nonfraction_cols, (F.col("fraction") * F.col("from_fraction")).alias("fraction")
     )
     return df
 
@@ -47,33 +80,81 @@ def add_time_zone(load_data_df, geography_dim):
     pyspark.sql.DataFrame
 
     """
-    geo_records = geography_dim.get_records_dataframe()
+    spark = get_spark_session()
+    dsg_geo_records = geography_dim.get_records_dataframe()
+    tz_map_table = spark.createDataFrame(
+        [(x.value, x.tz_name) for x in TimeZone], ("dsgrid_name", "tz_name")
+    )
+    geo_records = (
+        join(dsg_geo_records, tz_map_table, "time_zone", "dsgrid_name")
+        .drop("time_zone", "dsgrid_name")
+        .withColumnRenamed("tz_name", "time_zone")
+    )
+    assert dsg_geo_records.count() == geo_records.count()
     geo_name = geography_dim.model.dimension_type.value
-    assert "time_zone" not in load_data_df.columns
     return add_column_from_records(load_data_df, geo_records, geo_name, "time_zone")
 
 
 def add_column_from_records(df, dimension_records, dimension_name, column_to_add):
-    df = df.join(
+    df = join(
+        df,
         dimension_records.select(F.col("id").alias("record_id"), column_to_add),
-        on=F.col(dimension_name) == F.col("record_id"),
+        dimension_name,
+        "record_id",
         how="inner",
     ).drop("record_id")
     return df
 
 
+def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> DataFrame:
+    """Add null rows from the nulled load data lookup table to data table.
+
+    Parameters
+    ----------
+    df
+        load data table
+    lookup
+        load data lookup table that has been filtered for nulls and mapped to project dimensions.
+    """
+    if not is_dataframe_empty(lookup):
+        intersect_cols = set(lookup.columns).intersection(df.columns)
+        null_rows_to_add = except_all(lookup.select(*intersect_cols), df.select(*intersect_cols))
+        for col in set(df.columns).difference(null_rows_to_add.columns):
+            null_rows_to_add = null_rows_to_add.withColumn(col, F.lit(None))
+        df = df.union(null_rows_to_add.select(*df.columns))
+
+    return df
+
+
 def apply_scaling_factor(
-    df: DataFrame, value_columns, scaling_factor_column=SCALING_FACTOR_COLUMN
+    df: DataFrame, value_column: str, scaling_factor_column: str = SCALING_FACTOR_COLUMN
 ) -> DataFrame:
     """Apply the scaling factor to all value columns and then drop the scaling factor column."""
-    for column in value_columns:
-        df = df.withColumn(
-            column,
-            F.when(
-                F.col(scaling_factor_column).isNotNull(),
-                F.col(column) * F.col(scaling_factor_column),
-            ).otherwise(F.col(column)),
-        )
+    if use_duckdb():
+        # Workaround for the fact that duckdb doesn't support
+        # F.col(scaling_factor_column).isNotNull()
+        cols = (x for x in df.columns if x not in (value_column, scaling_factor_column))
+        cols_str = ",".join(cols)
+        view = create_temp_view(df)
+        query = f"""
+            SELECT
+                {cols_str},
+                (
+                    CASE WHEN {scaling_factor_column} IS NULL THEN {value_column}
+                    ELSE {value_column} * {scaling_factor_column} END
+                ) AS {value_column}
+            FROM {view}
+        """
+        spark = get_spark_session()
+        return spark.sql(query)
+
+    df = df.withColumn(
+        value_column,
+        F.when(
+            F.col(scaling_factor_column).isNotNull(),
+            F.col(value_column) * F.col(scaling_factor_column),
+        ).otherwise(F.col(value_column)),
+    )
     return df.drop(scaling_factor_column)
 
 
@@ -119,14 +200,174 @@ def check_null_value_in_dimension_rows(dim_table, exclude_columns=None):
         )
 
 
-def is_noop_mapping(records: pyspark.sql.DataFrame) -> bool:
+def is_noop_mapping(records: DataFrame) -> bool:
     """Return True if the mapping is a no-op."""
-    return records.filter(
-        (records.to_id.isNull() & ~records.from_id.isNull())
-        | (~records.to_id.isNull() & records.from_id.isNull())
-        | (records.from_id != records.to_id)
-        | (records.from_fraction != 1.0)
-    ).rdd.isEmpty()
+    return is_dataframe_empty(
+        records.filter(
+            "(to_id IS NULL and from_id IS NOT NULL) or "
+            "(to_id IS NOT NULL and from_id IS NULL) or "
+            "(from_id != to_id) or (from_fraction != 1.0)"
+        )
+    )
+
+
+def map_time_dimension_with_chronify_duckdb(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+    wrap_time_allowed: bool = False,
+    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+) -> DataFrame:
+    """Create a time-mapped table with chronify and DuckDB.
+    All operations are performed in memory.
+    """
+    # This will only work if the source and destination tables will fit in memory.
+    # We could potentially use a file-based DuckDB database for larger-than memory datasets.
+    # However, time checks and unpivot operations have failed with out-of-memory errors,
+    # and so we have never reached this point.
+    # If we solve those problems, this code could be modified.
+    src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
+    store = chronify.Store.create_in_memory_db()
+    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
+    store.map_table_time_config(
+        src_schema.name,
+        dst_schema,
+        wrap_time_allowed=wrap_time_allowed,
+        data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
+    )
+    pandas_df = store.read_table(dst_schema.name)
+    store.drop_table(dst_schema.name)
+    return df.session.createDataFrame(pandas_df)
+
+
+def map_time_dimension_with_chronify_spark_hive(
+    df: DataFrame,
+    table_name: str,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    wrap_time_allowed: bool = False,
+) -> DataFrame:
+    """Create a time-mapped table with chronify and Spark and a Hive Metastore.
+    The source data must already be stored in the metastore.
+    Chronify will store the mapped table in the metastore.
+    """
+    src_schema, dst_schema = _get_mapping_schemas(
+        df, value_column, from_time_dim, to_time_dim, src_name=table_name
+    )
+    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    with store.engine.begin() as conn:
+        # This bypasses checks because the table should already be valid.
+        store.schema_manager.add_schema(conn, src_schema)
+    try:
+        # TODO: https://github.com/NREL/chronify/issues/37
+        store.map_table_time_config(
+            src_schema.name,
+            dst_schema,
+            check_mapped_timestamps=False,
+            scratch_dir=get_spark_warehouse_dir(),
+            wrap_time_allowed=wrap_time_allowed,
+            data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
+        )
+    finally:
+        with store.engine.begin() as conn:
+            store.schema_manager.remove_schema(conn, src_schema.name)
+
+    return df.sparkSession.sql(f"SELECT * FROM {dst_schema.name}")
+
+
+def map_time_dimension_with_chronify_spark_path(
+    df: DataFrame,
+    filename: Path,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+    scratch_dir_context: ScratchDirContext,
+    wrap_time_allowed: bool = False,
+    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+) -> DataFrame:
+    """Create a time-mapped table with chronify and Spark using the local filesystem.
+    Chronify will store the mapped table in a Parquet file within scratch_dir_context.
+    """
+    src_schema, dst_schema = _get_mapping_schemas(df, value_column, from_time_dim, to_time_dim)
+    store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
+    store.create_view_from_parquet(filename, src_schema, bypass_checks=True)
+    output_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+    store.map_table_time_config(
+        src_schema.name,
+        dst_schema,
+        check_mapped_timestamps=False,
+        scratch_dir=scratch_dir_context.scratch_dir,
+        output_file=output_file,
+        wrap_time_allowed=wrap_time_allowed,
+        data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
+    )
+    return df.sparkSession.read.load(str(output_file))
+
+
+def _to_chronify_time_based_data_adjustment(
+    adj: Optional[TimeBasedDataAdjustmentModel],
+) -> Optional[chronify.TimeBasedDataAdjustment]:
+    if adj is None:
+        return None
+    if (
+        adj.daylight_saving_adjustment.spring_forward_hour == DaylightSavingSpringForwardType.NONE
+        and adj.daylight_saving_adjustment.fall_back_hour == DaylightSavingFallBackType.NONE
+    ):
+        chronify_dst_adjustment = chronify.time.DaylightSavingAdjustmentType.NONE
+    elif (
+        adj.daylight_saving_adjustment.spring_forward_hour == DaylightSavingSpringForwardType.DROP
+        and adj.daylight_saving_adjustment.fall_back_hour == DaylightSavingFallBackType.DUPLICATE
+    ):
+        chronify_dst_adjustment = (
+            chronify.time.DaylightSavingAdjustmentType.DROP_SPRING_FORWARD_DUPLICATE_FALLBACK
+        )
+    elif (
+        adj.daylight_saving_adjustment.spring_forward_hour == DaylightSavingSpringForwardType.DROP
+        and adj.daylight_saving_adjustment.fall_back_hour == DaylightSavingFallBackType.INTERPOLATE
+    ):
+        chronify_dst_adjustment = (
+            chronify.time.DaylightSavingAdjustmentType.DROP_SPRING_FORWARD_INTERPOLATE_FALLBACK
+        )
+    else:
+        msg = f"dsgrid time_based_data_adjustment = {adj}"
+        raise NotImplementedError(msg)
+
+    return chronify.TimeBasedDataAdjustment(
+        leap_day_adjustment=adj.leap_day_adjustment.value,
+        daylight_saving_adjustment=chronify_dst_adjustment,
+    )
+
+
+def _get_mapping_schemas(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+    src_name: Optional[str] = None,
+) -> tuple[TableSchema, TableSchema]:
+    src = src_name or "src_" + make_temp_view_name()
+    time_array_id_columns = [
+        x
+        for x in df.columns
+        if x
+        in set(df.columns).difference(from_time_dim.get_load_data_time_columns()) - {value_column}
+    ]
+    src_schema = chronify.TableSchema(
+        name=src,
+        time_config=from_time_dim.to_chronify(),
+        time_array_id_columns=time_array_id_columns,
+        value_column=value_column,
+    )
+    dst_schema = chronify.TableSchema(
+        name="dst_" + make_temp_view_name(),
+        time_config=to_time_dim.to_chronify(),
+        time_array_id_columns=time_array_id_columns,
+        value_column=value_column,
+    )
+    return src_schema, dst_schema
 
 
 def ordered_subset_columns(df, subset: set[str]) -> list[str]:
@@ -143,11 +384,10 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
     orig_columns = df.columns
     stacked = list(stacked_columns)
     return (
-        df.join(
-            df.groupBy(*stacked).agg(F.count_distinct(time_column).alias("count_time")),
-            on=stacked,
+        join_multiple_columns(
+            df, count_distinct_on_group_by(df, stacked, time_column, "count_time"), stacked
         )
-        .filter(f"{time_column} IS NOT NULL or count_time == 0")
+        .filter(f"{handle_column_spaces(time_column)} IS NOT NULL OR count_time = 0")
         .select(orig_columns)
     )
 
@@ -159,7 +399,10 @@ def repartition_if_needed_by_mapping(
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Repartition the dataframe if the mapping might cause data skew."""
-    # We experienced an issue with the DECARB buildings dataset where the disaggregation of
+    if use_duckdb():
+        return df
+
+    # We experienced an issue with the IEF buildings dataset where the disaggregation of
     # region to county caused a major issue where one Spark executor thread got stuck,
     # seemingly indefinitely. A message like this was repeated continually.
     # UnsafeExternalSorter: Thread 152 spilling sort data of 4.0 GiB to disk (0  time so far)
@@ -207,12 +450,7 @@ def unpivot_dataframe(
     """Unpivot the dataframe, accounting for time columns."""
     values = value_columns if isinstance(value_columns, set) else set(value_columns)
     ids = [x for x in df.columns if x != VALUE_COLUMN and x not in values]
-    df = df.unpivot(
-        ids,
-        value_columns,
-        variable_column,
-        VALUE_COLUMN,
-    )
+    df = unpivot(df, value_columns, variable_column, VALUE_COLUMN)
     cols = set(df.columns).difference(time_columns)
     new_rows = df.filter(f"{VALUE_COLUMN} IS NULL").select(*cols).distinct()
     for col in time_columns:

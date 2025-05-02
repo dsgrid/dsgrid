@@ -27,7 +27,7 @@ from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
     AggregationModel,
-    DimensionQueryNamesModel,
+    DimensionNamesModel,
     ProjectQueryModel,
     ProjectQueryParamsModel,
     CreateCompositeDatasetQueryModel,
@@ -36,11 +36,14 @@ from dsgrid.query.models import (
     DatasetModel,
 )
 from dsgrid.query.query_submitter import (
+    DatasetMapper,
     ProjectQuerySubmitter,
 )  # , CompositeDatasetQuerySubmitter
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 
+
+QUERY_OUTPUT_DIR = "query_output"
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +71,7 @@ _COMMON_RUN_OPTIONS = (
     click.option(
         "-o",
         "--output",
-        default="query_output",
+        default=QUERY_OUTPUT_DIR,
         show_default=True,
         type=str,
         help="Output directory for query results",
@@ -81,7 +84,7 @@ _COMMON_RUN_OPTIONS = (
         help="Try to load a cached table if one exists.",
     ),
     click.option(
-        "--force",
+        "--overwrite",
         is_flag=True,
         default=False,
         show_default=True,
@@ -121,7 +124,7 @@ $ dsgrid query project create --default-result-aggregation my_query_result_name 
     default="query.json5",
     show_default=True,
     help="Query file to create.",
-    callback=lambda _, __, x: Path(x),
+    callback=lambda *x: Path(x[2]),
 )
 @click.option(
     "-r",
@@ -132,7 +135,7 @@ $ dsgrid query project create --default-result-aggregation my_query_result_name 
     help="Add default result aggregration.",
 )
 @click.option(
-    "--force",
+    "--overwrite",
     is_flag=True,
     default=False,
     show_default=True,
@@ -149,16 +152,16 @@ def create_project_query(
     aggregation_function,
     query_file,
     default_result_aggregation,
-    force,
+    overwrite,
     remote_path,
 ):
     """Create a default query file for a dsgrid project."""
     if query_file.exists():
-        if force:
+        if overwrite:
             query_file.unlink()
         else:
             print(
-                f"{query_file} already exists. Choose a different name or pass --force to overwrite it.",
+                f"{query_file} already exists. Choose a different name or pass --overwrite to overwrite it.",
                 file=sys.stderr,
             )
             return 1
@@ -192,52 +195,52 @@ def create_project_query(
             case DimensionFilterType.EXPRESSION:
                 flt = DimensionFilterExpressionModel(
                     dimension_type=DimensionType.GEOGRAPHY,
-                    dimension_query_name="county",
+                    dimension_name="county",
                     operator="==",
                     value="",
                 )
             case DimensionFilterType.BETWEEN_COLUMN_OPERATOR:
                 flt = DimensionFilterBetweenColumnOperatorModel(
                     dimension_type=DimensionType.TIME,
-                    dimension_query_name="time_est",
+                    dimension_name="time_est",
                     lower_bound="",
                     upper_bound="",
                 )
             case DimensionFilterType.COLUMN_OPERATOR:
                 flt = DimensionFilterColumnOperatorModel(
                     dimension_type=DimensionType.GEOGRAPHY,
-                    dimension_query_name="county",
+                    dimension_name="county",
                     value="",
                     operator="contains",
                 )
             case DimensionFilterType.SUPPLEMENTAL_COLUMN_OPERATOR:
                 flt = SupplementalDimensionFilterColumnOperatorModel(
                     dimension_type=DimensionType.GEOGRAPHY,
-                    dimension_query_name="state",
+                    dimension_name="state",
                 )
             case DimensionFilterType.EXPRESSION_RAW:
                 flt = DimensionFilterExpressionRawModel(
                     dimension_type=DimensionType.GEOGRAPHY,
-                    dimension_query_name="county",
+                    dimension_name="county",
                     value="== '06037'",
                 )
             case DimensionFilterType.SUBSET:
                 flt = SubsetDimensionFilterModel(
                     dimension_type=DimensionType.SUBSECTOR,
-                    dimension_query_names=["commercial_subsectors", "residential_subsectors"],
+                    dimension_names=["commercial_subsectors", "residential_subsectors"],
                 )
             case _:
                 raise NotImplementedError(f"Bug: {filter_type}")
         query.project.dataset.params.dimension_filters.append(flt)
 
     if default_result_aggregation:
-        default_aggs = {}
-        for dim_type, name in project.config.get_base_dimension_to_query_name_mapping().items():
-            default_aggs[dim_type.value] = [name]
+        default_aggs = {
+            k.value: v for k, v in project.config.get_dimension_type_to_base_name_mapping().items()
+        }
         if default_result_aggregation:
             query.result.aggregations = [
                 AggregationModel(
-                    dimensions=DimensionQueryNamesModel(**default_aggs),
+                    dimensions=DimensionNamesModel(**default_aggs),
                     aggregation_function=aggregation_function,
                 ),
             ]
@@ -247,7 +250,7 @@ def create_project_query(
 
 
 @click.command("validate")
-@click.argument("query_file", type=click.Path(exists=True), callback=lambda _, __, x: Path(x))
+@click.argument("query_file", type=click.Path(exists=True), callback=lambda *x: Path(x[2]))
 def validate_project_query(query_file):
     try:
         ProjectQueryModel.from_file(query_file)
@@ -291,7 +294,7 @@ def run_project_query(
     remote_path,
     output,
     load_cached_table,
-    force,
+    overwrite,
 ):
     """Run a query on a dsgrid project."""
     scratch_dir = get_value_from_context(ctx, "scratch_dir")
@@ -315,7 +318,66 @@ def run_project_query(
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
         zip_file=zip_file,
-        force=force,
+        force=overwrite,
+    )
+    if res[1] != 0:
+        ctx.exit(res[1])
+
+
+_map_dataset_epilog = """
+Examples:\n
+$ dsgrid query project map_dataset project_id dataset_id
+"""
+
+
+@click.command("map-dataset", epilog=_map_dataset_epilog)
+@click.argument("project-id")
+@click.argument("dataset-id")
+@click.option(
+    "-o",
+    "--output",
+    default=QUERY_OUTPUT_DIR,
+    show_default=True,
+    type=str,
+    help="Output directory for query results",
+    callback=lambda *x: Path(x[2]),
+)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite results directory if it exists.",
+)
+@add_options(_COMMON_REGISTRY_OPTIONS)
+@click.pass_context
+def map_dataset(
+    ctx: click.Context,
+    project_id: str,
+    dataset_id: str,
+    remote_path,
+    output: Path,
+    overwrite: bool,
+):
+    """Map a dataset to the project's base dimensions."""
+    # TODO: Support supplemental dimensions: issue #343.
+    scratch_dir = get_value_from_context(ctx, "scratch_dir")
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
+    )
+    registry_manager = RegistryManager.load(
+        conn,
+        remote_path=remote_path,
+        offline_mode=get_value_from_context(ctx, "offline"),
+    )
+    project = registry_manager.project_manager.load_project(project_id)
+    fs_interface = make_filesystem_interface(output)
+    mapper = DatasetMapper(project, dataset_id, fs_interface.path(output))
+    res = handle_dsgrid_exception(
+        ctx,
+        mapper.submit,
+        scratch_dir,
+        overwrite=overwrite,
     )
     if res[1] != 0:
         ctx.exit(res[1])
@@ -331,7 +393,7 @@ def create_composite_dataset(
     remote_path,
     output,
     load_cached_table,
-    force,
+    overwrite,
 ):
     """Run a query to create a composite dataset."""
     CreateCompositeDatasetQueryModel.from_file(query_definition_file)
@@ -350,7 +412,7 @@ def create_composite_dataset(
     #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
-    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
+    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=overwrite)
 
 
 @click.command("run")
@@ -363,7 +425,7 @@ def query_composite_dataset(
     remote_path,
     output,
     load_cached_table,
-    force,
+    overwrite,
 ):
     """Run a query on a composite dataset."""
     CompositeDatasetQueryModel.from_file(query_definition_file)
@@ -382,12 +444,12 @@ def query_composite_dataset(
     #     offline_mode=get_value_from_context(ctx, "offline"),
     # )
     # project = registry_manager.project_manager.load_project(query.project.project_id)
-    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, force=force)
+    # CompositeDatasetQuerySubmitter.submit(project, output).submit(query, overwrite=overwrite)
 
 
-_create_derived_dataset_config_epilog = """
+_create_derived_dataset_config_epilog = f"""
 Examples:\n
-$ dsgrid query project create-derived-dataset-config query_output/my_query_result_name my_dataset_config\n
+$ dsgrid query project create-derived-dataset-config {QUERY_OUTPUT_DIR}/my_query_result_name my_dataset_config\n
 """
 
 
@@ -396,14 +458,14 @@ $ dsgrid query project create-derived-dataset-config query_output/my_query_resul
 @click.argument("dst")
 @add_options(_COMMON_REGISTRY_OPTIONS)
 @click.option(
-    "--force",
+    "--overwrite",
     is_flag=True,
     default=False,
     show_default=True,
     help="Overwrite results directory if it exists.",
 )
 @click.pass_context
-def create_derived_dataset_config(ctx, src, dst, remote_path, force):
+def create_derived_dataset_config(ctx, src, dst, remote_path, overwrite):
     """Create a derived dataset configuration and dimensions from a query result."""
     fs_interface = make_filesystem_interface(src)
     src_path = fs_interface.path(src)
@@ -411,7 +473,7 @@ def create_derived_dataset_config(ctx, src, dst, remote_path, force):
         print(f"{src} does not exist", file=sys.stderr)
         return 1
     dst_path = fs_interface.path(dst)
-    check_output_directory(dst_path, fs_interface, force)
+    check_output_directory(dst_path, fs_interface, overwrite)
 
     conn = DatabaseConnection(
         url=get_value_from_context(ctx, "url"),
@@ -448,5 +510,6 @@ project.add_command(create_project_query)
 project.add_command(validate_project_query)
 project.add_command(run_project_query)
 project.add_command(create_derived_dataset_config)
+project.add_command(map_dataset)
 composite_dataset.add_command(create_composite_dataset)
 composite_dataset.add_command(query_composite_dataset)

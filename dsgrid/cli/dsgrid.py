@@ -5,6 +5,7 @@ from pathlib import Path
 
 import rich_click as click
 
+import dsgrid
 from dsgrid.utils.timing import timer_stats_collector
 from dsgrid.cli.common import get_log_level_from_str, handle_scratch_dir
 from dsgrid.cli.config import config
@@ -12,26 +13,24 @@ from dsgrid.cli.download import download
 from dsgrid.cli.install_notebooks import install_notebooks
 from dsgrid.cli.query import query
 from dsgrid.cli.registry import registry
-from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.loggers import setup_logging, check_log_file_size, disable_console_logging
 
 
 logger = logging.getLogger(__name__)
-_config = DsgridRuntimeConfig.load()
 
 
 @click.group()
 @click.option(
     "-c",
     "--console-level",
-    default=_config.console_level,
+    default=dsgrid.runtime_config.console_level,
     show_default=True,
     help="Console log level.",
 )
 @click.option(
     "-f",
     "--file-level",
-    default=_config.file_level,
+    default=dsgrid.runtime_config.file_level,
     show_default=True,
     help="File log level.",
 )
@@ -42,7 +41,7 @@ _config = DsgridRuntimeConfig.load()
 @click.option(
     "--offline/--online",
     is_flag=True,
-    default=_config.offline,
+    default=dsgrid.runtime_config.offline,
     show_default=True,
     help="Run registry commands in offline mode. WARNING: any commands you perform in offline "
     "mode run the risk of being out-of-sync with the latest dsgrid registry, and any write "
@@ -50,7 +49,7 @@ _config = DsgridRuntimeConfig.load()
 )
 @click.option(
     "--timings/--no-timings",
-    default=_config.timings,
+    default=dsgrid.runtime_config.timings,
     is_flag=True,
     show_default=True,
     help="Enable tracking of function timings.",
@@ -61,7 +60,7 @@ _config = DsgridRuntimeConfig.load()
 #    "-U",
 #    "--username",
 #    type=str,
-#    default=_config.database_user,
+#    default=dsgrid.runtime_config.database_user,
 #    help="Database username",
 # )
 # @click.option(
@@ -77,7 +76,7 @@ _config = DsgridRuntimeConfig.load()
     "-u",
     "--url",
     type=str,
-    default=_config.database_url,
+    default=dsgrid.runtime_config.database_url,
     envvar="DSGRID_REGISTRY_DATABASE_URL",
     help="Database URL. Ex: http://localhost:8529",
 )
@@ -85,14 +84,14 @@ _config = DsgridRuntimeConfig.load()
     "-r",
     "--reraise-exceptions",
     is_flag=True,
-    default=_config.reraise_exceptions,
+    default=dsgrid.runtime_config.reraise_exceptions,
     show_default=True,
     help="Re-raise any dsgrid exception. Default is to log the exception and exit.",
 )
 @click.option(
     "-s",
     "--scratch-dir",
-    default=_config.scratch_dir,
+    default=dsgrid.runtime_config.scratch_dir,
     callback=handle_scratch_dir,
     help="Base directory for dsgrid temporary directories. Must be accessible on all compute "
     "nodes. Defaults to the current directory.",

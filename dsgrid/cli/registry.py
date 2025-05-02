@@ -14,6 +14,7 @@ from semver import VersionInfo
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.registration_models import RegistrationModel, RegistrationJournal
 from dsgrid.registry.common import DatabaseConnection, VersionUpdateType
 from dsgrid.registry.registry_manager import RegistryManager
@@ -608,13 +609,13 @@ $ dsgrid registry projects submit-dataset \\ \n
 )
 @click.pass_obj
 def submit_dataset(
-    registry_manager,
-    dataset_id,
-    project_id,
-    dimension_mapping_file,
-    dimension_mapping_references_file,
-    autogen_reverse_supplemental_mappings,
-    log_message,
+    registry_manager: RegistryManager,
+    dataset_id: str,
+    project_id: str,
+    dimension_mapping_file: Path,
+    dimension_mapping_references_file: Path,
+    autogen_reverse_supplemental_mappings: list[DimensionType],
+    log_message: str,
 ):
     """Submit a dataset to a dsgrid project."""
     submitter = getpass.getuser()
@@ -1056,17 +1057,15 @@ def replace_dataset_dimension_requirements(
         ctx.exit(res[1])
 
 
-_list_project_dimension_query_names_epilog = """
+_list_project_dimension_names_epilog = """
 Examples:\n
-$ dsgrid registry projects list-dimension-query-names my_project_id\n
-$ dsgrid registry projects list-dimension-query-names --exclude-subset my_project_id\n
-$ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_project_id\n
+$ dsgrid registry projects list-dimension-names my_project_id\n
+$ dsgrid registry projects list-dimension-names --exclude-subset my_project_id\n
+$ dsgrid registry projects list-dimension-names --exclude-supplemental my_project_id\n
 """
 
 
-@click.command(
-    name="list-dimension-query-names", epilog=_list_project_dimension_query_names_epilog
-)
+@click.command(name="list-dimension-names", epilog=_list_project_dimension_names_epilog)
 @click.argument("project-id")
 @click.option(
     "-b",
@@ -1074,7 +1073,7 @@ $ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_
     is_flag=True,
     default=False,
     show_default=True,
-    help="Exclude base dimension query names.",
+    help="Exclude base dimension names.",
 )
 @click.option(
     "-S",
@@ -1082,7 +1081,7 @@ $ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_
     is_flag=True,
     default=False,
     show_default=True,
-    help="Exclude subset dimension query names.",
+    help="Exclude subset dimension names.",
 )
 @click.option(
     "-s",
@@ -1090,11 +1089,11 @@ $ dsgrid registry projects list-dimension-query-names --exclude-supplemental my_
     is_flag=True,
     default=False,
     show_default=True,
-    help="Exclude supplemental dimension query names.",
+    help="Exclude supplemental dimension names.",
 )
 @click.pass_obj
 @click.pass_context
-def list_project_dimension_query_names(
+def list_project_dimension_names(
     ctx,
     registry_manager: RegistryManager,
     project_id,
@@ -1102,7 +1101,7 @@ def list_project_dimension_query_names(
     exclude_subset,
     exclude_supplemental,
 ):
-    """List the project's dimension query names."""
+    """List the project's dimension names."""
     if exclude_base and exclude_subset and exclude_supplemental:
         print(
             "exclude_base, exclude_subset, and exclude_supplemental cannot all be set",
@@ -1116,12 +1115,13 @@ def list_project_dimension_query_names(
         ctx.exit(res[1])
 
     project_config = res[0]
-    base = None if exclude_base else project_config.get_base_dimension_to_query_name_mapping()
-    sub = None if exclude_subset else project_config.get_subset_dimension_to_query_name_mapping()
+    assert isinstance(project_config, ProjectConfig)
+    base = None if exclude_base else project_config.get_dimension_type_to_base_name_mapping()
+    sub = None if exclude_subset else project_config.get_subset_dimension_to_name_mapping()
     supp = (
         None
         if exclude_supplemental
-        else project_config.get_supplemental_dimension_to_query_name_mapping()
+        else project_config.get_supplemental_dimension_to_name_mapping()
     )
 
     dimensions = sorted(DimensionType, key=lambda x: x.value)
@@ -1129,12 +1129,13 @@ def list_project_dimension_query_names(
     for dim_type in dimensions:
         lines.append(f"  {dim_type.value}:")
         if base:
-            lines.append(f"    base: {base[dim_type]}")
+            base_str = " ".join(base[dim_type])
+            lines.append(f"    base: {base_str}")
         if sub:
             lines.append("    subset: " + " ".join(sub[dim_type]))
         if supp:
             lines.append("    supplemental: " + " ".join(supp[dim_type]))
-    print("Dimension query names:")
+    print("Dimension names:")
     for line in lines:
         print(line)
 
@@ -1262,6 +1263,13 @@ $ dsgrid registry datasets update \\ \n
     help="reason for submission",
 )
 @click.option(
+    "-p",
+    "--dataset-path",
+    type=click.Path(exists=True),
+    callback=_path_callback,
+    help="New dataset path. If not set, use existing dataset.",
+)
+@click.option(
     "-t",
     "--update-type",
     required=True,
@@ -1278,7 +1286,14 @@ $ dsgrid registry datasets update \\ \n
 @click.pass_obj
 @click.pass_context
 def update_dataset(
-    ctx, registry_manager, dataset_config_file, dataset_id, log_message, update_type, version
+    ctx: click.Context,
+    registry_manager: RegistryManager,
+    dataset_config_file: Path,
+    dataset_id: str,
+    log_message: str,
+    dataset_path: Optional[Path],
+    update_type: VersionUpdateType,
+    version: str,
 ):
     """Update an existing dataset in the registry. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
@@ -1295,6 +1310,7 @@ def update_dataset(
         update_type,
         log_message,
         version,
+        dataset_path=dataset_path,
     )
     if res[1] != 0:
         ctx.exit(res[1])
@@ -1521,7 +1537,7 @@ projects.add_command(register_subset_dimensions)
 projects.add_command(register_supplemental_dimensions)
 projects.add_command(add_dataset_requirements)
 projects.add_command(replace_dataset_dimension_requirements)
-projects.add_command(list_project_dimension_query_names)
+projects.add_command(list_project_dimension_names)
 
 datasets.add_command(list_datasets)
 datasets.add_command(register_dataset)

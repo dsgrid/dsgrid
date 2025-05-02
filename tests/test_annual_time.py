@@ -1,4 +1,3 @@
-import pyspark.sql.functions as F
 import pytest
 
 from dsgrid.dimension.base_models import DimensionType
@@ -19,6 +18,7 @@ from dsgrid.dimension.time import (
 )
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.utils.dataset import check_historical_annual_time_model_year_consistency
+from dsgrid.spark.types import F, use_duckdb
 from dsgrid.utils.spark import create_dataframe_from_dicts
 
 
@@ -46,7 +46,12 @@ def annual_dataframe():
             "electricity_sales": 902872.1,
         },
     ]
-    yield create_dataframe_from_dicts(data).cache()
+
+    df = create_dataframe_from_dicts(data)
+    if not use_duckdb():
+        df.cache()
+        df.count()
+    yield df
 
 
 @pytest.fixture
@@ -82,7 +87,10 @@ def annual_dataframe_with_model_year_values():
 @pytest.fixture
 def annual_dataframe_with_model_year_valid(annual_dataframe_with_model_year_values):
     data = annual_dataframe_with_model_year_values
-    yield create_dataframe_from_dicts(data).cache(), "time_year", "model_year"
+    df = create_dataframe_from_dicts(data)
+    if not use_duckdb():
+        df.cache()
+    yield df, "time_year", "model_year"
 
 
 @pytest.fixture
@@ -96,7 +104,10 @@ def annual_dataframe_with_model_year_invalid(annual_dataframe_with_model_year_va
             "electricity_sales": 702872.1,
         },
     )
-    yield create_dataframe_from_dicts(data).cache(), "time_year", "model_year"
+    df = create_dataframe_from_dicts(data)
+    if not use_duckdb():
+        df.cache()
+    yield df, "time_year", "model_year"
 
 
 @pytest.fixture
@@ -108,7 +119,6 @@ def annual_time_dimension():
             module="dsgrid.dimension.standard",
             name="annual_time",
             description="test annual time",
-            display_name="Annual",
             ranges=[
                 TimeRangeModel(start="2010", end="2020"),
             ],
@@ -130,7 +140,6 @@ def date_time_dimension():
             timezone=TimeZone.EST,
             name="datetime",
             description="example date time",
-            display_name="time_est",
             ranges=[
                 TimeRangeModel(start="2012-02-01 00:00:00", end="2012-02-07 23:00:00"),
             ],

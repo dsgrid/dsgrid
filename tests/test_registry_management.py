@@ -4,7 +4,6 @@ import os
 import shutil
 from pathlib import Path
 
-import pyspark
 import pytest
 from click.testing import CliRunner
 from pydantic import ValidationError
@@ -33,6 +32,7 @@ from dsgrid.registry.common import (
 from dsgrid.registry.registry_auto_updater import RegistryAutoUpdater
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.spark.types import DataFrame
 from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
@@ -153,7 +153,7 @@ def test_duplicate_dimensions(tmp_registry_db):
     assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 2
 
 
-def test_duplicate_project_dimension_display_names(tmp_registry_db):
+def test_duplicate_project_dimension_names(tmp_registry_db):
     test_project_dir, tmp_path, url = tmp_registry_db
     conn = DatabaseConnection(url=url)
     create_local_test_registry(tmp_path, conn=conn)
@@ -164,8 +164,8 @@ def test_duplicate_project_dimension_display_names(tmp_registry_db):
     project_file = test_project_dir / "project.json5"
     data = load_data(project_file)
     for dim in data["dimensions"]["supplemental_dimensions"]:
-        if dim["display_name"] == "State":
-            dim["display_name"] = "County"
+        if dim["name"] == "US States":
+            dim["name"] = "US Counties 2010 - ComStock Only"
     dump_data(data, project_file)
     with pytest.raises(ValidationError):
         manager.project_manager.register(project_file, user, log_message)
@@ -250,7 +250,10 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
             f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
         )
         if missing_record_file.exists():
-            shutil.rmtree(missing_record_file)
+            if missing_record_file.is_dir():
+                shutil.rmtree(missing_record_file)
+            else:
+                missing_record_file.unlink()
 
     assert manager.dimension_manager.list_ids() == orig_dimension_ids
     assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids
@@ -273,7 +276,6 @@ fans,x
         "subset_dimensions": [
             {
                 "name": "End Uses by Fuel Type",
-                "display_name": "end_uses_by_fuel_type",
                 "description": "Provides selection of end uses by fuel type.",
                 "type": "metric",
                 "filename": str(subset_data_file),
@@ -341,7 +343,6 @@ def test_add_supplemental_dimension(mutable_cached_registry, tmp_path):
                 "type": "geography",
                 "class": "GeographyDimensionBaseModel",
                 "name": "Random Region",
-                "display_name": "Random Region",
                 "description": "Randomly-generated regions",
                 "file": str(dim_records_file),
                 "module": "dsgrid.dimension.standard",
@@ -465,14 +466,28 @@ def test_replace_dataset_dimension_requirements(mutable_cached_registry, tmp_pat
     config = project_mgr.get_by_id(project_id)
     requirements_file = tmp_path / "requirements.json5"
     dataset = config.model.datasets[1]
+    com_record_ids = [
+        "FullServiceRestaurant",
+        "Hospital",
+        "LargeHotel",
+        "LargeOffice",
+        "MediumOffice",
+        "Outpatient",
+        "PrimarySchool",
+        "QuickServiceRestaurant",
+        "SmallHotel",
+        "SmallOffice",
+        "StandaloneRetail",
+        "StripMall",
+        "Warehouse",
+    ]
+
     assert dataset.status == DatasetRegistryStatus.REGISTERED
     assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
     reqs = dataset.required_dimensions
-    assert reqs.multi_dimensional[0].subsector.supplemental[0].record_ids == [
-        "commercial_subsectors"
-    ]
-    reqs.multi_dimensional[0].subsector.supplemental[0].record_ids = ["residential_subsectors"]
-    reqs.multi_dimensional[0].subsector.supplemental[0].name = "Residential Subsector"
+    assert reqs.multi_dimensional[0].subsector.subset[0].selectors == ["commercial_subsectors2"]
+    reqs.multi_dimensional[0].subsector.subset.clear()
+    reqs.multi_dimensional[0].subsector.base.record_ids = com_record_ids
     model = InputDatasetDimensionRequirementsListModel(
         dataset_dimension_requirements=[
             InputDatasetDimensionRequirementsModel(
@@ -504,9 +519,7 @@ def test_replace_dataset_dimension_requirements(mutable_cached_registry, tmp_pat
     config = project_mgr.get_by_id(project_id)
     assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
     assert config.model.datasets[1].status == DatasetRegistryStatus.UNREGISTERED
-    assert reqs.multi_dimensional[0].subsector.supplemental[0].record_ids == [
-        "residential_subsectors"
-    ]
+    assert reqs.multi_dimensional[0].subsector.base.record_ids == com_record_ids
 
 
 def test_auto_updates(mutable_cached_registry: tuple[RegistryManager, Path]):
@@ -518,12 +531,14 @@ def test_auto_updates(mutable_cached_registry: tuple[RegistryManager, Path]):
     project_id = project_mgr.list_ids()[0]
     dataset_id = dataset_mgr.list_ids()[0]
     dimension = [
-        x for x in dimension_mgr.iter_configs() if x.model.name.startswith("US Counties 2010")
+        x
+        for x in dimension_mgr.iter_configs()
+        if x.model.name.startswith("US Counties 2010 - ComStock Only")
     ][0]
     orig_dim_version = dimension.model.version
 
     # Test that we can convert records to a Spark DataFrame. Unrelated to the rest.
-    assert isinstance(dimension.get_records_dataframe(), pyspark.sql.DataFrame)
+    assert isinstance(dimension.get_records_dataframe(), DataFrame)
 
     dimension.model.description += "; test update"
     update_type = VersionUpdateType.MINOR
@@ -535,7 +550,9 @@ def test_auto_updates(mutable_cached_registry: tuple[RegistryManager, Path]):
     for _mapping in dimension_mapping_mgr.iter_configs():
         from_dim = dimension_mgr.get_by_id(_mapping.model.from_dimension.dimension_id).model
         to_dim = dimension_mgr.get_by_id(_mapping.model.to_dimension.dimension_id).model
-        if from_dim.name.startswith("US Counties") and to_dim.name.startswith("US Census Region"):
+        if from_dim.name.startswith("US Counties 2010 - ComStock Only") and to_dim.name.startswith(
+            "US Census Regions"
+        ):
             mapping = _mapping
             break
     assert mapping is not None
@@ -583,7 +600,6 @@ def test_auto_updates(mutable_cached_registry: tuple[RegistryManager, Path]):
     )
     assert project_mgr.get_latest_version(project_id) == "1.3.1"
 
-    # And again if we update the dataset.
     dataset.model.description += "test update"
     original_version = dataset.model.version
     dataset_mgr.update(dataset, VersionUpdateType.PATCH, "test update")
@@ -706,7 +722,7 @@ def test_registry_contains(cached_registry):
     dimension_mgr = mgr.dimension_manager
     county_dim = None
     for config in dimension_mgr.iter_configs():
-        if config.model.dimension_query_name == "county":
+        if config.model.name == "US Counties 2010 - ComStock Only":
             county_dim = config.model
             break
     assert county_dim is not None

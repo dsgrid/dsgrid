@@ -24,7 +24,6 @@ from dsgrid.registry.registry_interface import DatasetRegistryInterface
 from dsgrid.utils.dataset import unpivot_dataframe
 from dsgrid.utils.spark import (
     read_dataframe,
-    write_dataframe,
     write_dataframe_and_auto_partition,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -230,11 +229,67 @@ class DatasetRegistryManager(RegistryManagerBase):
         dataset_path: Path,
         context: RegistrationContext,
     ):
-        dataset_id = config.model.dataset_id
-        self._run_checks(context.connection, config)
+        # Explanation for this order of operations:
+        # 1. Check time consistency in the original dataset format.
+        #    Many datasets are stored in pivoted format and have many value columns. If we
+        #    check timestamps after unpivoting the dataset, we will multiply the required work
+        #    by the number of columns.
+        # 2. Write to the registry in unpivoted format before running the other checks.
+        #    The final data is always stored in unpivoted format. We can reduce code if we
+        #    transform pivoted tables first.
+        #    In the nominal case where the dataset is valid, there is no difference in performance.
+        #    In the failure case where the dataset is invalid, it will take longer to detect the
+        #    errors.
+        self._check_time_consistency(config, context)
 
+        config.model.version = "1.0.0"
+        dataset_registry_dir = self.get_registry_data_directory(config.model.dataset_id)
+        if not dataset_registry_dir.parent.exists():
+            msg = (
+                f"The registry data path: {dataset_registry_dir.parent} does not exist "
+                "(at least from the current computer). Please contact the dsgrid team if this is "
+                "unexpected."
+            )
+            raise Exception(msg)
+
+        dataset_path = dataset_registry_dir / config.model.version
+        self.fs_interface.mkdir(dataset_path)
+
+        config = self._write_to_registry(context.connection, config, dataset_path)
+
+        try:
+            self._run_checks(context.connection, config)
+        except Exception:
+            self.fs_interface.rm_tree(dataset_path)
+            raise
+
+        self._db.insert(context.connection, config.model, context.registration)
+        logger.info(
+            "%s Registered dataset %s with version=%s",
+            self._log_offline_mode_prefix(),
+            config.model.dataset_id,
+            config.model.version,
+        )
+
+    def _check_time_consistency(
+        self,
+        config: DatasetConfig,
+        context: RegistrationContext,
+    ) -> None:
+        schema_handler = make_dataset_schema_handler(
+            context.connection, config, self._dimension_mgr, self._dimension_mapping_mgr
+        )
+        schema_handler.check_time_consistency()
+
+    def _write_to_registry(
+        self,
+        conn: Connection,
+        orig_config: DatasetConfig,
+        dataset_path: Path,
+    ) -> DatasetConfig:
+        config = self._copy_dataset_config(conn, orig_config)
         if config.get_table_format_type() == TableFormatType.PIVOTED:
-            logger.info("Converting dataset %s from pivoted to unpivoted.", dataset_id)
+            logger.info("Convert dataset %s from pivoted to unpivoted.", config.model.dataset_id)
             needs_unpivot = True
             pivoted_columns = config.get_pivoted_dimension_columns()
             pivoted_dimension_type = config.get_pivoted_dimension_type()
@@ -244,56 +299,49 @@ class DatasetRegistryManager(RegistryManagerBase):
             pivoted_columns = None
             pivoted_dimension_type = None
 
-        config.model.dataset_version = "1.0.0"
-        dataset_registry_dir = self.get_registry_data_directory(dataset_id)
-        if not dataset_registry_dir.parent.exists():
-            msg = (
-                f"The registry data path: {dataset_registry_dir.parent} does not exist "
-                "(at least from the current computer). Please contact the dsgrid team if this is "
-                "unexpected."
-            )
-            raise Exception(msg)
-
-        dataset_path = dataset_registry_dir / config.model.dataset_version
-        dataset_path.mkdir(exist_ok=True, parents=True)
-        self.fs_interface.mkdir(dataset_registry_dir)
         found_files = False
         for filename in ALLOWED_DATA_FILES:
             assert config.dataset_path is not None
             path = Path(config.dataset_path) / filename
             if path.exists():
-                dst = dataset_path / filename
+                # Always write Parquet.
+                dst = dataset_path / (path.stem + ".parquet")
                 # Writing with Spark is much faster than copying or rsync if there are
                 # multiple nodes in the cluster - much more parallelism.
                 df = read_dataframe(path)
+                if filename in ALLOWED_LOAD_DATA_FILENAMES:
+                    time_dim = config.get_dimension(DimensionType.TIME)
+                    df = time_dim.convert_time_format(df, update_model=True)
                 if needs_unpivot and filename in ALLOWED_LOAD_DATA_FILENAMES:
                     assert pivoted_columns is not None
                     assert pivoted_dimension_type is not None
                     time_columns = config.get_dimension(
                         DimensionType.TIME
                     ).get_load_data_time_columns()
+                    existing_columns = set(df.columns)
+                    if diff := set(time_columns) - existing_columns:
+                        msg = f"Expected time columns are not present in the table: {diff=}"
+                        raise DSGInvalidDataset(msg)
+                    if diff := set(pivoted_columns) - existing_columns:
+                        msg = f"Expected pivoted_columns are not present in the table: {diff=}"
+                        raise DSGInvalidDataset(msg)
                     df = unpivot_dataframe(
                         df, pivoted_columns, pivoted_dimension_type.value, time_columns
                     )
-                if dst.suffix == ".parquet":
-                    # This function doesn't support CSV and JSON. Support could be added if
-                    # needed. We only use it for large files.
-                    write_dataframe_and_auto_partition(df, dst)
-                else:
-                    write_dataframe(df, dst, overwrite=True)
+                write_dataframe_and_auto_partition(df, dst)
                 found_files = True
         if not found_files:
             msg = f"Did not find any data files in {config.dataset_path}"
             raise DSGInvalidDataset(msg)
 
-        config.model.version = "1.0.0"
-        self._db.insert(context.connection, config.model, context.registration)
-        logger.info(
-            "%s Registered dataset %s with version=%s",
-            self._log_offline_mode_prefix(),
-            dataset_id,
-            config.model.dataset_version,
-        )
+        config.dataset_path = str(dataset_path)
+        return config
+
+    def _copy_dataset_config(self, conn: Connection, config: DatasetConfig) -> DatasetConfig:
+        new_config = DatasetConfig(config.model)
+        new_config.dataset_path = config.dataset_path
+        self._update_dimensions(conn, new_config)
+        return new_config
 
     def update_from_file(
         self,
@@ -303,11 +351,16 @@ class DatasetRegistryManager(RegistryManagerBase):
         update_type: VersionUpdateType,
         log_message: str,
         version: str,
+        dataset_path: Optional[Path] = None,
     ):
         with RegistrationContext(self.db, log_message, update_type, submitter) as context:
             conn = context.connection
-            dataset_path = self._params.base_path / "data" / dataset_id / version
-            config = DatasetConfig.load_from_user_path(config_file, dataset_path)
+            path = (
+                self._params.base_path / "data" / dataset_id / version
+                if dataset_path is None
+                else dataset_path
+            )
+            config = DatasetConfig.load_from_user_path(config_file, path)
             self._update_dimensions(conn, config)
             self._check_update(conn, config, dataset_id, version)
             self.update_with_context(config, context)
@@ -333,23 +386,29 @@ class DatasetRegistryManager(RegistryManagerBase):
         context: RegistrationContext,
     ) -> DatasetConfig:
         conn = context.connection
-        self._run_checks(conn, config)
         dataset_id = config.model.dataset_id
-        cur_model = self.db.get_latest(conn, dataset_id)
-        old_key = ConfigKey(dataset_id, cur_model.version)
-        model = self._update_config(config, context)
-        new_key = ConfigKey(dataset_id, model.version)
-        self._datasets.pop(old_key, None)
+        cur_model = self.get_by_id(dataset_id, conn=conn).model
+        updated_model = self._update_config(config, context)
+        updated_config = DatasetConfig(updated_model)
+        updated_config.dataset_path = config.dataset_path
+        self._update_dimensions(conn, updated_config)
 
-        dataset_path = self._get_registry_data_path()
-        config = DatasetConfig.load_from_registry(model, dataset_path)
-        self._update_dimensions(conn, config)
-        self._datasets[new_key] = config
+        dataset_registry_dir = self.get_registry_data_directory(dataset_id)
+        new_dataset_path = dataset_registry_dir / updated_config.model.version
+
+        self.fs_interface.mkdir(new_dataset_path)
+        updated_config = self._write_to_registry(conn, updated_config, new_dataset_path)
+
+        self._run_checks(conn, updated_config)
+        old_key = ConfigKey(dataset_id, cur_model.version)
+        new_key = ConfigKey(dataset_id, updated_config.model.version)
+        self._datasets.pop(old_key, None)
+        self._datasets[new_key] = updated_config
 
         if not self.offline_mode:
             self.sync_push(self.get_registry_data_directory(dataset_id))
 
-        return config
+        return updated_config
 
     def remove(self, dataset_id: str, conn: Optional[Connection] = None):
         self.remove_data(dataset_id, conn=conn)

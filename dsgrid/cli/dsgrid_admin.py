@@ -134,8 +134,13 @@ def datasets(registry_manager: RegistryManager):
 Registry Commands
 """
 
+_create_epilog = """
+Examples:\n
+$ dsgrid-admin registry create sqlite:////projects/dsgrid/my_project/registry.db -p /projects/dsgrid/my_project/registry-data\n
+"""
 
-@click.command()
+
+@click.command(epilog=_create_epilog)
 @click.argument("url")
 @click.option(
     "-p",
@@ -143,7 +148,7 @@ Registry Commands
     default=LOCAL_REGISTRY,
     show_default=True,
     callback=lambda *x: Path(x[2]),
-    help="local dsgrid registry data path.",
+    help="Local dsgrid registry data path. Must not contain the registry file listed in URL.",
 )
 @click.option(
     "-f",
@@ -277,6 +282,7 @@ def remove_datasets(registry_manager: RegistryManager, dataset_ids: list[str]):
 )
 @click.option(
     "-f",
+    "--overwrite",
     "--force",
     default=False,
     is_flag=True,
@@ -291,7 +297,7 @@ def make_filtered_registry(
     dst_data_path: Path,
     config_file: Path,
     mode,
-    force,
+    overwrite,
 ):
     """Make a filtered registry for testing purposes."""
     simple_model = RegistrySimpleModel(**load_data(config_file))
@@ -312,7 +318,7 @@ def make_filtered_registry(
         dst_conn,
         dst_data_path,
         mode=mode,
-        force=force,
+        force=overwrite,
     )
     mgr = FilterRegistryManager.load(dst_conn, offline_mode=True, use_remote_data=False)
     mgr.filter(simple_model=simple_model)

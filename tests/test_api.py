@@ -17,15 +17,15 @@ from dsgrid.api.response_models import (
     GetAsyncTaskResponse,
     GetDatasetResponse,
     GetDimensionResponse,
-    GetProjectBaseDimensionQueryNameResponse,
-    GetProjectDimensionQueryNamesResponse,
+    GetProjectBaseDimensionNameResponse,
+    GetProjectDimensionNamesResponse,
     GetProjectResponse,
     ListAsyncTasksResponse,
     ListDatasetsResponse,
     ListDimensionRecordsResponse,
     ListDimensionTypesResponse,
     ListDimensionsResponse,
-    ListProjectSupplementalDimensionQueryNames,
+    ListProjectSupplementalDimensionNames,
     ListProjectsResponse,
     ListProjectDimensionsResponse,
     ListReportTypesResponse,
@@ -106,27 +106,27 @@ def test_list_project_dimensions(client):
     assert response.dimensions
 
 
-def test_get_project_dimension_query_names(client):
-    response = check_response(client, f"/projects/{PROJECT_ID}/dimensions/dimension_query_names")
-    GetProjectDimensionQueryNamesResponse(**response.json())
+def test_get_project_dimension_names(client):
+    response = check_response(client, f"/projects/{PROJECT_ID}/dimensions/dimension_names")
+    GetProjectDimensionNamesResponse(**response.json())
 
 
-def test_get_project_base_dimension_query_name(client):
+def test_get_project_base_dimension_name(client):
     dim = DimensionType.TIME.value
     response = check_response(
-        client, f"/projects/{PROJECT_ID}/dimensions/base_dimension_query_name/{dim}"
+        client, f"/projects/{PROJECT_ID}/dimensions/base_dimension_name/{dim}"
     )
-    result = GetProjectBaseDimensionQueryNameResponse(**response.json())
-    assert result.dimension_query_name == "time_est"
+    result = GetProjectBaseDimensionNameResponse(**response.json())
+    assert result.dimension_name == "time_est"
 
 
-def test_list_project_supplemental_dimension_query_names(client):
+def test_list_project_supplemental_dimension_names(client):
     dim = DimensionType.GEOGRAPHY.value
     response = check_response(
-        client, f"/projects/{PROJECT_ID}/dimensions/supplemental_dimension_query_names/{dim}"
+        client, f"/projects/{PROJECT_ID}/dimensions/supplemental_dimension_names/{dim}"
     )
-    result = ListProjectSupplementalDimensionQueryNames(**response.json())
-    assert result.dimension_query_names == [
+    result = ListProjectSupplementalDimensionNames(**response.json())
+    assert result.dimension_names == [
         "all_geographies",
         "census_division",
         "census_region",
@@ -161,14 +161,14 @@ def test_list_dimensions_with_type(client):
 
 def test_list_dimension_records(client):
     dim = DimensionType.GEOGRAPHY.value
-    query_name = GetProjectBaseDimensionQueryNameResponse(
+    query_name = GetProjectBaseDimensionNameResponse(
         **check_response(
-            client, f"/projects/{PROJECT_ID}/dimensions/base_dimension_query_name/{dim}"
+            client, f"/projects/{PROJECT_ID}/dimensions/base_dimension_name/{dim}"
         ).json()
-    ).dimension_query_name
+    ).dimension_name
     dimension = GetDimensionResponse(
         **check_response(
-            client, f"/projects/{PROJECT_ID}/dimensions/dimensions_by_query_name/{query_name}"
+            client, f"/projects/{PROJECT_ID}/dimensions/dimensions_by_name/{query_name}"
         ).json()
     ).dimension
     records = ListDimensionRecordsResponse(

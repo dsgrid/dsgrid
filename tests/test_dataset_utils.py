@@ -1,13 +1,27 @@
 import logging
 import os
 
-import pyspark.sql.functions as F
 import pytest
-from pyspark.sql.types import StructType, IntegerType
 
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.spark.functions import (
+    aggregate_single_value,
+    cache,
+    get_spark_session,
+    is_dataframe_empty,
+    unpersist,
+)
+from dsgrid.spark.types import (
+    StructField,
+    StructType,
+    DoubleType,
+    IntegerType,
+    StringType,
+    use_duckdb,
+)
 from dsgrid.utils.dataset import (
+    add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
     is_noop_mapping,
     remove_invalid_null_timestamps,
@@ -15,13 +29,12 @@ from dsgrid.utils.dataset import (
     unpivot_dataframe,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import create_dataframe_from_dicts, get_spark_session
+from dsgrid.utils.spark import create_dataframe_from_dicts
 
 
 @pytest.fixture(scope="module")
 def dataframes():
-    spark = get_spark_session()
-    df = spark.createDataFrame(
+    df = create_dataframe_from_dicts(
         [
             {
                 "county": "Jefferson",
@@ -53,7 +66,7 @@ def dataframes():
             },
         ]
     )
-    records = spark.createDataFrame(
+    records = create_dataframe_from_dicts(
         [
             {"from_id": "res_elec", "to_id": "all_electricity", "from_fraction": 1.0},
             {"from_id": "com_elec", "to_id": "all_electricity", "from_fraction": 1.0},
@@ -106,13 +119,12 @@ def pivoted_dataframe_with_time():
             },
         ]
     )
-    yield df.cache(), ["time_index"], ["cooling", "heating"]
-    df.unpersist()
+    yield cache(df), ["time_index"], ["cooling", "heating"]
+    unpersist(df)
 
 
 def test_is_noop_mapping_true():
-    spark = get_spark_session()
-    df = spark.createDataFrame(
+    df = create_dataframe_from_dicts(
         [
             {
                 "from_id": "elec_cooling",
@@ -130,7 +142,6 @@ def test_is_noop_mapping_true():
 
 
 def test_is_noop_mapping_false():
-    spark = get_spark_session()
     for records in (
         [
             {
@@ -207,13 +218,49 @@ def test_is_noop_mapping_false():
             },
         ],
     ):
-        df = spark.createDataFrame(records)
+        df = create_dataframe_from_dicts(records)
         assert not is_noop_mapping(df)
 
 
-def test_remove_invalid_null_timestamps():
+def test_add_null_rows_from_load_data_lookup():
     spark = get_spark_session()
     df = spark.createDataFrame(
+        [
+            ("2018-01-01 01:00:00", 2030, "Jefferson", 1.0),
+            ("2018-01-01 02:00:00", 2030, "Jefferson", 2.0),
+            ("2018-01-01 03:00:00", 2030, "Jefferson", 3.0),
+        ],
+        StructType(
+            [
+                StructField("timestamp", StringType(), True),
+                StructField("model_year", IntegerType(), False),
+                StructField("geography", StringType(), False),
+                StructField("value", DoubleType(), True),
+            ],
+        ),
+    )
+    lookup = spark.createDataFrame(
+        [
+            (None, 2030, "Jefferson"),
+            (None, 2030, "Boulder"),
+        ],
+        StructType(
+            [
+                StructField("id", IntegerType(), True),
+                StructField("model_year", IntegerType(), False),
+                StructField("geography", StringType(), False),
+            ],
+        ),
+    )
+    result = add_null_rows_from_load_data_lookup(df, lookup)
+    assert result.count() == 4
+    null_rows = result.filter("timestamp is NULL").collect()
+    assert len(null_rows) == 1
+    assert null_rows[0].geography == "Boulder"
+
+
+def test_remove_invalid_null_timestamps():
+    df = create_dataframe_from_dicts(
         [
             # No nulls
             {"timestamp": 1, "county": "Jefferson", "subsector": "warehouse", "value": 4},
@@ -232,32 +279,27 @@ def test_remove_invalid_null_timestamps():
     result = remove_invalid_null_timestamps(df, {time_col}, stacked)
     assert result.count() == 6
     assert result.filter("county == 'Boulder'").count() == 2
-    assert result.filter(f"county == 'Boulder' and {time_col} is NULL").rdd.isEmpty()
+    assert is_dataframe_empty(result.filter(f"county == 'Boulder' and {time_col} is NULL"))
 
 
 def test_apply_scaling_factor():
-    spark = get_spark_session()
-    schema = (
-        StructType()
-        .add("a", IntegerType(), False)
-        .add("b", IntegerType(), False)
-        .add("bystander", IntegerType(), False)
-        .add("scaling_factor", IntegerType(), True)
-    )
-    df = spark.createDataFrame(
+    df = create_dataframe_from_dicts(
         [
-            {"a": 1, "b": 2, "bystander": 1, "scaling_factor": 5},
-            {"a": 2, "b": 3, "bystander": 1, "scaling_factor": 6},
-            {"a": 3, "b": 4, "bystander": 1, "scaling_factor": None},
+            {"value": 1, "bystander": 1, "scaling_factor": 5},
+            {"value": 2, "bystander": 1, "scaling_factor": 6},
+            {"value": 3, "bystander": 1, "scaling_factor": 0},
+            {"value": 4, "bystander": 1, "scaling_factor": None},
         ],
-        schema=schema,
     )
-    df2 = apply_scaling_factor(df, ("a", "b"))
-    assert df2.select("a").agg(F.sum("a").alias("sum_a")).collect()[0].sum_a == 1 * 5 + 2 * 6 + 3
-    assert df2.select("b").agg(F.sum("b").alias("sum_b")).collect()[0].sum_b == 2 * 5 + 3 * 6 + 4
-    assert df2.select("bystander").agg(F.sum("bystander").alias("c")).collect()[0].c == 1 + 1 + 1
+    df2 = apply_scaling_factor(df, "value")
+    expected_sum = 1 * 5 + 2 * 6 + 0 + 4
+    expected_sum_bystander = 1 + 1 + 1 + 1
+
+    assert aggregate_single_value(df2, "sum", "value") == expected_sum
+    assert aggregate_single_value(df2, "sum", "bystander") == expected_sum_bystander
 
 
+@pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
 def test_repartition_if_needed_by_mapping(tmp_path, caplog, dataframes):
     df = dataframes[0]
     context = ScratchDirContext(tmp_path)
@@ -270,6 +312,7 @@ def test_repartition_if_needed_by_mapping(tmp_path, caplog, dataframes):
         assert "Completed repartition" in caplog.text
 
 
+@pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
 def test_repartition_if_needed_by_mapping_override(tmp_path, caplog, dataframes):
     df = dataframes[0]
     context = ScratchDirContext(tmp_path)
@@ -286,6 +329,7 @@ def test_repartition_if_needed_by_mapping_override(tmp_path, caplog, dataframes)
         os.environ.pop("DSGRID_SKIP_MAPPING_SKEW_REPARTITION")
 
 
+@pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
 def test_repartition_if_needed_by_mapping_not_needed(tmp_path, caplog, dataframes):
     df = dataframes[0]
     context = ScratchDirContext(tmp_path)

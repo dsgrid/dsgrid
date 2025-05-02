@@ -9,8 +9,6 @@ import sys
 import uuid
 from pathlib import Path
 from typing import Optional
-
-from pyspark.sql import SparkSession
 from sqlalchemy import Connection
 
 from dsgrid.common import (
@@ -24,7 +22,7 @@ from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGInvalidOperation, DSGValueNotRegistered, DSGInvalidParameter
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.filesystem.factory import make_filesystem_interface
-from dsgrid.utils.spark import init_spark
+from dsgrid.utils.spark import init_spark, get_active_session
 from .common import (
     RegistryManagerParams,
 )
@@ -50,7 +48,7 @@ class RegistryManager:
 
     def __init__(self, params: RegistryManagerParams, db: RegistryDatabase):
         self._check_environment_variables(params)
-        if SparkSession.getActiveSession() is None:
+        if get_active_session() is None:
             init_spark("dsgrid")
         self._params = params
         self._dimension_mgr = DimensionRegistryManager.load(
@@ -112,7 +110,14 @@ class RegistryManager:
 
         """
         if RegistryDatabase.has_database(conn) and not overwrite:
-            msg = f"database={conn.database} already exists. Choose a different name or set overwrite=True."
+            msg = f"database={conn.url} already exists. Choose a different name or set overwrite=True."
+            raise DSGInvalidOperation(msg)
+
+        db_filename = conn.try_get_filename()
+        if db_filename is not None and db_filename.is_relative_to(data_path):
+            msg = (
+                f"The database path {db_filename} cannot be relative to the data_path {data_path}."
+            )
             raise DSGInvalidOperation(msg)
 
         if not user:

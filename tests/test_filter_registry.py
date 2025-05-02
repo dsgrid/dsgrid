@@ -11,7 +11,7 @@ PROJECT_ID = "test_efs"
 DATASET_ID = "test_efs_comstock"
 COUNTY_ID = "08031"
 STATE_ID = "CO"
-QUERY_NAME = "state"
+DIMENSION_NAME = "US States"
 FILTER_CONFIG = {
     "projects": [
         {
@@ -20,7 +20,7 @@ FILTER_CONFIG = {
                 "base_dimensions": [{"dimension_type": "geography", "record_ids": [COUNTY_ID]}],
                 "supplemental_dimensions": [
                     {
-                        "dimension_query_name": QUERY_NAME,
+                        "dimension_name": DIMENSION_NAME,
                         "dimension_type": "geography",
                         "record_ids": [STATE_ID],
                     }
@@ -63,13 +63,13 @@ def test_filter_registry(cached_registry, tmp_path):
         assert len(records) == 1
         assert records[0].id == COUNTY_ID
 
-        supp_dim = project.config.get_dimension_records(QUERY_NAME).collect()
+        supp_dim = project.config.get_dimension_records(DIMENSION_NAME).collect()
         assert len(supp_dim) == 1
         assert supp_dim[0].id == STATE_ID
 
         found_mapping_records = False
         for dim in project.config.list_supplemental_dimensions(DimensionType.GEOGRAPHY):
-            if dim.model.dimension_query_name == QUERY_NAME:
+            if dim.model.name == DIMENSION_NAME:
                 for mapping in project.config.get_base_to_supplemental_dimension_mappings_by_types(
                     DimensionType.GEOGRAPHY
                 ):

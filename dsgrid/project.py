@@ -2,11 +2,10 @@
 
 import json
 import logging
-import shutil
+
+from chronify.utils.path_utils import check_overwrite
 from pathlib import Path
 from typing import Optional
-
-from pyspark.sql import SparkSession
 from semver import VersionInfo
 from sqlalchemy import Connection
 
@@ -16,10 +15,11 @@ from dsgrid.dataset.dataset import Dataset
 from dsgrid.dataset.growth_rates import apply_exponential_growth_rate, apply_annual_multiplier
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
+    DimensionFilterSingleQueryNameBaseModel,
     SubsetDimensionFilterModel,
 )
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.exceptions import DSGInvalidQuery, DSGValueNotRegistered, DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidQuery, DSGValueNotRegistered
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import (
     StandaloneDatasetModel,
@@ -27,13 +27,20 @@ from dsgrid.query.models import (
     DatasetConstructionMethod,
     ColumnType,
 )
+from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.utils.files import compute_hash
+from dsgrid.spark.functions import (
+    is_dataframe_empty,
+)
+from dsgrid.spark.types import DataFrame
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     read_dataframe,
     try_read_dataframe,
     restart_spark_with_custom_conf,
     write_dataframe_and_auto_partition,
+    get_active_session,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing, Timer
 
@@ -44,9 +51,16 @@ logger = logging.getLogger(__name__)
 class Project:
     """Interface to a dsgrid project."""
 
-    def __init__(self, config, version, dataset_configs, dimension_mgr, dimension_mapping_mgr):
-        self._spark = SparkSession.getActiveSession()
-        self._config: ProjectConfig = config
+    def __init__(
+        self,
+        config: ProjectConfig,
+        version: str,
+        dataset_configs,
+        dimension_mgr: DimensionRegistryManager,
+        dimension_mapping_mgr: DimensionMappingRegistryManager,
+    ):
+        self._spark = get_active_session()
+        self._config = config
         self._version = version
         self._dataset_configs = dataset_configs
         self._datasets = {}
@@ -144,7 +158,7 @@ class Project:
             self._dimension_mgr,
             self._dimension_mapping_mgr,
             mapping_references=input_dataset.mapping_references,
-            project_time_dim=self._config.get_base_dimension(DimensionType.TIME),
+            project_time_dim=self._config.get_base_time_dimension(),
             conn=conn,
         )
         self._datasets[dataset_id] = dataset
@@ -160,29 +174,23 @@ class Project:
         """
         self._datasets.pop(dataset_id, None)
 
-    def transform_dataset(
+    def map_dataset(
         self,
         dataset_id: str,
         output_dir: Path,
         overwrite=False,
         scratch_dir: Optional[Path] = None,
     ) -> Path:
-        """Transform a dataset by mapping its dimensions to the project's dimensions and write it
-        to the filesystem.
-        """
+        """Map a dataset to the project's dimensions and write it to the filesystem."""
         output_file = output_dir / "table.parquet"
-        if output_file.exists():
-            if not overwrite:
-                msg = f"{output_file=} already exists. Set overwrite=True or pass a different base directory."
-                raise DSGInvalidParameter(msg)
-            shutil.rmtree(output_file)
-
+        check_overwrite(output_file, overwrite)
         output_dir.mkdir(exist_ok=True)
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         dataset = self.get_dataset(dataset_id)
         with ScratchDirContext(scratch_dir) as context:
             df = dataset.make_project_dataframe(self._config, context)
             write_dataframe_and_auto_partition(df, output_file)
+            logger.info("Wrote mapped dataset %s to %s", dataset_id, output_file)
             return output_file
 
     def _iter_datasets(self):
@@ -216,7 +224,7 @@ class Project:
         return df_filenames
 
     def _build_filtered_record_ids_by_dimension_type(self, context: QueryContext):
-        record_ids = {}
+        record_ids: dict[DimensionType, DataFrame] = {}
         for dim_filter in context.model.project.dataset.params.dimension_filters:
             dim_type = dim_filter.dimension_type
             if dim_type == DimensionType.TIME:
@@ -228,27 +236,32 @@ class Project:
                     "id"
                 )
             else:
-                supp_query_names = set(
-                    self._config.list_dimension_query_names(
-                        category=DimensionCategory.SUPPLEMENTAL
-                    )
-                )
-                records = self._config.get_dimension_records(dim_filter.dimension_query_name)
+                query_name = dim_filter.dimension_name
+                records = self._config.get_dimension_records(query_name)
                 df = dim_filter.apply_filter(records).select("id")
-                query_name = dim_filter.dimension_query_name
+                supp_query_names = set(
+                    self._config.list_dimension_names(category=DimensionCategory.SUPPLEMENTAL)
+                )
                 if query_name in supp_query_names:
+                    assert isinstance(dim_filter, DimensionFilterSingleQueryNameBaseModel)
+                    base_query_name = getattr(
+                        context.base_dimension_names, dim_filter.dimension_type.value
+                    )
+                    base_dim = self._config.get_dimension(base_query_name)
+                    supp_dim = self._config.get_dimension(query_name)
                     mapping_records = self._config.get_base_to_supplemental_mapping_records(
-                        query_name
+                        base_dim, supp_dim
                     )
                     df = (
                         mapping_records.join(df, on=mapping_records.to_id == df.id)
-                        .selectExpr("from_id AS id")
+                        .select("from_id")
+                        .withColumnRenamed("from_id", "id")
                         .distinct()
                     )
 
             if dim_type in record_ids:
-                df = record_ids[dim_type].intersect(df)
-            if df.rdd.isEmpty():
+                df = record_ids[dim_type].join(df, "id")
+            if is_dataframe_empty(df):
                 raise DSGInvalidQuery(f"Query filter produced empty records: {dim_filter}")
             record_ids[dim_type] = df
 
@@ -344,7 +357,7 @@ class Project:
             match context.model.result.column_type:
                 case ColumnType.DIMENSION_TYPES:
                     return DimensionType.MODEL_YEAR.value
-                case ColumnType.DIMENSION_QUERY_NAMES:
+                case ColumnType.DIMENSION_NAMES:
                     pass
                 case _:
                     raise NotImplementedError(
@@ -374,7 +387,7 @@ class Project:
                 f"{model_year_column=} {model_year_column_gr=}"
             )
         match context.model.result.column_type:
-            case ColumnType.DIMENSION_QUERY_NAMES:
+            case ColumnType.DIMENSION_NAMES:
                 time_columns = context.get_dimension_column_names(
                     DimensionType.TIME, dataset_id=dataset.initial_value_dataset_id
                 )

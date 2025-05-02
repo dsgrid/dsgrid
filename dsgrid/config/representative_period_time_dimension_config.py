@@ -1,27 +1,15 @@
 import abc
-import calendar
 import logging
-from datetime import datetime, timedelta
-from typing import Type
+from datetime import timedelta
+from typing import Type, Any, Union
 
-from pyspark.sql.types import StructType, StructField, IntegerType
-import pyspark.sql.functions as F
-import pandas as pd
+import chronify
 
-from dsgrid.dimension.time import (
-    TimeZone,
-    RepresentativePeriodFormat,
-    DatetimeRange,
-)
-from dsgrid.dimension.time_utils import shift_time_interval
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.dimension.time import RepresentativePeriodFormat, TimeIntervalType
 from dsgrid.time.types import (
     OneWeekPerMonthByHourType,
     OneWeekdayDayAndOneWeekendDayPerMonthByHourType,
 )
-from dsgrid.utils.timing import track_timing, timer_stats_collector
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import get_spark_session
 from .dimensions import RepresentativePeriodTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
 
@@ -47,146 +35,64 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
                 msg = self.model.format.value
                 raise NotImplementedError(msg)
 
-    @staticmethod
-    def model_class():
-        return RepresentativePeriodTimeDimensionModel
+    def supports_chronify(self) -> bool:
+        return True
 
-    @track_timing(timer_stats_collector)
-    def check_dataset_time_consistency(self, load_data_df, time_columns):
-        self._format_handler.check_dataset_time_consistency(
-            self._format_handler.list_expected_dataset_timestamps(self.model.ranges),
-            load_data_df,
-            time_columns,
-        )
-
-    def build_time_dataframe(self):
-        time_cols = self.get_load_data_time_columns()
-        schema = StructType(
-            [StructField(time_col, IntegerType(), False) for time_col in time_cols]
-        )
-        model_time = self.list_expected_dataset_timestamps()
-        df_time = get_spark_session().createDataFrame(model_time, schema=schema)
-
-        return df_time
-
-    # def build_time_dataframe_with_time_zone(self):
-    #     return self.build_time_dataframe()
-
-    def convert_dataframe(
+    def to_chronify(
         self,
-        df,
-        project_time_dim,
-        value_columns: set[str],
-        scratch_dir_context: ScratchDirContext,
-        wrap_time_allowed=False,
-        time_based_data_adjustment=None,
-    ):
-        """Time interval type alignment is done in the mapping process."""
-        if project_time_dim is None:
-            return df
-        if (
-            project_time_dim.list_expected_dataset_timestamps()
-            == self.list_expected_dataset_timestamps()
+    ) -> Union[chronify.RepresentativePeriodTimeTZ, chronify.RepresentativePeriodTimeNTZ]:
+        if len(self._model.ranges) != 1:
+            msg = (
+                "Mapping RepresentativePeriodTime with chronify is only supported with one range: "
+                f"{self._model.ranges}"
+            )
+            raise NotImplementedError(msg)
+        range_ = self._model.ranges[0]
+        if range_.start != 1 or range_.end != 12:
+            msg = (
+                "Mapping RepresentativePeriodTime with chronify is only supported with a full year: "
+                f"{range_}"
+            )
+            raise NotImplementedError(msg)
+        # RepresentativePeriodTimeDimensionModel does not map to NTZ at the moment
+        if isinstance(self._format_handler, OneWeekPerMonthByHourHandler) or isinstance(
+            self._format_handler, OneWeekdayDayAndWeekendDayPerMonthByHourHandler
         ):
-            return df
 
-        time_cols = self.get_load_data_time_columns()
-        ptime_col = project_time_dim.get_load_data_time_columns()
-        assert len(ptime_col) == 1, ptime_col
-        ptime_col = ptime_col[0]
-
-        assert "time_zone" in df.columns, df.columns
-        geo_tz_values = [row.time_zone for row in df.select("time_zone").distinct().collect()]
-        assert geo_tz_values
-        geo_tz_to_map = [TimeZone(tz) for tz in geo_tz_values]
-        geo_tz_to_map = [tz.tz_name for tz in geo_tz_to_map]  # covert to tz_name
-
-        # create time map
-        # temporarily set session time to UTC for timeinfo extraction
-        # Note: timeinfo is extracted from local_time column exactly in DF.show(),
-        # and only UTC seems to convert to local_time correctly for DF.show().
-        # Even though UTC does not always lead to correct time output when DF.toPandas()
-        # the underlying time data is correctly stored when saved to file
-        spark = get_spark_session()
-        session_tz_orig = spark.conf.get("spark.sql.session.timeZone")
-        spark.conf.set("spark.sql.session.timeZone", "UTC")
-        session_tz = spark.conf.get("spark.sql.session.timeZone")
-        if session_tz is None:
-            msg = "Failed to get spark.sql.session.timeZone"
-            raise Exception(msg)
-
-        time_df = None
-        try:
-            project_time_df = project_time_dim.build_time_dataframe()
-            map_time = "timestamp_to_map"
-            project_time_df = shift_time_interval(
-                project_time_df,
-                ptime_col,
-                project_time_dim.get_time_interval_type(),
-                self.get_time_interval_type(),
-                project_time_dim.get_frequency(),
-                new_time_column=map_time,
+            return chronify.RepresentativePeriodTimeTZ(
+                measurement_type=self._model.measurement_type,
+                interval_type=self._model.time_interval_type,
+                time_format=chronify.RepresentativePeriodFormat(self._model.format.value),
+                time_zone_column="time_zone",
             )
 
-            for tz_value, tz_name in zip(geo_tz_values, geo_tz_to_map):
-                local_time_df = project_time_df.withColumn(
-                    "time_zone", F.lit(tz_value)
-                ).withColumn(
-                    "local_time",
-                    F.from_utc_timestamp(F.to_utc_timestamp(F.col(map_time), session_tz), tz_name),
-                )
-                select = [ptime_col, "time_zone"]
-                for col in time_cols:
-                    func = col.replace("_", "")
-                    expr = f"{func}(local_time) AS {col}"
-                    if col == "day_of_week":
-                        expr = f"weekday(local_time) AS {col}"
-                    elif col == "is_weekday":
-                        expr = f"(weekday(local_time) < 5) AS {col}"
-                    select.append(expr)
-                local_time_df = local_time_df.selectExpr(*select)
-                if time_df is None:
-                    time_df = local_time_df
-                else:
-                    time_df = time_df.union(local_time_df)
-        finally:
-            # reset session timezone
-            spark.conf.set("spark.sql.session.timeZone", session_tz_orig)
-            assert spark.conf.get("spark.sql.session.timeZone") == session_tz_orig
+        msg = f"Cannot chronify time_config for {self._format_handler}"
+        raise NotImplementedError(msg)
 
-        # join all
-        join_keys = time_cols + ["time_zone"]
-        select = [
-            col if col not in time_cols else F.col(col).cast(IntegerType()) for col in df.columns
-        ]
-        df = df.select(*select).join(time_df, on=join_keys).drop(*time_cols)
+    @staticmethod
+    def model_class() -> RepresentativePeriodTimeDimensionModel:
+        return RepresentativePeriodTimeDimensionModel
 
-        return df
-
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return self._format_handler.get_frequency()
 
-    def get_time_ranges(self):
-        return self._format_handler.get_time_ranges(
-            self.model.ranges,
-            self.model.time_interval_type,
-            self.get_tzinfo(),
-        )
+    def get_start_times(self) -> list[Any]:
+        return self._format_handler.get_start_times(self.model.ranges)
 
-    def get_load_data_time_columns(self):
+    def get_lengths(self) -> list[int]:
+        return self._format_handler.get_lengths(self.model.ranges)
+
+    def get_load_data_time_columns(self) -> list[str]:
         return self._format_handler.get_load_data_time_columns()
 
     def get_time_zone(self) -> None:
         return None
 
-    def get_tzinfo(self):
+    def get_tzinfo(self) -> None:
         return None
 
-    def get_time_interval_type(self):
+    def get_time_interval_type(self) -> TimeIntervalType:
         return self.model.time_interval_type
-
-    def list_expected_dataset_timestamps(self):
-        return self._format_handler.list_expected_dataset_timestamps(self.model.ranges)
 
 
 class RepresentativeTimeFormatHandlerBase(abc.ABC):
@@ -196,53 +102,6 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
     @abc.abstractmethod
     def get_representative_time_type() -> Type:
         """Return the time type representing the data."""
-
-    def check_dataset_time_consistency(self, expected_timestamps, load_data_df, time_columns):
-        """Check consistency between time ranges from the time dimension and load data.
-
-        Parameters
-        ----------
-        expected_timestamps : list
-        load_data_df : pyspark.sql.DataFrame
-        time_columns : list[str]
-
-        Raises
-        ------
-        DSGInvalidDataset
-
-        """
-        logger.info("Check %s dataset time consistency.", self.__class__.__name__)
-        actual_timestamps = []
-        for row in load_data_df.select(*time_columns).distinct().sort(*time_columns).collect():
-            data = row.asDict()
-            num_none = 0
-            for val in data.values():
-                if val is None:
-                    num_none += 1
-            if num_none > 0:
-                if num_none != len(data):
-                    raise DSGInvalidDataset(
-                        f"If any time column is null then all columns must be null: {data}"
-                    )
-            else:
-                actual_timestamps.append(self.get_representative_time_type()(**data))
-
-        if expected_timestamps != actual_timestamps:
-            mismatch = sorted(
-                set(expected_timestamps).symmetric_difference(set(actual_timestamps))
-            )
-            raise DSGInvalidDataset(
-                f"load_data timestamps do not match expected times. mismatch={mismatch}"
-            )
-        logger.info("Verified that expected_timestamps equal actual_timestamps")
-
-        actual_len = len(actual_timestamps)
-        expected_len = len(expected_timestamps)
-        if actual_len != expected_len:
-            raise DSGInvalidDataset(
-                f"Length of time arrays is incorrect: actual={actual_len} expected={expected_len}"
-            )
-        logger.info("Verified that all time arrays have the same, correct length.")
 
     @abc.abstractmethod
     def get_frequency(self):
@@ -265,72 +124,37 @@ class RepresentativeTimeFormatHandlerBase(abc.ABC):
 
         """
 
-    @abc.abstractmethod
-    def get_time_ranges(self):
-        """Return a list of DatetimeRange instances for the dataset.
-
-        Returns
-        -------
-        list
-            list of DatetimeRange
-
-        """
-
-    @abc.abstractmethod
-    def list_expected_dataset_timestamps(self):
-        """Return a list of the timestamps expected in the load_data table.
-
-        Returns
-        -------
-        list
-            List of tuples of columns representing time in the load_data table.
-
-        """
-
 
 class OneWeekPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
     """Handler for format with hourly data that includes one week per month."""
 
     @staticmethod
-    def get_representative_time_type():
+    def get_representative_time_type() -> OneWeekPerMonthByHourType:
         return OneWeekPerMonthByHourType
 
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, time_interval_type, _):
-        # TODO: This method may have some problems but is currently unused.
-        # How to handle year? Leap year?
-        time_ranges = []
+    @staticmethod
+    def get_start_times(ranges) -> list[OneWeekPerMonthByHourType]:
+        """Get the starting combination of (month, day_of_week, hour) based on sorted order"""
+        start_times = []
         for model in ranges:
-            if model.end == 2:
-                logger.warning("Last day of February may not be accurate.")
-            last_day = calendar.monthrange(2021, model.end)[1]
-            time_ranges.append(
-                DatetimeRange(
-                    start=pd.Timestamp(datetime(year=1970, month=model.start, day=1)),
-                    end=pd.Timestamp(datetime(year=1970, month=model.end, day=last_day, hour=23)),
-                    frequency=timedelta(hours=1),
-                )
-            )
-
-        return time_ranges
+            start_times.append(OneWeekPerMonthByHourType(month=model.start, day_of_week=0, hour=0))
+        return start_times
 
     @staticmethod
-    def get_load_data_time_columns():
-        return list(OneWeekPerMonthByHourType._fields)
-
-    def list_expected_dataset_timestamps(self, ranges):
-        timestamps = []
+    def get_lengths(ranges) -> list[int]:
+        """Get the number of unique combinations of (month, day_of_week, hour)"""
+        lengths = []
         for model in ranges:
-            for month in range(model.start, model.end + 1):
-                for day_of_week in range(7):
-                    for hour in range(24):
-                        ts = OneWeekPerMonthByHourType(
-                            month=month, day_of_week=day_of_week, hour=hour
-                        )
-                        timestamps.append(ts)
-        return timestamps
+            n_months = model.end - model.start + 1
+            lengths.append(n_months * 7 * 24)
+        return lengths
+
+    @staticmethod
+    def get_load_data_time_columns() -> list[str]:
+        return list(OneWeekPerMonthByHourType._fields)
 
 
 class OneWeekdayDayAndWeekendDayPerMonthByHourHandler(RepresentativeTimeFormatHandlerBase):
@@ -339,28 +163,33 @@ class OneWeekdayDayAndWeekendDayPerMonthByHourHandler(RepresentativeTimeFormatHa
     """
 
     @staticmethod
-    def get_representative_time_type():
+    def get_representative_time_type() -> OneWeekdayDayAndOneWeekendDayPerMonthByHourType:
         return OneWeekdayDayAndOneWeekendDayPerMonthByHourType
 
-    def get_frequency(self):
+    def get_frequency(self) -> timedelta:
         return timedelta(hours=1)
 
-    def get_time_ranges(self, ranges, time_interval_type, _):
-        raise NotImplementedError("get_time_ranges")
+    @staticmethod
+    def get_start_times(ranges) -> list[OneWeekdayDayAndOneWeekendDayPerMonthByHourType]:
+        """Get the starting combination of (month, hour, is_weekday) based on sorted order"""
+        start_times = []
+        for model in ranges:
+            start_times.append(
+                OneWeekdayDayAndOneWeekendDayPerMonthByHourType(
+                    month=model.start, hour=0, is_weekday=False
+                )
+            )
+        return start_times
 
     @staticmethod
-    def get_load_data_time_columns():
-        return list(OneWeekdayDayAndOneWeekendDayPerMonthByHourType._fields)
-
-    def list_expected_dataset_timestamps(self, ranges):
-        timestamps = []
+    def get_lengths(ranges) -> list[int]:
+        """Get the number of unique combinations of (month, hour, is_weekday)"""
+        lengths = []
         for model in ranges:
-            for month in range(model.start, model.end + 1):
-                # This is sorted because we sort time columns in the load data.
-                for is_weekday in sorted((False, True)):
-                    for hour in range(24):
-                        ts = OneWeekdayDayAndOneWeekendDayPerMonthByHourType(
-                            month=month, hour=hour, is_weekday=is_weekday
-                        )
-                        timestamps.append(ts)
-        return timestamps
+            n_months = model.end - model.start + 1
+            lengths.append(n_months * 24 * 2)
+        return lengths
+
+    @staticmethod
+    def get_load_data_time_columns() -> list[str]:
+        return list(OneWeekdayDayAndOneWeekendDayPerMonthByHourType._fields)

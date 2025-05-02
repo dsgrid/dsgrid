@@ -9,26 +9,44 @@ import shutil
 import time
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Iterable, Type, Union, get_origin, get_args
+from typing import Any, Generator, Iterable, Sequence, Type, Union, get_origin, get_args
 
+import duckdb
 import pandas as pd
-import pyspark
-from pyspark.sql import DataFrame, Row, SparkSession
-from pyspark.sql.types import (
-    StructType,
-    StructField,
-    StringType,
-    DoubleType,
-    IntegerType,
-    BooleanType,
-)
-from pyspark import SparkConf
 
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidFile, DSGInvalidParameter
-from dsgrid.loggers import disable_console_logging
-from dsgrid.utils.files import load_data
+from dsgrid.exceptions import (
+    DSGInvalidField,
+    DSGInvalidFile,
+    DSGInvalidOperation,
+    DSGInvalidParameter,
+)
+from dsgrid.utils.files import delete_if_exists, load_data
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.spark.functions import (
+    cross_join,
+    get_spark_session,
+    get_duckdb_spark_session,
+    get_current_time_zone,
+    set_current_time_zone,
+    init_spark,
+    is_dataframe_empty,
+    read_csv,
+    read_json,
+    read_parquet,
+)
+from dsgrid.spark.types import (
+    AnalysisException,
+    BooleanType,
+    DataFrame,
+    DoubleType,
+    IntegerType,
+    SparkSession,
+    StringType,
+    StructField,
+    StructType,
+    use_duckdb,
+)
 from dsgrid.utils.timing import Timer, track_timing, timer_stats_collector
 
 
@@ -49,46 +67,9 @@ PYTHON_TO_SPARK_TYPES = {
 }
 
 
-def init_spark(name="dsgrid", check_env=True, spark_conf=None):
-    """Initialize a SparkSession.
-
-    Parameters
-    ----------
-    name : str
-    check_env : bool
-        If True, which is default, check for the SPARK_CLUSTER environment variable and attach to
-        it. Otherwise, create a local-mode cluster or attach to the SparkSession that was created
-        by pyspark/spark-submit prior to starting the current process.
-    spark_conf : dict | None, defaults to None
-        If set, Spark configuration parameters
-
-    """
-    cluster = os.environ.get("SPARK_CLUSTER")
-    conf = SparkConf().setAppName(name)
-    if spark_conf is not None:
-        for key, val in spark_conf.items():
-            conf.set(key, val)
-
-    out_ts_type = conf.get("spark.sql.parquet.outputTimestampType")
-    if out_ts_type is None:
-        conf.set("spark.sql.parquet.outputTimestampType", "TIMESTAMP_MICROS")
-    elif out_ts_type != "TIMESTAMP_MICROS":
-        logger.warning(
-            "spark.sql.parquet.outputTimestampType is set to %s. Writing parquet files may "
-            "produced undesired results.",
-            out_ts_type,
-        )
-
-    if check_env and cluster is not None:
-        logger.info("Create SparkSession %s on existing cluster %s", name, cluster)
-        conf.setMaster(cluster)
-    spark = SparkSession.builder.config(conf=conf).getOrCreate()
-
-    with disable_console_logging():
-        log_spark_conf(spark)
-        logger.info("Custom configuration settings: %s", spark_conf)
-
-    return spark
+def get_active_session(*args) -> SparkSession:
+    """Return the active Spark Session."""
+    return get_duckdb_spark_session() or init_spark(*args)
 
 
 def restart_spark(*args, force=False, **kwargs) -> SparkSession:
@@ -105,6 +86,10 @@ def restart_spark(*args, force=False, **kwargs) -> SparkSession:
     pyspark.sql.SparkSession
 
     """
+    spark = get_duckdb_spark_session()
+    if spark is not None:
+        return spark
+
     spark = SparkSession.getActiveSession()
     needs_restart = force
     orig_time_zone = spark.conf.get("spark.sql.session.timeZone")
@@ -137,13 +122,6 @@ def restart_spark(*args, force=False, **kwargs) -> SparkSession:
         logger.info("No restart of Spark is needed.")
 
     return spark
-
-
-def log_spark_conf(spark: SparkSession):
-    """Log the Spark configuration details."""
-    conf = spark.sparkContext.getConf().getAll()
-    conf.sort(key=lambda x: x[0])
-    logger.info("Spark conf: %s", "\n".join([f"{x} = {y}" for x, y in conf]))
 
 
 @track_timing(timer_stats_collector)
@@ -269,28 +247,26 @@ def read_dataframe(
     return df
 
 
-def read_parquet(filename: Path) -> DataFrame:
-    """Read a DataFrame from a file path."""
-    return get_spark_session().read.parquet(str(filename))
-
-
 def _read_with_spark(filename):
     if not os.path.exists(filename):
         raise FileNotFoundError(f"{filename} does not exist")
-    spark = get_spark_session()
     suffix = Path(filename).suffix
     if suffix == ".csv":
-        df = spark.read.csv(filename, inferSchema=True, header=True)
+        df = read_csv(filename)
     elif suffix == ".parquet":
         try:
-            df = spark.read.parquet(filename)
-        except pyspark.sql.utils.AnalysisException as exc:
+            df = read_parquet(filename)
+        except AnalysisException as exc:
             if "Unable to infer schema for Parquet. It must be specified manually." in str(exc):
                 logger.exception("Failed to read Parquet file=%s. File may be invalid", filename)
                 raise DSGInvalidFile(f"Cannot read {filename=}")
             raise
+        except duckdb.duckdb.IOException:
+            logger.exception("Failed to read Parquet file=%s. File may be invalid", filename)
+            raise DSGInvalidFile(f"Cannot read {filename=}")
+
     elif suffix == ".json":
-        df = spark.read.json(filename, mode="FAILFAST")
+        df = read_json(filename)
     else:
         assert False, f"Unsupported file extension: {filename}"
     return df
@@ -308,12 +284,13 @@ def _read_natively(filename):
     elif suffix == ".json":
         obj = load_data(filename)
     else:
-        assert False, f"Unsupported file extension: {filename}"
+        msg = f"Unsupported file extension: {filename}"
+        raise NotImplementedError(msg)
     return get_spark_session().createDataFrame(obj)
 
 
 def _post_process_dataframe(df, table_name=None, require_unique=None):
-    if table_name is not None:
+    if not use_duckdb() and table_name is not None:
         df.createOrReplaceTempView(table_name)
         df.cache()
 
@@ -325,7 +302,18 @@ def _post_process_dataframe(df, table_name=None, require_unique=None):
                     raise DSGInvalidField(f"DataFrame has duplicate entries for {column}")
 
 
-def get_unique_values(df: DataFrame, columns: str | list[str]) -> set:
+def cross_join_dfs(dfs: list[DataFrame]) -> DataFrame:
+    """Perform a cross join of all dataframes in dfs."""
+    if len(dfs) == 1:
+        return dfs[0]
+
+    df = dfs[0]
+    for other in dfs[1:]:
+        df = cross_join(df, other)
+    return df
+
+
+def get_unique_values(df: DataFrame, columns: Sequence[str]) -> set[str]:
     """Return the unique values of a dataframe in one column or a list of columns."""
     dfc = df.select(columns).distinct().collect()
     if isinstance(columns, list):
@@ -347,17 +335,18 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
         If set, a unique ID to use as the cached table name. Return from cache if already stored.
     """
     spark = get_spark_session()
-    if (
-        table_name is not None
-        and spark.catalog.tableExists(table_name)
-        and spark.catalog.isCached(table_name)
-    ):
-        return spark.table(table_name)
+    if not use_duckdb():
+        if (
+            table_name is not None
+            and spark.catalog.tableExists(table_name)
+            and spark.catalog.isCached(table_name)
+        ):
+            return spark.table(table_name)
 
     assert models
     cls = type(models[0])
     rows = []
-    schema = StructType()
+    struct_fields = []
     for i, model in enumerate(models):
         dct = {}
         for f in cls.model_fields:
@@ -375,13 +364,14 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
                 else:
                     python_type = type(val)
                 spark_type = PYTHON_TO_SPARK_TYPES[python_type]()
-                schema.add(f, spark_type, nullable=True)
+                struct_fields.append(StructField(f, spark_type, nullable=True))
             dct[f] = val
-        rows.append(Row(**dct))
+        rows.append(tuple(dct.values()))
 
+    schema = StructType(struct_fields)
     df = spark.createDataFrame(rows, schema=schema)
 
-    if table_name is not None:
+    if not use_duckdb() and table_name is not None:
         df.createOrReplaceTempView(table_name)
         df.cache()
 
@@ -430,7 +420,7 @@ def create_dataframe_from_dimension_ids(records, *dimension_types, cache=True) -
     for dimension_type in dimension_types:
         schema.add(dimension_type.value, StringType(), nullable=False)
     df = get_spark_session().createDataFrame(records, schema=schema)
-    if cache:
+    if not use_duckdb() and cache:
         df.cache()
     return df
 
@@ -460,10 +450,10 @@ def check_for_nulls(df, exclude_columns=None):
     try:
         # Avoid iterating with many checks unless we know there is at least one failure.
         nulls = sql(f"SELECT {cols_str} FROM tmp_table WHERE {filter_str}")
-        if not nulls.rdd.isEmpty():
+        if not is_dataframe_empty(nulls):
             cols_with_null = set()
             for col in cols_to_check:
-                if not nulls.select(col).filter(f"{col} is NULL").rdd.isEmpty():
+                if not is_dataframe_empty(nulls.select(col).filter(f"{col} is NULL")):
                     cols_with_null.add(col)
             assert cols_with_null, "Did not find any columns with NULL values"
 
@@ -486,20 +476,17 @@ def overwrite_dataframe_file(filename: Path | str, df: DataFrame) -> DataFrame:
     tmp = str(filename) + ".tmp"
     if suffix == ".parquet":
         df.write.parquet(tmp)
-        read_method = spark.read.parquet
+        read_method = read_parquet
         kwargs = {}
     elif suffix == ".csv":
         df.write.csv(str(tmp), header=True)
         read_method = spark.read.csv
-        kwargs = {"header": True, "inferSchema": True}
+        kwargs = {"header": True, "schema": df.schema}
     elif suffix == ".json":
         df.write.json(str(tmp))
         read_method = spark.read.json
         kwargs = {}
-    if os.path.isfile(filename) or os.path.islink(filename):
-        os.unlink(filename)
-    else:
-        shutil.rmtree(filename)
+    delete_if_exists(filename)
     os.rename(tmp, str(filename))
     return read_method(str(filename), **kwargs)
 
@@ -565,15 +552,20 @@ def write_dataframe_and_auto_partition(
         msg = "write_dataframe_and_auto_partition only supports Parquet files: {filename=}"
         raise DSGInvalidParameter(msg)
 
-    spark = get_spark_session()
     start_initial_write = time.time()
     if filename.exists():
         df = overwrite_dataframe_file(filename, df)
     else:
         df.write.parquet(str(filename))
-        df = spark.read.parquet(str(filename))
+        df = read_parquet(filename)
+
     end_initial_write = time.time()
     duration_first_write = end_initial_write - start_initial_write
+
+    if use_duckdb():
+        logger.debug("write_dataframe_and_auto_partition is not optimized for DuckDB")
+        return df
+
     partition_size_bytes = partition_size_mb * 1024 * 1024
     total_size = sum((x.stat().st_size for x in filename.glob("*.parquet")))
     desired = math.ceil(total_size / partition_size_bytes)
@@ -624,11 +616,8 @@ def write_dataframe(df: DataFrame, filename: str | Path, overwrite: bool = False
     df : pyspark.sql.DataFrame
     """
     path = Path(filename)
-    if overwrite and path.exists():
-        if path.is_dir():
-            shutil.rmtree(path)
-        else:
-            path.unlink()
+    if overwrite:
+        delete_if_exists(path)
 
     suffix = path.suffix
     name = str(filename)
@@ -637,11 +626,15 @@ def write_dataframe(df: DataFrame, filename: str | Path, overwrite: bool = False
     elif suffix == ".csv":
         df.write.csv(name, header=True)
     elif suffix == ".json":
-        df.write.json(name)
+        if use_duckdb():
+            new_name = name.replace(".json", ".parquet")
+            df.write.parquet(new_name)
+        else:
+            df.write.json(name)
 
 
 @track_timing(timer_stats_collector)
-def persist_intermediate_table(df: DataFrame, context: ScratchDirContext, tag=None) -> DataFrame:
+def persist_intermediate_table(df: DataFrame, context: ScratchDirContext, tag=None) -> Path:
     """Persist a table to the scratch directory. This can be helpful to avoid multiple
     evaluations of the same query.
     """
@@ -650,9 +643,21 @@ def persist_intermediate_table(df: DataFrame, context: ScratchDirContext, tag=No
     path = context.get_temp_filename(suffix=".parquet")
     logger.info("Start persist_intermediate_table %s %s", path, tag or "")
     write_dataframe(df, path)
-    df = read_dataframe(path)
     logger.info("Completed persist_intermediate_table %s %s", path, tag or "")
-    return df
+    return path
+
+
+@track_timing(timer_stats_collector)
+def save_to_warehouse(df: DataFrame, table_name: str) -> DataFrame:
+    """Save a table to the Spark warehouse. Not supported when using DuckDB."""
+    if use_duckdb():
+        msg = "save_to_warehouse is not supported when using DuckDB"
+        raise DSGInvalidOperation(msg)
+
+    logger.info("Start saveAsTable to warehouse %s", table_name)
+    df.write.saveAsTable(table_name)
+    logger.info("Completed saveAsTable %s", table_name)
+    return df.sparkSession.sql(f"select * from {table_name}")
 
 
 def sql(query: str) -> DataFrame:
@@ -661,15 +666,47 @@ def sql(query: str) -> DataFrame:
     return get_spark_session().sql(query)
 
 
-def cross_join_dfs(dfs: list[DataFrame]) -> DataFrame:
-    """Perform a cross join of all dataframes in dfs."""
-    if len(dfs) == 1:
-        return dfs[0]
+def load_stored_table(table_name: str) -> DataFrame:
+    """Return a table stored in the Spark warehouse."""
+    spark = get_spark_session()
+    return spark.table(table_name)
 
-    df = dfs[0]
-    for other in dfs[1:]:
-        df = df.crossJoin(other)
-    return df
+
+def try_load_stored_table(
+    table_name: str, database: str | None = DSGRID_DB_NAME
+) -> DataFrame | None:
+    """Return a table if it is stored in the Spark warehouse."""
+    spark = get_spark_session()
+    full_name = f"{database}.{table_name}"
+    if spark.catalog.tableExists(full_name):
+        return spark.table(table_name)
+    return None
+
+
+def is_table_stored(table_name, database=DSGRID_DB_NAME):
+    spark = get_spark_session()
+    full_name = f"{database}.{table_name}"
+    return spark.catalog.tableExists(full_name)
+
+
+def save_table(table, table_name, overwrite=True, database=DSGRID_DB_NAME):
+    full_name = f"{database}.{table_name}"
+    if overwrite:
+        table.write.mode("overwrite").saveAsTable(full_name)
+    else:
+        table.write.saveAsTable(full_name)
+
+
+def list_tables(database=DSGRID_DB_NAME):
+    spark = get_spark_session()
+    return [x.name for x in spark.catalog.listTables(dbName=database)]
+
+
+def drop_table(table_name, database=DSGRID_DB_NAME):
+    spark = get_spark_session()
+    if is_table_stored(table_name, database=database):
+        spark.sql(f"DROP TABLE {table_name}")
+        logger.info("Dropped table %s", table_name)
 
 
 @track_timing(timer_stats_collector)
@@ -718,7 +755,10 @@ def create_dataframe_from_product(
             writer.add_row(row)
 
     spark = get_spark_session()
-    df = spark.read.csv(str(csv_dir), header=False, schema=schema)
+    if use_duckdb():
+        df = spark.read.csv(f"{csv_dir}/*.csv", header=False, schema=schema)
+    else:
+        df = spark.read.csv(str(csv_dir), header=False, schema=schema)
     return df
 
 
@@ -755,16 +795,6 @@ class CsvPartitionWriter:
             self._index += 1
 
 
-def get_spark_session() -> SparkSession:
-    """Return the active SparkSession or create a new one is none is active."""
-    spark = SparkSession.getActiveSession()
-    if spark is None:
-        logger.warning("Could not find a SparkSession. Create a new one.")
-        spark = SparkSession.builder.getOrCreate()
-        log_spark_conf(spark)
-    return spark
-
-
 @contextmanager
 def custom_spark_conf(conf):
     """Apply a custom Spark configuration for the duration of a code block.
@@ -775,6 +805,11 @@ def custom_spark_conf(conf):
         Key-value pairs to set on the spark configuration.
 
     """
+    spark = get_duckdb_spark_session()
+    if spark is not None:
+        yield
+        return
+
     spark = get_spark_session()
     orig_settings = {}
 
@@ -793,6 +828,19 @@ def custom_spark_conf(conf):
 
 
 @contextmanager
+def custom_time_zone(time_zone: str):
+    """Apply a custom Spark time zone for the duration of a code block."""
+    orig_time_zone = get_current_time_zone()
+    try:
+        set_current_time_zone(time_zone)
+        yield
+    finally:
+        # Note that the user code could have restarted the session.
+        # This will function will get the current one.
+        set_current_time_zone(orig_time_zone)
+
+
+@contextmanager
 def restart_spark_with_custom_conf(conf: dict, force=False):
     """Restart the SparkSession with a custom configuration for the duration of a code block.
 
@@ -804,6 +852,11 @@ def restart_spark_with_custom_conf(conf: dict, force=False):
         If True, restart the session even if the config parameters haven't changed.
         You might want to do this in order to clear cached tables or start Spark fresh.
     """
+    spark = get_duckdb_spark_session()
+    if spark is not None:
+        yield spark
+        return
+
     spark = get_spark_session()
     app_name = spark.conf.get("spark.app.name")
     orig_settings = {}
@@ -819,21 +872,16 @@ def restart_spark_with_custom_conf(conf: dict, force=False):
         restart_spark(name=app_name, spark_conf=orig_settings, force=force)
 
 
-def load_stored_table(table_name: str) -> DataFrame:
-    """Return a table stored in the Spark warehouse."""
-    spark = get_spark_session()
-    return spark.table(table_name)
+@contextmanager
+def set_session_time_zone(time_zone: str) -> Generator[None, None, None]:
+    """Set the session time zone for execution of a code block."""
+    orig = get_current_time_zone()
 
-
-def try_load_stored_table(
-    table_name: str, database: str | None = DSGRID_DB_NAME
-) -> DataFrame | None:
-    """Return a table if it is stored in the Spark warehouse."""
-    spark = get_spark_session()
-    full_name = f"{database}.{table_name}"
-    if spark.catalog.tableExists(full_name):
-        return spark.table(table_name)
-    return None
+    try:
+        set_current_time_zone(time_zone)
+        yield
+    finally:
+        set_current_time_zone(orig)
 
 
 def union(dfs: list[DataFrame]) -> DataFrame:
@@ -845,29 +893,3 @@ def union(dfs: list[DataFrame]) -> DataFrame:
                 raise Exception(f"columns don't match: {df.columns=} {dft.columns=}")
             df = df.union(dft)
     return df
-
-
-def is_table_stored(table_name, database=DSGRID_DB_NAME):
-    spark = get_spark_session()
-    full_name = f"{database}.{table_name}"
-    return spark.catalog.tableExists(full_name)
-
-
-def save_table(table, table_name, overwrite=True, database=DSGRID_DB_NAME):
-    full_name = f"{database}.{table_name}"
-    if overwrite:
-        table.write.mode("overwrite").saveAsTable(full_name)
-    else:
-        table.write.saveAsTable(full_name)
-
-
-def list_tables(database=DSGRID_DB_NAME):
-    spark = get_spark_session()
-    return [x.name for x in spark.catalog.listTables(dbName=database)]
-
-
-def drop_table(table_name, database=DSGRID_DB_NAME):
-    spark = get_spark_session()
-    if is_table_stored(table_name, database=database):
-        spark.sql(f"DROP TABLE {table_name}")
-        logger.info("Dropped table %s", table_name)

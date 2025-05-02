@@ -6,6 +6,7 @@ from typing import Optional, Self
 from sqlalchemy import Connection
 
 from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.spark.functions import drop_temp_tables_and_views
 from dsgrid.registry.common import RegistrationModel, RegistryType, VersionUpdateType
 from dsgrid.registry.registry_interface import RegistryInterfaceBase
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -157,6 +158,7 @@ class RegistrationContext:
         registrations.
         """
         try:
+            drop_temp_tables_and_views()
             for registry_type, manager_context in self._managers.items():
                 if manager_context is not None:
                     if manager_context.ids:

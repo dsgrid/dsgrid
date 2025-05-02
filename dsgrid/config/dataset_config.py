@@ -4,15 +4,20 @@ from pathlib import Path
 from typing import Any, Optional, Literal, Union
 
 from pydantic import field_validator, model_validator, Field
-import pyspark.sql.functions as F
 
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionBaseConfigWithFiles
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
-from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidParameter, DSGValueNotRegistered
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
+from dsgrid.spark.types import (
+    DataFrame,
+    F,
+)
 from dsgrid.utils.utilities import check_uniqueness
 from .config_base import ConfigBase
 from .dimensions import (
@@ -35,7 +40,7 @@ ALLOWED_DATA_FILES = ALLOWED_LOAD_DATA_FILENAMES + ALLOWED_LOAD_DATA_LOOKUP_FILE
 logger = logging.getLogger(__name__)
 
 
-def check_load_data_filename(path: str):
+def check_load_data_filename(path: str) -> str:
     """Return the load_data filename in path. Supports Parquet and CSV.
 
     Parameters
@@ -257,11 +262,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         description="Schema (table layouts) used for writing out the dataset",
         discriminator="data_schema_type",
     )
-    dataset_version: Optional[str] = Field(
-        default=None,
-        title="dataset_version",
-        description="The version of the dataset.",
-    )
     description: str = Field(
         title="description",
         description="A detailed description of the dataset.",
@@ -369,6 +369,11 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy_fields(cls, values):
+        if "dataset_version" in values:
+            val = values.pop("dataset_version")
+            if val is not None:
+                values["version"] = val
+
         if "data_schema_type" in values:
             if "data_schema_type" in values["data_schema"]:
                 raise ValueError(f"Unknown data_schema format: {values=}")
@@ -447,7 +452,7 @@ class DatasetConfig(ConfigBase):
 
     def __init__(self, model):
         super().__init__(model)
-        self._dimensions = {}  # ConfigKey to DatasetConfig
+        self._dimensions = {}  # ConfigKey to DimensionConfig
         self._dataset_path = None
 
     @staticmethod
@@ -467,9 +472,7 @@ class DatasetConfig(ConfigBase):
         # Join with forward slashes instead of Path because this might be an s3 path and
         # we don't want backslashes on Windows.
         config = cls(model)
-        config.dataset_path = (
-            f"{registry_data_path}/data/{model.dataset_id}/{model.dataset_version}"
-        )
+        config.dataset_path = f"{registry_data_path}/data/{model.dataset_id}/{model.version}"
         return config
 
     @classmethod
@@ -519,22 +522,33 @@ class DatasetConfig(ConfigBase):
     def dimensions(self):
         return self._dimensions
 
-    def get_dimension(self, dimension_type: DimensionType):
-        """Return the dimension matching dimension_type.
-
-        Parameters
-        ----------
-        dimension_type : DimensionType
-
-        Returns
-        -------
-        DimensionConfig
-
-        """
+    def get_dimension(self, dimension_type: DimensionType) -> DimensionBaseConfig:
+        """Return the dimension matching dimension_type."""
         for dim_config in self.dimensions.values():
             if dim_config.model.dimension_type == dimension_type:
                 return dim_config
-        assert False, dimension_type
+
+        msg = f"Dimension {dimension_type} not found in dataset {self.config_id}"
+        raise DSGValueNotRegistered(msg)
+
+    def get_time_dimension(self) -> TimeDimensionBaseConfig:
+        """Return the time dimension of the dataset."""
+        dim = self.get_dimension(DimensionType.TIME)
+        assert isinstance(dim, TimeDimensionBaseConfig)
+        return dim
+
+    def get_dimension_with_records(
+        self, dimension_type: DimensionType
+    ) -> DimensionBaseConfigWithFiles:
+        """Return the dimension matching dimension_type."""
+        for dim_config in self.dimensions.values():
+            if dim_config.model.dimension_type == dimension_type and isinstance(
+                dim_config, DimensionBaseConfigWithFiles
+            ):
+                return dim_config
+
+        msg = f"Dimension {dimension_type} not found in dataset {self.config_id} or does not have records"
+        raise DSGValueNotRegistered(msg)
 
     def get_pivoted_dimension_type(self) -> DimensionType | None:
         """Return the table's pivoted dimension type or None if the table isn't pivoted."""
@@ -549,7 +563,7 @@ class DatasetConfig(ConfigBase):
         if self.get_table_format_type() != TableFormatType.PIVOTED:
             return []
         dim_type = self.model.data_schema.table_format.pivoted_dimension_type
-        return sorted(list(self.get_dimension(dim_type).get_unique_ids()))
+        return sorted(list(self.get_dimension_with_records(dim_type).get_unique_ids()))
 
     def get_value_columns(self) -> list[str]:
         """Return the table's columns that contain values."""
@@ -569,7 +583,7 @@ class DatasetConfig(ConfigBase):
         """Return the format type of the table."""
         return TableFormatType(self._model.data_schema.table_format.format_type)
 
-    def add_trivial_dimensions(self, df):
+    def add_trivial_dimensions(self, df: DataFrame):
         """Add trivial 1-element dimensions to load_data_lookup."""
         for dim in self._dimensions.values():
             if dim.model.dimension_type in self.model.trivial_dimensions:

@@ -73,7 +73,7 @@ def test_resstock_projection_valid_query(valid_query):
 
 def test_resstock_projection_invalid_query_column_type(valid_query):
     query = valid_query
-    query.result.column_type = ColumnType.DIMENSION_QUERY_NAMES
+    query.result.column_type = ColumnType.DIMENSION_NAMES
     assert not does_query_support_a_derived_dataset(query)
 
 
@@ -100,7 +100,7 @@ def test_create_derived_dataset_config(tmp_path):
             str(RESSTOCK_PROJECTION_QUERY),
             "-o",
             str(query_output_base),
-            "--force",
+            "--overwrite",
         ],
     )
     assert result.exit_code == 0
@@ -137,7 +137,7 @@ def test_create_derived_dataset_config(tmp_path):
             "create-derived-dataset-config",
             str(query_output),
             str(dataset_dir),
-            "--force",
+            "--overwrite",
         ],
     )
     assert result.exit_code == 0

@@ -61,9 +61,6 @@ class RegistryDatabase:
     ) -> "RegistryDatabase":
         """Create a new registry database."""
         filename = conn.get_filename()
-        if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
         if filename.exists():
             if overwrite:
                 filename.unlink()
@@ -84,9 +81,6 @@ class RegistryDatabase:
     ) -> "RegistryDatabase":
         """Create a new registry database with existing registry data."""
         filename = conn.get_filename()
-        if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
         if filename.exists():
             if overwrite:
                 filename.unlink()
@@ -104,10 +98,8 @@ class RegistryDatabase:
         **connect_kwargs: Any,
     ) -> "RegistryDatabase":
         """Load an existing registry database."""
-        filename = conn.get_filename()
-        if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
+        # This tests the connection.
+        conn.get_filename()
         db = RegistryDatabase(engine=create_engine(conn.url, **connect_kwargs))
         db.update_sqlalchemy_metadata()
         return db
@@ -137,12 +129,11 @@ class RegistryDatabase:
         created_by = getpass.getuser()
         created_on = str(datetime.now())
         registry_data_path = str(data_path)
-        with self._engine.connect() as conn:
+        with self._engine.begin() as conn:
             kv_table = self.get_table(RegistryTables.KEY_VALUE)
             conn.execute(insert(kv_table).values(key="created_by", value=created_by))
             conn.execute(insert(kv_table).values(key="created_on", value=created_on))
             conn.execute(insert(kv_table).values(key="data_path", value=registry_data_path))
-            conn.commit()
 
         data_path.mkdir(exist_ok=True)
         record = {
@@ -191,7 +182,7 @@ class RegistryDatabase:
         cls.delete(dst_conn)
         dst = cls.create(dst_conn, dst_data_path)
         with sqlite3.connect(src_conn.url.replace("sqlite:///", "")) as src:
-            with dst.engine.connect() as dst_conn_:
+            with dst.engine.begin() as dst_conn_:
                 # The backup below will overwrite the data_path value.
                 table = dst.get_table(RegistryTables.KEY_VALUE)
                 stmt = select(table.c.value).where(table.c.key == "data_path")
@@ -205,7 +196,6 @@ class RegistryDatabase:
                 src.backup(dst_conn_._dbapi_connection.driver_connection)
                 stmt = update(table).where(table.c.key == "data_path").values(value=orig_data_path)
                 dst_conn_.execute(stmt)
-                dst_conn_.commit()
 
         logger.info("Copied database %s to %s", src_conn.url, dst_conn.url)
         return dst
@@ -214,9 +204,6 @@ class RegistryDatabase:
     def delete(conn: DatabaseConnection) -> None:
         """Delete the dsgrid database."""
         filename = conn.get_filename()
-        if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
         if filename.exists():
             filename.unlink()
 
@@ -224,9 +211,6 @@ class RegistryDatabase:
     def has_database(conn: DatabaseConnection) -> bool:
         """Return True if the database exists."""
         filename = conn.get_filename()
-        if filename is None:
-            msg = "Only file-based registry databases are currently supported."
-            raise NotImplementedError(msg)
         return filename.exists()
 
     def _get_model_id(self, model_type: RegistryType, model: dict[str, Any]) -> str:

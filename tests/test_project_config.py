@@ -8,7 +8,7 @@ from dsgrid.exceptions import DSGValueNotRegistered
 from dsgrid.utils.files import load_data
 from dsgrid.config.project_config import (
     ProjectConfigModel,
-    ProjectDimensionQueryNamesModel,
+    ProjectDimensionNamesModel,
     RequiredDimensionsModel,
     RequiredDimensionRecordsModel,
 )
@@ -88,10 +88,8 @@ def test_project_duplicate_type(config_as_dict):
         ProjectConfigModel(**config)
 
 
-def test_project_dimension_query_names_model():
-    assert not {x.value for x in DimensionType}.difference(
-        ProjectDimensionQueryNamesModel.model_fields
-    )
+def test_project_dimension_names_model():
+    assert not {x.value for x in DimensionType}.difference(ProjectDimensionNamesModel.model_fields)
 
 
 def test_duplicate_dimension_requirements():
@@ -146,7 +144,7 @@ def test_invalid_multi_dimensional_requirement_base_and_base_missing():
             "subsector": {"base": ["subsector1"]},
         },
     ]
-    with pytest.raises(ValueError, match="base and base_missing cannot both be set"):
+    with pytest.raises(ValueError, match="base and base_missing cannot both contain"):
         RequiredDimensionsModel(
             multi_dimensional=[RequiredDimensionRecordsModel(**x) for x in multi_dim_data],
         )

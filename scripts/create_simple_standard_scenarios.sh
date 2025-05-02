@@ -30,6 +30,8 @@ if [[ $? -ne 0 ]]; then
     exit 1
 fi
 
+read -r -d "" USAGE << EOM
+
 Created a registry database called ${DSGRID_REGISTRY_SIMPLE_DB_URL} with filtered StandardScenarios data.
 The load data for the registry is at ${SIMPLE_SS_DATA}.
 Run 'python tests/simple_standard_scenarios_datasets.py' to unpivot the ComStock datasets and

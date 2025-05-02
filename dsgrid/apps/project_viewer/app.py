@@ -81,7 +81,7 @@ app.layout = dbc.Container(
         html.Br(),
         html.H5("Dimension Records"),
         dcc.Input(
-            id="dimension_display_name",
+            id="dimension_name",
             value="",
             readOnly=True,
         ),
@@ -152,7 +152,7 @@ def on_list_dimensions(n_clicks, project_id, url):
 
 @app.callback(
     Output("dimension_records_table_container", "children"),
-    Output("dimension_display_name", "value"),
+    Output("dimension_name", "value"),
     Input("dimensions_table", "derived_viewport_selected_rows"),
     Input("dimensions_table", "derived_viewport_data"),
     State("url_text", "value"),
@@ -186,7 +186,7 @@ def on_list_dimension_records(row_indexes, row_data, url):
             style_cell=STYLE_CELL,
             style_data_conditional=STYLE_DATA_CONDITIONAL,
         ),
-        row_data[row_index]["display_name"],
+        row_data[row_index]["name"],
     )
 
 

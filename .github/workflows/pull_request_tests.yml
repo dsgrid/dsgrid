@@ -1,4 +1,4 @@
-name: Pytests
+name: Run tests
 
 on: pull_request
 
@@ -23,14 +23,21 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install '.[dev]'
-    - name: Run pytests
+        python -m pip install '.[dev,spark]'
+        wget https://archive.apache.org/dist/spark/spark-3.5.4/spark-3.5.4-bin-hadoop3.tgz
+        tar -xzf spark-3.5.4-bin-hadoop3.tgz
+        export SPARK_HOME=$(pwd)/spark-3.5.4-bin-hadoop3
+        ${SPARK_HOME}/sbin/start-thriftserver.sh
+    - name: Run tests
       run: |
         # This does not run the AWS tests.
         # Credentials would need to be configured.
         git submodule init
         git submodule update
-        python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
+        DSGRID_BACKEND_ENGINE=duckdb python -m pytest -v --disable-warnings --cov=./ --cov-report=xml:coverage.xml tests dsgrid/utils/py_expression_eval/tests.py
+        # Restart from scratch.
+        rm -rf tests/data/registry
+        DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4.2.0
       with:

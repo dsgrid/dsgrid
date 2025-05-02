@@ -13,10 +13,16 @@ from dsgrid.cli.dsgrid import cli as cli
 from dsgrid.cli.dsgrid_admin import cli as cli_admin
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.spark.functions import (
+    drop_temp_tables_and_views,
+    get_current_time_zone,
+    set_current_time_zone,
+)
+from dsgrid.spark.types import use_duckdb
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.utils.run_command import check_run_command
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.utils.spark import init_spark, get_spark_session
+from dsgrid.utils.spark import init_spark
 from dsgrid.tests.common import (
     TEST_DATASET_DIRECTORY,
     TEST_PROJECT_PATH,
@@ -44,6 +50,9 @@ def pytest_sessionstart(session):
     path = Path("metastore_db")
     if path.exists():
         shutil.rmtree(path)
+
+    yield
+    drop_temp_tables_and_views()
 
 
 @pytest.fixture(scope="session")
@@ -132,11 +141,11 @@ def _get_latest_commit():
     return commit
 
 
-@pytest.fixture
 def spark_session():
     spark = init_spark("dsgrid_test")
     yield spark
-    spark.stop()
+    if not use_duckdb():
+        spark.stop()
 
 
 @pytest.fixture(scope="module")
@@ -205,11 +214,10 @@ def tmp_registry_db(make_test_project_dir, tmp_path):
 
 @pytest.fixture
 def spark_time_zone(request):
-    spark = get_spark_session()
-    orig = spark.conf.get("spark.sql.session.timeZone")
-    spark.conf.set("spark.sql.session.timeZone", request.param)
+    orig = get_current_time_zone()
+    set_current_time_zone(request.param)
     yield
-    spark.conf.set("spark.sql.session.timeZone", orig)
+    set_current_time_zone(orig)
 
 
 @pytest.fixture

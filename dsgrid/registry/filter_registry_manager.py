@@ -5,8 +5,8 @@ from sqlalchemy import Connection
 
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
+from dsgrid.spark.functions import is_dataframe_empty
 from dsgrid.utils.timing import track_timing, timer_stats_collector
-from dsgrid.registry.registry_interface import commit_manager
 from .registry_manager import RegistryManager
 
 
@@ -26,7 +26,7 @@ class FilterRegistryManager(RegistryManager):
             Filter all configs and data according to this model.
         """
         if conn is None:
-            with commit_manager(self.project_manager.db.engine) as conn:
+            with self.project_manager.db.engine.begin() as conn:
                 self._filter(conn, simple_model)
         else:
             self._filter(conn, simple_model)
@@ -69,13 +69,15 @@ class FilterRegistryManager(RegistryManager):
                 project_config.model.datasets.pop(index)
                 changed_project = True
             for simple_dim in project.dimensions.base_dimensions:
-                dim = project_config.get_base_dimension(simple_dim.dimension_type)
-                dim.model.records = handle_dimension(simple_dim, dim)
-                self.dimension_manager.db.replace(conn, dim.model)
+                for dim in project_config.list_base_dimensions(
+                    dimension_type=simple_dim.dimension_type
+                ):
+                    dim.model.records = handle_dimension(simple_dim, dim)
+                    self.dimension_manager.db.replace(conn, dim.model)
 
             for simple_dim in project.dimensions.supplemental_dimensions:
                 for dim in project_config.list_supplemental_dimensions(simple_dim.dimension_type):
-                    if dim.model.dimension_query_name == simple_dim.dimension_query_name:
+                    if dim.model.name == simple_dim.dimension_name:
                         dim.model.records = handle_dimension(simple_dim, dim)
                         self.dimension_manager.db.replace(conn, dim.model)
             if changed_project:
@@ -110,7 +112,7 @@ class FilterRegistryManager(RegistryManager):
                     changed = True
 
             # TODO: probably need to remove a dimension mapping if it is empty
-            if records is not None and changed and not records.rdd.isEmpty():
+            if records is not None and changed and not is_dataframe_empty(records):
                 mapping.model.records = [x.asDict() for x in records.collect()]
                 self.dimension_mapping_manager.db.replace(conn, mapping.model)
                 logger.info(

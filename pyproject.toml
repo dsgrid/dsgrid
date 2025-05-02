@@ -9,7 +9,7 @@ copyright = "Copyright 2023, The Alliance for Sustainable Energy, LLC"
 description = "Python API for accessing demand-side grid model (dsgrid) datasets"
 url = "https://github.com/dsgrid/dsgrid"
 requires-python = ">=3.11"
-license = {file = "LICENSE"}
+license = { file = "LICENSE" }
 readme = "README.md"
 keywords = ["dsgrid"]
 authors = [
@@ -18,9 +18,7 @@ authors = [
     {name = "Meghan Mooney", email = "meghan.mooney@nrel.gov"},
     {name = "Daniel Thom", email = "daniel.thom@nrel.gov"},
 ]
-maintainers = [
-    {name = "Elaine Hale", email = "elaine.hale@nrel.gov"}
-]
+maintainers = [{name = "Elaine Hale", email = "elaine.hale@nrel.gov"}]
 include_package_data = true
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -34,16 +32,17 @@ dependencies = [
     # "awscliv2",
     # "boto3",
     # "s3path",
+    "chronify ~= 0.3.0",
     "click>=8",
     "dash",
     "dash_bootstrap_components",
+    "duckdb >= 1, < 2",
     "fastapi",
     "json5",
     "pandas",
     "prettytable",
     "pyarrow",
     "pydantic~=2.9.2",
-    "pyspark==3.5.2",  # Keep this synced with the spark version in Dockerfile.
     "requests",
     "rich_click",
     "semver",
@@ -59,6 +58,14 @@ path = "dsgrid/__init__.py"
 allow-direct-references = true
 
 [project.optional-dependencies]
+spark = [
+    "chronify[spark]",
+    "pyhive @ git+https://github.com/apache/kyuubi.git#egg=pyhive&subdirectory=python",
+    "pyspark==3.5.4",  # Keep this synced with the spark version in Dockerfile.
+    "thrift",
+    "thrift_sasl",
+]
+
 dev = [
     "httpx",  # starlette, used by fastapi, requires this as an optional dependency for testing.
     "pytest",
@@ -67,6 +74,7 @@ dev = [
     "pre-commit",
     "devtools",
     "flake8",
+    "mypy",
     "pyarrow",
 ]
 
@@ -74,6 +82,7 @@ doc = [
     "furo",
     "ghp-import",
     "numpydoc",
+    "pandas-stubs",
     "sphinx~=7.2",
     "sphinx-click~=5.0",
     "sphinx-copybutton~=0.5.2",
@@ -83,11 +92,7 @@ doc = [
     "autodoc_pydantic[erdantic]~=2.0",
 ]
 
-release = [
-    "twine",
-    "setuptools",
-    "wheel",
-]
+release = ["twine", "setuptools", "wheel"]
 
 [project.scripts]
 dsgrid = "dsgrid.cli.dsgrid:cli"
@@ -99,10 +104,11 @@ dsgrid-admin = "dsgrid.cli.dsgrid_admin:cli"
 [tool.pytest.ini_options]
 minversion = "6.0"
 addopts = "-ra"
-testpaths = [
-    "tests",
-]
+testpaths = ["tests"]
 
 [tool.black]
 line-length = 99
 target-version = ['py311']
+
+[tool.mypy]
+plugins = "pydantic.mypy"

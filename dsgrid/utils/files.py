@@ -4,6 +4,7 @@ import hashlib
 import logging
 import os
 import json
+import shutil
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
@@ -34,6 +35,16 @@ def compute_hash(text: bytes):
     hash_obj = hashlib.sha256()
     hash_obj.update(text)
     return hash_obj.hexdigest()
+
+
+def delete_if_exists(path: Path | str) -> None:
+    """Delete a file or directory if it exists."""
+    path = Path(path) if isinstance(path, str) else path
+    if path.exists():
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
 
 
 def dump_data(data, filename, **kwargs):
@@ -112,7 +123,7 @@ def load_line_delimited_json(filename):
 
     """
     objects = []
-    with open(filename) as f_in:
+    with open(filename, encoding="utf-8-sig") as f_in:
         for i, line in enumerate(f_in):
             text = line.strip()
             if not text:

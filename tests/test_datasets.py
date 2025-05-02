@@ -1,5 +1,6 @@
 import copy
 import getpass
+import json
 import logging
 import os
 import shutil
@@ -9,14 +10,24 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from chronify import InvalidTable
 
+from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
 from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
 )
-from dsgrid.utils.files import dump_line_delimited_json, load_line_delimited_json, load_data
+from dsgrid.utils.files import (
+    dump_line_delimited_json,
+    load_line_delimited_json,
+    load_data,
+    delete_if_exists,
+)
 from dsgrid.tests.make_us_data_registry import make_test_data_registry
+from dsgrid.tests.common import (
+    STANDARD_SCENARIOS_PROJECT_REPO,
+)
 
 logger = logging.getLogger()
 
@@ -123,8 +134,7 @@ def register_and_submit_dataset(setup_registry_single):
         missing_record_file = Path(
             f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
         )
-        if missing_record_file.exists():
-            shutil.rmtree(missing_record_file)
+        delete_if_exists(missing_record_file)
 
 
 def test_invalid_load_data_lookup_column_name(register_dataset):
@@ -182,8 +192,8 @@ def test_invalid_load_data_missing_timestamp(register_dataset):
                 f_out.write(line)
                 f_out.write("\n")
 
-    expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = r"load_data timestamps do not match expected times"
+    expected_errors["exception"] = InvalidTable
+    expected_errors["match_msg"] = r"Actual timestamps do not match expected timestamps"
 
 
 def test_invalid_load_data_id_missing_timestamp(register_dataset):
@@ -192,10 +202,8 @@ def test_invalid_load_data_id_missing_timestamp(register_dataset):
     # Remove one row/timestamp for one load data array.
     text = "\n".join(data_file.read_text().splitlines()[:-1])
     data_file.write_text(text)
-    expected_errors["exception"] = DSGInvalidDataset
-    expected_errors[
-        "match_msg"
-    ] = r"All time arrays must be repeated the same number of times: unique timestamp repeats =.*"
+    expected_errors["exception"] = InvalidTable
+    expected_errors["match_msg"] = r"The count of time values in each time array must be"
 
 
 def test_invalid_load_data_id_extra_timestamp(register_dataset):
@@ -211,8 +219,8 @@ def test_invalid_load_data_id_extra_timestamp(register_dataset):
     with open(data_file, "a") as f_out:
         f_out.write(",".join([str(x) for x in new_row]))
         f_out.write("\n")
-    expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = r"load_data timestamps do not match expected times"
+    expected_errors["exception"] = InvalidTable
+    expected_errors["match_msg"] = r"Actual timestamps do not match expected timestamps"
 
 
 def test_invalid_load_data_null_id(register_dataset):
@@ -326,5 +334,23 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
         missing_record_file = Path(
             f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
         )
-        if missing_record_file.exists():
-            shutil.rmtree(missing_record_file)
+        delete_if_exists(missing_record_file)
+
+
+def test_invalid_dataset_id(tmp_path):
+    config_file = (
+        STANDARD_SCENARIOS_PROJECT_REPO
+        / "dsgrid_project"
+        / "datasets"
+        / "modeled"
+        / "comstock"
+        / "dataset.json5"
+    )
+    DatasetConfigModel.load(config_file)
+
+    data = load_data(config_file)
+    data["dataset_id"] = "123invalid"
+    filename = tmp_path / "dataset.json5"
+    filename.write_text(json.dumps(data), encoding="utf-8")
+    with pytest.raises(ValueError):
+        DatasetConfigModel.load(filename)

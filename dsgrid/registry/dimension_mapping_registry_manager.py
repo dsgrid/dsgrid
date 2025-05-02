@@ -7,7 +7,6 @@ from pathlib import Path
 from uuid import uuid4
 
 from prettytable import PrettyTable
-import pyspark.sql.functions as F
 from sqlalchemy import Connection
 
 from dsgrid.config.mapping_tables import MappingTableConfig
@@ -17,6 +16,7 @@ from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
 )
+from dsgrid.spark.types import F
 from dsgrid.registry.registry_interface import DimensionMappingRegistryInterface
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
 from dsgrid.utils.spark import models_to_dataframe
@@ -219,7 +219,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         mapping_sum_df = (
             mapping_df.groupBy(group_by)
             .agg(F.sum("from_fraction").alias("sum_fraction"))
-            .sort(F.desc("sum_fraction"), group_by)
+            .sort("sum_fraction", group_by)
         )
         fracs_greater_than_one = mapping_sum_df.filter((F.col("sum_fraction") - 1.0) > tolerance)
         fracs_less_than_one = mapping_sum_df.filter(1.0 - F.col("sum_fraction") > tolerance)
@@ -261,8 +261,10 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         return config
 
     def load_dimension_mappings(
-        self, dimension_mapping_references, conn: Optional[Connection] = None
-    ):
+        self,
+        dimension_mapping_references: list[DimensionMappingReferenceModel],
+        conn: Optional[Connection] = None,
+    ) -> dict[ConfigKey, MappingTableConfig]:
         """Load dimension_mappings from files.
 
         Parameters
@@ -276,7 +278,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             ConfigKey to DimensionMappingConfig
 
         """
-        mappings = {}
+        mappings: dict[ConfigKey, MappingTableConfig] = {}
         for ref in dimension_mapping_references:
             key = ConfigKey(ref.mapping_id, ref.version)
             mappings[key] = self.get_by_id(key.id, version=key.version, conn=conn)
@@ -285,7 +287,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
     def make_dimension_mapping_references(
         self, mapping_ids: list[str], conn: Optional[Connection] = None
-    ):
+    ) -> list[DimensionMappingReferenceModel]:
         """Return a list of dimension mapping references from a list of registered mapping IDs.
 
         Parameters
@@ -317,7 +319,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             config = DimensionMappingsConfig.load(config_file)
             return self.register_from_config(config, context)
 
-    @track_timing(timer_stats_collector)
     def register_from_config(
         self,
         config: DimensionMappingsConfig,

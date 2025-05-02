@@ -1,19 +1,31 @@
 import logging
 from pathlib import Path
 
-import pyspark.sql.functions as F
-from pyspark.sql import DataFrame
-from pyspark.sql.types import StringType
-
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
+from dsgrid.spark.functions import (
+    cache,
+    coalesce,
+    collect_list,
+    cross_join,
+    except_all,
+    intersect,
+    is_dataframe_empty,
+    unpersist,
+)
+from dsgrid.spark.types import (
+    DataFrame,
+    StringType,
+)
 from dsgrid.utils.dataset import (
+    add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -48,8 +60,17 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(self):
         self._check_lookup_data_consistency()
-        self._check_dataset_time_consistency(self._load_data.join(self._load_data_lookup, on="id"))
         self._check_dataset_internal_consistency()
+
+    @track_timing(timer_stats_collector)
+    def check_time_consistency(self):
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        if time_dim.supports_chronify():
+            self._check_dataset_time_consistency_with_chronify()
+        else:
+            self._check_dataset_time_consistency(
+                self._load_data.join(self._load_data_lookup, on="id")
+            )
 
     def make_dimension_association_table(self) -> DataFrame:
         lk_df = self._load_data_lookup.filter("id is not NULL")
@@ -57,14 +78,16 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         df = self._load_data.select("id", *dim_cols).distinct()
         df = df.join(lk_df, on="id").drop("id")
         df = self._remap_dimension_columns(df).drop("fraction")
-        null_lk_df = (
-            self._remap_dimension_columns(self._load_data_lookup.filter("id is NULL"))
-            .drop("fraction")
-            .crossJoin(df.select(*dim_cols).distinct())
+        null_lk_df = self._remap_dimension_columns(
+            self._load_data_lookup.filter("id is NULL")
+        ).drop("fraction")
+        return add_null_rows_from_load_data_lookup(
+            df, cross_join(null_lk_df, df.select(*dim_cols).distinct())
         )
-        return self._add_null_values(df, null_lk_df)
 
-    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
+    def make_project_dataframe(
+        self, project_config: ProjectConfig, scratch_dir_context: ScratchDirContext
+    ):
         # TODO: Can we remove NULLs at registration time?
         null_lk_df = self._load_data_lookup.filter("id is NULL")
         lk_df = self._load_data_lookup.filter("id is not NULL")
@@ -74,20 +97,19 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         # TODO: This might need to handle data skew in the future.
         null_lk_df = self._remap_dimension_columns(null_lk_df)
         ld_df = self._remap_dimension_columns(ld_df, scratch_dir_context=scratch_dir_context)
-        value_columns = {VALUE_COLUMN}
         if SCALING_FACTOR_COLUMN in ld_df.columns:
-            ld_df = apply_scaling_factor(ld_df, value_columns)
-        ld_df = self._apply_fraction(ld_df, value_columns)
-        project_metric_records = project_config.get_base_dimension(
-            DimensionType.METRIC
-        ).get_records_dataframe()
-        ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
+            ld_df = apply_scaling_factor(ld_df, VALUE_COLUMN)
+        ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
+        project_metric_records = self._get_project_metric_records(project_config)
+        ld_df = self._convert_units(ld_df, project_metric_records)
         ld_df = self._convert_time_dimension(
-            ld_df, project_config, value_columns, scratch_dir_context
+            ld_df, project_config, VALUE_COLUMN, scratch_dir_context
         )
-        return self._add_null_values(ld_df, null_lk_df)
+        return add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
 
-    def make_project_dataframe_from_query(self, context: QueryContext, project_config):
+    def make_project_dataframe_from_query(
+        self, context: QueryContext, project_config: ProjectConfig
+    ):
         lk_df = self._load_data_lookup
         ld_df = self._load_data
 
@@ -103,32 +125,20 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             handle_data_skew=True,
             scratch_dir_context=context.scratch_dir_context,
         )
-        value_columns = {VALUE_COLUMN}
         if "scaling_factor" in ld_df.columns:
-            ld_df = apply_scaling_factor(ld_df, value_columns)
+            ld_df = apply_scaling_factor(ld_df, VALUE_COLUMN)
 
-        ld_df = self._apply_fraction(ld_df, value_columns)
-        project_metric_records = project_config.get_base_dimension(
-            DimensionType.METRIC
-        ).get_records_dataframe()
-        ld_df = self._convert_units(ld_df, project_metric_records, value_columns)
+        ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
+        project_metric_records = self._get_project_metric_records(project_config)
+        ld_df = self._convert_units(ld_df, project_metric_records)
         null_lk_df = self._remap_dimension_columns(
             null_lk_df, filtered_records=context.get_record_ids()
         )
         ld_df = self._convert_time_dimension(
-            ld_df, project_config, value_columns, context.scratch_dir_context
+            ld_df, project_config, VALUE_COLUMN, context.scratch_dir_context
         )
-        ld_df = self._add_null_values(ld_df, null_lk_df)
+        ld_df = add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
         return self._finalize_table(context, ld_df, project_config)
-
-    @staticmethod
-    def _add_null_values(ld_df, null_lk_df):
-        if not null_lk_df.rdd.isEmpty():
-            for col in set(ld_df.columns).difference(null_lk_df.columns):
-                null_lk_df = null_lk_df.withColumn(col, F.lit(None))
-            ld_df = ld_df.union(null_lk_df.select(*ld_df.columns))
-
-        return ld_df
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):
@@ -190,16 +200,36 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def _check_dataset_internal_consistency(self):
         """Check load_data dimensions and id series."""
         logger.info("Check dataset internal consistency.")
-        match self._config.get_table_format_type():
-            case TableFormatType.PIVOTED:
-                self._check_load_data_pivoted_columns()
-            case TableFormatType.UNPIVOTED:
-                self._check_load_data_unpivoted_value_column(self._load_data)
+        assert (
+            self._config.get_table_format_type() == TableFormatType.UNPIVOTED
+        ), self._config.get_table_format_type()
+        self._check_load_data_unpivoted_value_column(self._load_data)
+
+        time_dim = self._config.get_dimension(DimensionType.TIME)
+        time_columns = set(time_dim.get_load_data_time_columns())
+        allowed_columns = (
+            DimensionType.get_allowed_dimension_column_names()
+            .union(time_columns)
+            .union({VALUE_COLUMN, "id", "scaling_factor"})
+        )
+
+        found_id = False
+        for column in self._load_data.columns:
+            if column not in allowed_columns:
+                msg = f"{column=} is not expected in load_data"
+                raise DSGInvalidDataset(msg)
+            if column == "id":
+                found_id = True
+
+        if not found_id:
+            msg = "load_data does not include an 'id' column"
+            raise DSGInvalidDataset(msg)
+
         ld_ids = self._load_data.select("id").distinct()
         ldl_ids = self._load_data_lookup.select("id").distinct()
 
         with Timer(timer_stats_collector, "check load_data for nulls"):
-            if not self._load_data.select("id").filter("id is NULL").rdd.isEmpty():
+            if not is_dataframe_empty(self._load_data.select("id").filter("id is NULL")):
                 raise DSGInvalidDataset(
                     f"load_data for dataset {self._config.config_id} has a null ID"
                 )
@@ -213,59 +243,27 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         if data_id_count != count:
             with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
-                diff = ld_ids.unionAll(ldl_ids).exceptAll(ld_ids.intersect(ldl_ids))
-                # TODO: Starting with Python 3.10 and Spark 3.3.0, this fails unless we call cache.
-                # Works fine on Python 3.9 and Spark 3.2.0. Haven't debugged further.
-                # The size should not cause a problem.
-                diff.cache()
+                diff = except_all(ld_ids.unionAll(ldl_ids), intersect(ld_ids, ldl_ids))
+                # Only run the query once (with Spark). Number of rows shouldn't be a problem.
+                cache(diff)
                 diff_count = diff.count()
                 limit = 100
-                if diff_count < limit:
-                    diff_list = diff.collect()
-                else:
-                    diff_list = diff.limit(limit).collect()
+                diff_list = diff.limit(limit).collect()
+                unpersist(diff)
                 logger.error(
-                    "load_data and load_data_lookup have %s different IDs: %s",
+                    "load_data and load_data_lookup have %s different IDs. Limited to %s: %s",
                     diff_count,
+                    limit,
                     diff_list,
                 )
             raise DSGInvalidDataset(
                 f"Data IDs for {self._config.config_id} data/lookup are inconsistent"
             )
 
-    def _check_load_data_pivoted_columns(self):
-        logger.info("Check load data pivoted columns.")
-        dim_type = self._config.get_pivoted_dimension_type()
-        dimension_records = set(self._config.get_pivoted_dimension_columns())
-        time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_columns = set(time_dim.get_load_data_time_columns())
-
-        found_id = False
-        pivoted_cols = set()
-        for col in self._load_data.columns:
-            if col == "id":
-                found_id = True
-                continue
-            if col in time_columns:
-                continue
-            if col in dimension_records:
-                pivoted_cols.add(col)
-            else:
-                raise DSGInvalidDataset(f"column={col} is not expected in load_data.")
-
-        if not found_id:
-            raise DSGInvalidDataset("load_data does not include an 'id' column")
-
-        if dimension_records != pivoted_cols:
-            missing = dimension_records.difference(pivoted_cols)
-            raise DSGInvalidDataset(
-                f"load_data is missing {missing} columns for dimension={dim_type.value} based on records."
-            )
-
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel]):
         lookup = self._load_data_lookup
-        lookup.cache()
+        cache(lookup)
         load_df = self._load_data
         lookup_columns = set(lookup.columns)
         for dim in dimensions:
@@ -281,12 +279,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             drop_columns.append(col)
         lookup = lookup.drop(*drop_columns)
 
-        lookup2 = lookup.coalesce(1)
+        lookup2 = coalesce(lookup, 1)
         lookup2 = overwrite_dataframe_file(self._config.load_data_lookup_path, lookup2)
-        lookup.unpersist()
+        unpersist(lookup)
         logger.info("Rewrote simplified %s", self._config.load_data_lookup_path)
-        ids = next(iter(lookup2.select("id").distinct().select(F.collect_list("id")).first()))
-
+        ids = collect_list(lookup2.select("id").distinct(), "id")
         load_df = self._load_data.filter(self._load_data.id.isin(ids))
         ld_columns = set(load_df.columns)
         for dim in dimensions:

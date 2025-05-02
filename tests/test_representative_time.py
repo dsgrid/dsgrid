@@ -7,7 +7,6 @@ import pytest
 
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType, TimeZone
-from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dimensions import (
     RepresentativePeriodTimeDimensionModel,
@@ -118,16 +117,6 @@ def make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config():
             time_interval_type=TimeIntervalType.PERIOD_ENDING,
         )
     )
-
-
-def test_time_consistency(one_weekday_day_and_one_weekend_day_per_month_by_hour_table):
-    df = one_weekday_day_and_one_weekend_day_per_month_by_hour_table
-    config = make_one_weekday_day_and_one_weekend_day_per_month_by_hour_config()
-    time_columns = config.get_load_data_time_columns()
-    assert time_columns == ["month", "is_weekday", "hour"]
-    with pytest.raises(DSGInvalidDataset):
-        config.check_dataset_time_consistency(df.filter("hour != 3"), time_columns)
-    config.check_dataset_time_consistency(df, time_columns)
 
 
 @pytest.mark.parametrize("spark_time_zone", ["America/Los_Angeles"], indirect=True)

@@ -167,7 +167,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @track_timing(timer_stats_collector)
-    def _check_dataset_time_consistency(self, load_data_df):
+    def _check_dataset_time_consistency(self, load_data_df: DataFrame):
         """Check dataset time consistency such that:
         1. time range(s) match time config record;
         2. all dimension combinations return the same set of time range(s).
@@ -178,7 +178,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             return
 
         logger.info("Check dataset time consistency.")
-        time_dim = self._config.get_dimension(DimensionType.TIME)
+        time_dim = self._config.get_time_dimension()
         time_cols = self._get_time_dimension_columns()
         time_dim.check_dataset_time_consistency(load_data_df, time_cols)
         if not isinstance(time_dim, NoOpTimeDimensionConfig):
@@ -226,7 +226,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             # If there are multiple weather years:
             #   - that are continuous, weather year needs to be excluded (one overall range).
             #   - that are not continuous, weather year needs to be included and chronify
-            #     needs additional support. TODO
+            #     needs additional support. TODO: issue #340
             if x != DimensionType.WEATHER_YEAR.value
             and x
             in set(df.columns).difference(time_cols).difference(self._config.get_value_columns())

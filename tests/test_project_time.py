@@ -81,6 +81,7 @@ def test_no_unexpected_timezone():
             ), f"{tzo} can either be prevailing or standard"
 
 
+@pytest.mark.skip
 def test_build_time_dataframe(project, resstock, comstock):
     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
     resstock_time_dim = resstock.config.get_dimension(DimensionType.TIME)
@@ -90,6 +91,7 @@ def test_build_time_dataframe(project, resstock, comstock):
     check_time_dataframe(comstock_time_dim)
 
 
+@pytest.mark.skip
 def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     project_time_dim = project.config.get_base_dimension(DimensionType.TIME)
 

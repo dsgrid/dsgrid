@@ -1435,8 +1435,8 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
     "--project-id",
     required=False,
     type=str,
-    help="Project ID, optional. If provided, generate dimension mapping files based on a "
-    "comparison with the project.",
+    help="Project ID, optional. If provided, prioritize project base dimensions when "
+    "searching for matching dimensions.",
 )
 @click.option(
     "-n",
@@ -1473,9 +1473,8 @@ def generate_dataset_config_from_dataset(
 
     Fill out the dimension record files based on the unique values in the dataset.
 
-    Look for matches for dimensions in the registry, checking for project base dimensions
-    first. Prompt the user for confirmation unless --no-prompts is set. If --no-prompts is
-    set, the first match is automatically accepted.
+    Look for matches for dimensions in the registry. Prompt the user for confirmation unless
+    --no-prompts is set. If --no-prompts is set, the first match is automatically accepted.
     """
     res = handle_dsgrid_exception(
         ctx,

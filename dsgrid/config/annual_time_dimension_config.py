@@ -157,7 +157,9 @@ def map_annual_time_to_date_time(
     assert len(time_cols) == 1, time_cols
     time_col = time_cols[0]
     schema = StructType([StructField(time_col, TimestampType(), False)])
-    dt_df = get_spark_session().createDataFrame([(x,) for x in timestamps], schema=schema)
+    dt_df = get_spark_session().createDataFrame(
+        [(x.to_pydatetime(),) for x in timestamps], schema=schema
+    )
 
     # Note that MeasurementType.TOTAL has already been verified.
     with set_session_time_zone(dt_dim.model.datetime_format.timezone.tz_name):

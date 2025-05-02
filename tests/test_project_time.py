@@ -459,5 +459,7 @@ def make_date_time_df(
     assert len(project_time_cols) == 1, project_time_cols
     time_col = project_time_cols[0]
     schema = StructType([StructField(time_col, TimestampType(), False)])
-    df = get_spark_session().createDataFrame([(x,) for x in timestamps], schema=schema)
+    df = get_spark_session().createDataFrame(
+        [(x.to_pydatetime(),) for x in timestamps], schema=schema
+    )
     return df, timestamps

@@ -3,6 +3,7 @@ from dsgrid.dimension.base_models import DimensionType
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli as cli
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.tests.common import TEST_PROJECT_PATH
 from dsgrid.utils.files import load_data
 
@@ -27,6 +28,8 @@ def test_generate_dataset_config_pivoted_matches(cached_registry, tmp_path):
         "standard",
         "--pivoted-dimension-type",
         "metric",
+        "--time-type",
+        TimeDimensionType.DATETIME.value,
         "--time-columns",
         "timestamp",
         "--output",

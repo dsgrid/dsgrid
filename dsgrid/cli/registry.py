@@ -16,6 +16,7 @@ from semver import VersionInfo
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.registration_models import RegistrationModel, RegistrationJournal
 from dsgrid.registry.common import DatabaseConnection, VersionUpdateType
@@ -1168,6 +1169,15 @@ $ dsgrid registry projects generate-config \\ \n
     help="Project description, optional",
 )
 @click.option(
+    "-t",
+    "--time-type",
+    type=click.Choice([x.value for x in TimeDimensionType]),
+    default=TimeDimensionType.DATETIME.value,
+    show_default=True,
+    help="Type of the time dimension",
+    callback=lambda *x: TimeDimensionType(x[2]),
+)
+@click.option(
     "-o",
     "--output",
     type=click.Path(),
@@ -1191,6 +1201,7 @@ def generate_project_config_from_ids(
     dataset_ids: tuple[str],
     name: str | None,
     description: str | None,
+    time_type: TimeDimensionType,
     output: Path | None,
     overwrite: bool,
 ):
@@ -1202,6 +1213,7 @@ def generate_project_config_from_ids(
         dataset_ids,
         name=name,
         description=description,
+        time_type=time_type,
         output_directory=output,
         overwrite=overwrite,
     )
@@ -1407,12 +1419,21 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
     callback=lambda *x: DataSchemaType(x[2]),
 )
 @click.option(
-    "-t",
+    "-p",
     "--pivoted-dimension-type",
     type=click.Choice([x.value for x in DimensionType if x != DimensionType.TIME]),
     default=None,
     callback=lambda *x: None if x[2] is None else DimensionType(x[2]),
     help="Optional, if one dimension has its records pivoted as columns, its type.",
+)
+@click.option(
+    "-t",
+    "--time-type",
+    type=click.Choice([x.value for x in TimeDimensionType]),
+    default=TimeDimensionType.DATETIME.value,
+    show_default=True,
+    help="Type of the time dimension",
+    callback=lambda *x: TimeDimensionType(x[2]),
 )
 @click.option(
     "-T",
@@ -1463,6 +1484,7 @@ def generate_dataset_config_from_dataset(
     dataset_path: Path,
     schema_type: DataSchemaType,
     pivoted_dimension_type: DimensionType | None,
+    time_type: TimeDimensionType,
     time_columns: tuple[str],
     output: Path | None,
     project_id: str | None,
@@ -1484,6 +1506,7 @@ def generate_dataset_config_from_dataset(
         dataset_path,
         schema_type,
         pivoted_dimension_type=pivoted_dimension_type,
+        time_type=time_type,
         time_columns=set(time_columns),
         output_directory=output,
         project_id=project_id,

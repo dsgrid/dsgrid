@@ -1,3 +1,4 @@
+from dsgrid.dimension.time import TimeDimensionType
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli as cli
@@ -20,6 +21,8 @@ def test_generate_project_config(cached_registry, tmp_path):
         "generate-config",
         "--description",
         description,
+        "--time-type",
+        TimeDimensionType.DATETIME.value,
         "--output",
         str(tmp_path),
         project_id,

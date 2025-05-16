@@ -11,6 +11,7 @@ from dsgrid.config.dataset_config import (
 )
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.files import dump_data
@@ -27,6 +28,7 @@ def generate_config_from_dataset(
     dataset_path: Path,
     schema_type: DataSchemaType,
     pivoted_dimension_type: DimensionType | None = None,
+    time_type: TimeDimensionType = TimeDimensionType.DATETIME,
     time_columns: set[str] | None = None,
     output_directory: Path | None = None,
     project_id: str | None = None,
@@ -72,7 +74,9 @@ def generate_config_from_dataset(
         else:
             dimension_references.append(ref)
 
-    config = make_unvalidated_dataset_config(dataset_id, dimension_references=dimension_references)
+    config = make_unvalidated_dataset_config(
+        dataset_id, dimension_references=dimension_references, time_type=time_type
+    )
     dump_data(config, dataset_file, indent=2)
     logger.info("Wrote dataset config to %s", dataset_file)
 

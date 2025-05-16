@@ -22,6 +22,7 @@ from dsgrid.dimension.base_models import (
     DimensionCategory,
     DimensionType,
 )
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
     DSGInvalidField,
@@ -732,6 +733,7 @@ def make_unvalidated_project_config(
     dataset_ids: Iterable[str],
     name: str | None = None,
     description: str | None = None,
+    time_type: TimeDimensionType = TimeDimensionType.DATETIME,
 ) -> dict[str, Any]:
     """Create a project config as a dictionary, skipping validation."""
     return {
@@ -739,7 +741,7 @@ def make_unvalidated_project_config(
         "name": name or "",
         "description": description or "",
         "dimensions": {
-            "base_dimensions": make_base_dimension_template(),
+            "base_dimensions": make_base_dimension_template(time_type=time_type),
             "subset_dimensions": [],
             "supplemental_dimensions": [],
         },

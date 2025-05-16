@@ -4,6 +4,7 @@ from typing import Iterable
 
 from chronify.utils.path_utils import check_overwrite
 
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.files import dump_data
 from dsgrid.config.project_config import make_unvalidated_project_config
 
@@ -16,6 +17,7 @@ def generate_project_config(
     dataset_ids: Iterable[str],
     name: str | None = None,
     description: str | None = None,
+    time_type: TimeDimensionType = TimeDimensionType.DATETIME,
     output_directory: Path | None = None,
     overwrite: bool = False,
 ):
@@ -37,7 +39,7 @@ def generate_project_config(
     (project_dir / "dimension_mappings").mkdir()
 
     config = make_unvalidated_project_config(
-        project_id, dataset_ids, name=name, description=description
+        project_id, dataset_ids, name=name, description=description, time_type=time_type
     )
     dump_data(config, project_file, indent=2)
     logger.info(

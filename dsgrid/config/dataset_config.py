@@ -12,6 +12,7 @@ from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionBaseCon
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.exceptions import DSGInvalidParameter, DSGValueNotRegistered
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
@@ -457,7 +458,8 @@ def make_unvalidated_dataset_config(
     table_format: dict[str, str] | None = None,
     data_classification=DataClassificationType.MODERATE.value,
     dataset_type=InputDatasetType.MODELED,
-    use_project_geography_time_zone=False,
+    time_type: TimeDimensionType = TimeDimensionType.DATETIME,
+    use_project_geography_time_zone: bool = False,
     dimension_references: list[DimensionReferenceModel] | None = None,
     trivial_dimensions: list[DimensionType] | None = None,
 ) -> dict[str, Any]:
@@ -465,8 +467,7 @@ def make_unvalidated_dataset_config(
     table_format_ = table_format or UnpivotedTableFormatModel().model_dump()
     trivial_dimensions_ = trivial_dimensions or []
     exclude_dimension_types = {x.dimension_type for x in dimension_references or []}
-    exclude_dimension_types.add(DimensionType.TIME)
-    dimensions = make_base_dimension_template(exclude_dimension_types)
+    dimensions = make_base_dimension_template(exclude_dimension_types, time_type=time_type)
     return {
         "dataset_id": dataset_id,
         "dataset_type": dataset_type.value,

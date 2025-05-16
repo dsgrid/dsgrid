@@ -10,7 +10,7 @@ from dsgrid.utils.files import load_data
 
 def test_generate_dataset_config_pivoted_matches(cached_registry, tmp_path):
     conn = cached_registry
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     dataset_id = "comstock"
     output_dir = tmp_path / dataset_id
     assert not output_dir.exists()
@@ -54,7 +54,7 @@ def test_generate_dataset_config_pivoted_matches(cached_registry, tmp_path):
 
 def test_generate_dataset_config_unpivoted_matches(cached_registry, tmp_path):
     conn = cached_registry
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     dataset_id = "comstock_unpivoted"
     output_dir = tmp_path / dataset_id
     assert not output_dir.exists()
@@ -92,7 +92,7 @@ def test_generate_dataset_config_unpivoted_matches(cached_registry, tmp_path):
 
 def test_generate_dataset_config_partial_matches(cached_registry, tmp_path):
     conn = cached_registry
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     dataset_id = "comstock_conus_2022_projected"
     output_dir = tmp_path / dataset_id
     assert not output_dir.exists()

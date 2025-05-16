@@ -7,7 +7,7 @@ from dsgrid.utils.files import load_data
 
 def test_generate_project_config(cached_registry, tmp_path):
     conn = cached_registry
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     project_id = "my_project"
     dataset_ids = ["d1", "d2", "d3"]
     description = "This is a test project"

@@ -87,7 +87,7 @@ def test_create_derived_dataset_config(tmp_path):
     conn = DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB)
     dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         cli,
         [

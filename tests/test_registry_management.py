@@ -295,7 +295,7 @@ fans,x
     subset_data_file.write_text(subset_dimensions_data, encoding="utf-8")
 
     url = f"sqlite:///{project_mgr.db.engine.url.database}"
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         cli,
         [
@@ -368,7 +368,7 @@ def test_add_supplemental_dimension(mutable_cached_registry, tmp_path):
                 f.write(f"{county_id},{region}\n")
 
     url = f"sqlite:///{project_mgr.db.engine.url.database}"
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         cli,
         [
@@ -403,7 +403,7 @@ def test_remove_dataset(mutable_cached_registry):
     assert config.model.datasets[0].status == DatasetRegistryStatus.REGISTERED
 
     url = f"sqlite:///{project_mgr.db.engine.url.database}"
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         cli_admin,
         [
@@ -436,7 +436,7 @@ def test_add_dataset_requirements(mutable_cached_registry, tmp_path):
         f.write(model.model_dump_json())
 
     url = f"sqlite:///{project_mgr.db.engine.url.database}"
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         cli,
         [
@@ -499,7 +499,7 @@ def test_replace_dataset_dimension_requirements(mutable_cached_registry, tmp_pat
         f.write(model.model_dump_json())
 
     url = f"sqlite:///{project_mgr.db.engine.url.database}"
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         cli,
         [

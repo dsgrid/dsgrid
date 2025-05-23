@@ -25,6 +25,7 @@ from dsgrid.dimension.dimension_filters import (
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.loggers import setup_logging
 from dsgrid.project import Project
+from dsgrid.query.dataset_mapping_plan import MapDimensionOperation
 from dsgrid.query.models import (
     AggregationModel,
     ColumnModel,
@@ -42,6 +43,9 @@ from dsgrid.query.models import (
     ProjectionDatasetModel,
     StandaloneDatasetModel,
     DatasetConstructionMethod,
+)
+from dsgrid.query.dataset_mapping_plan import (
+    DatasetMappingPlan,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
@@ -210,6 +214,20 @@ def test_map_annual_time():
 
 def test_unit_mapping(cached_registry):
     run_query_test(QueryTestUnitMapping)
+
+
+@pytest.mark.parametrize(
+    "inputs",
+    [
+        ("True", "True"),
+        ("True", "False"),
+        ("False", "True"),
+        ("False", "False"),
+    ],
+)
+def test_dataset_mapping_plan_order(inputs):
+    handle_data_skew, persist = inputs
+    run_query_test(QueryTestDatasetMappingPlan, handle_data_skew, persist)
 
 
 def test_invalid_drop_metric_dimension():
@@ -816,6 +834,80 @@ class QueryTestElectricityUse(QueryTestBase):
         else:
             assert False, self._geography
 
+        return True
+
+
+class QueryTestDatasetMappingPlan(QueryTestBase):
+    NAME = "dataset_mapping_plan"
+
+    def __init__(self, handle_data_skew, persist, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._handle_data_skew = handle_data_skew
+        self._persist = persist
+
+    def make_query(self) -> None:
+        self._model = ProjectQueryModel(
+            name=self.NAME,
+            project=ProjectQueryParamsModel(
+                project_id=self.get_project_id(),
+                include_dsgrid_dataset_components=False,
+                dataset=DatasetModel(
+                    dataset_id="tempo_mapped",
+                    source_datasets=[
+                        StandaloneDatasetModel(dataset_id="tempo_conus_2022"),
+                    ],
+                ),
+                mapping_plan=[
+                    DatasetMappingPlan(
+                        dataset_id="tempo_conus_2022",
+                        mappings=[
+                            MapDimensionOperation(
+                                dimension_name="county",
+                                handle_data_skew=self._handle_data_skew,
+                                persist=self._persist,
+                            ),
+                            MapDimensionOperation(
+                                dimension_name="model_year",
+                                handle_data_skew=self._handle_data_skew,
+                                persist=self._persist,
+                            ),
+                            MapDimensionOperation(
+                                dimension_name="end_use",
+                                handle_data_skew=self._handle_data_skew,
+                                persist=self._persist,
+                            ),
+                            MapDimensionOperation(
+                                dimension_name="subsector",
+                                handle_data_skew=self._handle_data_skew,
+                                persist=self._persist,
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+            result=QueryResultParamsModel(
+                aggregations=[
+                    AggregationModel(
+                        dimensions=DimensionNamesModel(
+                            geography=["state"],
+                            metric=["end_uses_by_fuel_type"],
+                            model_year=[],
+                            scenario=[],
+                            sector=[],
+                            subsector=[],
+                            time=[],
+                            weather_year=[],
+                        ),
+                        aggregation_function="sum",
+                    ),
+                ],
+                output_format="parquet",
+                table_format=UnpivotedTableFormatModel(),
+            ),
+        )
+        return self._model
+
+    def validate(self, expected_values=None) -> bool:
         return True
 
 

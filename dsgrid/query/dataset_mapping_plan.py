@@ -1,11 +1,12 @@
-import copy
+# import copy
 import logging
 from pathlib import Path
 
 from pydantic import Field, field_validator
 
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.utils.files import compute_hash
+
+# from dsgrid.utils.files import compute_hash
 from dsgrid.utils.utilities import check_uniqueness
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 
@@ -48,6 +49,8 @@ class MappingJournal(DSGBaseModel):
         self.completed_mappings.append(dimension_name)
         self.table_path = path
         logger.info("Add completed mapping for %s at %s", dimension_name, path)
+        # This isn't fully implemented yet. It might provide some value in debugging
+        # failures.
 
 
 class DatasetMappingPlan(DSGBaseModel):
@@ -65,16 +68,16 @@ class DatasetMappingPlan(DSGBaseModel):
         check_uniqueness((x.dimension_name for x in mappings), "dimension_name")
         return mappings
 
-    def make_model_hash(self) -> tuple[str, str]:
-        """Return a hash that uniquely identifies this map operation.
-        The output can be used to determine if a cached operation can be used.
-        """
-        model = copy.deepcopy(self)
-        model.journal = MappingJournal()
-        for mapping in model.mappings:
-            mapping.handle_data_skew = None
-            mapping.mapping_reference = None
+    # TODO: Proper journal handling is not implemented yet.
+    # def make_model_hash(self) -> tuple[str, str]:
+    #     """Return a hash that uniquely identifies this map operation.
+    #     The output can be used to determine if a cached operation can be used.
+    #     """
+    #     model = copy.deepcopy(self)
+    #     model.journal = MappingJournal()
+    #     for mapping in model.mappings:
+    #         mapping.mapping_reference = None
 
-        text = model.model_dump_json(indent=2)
-        hash_value = compute_hash(text.encode())
-        return text, hash_value
+    #     text = model.model_dump_json(indent=2)
+    #     hash_value = compute_hash(text.encode())
+    #     return text, hash_value

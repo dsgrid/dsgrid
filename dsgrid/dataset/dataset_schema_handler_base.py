@@ -488,45 +488,63 @@ class DatasetSchemaHandlerBase(abc.ABC):
             assert ref.to_dimension_type not in req_dimensions
             req_dimensions[ref.to_dimension_type] = ref
 
+        dataset_id = mapping_plan.dataset_id
         indexes_to_remove: list[int] = []
         for i, mapping in enumerate(mapping_plan.mappings):
             to_dim = project_config.get_dimension(mapping.dimension_name)
             if to_dim.model.dimension_type == DimensionType.TIME:
                 msg = (
-                    "DatasetMappingPlan does not support mapping to a time dimension: "
-                    f"{mapping.dimension_name}"
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because it does not "
+                    f"support mapping to a time dimension: {mapping.dimension_name}"
                 )
                 raise DSGInvalidDimensionMapping(msg)
             if to_dim.model.dimension_type in actual_mapping_dims:
                 msg = (
-                    f"A DatasetMapperModel can only have one dimension for a given "
-                    f"dimension type. type={to_dim.model.dimension_type} "
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because it can only "
+                    f"support mapping one dimension for a given dimension type. "
+                    f"type={to_dim.model.dimension_type} "
                     f"first={actual_mapping_dims[to_dim.model.dimension_type]} "
                     f"second={mapping.dimension_name}"
                 )
                 raise DSGInvalidDimensionMapping(msg)
+
             from_dim = self._config.get_dimension(to_dim.model.dimension_type)
+            supp_dim_names = {
+                x.model.name
+                for x in project_config.list_supplemental_dimensions(to_dim.model.dimension_type)
+            }
+            if mapping.dimension_name in supp_dim_names:
+                # This could be useful if we wanted to use DatasetMappingPlan for mapping
+                # a single dataset to a project's dimensions without being concerned about
+                # aggregrations. As it stands, we can are only using this within our
+                # project query process. We need much more handling to make that work.
+                msg = (
+                    "DatasetMappingPlan for {dataset_id=} is invalid because it does not "
+                    f"support mapping to a supplemental dimension: {mapping.dimension_name}"
+                )
+                # indexes_to_remove.insert(0, i)
+                # logger.info(
+                #     "No mapping is required for dimension %s. The dataset is already at "
+                #     "the project supplemental dimension.",
+                #     from_dim.model.label,
+                # )
+            elif to_dim.model.dimension_type not in req_dimensions:
+                msg = (
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because there is no "
+                    f"dataset-to-project-base mapping defined for {to_dim.model.label}"
+                )
+                raise DSGInvalidDimensionMapping(msg)
 
             ref = req_dimensions[to_dim.model.dimension_type]
             mapping_config = self._dimension_mapping_mgr.get_by_id(
                 ref.mapping_id, version=ref.version, conn=self.connection
             )
-            if from_dim.model.dimension_id == mapping_config.model.to_dimension.dimension_id:
-                indexes_to_remove.insert(0, i)
-                logger.info(
-                    "No mapping is required for dimension type {}",
-                    to_dim.model.dimension_type.value,
-                )
-            elif (
+            if (
                 from_dim.model.dimension_id == mapping_config.model.from_dimension.dimension_id
                 and to_dim.model.dimension_id == mapping_config.model.to_dimension.dimension_id
             ):
                 mapping.mapping_reference = ref
                 actual_mapping_dims[to_dim.model.dimension_type] = mapping.dimension_name
-            else:
-                # TODO DT: what to do here? could be dataset base to project supp
-                msg = f"Mapping dataset dimension base to project supplemental is not implemented yet: {mapping.dimension_name}"
-                raise NotImplementedError(msg)
 
         for index in indexes_to_remove:
             mapping_plan.mappings.pop(index)
@@ -546,7 +564,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _remap_dimension_columns(
         self,
         df: DataFrame,
-        mapper: DatasetMappingPlan,
+        plan: DatasetMappingPlan,
         filtered_records: dict[str, DataFrame] | None = None,
         scratch_dir_context: ScratchDirContext | None = None,
     ) -> DataFrame:
@@ -556,7 +574,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         ----------
         df : DataFrame
             The dataframe to map.
-        mapper : DatasetMapperModel
+        plan : DatasetMappingPlan
             Specifies the order of dimensions to map and any secondary operations.
         filtered_records : dict | None
             If not None, use these records to filter the table.
@@ -567,7 +585,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             If None, do not persist any intermediate tables.
             If not None, use this context to persist intermediate tables if required.
         """
-        for dim_mapping in mapper.mappings:
+        for dim_mapping in plan.mappings:
             assert dim_mapping.mapping_reference is not None
             ref = dim_mapping.mapping_reference
             dim_type = ref.from_dimension_type
@@ -603,7 +621,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         logger.info("Persisted %s to %s", column, persisted_file)
                         df = read_dataframe(persisted_file)
                     if persisted_file is not None:
-                        mapper.journal.add_completed_mapping(
+                        plan.journal.add_completed_mapping(
                             dim_mapping.dimension_name, persisted_file
                         )
 

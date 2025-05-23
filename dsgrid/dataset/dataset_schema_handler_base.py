@@ -138,10 +138,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
         return self._config
 
-    @property
-    def mapping_references(self) -> list[DimensionMappingReferenceModel]:
-        return self._mapping_references
-
     @abc.abstractmethod
     def make_project_dataframe(
         self, project_config, scratch_dir_context: ScratchDirContext

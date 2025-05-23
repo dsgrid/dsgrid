@@ -450,10 +450,11 @@ def repartition_if_needed_by_mapping(
         # could be many instances of zero or null. So, add a new column with random values.
         logger.info("Repartition after mapping %s", mapping_type)
         salted_column = "salted_key"
-        # TODO DT: between 1 and shuffle.partitions?
-        df.withColumn(salted_column, F.rand()).repartition(salted_column).write.parquet(
-            str(filename)
-        )
+        spark = get_spark_session()
+        num_partitions = int(spark.conf.get("spark.sql.shuffle.partitions"))
+        df.withColumn(
+            salted_column, (F.rand() * num_partitions).cast(IntegerType()) + 1
+        ).repartition(salted_column).write.parquet(str(filename))
         df = read_parquet(filename).drop(salted_column)
         logger.info("Completed repartition.")
         return df, filename

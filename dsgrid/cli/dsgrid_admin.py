@@ -136,7 +136,7 @@ Registry Commands
 
 _create_epilog = """
 Examples:\n
-$ dsgrid-admin registry create sqlite:////projects/dsgrid/my_project/registry.db -p /projects/dsgrid/my_project/registry-data\n
+$ dsgrid-admin create-registry sqlite:////projects/dsgrid/my_project/registry.db -p /projects/dsgrid/my_project/registry-data\n
 """
 
 

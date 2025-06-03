@@ -25,7 +25,7 @@ from dsgrid.utils.id_remappings import (
 
 def test_register_dimensions_and_mappings(tmp_registry_db):
     src_dir, tmpdir, url = tmp_registry_db
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         admin_cli,
         [
@@ -81,7 +81,7 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
 
 def test_register_project_and_dataset(tmp_registry_db):
     src_dir, tmpdir, url = tmp_registry_db
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         admin_cli,
         [
@@ -208,7 +208,7 @@ def test_register_project_and_dataset(tmp_registry_db):
 
 def test_list_project_dimension_names(cached_registry):
     conn = cached_registry
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     cmd = [
         "--url",
         conn.url,
@@ -232,7 +232,7 @@ def test_list_project_dimension_names(cached_registry):
 def test_register_dsgrid_projects(tmp_registry_db):
     """Test registration of the real dsgrid projects."""
     _, tmpdir, url = tmp_registry_db
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         admin_cli,
         [
@@ -278,7 +278,7 @@ def test_register_dsgrid_projects(tmp_registry_db):
 
 def test_bulk_register(tmp_registry_db):
     test_project_dir, tmp_path, url = tmp_registry_db
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         admin_cli,
         [
@@ -301,7 +301,7 @@ def test_bulk_register(tmp_registry_db):
     registration_file = tmp_path / "registration.json5"
     registration_file.write_text(registration.model_dump_json(indent=2), encoding="utf-8")
 
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         cli,
         [
@@ -339,7 +339,7 @@ def test_bulk_register(tmp_registry_db):
 
 def test_register_multiple_metric_dimensions(tmp_registry_db):
     _, tmpdir, url = tmp_registry_db
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(
         admin_cli,
         [

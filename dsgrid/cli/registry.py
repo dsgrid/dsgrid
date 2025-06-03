@@ -1,3 +1,5 @@
+from dsgrid.config.dataset_config import DataSchemaType
+
 """Manages a dsgrid registry."""
 
 import getpass
@@ -14,9 +16,11 @@ from semver import VersionInfo
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.registration_models import RegistrationModel, RegistrationJournal
 from dsgrid.registry.common import DatabaseConnection, VersionUpdateType
+from dsgrid.registry.dataset_config_generator import generate_config_from_dataset
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.id_remappings import (
     map_dimension_ids_to_names,
@@ -25,30 +29,31 @@ from dsgrid.utils.id_remappings import (
     replace_dimension_mapping_names_with_current_ids,
     replace_dimension_names_with_current_ids,
 )
+from dsgrid.registry.project_config_generator import generate_project_config
 from dsgrid.utils.filters import ACCEPTED_OPS
 
 
 logger = logging.getLogger(__name__)
 
 
-def _version_info_callback(*args):
+def _version_info_callback(*args) -> VersionInfo:
     val = args[2]
     if val is None:
         return val
     return VersionInfo.parse(val)
 
 
-def _version_info_required_callback(*args):
+def _version_info_required_callback(*args) -> VersionInfo:
     val = args[2]
     return VersionInfo.parse(val)
 
 
-def _version_update_callback(*args):
+def _version_update_callback(*args) -> VersionUpdateType:
     val = args[2]
     return VersionUpdateType(val)
 
 
-def _path_callback(*args):
+def _path_callback(*args) -> Path | None:
     val = args[2]
     if val is None:
         return val
@@ -1140,6 +1145,82 @@ def list_project_dimension_names(
         print(line)
 
 
+_generate_project_config_epilog = """
+Examples:\n
+$ dsgrid registry projects generate-config \\ \n
+    -o "./my-project-dir" \\ \n
+    my-project-id dataset-id1 dataset-id2 dataset-id3\n
+"""
+
+
+@click.command(name="generate-config", epilog=_generate_project_config_epilog)
+@click.argument("project_id")
+@click.argument("dataset_ids", nargs=-1)
+@click.option(
+    "-n",
+    "--name",
+    type=str,
+    help="Project name, optional",
+)
+@click.option(
+    "-d",
+    "--description",
+    type=str,
+    help="Project description, optional",
+)
+@click.option(
+    "-t",
+    "--time-type",
+    type=click.Choice([x.value for x in TimeDimensionType]),
+    default=TimeDimensionType.DATETIME.value,
+    show_default=True,
+    help="Type of the time dimension",
+    callback=lambda *x: TimeDimensionType(x[2]),
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    default=".",
+    show_default=True,
+    callback=_path_callback,
+    help="Path in which to generate project config files.",
+)
+@click.option(
+    "-O",
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite files if they exist.",
+)
+@click.pass_context
+def generate_project_config_from_ids(
+    ctx: click.Context,
+    project_id: str,
+    dataset_ids: tuple[str],
+    name: str | None,
+    description: str | None,
+    time_type: TimeDimensionType,
+    output: Path | None,
+    overwrite: bool,
+):
+    """Generate project config files from a project ID and one or more dataset IDs."""
+    res = handle_dsgrid_exception(
+        ctx,
+        generate_project_config,
+        project_id,
+        dataset_ids,
+        name=name,
+        description=description,
+        time_type=time_type,
+        output_directory=output,
+        overwrite=overwrite,
+    )
+    if res[1] != 0:
+        ctx.exit(res[1])
+
+
 """
 Dataset Commands
 """
@@ -1311,6 +1392,126 @@ def update_dataset(
         log_message,
         version,
         dataset_path=dataset_path,
+    )
+    if res[1] != 0:
+        ctx.exit(res[1])
+
+
+_generate_dataset_config_from_dataset_epilog = """
+Examples:\n
+$ dsgrid registry datasets generate-config-from-dataset \\ \n
+    -o "./my-dataset-dir" \\ \n
+    -P my-project-id \\ \n
+    my-dataset-id \\ \n
+    /path/to/table.parquet\n
+"""
+
+
+@click.command(name="generate-config", epilog=_generate_dataset_config_from_dataset_epilog)
+@click.argument("dataset-id")
+@click.argument("dataset-path")
+@click.option(
+    "-s",
+    "--schema-type",
+    type=click.Choice([x.value for x in DataSchemaType]),
+    default=DataSchemaType.ONE_TABLE.value,
+    show_default=True,
+    callback=lambda *x: DataSchemaType(x[2]),
+)
+@click.option(
+    "-p",
+    "--pivoted-dimension-type",
+    type=click.Choice([x.value for x in DimensionType if x != DimensionType.TIME]),
+    default=None,
+    callback=lambda *x: None if x[2] is None else DimensionType(x[2]),
+    help="Optional, if one dimension has its records pivoted as columns, its type.",
+)
+@click.option(
+    "-t",
+    "--time-type",
+    type=click.Choice([x.value for x in TimeDimensionType]),
+    default=TimeDimensionType.DATETIME.value,
+    show_default=True,
+    help="Type of the time dimension",
+    callback=lambda *x: TimeDimensionType(x[2]),
+)
+@click.option(
+    "-T",
+    "--time-columns",
+    multiple=True,
+    help="Names of time columns in the table. Required if pivoted_dimension_type is set "
+    "and the time column is not 'timestamp'.",
+)
+@click.option(
+    "-o",
+    "--output",
+    type=click.Path(),
+    default=".",
+    show_default=True,
+    callback=_path_callback,
+    help="Path in which to create dataset config files.",
+)
+@click.option(
+    "-P",
+    "--project-id",
+    required=False,
+    type=str,
+    help="Project ID, optional. If provided, prioritize project base dimensions when "
+    "searching for matching dimensions.",
+)
+@click.option(
+    "-n",
+    "--no-prompts",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Do not prompt for matches. Automatically accept the first one.",
+)
+@click.option(
+    "-O",
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite files if they exist.",
+)
+@click.pass_obj
+@click.pass_context
+def generate_dataset_config_from_dataset(
+    ctx: click.Context,
+    registry_manager: RegistryManager,
+    dataset_id: str,
+    dataset_path: Path,
+    schema_type: DataSchemaType,
+    pivoted_dimension_type: DimensionType | None,
+    time_type: TimeDimensionType,
+    time_columns: tuple[str],
+    output: Path | None,
+    project_id: str | None,
+    no_prompts: bool,
+    overwrite: bool,
+):
+    """Generate dataset config files from a dataset table.
+
+    Fill out the dimension record files based on the unique values in the dataset.
+
+    Look for matches for dimensions in the registry. Prompt the user for confirmation unless
+    --no-prompts is set. If --no-prompts is set, the first match is automatically accepted.
+    """
+    res = handle_dsgrid_exception(
+        ctx,
+        generate_config_from_dataset,
+        registry_manager,
+        dataset_id,
+        dataset_path,
+        schema_type,
+        pivoted_dimension_type=pivoted_dimension_type,
+        time_type=time_type,
+        time_columns=set(time_columns),
+        output_directory=output,
+        project_id=project_id,
+        no_prompts=no_prompts,
+        overwrite=overwrite,
     )
     if res[1] != 0:
         ctx.exit(res[1])
@@ -1538,11 +1739,13 @@ projects.add_command(register_supplemental_dimensions)
 projects.add_command(add_dataset_requirements)
 projects.add_command(replace_dataset_dimension_requirements)
 projects.add_command(list_project_dimension_names)
+projects.add_command(generate_project_config_from_ids)
 
 datasets.add_command(list_datasets)
 datasets.add_command(register_dataset)
 datasets.add_command(dump_dataset)
 datasets.add_command(update_dataset)
+datasets.add_command(generate_dataset_config_from_dataset)
 
 registry.add_command(list_)
 registry.add_command(dimensions)

@@ -19,7 +19,7 @@ class DimensionBaseConfigWithFiles(ConfigWithRecordFileBase, abc.ABC):
     def config_id(self):
         return self.model.dimension_id
 
-    def get_unique_ids(self):
+    def get_unique_ids(self) -> set[str]:
         """Return the unique IDs in a dimension's records.
 
         Returns

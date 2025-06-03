@@ -343,7 +343,7 @@ def test_query_cli_create_validate(tmp_path):
         "projected_dg_conus_2022",
     ]
     shutdown_project()
-    runner = CliRunner(mix_stderr=False)
+    runner = CliRunner()
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
     query = ProjectQueryModel.from_file(filename)
@@ -387,7 +387,7 @@ def test_query_cli_run(tmp_path, cached_registry, table_format):
             str(output_dir),
             str(dst),
         ]
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         result = runner.invoke(cli, cmd)
         assert result.exit_code == 0
 

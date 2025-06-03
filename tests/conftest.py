@@ -70,7 +70,7 @@ def cached_registry():
         if TEST_REGISTRY_BASE_PATH.exists():
             shutil.rmtree(TEST_REGISTRY_BASE_PATH)
         TEST_REGISTRY_BASE_PATH.mkdir()
-        runner = CliRunner(mix_stderr=False)
+        runner = CliRunner()
         result = runner.invoke(
             cli_admin,
             [

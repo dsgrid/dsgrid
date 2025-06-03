@@ -653,13 +653,13 @@ class DatasetConfig(ConfigBase):
             )
 
 
-def get_unique_dimension_ids(
+def get_unique_dimension_record_ids(
     path: Path,
     schema_type: DataSchemaType,
     pivoted_dimension_type: DimensionType | None,
     time_columns: set[str],
 ) -> dict[DimensionType, list[str]]:
-    """Get the unique dimension IDs from a table."""
+    """Get the unique dimension record IDs from a table."""
     if schema_type == DataSchemaType.STANDARD:
         ld = read_dataframe(check_load_data_filename(path))
         lk = read_dataframe(check_load_data_lookup_filename(path))

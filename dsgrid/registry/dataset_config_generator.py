@@ -6,7 +6,7 @@ from chronify.utils.path_utils import check_overwrite
 
 from dsgrid.config.dataset_config import (
     DataSchemaType,
-    get_unique_dimension_ids,
+    get_unique_dimension_record_ids,
     make_unvalidated_dataset_config,
 )
 from dsgrid.config.project_config import ProjectConfig
@@ -55,7 +55,7 @@ def generate_config_from_dataset(
     time_cols = time_columns or {"timestamp"}
 
     dimension_references: list[DimensionReferenceModel] = []
-    for dim_type, ids in get_unique_dimension_ids(
+    for dim_type, ids in get_unique_dimension_record_ids(
         dataset_path, schema_type, pivoted_dimension_type, time_cols
     ).items():
         ref, checked_project_dim_ids = find_matching_project_base_dimension(

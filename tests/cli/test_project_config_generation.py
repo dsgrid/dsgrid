@@ -1,8 +1,10 @@
-from dsgrid.dimension.time import TimeDimensionType
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli as cli
+from dsgrid.config.project_config import ProjectConfigModel
+from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.utils.files import load_data
+from common import check_config_fields
 
 
 def test_generate_project_config(cached_registry, tmp_path):
@@ -42,3 +44,4 @@ def test_generate_project_config(cached_registry, tmp_path):
     assert (output_dir / "project" / "dimension_mappings").exists()
     assert (output_dir / "datasets" / "historical").exists()
     assert (output_dir / "datasets" / "modeled").exists()
+    check_config_fields(output_dir / "project" / "project.json5", ProjectConfigModel)

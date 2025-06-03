@@ -1,11 +1,12 @@
-from dsgrid.dimension.base_models import DimensionType
-
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli as cli
+from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.dimension.time import TimeDimensionType
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.tests.common import TEST_PROJECT_PATH
 from dsgrid.utils.files import load_data
+from common import check_config_fields
 
 
 def test_generate_dataset_config_pivoted_matches(cached_registry, tmp_path):
@@ -88,6 +89,7 @@ def test_generate_dataset_config_unpivoted_matches(cached_registry, tmp_path):
         DimensionType.SUBSECTOR.value,
     ]
     assert not list((output_dir / "dimensions").iterdir())
+    check_config_fields(output_dir / "dataset.json5", DatasetConfigModel)
 
 
 def test_generate_dataset_config_partial_matches(cached_registry, tmp_path):
@@ -136,3 +138,4 @@ def test_generate_dataset_config_partial_matches(cached_registry, tmp_path):
         DimensionType.SECTOR.value + ".csv",
         DimensionType.SUBSECTOR.value + ".csv",
     ]
+    check_config_fields(output_dir / "dataset.json5", DatasetConfigModel)

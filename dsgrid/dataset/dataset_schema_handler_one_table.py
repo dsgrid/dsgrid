@@ -9,6 +9,7 @@ from dsgrid.spark.types import (
     DataFrame,
     StringType,
 )
+from dsgrid.utils.dataset import convert_types_if_necessary
 from dsgrid.utils.spark import (
     read_dataframe,
     get_unique_values,
@@ -35,6 +36,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def load(cls, config: DatasetConfig, *args, **kwargs):
         df = read_dataframe(config.load_data_path)
         load_data_df = config.add_trivial_dimensions(df)
+        load_data_df = convert_types_if_necessary(load_data_df)
         time_dim = config.get_dimension(DimensionType.TIME)
         load_data_df = time_dim.convert_time_format(load_data_df)
         return cls(load_data_df, config, *args, **kwargs)

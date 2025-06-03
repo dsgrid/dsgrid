@@ -27,6 +27,7 @@ from dsgrid.spark.types import (
 from dsgrid.utils.dataset import (
     add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
+    convert_types_if_necessary,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
@@ -50,11 +51,12 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @classmethod
     def load(cls, config: DatasetConfig, *args, **kwargs):
-        load_data_df = read_dataframe(config.load_data_path)
+        load_data_df = convert_types_if_necessary(read_dataframe(config.load_data_path))
         time_dim = config.get_dimension(DimensionType.TIME)
         load_data_df = time_dim.convert_time_format(load_data_df)
         load_data_lookup = read_dataframe(config.load_data_lookup_path)
         load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
+        load_data_lookup = convert_types_if_necessary(load_data_lookup)
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)

@@ -10,6 +10,7 @@ import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
+from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     DaylightSavingFallBackType,
     DaylightSavingSpringForwardType,
@@ -33,6 +34,10 @@ from dsgrid.spark.functions import except_all, get_spark_session
 from dsgrid.spark.types import (
     DataFrame,
     F,
+    IntegerType,
+    LongType,
+    ShortType,
+    StringType,
     use_duckdb,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
@@ -461,3 +466,14 @@ def unpivot_dataframe(
         .union(new_rows.select(*df.columns))
         .select(*ids, variable_column, VALUE_COLUMN)
     )
+
+
+def convert_types_if_necessary(df: DataFrame) -> DataFrame:
+    """Convert the types of the dataframe if necessary."""
+    allowed_int_columns = (DimensionType.MODEL_YEAR.value, DimensionType.WEATHER_YEAR.value)
+    int_types = {IntegerType(), LongType(), ShortType()}
+    existing_columns = set(df.columns)
+    for column in allowed_int_columns:
+        if column in existing_columns and df.schema[column].dataType in int_types:
+            df = df.withColumn(column, F.col(column).cast(StringType()))
+    return df

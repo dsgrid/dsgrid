@@ -17,12 +17,15 @@ from dsgrid.spark.types import (
     StructType,
     DoubleType,
     IntegerType,
+    ShortType,
+    LongType,
     StringType,
     use_duckdb,
 )
 from dsgrid.utils.dataset import (
     add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
+    convert_types_if_necessary,
     is_noop_mapping,
     remove_invalid_null_timestamps,
     repartition_if_needed_by_mapping,
@@ -352,3 +355,20 @@ def test_unpivot(pivoted_dataframe_with_time):
     assert len(null_data) == 1
     assert null_data[0].time_index is None
     assert null_data[0][VALUE_COLUMN] is None
+
+
+@pytest.mark.parametrize("data_type", [IntegerType(), ShortType(), LongType()])
+def test_convert_types_if_necessary(data_type):
+    schema = StructType(
+        [
+            StructField("model_year", data_type, False),
+            StructField("weather_year", data_type, False),
+            StructField("bystander", IntegerType(), False),
+        ]
+    )
+    df1 = get_spark_session().createDataFrame([(2030, 2018, 2040)], schema)
+    df2 = convert_types_if_necessary(df1)
+    row = df2.collect()[0]
+    assert row.model_year == "2030"
+    assert row.weather_year == "2018"
+    assert row.bystander == 2040

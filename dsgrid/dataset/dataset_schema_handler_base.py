@@ -609,7 +609,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         df,
                         mapping_config.model.mapping_type,
                         scratch_dir_context,
-                        repartition=bool(dim_mapping.handle_data_skew),
+                        repartition=dim_mapping.handle_data_skew,
                     )
                     if dim_mapping.persist and persisted_file is None:
                         persisted_file = scratch_dir_context.get_temp_filename(suffix=".parquet")

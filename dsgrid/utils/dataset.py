@@ -402,7 +402,7 @@ def repartition_if_needed_by_mapping(
     df: DataFrame,
     mapping_type: DimensionMappingType,
     scratch_dir_context: ScratchDirContext,
-    repartition: bool = False,
+    repartition: bool | None = None,
 ) -> tuple[DataFrame, Path | None]:
     """Repartition the dataframe if the mapping might cause data skew.
 
@@ -414,7 +414,8 @@ def repartition_if_needed_by_mapping(
     scratch_dir_context : ScratchDirContext
         The scratch directory context to use for temporary files.
     repartition : bool
-        Whether to force repartitioning even if the mapping type doesn't require it.
+        If None, repartition based on the mapping type.
+        Otherwise, always repartition if True, or never if False.
     """
     if use_duckdb():
         return df, None
@@ -431,15 +432,19 @@ def repartition_if_needed_by_mapping(
     # The case with buildings was particularly severe because it is an unpivoted dataset.
 
     # Note: log messages below are checked in the tests.
-    if repartition or mapping_type in {
-        DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
-        # These cases might be problematic in the future.
-        # DimensionMappingType.ONE_TO_MANY_ASSIGNMENT,
-        # DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS,
-        # DimensionMappingType.MANY_TO_MANY_DISAGGREGATION,
-        # This is usually happening with scenario and hasn't caused a problem.
-        # DimensionMappingType.DUPLICATION,
-    }:
+    if repartition or (
+        repartition is None
+        and mapping_type
+        in {
+            DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
+            # These cases might be problematic in the future.
+            # DimensionMappingType.ONE_TO_MANY_ASSIGNMENT,
+            # DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS,
+            # DimensionMappingType.MANY_TO_MANY_DISAGGREGATION,
+            # This is usually happening with scenario and hasn't caused a problem.
+            # DimensionMappingType.DUPLICATION,
+        }
+    ):
         if os.environ.get("DSGRID_SKIP_MAPPING_SKEW_REPARTITION", "false").lower() == "true":
             logger.info("DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true; skip repartitions")
             return df, None

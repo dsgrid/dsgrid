@@ -476,7 +476,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def check_dataset_mapping_plan(
         self, mapping_plan: DatasetMappingPlan, project_config: ProjectConfig
     ) -> None:
-        """Check that a user-defined mapping order is correct. Remove any no-ops."""
+        """Check that a user-defined mapping order is valid."""
         req_dimensions: dict[DimensionType, DimensionMappingReferenceModel] = {}
         actual_mapping_dims: dict[DimensionType, str] = {}
 
@@ -490,8 +490,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
             to_dim = project_config.get_dimension(mapping.dimension_name)
             if to_dim.model.dimension_type == DimensionType.TIME:
                 msg = (
-                    f"DatasetMappingPlan for {dataset_id=} is invalid because it does not "
-                    f"support mapping to a time dimension: {mapping.dimension_name}"
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because specification "
+                    f"of the time dimension is not supported: {mapping.dimension_name}"
                 )
                 raise DSGInvalidDimensionMapping(msg)
             if to_dim.model.dimension_type in actual_mapping_dims:
@@ -515,15 +515,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 # aggregrations. As it stands, we can are only using this within our
                 # project query process. We need much more handling to make that work.
                 msg = (
-                    "DatasetMappingPlan for {dataset_id=} is invalid because it does not "
-                    f"support mapping to a supplemental dimension: {mapping.dimension_name}"
+                    "DatasetMappingPlan for {dataset_id=} is invalid because it specifies "
+                    f"a supplemental dimension: {mapping.dimension_name}"
                 )
-                # indexes_to_remove.insert(0, i)
-                # logger.info(
-                #     "No mapping is required for dimension %s. The dataset is already at "
-                #     "the project supplemental dimension.",
-                #     from_dim.model.label,
-                # )
             elif to_dim.model.dimension_type not in req_dimensions:
                 msg = (
                     f"DatasetMappingPlan for {dataset_id=} is invalid because there is no "
@@ -551,8 +545,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
             diff = sorted((x.value for x in diff_dims))
             msg = (
                 "If a mapping order is specified for a dataset, it must include all "
-                "dimension types that require mappings to the project base dimension. "
-                f"Required dimension types: {req} Actual dimension types: {act} "
+                "dimension types that require mappings to the project base dimension.\n"
+                f"Required dimension types: {req}\nActual dimension types: {act}\n"
                 f"Difference: {diff}"
             )
             raise DSGInvalidDimensionMapping(msg)
@@ -564,20 +558,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
         filtered_records: dict[str, DataFrame] | None = None,
         scratch_dir_context: ScratchDirContext | None = None,
     ) -> DataFrame:
-        """Map the table's dimensions according to the mapper.
+        """Map the table's dimensions according to the plan.
 
         Parameters
         ----------
-        df : DataFrame
+        df
             The dataframe to map.
-        plan : DatasetMappingPlan
+        plan
             Specifies the order of dimensions to map and any secondary operations.
-        filtered_records : dict | None
+        filtered_records
             If not None, use these records to filter the table.
-        handle_data_skew : bool
-            If False (default), do not perform any handling of data skew, even if the mapper
-            specifies it.
-        scratch_dir_context : ScratchDirContext | None
+        scratch_dir_context
             If None, do not persist any intermediate tables.
             If not None, use this context to persist intermediate tables if required.
         """
@@ -616,10 +607,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
                         write_dataframe(df, persisted_file)
                         logger.info("Persisted %s to %s", column, persisted_file)
                         df = read_dataframe(persisted_file)
-                    if persisted_file is not None:
-                        plan.journal.add_completed_mapping(
-                            dim_mapping.dimension_name, persisted_file
-                        )
 
         return df
 

@@ -429,7 +429,7 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
         return values
 
     @model_validator(mode="after")
-    def check_dataset_ids(self) -> Self:
+    def check_invalid_dataset_ids(self) -> Self:
         source_dataset_ids: set[str] = set()
         for src_dataset in self.dataset.source_datasets:
             source_dataset_ids.update(src_dataset.list_source_dataset_ids())

@@ -6,6 +6,7 @@ import inspect
 import json
 import os
 from enum import Enum
+from typing import Iterable
 
 from prettytable import PrettyTable
 
@@ -82,7 +83,7 @@ def get_class_properties(cls):
     return properties
 
 
-def check_uniqueness(iterable, tag):
+def check_uniqueness(iterable: Iterable, tag: str) -> set[str]:
     """Raises ValueError if iterable has duplicate entries.
 
     Parameters

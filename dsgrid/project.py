@@ -117,7 +117,7 @@ class Project:
 
         return dataset_id in self._dataset_configs
 
-    def get_dataset(self, dataset_id):
+    def get_dataset(self, dataset_id, conn: Connection | None = None) -> Dataset:
         """Returns a Dataset. Calls load_dataset if it hasn't already been loaded.
 
         Parameters
@@ -132,10 +132,10 @@ class Project:
         if dataset_id in self._datasets:
             dataset = self._datasets[dataset_id]
         else:
-            dataset = self.load_dataset(dataset_id)
+            dataset = self.load_dataset(dataset_id, conn=conn)
         return dataset
 
-    def load_dataset(self, dataset_id, conn: Optional[Connection] = None):
+    def load_dataset(self, dataset_id, conn: Optional[Connection] = None) -> Dataset:
         """Loads a dataset.
 
         Parameters

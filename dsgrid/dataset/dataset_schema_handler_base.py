@@ -27,10 +27,11 @@ from dsgrid.config.simple_models import DatasetSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import (
     DaylightSavingAdjustmentModel,
 )
+from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapDimensionOperation
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.spark.functions import join, make_temp_view_name
@@ -56,6 +57,8 @@ from dsgrid.utils.spark import (
     write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
+from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 
 logger = logging.getLogger(__name__)
 
@@ -65,15 +68,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def __init__(
         self,
-        config,
+        config: DatasetConfig,
         conn: Optional[Connection],
-        dimension_mgr,
-        dimension_mapping_mgr,
+        dimension_mgr: DimensionRegistryManager,
+        dimension_mapping_mgr: DimensionMappingRegistryManager,
         mapping_references: Optional[list[DimensionMappingReferenceModel]] = None,
         project_time_dim=None,
     ):
         self._conn = conn
-        self._config: DatasetConfig = config
+        self._config = config
         self._dimension_mgr = dimension_mgr
         self._dimension_mapping_mgr = dimension_mapping_mgr
         self._mapping_references: list[DimensionMappingReferenceModel] = mapping_references or []
@@ -136,7 +139,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return self._config
 
     @abc.abstractmethod
-    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
+    def make_project_dataframe(
+        self, project_config, scratch_dir_context: ScratchDirContext
+    ) -> DataFrame:
         """Return a load_data dataframe with dimensions mapped to the project's.
 
         Parameters
@@ -151,7 +156,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def make_project_dataframe_from_query(self, context, project_config):
+    def make_project_dataframe_from_query(self, context, project_config) -> DataFrame:
         """Return a load_data dataframe with dimensions mapped to the project's with filters
         as specified by the QueryContext.
 
@@ -451,18 +456,125 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # TODO #196:
         return df
 
+    def build_default_dataset_mapping_plan(self) -> DatasetMappingPlan:
+        """Build a default mapping order of dimensions to a project."""
+        mappings: list[MapDimensionOperation] = []
+        for ref in self._mapping_references:
+            config = self._dimension_mapping_mgr.get_by_id(ref.mapping_id, conn=self.connection)
+            dim = self._dimension_mgr.get_by_id(
+                config.model.to_dimension.dimension_id, conn=self.connection
+            )
+            mappings.append(
+                MapDimensionOperation(
+                    dimension_name=dim.model.name,
+                    mapping_reference=ref,
+                )
+            )
+
+        return DatasetMappingPlan(dataset_id=self._config.model.dataset_id, mappings=mappings)
+
+    def check_dataset_mapping_plan(
+        self, mapping_plan: DatasetMappingPlan, project_config: ProjectConfig
+    ) -> None:
+        """Check that a user-defined mapping order is valid."""
+        req_dimensions: dict[DimensionType, DimensionMappingReferenceModel] = {}
+        actual_mapping_dims: dict[DimensionType, str] = {}
+
+        for ref in self._mapping_references:
+            assert ref.to_dimension_type not in req_dimensions
+            req_dimensions[ref.to_dimension_type] = ref
+
+        dataset_id = mapping_plan.dataset_id
+        indexes_to_remove: list[int] = []
+        for i, mapping in enumerate(mapping_plan.mappings):
+            to_dim = project_config.get_dimension(mapping.dimension_name)
+            if to_dim.model.dimension_type == DimensionType.TIME:
+                msg = (
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because specification "
+                    f"of the time dimension is not supported: {mapping.dimension_name}"
+                )
+                raise DSGInvalidDimensionMapping(msg)
+            if to_dim.model.dimension_type in actual_mapping_dims:
+                msg = (
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because it can only "
+                    f"support mapping one dimension for a given dimension type. "
+                    f"type={to_dim.model.dimension_type} "
+                    f"first={actual_mapping_dims[to_dim.model.dimension_type]} "
+                    f"second={mapping.dimension_name}"
+                )
+                raise DSGInvalidDimensionMapping(msg)
+
+            from_dim = self._config.get_dimension(to_dim.model.dimension_type)
+            supp_dim_names = {
+                x.model.name
+                for x in project_config.list_supplemental_dimensions(to_dim.model.dimension_type)
+            }
+            if mapping.dimension_name in supp_dim_names:
+                # This could be useful if we wanted to use DatasetMappingPlan for mapping
+                # a single dataset to a project's dimensions without being concerned about
+                # aggregrations. As it stands, we can are only using this within our
+                # project query process. We need much more handling to make that work.
+                msg = (
+                    "DatasetMappingPlan for {dataset_id=} is invalid because it specifies "
+                    f"a supplemental dimension: {mapping.dimension_name}"
+                )
+            elif to_dim.model.dimension_type not in req_dimensions:
+                msg = (
+                    f"DatasetMappingPlan for {dataset_id=} is invalid because there is no "
+                    f"dataset-to-project-base mapping defined for {to_dim.model.label}"
+                )
+                raise DSGInvalidDimensionMapping(msg)
+
+            ref = req_dimensions[to_dim.model.dimension_type]
+            mapping_config = self._dimension_mapping_mgr.get_by_id(
+                ref.mapping_id, version=ref.version, conn=self.connection
+            )
+            if (
+                from_dim.model.dimension_id == mapping_config.model.from_dimension.dimension_id
+                and to_dim.model.dimension_id == mapping_config.model.to_dimension.dimension_id
+            ):
+                mapping.mapping_reference = ref
+                actual_mapping_dims[to_dim.model.dimension_type] = mapping.dimension_name
+
+        for index in indexes_to_remove:
+            mapping_plan.mappings.pop(index)
+
+        if diff_dims := set(req_dimensions.keys()).difference(actual_mapping_dims.keys()):
+            req = sorted((x.value for x in req_dimensions))
+            act = sorted((x.value for x in actual_mapping_dims))
+            diff = sorted((x.value for x in diff_dims))
+            msg = (
+                "If a mapping order is specified for a dataset, it must include all "
+                "dimension types that require mappings to the project base dimension.\n"
+                f"Required dimension types: {req}\nActual dimension types: {act}\n"
+                f"Difference: {diff}"
+            )
+            raise DSGInvalidDimensionMapping(msg)
+
     def _remap_dimension_columns(
         self,
         df: DataFrame,
-        filtered_records: None | dict = None,
-        handle_data_skew=False,
-        scratch_dir_context: Optional[ScratchDirContext] = None,
+        plan: DatasetMappingPlan,
+        filtered_records: dict[str, DataFrame] | None = None,
+        scratch_dir_context: ScratchDirContext | None = None,
     ) -> DataFrame:
-        if handle_data_skew and scratch_dir_context is None:
-            msg = "Bug: conflicting inputs: handle_data_skew requires a scratch_dir_context"
-            raise Exception(msg)
+        """Map the table's dimensions according to the plan.
 
-        for ref in self._mapping_references:
+        Parameters
+        ----------
+        df
+            The dataframe to map.
+        plan
+            Specifies the order of dimensions to map and any secondary operations.
+        filtered_records
+            If not None, use these records to filter the table.
+        scratch_dir_context
+            If None, do not persist any intermediate tables.
+            If not None, use this context to persist intermediate tables if required.
+        """
+        for dim_mapping in plan.mappings:
+            assert dim_mapping.mapping_reference is not None
+            ref = dim_mapping.mapping_reference
             dim_type = ref.from_dimension_type
             column = dim_type.value
             mapping_config = self._dimension_mapping_mgr.get_by_id(
@@ -481,14 +593,20 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 logger.info("Skip no-op mapping %s.", ref.mapping_id)
                 continue
             if column in df.columns:
+                persisted_file: Path | None = None
                 df = map_and_reduce_stacked_dimension(df, records, column)
-                if handle_data_skew:
-                    assert scratch_dir_context is not None
-                    df = repartition_if_needed_by_mapping(
+                if scratch_dir_context is not None:
+                    df, persisted_file = repartition_if_needed_by_mapping(
                         df,
                         mapping_config.model.mapping_type,
                         scratch_dir_context,
+                        repartition=dim_mapping.handle_data_skew,
                     )
+                    if dim_mapping.persist and persisted_file is None:
+                        persisted_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
+                        write_dataframe(df, persisted_file)
+                        logger.info("Persisted %s to %s", column, persisted_file)
+                        df = read_dataframe(persisted_file)
 
         return df
 

@@ -79,9 +79,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         dim_cols = self._list_dimension_columns(self._load_data)
         df = self._load_data.select("id", *dim_cols).distinct()
         df = df.join(lk_df, on="id").drop("id")
-        df = self._remap_dimension_columns(df).drop("fraction")
+        mapper = self.build_default_dataset_mapping_plan()
+        df = self._remap_dimension_columns(df, mapper).drop("fraction")
         null_lk_df = self._remap_dimension_columns(
-            self._load_data_lookup.filter("id is NULL")
+            self._load_data_lookup.filter("id is NULL"),
+            mapper,
         ).drop("fraction")
         return add_null_rows_from_load_data_lookup(
             df, cross_join(null_lk_df, df.select(*dim_cols).distinct())
@@ -96,9 +98,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ld_df = self._load_data
         ld_df = ld_df.join(lk_df, on="id").drop("id")
 
-        # TODO: This might need to handle data skew in the future.
-        null_lk_df = self._remap_dimension_columns(null_lk_df)
-        ld_df = self._remap_dimension_columns(ld_df, scratch_dir_context=scratch_dir_context)
+        mapper = self.build_default_dataset_mapping_plan()
+        null_lk_df = self._remap_dimension_columns(null_lk_df, mapper)
+        ld_df = self._remap_dimension_columns(
+            ld_df, mapper, scratch_dir_context=scratch_dir_context
+        )
         if SCALING_FACTOR_COLUMN in ld_df.columns:
             ld_df = apply_scaling_factor(ld_df, VALUE_COLUMN)
         ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
@@ -121,10 +125,12 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         lk_df = lk_df.filter("id is not NULL")
         ld_df = self._prefilter_time_dimension(context, ld_df)
         ld_df = ld_df.join(lk_df, on="id").drop("id")
+        mapper = context.model.project.get_dataset_mapper(self._config.model.dataset_id)
+        assert mapper is not None
         ld_df = self._remap_dimension_columns(
             ld_df,
+            mapper,
             filtered_records=context.get_record_ids(),
-            handle_data_skew=True,
             scratch_dir_context=context.scratch_dir_context,
         )
         if "scaling_factor" in ld_df.columns:
@@ -134,8 +140,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         project_metric_records = self._get_project_metric_records(project_config)
         ld_df = self._convert_units(ld_df, project_metric_records)
         null_lk_df = self._remap_dimension_columns(
-            null_lk_df, filtered_records=context.get_record_ids()
+            null_lk_df, mapper, filtered_records=context.get_record_ids()
         )
+        # TODO: record the mapper journal. We should be able to use it if something fails
+        # and we need to re-run the query.
         ld_df = self._convert_time_dimension(
             ld_df, project_config, VALUE_COLUMN, context.scratch_dir_context
         )

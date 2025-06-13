@@ -3,6 +3,7 @@ from pathlib import Path
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.spark.types import (
@@ -113,7 +114,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def make_dimension_association_table(self) -> DataFrame:
         dim_cols = self._list_dimension_columns(self._load_data)
         df = self._load_data.select(*dim_cols).distinct()
-        df = self._remap_dimension_columns(df)
+        df = self._remap_dimension_columns(df, self.build_default_dataset_mapping_plan())
         return self._remove_non_dimension_columns(df).distinct()
 
     @track_timing(timer_stats_collector)
@@ -144,8 +145,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
         ld_df = self._load_data
-        # TODO: This might need to handle data skew in the future.
-        ld_df = self._remap_dimension_columns(ld_df, scratch_dir_context=scratch_dir_context)
+        mapper = self.build_default_dataset_mapping_plan()
+        ld_df = self._remap_dimension_columns(
+            ld_df, mapper, scratch_dir_context=scratch_dir_context
+        )
         ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
         project_metric_records = self._get_project_metric_records(project_config)
         ld_df = self._convert_units(ld_df, project_metric_records)
@@ -153,14 +156,18 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df, project_config, VALUE_COLUMN, scratch_dir_context
         )
 
-    def make_project_dataframe_from_query(self, context: QueryContext, project_config):
+    def make_project_dataframe_from_query(
+        self, context: QueryContext, project_config: ProjectConfig
+    ):
         ld_df = self._load_data
         ld_df = self._prefilter_stacked_dimensions(context, ld_df)
         ld_df = self._prefilter_time_dimension(context, ld_df)
+        mapper = context.model.project.get_dataset_mapper(self._config.model.dataset_id)
+        assert mapper is not None
         ld_df = self._remap_dimension_columns(
             ld_df,
+            mapper,
             filtered_records=context.get_record_ids(),
-            handle_data_skew=True,
             scratch_dir_context=context.scratch_dir_context,
         )
         ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})

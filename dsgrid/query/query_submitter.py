@@ -7,6 +7,7 @@ from typing import Optional
 from zipfile import ZipFile
 
 from semver import VersionInfo
+from sqlalchemy import Connection
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
@@ -173,20 +174,23 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             report = make_report(report_inputs.report_type)
             report.check_query(model)
 
-        return self._check_datasets(model)
+        with self._project.dimension_mapping_manager.db.engine.connect() as conn:
+            return self._check_datasets(model, conn)
 
-    def _check_datasets(self, model: ProjectQueryModel) -> DatasetBaseDimensionNamesModel:
+    def _check_datasets(
+        self, query_model: ProjectQueryModel, conn: Connection
+    ) -> DatasetBaseDimensionNamesModel:
         base_dimension_names: Optional[DatasetBaseDimensionNamesModel] = None
         dataset_ids: list[str] = []
         query_names: list[DatasetBaseDimensionNamesModel] = []
-        for dataset in model.project.dataset.source_datasets:
+        for dataset in query_model.project.dataset.source_datasets:
+            src_dataset_ids = dataset.list_source_dataset_ids()
+            dataset_ids += src_dataset_ids
             if isinstance(dataset, StandaloneDatasetModel):
                 query_names.append(
                     self._project.config.get_dataset_base_dimension_names(dataset.dataset_id)
                 )
-                dataset_ids.append(dataset.dataset_id)
             elif isinstance(dataset, ProjectionDatasetModel):
-                dataset_ids += [dataset.initial_value_dataset_id, dataset.growth_rate_dataset_id]
                 query_names += [
                     self._project.config.get_dataset_base_dimension_names(
                         dataset.initial_value_dataset_id
@@ -198,6 +202,15 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             else:
                 msg = f"Unhandled dataset type: {dataset=}"
                 raise NotImplementedError(msg)
+
+            for dataset_id in src_dataset_ids:
+                dataset = self._project.load_dataset(dataset_id, conn=conn)
+                mapper = query_model.project.get_dataset_mapper(dataset_id)
+                if mapper is None:
+                    mapper = dataset.handler.build_default_dataset_mapping_plan()
+                    query_model.project.set_dataset_mapper(mapper)
+                else:
+                    dataset.handler.check_dataset_mapping_plan(mapper, self._project.config)
 
             for dataset_id, names in zip(dataset_ids, query_names):
                 self._fix_legacy_base_dimension_names(names, dataset_id)

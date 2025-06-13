@@ -6,9 +6,13 @@ from typing import Optional
 
 from sqlalchemy import Connection
 
+from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.query.query_context import QueryContext
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
+from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
+from dsgrid.spark.types import DataFrame
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +20,7 @@ logger = logging.getLogger(__name__)
 class DatasetBase(abc.ABC):
     """Base class for datasets"""
 
-    def __init__(self, schema_handler):
+    def __init__(self, schema_handler: DatasetSchemaHandlerBase):
         self._config = schema_handler.config
         self._handler = schema_handler
         self._id = schema_handler.config.model.dataset_id
@@ -24,12 +28,16 @@ class DatasetBase(abc.ABC):
         # queries based on dataset ID.
 
     @property
-    def config(self):
+    def config(self) -> DatasetConfig:
         return self._config
 
     @property
-    def dataset_id(self):
+    def dataset_id(self) -> str:
         return self._id
+
+    @property
+    def handler(self) -> DatasetSchemaHandlerBase:
+        return self._handler
 
 
 class Dataset(DatasetBase):
@@ -71,10 +79,14 @@ class Dataset(DatasetBase):
             )
         )
 
-    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
+    def make_project_dataframe(
+        self, project_config: ProjectConfig, scratch_dir_context: ScratchDirContext
+    ) -> DataFrame:
         return self._handler.make_project_dataframe(project_config, scratch_dir_context)
 
-    def make_project_dataframe_from_query(self, query: QueryContext, project_config):
+    def make_project_dataframe_from_query(
+        self, query: QueryContext, project_config: ProjectConfig
+    ) -> DataFrame:
         return self._handler.make_project_dataframe_from_query(query, project_config)
 
 

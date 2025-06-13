@@ -402,10 +402,23 @@ def repartition_if_needed_by_mapping(
     df: DataFrame,
     mapping_type: DimensionMappingType,
     scratch_dir_context: ScratchDirContext,
-) -> DataFrame:
-    """Repartition the dataframe if the mapping might cause data skew."""
+    repartition: bool | None = None,
+) -> tuple[DataFrame, Path | None]:
+    """Repartition the dataframe if the mapping might cause data skew.
+
+    Parameters
+    ----------
+    df : DataFrame
+        The dataframe to repartition.
+    mapping_type : DimensionMappingType
+    scratch_dir_context : ScratchDirContext
+        The scratch directory context to use for temporary files.
+    repartition : bool
+        If None, repartition based on the mapping type.
+        Otherwise, always repartition if True, or never if False.
+    """
     if use_duckdb():
-        return df
+        return df, None
 
     # We experienced an issue with the IEF buildings dataset where the disaggregation of
     # region to county caused a major issue where one Spark executor thread got stuck,
@@ -419,18 +432,22 @@ def repartition_if_needed_by_mapping(
     # The case with buildings was particularly severe because it is an unpivoted dataset.
 
     # Note: log messages below are checked in the tests.
-    if mapping_type in {
-        DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
-        # These cases might be problematic in the future.
-        # DimensionMappingType.ONE_TO_MANY_ASSIGNMENT,
-        # DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS,
-        # DimensionMappingType.MANY_TO_MANY_DISAGGREGATION,
-        # This is usually happening with scenario and hasn't caused a problem.
-        # DimensionMappingType.DUPLICATION,
-    }:
+    if repartition or (
+        repartition is None
+        and mapping_type
+        in {
+            DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
+            # These cases might be problematic in the future.
+            # DimensionMappingType.ONE_TO_MANY_ASSIGNMENT,
+            # DimensionMappingType.ONE_TO_MANY_EXPLICIT_MULTIPLIERS,
+            # DimensionMappingType.MANY_TO_MANY_DISAGGREGATION,
+            # This is usually happening with scenario and hasn't caused a problem.
+            # DimensionMappingType.DUPLICATION,
+        }
+    ):
         if os.environ.get("DSGRID_SKIP_MAPPING_SKEW_REPARTITION", "false").lower() == "true":
             logger.info("DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true; skip repartitions")
-            return df
+            return df, None
 
         filename = scratch_dir_context.get_temp_filename(suffix=".parquet")
         # Salting techniques online talk about adding or modifying a column with random values.
@@ -438,15 +455,17 @@ def repartition_if_needed_by_mapping(
         # could be many instances of zero or null. So, add a new column with random values.
         logger.info("Repartition after mapping %s", mapping_type)
         salted_column = "salted_key"
-        df.withColumn(salted_column, F.rand()).repartition(salted_column).write.parquet(
-            str(filename)
-        )
+        spark = get_spark_session()
+        num_partitions = int(spark.conf.get("spark.sql.shuffle.partitions"))
+        df.withColumn(
+            salted_column, (F.rand() * num_partitions).cast(IntegerType()) + 1
+        ).repartition(salted_column).write.parquet(str(filename))
         df = read_parquet(filename).drop(salted_column)
         logger.info("Completed repartition.")
-    else:
-        logger.debug("Repartition is not needed for mapping_type %s", mapping_type)
+        return df, filename
 
-    return df
+    logger.debug("Repartition is not needed for mapping_type %s", mapping_type)
+    return df, None
 
 
 def unpivot_dataframe(

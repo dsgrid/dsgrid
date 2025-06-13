@@ -33,7 +33,7 @@ dependencies = [
     # "boto3",
     # "s3path",
     "chronify ~= 0.3.0",
-    "click>=8.2, <9",
+    "click>=8.2, < 9",
     "dash",
     "dash_bootstrap_components",
     "duckdb >= 1, < 2",

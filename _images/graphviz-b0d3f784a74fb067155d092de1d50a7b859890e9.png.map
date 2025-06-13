@@ -1,0 +1,172 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel
+
+Reference to a dimension mapping stored in the registry.
+
+The DimensionMappingReferenceModel is utilized by the project configuration (project.json5) as well as by the
+dimension mapping reference configuration (dimension_mapping_references.json5) that may be required when submitting a dataset to a project.
+" alt="" coords="2486,4287,2791,4455"/>
+<area shape="rect" id="node2" title="dsgrid.config.dimensions.AlignedTime
+
+Data has absolute timestamps that are aligned with the same start and end
+for each geography.
+" alt="" coords="3127,1805,3497,1889"/>
+<area shape="rect" id="node3" title="dsgrid.config.dimensions.AnnualTimeDimensionModel
+
+Defines an annual time dimension where timestamps are years.
+" alt="" coords="2477,2497,2800,2917"/>
+<area shape="rect" id="node4" title="dsgrid.config.dimensions.TimeRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="3237,2499,3387,2583"/>
+<area shape="rect" id="node5" title="dsgrid.config.dimensions.DateTimeDimensionModel
+
+Defines a time dimension where timestamps translate to datetime objects.
+" alt="" coords="2403,1561,2874,2037"/>
+<area shape="rect" id="node6" title="dsgrid.config.dimensions.LocalTimeAsStrings
+
+Data has absolute timestamps formatted as strings with offsets from UTC.
+They are aligned for each geography when adjusted for time zone but staggered
+in an absolute time scale.
+" alt="" coords="3065,1937,3559,2021"/>
+<area shape="rect" id="node7" title="dsgrid.config.dimensions.DimensionModel
+
+Defines a non&#45;time dimension
+" alt="" coords="2513,2085,2764,2449"/>
+<area shape="rect" id="node8" title="dsgrid.config.dimensions.DimensionReferenceModel
+
+Reference to a dimension stored in the registry
+" alt="" coords="3187,3670,3437,3782"/>
+<area shape="rect" id="node9" title="dsgrid.config.dimensions.IndexRangeModel
+
+Defines a continuous range of indices.
+" alt="" coords="3236,907,3388,991"/>
+<area shape="rect" id="node10" title="dsgrid.config.dimensions.IndexTimeDimensionModel
+
+Defines a time dimension where timestamps are indices.
+" alt="" coords="2472,569,2805,1045"/>
+<area shape="rect" id="node11" title="dsgrid.config.dimensions.MonthRangeModel
+
+Defines a continuous range of time.
+" alt="" coords="3231,1459,3393,1543"/>
+<area shape="rect" id="node12" title="dsgrid.config.dimensions.NoOpTimeDimensionModel
+
+Defines a NoOp time dimension.
+" alt="" coords="2494,2965,2783,3273"/>
+<area shape="rect" id="node13" title="dsgrid.config.dimensions.RepresentativePeriodTimeDimensionModel
+
+Defines a representative time dimension.
+" alt="" coords="2457,1093,2820,1513"/>
+<area shape="rect" id="node14" title="dsgrid.config.mapping_tables.MappingTableByNameModel
+
+Attributes for a dimension mapping table for soon&#45;to&#45;be registered dimensions by name.
+This will be converted to a MappingTableModel as soon as the dimensions are registered.
+" alt="" coords="3043,4114,3581,4338"/>
+<area shape="rect" id="node15" title="dsgrid.config.project_config.DatasetBaseDimensionNamesModel
+
+Defines the query names for project base dimensions to which datasets will be mapped.
+This is important for cases where a project has multiple base dimensions of the same type.
+" alt="" coords="2494,137,2783,389"/>
+<area shape="rect" id="node16" title="dsgrid.config.project_config.DimensionMappingsModel
+
+Defines all dimension mappings associated with a dsgrid project,
+including base&#45;to&#45;supplemental mappings and dataset&#45;to&#45;project mappings.
+" alt="" coords="1065,4229,1694,4313"/>
+<area shape="rect" id="node17" title="dsgrid.config.project_config.DimensionsModel
+
+Contains dimensions defined by a project
+" alt="" coords="524,2705,2235,2873"/>
+<area shape="rect" id="node18" title="dsgrid.config.project_config.SubsetDimensionGroupModel
+
+Defines one or more subset dimension selectors for a dimension type.
+" alt="" coords="2379,3421,2899,3701"/>
+<area shape="rect" id="node19" title="dsgrid.config.supplemental_dimension.SupplementalDimensionModel
+
+Defines a supplemental dimension.
+" alt="" coords="2462,3749,2815,4141"/>
+<area shape="rect" id="node28" title="dsgrid.config.project_config.SubsetDimensionSelectorModel
+
+Defines a subset dimension selector inclusive of the subset&#39;s records and information
+required to define the selector as a record within the supplemental dimension defined by the
+subset dimension group.
+" alt="" coords="3185,3481,3439,3621"/>
+<area shape="rect" id="node20" title="dsgrid.config.project_config.InputDatasetModel
+
+Defines an input dataset for the project config.
+" alt="" coords="1115,185,1644,465"/>
+<area shape="rect" id="node21" title="dsgrid.config.project_config.RequiredDimensionsModel
+
+Defines required record IDs that must exist for each dimension in a dataset.
+Record IDs can reside in the project&#39;s base or subset dimensions.
+
+Requirements can be specified for a single dimension or a combination of dimensions.
+For example, if a project includes commercial, residential, and transportation sectors but the
+dataset has only transporation sector records, it should specify a single_dimensional
+requirement that is a subset of of the project&#39;s base dimension.
+`{&quot;single_dimensional&quot;: &quot;sector&quot;: {&quot;base&quot;: {&quot;record_ids&quot;: [&quot;transportation&quot;]}}}`.
+
+If a dataset&#39;s requirements span multiple dimensions, such as if it does not have some
+metric records for some geography records, then a multi_dimensional requirement should be
+specified. (By default, a full cross join is assumed to be present.)
+`{&quot;multi_dimensional&quot;: {
+ &#160;&#160;&#160;&quot;geography&quot;: {&quot;base&quot;: {&quot;record_ids&quot;: [&quot;12345&quot;]}}
+ &#160;&#160;&#160;&quot;metric&quot;: {&quot;base&quot;: {&quot;record_ids&quot;: [&quot;electricity_cooling&quot;]}}
+ &#160;}
+}`
+
+If a dataset specifies a dimension type within a multi_dimensional section and wants to use
+all records from a project base dimension, it can specify `base.record_ids = [&quot;__all__&quot;]
+as a shorthand notation.
+
+Requirements for a dimension cannot be defined in both single_dimensional and multi_dimensional
+sections.
+
+If no records are listed for a dimension then all project base records are required.
+
+It might be easier for a dataset to specify what it does not have rather than what it does have.
+In that case, it is recommended to use the RequiredDimensionRecordsModel.base_missing field.
+dsgrid will compute the difference of the base dimension records and the base_missing records
+to determine the dataset&#39;s required records.
+
+If a project has multiple base dimensions of the same type, the
+RequiredDimensionRecordsModel.dimension_name must be specified to identify the base
+dimension that contains the record IDs.
+
+If a dataset contains a subset of project base dimension records that are defined in the
+project&#39;s subset dimensions, it is recommended to use that specification. dsgrid will
+substitute base records for mapped subset records at runtime.
+" alt="" coords="2416,5,2861,89"/>
+<area shape="rect" id="node22" title="dsgrid.dimension.time.TimeBasedDataAdjustmentModel
+
+Defines how data needs to be adjusted with respect to time.
+For leap day adjustment, up to one full day of timestamps and data are dropped.
+For daylight savings, the dataframe is adjusted alongside the timestamps.
+This is useful when the load profiles are modeled in standard time and
+need to be converted to get clock time load profiles.
+" alt="" coords="2405,437,2873,521"/>
+<area shape="rect" id="node27" title="dsgrid.config.project_config.RequiredDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="3100,50,3524,274"/>
+<area shape="rect" id="node29" title="dsgrid.dimension.time.DaylightSavingAdjustmentModel
+
+Defines how to drop and add data along with timestamps to convert standard time
+load profiles to clock time
+" alt="" coords="3098,495,3526,579"/>
+<area shape="rect" id="node23" title="dsgrid.config.project_config.ProjectConfigModel
+
+Represents project configurations
+" alt="" coords="5,2479,380,2759"/>
+<area shape="rect" id="node24" title="dsgrid.config.project_config.RequiredBaseDimensionModel
+
+Base data model for all dsgrid data models
+" alt="" coords="4359,191,4609,275"/>
+<area shape="rect" id="node25" title="dsgrid.config.project_config.RequiredDimensionRecordsByTypeModel
+
+Base data model for all dsgrid data models
+" alt="" coords="3725,163,4176,275"/>
+<area shape="rect" id="node26" title="dsgrid.config.project_config.RequiredSubsetDimensionRecordsModel
+
+Base data model for all dsgrid data models
+" alt="" coords="4320,323,4648,407"/>
+</map>

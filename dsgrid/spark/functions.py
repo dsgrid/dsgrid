@@ -276,8 +276,10 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None) -> SparkSession:
 
     """
     if use_duckdb():
+        logger.info("Using DuckDB as the backend engine.")
         return g_duckdb_spark
 
+    logger.info("Using Spark as the backend engine.")
     cluster = os.environ.get("SPARK_CLUSTER")
     conf = SparkConf().setAppName(name)
     if spark_conf is not None:

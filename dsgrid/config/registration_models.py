@@ -27,8 +27,8 @@ class ProjectRegistrationModel(DSGBaseModel):
         return data
 
     @field_validator("log_message")
-    def fix_log_message(cls, log_message: Optional[str], info: ValidationInfo) -> str:
-        if log_message is None:
+    def fix_log_message(cls, log_message: str | None, info: ValidationInfo) -> str | None:
+        if log_message is None and "project_id" in info.data:
             log_message = f"Register project {info.data['project_id']}"
         return log_message
 
@@ -52,8 +52,8 @@ class DatasetRegistrationModel(DSGBaseModel):
     )
 
     @field_validator("log_message")
-    def fix_log_message(cls, log_message: Optional[str], info: ValidationInfo) -> str:
-        if log_message is None:
+    def fix_log_message(cls, log_message: str | None, info: ValidationInfo) -> str | None:
+        if log_message is None and "dataset_id" in info.data:
             log_message = f"Register dataset {info.data['dataset_id']}"
         return log_message
 
@@ -109,8 +109,8 @@ class DatasetSubmissionModel(DSGBaseModel):
         return data
 
     @field_validator("log_message")
-    def fix_log_message(cls, log_message: Optional[str], info: ValidationInfo) -> str:
-        if log_message is None:
+    def fix_log_message(cls, log_message: str | None, info: ValidationInfo) -> str | None:
+        if log_message is None and "dataset_id" in info.data:
             log_message = (
                 f"Submit dataset {info.data['dataset_id']} to project {info.data['project_id']}"
             )

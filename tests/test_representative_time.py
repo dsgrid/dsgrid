@@ -139,6 +139,7 @@ def test_time_mapping(
             VALUE_COLUMN,
             config,
             project_time_config,
+            scratch_dir_context,
         )
     else:
         filename = persist_intermediate_table(

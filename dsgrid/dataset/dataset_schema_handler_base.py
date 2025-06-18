@@ -638,8 +638,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         time_dim = self._config.get_dimension(DimensionType.TIME)
         if time_dim.model.is_time_zone_required_in_geography():
             if self._config.model.use_project_geography_time_zone:
+                logger.info("Add time zone from project geography dimension.")
                 geography_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
             else:
+                logger.info("Add time zone from dataset geography dimension.")
                 geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
             load_data_df = add_time_zone(load_data_df, geography_dim)
 
@@ -673,6 +675,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_time_dimension(),
+                    scratch_dir_context=scratch_dir_context,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
@@ -689,9 +692,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_time_dimension(),
+                    scratch_dir_context=scratch_dir_context,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
-                    scratch_dir_context=scratch_dir_context,
                 )
             case (BackendEngine.DUCKDB, _):
                 load_data_df = map_time_dimension_with_chronify_duckdb(
@@ -699,6 +702,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_time_dimension(),
+                    scratch_dir_context=scratch_dir_context,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )

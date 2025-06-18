@@ -21,7 +21,6 @@ from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGIn
 from dsgrid.spark.functions import (
     count_distinct_on_group_by,
     create_temp_view,
-    get_spark_warehouse_dir,
     handle_column_spaces,
     make_temp_view_name,
     read_parquet,
@@ -221,6 +220,7 @@ def map_time_dimension_with_chronify_duckdb(
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
+    scratch_dir_context: ScratchDirContext,
     wrap_time_allowed: bool = False,
     time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
 ) -> DataFrame:
@@ -240,6 +240,7 @@ def map_time_dimension_with_chronify_duckdb(
         dst_schema,
         wrap_time_allowed=wrap_time_allowed,
         data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
+        scratch_dir=scratch_dir_context.scratch_dir,
     )
     pandas_df = store.read_table(dst_schema.name)
     store.drop_table(dst_schema.name)
@@ -252,6 +253,7 @@ def map_time_dimension_with_chronify_spark_hive(
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
+    scratch_dir_context: ScratchDirContext,
     time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
     wrap_time_allowed: bool = False,
 ) -> DataFrame:
@@ -272,7 +274,7 @@ def map_time_dimension_with_chronify_spark_hive(
             src_schema.name,
             dst_schema,
             check_mapped_timestamps=False,
-            scratch_dir=get_spark_warehouse_dir(),
+            scratch_dir=scratch_dir_context.scratch_dir,
             wrap_time_allowed=wrap_time_allowed,
             data_adjustment=_to_chronify_time_based_data_adjustment(time_based_data_adjustment),
         )

@@ -1,4 +1,3 @@
-Completes JIRA Story DSGRID-
 Closes GitHub Issue #
 
 ## Description

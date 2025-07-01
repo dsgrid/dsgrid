@@ -86,10 +86,6 @@ class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     )
 
 
-class DataSourceDimensionBaseModel(DimensionRecordBaseModel):
-    """Base class for all data source dimensions"""
-
-
 class ModelYearDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all model year dimensions"""
 

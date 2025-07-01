@@ -7,4 +7,4 @@ Closes GitHub Issue #
 - [ ] Tests exercising the new feature or bug fix
 - [ ] All tests pass
 - [ ] At least one code review approval
-- [ ] Consider transferring TODOs to JIRA or GitHub
+- [ ] Consider transferring TODOs to GitHub

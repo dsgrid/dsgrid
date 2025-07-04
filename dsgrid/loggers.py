@@ -91,7 +91,12 @@ def setup_logging(
     # TODO: more consideration is warranted, but this is usually what we want.
     # If we migrate dsgrid to use loguru, it will be easier. We could use the TRACE level
     # in dsgrid.
-    chronify.loggers.setup_logging(console_level="WARNING", file_level="DEBUG", filename=filename)
+    chronify.loggers.setup_logging(
+        console_level="WARNING",
+        file_level="DEBUG",
+        filename=filename,
+        mode=mode,
+    )
     return logger
 
 

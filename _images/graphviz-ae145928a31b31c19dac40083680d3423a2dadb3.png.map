@@ -1,0 +1,20 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimensions.DimensionReferenceModel
+
+Reference to a dimension stored in the registry
+" alt="" coords="1226,284,1477,396"/>
+<area shape="rect" id="node2" title="dsgrid.config.project_config.SubsetDimensionGroupListModel
+
+Defines a list of subset dimensions.
+" alt="" coords="5,5,416,61"/>
+<area shape="rect" id="node3" title="dsgrid.config.project_config.SubsetDimensionGroupModel
+
+Defines one or more subset dimension selectors for a dimension type.
+" alt="" coords="560,35,1080,315"/>
+<area shape="rect" id="node4" title="dsgrid.config.project_config.SubsetDimensionSelectorModel
+
+Defines a subset dimension selector inclusive of the subset&#39;s records and information
+required to define the selector as a record within the supplemental dimension defined by the
+subset dimension group.
+" alt="" coords="1224,95,1479,235"/>
+</map>

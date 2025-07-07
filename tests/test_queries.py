@@ -506,6 +506,16 @@ def test_map_dataset(tmp_path):
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
     df1 = read_parquet(output_dir / dataset_id / "table.parquet")
+    columns = [
+        "time_est",
+        "model_year",
+        "scenario",
+        "county",
+        "sector",
+        "subsector",
+        "end_use",
+    ]
+    dfp1 = df1.sort(*columns).toPandas()
     checkpoint_files = [x for x in scratch_dir.iterdir() if x.suffix == ".json"]
     assert len(checkpoint_files) == 2
     checkpoint_files.sort(key=lambda x: x.stat().st_mtime)
@@ -521,16 +531,6 @@ def test_map_dataset(tmp_path):
         result2 = runner.invoke(cli, cmd2)
         assert result2.exit_code == 0
         df2 = read_parquet(Path(out_dir) / dataset_id / "table.parquet")
-        columns = [
-            "time_est",
-            "model_year",
-            "scenario",
-            "county",
-            "sector",
-            "subsector",
-            "end_use",
-        ]
-        dfp1 = df1.sort(*columns).toPandas()
         dfp2 = df2.sort(*columns).toPandas()
         assert_frame_equal(dfp1, dfp2)
 

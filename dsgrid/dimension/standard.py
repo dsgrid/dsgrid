@@ -1,6 +1,6 @@
 """Standard dimension classes for dsgrid"""
 
-from enum import Enum, StrEnum
+from enum import StrEnum
 from typing import Optional
 
 from pydantic import Field
@@ -56,7 +56,7 @@ class County(GeographyDimensionBaseModel):
 # ---------------------------
 # SECTOR DIMENSIONS
 # ---------------------------
-    
+
 class Sector(SectorDimensionBaseModel):
     """Sector attributes"""
 
@@ -70,7 +70,7 @@ class Sector(SectorDimensionBaseModel):
 # ---------------------------
 # SUBSECTOR DIMENSIONS
 # ---------------------------
-    
+
 class Subsector(SubsectorDimensionBaseModel):
     """Subsector attributes"""
 
@@ -81,7 +81,7 @@ class Subsector(SubsectorDimensionBaseModel):
 # ---------------------------
 # METRIC DIMENSIONS
 # ---------------------------
-    
+
 class FunctionalForm(StrEnum):
     """Functional forms for regression parameters"""
 
@@ -141,7 +141,7 @@ class Stock(MetricDimensionBaseModel):
 
 class FractionalIndex(MetricDimensionBaseModel):
     """Fractional Index attributes - e.g., human development index (HDI)
-    
+
     Generally dimensionless, but a unit string can be provided to assist with
     calculations.
     """
@@ -153,9 +153,9 @@ class FractionalIndex(MetricDimensionBaseModel):
 
 class PeggedIndex(MetricDimensionBaseModel):
     """Pegged Index attributes
-    
+
     Data relative to a base year that is normalized to a value like 1 or 100.
-    
+
     Generally dimensionless, but a unit string can be provided to assist with
     calculations.
     """
@@ -195,7 +195,7 @@ class NoOpTime(NoOpTimeDimensionModel):
 # ---------------------------
 # OTHER DIMENSIONS
 # ---------------------------
-    
+
 class WeatherYear(WeatherYearDimensionBaseModel):
     """Weather Year attributes"""
 

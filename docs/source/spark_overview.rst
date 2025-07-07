@@ -591,11 +591,42 @@ repartition like this:
 
     df.repartition(column_name).write.partitionBy(column_name).parquet("data.parquet")
 
+Executors are spilling to disk
+------------------------------
+You are observing that the Spark job seems stalled. Most of the work in a stage is complete, but
+one or two executors are still running. You see this log message over and over in the ``stderr``
+log files (e.g., ``spark_scratch/workers/app-20250115165825-0006/1/stderr``):
+
+.. code-block:: console
+
+    25/07/15 14:24:06 INFO UnsafeExternalSorter: Thread 60 spilling sort data of 4.6 GiB to disk (201  times so far)
+
+If this has occurred 201 times over more than an hour, then you might be better off canceling the
+job and re-running with a different configuration.
+
+First, ensure that you have set ``spark.sql.shuffle.partitions`` to a reasonable value, as discussed
+above.
+
+Second, your executor memory may be too small. Kestrel compute nodes have disproportionate CPUs with
+respect to memory. By default, our configuration scripts will allocate 7 GB of memory per executor
+and this is insufficient for some queries. The error message above indicates that the executor
+was not able to perform a sort in memory, and so spilled to disk. This is very slow.
+
+Try to double or triple the executor memory. You can do this by setting the
+``spark.executor.memory`` value in ``spark-defaults.conf``. You can set that value directly by
+editing the file or indirectly by setting ``--executor-cores`` to 10 or 15 (default is 5), thereby
+reducing the number of executors and giving each executor more memory.
+
+You can also acquire a bigmem node. The debug partition on Kestrel usually has two bigmem nodes.
+They have 2 TB of memory. Our Spark scripts will allocate 70 GB of memory per executor.
+
+Third, you may be experiencing data skew. This has happened frequently when performing a dimension
+mapping operation that explodes data sizes by disaggregating or duplicating data. One or two
+executors end up with significantly more data than the others, and get stuck. Refer to the next
+section.
+
 Skew
 ----
-We have not yet experienced problems with data skew, but expect to. It is covered by many online
-sources.
-
 If your query will produce high data skew, such as can happen with a query that produces results
 from large and small counties, you can use a salting technique to balance the data. For example,
 

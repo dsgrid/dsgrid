@@ -115,7 +115,7 @@ class EnergyIntensityRegression(MetricDimensionBaseModel):
     """Energy Intensity per capita, GDP, etc. regression over time or other variables"""
 
     regression_type: FunctionalForm = Field(
-        default=FunctionalForm.Linear,
+        default=FunctionalForm.LINEAR,
         description="Specifies the functional form of the regression model",
     )
     unit: str

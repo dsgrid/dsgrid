@@ -3,12 +3,12 @@
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Self
 
 from pydantic import ConfigDict, BaseModel, Field, ValidationError
 
 from dsgrid.exceptions import DSGInvalidParameter
-from dsgrid.utils.files import in_other_dir, load_data
+from dsgrid.utils.files import in_other_dir, load_data, dump_data
 
 
 logger = logging.getLogger(__name__)
@@ -77,11 +77,16 @@ class DSGBaseModel(BaseModel):
         return self.model_dump(*args, mode="json", **kwargs)
 
     @classmethod
-    def from_file(cls, filename: Path):
+    def from_file(cls, filename: Path) -> Self:
         """Deserialize the model from a file. Unlike the load method,
         this does not change directories.
         """
         return cls(**load_data(filename))
+
+    def to_file(self, filename: Path) -> None:
+        """Serialize the model to a file."""
+        data = self.serialize()
+        dump_data(data, filename, indent=2)
 
 
 class DSGBaseDatabaseModel(DSGBaseModel):

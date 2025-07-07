@@ -1,3 +1,4 @@
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 import logging
 import os
 from pathlib import Path
@@ -131,35 +132,59 @@ def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> Dat
 
 
 def apply_scaling_factor(
-    df: DataFrame, value_column: str, scaling_factor_column: str = SCALING_FACTOR_COLUMN
+    df: DataFrame,
+    value_column: str,
+    mapping_manager: DatasetMappingManager,
+    scaling_factor_column: str = SCALING_FACTOR_COLUMN,
 ) -> DataFrame:
     """Apply the scaling factor to all value columns and then drop the scaling factor column."""
-    if use_duckdb():
-        # Workaround for the fact that duckdb doesn't support
-        # F.col(scaling_factor_column).isNotNull()
-        cols = (x for x in df.columns if x not in (value_column, scaling_factor_column))
-        cols_str = ",".join(cols)
-        view = create_temp_view(df)
-        query = f"""
-            SELECT
-                {cols_str},
-                (
-                    CASE WHEN {scaling_factor_column} IS NULL THEN {value_column}
-                    ELSE {value_column} * {scaling_factor_column} END
-                ) AS {value_column}
-            FROM {view}
-        """
-        spark = get_spark_session()
-        return spark.sql(query)
+    if mapping_manager.has_completed_operation(mapping_manager.plan.apply_scaling_factor_op.name):
+        return df
 
-    df = df.withColumn(
+    func = _apply_scaling_factor_duckdb if use_duckdb() else _apply_scaling_factor_spark
+    df = func(df, value_column, scaling_factor_column)
+    if mapping_manager.plan.apply_scaling_factor_op.persist:
+        df = mapping_manager.persist_intermediate_table(
+            df, mapping_manager.plan.apply_scaling_factor_op.name
+        )
+    return df
+
+
+def _apply_scaling_factor_duckdb(
+    df: DataFrame,
+    value_column: str,
+    scaling_factor_column: str,
+):
+    # Workaround for the fact that duckdb doesn't support
+    # F.col(scaling_factor_column).isNotNull()
+    cols = (x for x in df.columns if x not in (value_column, scaling_factor_column))
+    cols_str = ",".join(cols)
+    view = create_temp_view(df)
+    query = f"""
+        SELECT
+            {cols_str},
+            (
+                CASE WHEN {scaling_factor_column} IS NULL THEN {value_column}
+                ELSE {value_column} * {scaling_factor_column} END
+            ) AS {value_column}
+        FROM {view}
+    """
+    spark = get_spark_session()
+    return spark.sql(query)
+
+
+def _apply_scaling_factor_spark(
+    df: DataFrame,
+    value_column: str,
+    scaling_factor_column: str,
+):
+    return df.withColumn(
         value_column,
         F.when(
             F.col(scaling_factor_column).isNotNull(),
             F.col(value_column) * F.col(scaling_factor_column),
         ).otherwise(F.col(value_column)),
-    )
-    return df.drop(scaling_factor_column)
+    ).drop(scaling_factor_column)
 
 
 def check_historical_annual_time_model_year_consistency(

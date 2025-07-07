@@ -9,7 +9,15 @@ from chronify.time_range_generator_factory import make_time_range_generator
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
+from dsgrid.query.query_context import QueryContext
+from dsgrid.query.models import (
+    DatasetBaseDimensionNamesModel,
+    ColumnType,
+    make_query_for_standalone_dataset,
+)
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone, TimeIntervalType, get_zone_info_from_spark_session
@@ -33,6 +41,7 @@ from dsgrid.spark.types import (
     use_duckdb,
 )
 from dsgrid.utils.dataset import add_time_zone
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import get_spark_session, get_unique_values
 
 from dsgrid.tests.common import SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB
@@ -94,9 +103,12 @@ def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     value_columns = tempo._handler.config.get_value_columns()
     assert len(value_columns) == 1
     value_column = next(iter(value_columns))
-    tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-        tempo_data, project.config, value_column, scratch_dir_context
-    )
+    plan = tempo._handler.build_default_dataset_mapping_plan()
+    context = ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir())
+    with DatasetMappingManager(tempo._handler.dataset_id, plan, context) as mgr:
+        tempo_data_mapped_time = tempo._handler._convert_time_dimension(
+            tempo_data, project.config, value_column, mgr
+        )
     tempo_data_with_tz = add_time_zone(
         tempo_data, project.config.get_base_dimension(DimensionType.GEOGRAPHY)
     )
@@ -110,9 +122,15 @@ def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
 
 
 def test_make_project_dataframe(project, resstock, comstock, tempo, scratch_dir_context):
-    tempo.make_project_dataframe(project.config, scratch_dir_context)
-    comstock.make_project_dataframe(project.config, scratch_dir_context)
-    resstock.make_project_dataframe(project.config, scratch_dir_context)
+    query = make_query_for_standalone_dataset(
+        project.config.model.project_id,
+        resstock.dataset_id,
+        column_type=ColumnType.DIMENSION_TYPES,
+    )
+    context = QueryContext(query, DatasetBaseDimensionNamesModel(), scratch_dir_context)
+    tempo.make_project_dataframe(context, project.config)
+    comstock.make_project_dataframe(context, project.config)
+    resstock.make_project_dataframe(context, project.config)
 
 
 def shift_time_interval(

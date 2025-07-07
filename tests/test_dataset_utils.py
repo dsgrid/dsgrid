@@ -1,3 +1,4 @@
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 import logging
 import os
 
@@ -5,6 +6,7 @@ import pytest
 
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
 from dsgrid.spark.functions import (
     aggregate_single_value,
     cache,
@@ -285,7 +287,7 @@ def test_remove_invalid_null_timestamps():
     assert is_dataframe_empty(result.filter(f"county == 'Boulder' and {time_col} is NULL"))
 
 
-def test_apply_scaling_factor():
+def test_apply_scaling_factor(tmp_path):
     df = create_dataframe_from_dicts(
         [
             {"value": 1, "bystander": 1, "scaling_factor": 5},
@@ -294,7 +296,10 @@ def test_apply_scaling_factor():
             {"value": 4, "bystander": 1, "scaling_factor": None},
         ],
     )
-    df2 = apply_scaling_factor(df, "value")
+    dataset_id = "test_dataset"
+    plan = DatasetMappingPlan(dataset_id=dataset_id)
+    with DatasetMappingManager(dataset_id, plan, ScratchDirContext(tmp_path)) as mgr:
+        df2 = apply_scaling_factor(df, "value", mgr)
     expected_sum = 1 * 5 + 2 * 6 + 0 + 4
     expected_sum_bystander = 1 + 1 + 1 + 1
 

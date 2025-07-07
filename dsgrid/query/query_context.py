@@ -1,6 +1,7 @@
 import logging
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Generator, Optional
 
 from dsgrid.dataset.models import (
     TableFormatType,
@@ -10,6 +11,8 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.dataset.models import PivotedTableFormatModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel, ProjectConfig
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
+from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MappingOperationCheckpoint
 from dsgrid.spark.functions import drop_temp_tables_and_views
 from dsgrid.spark.types import DataFrame
 from dsgrid.utils.spark import get_spark_session
@@ -28,6 +31,7 @@ class QueryContext:
         model: ProjectQueryModel,
         base_dimension_names: DatasetBaseDimensionNamesModel,
         scratch_dir_context: ScratchDirContext,
+        checkpoint: MappingOperationCheckpoint | None = None,
     ) -> None:
         self._model = model
         self._record_ids_by_dimension_type: dict[DimensionType, list[tuple[str]]] = {}
@@ -37,6 +41,7 @@ class QueryContext:
         )
         self._dataset_metadata: dict[str, DatasetMetadataModel] = {}
         self._scratch_dir_context = scratch_dir_context
+        self._checkpoint = checkpoint
 
     @property
     def metadata(self) -> DatasetMetadataModel:
@@ -268,3 +273,16 @@ class QueryContext:
     ) -> None:
         # Can't keep the dataframes in memory because of spark restarts.
         self._record_ids_by_dimension_type[dim_type] = [(x.id,) for x in record_ids.collect()]
+
+    @contextmanager
+    def dataset_mapping_manager(
+        self, dataset_id: str, plan: DatasetMappingPlan
+    ) -> Generator[DatasetMappingManager, None, None]:
+        """Start a mapping manager for a dataset."""
+        checkpoint = (
+            self._checkpoint
+            if self._checkpoint is not None and self._checkpoint.dataset_id == dataset_id
+            else None
+        )
+        with DatasetMappingManager(dataset_id, plan, self._scratch_dir_context, checkpoint) as mgr:
+            yield mgr

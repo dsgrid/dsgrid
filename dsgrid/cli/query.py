@@ -12,6 +12,7 @@ from dsgrid.cli.common import (
     check_output_directory,
     get_value_from_context,
     handle_dsgrid_exception,
+    path_callback,
 )
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
@@ -24,6 +25,7 @@ from dsgrid.dimension.dimension_filters import (
     SupplementalDimensionFilterColumnOperatorModel,
 )
 from dsgrid.filesystem.factory import make_filesystem_interface
+from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
     AggregationModel,
@@ -34,9 +36,9 @@ from dsgrid.query.models import (
     CompositeDatasetQueryModel,
     StandaloneDatasetModel,
     DatasetModel,
+    make_query_for_standalone_dataset,
 )
 from dsgrid.query.query_submitter import (
-    DatasetMapper,
     ProjectQuerySubmitter,
 )  # , CompositeDatasetQuerySubmitter
 from dsgrid.registry.common import DatabaseConnection
@@ -75,6 +77,7 @@ _COMMON_RUN_OPTIONS = (
         show_default=True,
         type=str,
         help="Output directory for query results",
+        callback=path_callback,
     ),
     click.option(
         "--load-cached-table/--no-load-cached-table",
@@ -124,7 +127,7 @@ $ dsgrid query project create --default-result-aggregation my_query_result_name 
     default="query.json5",
     show_default=True,
     help="Query file to create.",
-    callback=lambda *x: Path(x[2]),
+    callback=path_callback,
 )
 @click.option(
     "-r",
@@ -250,7 +253,7 @@ def create_project_query(
 
 
 @click.command("validate")
-@click.argument("query_file", type=click.Path(exists=True), callback=lambda *x: Path(x[2]))
+@click.argument("query_file", type=click.Path(exists=True), callback=path_callback)
 def validate_project_query(query_file):
     try:
         ProjectQueryModel.from_file(query_file)
@@ -268,6 +271,14 @@ $ dsgrid query project run query.json5
 
 @click.command("run", epilog=_run_project_query_epilog)
 @click.argument("query_definition_file", type=click.Path(exists=True))
+@click.option(
+    "-c",
+    "--checkpoint-file",
+    type=click.Path(exists=True),
+    callback=path_callback,
+    help="Checkpoint file created by a previous map operation. If passed, the code will "
+    "read it and resume from the last persisted file.",
+)
 @click.option(
     "--persist-intermediate-table/--no-persist-intermediate-table",
     is_flag=True,
@@ -287,21 +298,46 @@ $ dsgrid query project run query.json5
 @add_options(_COMMON_RUN_OPTIONS)
 @click.pass_context
 def run_project_query(
-    ctx,
-    query_definition_file,
-    persist_intermediate_table,
-    zip_file,
-    remote_path,
-    output,
-    load_cached_table,
-    overwrite,
+    ctx: click.Context,
+    query_definition_file: Path,
+    checkpoint_file: Path | None,
+    persist_intermediate_table: bool,
+    zip_file: bool,
+    remote_path: str,
+    output: Path,
+    load_cached_table: bool,
+    overwrite: bool,
 ):
     """Run a query on a dsgrid project."""
-    scratch_dir = get_value_from_context(ctx, "scratch_dir")
     query = ProjectQueryModel.from_file(query_definition_file)
+    _run_project_query(
+        ctx,
+        query,
+        checkpoint_file,
+        persist_intermediate_table,
+        zip_file,
+        remote_path,
+        output,
+        load_cached_table,
+        overwrite,
+    )
+
+
+def _run_project_query(
+    ctx: click.Context,
+    query: ProjectQueryModel,
+    checkpoint_file: Path | None,
+    persist_intermediate_table: bool,
+    zip_file: bool,
+    remote_path,
+    output: Path,
+    load_cached_table: bool,
+    overwrite: bool,
+) -> None:
     conn = DatabaseConnection(
         url=get_value_from_context(ctx, "url"),
     )
+    scratch_dir = get_value_from_context(ctx, "scratch_dir")
     registry_manager = RegistryManager.load(
         conn,
         remote_path=remote_path,
@@ -315,10 +351,11 @@ def run_project_query(
         submitter.submit,
         query,
         scratch_dir,
+        checkpoint_file=checkpoint_file,
         persist_intermediate_table=persist_intermediate_table,
         load_cached_table=load_cached_table,
         zip_file=zip_file,
-        force=overwrite,
+        overwrite=overwrite,
     )
     if res[1] != 0:
         ctx.exit(res[1])
@@ -334,53 +371,65 @@ $ dsgrid query project map_dataset project_id dataset_id
 @click.argument("project-id")
 @click.argument("dataset-id")
 @click.option(
-    "-o",
-    "--output",
-    default=QUERY_OUTPUT_DIR,
-    show_default=True,
-    type=str,
-    help="Output directory for query results",
-    callback=lambda *x: Path(x[2]),
+    "-c",
+    "--checkpoint-file",
+    type=click.Path(exists=True),
+    callback=path_callback,
+    help="Checkpoint file created by a previous map operation. If passed, the code will "
+    "read it and resume from the last persisted file.",
 )
 @click.option(
-    "--overwrite",
+    "-p",
+    "--mapping-plan",
+    type=click.Path(exists=True),
+    help="Path to a mapping plan file. If not provided, the default mapping plan will be used.",
+    callback=path_callback,
+)
+@click.option(
+    "--persist-intermediate-table/--no-persist-intermediate-table",
+    is_flag=True,
+    default=True,
+    show_default=True,
+    help="Persist the intermediate table to the filesystem to allow for reuse.",
+)
+@click.option(
+    "-z",
+    "--zip-file",
     is_flag=True,
     default=False,
     show_default=True,
-    help="Overwrite results directory if it exists.",
+    help="Create a zip file containing all output files.",
 )
 @add_options(_COMMON_REGISTRY_OPTIONS)
+@add_options(_COMMON_RUN_OPTIONS)
 @click.pass_context
 def map_dataset(
     ctx: click.Context,
     project_id: str,
     dataset_id: str,
+    checkpoint_file: Path | None,
+    mapping_plan: Path | None,
+    persist_intermediate_table: bool,
     remote_path,
     output: Path,
+    load_cached_table: bool,
     overwrite: bool,
+    zip_file: bool,
 ):
     """Map a dataset to the project's base dimensions."""
-    # TODO: Support supplemental dimensions: issue #343.
-    scratch_dir = get_value_from_context(ctx, "scratch_dir")
-    conn = DatabaseConnection(
-        url=get_value_from_context(ctx, "url"),
-    )
-    registry_manager = RegistryManager.load(
-        conn,
+    plan = DatasetMappingPlan.from_file(mapping_plan) if mapping_plan else None
+    query = make_query_for_standalone_dataset(project_id, dataset_id, plan)
+    _run_project_query(
+        ctx=ctx,
+        query=query,
+        checkpoint_file=checkpoint_file,
+        persist_intermediate_table=persist_intermediate_table,
+        zip_file=zip_file,
         remote_path=remote_path,
-        offline_mode=get_value_from_context(ctx, "offline"),
-    )
-    project = registry_manager.project_manager.load_project(project_id)
-    fs_interface = make_filesystem_interface(output)
-    mapper = DatasetMapper(project, dataset_id, fs_interface.path(output))
-    res = handle_dsgrid_exception(
-        ctx,
-        mapper.submit,
-        scratch_dir,
+        output=output,
+        load_cached_table=load_cached_table,
         overwrite=overwrite,
     )
-    if res[1] != 0:
-        ctx.exit(res[1])
 
 
 @click.command("create_dataset")

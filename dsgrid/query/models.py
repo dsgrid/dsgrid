@@ -408,7 +408,7 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
         description="Version of project or dataset on which the query is based. "
         "Should not be set by the user",
     )
-    mapping_plan: list[DatasetMappingPlan] = Field(
+    mapping_plans: list[DatasetMappingPlan] = Field(
         default=[],
         description="Defines the order in which to map the dimensions of datasets.",
     )
@@ -433,13 +433,13 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
         source_dataset_ids: set[str] = set()
         for src_dataset in self.dataset.source_datasets:
             source_dataset_ids.update(src_dataset.list_source_dataset_ids())
-        for item in itertools.chain(self.mapping_plan, self.spark_conf_per_dataset):
+        for item in itertools.chain(self.mapping_plans, self.spark_conf_per_dataset):
             if item.dataset_id not in source_dataset_ids:
                 msg = f"Dataset {item.dataset_id} is not a source dataset"
                 raise ValueError(msg)
         return self
 
-    @field_validator("mapping_plan", "spark_conf_per_dataset")
+    @field_validator("mapping_plans", "spark_conf_per_dataset")
     @classmethod
     def check_duplicate_dataset_ids(cls, value: list) -> list:
         dataset_ids: set[str] = set()
@@ -451,17 +451,17 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
         return value
 
     def set_dataset_mapper(self, new_mapper: DatasetMappingPlan) -> None:
-        for i, mapper in enumerate(self.mapping_plan):
+        for i, mapper in enumerate(self.mapping_plans):
             if mapper.dataset_id == new_mapper.dataset_id:
-                self.mapping_plan[i] = new_mapper
+                self.mapping_plans[i] = new_mapper
                 return
-        self.mapping_plan.append(new_mapper)
+        self.mapping_plans.append(new_mapper)
 
-    def get_dataset_mapper(self, dataset_id: str) -> DatasetMappingPlan | None:
-        """Return the mapper object for this dataset_id or None if the user did not
+    def get_dataset_mapping_plan(self, dataset_id: str) -> DatasetMappingPlan | None:
+        """Return the mapping plan for this dataset_id or None if the user did not
         specify one.
         """
-        for mapper in self.mapping_plan:
+        for mapper in self.mapping_plans:
             if dataset_id == mapper.dataset_id:
                 return mapper
         return None
@@ -598,6 +598,31 @@ class ProjectQueryModel(QueryBaseModel):
             "version",  # We use the project major version as a separate field.
         }
         return self.project.model_dump(mode="json", exclude=exclude)
+
+
+def make_query_for_standalone_dataset(
+    project_id: str,
+    dataset_id: str,
+    plan: DatasetMappingPlan | None = None,
+    column_type: ColumnType = ColumnType.DIMENSION_NAMES,
+) -> ProjectQueryModel:
+    plans: list[DatasetMappingPlan] = []
+    if plan is not None:
+        plans.append(plan)
+    return ProjectQueryModel(
+        name=dataset_id,
+        project=ProjectQueryParamsModel(
+            project_id=project_id,
+            dataset=DatasetModel(
+                dataset_id=dataset_id,
+                source_datasets=[StandaloneDatasetModel(dataset_id=dataset_id)],
+            ),
+            mapping_plans=plans,
+        ),
+        result=QueryResultParamsModel(
+            column_type=column_type,
+        ),
+    )
 
 
 class CreateCompositeDatasetQueryModel(QueryBaseModel):

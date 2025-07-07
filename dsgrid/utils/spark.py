@@ -523,9 +523,10 @@ def persist_intermediate_query(
 def write_dataframe_and_auto_partition(
     df: DataFrame,
     filename: Path,
-    partition_size_mb=MAX_PARTITION_SIZE_MB,
-    columns=None,
-    rtol_pct=50,
+    partition_size_mb: int = MAX_PARTITION_SIZE_MB,
+    columns: list[str] | None = None,
+    rtol_pct: float = 50,
+    min_num_partitions: int = 36,
 ) -> DataFrame:
     """Write a dataframe to a Parquet file and then automatically coalesce or repartition it if
     needed. If the file already exists, it will be overwritten.
@@ -541,6 +542,9 @@ def write_dataframe_and_auto_partition(
     rtol_pct : int
         Don't repartition or coalesce if the relative difference between desired and actual
         partitions is within this tolerance as a percentage.
+    min_num_partitions : int
+        Minimum number of partitions to create. If the number of partitions is less than this,
+        Do not coalesce/repartition because it will reduce parallelism.
 
     Raises
     ------
@@ -564,6 +568,18 @@ def write_dataframe_and_auto_partition(
 
     if use_duckdb():
         logger.debug("write_dataframe_and_auto_partition is not optimized for DuckDB")
+        return df
+
+    num_partitions = len(list(filename.parent.iterdir()))
+    if num_partitions < min_num_partitions:
+        logger.info(
+            "Not coalescing %s because it has only %s partitions, "
+            "which is less than the minimum of %s.",
+            filename,
+            num_partitions,
+            min_num_partitions,
+        )
+        # TODO: consider repartitioning to increase the number of partitions.
         return df
 
     partition_size_bytes = partition_size_mb * 1024 * 1024

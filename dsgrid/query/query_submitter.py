@@ -19,6 +19,7 @@ from dsgrid.dimension.base_models import DimensionCategory, DimensionType
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
+from dsgrid.query.dataset_mapping_plan import MappingOperationCheckpoint
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
 from dsgrid.spark.functions import pivot
@@ -54,7 +55,6 @@ class QuerySubmitterBase:
         self._output_dir = output_dir
         self._cached_tables_dir().mkdir(exist_ok=True, parents=True)
         self._composite_datasets_dir().mkdir(exist_ok=True, parents=True)
-        self._project_mapped_datasets_dir().mkdir(exist_ok=True, parents=True)
 
         # TODO #186: This location will need more consideration.
         # We might want to store cached datasets in the spark-warehouse and let Spark manage it
@@ -79,12 +79,6 @@ class QuerySubmitterBase:
         Data could be filtered.
         """
         return self._output_dir / "cached_project_mapped_datasets"
-
-    def _project_mapped_datasets_dir(self):
-        """Directory for datasets mapped to project base or supplemental dimensions.
-        Data cannot be filtered.
-        """
-        return self._output_dir / "project_mapped_datasets"
 
     @staticmethod
     def metadata_filename(path: Path):
@@ -205,7 +199,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
             for dataset_id in src_dataset_ids:
                 dataset = self._project.load_dataset(dataset_id, conn=conn)
-                mapper = query_model.project.get_dataset_mapper(dataset_id)
+                mapper = query_model.project.get_dataset_mapping_plan(dataset_id)
                 if mapper is None:
                     mapper = dataset.handler.build_default_dataset_mapping_plan()
                     query_model.project.set_dataset_mapper(mapper)
@@ -248,18 +242,43 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         self,
         scratch_dir_context: ScratchDirContext,
         model: ProjectQueryModel,
-        load_cached_table,
-        persist_intermediate_table,
-        zip_file=False,
-        force=False,
+        load_cached_table: bool,
+        checkpoint_file: Path | None,
+        persist_intermediate_table: bool,
+        zip_file: bool = False,
+        overwrite: bool = False,
     ):
         base_dimension_names = self._run_checks(model)
+        checkpoint = (
+            MappingOperationCheckpoint.from_file(checkpoint_file) if checkpoint_file else None
+        )
+        if checkpoint is not None:
+            confirmed_checkpoint = False
+            for dataset in model.project.dataset.source_datasets:
+                if dataset.get_dataset_id() == checkpoint.dataset_id:
+                    for plan in model.project.mapping_plans:
+                        if plan.dataset_id == checkpoint.dataset_id:
+                            if plan.compute_hash() == checkpoint.mapping_plan_hash:
+                                confirmed_checkpoint = True
+                            else:
+                                msg = (
+                                    f"The hash of the mapping plan for dataset {checkpoint.dataset_id} "
+                                    "does not match the checkpoint file. Cannot use the checkpoint."
+                                )
+                                raise DSGInvalidParameter(msg)
+            if not confirmed_checkpoint:
+                msg = f"Checkpoint {checkpoint_file} does not match any dataset in the query."
+                raise DSGInvalidParameter(msg)
+
         context = QueryContext(
-            model, base_dimension_names, scratch_dir_context=scratch_dir_context
+            model,
+            base_dimension_names,
+            scratch_dir_context=scratch_dir_context,
+            checkpoint=checkpoint,
         )
         context.model.project.version = str(self._project.version)
         output_dir = self._output_dir / context.model.name
-        if output_dir.exists() and not force:
+        if output_dir.exists() and not overwrite:
             raise DSGInvalidParameter(
                 f"output directory {self._output_dir} and query name={context.model.name} will "
                 "overwrite an existing query results directory. "
@@ -464,24 +483,27 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
     def submit(
         self,
         model: ProjectQueryModel,
-        scratch_dir: Optional[Path] = None,
-        persist_intermediate_table=True,
-        load_cached_table=True,
-        zip_file=False,
-        force=False,
+        scratch_dir: Path | None = None,
+        checkpoint_file: Path | None = None,
+        persist_intermediate_table: bool = True,
+        load_cached_table: bool = True,
+        zip_file: bool = False,
+        overwrite: bool = False,
     ):
         """Submits a project query to consolidate datasets and produce result tables.
 
         Parameters
         ----------
         model : ProjectQueryResultModel
+        checkpoint_file : bool, optional
+            Optional checkpoint file from which to resume the operation.
         persist_intermediate_table : bool, optional
             Persist the intermediate consolidated table.
         load_cached_table : bool, optional
             Load a cached consolidated table if the query matches an existing query.
         zip_file : bool, optional
             Create a zip file with all output files.
-        force : bool
+        overwrite : bool
             If True, overwrite any existing output directory.
 
         Returns
@@ -508,65 +530,13 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
                     scratch_dir_context,
                     model,
                     load_cached_table,
+                    checkpoint_file=checkpoint_file,
                     persist_intermediate_table=persist_intermediate_table,
                     zip_file=zip_file,
-                    force=force,
+                    overwrite=overwrite,
                 )
                 context.finalize()
                 return df
-
-
-class DatasetMapper(ProjectBasedQuerySubmitter):
-    """Map a dataset to a project's dimensions."""
-
-    def __init__(self, project: Project, dataset_id: str, *args, **kwargs):
-        super().__init__(project, *args, **kwargs)
-        self._dataset_id = dataset_id
-
-    @track_timing(timer_stats_collector)
-    def submit(
-        self,
-        scratch_dir: Optional[Path] = None,
-        overwrite: bool = False,
-    ) -> Path:
-        """Map a dataset to the project's base dimensions.
-
-        Parameters
-        ----------
-        dataset_id
-        load_cached_table : bool, optional
-            Load a cached consolidated table if the query matches an existing query.
-        zip_file : bool, optional
-            Create a zip file with all output files.
-        overwrite : bool
-            If True, overwrite any existing output directory.
-        """
-        tz = self._project.config.get_base_time_dimension().get_time_zone()
-        assert tz is not None, "Project base time dimension must have a time zone"
-        text, hash_value = self._make_dataset_hash()
-        # Ensure that queries that aggregate time reflect the project's time zone instead
-        # of the local computer.
-        # If any other settings get customized here, handle them in restart_spark()
-        # as well. This change won't persist Spark session restarts.
-        with custom_time_zone(tz.tz_name):
-            dir_name = self._project_mapped_datasets_dir() / hash_value / self._dataset_id
-            dir_name.mkdir(exist_ok=True, parents=True)
-            output_file = self._project.map_dataset(
-                self._dataset_id,
-                output_dir=dir_name,
-                overwrite=overwrite,
-                scratch_dir=scratch_dir,
-            )
-            metadata_file = dir_name / "metadata.json5"
-            metadata_file.write_text(text, encoding="utf-8")
-            return output_file
-
-    def _make_dataset_hash(self) -> tuple[str, str]:
-        # This will change when issue #343 is implemented to support supplemental dimensions.
-        query_names = self._project.config.get_dataset_base_dimension_names(self._dataset_id)
-        text = json.dumps({"dimension_names": query_names.model_dump(mode="json")}, indent=2)
-        hash_value = compute_hash(text.encode())
-        return text, hash_value
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
@@ -606,8 +576,9 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
                     scratch_dir_context,
                     model,
                     load_cached_table,
+                    None,
                     persist_intermediate_table,
-                    force=force,
+                    overwrite=force,
                 )
                 self._save_composite_dataset(context, df, not persist_intermediate_table)
                 context.finalize()

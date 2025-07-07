@@ -5,12 +5,14 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.spark.types import (
     DataFrame,
     StringType,
 )
 from dsgrid.utils.dataset import convert_types_if_necessary
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     read_dataframe,
     get_unique_values,
@@ -21,7 +23,6 @@ from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
 logger = logging.getLogger(__name__)
 
@@ -111,10 +112,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     f"load_data records do not match dimension records for {name}"
                 )
 
-    def make_dimension_association_table(self) -> DataFrame:
+    def make_dimension_association_table(self, context: ScratchDirContext) -> DataFrame:
         dim_cols = self._list_dimension_columns(self._load_data)
         df = self._load_data.select(*dim_cols).distinct()
-        df = self._remap_dimension_columns(df, self.build_default_dataset_mapping_plan())
+        plan = self.build_default_dataset_mapping_plan()
+        with DatasetMappingManager(self.dataset_id, plan, context) as mapping_manager:
+            df = self._remap_dimension_columns(df, mapping_manager)
         return self._remove_non_dimension_columns(df).distinct()
 
     @track_timing(timer_stats_collector)
@@ -143,37 +146,28 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         write_dataframe_and_auto_partition(load_df, path)
         logger.info("Rewrote simplified %s", self._config.load_data_path)
 
-    def make_project_dataframe(self, project_config, scratch_dir_context: ScratchDirContext):
-        ld_df = self._load_data
-        mapper = self.build_default_dataset_mapping_plan()
-        ld_df = self._remap_dimension_columns(
-            ld_df, mapper, scratch_dir_context=scratch_dir_context
-        )
-        ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
-        project_metric_records = self._get_project_metric_records(project_config)
-        ld_df = self._convert_units(ld_df, project_metric_records)
-        return self._convert_time_dimension(
-            ld_df, project_config, VALUE_COLUMN, scratch_dir_context
-        )
-
-    def make_project_dataframe_from_query(
+    def make_project_dataframe(
         self, context: QueryContext, project_config: ProjectConfig
-    ):
-        ld_df = self._load_data
-        ld_df = self._prefilter_stacked_dimensions(context, ld_df)
-        ld_df = self._prefilter_time_dimension(context, ld_df)
-        mapper = context.model.project.get_dataset_mapper(self._config.model.dataset_id)
-        assert mapper is not None
-        ld_df = self._remap_dimension_columns(
-            ld_df,
-            mapper,
-            filtered_records=context.get_record_ids(),
-            scratch_dir_context=context.scratch_dir_context,
-        )
-        ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
-        project_metric_records = self._get_project_metric_records(project_config)
-        ld_df = self._convert_units(ld_df, project_metric_records)
-        ld_df = self._convert_time_dimension(
-            ld_df, project_config, VALUE_COLUMN, context.scratch_dir_context
-        )
-        return self._finalize_table(context, ld_df, project_config)
+    ) -> DataFrame:
+        plan = context.model.project.get_dataset_mapping_plan(self.dataset_id)
+        if plan is None:
+            plan = self.build_default_dataset_mapping_plan()
+        with context.dataset_mapping_manager(self.dataset_id, plan) as mapping_manager:
+            ld_df = mapping_manager.try_read_checkpointed_table()
+            if ld_df is None:
+                ld_df = self._load_data
+                ld_df = self._prefilter_stacked_dimensions(context, ld_df)
+                ld_df = self._prefilter_time_dimension(context, ld_df)
+
+            ld_df = self._remap_dimension_columns(
+                ld_df,
+                mapping_manager,
+                filtered_records=context.get_record_ids(),
+            )
+            ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN}, mapping_manager)
+            project_metric_records = self._get_project_metric_records(project_config)
+            ld_df = self._convert_units(ld_df, project_metric_records, mapping_manager)
+            ld_df = self._convert_time_dimension(
+                ld_df, project_config, VALUE_COLUMN, mapping_manager
+            )
+            return self._finalize_table(context, ld_df, project_config)

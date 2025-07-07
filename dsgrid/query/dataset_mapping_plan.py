@@ -44,7 +44,7 @@ class MapOperation(DSGBaseModel):
     )
 
 
-class MappingOperationCheckpoint(DSGBaseModel):
+class MapOperationCheckpoint(DSGBaseModel):
     """Defines a completed mapping operation that has been persisted to the filesystem."""
 
     dataset_id: str

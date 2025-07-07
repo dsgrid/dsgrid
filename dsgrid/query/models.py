@@ -606,6 +606,17 @@ def make_query_for_standalone_dataset(
     plan: DatasetMappingPlan | None = None,
     column_type: ColumnType = ColumnType.DIMENSION_NAMES,
 ) -> ProjectQueryModel:
+    """Create a query to map a standalone dataset to a project's dimensions.
+
+    Parameters
+    ----------
+    project_id: str
+    dataset_id: str
+    plan: DatasetMappingPlan | None
+        Optional plan to control the mapping operation.
+    column_type: ColumnType
+        The type of columns in the result table. Default is ColumnType.DIMENSION_NAMES.
+    """
     plans: list[DatasetMappingPlan] = []
     if plan is not None:
         plans.append(plan)

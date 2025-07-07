@@ -48,7 +48,7 @@ from dsgrid.query.models import (
 )
 from dsgrid.query.dataset_mapping_plan import (
     DatasetMappingPlan,
-    MappingOperationCheckpoint,
+    MapOperationCheckpoint,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
@@ -509,7 +509,7 @@ def test_map_dataset(tmp_path):
     checkpoint_files = [x for x in scratch_dir.iterdir() if x.suffix == ".json"]
     assert len(checkpoint_files) == 2
     checkpoint_files.sort(key=lambda x: x.stat().st_mtime)
-    checkpoint = MappingOperationCheckpoint.from_file(checkpoint_files[-1])
+    checkpoint = MapOperationCheckpoint.from_file(checkpoint_files[-1])
     assert checkpoint.completed_operation_names == ["scenario", "county", "apply_fraction_op"]
 
     for i, checkpoint_file in enumerate(checkpoint_files):

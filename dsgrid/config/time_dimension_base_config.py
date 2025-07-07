@@ -62,7 +62,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         pyspark.sql.DataFrame
         """
         msg = f"{self.__class__.__name__}.build_time_dataframe is not implemented"
-        breakpoint()
         raise NotImplementedError(msg)
 
     @abc.abstractmethod

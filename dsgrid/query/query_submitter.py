@@ -19,7 +19,7 @@ from dsgrid.dimension.base_models import DimensionCategory, DimensionType
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter, DSGInvalidQuery
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.query.dataset_mapping_plan import MappingOperationCheckpoint
+from dsgrid.query.dataset_mapping_plan import MapOperationCheckpoint
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
 from dsgrid.spark.functions import pivot
@@ -199,12 +199,12 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
             for dataset_id in src_dataset_ids:
                 dataset = self._project.load_dataset(dataset_id, conn=conn)
-                mapper = query_model.project.get_dataset_mapping_plan(dataset_id)
-                if mapper is None:
-                    mapper = dataset.handler.build_default_dataset_mapping_plan()
-                    query_model.project.set_dataset_mapper(mapper)
+                plan = query_model.project.get_dataset_mapping_plan(dataset_id)
+                if plan is None:
+                    plan = dataset.handler.build_default_dataset_mapping_plan()
+                    query_model.project.set_dataset_mapper(plan)
                 else:
-                    dataset.handler.check_dataset_mapping_plan(mapper, self._project.config)
+                    dataset.handler.check_dataset_mapping_plan(plan, self._project.config)
 
             for dataset_id, names in zip(dataset_ids, query_names):
                 self._fix_legacy_base_dimension_names(names, dataset_id)
@@ -249,27 +249,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         overwrite: bool = False,
     ):
         base_dimension_names = self._run_checks(model)
-        checkpoint = (
-            MappingOperationCheckpoint.from_file(checkpoint_file) if checkpoint_file else None
-        )
-        if checkpoint is not None:
-            confirmed_checkpoint = False
-            for dataset in model.project.dataset.source_datasets:
-                if dataset.get_dataset_id() == checkpoint.dataset_id:
-                    for plan in model.project.mapping_plans:
-                        if plan.dataset_id == checkpoint.dataset_id:
-                            if plan.compute_hash() == checkpoint.mapping_plan_hash:
-                                confirmed_checkpoint = True
-                            else:
-                                msg = (
-                                    f"The hash of the mapping plan for dataset {checkpoint.dataset_id} "
-                                    "does not match the checkpoint file. Cannot use the checkpoint."
-                                )
-                                raise DSGInvalidParameter(msg)
-            if not confirmed_checkpoint:
-                msg = f"Checkpoint {checkpoint_file} does not match any dataset in the query."
-                raise DSGInvalidParameter(msg)
-
+        checkpoint = self._check_checkpoint_file(checkpoint_file, model)
         context = QueryContext(
             model,
             base_dimension_names,
@@ -319,6 +299,32 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             report.generate(table_filename, output_dir, context, report_inputs.inputs)
 
         return df, context
+
+    def _check_checkpoint_file(
+        self, checkpoint_file: Path | None, model: ProjectQueryModel
+    ) -> MapOperationCheckpoint | None:
+        if checkpoint_file is None:
+            return None
+
+        checkpoint = MapOperationCheckpoint.from_file(checkpoint_file)
+        confirmed_checkpoint = False
+        for dataset in model.project.dataset.source_datasets:
+            if dataset.get_dataset_id() == checkpoint.dataset_id:
+                for plan in model.project.mapping_plans:
+                    if plan.dataset_id == checkpoint.dataset_id:
+                        if plan.compute_hash() == checkpoint.mapping_plan_hash:
+                            confirmed_checkpoint = True
+                        else:
+                            msg = (
+                                f"The hash of the mapping plan for dataset {checkpoint.dataset_id} "
+                                "does not match the checkpoint file. Cannot use the checkpoint."
+                            )
+                            raise DSGInvalidParameter(msg)
+        if not confirmed_checkpoint:
+            msg = f"Checkpoint {checkpoint_file} does not match any dataset in the query."
+            raise DSGInvalidParameter(msg)
+
+        return checkpoint
 
     @track_timing(timer_stats_collector)
     def _persist_intermediate_result(self, context: QueryContext, df):

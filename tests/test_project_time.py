@@ -12,12 +12,6 @@ from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.query.query_context import QueryContext
-from dsgrid.query.models import (
-    DatasetBaseDimensionNamesModel,
-    ColumnType,
-    make_query_for_standalone_dataset,
-)
 from dsgrid.registry.registry_database import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.dimension.time import TimeZone, TimeIntervalType, get_zone_info_from_spark_session
@@ -119,18 +113,6 @@ def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
         raw_data=tempo_data_with_tz,
         converted_data=tempo_data_mapped_time,
     )
-
-
-def test_make_project_dataframe(project, resstock, comstock, tempo, scratch_dir_context):
-    query = make_query_for_standalone_dataset(
-        project.config.model.project_id,
-        resstock.dataset_id,
-        column_type=ColumnType.DIMENSION_TYPES,
-    )
-    context = QueryContext(query, DatasetBaseDimensionNamesModel(), scratch_dir_context)
-    tempo.make_project_dataframe(context, project.config)
-    comstock.make_project_dataframe(context, project.config)
-    resstock.make_project_dataframe(context, project.config)
 
 
 def shift_time_interval(

@@ -35,6 +35,7 @@ from dsgrid.query.models import (
     CreateCompositeDatasetQueryModel,
     CompositeDatasetQueryModel,
     StandaloneDatasetModel,
+    ColumnType,
     DatasetModel,
     make_query_for_standalone_dataset,
 )
@@ -393,6 +394,13 @@ $ dsgrid query project map_dataset project_id dataset_id
     help="Persist the intermediate table to the filesystem to allow for reuse.",
 )
 @click.option(
+    "-t",
+    "--column-type",
+    type=click.Choice([x.value for x in ColumnType]),
+    default=ColumnType.DIMENSION_NAMES.value,
+    callback=lambda *x: ColumnType(x[2]),
+)
+@click.option(
     "-z",
     "--zip-file",
     is_flag=True,
@@ -414,11 +422,14 @@ def map_dataset(
     output: Path,
     load_cached_table: bool,
     overwrite: bool,
+    column_type: ColumnType,
     zip_file: bool,
 ):
     """Map a dataset to the project's base dimensions."""
     plan = DatasetMappingPlan.from_file(mapping_plan) if mapping_plan else None
-    query = make_query_for_standalone_dataset(project_id, dataset_id, plan)
+    query = make_query_for_standalone_dataset(
+        project_id, dataset_id, plan, column_type=column_type
+    )
     _run_project_query(
         ctx=ctx,
         query=query,

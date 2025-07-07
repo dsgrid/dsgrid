@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 from typing import Self
 
-from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MappingOperationCheckpoint
+from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperationCheckpoint
 from dsgrid.spark.types import DataFrame
 from dsgrid.utils.files import delete_if_exists
 from dsgrid.utils.spark import read_dataframe, write_dataframe
@@ -19,7 +19,7 @@ class DatasetMappingManager:
         dataset_id: str,
         plan: DatasetMappingPlan,
         scratch_dir_context: ScratchDirContext,
-        checkpoint: MappingOperationCheckpoint | None = None,
+        checkpoint: MapOperationCheckpoint | None = None,
     ):
         self._dataset_id = dataset_id
         self._plan = plan
@@ -78,7 +78,7 @@ class DatasetMappingManager:
             if mapping_op.name == name:
                 break
 
-        checkpoint = MappingOperationCheckpoint(
+        checkpoint = MapOperationCheckpoint(
             dataset_id=self._dataset_id,
             completed_operation_names=completed_operation_names,
             persisted_table_filename=persisted_table,

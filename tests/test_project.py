@@ -1,6 +1,6 @@
 import pytest
 
-from dsgrid.config.project_config import DatasetBaseDimensionNamesModel, ProjectConfig
+from dsgrid.config.project_config import ProjectConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
@@ -11,8 +11,6 @@ from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
 )
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
-from dsgrid.query.models import ColumnType, make_query_for_standalone_dataset
-from dsgrid.query.query_context import QueryContext
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 
@@ -188,19 +186,6 @@ def test_dataset_load(cached_registry, scratch_dir_context):
     dataset = project.get_dataset(DATASET_ID)
 
     assert isinstance(dataset, Dataset)
-    query = make_query_for_standalone_dataset(
-        PROJECT_ID, DATASET_ID, column_type=ColumnType.DIMENSION_TYPES
-    )
-    context = QueryContext(
-        query,
-        DatasetBaseDimensionNamesModel(),
-        scratch_dir_context=scratch_dir_context,
-    )
-    data = dataset.make_project_dataframe(context, project.config)
-    assert "timestamp" in data.columns
-    assert DimensionType.METRIC.value in data.columns
-    assert DimensionType.GEOGRAPHY.value in data.columns
-
     query_names = sorted(project.config.list_dimension_names_by_type(DimensionType.GEOGRAPHY))
     assert query_names == [
         "US Census Divisions",

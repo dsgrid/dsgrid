@@ -12,7 +12,7 @@ from dsgrid.dataset.models import PivotedTableFormatModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel, ProjectConfig
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
-from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MappingOperationCheckpoint
+from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperationCheckpoint
 from dsgrid.spark.functions import drop_temp_tables_and_views
 from dsgrid.spark.types import DataFrame
 from dsgrid.utils.spark import get_spark_session
@@ -31,7 +31,7 @@ class QueryContext:
         model: ProjectQueryModel,
         base_dimension_names: DatasetBaseDimensionNamesModel,
         scratch_dir_context: ScratchDirContext,
-        checkpoint: MappingOperationCheckpoint | None = None,
+        checkpoint: MapOperationCheckpoint | None = None,
     ) -> None:
         self._model = model
         self._record_ids_by_dimension_type: dict[DimensionType, list[tuple[str]]] = {}
@@ -56,7 +56,7 @@ class QueryContext:
         return self._model
 
     @property
-    def base_dimension_names(self) -> DatasetMetadataModel:
+    def base_dimension_names(self) -> DatasetBaseDimensionNamesModel:
         return self._metadata.base_dimension_names
 
     @property
@@ -156,28 +156,27 @@ class QueryContext:
     ) -> None:
         table_format = UnpivotedTableFormatModel()
         self._dataset_metadata[dataset_id] = DatasetMetadataModel(table_format=table_format)
-        for (
-            dim_type,
-            names,
-        ) in project_config.get_dimension_type_to_base_name_mapping().items():
-            for name in names:
-                match (column_type, dim_type):
-                    case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
-                        # This uses the project dimension because the dataset is being mapped.
-                        time_columns = project_config.get_load_data_time_columns(name)
-                        column_names = time_columns
-                    case (ColumnType.DIMENSION_NAMES, _):
-                        column_names = [name]
-                    case (ColumnType.DIMENSION_TYPES, _):
-                        column_names = [dim_type.value]
-                    case _:
-                        msg = f"Bug: need to support {column_type=} {dim_type=}"
-                        raise NotImplementedError(msg)
-                self.add_dimension_metadata(
-                    dim_type,
-                    DimensionMetadataModel(dimension_name=name, column_names=column_names),
-                    dataset_id=dataset_id,
-                )
+        base_dimension_names = self.base_dimension_names
+        for dim_type in DimensionType:
+            name = getattr(base_dimension_names, dim_type.value)
+            assert name is not None
+            match (column_type, dim_type):
+                case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
+                    # This uses the project dimension because the dataset is being mapped.
+                    time_columns = project_config.get_load_data_time_columns(name)
+                    column_names = time_columns
+                case (ColumnType.DIMENSION_NAMES, _):
+                    column_names = [name]
+                case (ColumnType.DIMENSION_TYPES, _):
+                    column_names = [dim_type.value]
+                case _:
+                    msg = f"Bug: need to support {column_type=} {dim_type=}"
+                    raise NotImplementedError(msg)
+            self.add_dimension_metadata(
+                dim_type,
+                DimensionMetadataModel(dimension_name=name, column_names=column_names),
+                dataset_id=dataset_id,
+            )
 
     def convert_to_pivoted(self) -> str:
         assert isinstance(self.model.result.table_format, PivotedTableFormatModel)

@@ -1,6 +1,6 @@
 """Standard dimension classes for dsgrid"""
 
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Optional
 
 from pydantic import Field
@@ -79,7 +79,7 @@ class Subsector(SubsectorDimensionBaseModel):
 # METRIC DIMENSIONS
 # ---------------------------
     
-class FunctionalForm(str, Enum):
+class FunctionalForm(StrEnum):
     """Functional forms for regression parameters"""
 
     # y = a0 + a1 * x + a2 * x^2 + ...
@@ -87,6 +87,7 @@ class FunctionalForm(str, Enum):
     # ln y = a0 + a1 * x + a2 * x^2 + ...
     # y = exp(a0 + a1 * x + a2 * x^2 + ...)
     EXPONENTIAL = "exponential"
+
 
 class EnergyEndUse(MetricDimensionBaseModel):
     """Energy Demand End Use attributes"""
@@ -193,10 +194,6 @@ class WeatherYear(WeatherYearDimensionBaseModel):
 
 class ModelYear(ModelYearDimensionBaseModel):
     """Model Year attributes"""
-
-
-class DataSource(DataSourceDimensionBaseModel):
-    """DataSource attributes"""
 
 
 class Scenario(ScenarioDimensionBaseModel):

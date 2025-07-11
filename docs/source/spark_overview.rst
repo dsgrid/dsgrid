@@ -591,11 +591,16 @@ repartition like this:
 
     df.repartition(column_name).write.partitionBy(column_name).parquet("data.parquet")
 
+.. _executors-spilling-to-disk:
+
 Executors are spilling to disk
 ------------------------------
-You are observing that the Spark job seems stalled. Most of the work in a stage is complete, but
-one or two executors are still running. You see this log message over and over in the ``stderr``
-log files (e.g., ``spark_scratch/workers/app-20250115165825-0006/1/stderr``):
+You are observing that the Spark job seems stalled.
+
+- Most of the work in a stage is complete, but one or two executors are still running.
+- Only 1-2 CPUs out of the entire cluster show any activity.
+- You see this log message over and over in the ``stderr`` log files
+  (e.g., ``spark_scratch/workers/app-20250115165825-0006/1/stderr``):
 
 .. code-block:: console
 
@@ -637,3 +642,6 @@ from large and small counties, you can use a salting technique to balance the da
         .groupBy("county", "salt_column") \
         .agg(F.sum("county")) \
         .drop("salt_column")
+
+dsgrid will employ this technique for specific mapping types or when you enabled `handle_data_skew`
+in a dataset's mapping plan.

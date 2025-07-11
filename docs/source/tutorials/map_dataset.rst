@@ -48,6 +48,10 @@ Points to consider when creating a mapping plan:
 - If a dimension mapping operation will increase the size of data, such as a disaggregation or
   duplication, list that operation last and persist the query just before it. We have experienced
   the most problems with Spark with this type of operation.
+- Some disaggregation operations can cause data skew. dsgrid will automatically enable techniques
+  to handle this condition with certain mapping types. If you experience this problem, you may need
+  to set `handle_data_skew: true` in the mapping plan for that operation. Refer to
+  :ref:`executors-spilling-to-disk` for information on how to identify this condition.
 
 Below is an example mapping plan in JSON formation. The dataset in this example has a one-to-one
 mapping for the scenario dimension, a many-to-many mapping for the model_year dimension, and a

@@ -1,16 +1,16 @@
 ***************************************
 Map a dataset to a project's dimensions
 ***************************************
-It is often beneficial to map a dataset to a project's dimensions before running queries that
-perform aggregations or filters with other datasets. Mapping a dataset can be an expensive
+It is often beneficial to map a dataset to a project's dimensions before running queries with other
+datasets that perform aggregations or filters. Mapping a dataset with Spark can be an expensive
 operation that takes several iterations to figure out with Spark. It is easier to debug in
 isolation. Once complete, the cached result can be used for subsequent queries.
 
 This page assumes that you have already registered a dataset and submitted it to a project.
-Also assumed is that you have populated your ``~/.dsgrid.json5`` file with the location of your
+It also assumes that you have populated your ``~/.dsgrid.json5`` file with the location of your
 dsgrid registry.
 
-Spark runtime details are not covered.
+Spark runtime details are not covered here. Refer to :ref:`spark-overview`.
 
 Basic operation
 ===============
@@ -20,18 +20,17 @@ dsgrid offers a CLI command to perform the mapping operation. This is its simple
 
     $ dsgrid query project map-dataset my-project-id my-dataset-id
 
-By default, this will attempt to map all dimensions and perform queries operations in three Spark
-queries:
+By default, this will attempt to map all dimensions by performing three Spark queries:
 
-1. Map all dimensions that do not already match the project. Apply scaling factors if assigned.
-   Convert units. Persist the result to the filesystem.
+1. Map all dimensions other than time that do not already match the project. Apply scaling factors
+   if assigned and automatically convert units if applicable. Persist the result to the filesystem.
 2. Map the time dimension. Persist the result to the filesystem.
 3. Finalize the table: convert user-defined options, such as column names. Add null rows as
    necessary.
 
 If the dataset is less than 10 GB, this process should run smoothly with Spark. If the dataset
 grows to hundreds of GBs or more, you may experience problems. Our recommendation is to use
-dsgrid features to work in an iterative manner.
+the dsgrid mapping plan features described below to work in an iterative manner.
 
 Mapping Plan
 ============
@@ -59,7 +58,7 @@ disaggregation is failing. Here is our rationale for the plan:
    but takes some time. We may have to run the geography disaggregation several times, and so we
    want to avoid repeating this work.
 2. Persist the result after mapping the geography dimension so that we don't have to repeat the work
-   once figure out the solution.
+   once we figure out the solution.
 
 .. code-block:: JavaScript
 
@@ -104,7 +103,8 @@ If the job fails, you can resume by specifying that checkpoint file as follows:
         --checkpoint-file /kfs3/scratch/dthom/dsgrid-project/__dsgrid_scratch__/tmpgn_6xbst.json
 
 Note that the checkpoint file defines what mapping operations completed and contains a reference to
-the persisted table. You can use that table to perform your own debugging.
+the persisted table. You can use that table to perform your own debugging. You could look at the
+size and number of partitions of the table, for example, to see if it is what you expect.
 
 .. code-block:: console
 

@@ -615,13 +615,14 @@ was not able to perform a sort in memory, and so spilled to disk. This is very s
 Try to double or triple the executor memory. You can do this by setting the
 ``spark.executor.memory`` value in ``spark-defaults.conf``. You can set that value directly by
 editing the file or indirectly by setting ``--executor-cores`` to 10 or 15 (default is 5), thereby
-reducing the number of executors and giving each executor more memory.
+reducing the number of executors (by assigning each one more of the total available cores) and
+giving each executor more memory.
 
-You can also acquire a bigmem node. The debug partition on Kestrel usually has two bigmem nodes.
-They have 2 TB of memory. Our Spark scripts will allocate 70 GB of memory per executor.
+You can also acquire a bigmem node, which has 2 TB of memory. On these nodes, our Spark scripts will
+allocate 70 GB of memory per executor. The debug partition on Kestrel usually has two bigmem nodes.
 
-Third, you may be experiencing data skew. This has happened frequently when performing a dimension
-mapping operation that explodes data sizes by disaggregating or duplicating data. One or two
+Third, you may be experiencing data skew. This has happened frequently when performing dimension
+mapping operations that explode data sizes by disaggregating or duplicating data. One or two
 executors end up with significantly more data than the others, and get stuck. Refer to the next
 section.
 

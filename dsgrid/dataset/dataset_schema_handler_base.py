@@ -283,7 +283,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if not self._config.model.enable_unit_conversion:
             return df
 
-        if mapping_manager.has_completed_operation(mapping_manager.plan.convert_units_op.name):
+        op = mapping_manager.plan.convert_units_op
+        if mapping_manager.has_completed_operation(op):
             return df
 
         # Note that a dataset could have the same dimension record IDs as the project,
@@ -306,10 +307,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
             mapping_records,
             project_metric_records,
         )
-        if mapping_manager.plan.convert_units_op.persist:
-            df = mapping_manager.plan.persist_intermediate_table(
-                df, mapping_manager.plan.convert_units_op.name
-            )
+        if op.persist:
+            df = mapping_manager.persist_intermediate_table(df, op)
         return df
 
     def _finalize_table(self, context: QueryContext, df, project_config):
@@ -604,9 +603,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     repartition=dim_mapping.handle_data_skew,
                 )
                 if dim_mapping.persist and persisted_file is None:
-                    mapping_manager.persist_intermediate_table(df, dim_mapping.name)
+                    mapping_manager.persist_intermediate_table(df, dim_mapping)
                 if persisted_file is not None:
-                    mapping_manager.save_checkpoint(persisted_file, dim_mapping.name)
+                    mapping_manager.save_checkpoint(persisted_file, dim_mapping)
 
         return df
 
@@ -617,9 +616,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         mapping_manager: DatasetMappingManager,
         agg_func=None,
     ):
+        op = mapping_manager.plan.apply_fraction_op
         if "fraction" not in df.columns:
             return df
-        if mapping_manager.has_completed_operation(mapping_manager.plan.apply_fraction_op.name):
+        if mapping_manager.has_completed_operation(op):
             return df
         agg_func = agg_func or F.sum
         # Maintain column order.
@@ -630,10 +630,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         gcols = set(df.columns) - value_columns - {"fraction"}
         df = df.groupBy(*ordered_subset_columns(df, gcols)).agg(*agg_ops)
         df = df.drop("fraction")
-        if mapping_manager.plan.apply_fraction_op.persist:
-            df = mapping_manager.persist_intermediate_table(
-                df, mapping_manager.plan.apply_fraction_op.name
-            )
+        if op.persist:
+            df = mapping_manager.persist_intermediate_table(df, op)
         return df
 
     @track_timing(timer_stats_collector)
@@ -644,7 +642,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         value_column: str,
         mapping_manager: DatasetMappingManager,
     ):
-        if mapping_manager.has_completed_operation(mapping_manager.plan.map_time_op.name):
+        op = mapping_manager.plan.map_time_op
+        if mapping_manager.has_completed_operation(op):
             return load_data_df
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
@@ -725,10 +724,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")
 
-        if mapping_manager.plan.map_time_op.persist:
-            load_data_df = mapping_manager.plan.persist_intermediate_table(
-                load_data_df, mapping_manager.plan.map_time_op.name
-            )
+        if op.persist:
+            load_data_df = mapping_manager.persist_intermediate_table(load_data_df, op)
         return load_data_df
 
     def _validate_daylight_saving_adjustment(self, time_based_data_adjustment):

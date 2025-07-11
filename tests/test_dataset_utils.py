@@ -1,6 +1,5 @@
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 import logging
-import os
 
 import pytest
 
@@ -318,23 +317,6 @@ def test_repartition_if_needed_by_mapping(tmp_path, caplog, dataframes):
             context,
         )
         assert "Completed repartition" in caplog.text
-
-
-@pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")
-def test_repartition_if_needed_by_mapping_override(tmp_path, caplog, dataframes):
-    df = dataframes[0]
-    context = ScratchDirContext(tmp_path)
-    os.environ["DSGRID_SKIP_MAPPING_SKEW_REPARTITION"] = "true"
-    try:
-        with caplog.at_level(logging.INFO):
-            df, _ = repartition_if_needed_by_mapping(
-                df,
-                DimensionMappingType.ONE_TO_MANY_DISAGGREGATION,
-                context,
-            )
-            assert "DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true" in caplog.text
-    finally:
-        os.environ.pop("DSGRID_SKIP_MAPPING_SKEW_REPARTITION")
 
 
 @pytest.mark.skipif(use_duckdb(), reason="This feature is not used with DuckDB.")

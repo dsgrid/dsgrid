@@ -138,15 +138,14 @@ def apply_scaling_factor(
     scaling_factor_column: str = SCALING_FACTOR_COLUMN,
 ) -> DataFrame:
     """Apply the scaling factor to all value columns and then drop the scaling factor column."""
-    if mapping_manager.has_completed_operation(mapping_manager.plan.apply_scaling_factor_op.name):
+    op = mapping_manager.plan.apply_scaling_factor_op
+    if mapping_manager.has_completed_operation(op):
         return df
 
     func = _apply_scaling_factor_duckdb if use_duckdb() else _apply_scaling_factor_spark
     df = func(df, value_column, scaling_factor_column)
     if mapping_manager.plan.apply_scaling_factor_op.persist:
-        df = mapping_manager.persist_intermediate_table(
-            df, mapping_manager.plan.apply_scaling_factor_op.name
-        )
+        df = mapping_manager.persist_intermediate_table(df, op)
     return df
 
 
@@ -456,7 +455,6 @@ def repartition_if_needed_by_mapping(
     # Apply the technique to mappings that will cause an explosion of rows.
     # Note that this probably isn't needed in all cases and we may need to adjust in the
     # future.
-    # The case with buildings was particularly severe because it is an unpivoted dataset.
 
     # Note: log messages below are checked in the tests.
     if repartition or (
@@ -472,10 +470,6 @@ def repartition_if_needed_by_mapping(
             # DimensionMappingType.DUPLICATION,
         }
     ):
-        if os.environ.get("DSGRID_SKIP_MAPPING_SKEW_REPARTITION", "false").lower() == "true":
-            logger.info("DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true; skip repartitions")
-            return df, None
-
         filename = scratch_dir_context.get_temp_filename(suffix=".parquet")
         # Salting techniques online talk about adding or modifying a column with random values.
         # We might be able to use one of our value columns. However, there are cases where there

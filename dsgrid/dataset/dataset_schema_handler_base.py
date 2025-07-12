@@ -31,7 +31,8 @@ from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import (
     DaylightSavingAdjustmentModel,
 )
-from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapDimensionOperation
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
+from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperation
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.spark.functions import join, make_temp_view_name
@@ -108,7 +109,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """Check the time consistency of the dataset."""
 
     @abc.abstractmethod
-    def make_dimension_association_table(self) -> DataFrame:
+    def make_dimension_association_table(self, context: ScratchDirContext) -> DataFrame:
         """Return a dataframe containing one row for each unique dimension combination except time."""
 
     @abc.abstractmethod
@@ -139,24 +140,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return self._config
 
     @abc.abstractmethod
-    def make_project_dataframe(
-        self, project_config, scratch_dir_context: ScratchDirContext
-    ) -> DataFrame:
-        """Return a load_data dataframe with dimensions mapped to the project's.
-
-        Parameters
-        ----------
-        project_config: ProjectConfig
-        scratch_dir_context: ScratchDirContext
-
-        Returns
-        -------
-        pyspark.sql.DataFrame
-
-        """
-
-    @abc.abstractmethod
-    def make_project_dataframe_from_query(self, context, project_config) -> DataFrame:
+    def make_project_dataframe(self, context, project_config) -> DataFrame:
         """Return a load_data dataframe with dimensions mapped to the project's with filters
         as specified by the QueryContext.
 
@@ -290,8 +274,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if VALUE_COLUMN not in df.columns:
             raise DSGInvalidDataset(f"value_column={VALUE_COLUMN} is not in columns={df.columns}")
 
-    def _convert_units(self, df: DataFrame, project_metric_records: DataFrame):
+    def _convert_units(
+        self,
+        df: DataFrame,
+        project_metric_records: DataFrame,
+        mapping_manager: DatasetMappingManager,
+    ):
         if not self._config.model.enable_unit_conversion:
+            return df
+
+        op = mapping_manager.plan.convert_units_op
+        if mapping_manager.has_completed_operation(op):
             return df
 
         # Note that a dataset could have the same dimension record IDs as the project,
@@ -307,13 +300,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         dataset_dim = self._config.get_dimension_with_records(DimensionType.METRIC)
         dataset_records = dataset_dim.get_records_dataframe()
-        return convert_units_unpivoted(
+        df = convert_units_unpivoted(
             df,
             DimensionType.METRIC.value,
             dataset_records,
             mapping_records,
             project_metric_records,
         )
+        if op.persist:
+            df = mapping_manager.persist_intermediate_table(df, op)
+        return df
 
     def _finalize_table(self, context: QueryContext, df, project_config):
         table_handler = make_table_format_handler(
@@ -458,15 +454,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def build_default_dataset_mapping_plan(self) -> DatasetMappingPlan:
         """Build a default mapping order of dimensions to a project."""
-        mappings: list[MapDimensionOperation] = []
+        mappings: list[MapOperation] = []
         for ref in self._mapping_references:
             config = self._dimension_mapping_mgr.get_by_id(ref.mapping_id, conn=self.connection)
             dim = self._dimension_mgr.get_by_id(
                 config.model.to_dimension.dimension_id, conn=self.connection
             )
             mappings.append(
-                MapDimensionOperation(
-                    dimension_name=dim.model.name,
+                MapOperation(
+                    name=dim.model.name,
                     mapping_reference=ref,
                 )
             )
@@ -476,7 +472,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def check_dataset_mapping_plan(
         self, mapping_plan: DatasetMappingPlan, project_config: ProjectConfig
     ) -> None:
-        """Check that a user-defined mapping order is valid."""
+        """Check that a user-defined mapping plan is valid."""
         req_dimensions: dict[DimensionType, DimensionMappingReferenceModel] = {}
         actual_mapping_dims: dict[DimensionType, str] = {}
 
@@ -487,11 +483,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
         dataset_id = mapping_plan.dataset_id
         indexes_to_remove: list[int] = []
         for i, mapping in enumerate(mapping_plan.mappings):
-            to_dim = project_config.get_dimension(mapping.dimension_name)
+            to_dim = project_config.get_dimension(mapping.name)
             if to_dim.model.dimension_type == DimensionType.TIME:
                 msg = (
                     f"DatasetMappingPlan for {dataset_id=} is invalid because specification "
-                    f"of the time dimension is not supported: {mapping.dimension_name}"
+                    f"of the time dimension is not supported: {mapping.name}"
                 )
                 raise DSGInvalidDimensionMapping(msg)
             if to_dim.model.dimension_type in actual_mapping_dims:
@@ -500,7 +496,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     f"support mapping one dimension for a given dimension type. "
                     f"type={to_dim.model.dimension_type} "
                     f"first={actual_mapping_dims[to_dim.model.dimension_type]} "
-                    f"second={mapping.dimension_name}"
+                    f"second={mapping.name}"
                 )
                 raise DSGInvalidDimensionMapping(msg)
 
@@ -509,14 +505,14 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 x.model.name
                 for x in project_config.list_supplemental_dimensions(to_dim.model.dimension_type)
             }
-            if mapping.dimension_name in supp_dim_names:
+            if mapping.name in supp_dim_names:
                 # This could be useful if we wanted to use DatasetMappingPlan for mapping
                 # a single dataset to a project's dimensions without being concerned about
                 # aggregrations. As it stands, we can are only using this within our
                 # project query process. We need much more handling to make that work.
                 msg = (
                     "DatasetMappingPlan for {dataset_id=} is invalid because it specifies "
-                    f"a supplemental dimension: {mapping.dimension_name}"
+                    f"a supplemental dimension: {mapping.name}"
                 )
             elif to_dim.model.dimension_type not in req_dimensions:
                 msg = (
@@ -534,7 +530,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 and to_dim.model.dimension_id == mapping_config.model.to_dimension.dimension_id
             ):
                 mapping.mapping_reference = ref
-                actual_mapping_dims[to_dim.model.dimension_type] = mapping.dimension_name
+                actual_mapping_dims[to_dim.model.dimension_type] = mapping.name
 
         for index in indexes_to_remove:
             mapping_plan.mappings.pop(index)
@@ -554,9 +550,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _remap_dimension_columns(
         self,
         df: DataFrame,
-        plan: DatasetMappingPlan,
-        filtered_records: dict[str, DataFrame] | None = None,
-        scratch_dir_context: ScratchDirContext | None = None,
+        mapping_manager: DatasetMappingManager,
+        filtered_records: dict[DimensionType, DataFrame] | None = None,
     ) -> DataFrame:
         """Map the table's dimensions according to the plan.
 
@@ -564,15 +559,21 @@ class DatasetSchemaHandlerBase(abc.ABC):
         ----------
         df
             The dataframe to map.
-        plan
-            Specifies the order of dimensions to map and any secondary operations.
+        mapping_manager
+            Manages checkpointing and order of the mapping operations.
         filtered_records
             If not None, use these records to filter the table.
-        scratch_dir_context
             If None, do not persist any intermediate tables.
             If not None, use this context to persist intermediate tables if required.
         """
-        for dim_mapping in plan.mappings:
+        completed_operations = mapping_manager.get_completed_mapping_operations()
+        for dim_mapping in mapping_manager.plan.mappings:
+            if dim_mapping.name in completed_operations:
+                logger.info(
+                    "Skip mapping operation %s because the result exists in a checkpointed file.",
+                    dim_mapping.name,
+                )
+                continue
             assert dim_mapping.mapping_reference is not None
             ref = dim_mapping.mapping_reference
             dim_type = ref.from_dimension_type
@@ -595,23 +596,30 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if column in df.columns:
                 persisted_file: Path | None = None
                 df = map_and_reduce_stacked_dimension(df, records, column)
-                if scratch_dir_context is not None:
-                    df, persisted_file = repartition_if_needed_by_mapping(
-                        df,
-                        mapping_config.model.mapping_type,
-                        scratch_dir_context,
-                        repartition=dim_mapping.handle_data_skew,
-                    )
-                    if dim_mapping.persist and persisted_file is None:
-                        persisted_file = scratch_dir_context.get_temp_filename(suffix=".parquet")
-                        write_dataframe(df, persisted_file)
-                        logger.info("Persisted %s to %s", column, persisted_file)
-                        df = read_dataframe(persisted_file)
+                df, persisted_file = repartition_if_needed_by_mapping(
+                    df,
+                    mapping_config.model.mapping_type,
+                    mapping_manager.scratch_dir_context,
+                    repartition=dim_mapping.handle_data_skew,
+                )
+                if dim_mapping.persist and persisted_file is None:
+                    mapping_manager.persist_intermediate_table(df, dim_mapping)
+                if persisted_file is not None:
+                    mapping_manager.save_checkpoint(persisted_file, dim_mapping)
 
         return df
 
-    def _apply_fraction(self, df, value_columns, agg_func=None):
+    def _apply_fraction(
+        self,
+        df,
+        value_columns,
+        mapping_manager: DatasetMappingManager,
+        agg_func=None,
+    ):
+        op = mapping_manager.plan.apply_fraction_op
         if "fraction" not in df.columns:
+            return df
+        if mapping_manager.has_completed_operation(op):
             return df
         agg_func = agg_func or F.sum
         # Maintain column order.
@@ -621,7 +629,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         ]
         gcols = set(df.columns) - value_columns - {"fraction"}
         df = df.groupBy(*ordered_subset_columns(df, gcols)).agg(*agg_ops)
-        return df.drop("fraction")
+        df = df.drop("fraction")
+        if op.persist:
+            df = mapping_manager.persist_intermediate_table(df, op)
+        return df
 
     @track_timing(timer_stats_collector)
     def _convert_time_dimension(
@@ -629,8 +640,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
         load_data_df: DataFrame,
         project_config: ProjectConfig,
         value_column: str,
-        scratch_dir_context: ScratchDirContext,
+        mapping_manager: DatasetMappingManager,
     ):
+        op = mapping_manager.plan.map_time_op
+        if mapping_manager.has_completed_operation(op):
+            return load_data_df
         input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
         wrap_time_allowed = input_dataset_model.wrap_time_allowed
         time_based_data_adjustment = input_dataset_model.time_based_data_adjustment
@@ -675,7 +689,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_time_dimension(),
-                    scratch_dir_context=scratch_dir_context,
+                    scratch_dir_context=mapping_manager.scratch_dir_context,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
@@ -683,7 +697,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             case (BackendEngine.SPARK, False):
                 filename = persist_intermediate_table(
                     load_data_df,
-                    scratch_dir_context,
+                    mapping_manager.scratch_dir_context,
                     tag="query before time mapping",
                 )
                 load_data_df = map_time_dimension_with_chronify_spark_path(
@@ -692,7 +706,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_time_dimension(),
-                    scratch_dir_context=scratch_dir_context,
+                    scratch_dir_context=mapping_manager.scratch_dir_context,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
@@ -702,7 +716,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     value_column=value_column,
                     from_time_dim=time_dim,
                     to_time_dim=project_config.get_base_time_dimension(),
-                    scratch_dir_context=scratch_dir_context,
+                    scratch_dir_context=mapping_manager.scratch_dir_context,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
                 )
@@ -710,6 +724,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if time_dim.model.is_time_zone_required_in_geography():
             load_data_df = load_data_df.drop("time_zone")
 
+        if op.persist:
+            load_data_df = mapping_manager.persist_intermediate_table(load_data_df, op)
         return load_data_df
 
     def _validate_daylight_saving_adjustment(self, time_based_data_adjustment):

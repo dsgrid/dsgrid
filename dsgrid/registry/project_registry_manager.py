@@ -1313,7 +1313,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         dataset_id = dataset_config.config_id
 
         with ScratchDirContext(self._params.scratch_dir) as scontext:
-            mapped_dataset_table = handler.make_dimension_association_table()
+            mapped_dataset_table = handler.make_dimension_association_table(scontext)
             project_table = self._make_dimension_associations(project_config, dataset_id, scontext)
             cols = sorted(project_table.columns)
             cache(mapped_dataset_table)

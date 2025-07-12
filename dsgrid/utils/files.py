@@ -15,7 +15,7 @@ import json5
 logger = logging.getLogger(__name__)
 
 
-def compute_file_hash(filename):
+def compute_file_hash(filename) -> str:
     """Compute a hash of the contents of a file.
 
     Parameters
@@ -31,7 +31,7 @@ def compute_file_hash(filename):
     return compute_hash(Path(filename).read_bytes())
 
 
-def compute_hash(text: bytes):
+def compute_hash(text: bytes) -> str:
     hash_obj = hashlib.sha256()
     hash_obj.update(text)
     return hash_obj.hexdigest()
@@ -47,7 +47,7 @@ def delete_if_exists(path: Path | str) -> None:
             path.unlink()
 
 
-def dump_data(data, filename, **kwargs):
+def dump_data(data, filename, **kwargs) -> None:
     """Dump data to the filename.
     Supports JSON, TOML, or custom via kwargs.
 

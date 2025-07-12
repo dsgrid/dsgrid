@@ -1,6 +1,7 @@
 import pytest
 
 from dsgrid.config.project_config import ProjectConfig
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.project import Project
 from dsgrid.dataset.dataset import Dataset
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
@@ -185,11 +186,6 @@ def test_dataset_load(cached_registry, scratch_dir_context):
     dataset = project.get_dataset(DATASET_ID)
 
     assert isinstance(dataset, Dataset)
-    data = dataset.make_project_dataframe(project.config, scratch_dir_context)
-    assert "timestamp" in data.columns
-    assert DimensionType.METRIC.value in data.columns
-    assert DimensionType.GEOGRAPHY.value in data.columns
-
     query_names = sorted(project.config.list_dimension_names_by_type(DimensionType.GEOGRAPHY))
     assert query_names == [
         "US Census Divisions",
@@ -211,13 +207,14 @@ def test_dimension_map_and_reduce_in_dataset(cached_registry):
 
     load_data_df = dataset._handler._load_data
     load_data_lookup_df = dataset._handler._load_data_lookup
-    mapper = dataset.handler.build_default_dataset_mapping_plan()
-    mapped_load_data = dataset._handler._remap_dimension_columns(
-        load_data_df,
-        mapper,
-        scratch_dir_context=ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir()),
-    )
-    mapped_load_data_lookup = dataset.handler._remap_dimension_columns(load_data_lookup_df, mapper)
+    plan = dataset.handler.build_default_dataset_mapping_plan()
+    context = ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir())
+    with DatasetMappingManager(DATASET_ID, plan, context) as mgr:
+        mapped_load_data = dataset._handler._remap_dimension_columns(load_data_df, mgr)
+    with DatasetMappingManager(DATASET_ID, plan, context) as mgr:
+        mapped_load_data_lookup = dataset.handler._remap_dimension_columns(
+            load_data_lookup_df, mgr
+        )
 
     # [1] check that mapped tables contain all to_id records from mappings
     for ref in dataset._handler._mapping_references:

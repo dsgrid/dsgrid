@@ -10,7 +10,6 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.query.query_context import QueryContext
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.spark.types import DataFrame
 
@@ -80,14 +79,9 @@ class Dataset(DatasetBase):
         )
 
     def make_project_dataframe(
-        self, project_config: ProjectConfig, scratch_dir_context: ScratchDirContext
-    ) -> DataFrame:
-        return self._handler.make_project_dataframe(project_config, scratch_dir_context)
-
-    def make_project_dataframe_from_query(
         self, query: QueryContext, project_config: ProjectConfig
     ) -> DataFrame:
-        return self._handler.make_project_dataframe_from_query(query, project_config)
+        return self._handler.make_project_dataframe(query, project_config)
 
 
 class StandaloneDataset(DatasetBase):

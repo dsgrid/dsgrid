@@ -1,3 +1,4 @@
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 import logging
 import os
 from pathlib import Path
@@ -131,35 +132,58 @@ def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> Dat
 
 
 def apply_scaling_factor(
-    df: DataFrame, value_column: str, scaling_factor_column: str = SCALING_FACTOR_COLUMN
+    df: DataFrame,
+    value_column: str,
+    mapping_manager: DatasetMappingManager,
+    scaling_factor_column: str = SCALING_FACTOR_COLUMN,
 ) -> DataFrame:
     """Apply the scaling factor to all value columns and then drop the scaling factor column."""
-    if use_duckdb():
-        # Workaround for the fact that duckdb doesn't support
-        # F.col(scaling_factor_column).isNotNull()
-        cols = (x for x in df.columns if x not in (value_column, scaling_factor_column))
-        cols_str = ",".join(cols)
-        view = create_temp_view(df)
-        query = f"""
-            SELECT
-                {cols_str},
-                (
-                    CASE WHEN {scaling_factor_column} IS NULL THEN {value_column}
-                    ELSE {value_column} * {scaling_factor_column} END
-                ) AS {value_column}
-            FROM {view}
-        """
-        spark = get_spark_session()
-        return spark.sql(query)
+    op = mapping_manager.plan.apply_scaling_factor_op
+    if mapping_manager.has_completed_operation(op):
+        return df
 
-    df = df.withColumn(
+    func = _apply_scaling_factor_duckdb if use_duckdb() else _apply_scaling_factor_spark
+    df = func(df, value_column, scaling_factor_column)
+    if mapping_manager.plan.apply_scaling_factor_op.persist:
+        df = mapping_manager.persist_intermediate_table(df, op)
+    return df
+
+
+def _apply_scaling_factor_duckdb(
+    df: DataFrame,
+    value_column: str,
+    scaling_factor_column: str,
+):
+    # Workaround for the fact that duckdb doesn't support
+    # F.col(scaling_factor_column).isNotNull()
+    cols = (x for x in df.columns if x not in (value_column, scaling_factor_column))
+    cols_str = ",".join(cols)
+    view = create_temp_view(df)
+    query = f"""
+        SELECT
+            {cols_str},
+            (
+                CASE WHEN {scaling_factor_column} IS NULL THEN {value_column}
+                ELSE {value_column} * {scaling_factor_column} END
+            ) AS {value_column}
+        FROM {view}
+    """
+    spark = get_spark_session()
+    return spark.sql(query)
+
+
+def _apply_scaling_factor_spark(
+    df: DataFrame,
+    value_column: str,
+    scaling_factor_column: str,
+):
+    return df.withColumn(
         value_column,
         F.when(
             F.col(scaling_factor_column).isNotNull(),
             F.col(value_column) * F.col(scaling_factor_column),
         ).otherwise(F.col(value_column)),
-    )
-    return df.drop(scaling_factor_column)
+    ).drop(scaling_factor_column)
 
 
 def check_historical_annual_time_model_year_consistency(
@@ -431,7 +455,6 @@ def repartition_if_needed_by_mapping(
     # Apply the technique to mappings that will cause an explosion of rows.
     # Note that this probably isn't needed in all cases and we may need to adjust in the
     # future.
-    # The case with buildings was particularly severe because it is an unpivoted dataset.
 
     # Note: log messages below are checked in the tests.
     if repartition or (
@@ -447,10 +470,6 @@ def repartition_if_needed_by_mapping(
             # DimensionMappingType.DUPLICATION,
         }
     ):
-        if os.environ.get("DSGRID_SKIP_MAPPING_SKEW_REPARTITION", "false").lower() == "true":
-            logger.info("DSGRID_SKIP_MAPPING_SKEW_REPARTITION is true; skip repartitions")
-            return df, None
-
         filename = scratch_dir_context.get_temp_filename(suffix=".parquet")
         # Salting techniques online talk about adding or modifying a column with random values.
         # We might be able to use one of our value columns. However, there are cases where there

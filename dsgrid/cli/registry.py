@@ -13,7 +13,7 @@ from uuid import uuid4
 import rich_click as click
 from semver import VersionInfo
 
-from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception
+from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception, path_callback
 from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType
@@ -51,13 +51,6 @@ def _version_info_required_callback(*args) -> VersionInfo:
 def _version_update_callback(*args) -> VersionUpdateType:
     val = args[2]
     return VersionUpdateType(val)
-
-
-def _path_callback(*args) -> Path | None:
-    val = args[2]
-    if val is None:
-        return val
-    return Path(val)
 
 
 """
@@ -168,7 +161,7 @@ $ dsgrid registry dimensions register -l "Register dimensions for my-project" di
 
 
 @click.command(name="register", epilog=_register_dimensions_epilog)
-@click.argument("dimension-config-file", type=click.Path(exists=True), callback=_path_callback)
+@click.argument("dimension-config-file", type=click.Path(exists=True), callback=path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -240,7 +233,7 @@ $ dsgrid registry dimensions update -d 17565829 -l "Update county dimension" -u 
 
 
 @click.command(name="update", epilog=_update_dimension_epilog)
-@click.argument("dimension-config-file", type=click.Path(exists=True), callback=_path_callback)
+@click.argument("dimension-config-file", type=click.Path(exists=True), callback=path_callback)
 @click.option(
     "-d",
     "--dimension-id",
@@ -335,7 +328,7 @@ $ dsgrid registry dimension-mappings register -l "Register dimension mappings fo
 
 @click.command(name="register", epilog=_register_dimension_mappings_epilog)
 @click.argument(
-    "dimension-mapping-config-file", type=click.Path(exists=True), callback=_path_callback
+    "dimension-mapping-config-file", type=click.Path(exists=True), callback=path_callback
 )
 @click.option(
     "-l",
@@ -425,7 +418,7 @@ $ dsgrid registry dimension-mappings update \\ \n
 
 @click.command(name="update", epilog=_update_dimension_mapping_epilog)
 @click.argument(
-    "dimension-mapping-config-file", type=click.Path(exists=True), callback=_path_callback
+    "dimension-mapping-config-file", type=click.Path(exists=True), callback=path_callback
 )
 @click.option(
     "-d",
@@ -520,7 +513,7 @@ $ dsgrid registry projects register -l "Register project my-project" project.jso
 
 
 @click.command(name="register", epilog=_register_project_epilog)
-@click.argument("project-config-file", type=click.Path(exists=True), callback=_path_callback)
+@click.argument("project-config-file", type=click.Path(exists=True), callback=path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -583,7 +576,7 @@ $ dsgrid registry projects submit-dataset \\ \n
     show_default=True,
     help="Dimension mapping file. Must match the data model defined by "
     "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel",
-    callback=_path_callback,
+    callback=path_callback,
 )
 @click.option(
     "-r",
@@ -593,7 +586,7 @@ $ dsgrid registry projects submit-dataset \\ \n
     help="dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
     "Use it when the mappings are already registered. Must mach the data model defined by "
     "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel",
-    callback=_path_callback,
+    callback=path_callback,
 )
 @click.option(
     "-a",
@@ -653,7 +646,7 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     "--dataset-config-file",
     required=True,
     type=click.Path(exists=True),
-    callback=_path_callback,
+    callback=path_callback,
     help="Dataset config file",
 )
 @click.option(
@@ -662,7 +655,7 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     required=True,
     help="Path to directory containing load data (Parquet) files.",
     type=click.Path(exists=True),
-    callback=_path_callback,
+    callback=path_callback,
 )
 @click.option(
     "-m",
@@ -670,7 +663,7 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     type=click.Path(exists=True),
     help="Dimension mapping file. Must match the data model defined by "
     "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mappings_config.DimensionMappingsConfigModel",
-    callback=_path_callback,
+    callback=path_callback,
 )
 @click.option(
     "-r",
@@ -680,7 +673,7 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     help="dimension mapping references file. Mutually exclusive with dimension_mapping_file. "
     "Use it when the mappings are already registered. Must mach the data model defined by "
     "https://dsgrid.github.io/dsgrid/reference/data_models/dimension_mapping.html#dsgrid.config.dimension_mapping_base.DimensionMappingReferenceListModel",
-    callback=_path_callback,
+    callback=path_callback,
 )
 @click.option(
     "-a",
@@ -796,7 +789,7 @@ $ dsgrid registry projects update \\ \n
 
 
 @click.command(name="update", epilog=_update_project_epilog)
-@click.argument("project-config-file", type=click.Path(exists=True), callback=_path_callback)
+@click.argument("project-config-file", type=click.Path(exists=True), callback=path_callback)
 @click.option(
     "-p",
     "--project-id",
@@ -866,7 +859,7 @@ $ dsgrid registry projects register-subset-dimensions \\ \n
 @click.pass_obj
 @click.pass_context
 @click.argument("project_id")
-@click.argument("filename", callback=_path_callback)
+@click.argument("filename", callback=path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -923,7 +916,7 @@ $ dsgrid registry projects register-supplemental-dimensions \\ \n
 @click.pass_obj
 @click.pass_context
 @click.argument("project_id")
-@click.argument("filename", callback=_path_callback)
+@click.argument("filename", callback=path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -974,7 +967,7 @@ $ dsgrid registry projects add-dataset-requirements \\ \n
 @click.pass_obj
 @click.pass_context
 @click.argument("project_id")
-@click.argument("filename", callback=_path_callback)
+@click.argument("filename", callback=path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -1024,7 +1017,7 @@ $ dsgrid registry projects replace-dataset-dimension-requirements \\ \n
 @click.pass_obj
 @click.pass_context
 @click.argument("project_id")
-@click.argument("filename", callback=_path_callback)
+@click.argument("filename", callback=path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -1183,7 +1176,7 @@ $ dsgrid registry projects generate-config \\ \n
     type=click.Path(),
     default=".",
     show_default=True,
-    callback=_path_callback,
+    callback=path_callback,
     help="Path in which to generate project config files.",
 )
 @click.option(
@@ -1258,8 +1251,8 @@ $ dsgrid registry datasets register dataset.json5 -l "Register dataset my-datase
 
 
 @click.command(name="register", epilog=_register_dataset_epilog)
-@click.argument("dataset-config-file", type=click.Path(exists=True), callback=_path_callback)
-@click.argument("dataset-path", type=click.Path(exists=True), callback=_path_callback)
+@click.argument("dataset-config-file", type=click.Path(exists=True), callback=path_callback)
+@click.argument("dataset-path", type=click.Path(exists=True), callback=path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -1328,7 +1321,7 @@ $ dsgrid registry datasets update \\ \n
 
 
 @click.command(name="update", epilog=_update_dataset_epilog)
-@click.argument("dataset-config-file", type=click.Path(exists=True), callback=_path_callback)
+@click.argument("dataset-config-file", type=click.Path(exists=True), callback=path_callback)
 @click.option(
     "-d",
     "--dataset-id",
@@ -1347,7 +1340,7 @@ $ dsgrid registry datasets update \\ \n
     "-p",
     "--dataset-path",
     type=click.Path(exists=True),
-    callback=_path_callback,
+    callback=path_callback,
     help="New dataset path. If not set, use existing dataset.",
 )
 @click.option(
@@ -1448,7 +1441,7 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
     type=click.Path(),
     default=".",
     show_default=True,
-    callback=_path_callback,
+    callback=path_callback,
     help="Path in which to create dataset config files.",
 )
 @click.option(
@@ -1530,7 +1523,7 @@ $ dsgrid registry bulk-register registration.json5 -j journal__11f733f6-ac9b-4f7
     "-d",
     "--base-data-dir",
     type=click.Path(exists=True),
-    callback=_path_callback,
+    callback=path_callback,
     help="Base directory for input data. If set, and if the dataset paths are relative, prepend "
     "them with this path.",
 )
@@ -1538,7 +1531,7 @@ $ dsgrid registry bulk-register registration.json5 -j journal__11f733f6-ac9b-4f7
     "-r",
     "--base-repo-dir",
     type=click.Path(exists=True),
-    callback=_path_callback,
+    callback=path_callback,
     help="Base directory for dsgrid project/dataset repository. If set, and if the config file "
     "paths are relative, prepend them with this path.",
 )
@@ -1546,7 +1539,7 @@ $ dsgrid registry bulk-register registration.json5 -j journal__11f733f6-ac9b-4f7
     "-j",
     "--journal-file",
     type=click.Path(exists=True),
-    callback=_path_callback,
+    callback=path_callback,
     help="Journal file created by a previous bulk register operation. If passed, the code will "
     "read it and skip all projects and datasets that were successfully registered. "
     "The file will be updated with IDs that are successfully registered.",

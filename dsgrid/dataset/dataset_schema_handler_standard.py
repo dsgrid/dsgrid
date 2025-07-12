@@ -5,6 +5,7 @@ from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
@@ -74,81 +75,65 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 self._load_data.join(self._load_data_lookup, on="id")
             )
 
-    def make_dimension_association_table(self) -> DataFrame:
+    def make_dimension_association_table(self, context: ScratchDirContext) -> DataFrame:
         lk_df = self._load_data_lookup.filter("id is not NULL")
         dim_cols = self._list_dimension_columns(self._load_data)
         df = self._load_data.select("id", *dim_cols).distinct()
         df = df.join(lk_df, on="id").drop("id")
-        mapper = self.build_default_dataset_mapping_plan()
-        df = self._remap_dimension_columns(df, mapper).drop("fraction")
-        null_lk_df = self._remap_dimension_columns(
-            self._load_data_lookup.filter("id is NULL"),
-            mapper,
-        ).drop("fraction")
+        mapping_plan = self.build_default_dataset_mapping_plan()
+        with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
+            df = self._remap_dimension_columns(df, mapping_manager).drop("fraction")
+        with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
+            null_lk_df = self._remap_dimension_columns(
+                self._load_data_lookup.filter("id is NULL"),
+                mapping_manager,
+            ).drop("fraction")
         return add_null_rows_from_load_data_lookup(
             df, cross_join(null_lk_df, df.select(*dim_cols).distinct())
         )
 
     def make_project_dataframe(
-        self, project_config: ProjectConfig, scratch_dir_context: ScratchDirContext
-    ):
-        # TODO: Can we remove NULLs at registration time?
-        null_lk_df = self._load_data_lookup.filter("id is NULL")
-        lk_df = self._load_data_lookup.filter("id is not NULL")
-        ld_df = self._load_data
-        ld_df = ld_df.join(lk_df, on="id").drop("id")
-
-        mapper = self.build_default_dataset_mapping_plan()
-        null_lk_df = self._remap_dimension_columns(null_lk_df, mapper)
-        ld_df = self._remap_dimension_columns(
-            ld_df, mapper, scratch_dir_context=scratch_dir_context
-        )
-        if SCALING_FACTOR_COLUMN in ld_df.columns:
-            ld_df = apply_scaling_factor(ld_df, VALUE_COLUMN)
-        ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
-        project_metric_records = self._get_project_metric_records(project_config)
-        ld_df = self._convert_units(ld_df, project_metric_records)
-        ld_df = self._convert_time_dimension(
-            ld_df, project_config, VALUE_COLUMN, scratch_dir_context
-        )
-        return add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
-
-    def make_project_dataframe_from_query(
         self, context: QueryContext, project_config: ProjectConfig
-    ):
+    ) -> DataFrame:
         lk_df = self._load_data_lookup
-        ld_df = self._load_data
-
-        ld_df = self._prefilter_stacked_dimensions(context, ld_df)
         lk_df = self._prefilter_stacked_dimensions(context, lk_df)
         null_lk_df = lk_df.filter("id is NULL")
         lk_df = lk_df.filter("id is not NULL")
-        ld_df = self._prefilter_time_dimension(context, ld_df)
-        ld_df = ld_df.join(lk_df, on="id").drop("id")
-        mapper = context.model.project.get_dataset_mapper(self._config.model.dataset_id)
-        assert mapper is not None
-        ld_df = self._remap_dimension_columns(
-            ld_df,
-            mapper,
-            filtered_records=context.get_record_ids(),
-            scratch_dir_context=context.scratch_dir_context,
-        )
-        if "scaling_factor" in ld_df.columns:
-            ld_df = apply_scaling_factor(ld_df, VALUE_COLUMN)
 
-        ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN})
-        project_metric_records = self._get_project_metric_records(project_config)
-        ld_df = self._convert_units(ld_df, project_metric_records)
-        null_lk_df = self._remap_dimension_columns(
-            null_lk_df, mapper, filtered_records=context.get_record_ids()
-        )
-        # TODO: record the mapper journal. We should be able to use it if something fails
-        # and we need to re-run the query.
-        ld_df = self._convert_time_dimension(
-            ld_df, project_config, VALUE_COLUMN, context.scratch_dir_context
-        )
-        ld_df = add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
-        return self._finalize_table(context, ld_df, project_config)
+        plan = context.model.project.get_dataset_mapping_plan(self.dataset_id)
+        if plan is None:
+            plan = self.build_default_dataset_mapping_plan()
+        with context.dataset_mapping_manager(self.dataset_id, plan) as mapping_manager:
+            ld_df = mapping_manager.try_read_checkpointed_table()
+            if ld_df is None:
+                ld_df = self._load_data
+                ld_df = self._prefilter_stacked_dimensions(context, ld_df)
+                ld_df = self._prefilter_time_dimension(context, ld_df)
+                ld_df = ld_df.join(lk_df, on="id").drop("id")
+
+            ld_df = self._remap_dimension_columns(
+                ld_df,
+                mapping_manager,
+                filtered_records=context.get_record_ids(),
+            )
+            if SCALING_FACTOR_COLUMN in ld_df.columns:
+                ld_df = apply_scaling_factor(ld_df, VALUE_COLUMN, mapping_manager)
+
+            ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN}, mapping_manager)
+            project_metric_records = self._get_project_metric_records(project_config)
+            ld_df = self._convert_units(ld_df, project_metric_records, mapping_manager)
+            lk_plan = self.build_default_dataset_mapping_plan()
+            with DatasetMappingManager(
+                self.dataset_id, lk_plan, context.scratch_dir_context
+            ) as lk_mapping_manager:
+                null_lk_df = self._remap_dimension_columns(
+                    null_lk_df, lk_mapping_manager, filtered_records=context.get_record_ids()
+                )
+            ld_df = self._convert_time_dimension(
+                ld_df, project_config, VALUE_COLUMN, mapping_manager
+            )
+            ld_df = add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
+            return self._finalize_table(context, ld_df, project_config)
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):

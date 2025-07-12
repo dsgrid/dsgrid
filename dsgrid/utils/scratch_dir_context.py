@@ -1,7 +1,12 @@
+import logging
 import os
-import shutil
 from pathlib import Path
 from tempfile import NamedTemporaryFile
+
+from dsgrid.utils.files import delete_if_exists
+
+
+logger = logging.getLogger(__name__)
 
 
 class ScratchDirContext:
@@ -47,11 +52,8 @@ class ScratchDirContext:
     def finalize(self) -> None:
         """Remove all tracked paths once use of them is complete."""
         for path in self._paths:
-            if path.exists():
-                if path.is_file():
-                    path.unlink()
-                else:
-                    shutil.rmtree(path)
+            delete_if_exists(path)
+            logger.info("Deleted temporary path %s", path)
 
     def __enter__(self):
         return self

@@ -21,6 +21,7 @@ is stored at ``~/dsgrid-data``.
 
    create_project
    create_and_submit_dataset
+   map_dataset
    query_project
    create_derived_dataset
    query_dataset

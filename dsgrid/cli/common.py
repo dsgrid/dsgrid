@@ -86,6 +86,14 @@ def handle_scratch_dir(*args):
     return path
 
 
+def path_callback(*args) -> Path | None:
+    """Ensure that a Path CLI option value is returned as a Path object."""
+    val = args[2]
+    if val is None:
+        return val
+    return Path(val)
+
+
 # Copied from
 # https://stackoverflow.com/questions/45868549/creating-a-click-option-with-prompt-that-shows-only-if-default-value-is-empty
 # and modified for our desired password behavior.

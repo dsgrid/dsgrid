@@ -1,4 +1,5 @@
 import abc
+import copy
 import logging
 import math
 import shutil
@@ -8,6 +9,7 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from pandas.testing import assert_frame_equal
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.cli.dsgrid import cli
@@ -25,7 +27,7 @@ from dsgrid.dimension.dimension_filters import (
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.loggers import setup_logging
 from dsgrid.project import Project
-from dsgrid.query.dataset_mapping_plan import MapDimensionOperation
+from dsgrid.query.dataset_mapping_plan import MapOperation
 from dsgrid.query.models import (
     AggregationModel,
     ColumnModel,
@@ -46,6 +48,7 @@ from dsgrid.query.models import (
 )
 from dsgrid.query.dataset_mapping_plan import (
     DatasetMappingPlan,
+    MapOperationCheckpoint,
 )
 from dsgrid.query.query_submitter import ProjectQuerySubmitter, CompositeDatasetQuerySubmitter
 from dsgrid.query.report_peak_load import PeakLoadInputModel, PeakLoadReport
@@ -460,46 +463,76 @@ def test_dimension_names_model():
     assert not diff
 
 
-def test_transform_unpivoted_dataset(tmp_path):
-    project = get_project(
-        DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB),
-        "dsgrid_conus_2022",
-    )
-    path = project.map_dataset("comstock_conus_2022_projected", tmp_path)
-    df = read_parquet(path)
-    actual = aggregate_single_value(
-        df.filter("geography == '06037'").filter(
-            F.col("metric").isin(["electricity_cooling", "electricity_heating"])
+def test_map_dataset(tmp_path):
+    dataset_id = "comstock_conus_2022_reference"
+    mapping_plan = DatasetMappingPlan(
+        dataset_id=dataset_id,
+        mappings=[
+            MapOperation(
+                name="scenario",
+            ),
+            MapOperation(
+                name="county",
+                persist=True,
+            ),
+        ],
+        apply_fraction_op=MapOperation(
+            name="apply_fraction_op",
+            persist=True,
         ),
-        "sum",
-        VALUE_COLUMN,
+        keep_intermediate_files=True,
     )
-    raw_stats = load_dataset_stats()
-    assert math.isclose(actual, raw_stats["by_county"]["06037"]["comstock"]["sum"]["electricity"])
-
-
-def test_transform_pivoted_dataset(tmp_path):
-    project = get_project(
-        DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB),
+    plan_file = tmp_path / "mapping_plan.json5"
+    mapping_plan.to_file(plan_file)
+    output_dir = tmp_path / "queries"
+    scratch_dir = tmp_path / "scratch"
+    cmd = [
+        "--scratch-dir",
+        str(scratch_dir),
+        "--offline",
+        "--url",
+        SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
+        "query",
+        "project",
+        "map-dataset",
+        "--mapping-plan",
+        str(plan_file),
         "dsgrid_conus_2022",
-    )
-    path = project.map_dataset("resstock_conus_2022_projected", tmp_path)
-    df = read_parquet(path).filter("geography == '06037'")
-    cooling = aggregate_single_value(
-        df.filter("metric = 'electricity_cooling'").select(VALUE_COLUMN),
-        "sum",
-        VALUE_COLUMN,
-    )
-    heating = aggregate_single_value(
-        df.filter("metric = 'electricity_heating'").select(VALUE_COLUMN),
-        "sum",
-        VALUE_COLUMN,
-    )
-    raw_stats = load_dataset_stats()
-    assert math.isclose(
-        cooling + heating,
-        raw_stats["by_county"]["06037"]["resstock"]["sum"]["electricity"],
-    )
+        dataset_id,
+        "--output",
+        str(output_dir),
+    ]
+    runner = CliRunner()
+    result = runner.invoke(cli, cmd)
+    assert result.exit_code == 0
+    df1 = read_parquet(output_dir / dataset_id / "table.parquet")
+    columns = [
+        "time_est",
+        "model_year",
+        "scenario",
+        "county",
+        "sector",
+        "subsector",
+        "end_use",
+    ]
+    dfp1 = df1.sort(*columns).toPandas()
+    checkpoint_files = [x for x in scratch_dir.iterdir() if x.suffix == ".json"]
+    assert len(checkpoint_files) == 2
+    checkpoint_files.sort(key=lambda x: x.stat().st_mtime)
+    checkpoint = MapOperationCheckpoint.from_file(checkpoint_files[-1])
+    assert checkpoint.completed_operation_names == ["scenario", "county", "apply_fraction_op"]
+
+    for i, checkpoint_file in enumerate(checkpoint_files):
+        out_dir = cmd[-1] + f"from_checkpoint_{i}"
+        cmd2 = copy.copy(cmd)
+        cmd2[-1] = out_dir
+        cmd2.append("--checkpoint-file")
+        cmd2.append(str(checkpoint_file))
+        result2 = runner.invoke(cli, cmd2)
+        assert result2.exit_code == 0
+        df2 = read_parquet(Path(out_dir) / dataset_id / "table.parquet")
+        dfp2 = df2.sort(*columns).toPandas()
+        assert_frame_equal(dfp1, dfp2)
 
 
 _projects = {}
@@ -542,7 +575,7 @@ def run_query_test(test_query_cls, *args, expected_values=None):
                 query.make_query(),
                 persist_intermediate_table=True,
                 load_cached_table=load_cached_table,
-                force=True,
+                overwrite=True,
             )
             assert query.validate(expected_values=expected_values)
             metadata_file = output_dir / query.name / "metadata.json"
@@ -857,27 +890,27 @@ class QueryTestDatasetMappingPlan(QueryTestBase):
                         StandaloneDatasetModel(dataset_id="tempo_conus_2022"),
                     ],
                 ),
-                mapping_plan=[
+                mapping_plans=[
                     DatasetMappingPlan(
                         dataset_id="tempo_conus_2022",
                         mappings=[
-                            MapDimensionOperation(
-                                dimension_name="county",
+                            MapOperation(
+                                name="county",
                                 handle_data_skew=self._handle_data_skew,
                                 persist=self._persist,
                             ),
-                            MapDimensionOperation(
-                                dimension_name="model_year",
+                            MapOperation(
+                                name="model_year",
                                 handle_data_skew=self._handle_data_skew,
                                 persist=self._persist,
                             ),
-                            MapDimensionOperation(
-                                dimension_name="end_use",
+                            MapOperation(
+                                name="end_use",
                                 handle_data_skew=self._handle_data_skew,
                                 persist=self._persist,
                             ),
-                            MapDimensionOperation(
-                                dimension_name="subsector",
+                            MapOperation(
+                                name="subsector",
                                 handle_data_skew=self._handle_data_skew,
                                 persist=self._persist,
                             ),

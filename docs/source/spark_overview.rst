@@ -299,7 +299,9 @@ The [sparkctl documentation](https://nrel.github.io/sparkctl/) has generic instr
 Spark in a variety of ways. The rest of this section calls out choices that you should make to run
 Spark jobs with dsgrid.
 
-1. Choose compute node(s) with fast local storage. This example will allocate one node.
+1. Choose compute node(s) with fast local storage. This example will allocate one node. Refer to this
+   `Kestrel documentation` <https://nrel.github.io/HPC/Documentation/Systems/Kestrel/Filesystems/#node-file-system>_
+   for more information for this type of compute node. 
 
 .. code-block:: console
 

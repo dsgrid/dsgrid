@@ -31,7 +31,7 @@ FROM python:3.11-slim
 USER root
 
 ARG VERSION
-ARG SPARK_VERSION=3.5.4
+ARG SPARK_VERSION=4.0.0
 
 RUN if [ -z "$VERSION" ]; then echo "VERSION must be specified"; exit 1; fi
 ENV CONTAINER_VERSION ${VERSION}

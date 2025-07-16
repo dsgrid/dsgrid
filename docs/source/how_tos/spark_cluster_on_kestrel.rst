@@ -3,12 +3,12 @@
 ***************************************
 How to Start a Spark Cluster on Kestrel
 ***************************************
-This section assumes that you have cloned the HPC Spark setup scripts from this `repo
-<https://github.com/NREL/HPC.git>`_. If you are unfamiliar with that, please read the full details
-at :ref:`spark-on-hpc`.
+This section assumes that you have installed the Python package ``sparkctl`` and are familiar
+with its [documentation](https://nrel.github.io/sparkctl/).
 
-.. note:: The latest scripts currently supporting Kestrel are at this branch:
-   https://github.com/daniel-thom/HPC/tree/kestrel-update
+.. code-block:: console
+
+    $ pip install "sparkctl[pyspark]"
 
 Compute Node Types
 ==================
@@ -26,29 +26,24 @@ Steps
 =====
 1. From the HPC login node, create a work directory somewhere in ``/scratch/$USER``.
 
-2. Add the ``spark_scripts`` to your PATH if you haven't already:
-
-.. code-block:: console
-
-   $ export PATH=$PATH:~/repos/HPC/applications/spark/spark_scripts
-
-3. Allocate one or more nodes.
+2. Allocate one or more nodes.
 
 .. code-block:: console
 
     $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G --mem=240G
 
-4. Configure the Spark settings and start the cluster. Run -h to see the available options.
+3. Configure the Spark settings and start the cluster. Run --help to see the available options.
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh
+    $ sparkctl configure --start
 
-5. Set the Spark configuration environment variable.
+5. Set the Spark configuration and Java environment variables.
 
 .. code-block:: console
 
     $ export SPARK_CONF_DIR=$(pwd)/conf
+    $ export JAVA_HOME=/datasets/images/apache_spark/jdk-21.0.7
 
 The Spark cluster is ready to query at ``spark://$(hostname):7077``. Run all query scripts from
 this node.

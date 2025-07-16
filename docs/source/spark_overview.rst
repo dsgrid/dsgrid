@@ -288,74 +288,36 @@ This section describes how you can run Spark jobs on any number of HPC compute n
 The scripts and examples described here rely on the SLURM scheduling system and have been tested
 on NREL's Kestrel cluster.
 
-NREL's HPC GitHub [repository](https://github.com/NREL/HPC) contains scripts that will create an
-ephemeral Spark cluster on compute nodes that you allocate.
-
-The [README](https://github.com/NREL/HPC/blob/master/applications/spark/README.md) in the
-repository has generic instructions to run Spark in a variety of ways. The rest of this section
-calls out choices that you should make to run Spark jobs with dsgrid.
-
-.. note:: The latest scripts currently supporting Kestrel are at this branch:
-   https://github.com/daniel-thom/HPC/tree/kestrel-update. Please follow its README instead.
-
-1. Clone the repository.
+Install the Python package ``sparkctl`` to run the scripts described below. You can install it with
+this command:
 
 .. code-block:: console
 
-    $ git clone https://github.com/NREL/HPC.git
+    $ pip install "sparkctl[pyspark]"
 
-2. Choose compute node(s) with fast local storage. This example will allocate one node.
+The [sparkctl documentation](https://nrel.github.io/sparkctl/) has generic instructions to run
+Spark in a variety of ways. The rest of this section calls out choices that you should make to run
+Spark jobs with dsgrid.
 
-.. code-block:: console
-
-    $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G --mem=240G
-
-- NREL's Kestrel cluster will let you allocate one debug job each with two nodes. So, you can use
-  these scripts to create a two-node cluster for one hour.
-- If the debug partition is not too full, you can append ``--qos=standby`` to the command above
-  and not be charged any AUs.
-
-3. Select a Spark container compatible with dsgrid, which currently requires Spark v3.5.2.
-   The team has validated the container ``/datasets/images/apache_spark/spark352_py311.sif``. It
-   was created with this Dockerfile in dsgrid: ``docker/spark/Dockerfile``. The container includes
-   ipython, jupyter, pyspark, pandas, duckdb, and pyarrow, but not dsgrid. The
-   ``configure_and_start_spark.sh`` will normally be updated to use the currently-supported dsgrid
-   container by default, but there may be some cases where you need to specify it manually with the
-   ``-c`` option.
+1. Choose compute node(s) with fast local storage. This example will allocate one node. Refer to this
+   `Kestrel documentation` <https://nrel.github.io/HPC/Documentation/Systems/Kestrel/Filesystems/#node-file-system>_
+   for more information for this type of compute node. 
 
 .. code-block:: console
 
-   $ configure_and_start_spark.sh -c <path_to_custom_container.sif>
+    $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=nvme --mem=240G
 
-4. Configure Spark parameters based on the amount of memory and CPU in each compute node.
-
-   Set the driver memory (``-M``) to a size sufficient for data transfer between the driver and
-   cluster. For example, if you will convert a 4 GB dataframe to Pandas (``df.toPandas()``),
-   set the value to 4. Some online sources recommend setting it to a size at least as big as the
-   executor memory. It defaults to 1 GB.
+2. Configure Spark parameters based on the amount of memory and CPU in each compute node.
 
    This command must be run on a compute node. The script will check for the environment variable
-   ``SLURM_JOB_ID``, which is set by ``SLURM``. If you ssh'd into the compute node, it won't be set and
-   then you have to pass it as an argument.
-
-   Choose the option that is appropriate for your environment.
-
-   **Note**: Please don't run this command in ``/projects/dsgrid``. It creates runtime files
-   that others may not be able to delete. Run in ``/scratch/$USER`` instead.
+   ``SLURM_JOB_ID``, which is set by ``Slurm``. If you ssh'd into the compute node, it won't be set
+   and then you have to pass it as an argument.
 
 .. code-block:: console
 
-    $ configure_and_start_spark.sh
+    $ sparkctl configure --start
 
-.. code-block:: console
-
-    $ configure_and_start_spark.sh <SLURM_JOB_ID>
-
-.. code-block:: console
-
-    $ configure_and_start_spark.sh <SLURM_JOB_ID1> <SLURM_JOB_ID2>
-
-Run ``configure_and_start_spark.sh --help`` to see all options.
+Run ``sparkctl configure --help`` to see all options.
 
 Alternatively, or in conjunction with the above command, customize the Spark configuration files
 in ``./conf`` as necessary per the HPC instructions.
@@ -365,6 +327,7 @@ in ``./conf`` as necessary per the HPC instructions.
 .. code-block:: console
 
     $ export SPARK_CONF_DIR=$(pwd)/conf
+    $ export JAVA_HOME=/datasets/images/apache_spark/jdk-21.0.7
 
 6. Follow the rest of the HPC instructions.
 

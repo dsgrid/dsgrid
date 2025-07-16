@@ -32,7 +32,7 @@ Steps
 
     $ salloc -t 01:00:00 -N1 --account=dsgrid --partition=debug --tmp=1600G --mem=240G
 
-3. Configure the Spark settings and start the cluster. Run -h to see the available options.
+3. Configure the Spark settings and start the cluster. Run --help to see the available options.
 
 .. code-block:: console
 

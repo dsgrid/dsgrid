@@ -61,7 +61,7 @@ allow-direct-references = true
 spark = [
     "chronify[spark]",
     "pyhive @ git+https://github.com/apache/kyuubi.git#egg=pyhive&subdirectory=python",
-    "pyspark==3.5.4",  # Keep this synced with the spark version in Dockerfile.
+    "pyspark==4.0.0",  # Keep this synced with the spark version in Dockerfile.
     "thrift",
     "thrift_sasl",
 ]

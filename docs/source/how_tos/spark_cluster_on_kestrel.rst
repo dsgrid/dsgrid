@@ -3,8 +3,12 @@
 ***************************************
 How to Start a Spark Cluster on Kestrel
 ***************************************
-This section assumes that you have pip-installed the Python package ``sparkctl`` and are familiar
+This section assumes that you have installed the Python package ``sparkctl`` and are familiar
 with its [documentation](https://nrel.github.io/sparkctl/).
+
+.. code-block:: console
+
+    $ pip install "sparkctl[pyspark]"
 
 Compute Node Types
 ==================

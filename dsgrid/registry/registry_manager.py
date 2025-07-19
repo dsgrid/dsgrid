@@ -24,6 +24,7 @@ from dsgrid.utils.run_command import check_run_command
 from dsgrid.filesystem.factory import make_filesystem_interface
 from dsgrid.utils.spark import init_spark, get_active_session
 from .common import (
+    DataStoreType,
     RegistryManagerParams,
 )
 from dsgrid.registry.registry_database import RegistryDatabase
@@ -47,6 +48,7 @@ class RegistryManager:
     """Manages registration of all projects and datasets."""
 
     def __init__(self, params: RegistryManagerParams, db: RegistryDatabase):
+        self._data_store = db.data_store
         self._check_environment_variables(params)
         if get_active_session() is None:
             init_spark("dsgrid")
@@ -68,6 +70,7 @@ class RegistryManager:
             self._dimension_mgr,
             self._dimension_mapping_mgr,
             DatasetRegistryInterface(db),
+            self._data_store,
         )
         self._project_mgr = ProjectRegistryManager.load(
             params.base_path,
@@ -83,6 +86,7 @@ class RegistryManager:
         cls,
         conn: DatabaseConnection,
         data_path: Path,
+        data_store_type: DataStoreType = DataStoreType.FILESYSTEM,
         remote_path=REMOTE_REGISTRY,
         user=None,
         scratch_dir=None,
@@ -94,6 +98,7 @@ class RegistryManager:
         ----------
         db_url : str
         data_path : Path
+        data_store_type : DataStoreType
         remote_path : str
             Path to remote registry.
         use_remote_data_path : None, str
@@ -143,7 +148,9 @@ class RegistryManager:
             scratch_dir=scratch_dir,
         )
         RegistryDatabase.delete(conn)
-        db = RegistryDatabase.create(conn, data_path, overwrite=overwrite)
+        db = RegistryDatabase.create(
+            conn, data_path, data_store_type=data_store_type, overwrite=overwrite
+        )
         return cls(params, db)
 
     @property

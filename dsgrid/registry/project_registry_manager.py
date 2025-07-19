@@ -253,6 +253,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             dataset_configs,
             self._dimension_mgr,
             self._dimension_mapping_mgr,
+            self._dataset_mgr,
         )
 
     def register(
@@ -1307,7 +1308,8 @@ class ProjectRegistryManager(RegistryManagerBase):
             dataset_config,
             self._dimension_mgr,
             self._dimension_mapping_mgr,
-            mapping_references,
+            store=self._dataset_mgr.store,
+            mapping_references=mapping_references,
             project_time_dim=project_config.get_base_time_dimension(),
         )
         dataset_id = dataset_config.config_id

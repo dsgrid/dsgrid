@@ -394,6 +394,27 @@ def test_add_supplemental_dimension(mutable_cached_registry, tmp_path):
     assert found_new_dimension
 
 
+def test_register_with_duckdb_store(registry_with_duckdb_store):
+    conn = registry_with_duckdb_store
+    manager = RegistryManager.load(conn, offline_mode=True)
+    project_mgr = manager.project_manager
+    dataset_mgr = manager.dataset_manager
+    project_ids = project_mgr.list_ids()
+    assert len(project_ids) == 1
+    project_id = project_ids[0]
+    dataset_ids = dataset_mgr.list_ids()
+    assert len(dataset_ids) == 2
+    project = project_mgr.load_project(project_id)
+    found_lookup = False
+    for dataset_id in dataset_ids:
+        dataset = project.load_dataset(dataset_id)
+        assert isinstance(dataset._handler._load_data, DataFrame)
+        if dataset_id == "test_efs_comstock":
+            assert isinstance(dataset._handler._load_data_lookup, DataFrame)
+            found_lookup = True
+    assert found_lookup
+
+
 def test_remove_dataset(mutable_cached_registry):
     mgr, _ = mutable_cached_registry
     project_mgr = mgr.project_manager

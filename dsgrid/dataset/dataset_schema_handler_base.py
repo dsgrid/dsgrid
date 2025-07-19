@@ -2,7 +2,7 @@ import abc
 import logging
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Self
 
 import chronify
 from sqlalchemy import Connection
@@ -23,7 +23,7 @@ from dsgrid.config.dataset_config import DatasetConfig, InputDatasetType
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
 )
-from dsgrid.config.simple_models import DatasetSimpleModel
+from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionType
@@ -36,6 +36,7 @@ from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperation
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.models import ColumnType
 from dsgrid.spark.functions import join, make_temp_view_name
+from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.spark.types import DataFrame, F
 from dsgrid.units.convert import convert_units_unpivoted
 from dsgrid.utils.dataset import (
@@ -85,12 +86,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     @classmethod
     @abc.abstractmethod
-    def load(cls, config: DatasetConfig):
+    def load(cls, config: DatasetConfig, *args, store: DataStoreInterface | None = None) -> Self:
         """Create a dataset schema handler by loading the data tables from files.
 
         Parameters
         ----------
         config: DatasetConfig
+        store: DataStoreInterface | None
+            If provided, the dataset must already be registered.
+            If not provided, the dataset must not be registered and the file paths must be
+            availabled via the DatasetConfig.
 
         Returns
         -------
@@ -113,10 +118,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """Return a dataframe containing one row for each unique dimension combination except time."""
 
     @abc.abstractmethod
-    def filter_data(self, dimensions: list[DatasetSimpleModel]):
+    def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
         """Filter the load data by dimensions and rewrite the files.
 
         dimensions : list[DimensionSimpleModel]
+        store : DataStoreInterface
+            The data store to use for reading and writing the data.
         """
 
     @property

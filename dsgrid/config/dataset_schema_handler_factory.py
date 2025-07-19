@@ -1,17 +1,19 @@
-from typing import Optional
-
 from sqlalchemy import Connection
 
 from dsgrid.dataset.dataset_schema_handler_standard import StandardDatasetSchemaHandler
 from dsgrid.dataset.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
-from .dataset_config import DataSchemaType
+from dsgrid.registry.data_store_interface import DataStoreInterface
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
+from .dataset_config import DataSchemaType, DatasetConfig
+from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 
 
 def make_dataset_schema_handler(
-    conn: Optional[Connection],
-    config,
-    dimension_mgr,
-    dimension_mapping_mgr,
+    conn: Connection | None,
+    config: DatasetConfig,
+    dimension_mgr: DimensionRegistryManager,
+    dimension_mapping_mgr: DimensionMappingRegistryManager,
+    store: DataStoreInterface | None = None,
     mapping_references=None,
     project_time_dim=None,
 ):
@@ -22,6 +24,7 @@ def make_dataset_schema_handler(
                 conn,
                 dimension_mgr,
                 dimension_mapping_mgr,
+                store=store,
                 mapping_references=mapping_references,
                 project_time_dim=project_time_dim,
             )
@@ -31,6 +34,7 @@ def make_dataset_schema_handler(
                 conn,
                 dimension_mgr,
                 dimension_mapping_mgr,
+                store=store,
                 mapping_references=mapping_references,
                 project_time_dim=project_time_dim,
             )

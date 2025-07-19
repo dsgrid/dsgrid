@@ -35,6 +35,7 @@ from .dimensions import (
 ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv", "table.parquet")
 ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.parquet",
+    "lookup_table.parquet",
     # The next two are only used for test data.
     "load_data_lookup.csv",
     "load_data_lookup.json",
@@ -500,7 +501,7 @@ class DatasetConfig(ConfigBase):
     def __init__(self, model):
         super().__init__(model)
         self._dimensions = {}  # ConfigKey to DimensionConfig
-        self._dataset_path = None
+        self._dataset_path: Path | None = None
 
     @staticmethod
     def config_filename():
@@ -513,14 +514,6 @@ class DatasetConfig(ConfigBase):
     @staticmethod
     def model_class():
         return DatasetConfigModel
-
-    @classmethod
-    def load_from_registry(cls, model, registry_data_path):
-        # Join with forward slashes instead of Path because this might be an s3 path and
-        # we don't want backslashes on Windows.
-        config = cls(model)
-        config.dataset_path = f"{registry_data_path}/data/{model.dataset_id}/{model.version}"
-        return config
 
     @classmethod
     def load_from_user_path(cls, config_file, dataset_path) -> "DatasetConfig":
@@ -544,18 +537,20 @@ class DatasetConfig(ConfigBase):
         return config
 
     @property
-    def dataset_path(self):
+    def dataset_path(self) -> Path | None:
         """Return the directory containing the dataset file(s)."""
         return self._dataset_path
 
     @dataset_path.setter
-    def dataset_path(self, dataset_path):
+    def dataset_path(self, dataset_path: Path | str) -> None:
         """Set the dataset path."""
+        if isinstance(dataset_path, str):
+            dataset_path = Path(dataset_path)
         self._dataset_path = dataset_path
 
     @property
     def load_data_path(self):
-        return check_load_data_filename(self._dataset_path)
+        return check_load_data_filename(self.dataset_path)
 
     @property
     def load_data_lookup_path(self):

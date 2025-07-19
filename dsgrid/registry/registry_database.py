@@ -1,11 +1,11 @@
 import getpass
 import logging
-import shutil
 import sqlite3
 from pathlib import Path
 from datetime import datetime
 from typing import Any, Generator, Optional
 
+from chronify.utils.path_utils import check_overwrite
 from sqlalchemy import (
     Column,
     Connection,
@@ -31,12 +31,15 @@ from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
 )
 from dsgrid.registry.common import (
+    DataStoreType,
     DatabaseConnection,
     RegistrationModel,
     RegistryTables,
     RegistryType,
     MODEL_TYPE_TO_ID_FIELD_MAPPING,
 )
+from dsgrid.registry.data_store_interface import DataStoreInterface
+from dsgrid.registry.data_store_factory import make_data_store_factory
 from dsgrid.utils.files import dump_data
 
 
@@ -46,29 +49,29 @@ logger = logging.getLogger(__name__)
 class RegistryDatabase:
     """Database containing a dsgrid registry"""
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, engine: Engine, data_store: DataStoreInterface | None = None) -> None:
         """Construct the database."""
         self._metadata = MetaData()
         self._engine = engine
+        self._data_store = data_store
 
     @classmethod
     def create(
         cls,
         conn: DatabaseConnection,
         data_path: Path,
+        data_store_type: DataStoreType = DataStoreType.FILESYSTEM,
         overwrite: bool = False,
         **connect_kwargs: Any,
     ) -> "RegistryDatabase":
         """Create a new registry database."""
         filename = conn.get_filename()
-        if filename.exists():
-            if overwrite:
-                filename.unlink()
-            else:
-                msg = f"{filename} already exists. Choose a different path or set overwrite=True."
-                raise DSGInvalidOperation(msg)
-        db = RegistryDatabase(engine=create_engine(conn.url, **connect_kwargs))
-        db.initialize_db(data_path, overwrite=overwrite)
+        for path in (filename, data_path):
+            check_overwrite(path, overwrite=overwrite)
+        data_path.mkdir()
+        data_store = make_data_store_factory(data_path, data_store_type, initialize=True)
+        db = cls(create_engine(conn.url, **connect_kwargs), data_store)
+        db.initialize_db(data_path, data_store_type)
         return db
 
     @classmethod
@@ -76,19 +79,16 @@ class RegistryDatabase:
         cls,
         conn: DatabaseConnection,
         data_path: Path,
+        data_store_type: DataStoreType = DataStoreType.FILESYSTEM,
         overwrite: bool = False,
         **connect_kwargs: Any,
     ) -> "RegistryDatabase":
         """Create a new registry database with existing registry data."""
         filename = conn.get_filename()
-        if filename.exists():
-            if overwrite:
-                filename.unlink()
-            else:
-                msg = f"{filename} already exists. Choose a different path or set overwrite=True."
-                raise DSGInvalidOperation(msg)
-        db = RegistryDatabase(engine=create_engine(conn.url, **connect_kwargs))
-        db.initialize_db(data_path)
+        check_overwrite(filename, overwrite=overwrite)
+        store = make_data_store_factory(data_path, data_store_type, initialize=False)
+        db = RegistryDatabase(create_engine(conn.url, **connect_kwargs), store)
+        db.initialize_db(data_path, data_store_type)
         return db
 
     @classmethod
@@ -100,8 +100,12 @@ class RegistryDatabase:
         """Load an existing registry database."""
         # This tests the connection.
         conn.get_filename()
-        db = RegistryDatabase(engine=create_engine(conn.url, **connect_kwargs))
+        engine = create_engine(conn.url, **connect_kwargs)
+        db = RegistryDatabase(engine)
         db.update_sqlalchemy_metadata()
+        base_path = db.get_data_path()
+        data_store_type = db.get_data_store_type()
+        db.data_store = make_data_store_factory(base_path, data_store_type, initialize=False)
         return db
 
     def update_sqlalchemy_metadata(self) -> None:
@@ -115,17 +119,22 @@ class RegistryDatabase:
         """Return the sqlalchemy engine."""
         return self._engine
 
-    def initialize_db(self, data_path: Path, overwrite: bool = False) -> None:
+    @property
+    def data_store(self) -> DataStoreInterface:
+        """Return the data store."""
+        if self._data_store is None:
+            msg = "Data store is not initialized. Use create() or connect() to initialize."
+            raise DSGInvalidOperation(msg)
+        return self._data_store
+
+    @data_store.setter
+    def data_store(self, store: DataStoreInterface) -> None:
+        """Set the data store."""
+        self._data_store = store
+
+    def initialize_db(self, data_path: Path, data_store_type: DataStoreType) -> None:
         """Initialize the database to store a dsgrid registry."""
-        if data_path.exists():
-            if overwrite:
-                shutil.rmtree(data_path)
-            else:
-                msg = f"{data_path=} already exists. Choose a different path or set overwrite=True"
-                raise DSGInvalidOperation(msg)
-
         create_tables(self._engine, self._metadata)
-
         created_by = getpass.getuser()
         created_on = str(datetime.now())
         registry_data_path = str(data_path)
@@ -134,15 +143,17 @@ class RegistryDatabase:
             conn.execute(insert(kv_table).values(key="created_by", value=created_by))
             conn.execute(insert(kv_table).values(key="created_on", value=created_on))
             conn.execute(insert(kv_table).values(key="data_path", value=registry_data_path))
+            conn.execute(
+                insert(kv_table).values(key="data_store_type", value=data_store_type.value)
+            )
 
-        data_path.mkdir(exist_ok=True)
         record = {
             "created_by": created_by,
             "created_on": created_on,
             "data_path": registry_data_path,
+            "data_store_type": data_store_type.value,
         }
         dump_data(record, data_path / "registry.json5")
-        (data_path / "data").mkdir(exist_ok=True)
 
     def get_table(self, name: RegistryTables) -> Table:
         """Return the sqlalchemy Table object."""
@@ -377,6 +388,20 @@ class RegistryDatabase:
                 msg = "Bug: received no result in query for data_path"
                 raise Exception(msg)
             return Path(row.value)
+
+    def get_data_store_type(self) -> DataStoreType:
+        """Return the path where dataset data is stored."""
+        table = self._get_table(RegistryTables.KEY_VALUE)
+        with self._engine.connect() as conn:
+            row = conn.execute(
+                select(table.c.value).where(table.c.key == "data_store_type")
+            ).fetchone()
+            if row is None:
+                # Allow legacy registries to keep working for some time.
+                return DataStoreType.FILESYSTEM
+                # msg = "Bug: received no result in query for data_store_type"
+                # raise Exception(msg)
+            return DataStoreType(row.value)
 
     def _get_table(self, table_type: RegistryTables) -> Table:
         return Table(table_type.value, self._metadata)

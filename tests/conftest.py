@@ -11,7 +11,7 @@ from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli as cli
 from dsgrid.cli.dsgrid_admin import cli as cli_admin
-from dsgrid.registry.common import DatabaseConnection
+from dsgrid.registry.common import DataStoreType, DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.functions import (
     drop_temp_tables_and_views,
@@ -118,6 +118,44 @@ def src_tmp_registry_db(tmp_path_factory):
     )
     yield conn, project_dir
     RegistryDatabase.delete(conn)
+
+
+@pytest.fixture
+def registry_with_duckdb_store(tmp_path):
+    db_file = tmp_path / "duckdb_registry.db"
+    url = f"sqlite:///{db_file}"
+    data_path = tmp_path / "registry_data"
+    runner = CliRunner()
+    result = runner.invoke(
+        cli_admin,
+        [
+            "--offline",
+            "create-registry",
+            url,
+            "--data-path",
+            str(data_path),
+            "--overwrite",
+            "--data-store-type",
+            DataStoreType.DUCKDB.value,
+        ],
+    )
+    assert result.exit_code == 0
+    result = runner.invoke(
+        cli,
+        [
+            "--url",
+            url,
+            "--offline",
+            "registry",
+            "bulk-register",
+            str(TEST_EFS_REGISTRATION_FILE),
+        ],
+    )
+    assert result.exit_code == 0
+    conn = DatabaseConnection(url=url)
+    yield conn
+    shutil.rmtree(data_path)
+    db_file.unlink()
 
 
 @pytest.fixture()

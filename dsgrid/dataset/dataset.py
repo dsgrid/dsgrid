@@ -2,7 +2,6 @@
 
 import abc
 import logging
-from typing import Optional
 
 from sqlalchemy import Connection
 
@@ -11,6 +10,8 @@ from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_han
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.query.query_context import QueryContext
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
+from dsgrid.registry.data_store_interface import DataStoreInterface
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.spark.types import DataFrame
 
 logger = logging.getLogger(__name__)
@@ -48,9 +49,10 @@ class Dataset(DatasetBase):
         config,
         dimension_mgr,
         dimension_mapping_mgr,
+        store: DataStoreInterface,
         mapping_references,
         project_time_dim,
-        conn: Optional[Connection] = None,
+        conn: Connection | None = None,
     ):
         """Load a dataset from a store.
 
@@ -73,6 +75,7 @@ class Dataset(DatasetBase):
                 config,
                 dimension_mgr,
                 dimension_mapping_mgr,
+                store=store,
                 mapping_references=mapping_references,
                 project_time_dim=project_time_dim,
             )
@@ -88,7 +91,12 @@ class StandaloneDataset(DatasetBase):
     """Represents a dataset used outside of a project."""
 
     @classmethod
-    def load(cls, config, dimension_mgr):
+    def load(
+        cls,
+        config: DatasetConfig,
+        dimension_mgr: DimensionRegistryManager,
+        store: DataStoreInterface,
+    ):
         """Load a dataset from a store.
 
         Parameters
@@ -101,4 +109,5 @@ class StandaloneDataset(DatasetBase):
         Dataset
 
         """
-        return cls(make_dataset_schema_handler(None, config, dimension_mgr, None))
+        # TODO DT
+        return cls(make_dataset_schema_handler(None, config, dimension_mgr, None, store=store))

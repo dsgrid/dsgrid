@@ -1,5 +1,5 @@
 import logging
-from pathlib import Path
+from typing import Self
 
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
@@ -11,6 +11,7 @@ from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.query.query_context import QueryContext
+from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.spark.functions import (
     cache,
     coalesce,
@@ -32,10 +33,8 @@ from dsgrid.utils.dataset import (
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
-    read_dataframe,
     get_unique_values,
-    overwrite_dataframe_file,
-    write_dataframe_and_auto_partition,
+    read_dataframe,
 )
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
@@ -51,11 +50,21 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._load_data_lookup = load_data_lookup
 
     @classmethod
-    def load(cls, config: DatasetConfig, *args, **kwargs):
-        load_data_df = convert_types_if_necessary(read_dataframe(config.load_data_path))
+    def load(
+        cls, config: DatasetConfig, *args, store: DataStoreInterface | None = None, **kwargs
+    ) -> Self:
+        if store is None:
+            load_data_df = read_dataframe(config.load_data_path)
+            load_data_lookup = read_dataframe(config.load_data_lookup_path)
+        else:
+            load_data_df = store.read_table(config.model.dataset_id, config.model.version)
+            load_data_lookup = store.read_lookup_table(
+                config.model.dataset_id, config.model.version
+            )
+
+        load_data_df = convert_types_if_necessary(load_data_df)
         time_dim = config.get_dimension(DimensionType.TIME)
         load_data_df = time_dim.convert_time_format(load_data_df)
-        load_data_lookup = read_dataframe(config.load_data_lookup_path)
         load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
         load_data_lookup = convert_types_if_necessary(load_data_lookup)
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)
@@ -256,7 +265,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
 
     @track_timing(timer_stats_collector)
-    def filter_data(self, dimensions: list[DimensionSimpleModel]):
+    def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
         lookup = self._load_data_lookup
         cache(lookup)
         load_df = self._load_data
@@ -275,9 +284,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         lookup = lookup.drop(*drop_columns)
 
         lookup2 = coalesce(lookup, 1)
-        lookup2 = overwrite_dataframe_file(self._config.load_data_lookup_path, lookup2)
+        store.write_lookup_table(
+            lookup2, self.dataset_id, self._config.model.version, overwrite=True
+        )
         unpersist(lookup)
-        logger.info("Rewrote simplified %s", self._config.load_data_lookup_path)
         ids = collect_list(lookup2.select("id").distinct(), "id")
         load_df = self._load_data.filter(self._load_data.id.isin(ids))
         ld_columns = set(load_df.columns)
@@ -286,10 +296,5 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if column in ld_columns:
                 load_df = load_df.filter(load_df[column].isin(dim.record_ids))
 
-        path = Path(self._config.load_data_path)
-        if path.suffix == ".csv":
-            # write_dataframe_and_auto_partition doesn't support CSV yet
-            overwrite_dataframe_file(path, load_df)
-        else:
-            write_dataframe_and_auto_partition(load_df, path)
-        logger.info("Rewrote simplified %s", self._config.load_data_path)
+        store.write_table(load_df, self.dataset_id, self._config.model.version, overwrite=True)
+        logger.info("Rewrote simplified %s", self._config.model.dataset_id)

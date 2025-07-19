@@ -1,5 +1,5 @@
 import logging
-from pathlib import Path
+from typing import Self
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
@@ -7,6 +7,7 @@ from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dataset.models import TableFormatType
+from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.spark.types import (
     DataFrame,
     StringType,
@@ -14,9 +15,8 @@ from dsgrid.spark.types import (
 from dsgrid.utils.dataset import convert_types_if_necessary
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
-    read_dataframe,
     get_unique_values,
-    write_dataframe_and_auto_partition,
+    read_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -35,8 +35,13 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         self._load_data = load_data_df
 
     @classmethod
-    def load(cls, config: DatasetConfig, *args, **kwargs):
-        df = read_dataframe(config.load_data_path)
+    def load(
+        cls, config: DatasetConfig, *args, store: DataStoreInterface | None = None, **kwargs
+    ) -> Self:
+        if store is None:
+            df = read_dataframe(config.load_data_path)
+        else:
+            df = store.read_table(config.model.dataset_id, config.model.version)
         load_data_df = config.add_trivial_dimensions(df)
         load_data_df = convert_types_if_necessary(load_data_df)
         time_dim = config.get_dimension(DimensionType.TIME)
@@ -121,7 +126,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return self._remove_non_dimension_columns(df).distinct()
 
     @track_timing(timer_stats_collector)
-    def filter_data(self, dimensions: list[DimensionSimpleModel]):
+    def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
         assert (
             self._config.get_table_format_type() == TableFormatType.UNPIVOTED
         ), self._config.get_table_format_type()
@@ -142,9 +147,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             drop_columns.append(col)
         load_df = load_df.drop(*drop_columns)
 
-        path = Path(self._config.load_data_path)
-        write_dataframe_and_auto_partition(load_df, path)
-        logger.info("Rewrote simplified %s", self._config.load_data_path)
+        store.write_table(load_df, self.dataset_id, self._config.model.version, overwrite=True)
+        logger.info("Rewrote simplified %s", self._config.model.dataset_id)
 
     def make_project_dataframe(
         self, context: QueryContext, project_config: ProjectConfig

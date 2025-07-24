@@ -359,6 +359,11 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         description="Additional user defined metadata fields",
         default={},
     )
+    included_dimensions: list[DimensionType] = Field(
+        title="included_dimensions",
+        default=[],
+        description="List of dimensions included in the dataset.",
+    )
     trivial_dimensions: list[DimensionType] = Field(
         title="trivial_dimensions",
         default=[],
@@ -415,7 +420,12 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     def check_files(cls, values: list) -> list:
         """Validate dimension files are unique across all dimensions"""
         check_uniqueness(
-            (x.filename for x in values if isinstance(x, DimensionModel)),
+            (
+                x.filename
+                for x in values
+                if isinstance(x, DimensionModel)
+                if x.filename is not None
+            ),
             "dimension record filename",
         )
         return values
@@ -456,10 +466,12 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
 
 def make_unvalidated_dataset_config(
     dataset_id,
+    metric_type: str,
     table_format: dict[str, str] | None = None,
     data_classification=DataClassificationType.MODERATE.value,
     dataset_type=InputDatasetType.MODELED,
-    time_type: TimeDimensionType = TimeDimensionType.DATETIME,
+    included_dimensions: list[DimensionType] | None = None,
+    time_type: TimeDimensionType | None = None,
     use_project_geography_time_zone: bool = False,
     dimension_references: list[DimensionReferenceModel] | None = None,
     trivial_dimensions: list[DimensionType] | None = None,
@@ -468,7 +480,13 @@ def make_unvalidated_dataset_config(
     table_format_ = table_format or UnpivotedTableFormatModel().model_dump()
     trivial_dimensions_ = trivial_dimensions or []
     exclude_dimension_types = {x.dimension_type for x in dimension_references or []}
-    dimensions = make_base_dimension_template(exclude_dimension_types, time_type=time_type)
+    if included_dimensions is not None:
+        for dim_type in set(DimensionType).difference(included_dimensions):
+            exclude_dimension_types.add(dim_type)
+
+    dimensions = make_base_dimension_template(
+        [metric_type], exclude_dimension_types=exclude_dimension_types, time_type=time_type
+    )
     return {
         "dataset_id": dataset_id,
         "dataset_type": dataset_type.value,
@@ -487,6 +505,7 @@ def make_unvalidated_dataset_config(
         "source": "",
         "data_classification": data_classification,
         "use_project_geography_time_zone": True,
+        "included_dimensions": [x.value for x in included_dimensions or []],
         "dimensions": dimensions,
         "dimension_references": [x.model_dump(mode="json") for x in dimension_references or []],
         "tags": [],
@@ -564,19 +583,20 @@ class DatasetConfig(ConfigBase):
     def dimensions(self):
         return self._dimensions
 
-    def get_dimension(self, dimension_type: DimensionType) -> DimensionBaseConfig:
+    def get_dimension(self, dimension_type: DimensionType) -> DimensionBaseConfig | None:
         """Return the dimension matching dimension_type."""
         for dim_config in self.dimensions.values():
             if dim_config.model.dimension_type == dimension_type:
                 return dim_config
 
-        msg = f"Dimension {dimension_type} not found in dataset {self.config_id}"
-        raise DSGValueNotRegistered(msg)
+        return None
+        # msg = f"Dimension {dimension_type} not found in dataset {self.config_id}"
+        # raise DSGValueNotRegistered(msg)
 
-    def get_time_dimension(self) -> TimeDimensionBaseConfig:
+    def get_time_dimension(self) -> TimeDimensionBaseConfig | None:
         """Return the time dimension of the dataset."""
         dim = self.get_dimension(DimensionType.TIME)
-        assert isinstance(dim, TimeDimensionBaseConfig)
+        assert dim is None or isinstance(dim, TimeDimensionBaseConfig)
         return dim
 
     def get_dimension_with_records(

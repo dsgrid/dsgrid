@@ -283,7 +283,11 @@ class DimensionsModel(DSGBaseModel):
     def check_files(cls, values: list) -> list:
         """Validate dimension files are unique across all dimensions"""
         check_uniqueness(
-            (x.filename for x in values if isinstance(x, DimensionModel)),
+            (
+                x.filename
+                for x in values
+                if isinstance(x, DimensionModel) and x.filename is not None
+            ),
             "dimension record filename",
         )
         return values
@@ -731,6 +735,7 @@ class ProjectConfigModel(DSGBaseDatabaseModel):
 def make_unvalidated_project_config(
     project_id: str,
     dataset_ids: Iterable[str],
+    metric_types: Iterable[str],
     name: str | None = None,
     description: str | None = None,
     time_type: TimeDimensionType = TimeDimensionType.DATETIME,
@@ -741,7 +746,7 @@ def make_unvalidated_project_config(
         "name": name or "",
         "description": description or "",
         "dimensions": {
-            "base_dimensions": make_base_dimension_template(time_type=time_type),
+            "base_dimensions": make_base_dimension_template(metric_types, time_type=time_type),
             "subset_dimensions": [],
             "supplemental_dimensions": [],
         },

@@ -44,8 +44,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             df = store.read_table(config.model.dataset_id, config.model.version)
         load_data_df = config.add_trivial_dimensions(df)
         load_data_df = convert_types_if_necessary(load_data_df)
-        time_dim = config.get_dimension(DimensionType.TIME)
-        load_data_df = time_dim.convert_time_format(load_data_df)
+        time_dim = config.get_time_dimension()
+        if time_dim is not None:
+            load_data_df = time_dim.convert_time_format(load_data_df)
         return cls(load_data_df, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
@@ -54,11 +55,12 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @track_timing(timer_stats_collector)
     def check_time_consistency(self):
-        time_dim = self._config.get_dimension(DimensionType.TIME)
-        if time_dim.supports_chronify():
-            self._check_dataset_time_consistency_with_chronify()
-        else:
-            self._check_dataset_time_consistency(self._load_data)
+        time_dim = self._config.get_time_dimension()
+        if time_dim is not None:
+            if time_dim.supports_chronify():
+                self._check_dataset_time_consistency_with_chronify()
+            else:
+                self._check_dataset_time_consistency(self._load_data)
 
     @track_timing(timer_stats_collector)
     def _check_one_table_data_consistency(self):
@@ -69,8 +71,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         """
         logger.info("Check one table dataset consistency.")
         dimension_types = set()
-        time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_columns = set(time_dim.get_load_data_time_columns())
+        time_dim = self._config.get_time_dimension()
+        time_columns: set[str] = set()
+        if time_dim is not None:
+            time_columns = set(time_dim.get_load_data_time_columns())
         assert (
             self._config.get_table_format_type() == TableFormatType.UNPIVOTED
         ), self._config.get_table_format_type()
@@ -90,13 +94,14 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     raise DSGInvalidDataset(msg)
                 dimension_types.add(dim_type)
 
-        expected_dimensions = DimensionType.get_dimension_types_allowed_as_columns()
-        missing_dimensions = expected_dimensions.difference(dimension_types)
-        if missing_dimensions:
-            raise DSGInvalidDataset(
-                f"load_data is missing dimensions: {missing_dimensions}. "
-                "If these are trivial dimensions, make sure to specify them in the Dataset Config."
-            )
+        # TODO: stride
+        # expected_dimensions = DimensionType.get_dimension_types_allowed_as_columns()
+        # missing_dimensions = expected_dimensions.difference(dimension_types)
+        # if missing_dimensions:
+        #     raise DSGInvalidDataset(
+        #         f"load_data is missing dimensions: {missing_dimensions}. "
+        #         "If these are trivial dimensions, make sure to specify them in the Dataset Config."
+        #     )
 
         for dimension_type in dimension_types:
             name = dimension_type.value

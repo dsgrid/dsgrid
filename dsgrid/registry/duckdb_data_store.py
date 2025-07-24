@@ -11,9 +11,14 @@ from dsgrid.spark.types import DataFrame
 
 
 DATABASE_FILENAME = "data.duckdb"
-SCHEMA_DATA = "dsgrid_data_tables"
-SCHEMA_LOOKUP_DATA = "dsgrid_lookup_tables"
-TABLE_TYPE_TO_SCHEMA = {"data": SCHEMA_DATA, "lookup": SCHEMA_LOOKUP_DATA}
+SCHEMA_DATA = "dsgrid_data"
+SCHEMA_LOOKUP_DATA = "dsgrid_lookup"
+SCHEMA_QUERY_OUTPUTS = "dsgrid_query"
+TABLE_TYPE_TO_SCHEMA = {
+    "data": SCHEMA_DATA,
+    "lookup": SCHEMA_LOOKUP_DATA,
+    "query": SCHEMA_QUERY_OUTPUTS,
+}
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +40,7 @@ class DuckDbDataStore(DataStoreInterface):
         con = duckdb.connect(db_file)
         con.sql(f"CREATE SCHEMA {SCHEMA_DATA}")
         con.sql(f"CREATE SCHEMA {SCHEMA_LOOKUP_DATA}")
+        con.sql(f"CREATE SCHEMA {SCHEMA_QUERY_OUTPUTS}")
         return store
 
     @classmethod

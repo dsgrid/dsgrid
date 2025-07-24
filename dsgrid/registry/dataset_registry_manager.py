@@ -17,7 +17,9 @@ from dsgrid.config.dataset_config import DataSchemaType
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dataset.models import TableFormatType, UnpivotedTableFormatModel
-from dsgrid.dimension.base_models import DimensionType, check_required_dimensions
+from dsgrid.dimension.base_models import (
+    check_required_dataset_dimensions,
+)
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
@@ -99,7 +101,7 @@ class DatasetRegistryManager(RegistryManagerBase):
     @track_timing(timer_stats_collector)
     def _run_checks(self, conn: Connection, config: DatasetConfig):
         logger.info("Run dataset registration checks.")
-        check_required_dimensions(config.model.dimension_references, "dataset dimensions")
+        check_required_dataset_dimensions(config.model.dimension_references, "dataset dimensions")
         check_uniqueness((x.model.name for x in config.model.dimensions), "dimension name")
         if not os.environ.get("__DSGRID_SKIP_CHECK_DATASET_CONSISTENCY__"):
             self._check_dataset_consistency(conn, config)
@@ -312,12 +314,15 @@ class DatasetRegistryManager(RegistryManagerBase):
             pivoted_dimension_type = None
 
         df = read_dataframe(ld_path)
-        time_dim = config.get_dimension(DimensionType.TIME)
-        df = time_dim.convert_time_format(df, update_model=True)
+        time_dim = config.get_time_dimension()
+        time_columns: list[str] = []
+        if time_dim is not None:
+            df = time_dim.convert_time_format(df, update_model=True)
         if needs_unpivot:
             assert pivoted_columns is not None
             assert pivoted_dimension_type is not None
-            time_columns = config.get_dimension(DimensionType.TIME).get_load_data_time_columns()
+            if time_dim is not None:
+                time_columns = time_dim.get_load_data_time_columns()
             existing_columns = set(df.columns)
             if diff := set(time_columns) - existing_columns:
                 msg = f"Expected time columns are not present in the table: {diff=}"

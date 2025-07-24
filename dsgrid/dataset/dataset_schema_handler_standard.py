@@ -63,8 +63,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
 
         load_data_df = convert_types_if_necessary(load_data_df)
-        time_dim = config.get_dimension(DimensionType.TIME)
-        load_data_df = time_dim.convert_time_format(load_data_df)
+        time_dim = config.get_time_dimension()
+        if time_dim is not None:
+            load_data_df = time_dim.convert_time_format(load_data_df)
         load_data_lookup = config.add_trivial_dimensions(load_data_lookup)
         load_data_lookup = convert_types_if_necessary(load_data_lookup)
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)
@@ -76,13 +77,14 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @track_timing(timer_stats_collector)
     def check_time_consistency(self):
-        time_dim = self._config.get_dimension(DimensionType.TIME)
-        if time_dim.supports_chronify():
-            self._check_dataset_time_consistency_with_chronify()
-        else:
-            self._check_dataset_time_consistency(
-                self._load_data.join(self._load_data_lookup, on="id")
-            )
+        time_dim = self._config.get_time_dimension()
+        if time_dim is not None:
+            if time_dim.supports_chronify():
+                self._check_dataset_time_consistency_with_chronify()
+            else:
+                self._check_dataset_time_consistency(
+                    self._load_data.join(self._load_data_lookup, on="id")
+                )
 
     def make_dimension_association_table(self, context: ScratchDirContext) -> DataFrame:
         lk_df = self._load_data_lookup.filter("id is not NULL")
@@ -209,8 +211,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         ), self._config.get_table_format_type()
         self._check_load_data_unpivoted_value_column(self._load_data)
 
-        time_dim = self._config.get_dimension(DimensionType.TIME)
-        time_columns = set(time_dim.get_load_data_time_columns())
+        time_dim = self._config.get_time_dimension()
+        time_columns: set[str] = set()
+        if time_dim is not None:
+            time_columns = set(time_dim.get_load_data_time_columns())
         allowed_columns = (
             DimensionType.get_allowed_dimension_column_names()
             .union(time_columns)

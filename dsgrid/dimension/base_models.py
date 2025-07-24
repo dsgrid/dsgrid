@@ -150,6 +150,37 @@ def check_required_dimensions(dimensions, tag):
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 
 
+def check_required_dataset_dimensions(dimensions, tag):
+    """Check that a dataset config contains all required dimensions.
+
+    Parameters
+    ----------
+    dimensions : list
+        list of DimensionReferenceModel
+    tag : str
+        User-defined string to include in exception messages
+
+    Raises
+    ------
+    ValueError
+        Raised if a required dimension is not provided.
+
+    """
+    dimension_types = {x.dimension_type for x in dimensions}
+    # TODO: stride
+    required_dim_types = {
+        DimensionType.GEOGRAPHY,
+        # DimensionType.MODEL_YEAR,
+        # DimensionType.SCENARIO,
+        # DimensionType.SECTOR,
+    }
+    missing = required_dim_types.difference(dimension_types)
+    if missing:
+        raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
+
+    check_uniqueness((x.dimension_type for x in dimensions), tag)
+
+
 def check_timezone_in_geography(dimension, err_msg=None):
     """Check that a geography dimension contains valid time zones in records.
 

@@ -7,10 +7,12 @@ from sqlalchemy import Connection
 
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.query.query_context import QueryContext
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.registry.data_store_interface import DataStoreInterface
+from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.spark.types import DataFrame
 
@@ -46,12 +48,11 @@ class Dataset(DatasetBase):
     @classmethod
     def load(
         cls,
-        config,
-        dimension_mgr,
-        dimension_mapping_mgr,
+        config: DatasetConfig,
+        dimension_mgr: DimensionRegistryManager,
+        dimension_mapping_mgr: DimensionMappingRegistryManager,
         store: DataStoreInterface,
-        mapping_references,
-        project_time_dim,
+        mapping_references: list[DimensionMappingReferenceListModel],
         conn: Connection | None = None,
     ):
         """Load a dataset from a store.
@@ -62,7 +63,6 @@ class Dataset(DatasetBase):
         dimension_mgr : DimensionRegistryManager
         dimension_mapping_mgr : DimensionMappingRegistryManager
         mapping_references: list[DimensionMappingReferenceListModel]
-        project_time_dim: TimeDimensionBaseConfig
 
         Returns
         -------
@@ -77,7 +77,6 @@ class Dataset(DatasetBase):
                 dimension_mapping_mgr,
                 store=store,
                 mapping_references=mapping_references,
-                project_time_dim=project_time_dim,
             )
         )
 
@@ -110,4 +109,12 @@ class StandaloneDataset(DatasetBase):
 
         """
         # TODO DT
-        return cls(make_dataset_schema_handler(None, config, dimension_mgr, None, store=store))
+        return cls(
+            make_dataset_schema_handler(
+                None,
+                config,
+                dimension_mgr,
+                None,
+                store=store,
+            )
+        )

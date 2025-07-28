@@ -102,6 +102,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     dataset_map_file = src_dir / dataset_dir / "dimension_mappings.json5"
     dataset_id = load_data(dataset_config)["dataset_id"]
     dataset_path = TEST_DATASET_DIRECTORY / dataset_id
+    missing_assoc_file = dataset_path / "missing_associations.csv"
 
     result = runner.invoke(
         cli,
@@ -139,6 +140,8 @@ def test_register_project_and_dataset(tmp_registry_db):
         project_id,
         "--log-message",
         "log",
+        "--missing-dimension-associations-file",
+        str(missing_assoc_file),
     ]
 
     result = runner.invoke(cli, cmd)

@@ -47,5 +47,15 @@ class DataStoreInterface(abc.ABC):
         """Write a lookup table to the data store."""
 
     @abc.abstractmethod
+    def write_missing_associations_table(
+        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+    ) -> None:
+        """Write a table of missing dimension associations to the data store."""
+
+    @abc.abstractmethod
+    def read_missing_associations_table(self, dataset_id: str, version: str) -> DataFrame | None:
+        """Read a missing dimensions association table from the data store."""
+
+    @abc.abstractmethod
     def remove_tables(self, dataset_id: str, version: str) -> None:
         """Remove the data and lookup tables from the data store."""

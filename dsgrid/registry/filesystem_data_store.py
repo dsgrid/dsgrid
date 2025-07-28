@@ -11,6 +11,7 @@ from dsgrid.utils.spark import read_dataframe, write_dataframe, write_dataframe_
 
 TABLE_FILENAME = "table.parquet"
 LOOKUP_TABLE_FILENAME = "lookup_table.parquet"
+MISSING_ASSOCIATIONS_TABLE_FILENAME = "missing_associations_table.parquet"
 # We used to write these filenames. Keep support for old registries, for now.
 ALT_TABLE_FILENAME = "load_data.parquet"
 ALT_LOOKUP_TABLE_FILENAME = "load_data_lookup.parquet"
@@ -51,6 +52,12 @@ class FilesystemDataStore(DataStoreInterface):
             raise FileNotFoundError(msg)
         return read_dataframe(filename)
 
+    def read_missing_associations_table(self, dataset_id: str, version: str) -> DataFrame | None:
+        filename = self._missing_associations_table_filename(dataset_id, version)
+        if not filename.exists():
+            return None
+        return read_dataframe(filename)
+
     def write_table(
         self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
@@ -65,9 +72,17 @@ class FilesystemDataStore(DataStoreInterface):
         filename.parent.mkdir(parents=True, exist_ok=True)
         write_dataframe(coalesce(df, 1), filename)
 
+    def write_missing_associations_table(
+        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+    ) -> None:
+        filename = self._missing_associations_table_filename(dataset_id, version)
+        filename.parent.mkdir(parents=True, exist_ok=True)
+        write_dataframe_and_auto_partition(df, filename)
+
     def remove_tables(self, dataset_id: str, version: str) -> None:
         delete_if_exists(self._table_filename(dataset_id, version))
         delete_if_exists(self._lookup_table_filename(dataset_id, version))
+        delete_if_exists(self._missing_associations_table_filename(dataset_id, version))
 
     @property
     def _data_dir(self) -> Path:
@@ -75,6 +90,9 @@ class FilesystemDataStore(DataStoreInterface):
 
     def _lookup_table_filename(self, dataset_id: str, version: str) -> Path:
         return self._data_dir / dataset_id / version / LOOKUP_TABLE_FILENAME
+
+    def _missing_associations_table_filename(self, dataset_id: str, version: str) -> Path:
+        return self._data_dir / dataset_id / version / MISSING_ASSOCIATIONS_TABLE_FILENAME
 
     def _table_filename(self, dataset_id: str, version: str) -> Path:
         return self._data_dir / dataset_id / version / TABLE_FILENAME

@@ -13,7 +13,7 @@ from dsgrid.config.dataset_config import (
     ALLOWED_LOAD_DATA_FILENAMES,
     ALLOWED_LOAD_DATA_LOOKUP_FILENAMES,
 )
-from dsgrid.config.dataset_config import DataSchemaType
+from dsgrid.config.dataset_config import DataSchemaType, MissingDimensionAssociations
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dataset.models import TableFormatType, UnpivotedTableFormatModel
@@ -25,8 +25,9 @@ from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.registry_interface import DatasetRegistryInterface
+from dsgrid.spark.functions import is_dataframe_empty
 from dsgrid.spark.types import DataFrame
-from dsgrid.utils.dataset import unpivot_dataframe
+from dsgrid.utils.dataset import get_missing_dimension_associations, unpivot_dataframe
 from dsgrid.utils.spark import (
     read_dataframe,
 )
@@ -99,18 +100,37 @@ class DatasetRegistryManager(RegistryManagerBase):
         return dataset_path
 
     @track_timing(timer_stats_collector)
-    def _run_checks(self, conn: Connection, config: DatasetConfig):
+    def _run_checks(
+        self,
+        conn: Connection,
+        config: DatasetConfig,
+        missing_dimension_associations: MissingDimensionAssociations,
+    ) -> DataFrame | None:
         logger.info("Run dataset registration checks.")
         check_required_dataset_dimensions(config.model.dimension_references, "dataset dimensions")
         check_uniqueness((x.model.name for x in config.model.dimensions), "dimension name")
         if not os.environ.get("__DSGRID_SKIP_CHECK_DATASET_CONSISTENCY__"):
-            self._check_dataset_consistency(conn, config)
+            return self._check_dataset_consistency(
+                conn,
+                config,
+                missing_dimension_associations,
+            )
+        return None
 
-    def _check_dataset_consistency(self, conn: Connection, config: DatasetConfig):
+    def _check_dataset_consistency(
+        self,
+        conn: Connection,
+        config: DatasetConfig,
+        missing_dimension_associations: MissingDimensionAssociations,
+    ) -> DataFrame:
         schema_handler = make_dataset_schema_handler(
-            conn, config, self._dimension_mgr, self._dimension_mapping_mgr, store=self._store
+            conn,
+            config,
+            self._dimension_mgr,
+            self._dimension_mapping_mgr,
+            store=self._store,
         )
-        schema_handler.check_consistency()
+        return schema_handler.check_consistency(missing_dimension_associations)
 
     @property
     def dimension_manager(self) -> DimensionRegistryManager:
@@ -174,9 +194,10 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         config_file: Path,
         dataset_path: Path,
-        submitter: Optional[str] = None,
-        log_message: Optional[str] = None,
-        context: Optional[RegistrationContext] = None,
+        submitter: str | None = None,
+        log_message: str | None = None,
+        context: RegistrationContext | None = None,
+        missing_dimension_associations_file: Path | str | None = None,
     ):
         config = DatasetConfig.load_from_user_path(config_file, dataset_path)
         if context is None:
@@ -185,9 +206,19 @@ class DatasetRegistryManager(RegistryManagerBase):
             with RegistrationContext(
                 self.db, log_message, VersionUpdateType.MAJOR, submitter
             ) as context:
-                return self.register_from_config(config, dataset_path, context)
+                return self.register_from_config(
+                    config,
+                    dataset_path,
+                    context,
+                    missing_dimension_associations_file=missing_dimension_associations_file,
+                )
         else:
-            return self.register_from_config(config, dataset_path, context)
+            return self.register_from_config(
+                config,
+                dataset_path,
+                context,
+                missing_dimension_associations_file=missing_dimension_associations_file,
+            )
 
     @track_timing(timer_stats_collector)
     def register_from_config(
@@ -195,12 +226,14 @@ class DatasetRegistryManager(RegistryManagerBase):
         config: DatasetConfig,
         dataset_path: Path,
         context: RegistrationContext,
+        missing_dimension_associations_file: Path | str | None = None,
     ):
         self._update_dimensions(context.connection, config)
         self._register_dataset_and_dimensions(
             config,
             dataset_path,
             context,
+            missing_dimension_associations_file=missing_dimension_associations_file,
         )
 
     def _register_dataset_and_dimensions(
@@ -208,6 +241,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         config: DatasetConfig,
         dataset_path: Path,
         context: RegistrationContext,
+        missing_dimension_associations_file: Path | str | None = None,
     ):
         logger.info("Start registration of dataset %s", config.model.dataset_id)
         # TODO S3: This requires downloading data to the local system.
@@ -230,7 +264,12 @@ class DatasetRegistryManager(RegistryManagerBase):
             config.model.dimensions.clear()
 
         self._update_dimensions(conn, config)
-        self._register(config, dataset_path, context)
+        self._register(
+            config,
+            dataset_path,
+            context,
+            missing_dimension_associations_file=missing_dimension_associations_file,
+        )
         context.add_id(RegistryType.DATASET, config.model.dataset_id, self)
 
     def _register(
@@ -238,6 +277,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         config: DatasetConfig,
         dataset_path: Path,
         context: RegistrationContext,
+        missing_dimension_associations_file: Path | str | None = None,
     ):
         config.model.version = "1.0.0"
         # Explanation for this order of operations:
@@ -254,8 +294,21 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._check_time_consistency(config, context)
         self._write_to_registry(config)
 
+        assoc_df = (
+            None
+            if missing_dimension_associations_file is None
+            else get_missing_dimension_associations(missing_dimension_associations_file)
+        )
         try:
-            self._run_checks(context.connection, config)
+            missing_associations = self._run_checks(
+                context.connection,
+                config,
+                MissingDimensionAssociations(df=assoc_df, needs_processing=True),
+            )
+            if missing_associations is not None and not is_dataframe_empty(missing_associations):
+                self._store.write_missing_associations_table(
+                    missing_associations, config.model.dataset_id, config.model.version
+                )
         except Exception:
             self._store.remove_tables(config.model.dataset_id, config.model.version)
             raise
@@ -382,6 +435,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         log_message: str,
         version: str,
         dataset_path: Path | None = None,
+        missing_dimension_associations_file: Path | str | None = None,
     ):
         with RegistrationContext(self.db, log_message, update_type, submitter) as context:
             conn = context.connection
@@ -396,7 +450,11 @@ class DatasetRegistryManager(RegistryManagerBase):
                 config = DatasetConfig.load_from_user_path(config_file, path)
             self._update_dimensions(conn, config)
             self._check_update(conn, config, dataset_id, version)
-            self.update_with_context(config, context)
+            self.update_with_context(
+                config,
+                context,
+                missing_dimension_associations_file=missing_dimension_associations_file,
+            )
 
     @track_timing(timer_stats_collector)
     def update(
@@ -404,19 +462,25 @@ class DatasetRegistryManager(RegistryManagerBase):
         config: DatasetConfig,
         update_type: VersionUpdateType,
         log_message: str,
-        submitter: Optional[str] = None,
+        submitter: str | None = None,
+        missing_dimension_associations_file: Path | str | None = None,
     ) -> DatasetConfig:
         lock_file_path = self.get_registry_lock_file(config.model.dataset_id)
         with self.cloud_interface.make_lock_file_managed(lock_file_path):
             # Note that projects will not pick up these changes until submit-dataset
             # is called again.
             with RegistrationContext(self.db, log_message, update_type, submitter) as context:
-                return self.update_with_context(config, context)
+                return self.update_with_context(
+                    config,
+                    context,
+                    missing_dimension_associations_file=missing_dimension_associations_file,
+                )
 
     def update_with_context(
         self,
         config: DatasetConfig,
         context: RegistrationContext,
+        missing_dimension_associations_file: Path | str | None = None,
     ) -> DatasetConfig:
         conn = context.connection
         dataset_id = config.model.dataset_id
@@ -428,7 +492,28 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         # Note: this method mutates updated_config.
         self._write_to_registry(updated_config, orig_version=cur_config.model.version)
-        self._run_checks(conn, updated_config)
+
+        if missing_dimension_associations_file is not None:
+            associations = MissingDimensionAssociations(
+                df=get_missing_dimension_associations(missing_dimension_associations_file),
+                needs_processing=True,
+            )
+        elif updated_config.dataset_path is None:
+            associations = MissingDimensionAssociations(
+                df=self._store.read_missing_associations_table(
+                    dataset_id, cur_config.model.version
+                ),
+                needs_processing=False,
+            )
+        else:
+            associations = MissingDimensionAssociations(df=None, needs_processing=False)
+
+        missing_associations = self._run_checks(conn, updated_config, associations)
+        if missing_associations is not None and not is_dataframe_empty(missing_associations):
+            self._store.write_missing_associations_table(
+                missing_associations, config.model.dataset_id, updated_config.model.version
+            )
+
         old_key = ConfigKey(dataset_id, cur_config.model.version)
         new_key = ConfigKey(dataset_id, updated_config.model.version)
         self._datasets.pop(old_key, None)

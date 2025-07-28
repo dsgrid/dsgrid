@@ -721,7 +721,14 @@ def test_register_submit_dataset_long_workflow(tmp_registry_db):
 
     manager.project_manager.register(project_config_file, user, "register project")
     dataset_path = TEST_DATASET_DIRECTORY / dataset_id
-    manager.dataset_manager.register(dataset_config_file, dataset_path, user, "register dataset")
+    missing_associations_file = dataset_path / "missing_associations.csv"
+    manager.dataset_manager.register(
+        dataset_config_file,
+        dataset_path,
+        user,
+        "register dataset",
+        missing_dimension_associations_file=missing_associations_file,
+    )
     manager.project_manager.submit_dataset(
         project_id,
         dataset_id,

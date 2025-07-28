@@ -13,7 +13,7 @@ from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.dimension.time import TimeDimensionType
-from dsgrid.exceptions import DSGInvalidParameter, DSGValueNotRegistered
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
@@ -601,7 +601,7 @@ class DatasetConfig(ConfigBase):
 
     def get_dimension_with_records(
         self, dimension_type: DimensionType
-    ) -> DimensionBaseConfigWithFiles:
+    ) -> DimensionBaseConfigWithFiles | None:
         """Return the dimension matching dimension_type."""
         for dim_config in self.dimensions.values():
             if dim_config.model.dimension_type == dimension_type and isinstance(
@@ -609,8 +609,10 @@ class DatasetConfig(ConfigBase):
             ):
                 return dim_config
 
-        msg = f"Dimension {dimension_type} not found in dataset {self.config_id} or does not have records"
-        raise DSGValueNotRegistered(msg)
+        # TODO: stride
+        # msg = f"Dimension {dimension_type} not found in dataset {self.config_id} or does not have records"
+        # raise DSGValueNotRegistered(msg)
+        return None
 
     def get_pivoted_dimension_type(self) -> DimensionType | None:
         """Return the table's pivoted dimension type or None if the table isn't pivoted."""
@@ -666,6 +668,13 @@ class DatasetConfig(ConfigBase):
             raise DSGInvalidDimension(
                 f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
             )
+
+
+class MissingDimensionAssociations(DSGBaseModel):
+    """Container for missing dimension associations."""
+
+    df: DataFrame | None
+    needs_processing: bool
 
 
 def get_unique_dimension_record_ids(

@@ -1,5 +1,6 @@
 from sqlalchemy import Connection
 
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceListModel
 from dsgrid.dataset.dataset_schema_handler_standard import StandardDatasetSchemaHandler
 from dsgrid.dataset.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
 from dsgrid.registry.data_store_interface import DataStoreInterface
@@ -14,8 +15,7 @@ def make_dataset_schema_handler(
     dimension_mgr: DimensionRegistryManager,
     dimension_mapping_mgr: DimensionMappingRegistryManager,
     store: DataStoreInterface | None = None,
-    mapping_references=None,
-    project_time_dim=None,
+    mapping_references: list[DimensionMappingReferenceListModel] | None = None,
 ):
     match config.get_data_schema_type():
         case DataSchemaType.STANDARD:
@@ -26,7 +26,6 @@ def make_dataset_schema_handler(
                 dimension_mapping_mgr,
                 store=store,
                 mapping_references=mapping_references,
-                project_time_dim=project_time_dim,
             )
         case DataSchemaType.ONE_TABLE:
             return OneTableDatasetSchemaHandler.load(
@@ -36,7 +35,6 @@ def make_dataset_schema_handler(
                 dimension_mapping_mgr,
                 store=store,
                 mapping_references=mapping_references,
-                project_time_dim=project_time_dim,
             )
         case _:
             raise NotImplementedError(f"{config.model.data_schema.data_schema_type=}")

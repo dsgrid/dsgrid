@@ -1445,7 +1445,7 @@ class ProjectConfig(ConfigBase):
         for df in multi_dfs:
             existing.update(set(df.columns))
 
-        single_dfs = {}
+        single_dfs: dict[str, list[str]] = {}
         for field in (x for x in RequiredDimensionRecordsModel.model_fields if x not in existing):
             req = getattr(required_dimensions.single_dimensional, field)
             record_ids = self._get_required_dimension_record_ids(req)

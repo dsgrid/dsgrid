@@ -126,6 +126,7 @@ def _run_bulk_registration(
             dataset.dataset_path,
             user,
             dataset.log_message,
+            missing_dimension_associations_file=dataset.missing_dimension_associations_file,
         )
         journal.add_dataset(dataset.dataset_id)
 

@@ -13,9 +13,11 @@ from dsgrid.spark.types import DataFrame
 DATABASE_FILENAME = "data.duckdb"
 SCHEMA_DATA = "dsgrid_data"
 SCHEMA_LOOKUP_DATA = "dsgrid_lookup"
+SCHEMA_MISSING_DIMENSION_ASSOCIATIONS = "dsgrid_missing_dimension_associations"
 TABLE_TYPE_TO_SCHEMA = {
     "data": SCHEMA_DATA,
     "lookup": SCHEMA_LOOKUP_DATA,
+    "missing_dimension_associations": SCHEMA_MISSING_DIMENSION_ASSOCIATIONS,
 }
 
 logger = logging.getLogger(__name__)
@@ -38,6 +40,7 @@ class DuckDbDataStore(DataStoreInterface):
         con = duckdb.connect(db_file)
         con.sql(f"CREATE SCHEMA {SCHEMA_DATA}")
         con.sql(f"CREATE SCHEMA {SCHEMA_LOOKUP_DATA}")
+        con.sql(f"CREATE SCHEMA {SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}")
         return store
 
     @classmethod
@@ -52,21 +55,30 @@ class DuckDbDataStore(DataStoreInterface):
 
     def read_table(self, dataset_id: str, version: str) -> DataFrame:
         con = self._get_connection()
-        table_name = self._make_table_name("data", dataset_id, version)
+        table_name = _make_table_full_name("data", dataset_id, version)
         df = con.sql(f"SELECT * FROM {table_name}").to_df()
         return get_spark_session().createDataFrame(df)
 
     def read_lookup_table(self, dataset_id: str, version: str) -> DataFrame:
         con = self._get_connection()
-        table_name = self._make_table_name("lookup", dataset_id, version)
+        table_name = _make_table_full_name("lookup", dataset_id, version)
         df = con.sql(f"SELECT * FROM {table_name}").to_df()
+        return get_spark_session().createDataFrame(df)
+
+    def read_missing_associations_table(self, dataset_id: str, version: str) -> DataFrame | None:
+        con = self._get_connection()
+        full_name = _make_table_full_name("missing_dimension_associations", dataset_id, version)
+        short_name = _make_table_short_name(dataset_id, version)
+        if not self._has_table(con, SCHEMA_MISSING_DIMENSION_ASSOCIATIONS, short_name):
+            return None
+        df = con.sql(f"SELECT * FROM {full_name}").to_df()
         return get_spark_session().createDataFrame(df)
 
     def write_table(
         self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         con = self._get_connection()
-        table_name = self._make_table_name("data", dataset_id, version)
+        table_name = _make_table_full_name("data", dataset_id, version)
         if overwrite:
             con.sql(f"DROP TABLE IF EXISTS {table_name}")
         _create_table_from_dataframe(con, df, table_name)
@@ -75,17 +87,25 @@ class DuckDbDataStore(DataStoreInterface):
         self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         con = self._get_connection()
-        table_name = self._make_table_name("lookup", dataset_id, version)
+        table_name = _make_table_full_name("lookup", dataset_id, version)
+        if overwrite:
+            con.sql(f"DROP TABLE IF EXISTS {table_name}")
+        _create_table_from_dataframe(con, df, table_name)
+
+    def write_missing_associations_table(
+        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+    ) -> None:
+        con = self._get_connection()
+        table_name = _make_table_full_name("missing_dimension_associations", dataset_id, version)
         if overwrite:
             con.sql(f"DROP TABLE IF EXISTS {table_name}")
         _create_table_from_dataframe(con, df, table_name)
 
     def remove_tables(self, dataset_id: str, version: str) -> None:
         con = self._get_connection()
-        table_name = self._make_table_name("data", dataset_id, version)
-        con.sql(f"DROP TABLE {table_name}")
-        lookup_table_name = self._make_table_name("lookup", dataset_id, version)
-        con.sql(f"DROP TABLE IF EXISTS {lookup_table_name}")
+        for table_type in ("data", "lookup", "missing_dimension_associations"):
+            table_name = _make_table_full_name(table_type, dataset_id, version)
+            con.sql(f"DROP TABLE IF EXISTS {table_name}")
 
     @property
     def _data_dir(self) -> Path:
@@ -98,16 +118,35 @@ class DuckDbDataStore(DataStoreInterface):
     def _get_connection(self) -> duckdb.DuckDBPyConnection:
         return duckdb.connect(self._db_file)
 
-    @staticmethod
-    def _make_table_name(
-        base_name: Literal["data", "lookup"], dataset_id: str, version: str
-    ) -> str:
-        schema = TABLE_TYPE_TO_SCHEMA[base_name]
-        # Replace dots so that manual SQL queries don't have to escape them.
-        ver = version.replace(".", "_")
-        return f"{schema}.{dataset_id}__{ver}"
+    def _has_table(self, con: DuckDBPyConnection, schema: str, table_name: str) -> bool:
+        return (
+            con.sql(
+                f"""
+            SELECT COUNT(*)
+            FROM information_schema.tables
+            WHERE table_schema = '{schema}' AND table_name = '{table_name}'
+        """
+            ).fetchone()[0]
+            > 0
+        )
 
 
 def _create_table_from_dataframe(con: DuckDBPyConnection, df: DataFrame, table_name: str) -> None:
     pdf = df.toPandas()  # noqa: F841
     con.sql(f"CREATE TABLE {table_name} AS SELECT * from pdf")
+
+
+def _make_table_full_name(
+    base_name: Literal["data", "lookup", "missing_dimension_associations"],
+    dataset_id: str,
+    version: str,
+) -> str:
+    schema = TABLE_TYPE_TO_SCHEMA[base_name]
+    short_name = _make_table_short_name(dataset_id, version)
+    return f"{schema}.{short_name}"
+
+
+def _make_table_short_name(dataset_id: str, version: str) -> str:
+    # Replace dots so that manual SQL queries don't have to escape them.
+    ver = version.replace(".", "_")
+    return f"{dataset_id}__{ver}"

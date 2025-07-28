@@ -6,7 +6,6 @@ import getpass
 import logging
 import sys
 from pathlib import Path
-from typing import Optional
 
 import rich_click as click
 from semver import VersionInfo
@@ -650,6 +649,12 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     callback=path_callback,
 )
 @click.option(
+    "-M",
+    "--missing-dimension-associations-file",
+    help="Path to file containing missing dimension associations. ",
+    callback=path_callback,
+)
+@click.option(
     "-m",
     "--dimension-mapping-file",
     type=click.Path(exists=True),
@@ -698,6 +703,7 @@ def register_and_submit_dataset(
     registry_manager,
     dataset_config_file,
     dataset_path,
+    missing_dimension_associations_file,
     dimension_mapping_file,
     dimension_mapping_references_file,
     autogen_reverse_supplemental_mappings,
@@ -715,6 +721,7 @@ def register_and_submit_dataset(
         project_id,
         submitter,
         log_message,
+        missing_dimension_associations_file=missing_dimension_associations_file,
         dimension_mapping_file=dimension_mapping_file,
         dimension_mapping_references_file=dimension_mapping_references_file,
         autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
@@ -1260,9 +1267,22 @@ $ dsgrid registry datasets register dataset.json5 -l "Register dataset my-datase
     required=True,
     help="reason for submission",
 )
+@click.option(
+    "-m",
+    "--missing-dimension-associations-file",
+    help="Path to file containing missing dimension associations. ",
+    callback=path_callback,
+)
 @click.pass_obj
 @click.pass_context
-def register_dataset(ctx, registry_manager, dataset_config_file, dataset_path, log_message):
+def register_dataset(
+    ctx: click.Context,
+    registry_manager: RegistryManager,
+    dataset_config_file: Path,
+    dataset_path: Path,
+    log_message: str,
+    missing_dimension_associations_file: Path | None = None,
+):
     """Register a new dataset with the registry. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
@@ -1270,7 +1290,13 @@ def register_dataset(ctx, registry_manager, dataset_config_file, dataset_path, l
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
     res = handle_dsgrid_exception(
-        ctx, manager.register, dataset_config_file, dataset_path, submitter, log_message
+        ctx,
+        manager.register,
+        dataset_config_file,
+        dataset_path,
+        submitter,
+        log_message,
+        missing_dimension_associations_file,
     )
     if res[1] != 0:
         ctx.exit(res[1])
@@ -1338,6 +1364,12 @@ $ dsgrid registry datasets update \\ \n
     help="reason for submission",
 )
 @click.option(
+    "-m",
+    "--missing-dimension-associations-file",
+    help="Path to file containing missing dimension associations. ",
+    callback=path_callback,
+)
+@click.option(
     "-p",
     "--dataset-path",
     type=click.Path(exists=True),
@@ -1366,7 +1398,8 @@ def update_dataset(
     dataset_config_file: Path,
     dataset_id: str,
     log_message: str,
-    dataset_path: Optional[Path],
+    missing_dimension_associations_file: Path | None,
+    dataset_path: Path | None,
     update_type: VersionUpdateType,
     version: str,
 ):
@@ -1386,6 +1419,7 @@ def update_dataset(
         log_message,
         version,
         dataset_path=dataset_path,
+        missing_dimension_associations_file=missing_dimension_associations_file,
     )
     if res[1] != 0:
         ctx.exit(res[1])

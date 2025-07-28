@@ -67,6 +67,9 @@ def make_test_data_registry(
     conn = DatabaseConnection(url=url)
     create_local_test_registry(registry_path, conn=conn, data_store_type=data_store_type)
     dataset_dirs = [Path("datasets/modeled/comstock"), Path("datasets/modeled/comstock_unpivoted")]
+    missing_dimension_associations_file = (
+        dataset_path / "test_efs_comstock" / "missing_associations.csv"
+    )
 
     user = getpass.getuser()
     log_message = "Initial registration"
@@ -105,6 +108,7 @@ def make_test_data_registry(
                 dataset_path / dataset_id,
                 user,
                 log_message,
+                missing_dimension_associations_file=missing_dimension_associations_file,
             )
             print(f"\n 3. submit dataset {dataset_id} to project\n")
             manager.project_manager.submit_dataset(
@@ -136,7 +140,6 @@ def make_test_data_registry(
     "-p",
     "--project-dir",
     default=TEST_PROJECT_REPO,
-    required=True,
     help="path to a project repository",
     callback=path_callback,
 )
@@ -144,7 +147,6 @@ def make_test_data_registry(
     "-d",
     "--dataset-dir",
     default=TEST_DATASET_DIRECTORY,
-    required=True,
     help="path to your local datasets",
     callback=path_callback,
 )

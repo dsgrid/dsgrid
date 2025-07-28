@@ -18,17 +18,23 @@ from dsgrid.dimension.time import (
     TimeBasedDataAdjustmentModel,
     TimeZone,
 )
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
+from dsgrid.exceptions import (
+    DSGInvalidField,
+    DSGInvalidDimensionMapping,
+    DSGInvalidDataset,
+)
 from dsgrid.spark.functions import (
     count_distinct_on_group_by,
     create_temp_view,
     handle_column_spaces,
     make_temp_view_name,
+    read_csv,
     read_parquet,
     is_dataframe_empty,
     join,
     join_multiple_columns,
     unpivot,
+    write_csv,
 )
 from dsgrid.spark.functions import except_all, get_spark_session
 from dsgrid.spark.types import (
@@ -119,7 +125,7 @@ def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> Dat
     df
         load data table
     lookup
-        load data lookup table that has been filtered for nulls and mapped to project dimensions.
+        load data lookup table that has been filtered for nulls.
     """
     if not is_dataframe_empty(lookup):
         intersect_cols = set(lookup.columns).intersection(df.columns)
@@ -226,6 +232,39 @@ def check_null_value_in_dimension_rows(dim_table, exclude_columns=None):
             "Combination of remapped dataset dimensions contain NULL value(s) for "
             f"dimension(s): \n{str(exc)}"
         )
+
+
+def handle_dimension_association_errors(
+    diff: DataFrame,
+    dataset_table: DataFrame,
+    dataset_id: str,
+) -> None:
+    """Record missing dimension record combinations in a CSV file and log an error."""
+    out_file = f"{dataset_id}__missing_dimension_record_combinations.csv"
+    write_csv(diff, out_file, header=True, overwrite=True)
+    logger.error(
+        "Dataset %s is missing required dimension records. " "Recorded missing records in %s",
+        dataset_id,
+        out_file,
+    )
+    _look_for_error_contributors(diff, dataset_table)
+    raise DSGInvalidDataset(
+        f"Dataset {dataset_id} is missing required dimension records. "
+        "Please look in the log file for more information."
+    )
+
+
+def _look_for_error_contributors(diff: DataFrame, dataset_table: DataFrame) -> None:
+    diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
+    for col in diff.columns:
+        dataset_count = dataset_table.select(col).distinct().count()
+        if dataset_count != diff_counts[col]:
+            logger.error(
+                "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
+                col,
+                dataset_count,
+                diff_counts[col],
+            )
 
 
 def is_noop_mapping(records: DataFrame) -> bool:
@@ -517,3 +556,39 @@ def convert_types_if_necessary(df: DataFrame) -> DataFrame:
         if column in existing_columns and df.schema[column].dataType in int_types:
             df = df.withColumn(column, F.col(column).cast(StringType()))
     return df
+
+
+def get_missing_dimension_associations(filename: Path | str) -> DataFrame:
+    """Get the missing dimension associations from filename."""
+    df = read_csv(filename)
+    for field in df.schema.fields:
+        if field.dataType != StringType():
+            df = df.withColumn(field.name, F.col(field.name).cast(StringType()))
+
+    return df
+
+
+def filter_out_expected_missing_associations(
+    main_df: DataFrame, missing_df: DataFrame
+) -> DataFrame:
+    """Filter out rows that are expected to be missing from the main dataframe."""
+    main_columns = ",".join((f"main_view.{x}" for x in main_df.columns))
+    missing_columns = [DimensionType.from_column(x).value for x in missing_df.columns]
+    spark = get_spark_session()
+
+    try:
+        main_df.createOrReplaceTempView("main_view")
+        missing_df.createOrReplaceTempView("assoc_view")
+        join_str = " AND ".join((f"main_view.{x} = assoc_view.{x}" for x in missing_columns))
+        query = f"""
+            SELECT {main_columns}
+            FROM main_view
+            ANTI JOIN assoc_view
+            ON {join_str}
+        """
+        res = spark.sql(query)
+        return res
+    finally:
+        pass
+        # spark.sql("DROP VIEW IF EXISTS main_view")
+        # spark.sql("DROP VIEW IF EXISTS assoc_view")

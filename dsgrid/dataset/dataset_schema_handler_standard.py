@@ -1,8 +1,8 @@
 import logging
-from typing import Self
+from typing import Iterable, Self
 
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
-from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dataset_config import DatasetConfig, MissingDimensionAssociations
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
@@ -27,7 +27,6 @@ from dsgrid.spark.types import (
     StringType,
 )
 from dsgrid.utils.dataset import (
-    add_null_rows_from_load_data_lookup,
     apply_scaling_factor,
     convert_types_if_necessary,
 )
@@ -35,8 +34,10 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     get_unique_values,
     read_dataframe,
+    union,
 )
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
+
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +72,12 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
-    def check_consistency(self):
+    def check_consistency(
+        self, missing_dimension_associations: MissingDimensionAssociations
+    ) -> DataFrame:
         self._check_lookup_data_consistency()
         self._check_dataset_internal_consistency()
+        return self._check_dimension_associations(missing_dimension_associations)
 
     @track_timing(timer_stats_collector)
     def check_time_consistency(self):
@@ -86,29 +90,58 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     self._load_data.join(self._load_data_lookup, on="id")
                 )
 
-    def make_dimension_association_table(self, context: ScratchDirContext) -> DataFrame:
+    def get_expected_missing_dimension_associations(
+        self,
+        missing_dimension_associations: DataFrame | None,
+        context: ScratchDirContext,
+    ) -> DataFrame:
+        dim_cols = self._list_dimension_columns(self._load_data)
+        df = self._load_data.select(*dim_cols).distinct()
+        null_lk_df = self._load_data_lookup.filter("id is NULL").drop("id")
+        null_df = cross_join(df, null_lk_df)
+        if not is_dataframe_empty(null_df):
+            if SCALING_FACTOR_COLUMN in null_df.columns:
+                null_df = null_df.drop(SCALING_FACTOR_COLUMN)
+
+        if missing_dimension_associations is None:
+            return null_df
+        return self._union_null_rows_from_missing_dimension_associations(
+            missing_dimension_associations,
+            null_df,
+            context,
+        )
+
+    def make_dimension_association_table(self) -> DataFrame:
         lk_df = self._load_data_lookup.filter("id is not NULL")
+        if SCALING_FACTOR_COLUMN in lk_df.columns:
+            lk_df = lk_df.drop(SCALING_FACTOR_COLUMN)
+        dim_cols = self._list_dimension_columns(self._load_data)
+        df = self._load_data.select("id", *dim_cols).distinct()
+        return df.join(lk_df, on="id").drop("id").distinct()
+
+    def make_mapped_dimension_association_table(
+        self, store: DataStoreInterface, context: ScratchDirContext
+    ) -> DataFrame:
+        lk_df = self._load_data_lookup.filter("id is not NULL")
+        missing_associations = store.read_missing_associations_table(
+            self._config.model.dataset_id, self._config.model.version
+        )
         dim_cols = self._list_dimension_columns(self._load_data)
         df = self._load_data.select("id", *dim_cols).distinct()
         df = df.join(lk_df, on="id").drop("id")
+        if missing_associations is not None:
+            assert sorted(df.columns) == sorted(missing_associations.columns)
+            df = union([df, missing_associations])
         mapping_plan = self.build_default_dataset_mapping_plan()
         with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
             df = self._remap_dimension_columns(df, mapping_manager).drop("fraction")
-        with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
-            null_lk_df = self._remap_dimension_columns(
-                self._load_data_lookup.filter("id is NULL"),
-                mapping_manager,
-            ).drop("fraction")
-        return add_null_rows_from_load_data_lookup(
-            df, cross_join(null_lk_df, df.select(*dim_cols).distinct())
-        )
+        return df
 
     def make_project_dataframe(
         self, context: QueryContext, project_config: ProjectConfig
     ) -> DataFrame:
         lk_df = self._load_data_lookup
         lk_df = self._prefilter_stacked_dimensions(context, lk_df)
-        null_lk_df = lk_df.filter("id is NULL")
         lk_df = lk_df.filter("id is not NULL")
 
         plan = context.model.project.get_dataset_mapping_plan(self.dataset_id)
@@ -133,17 +166,9 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN}, mapping_manager)
             project_metric_records = self._get_project_metric_records(project_config)
             ld_df = self._convert_units(ld_df, project_metric_records, mapping_manager)
-            lk_plan = self.build_default_dataset_mapping_plan()
-            with DatasetMappingManager(
-                self.dataset_id, lk_plan, context.scratch_dir_context
-            ) as lk_mapping_manager:
-                null_lk_df = self._remap_dimension_columns(
-                    null_lk_df, lk_mapping_manager, filtered_records=context.get_record_ids()
-                )
             ld_df = self._convert_time_dimension(
                 ld_df, project_config, VALUE_COLUMN, mapping_manager
             )
-            ld_df = add_null_rows_from_load_data_lookup(ld_df, null_lk_df)
             return self._finalize_table(context, ld_df, project_config)
 
     @track_timing(timer_stats_collector)
@@ -183,9 +208,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 "If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
 
+        self._check_dimension_records_by_dimension_type(dimension_types)
+
+    def _check_dimension_records_by_dimension_type(
+        self, dimension_types: Iterable[DimensionType]
+    ) -> None:
         for dimension_type in dimension_types:
             name = dimension_type.value
-            dimension = self._config.get_dimension(dimension_type)
+            dimension = self._config.get_dimension_with_records(dimension_type)
+            assert dimension is not None
             dim_records = dimension.get_unique_ids()
             lookup_records = get_unique_values(self._load_data_lookup, name)
             if None in lookup_records:
@@ -234,22 +265,20 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             raise DSGInvalidDataset(msg)
 
         ld_ids = self._load_data.select("id").distinct()
-        ldl_ids = self._load_data_lookup.select("id").distinct()
+        ldl_ids = self._load_data_lookup.select("id").filter("id IS NOT NULL").distinct()
 
         with Timer(timer_stats_collector, "check load_data for nulls"):
-            if not is_dataframe_empty(self._load_data.select("id").filter("id is NULL")):
+            if not is_dataframe_empty(self._load_data.select("id").filter("id IS NULL")):
                 raise DSGInvalidDataset(
                     f"load_data for dataset {self._config.config_id} has a null ID"
                 )
 
-        with Timer(timer_stats_collector, "check load_data ID count"):
-            data_id_count = ld_ids.count()
+        ldl_id_count = ldl_ids.count()
+        data_id_count = ld_ids.count()
+        joined = ld_ids.join(ldl_ids, on="id")
+        count = joined.count()
 
-        with Timer(timer_stats_collector, "compare load_data and load_data_lookup IDs"):
-            joined = ld_ids.join(ldl_ids, on="id")
-            count = joined.count()
-
-        if data_id_count != count:
+        if data_id_count != count or ldl_id_count != count:
             with Timer(timer_stats_collector, "show load_data and load_data_lookup ID diff"):
                 diff = except_all(ld_ids.unionAll(ldl_ids), intersect(ld_ids, ldl_ids))
                 # Only run the query once (with Spark). Number of rows shouldn't be a problem.

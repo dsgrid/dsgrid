@@ -359,3 +359,50 @@ def test_convert_types_if_necessary(data_type):
     assert row.model_year == "2030"
     assert row.weather_year == "2018"
     assert row.bystander == 2040
+
+
+@pytest.fixture
+def missing_dimension_associations(tmp_path):
+    filename = tmp_path / "missing_associations.csv"
+    with open(filename, "w") as f:
+        f.write("sector,subsector\n")
+        f.write("com,midrise_apartment\n")
+        f.write("res,hotel\n")
+        f.write("res,hospital\n")
+
+    df_from_records_cross_join = create_dataframe_from_dicts(
+        [
+            {
+                "sector": "res",
+                "subsector": "midrise_apartment",
+                "geography": "36047",
+            },
+            {
+                "sector": "com",
+                "subsector": "midrise_apartment",
+                "geography": "36047",
+            },
+            {
+                "sector": "com",
+                "subsector": "hotel",
+                "geography": "36047",
+            },
+            {
+                "sector": "res",
+                "subsector": "hotel",
+                "geography": "36047",
+            },
+            {
+                "sector": "com",
+                "subsector": "hospital",
+                "geography": "36047",
+            },
+            {
+                "sector": "res",
+                "subsector": "hospital",
+                "geography": "36047",
+            },
+        ]
+    )
+    yield filename, df_from_records_cross_join
+    filename.unlink()

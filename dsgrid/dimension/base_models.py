@@ -26,13 +26,12 @@ class DimensionType(DSGEnum):
         return self.value < other.value
 
     @classmethod
-    def from_column(cls, column) -> "DimensionType":
+    def from_column(cls, column: str) -> "DimensionType":
         try:
             return cls(column)
         except ValueError:
-            raise DSGInvalidDimension(
-                f"column={column} is not expected or of a known dimension type."
-            )
+            msg = f"column={column} is not expected or of a known dimension type."
+            raise DSGInvalidDimension(msg)
 
     @staticmethod
     def get_dimension_types_allowed_as_columns() -> set["DimensionType"]:

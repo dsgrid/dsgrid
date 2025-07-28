@@ -158,7 +158,6 @@ class Project:
             self._dimension_mapping_mgr,
             self._dataset_mgr.store,
             mapping_references=input_dataset.mapping_references,
-            project_time_dim=self._config.get_base_time_dimension(),
             conn=conn,
         )
         self._datasets[dataset_id] = dataset

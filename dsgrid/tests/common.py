@@ -25,6 +25,7 @@ TEST_REMOTE_REGISTRY = "s3://nrel-dsgrid-registry-test"
 CACHED_TEST_REGISTRY_DB = f"sqlite:///{TEST_REGISTRY_BASE_PATH}/cached_registry.db"
 STANDARD_SCENARIOS_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-StandardScenarios"
 IEF_PROJECT_REPO = Path(__file__).parents[2] / "dsgrid-project-IEF"
+SIMPLE_STANDARD_SCENARIOS = TEST_PROJECT_PATH / "filtered_registries" / "simple_standard_scenarios"
 SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB = (
     f"sqlite:///{TEST_PROJECT_PATH}/filtered_registries/simple_standard_scenarios/registry.db"
 )

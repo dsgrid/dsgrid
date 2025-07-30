@@ -39,6 +39,7 @@ dependencies = [
     "duckdb >= 1, < 2",
     "fastapi",
     "json5",
+    "networkx",
     "pandas",
     "prettytable",
     "pyarrow",

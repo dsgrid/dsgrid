@@ -99,9 +99,16 @@ def test_convert_time_for_tempo(project, tempo, scratch_dir_context):
     value_column = next(iter(value_columns))
     plan = tempo._handler.build_default_dataset_mapping_plan()
     context = ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir())
+    input_dataset = project.config.get_dataset("tempo_conus_2022")
     with DatasetMappingManager(tempo._handler.dataset_id, plan, context) as mgr:
         tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-            tempo_data, project.config, value_column, mgr
+            tempo_data,
+            to_time_dim=project_time_dim,
+            mapping_manager=mgr,
+            value_column=value_column,
+            wrap_time_allowed=input_dataset.wrap_time_allowed,
+            time_based_data_adjustment=input_dataset.time_based_data_adjustment,
+            to_geo_dim=project.config.get_base_dimension(DimensionType.GEOGRAPHY),
         )
     tempo_data_with_tz = add_time_zone(
         tempo_data, project.config.get_base_dimension(DimensionType.GEOGRAPHY)

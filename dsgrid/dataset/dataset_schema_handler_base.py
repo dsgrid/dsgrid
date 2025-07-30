@@ -14,10 +14,15 @@ from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     map_annual_time_to_date_time,
 )
+from dsgrid.config.dimension_config import (
+    DimensionBaseConfigWithFiles,
+)
 from dsgrid.config.noop_time_dimension_config import NoOpTimeDimensionConfig
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.config.index_time_dimension_config import IndexTimeDimensionConfig
 from dsgrid.config.project_config import ProjectConfig
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
+from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import (
@@ -287,6 +292,16 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
         """
 
+    @abc.abstractmethod
+    def make_mapped_dataframe(
+        self,
+        context: QueryContext,
+        geography_dimension: DimensionBaseConfigWithFiles | None = None,
+        metric_dimension: DimensionBaseConfigWithFiles | None = None,
+        time_dimension: TimeDimensionBaseConfig | None = None,
+    ) -> DataFrame:
+        """Return a load_data dataframe with dimensions mapped as specified by the QueryContext."""
+
     @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency(self, load_data_df: DataFrame):
         """Check dataset time consistency such that:
@@ -446,17 +461,18 @@ class DatasetSchemaHandlerBase(abc.ABC):
             df = mapping_manager.persist_intermediate_table(df, op)
         return df
 
-    def _finalize_table(self, context: QueryContext, df, project_config):
+    def _finalize_table(self, context: QueryContext, df: DataFrame, project_config: ProjectConfig):
         table_handler = make_table_format_handler(
             self._config.get_table_format_type(),
             project_config,
             dataset_id=self.dataset_id,
         )
 
+        time_dim = project_config.get_base_dimension(DimensionType.TIME)
         context.set_dataset_metadata(
             self.dataset_id,
             context.model.result.column_type,
-            project_config,
+            project_config.get_load_data_time_columns(time_dim.model.name),
         )
 
         if context.model.result.column_type == ColumnType.DIMENSION_NAMES:
@@ -773,37 +789,39 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def _convert_time_dimension(
         self,
         load_data_df: DataFrame,
-        project_config: ProjectConfig,
+        to_time_dim: TimeDimensionBaseConfig,
         value_column: str,
         mapping_manager: DatasetMappingManager,
+        wrap_time_allowed: bool,
+        time_based_data_adjustment: TimeBasedDataAdjustmentModel,
+        to_geo_dim: DimensionBaseConfigWithFiles | None = None,
     ):
         op = mapping_manager.plan.map_time_op
         if mapping_manager.has_completed_operation(op):
             return load_data_df
-        input_dataset_model = project_config.get_dataset(self._config.model.dataset_id)
-        wrap_time_allowed = input_dataset_model.wrap_time_allowed
-        time_based_data_adjustment = input_dataset_model.time_based_data_adjustment
         self._validate_daylight_saving_adjustment(time_based_data_adjustment)
-        time_dim = self._config.get_dimension(DimensionType.TIME)
+        time_dim = self._config.get_time_dimension()
         if time_dim.model.is_time_zone_required_in_geography():
             if self._config.model.use_project_geography_time_zone:
+                if to_geo_dim is None:
+                    msg = "Bug: to_geo_dim must be provided if time zone is required in geography."
+                    raise Exception(msg)
                 logger.info("Add time zone from project geography dimension.")
-                geography_dim = project_config.get_base_dimension(DimensionType.GEOGRAPHY)
+                geography_dim = to_geo_dim
             else:
                 logger.info("Add time zone from dataset geography dimension.")
                 geography_dim = self._config.get_dimension(DimensionType.GEOGRAPHY)
             load_data_df = add_time_zone(load_data_df, geography_dim)
 
         if isinstance(time_dim, AnnualTimeDimensionConfig):
-            project_time_dim = project_config.get_base_dimension(DimensionType.TIME)
-            if not isinstance(project_time_dim, DateTimeDimensionConfig):
-                msg = f"Annual time can only be mapped to DateTime: {project_time_dim.model.time_type}"
+            if not isinstance(to_time_dim, DateTimeDimensionConfig):
+                msg = f"Annual time can only be mapped to DateTime: {to_time_dim.model.time_type}"
                 raise NotImplementedError(msg)
 
             return map_annual_time_to_date_time(
                 load_data_df,
                 time_dim,
-                project_time_dim,
+                to_time_dim,
                 {value_column},
             )
 
@@ -823,7 +841,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     table_name=table_name,
                     value_column=value_column,
                     from_time_dim=time_dim,
-                    to_time_dim=project_config.get_base_time_dimension(),
+                    to_time_dim=to_time_dim,
                     scratch_dir_context=mapping_manager.scratch_dir_context,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
@@ -840,7 +858,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     filename=filename,
                     value_column=value_column,
                     from_time_dim=time_dim,
-                    to_time_dim=project_config.get_base_time_dimension(),
+                    to_time_dim=to_time_dim,
                     scratch_dir_context=mapping_manager.scratch_dir_context,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,
@@ -850,7 +868,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     df=load_data_df,
                     value_column=value_column,
                     from_time_dim=time_dim,
-                    to_time_dim=project_config.get_base_time_dimension(),
+                    to_time_dim=to_time_dim,
                     scratch_dir_context=mapping_manager.scratch_dir_context,
                     time_based_data_adjustment=time_based_data_adjustment,
                     wrap_time_allowed=wrap_time_allowed,

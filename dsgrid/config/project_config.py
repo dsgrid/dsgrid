@@ -537,14 +537,14 @@ class DatasetBaseDimensionNamesModel(DSGBaseModel):
     # This is here because Pydantic doesn't like fields that start with 'model_'
     model_config = make_model_config(protected_namespaces=())
 
-    geography: Optional[str] = None
-    metric: Optional[str] = None
-    model_year: Optional[str] = None
-    scenario: Optional[str] = None
-    sector: Optional[str] = None
-    subsector: Optional[str] = None
-    time: Optional[str] = None
-    weather_year: Optional[str] = None
+    geography: str | None = None
+    metric: str | None = None
+    model_year: str | None = None
+    scenario: str | None = None
+    sector: str | None = None
+    subsector: str | None = None
+    time: str | None = None
+    weather_year: str | None = None
 
 
 class InputDatasetModel(DSGBaseModel):

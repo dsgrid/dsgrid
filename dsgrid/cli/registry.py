@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 import rich_click as click
+from rich import print
 from semver import VersionInfo
 
 from dsgrid.cli.common import get_value_from_context, handle_dsgrid_exception, path_callback
@@ -179,7 +180,7 @@ def register_dimensions(
 
 _dump_dimension_epilog = """
 Examples:\n
-$ dsgrid registry dimensions dump 17565829\n
+$ dsgrid registry dimensions dump 8c575746-18fa-4b65-bf1f-516079d634a5\n
 """
 
 
@@ -217,9 +218,50 @@ def dump_dimension(ctx, registry_manager, dimension_id, version, directory, forc
         ctx.exit(res[1])
 
 
+_show_dimension_epilog = """
+Examples:\n
+$ dsgrid registry dimensions show 8c575746-18fa-4b65-bf1f-516079d634a5
+"""
+
+
+@click.command(name="show", epilog=_show_dimension_epilog)
+@click.argument("dimension-id", type=str)
+@click.option(
+    "-v",
+    "--version",
+    default="1.0.0",
+    show_default=True,
+    callback=_version_info_required_callback,
+    help="Version to show.",
+)
+@click.pass_obj
+@click.pass_context
+def show_dimension(
+    ctx,
+    registry_manager: RegistryManager,
+    dimension_id: str,
+    version: str,
+):
+    """Show an existing dimension in the registry."""
+    manager = registry_manager.dimension_manager
+    res = handle_dsgrid_exception(
+        ctx,
+        manager.get_by_id,
+        dimension_id,
+        version,
+    )
+    if res[1] != 0:
+        ctx.exit(res[1])
+    dim = res[0]
+    print(f"type={dim.model.dimension_type} id={dim.model.dimension_id} name={dim.model.name}")
+    if dim.model.dimension_type != DimensionType.TIME:
+        records = dim.get_records_dataframe()
+        records.show(n=4000)
+
+
 _update_dimension_epilog = """
 Examples:\n
-$ dsgrid registry dimensions update -d 17565829 -l "Update county dimension" -u major -v 1.0.0 dimension.json5\n
+$ dsgrid registry dimensions update -d 8c575746-18fa-4b65-bf1f-516079d634a5 -l "Update county dimension" -u major -v 1.0.0 dimension.json5\n
 """
 
 
@@ -347,7 +389,7 @@ def register_dimension_mappings(
 
 _dump_dimension_mapping_epilog = """
 Examples:\n
-$ dsgrid registry dimension-mappings dump 17565575\n
+$ dsgrid registry dimension-mappings dump 8c575746-18fa-4b65-bf1f-516079d634a5\n
 """
 
 
@@ -397,10 +439,63 @@ def dump_dimension_mapping(
         ctx.exit(res[1])
 
 
+_show_dimension_mapping_epilog = """
+Examples:\n
+$ dsgrid registry dimension-mappings show 8c575746-18fa-4b65-bf1f-516079d634a5
+"""
+
+
+@click.command(name="show", epilog=_show_dimension_mapping_epilog)
+@click.argument("mapping-id", type=str)
+@click.option(
+    "-v",
+    "--version",
+    default="1.0.0",
+    show_default=True,
+    callback=_version_info_required_callback,
+    help="Version to show.",
+)
+@click.pass_obj
+@click.pass_context
+def show_dimension_mapping(
+    ctx,
+    registry_manager: RegistryManager,
+    mapping_id: str,
+    version: str,
+):
+    """Show an existing dimension mapping in the registry."""
+    manager = registry_manager.dimension_mapping_manager
+    res = handle_dsgrid_exception(
+        ctx,
+        manager.get_by_id,
+        mapping_id,
+        version,
+    )
+    if res[1] != 0:
+        ctx.exit(res[1])
+    mapping = res[0]
+    from_dim = registry_manager.dimension_manager.get_by_id(
+        mapping.model.from_dimension.dimension_id
+    )
+    to_dim = registry_manager.dimension_manager.get_by_id(mapping.model.to_dimension.dimension_id)
+    print(
+        f"""
+type={mapping.model.from_dimension.dimension_type}
+from_name={from_dim.model.name} to_name={to_dim.model.name}
+from_description={from_dim.model.description}
+to_name={to_dim.model.name}
+to_description={to_dim.model.description}
+from_id={mapping.model.from_dimension.dimension_id} to_id={mapping.model.to_dimension.dimension_id}
+"""
+    )
+    records = mapping.get_records_dataframe()
+    records.show(n=4000)
+
+
 _update_dimension_mapping_epilog = """
 Examples:\n
 $ dsgrid registry dimension-mappings update \\ \n
-    -d 17565575 \\ \n
+    -d 8c575746-18fa-4b65-bf1f-516079d634a5 \\ \n
     -l "Swap out the state to county mapping for my-dataset to that-project" \\ \n
     -u major \\ \n
     -v 1.0.0 dimension_mappings.json5"
@@ -1644,11 +1739,13 @@ def data_sync(ctx, registry_manager, project_id, dataset_id):
 dimensions.add_command(list_dimensions)
 dimensions.add_command(register_dimensions)
 dimensions.add_command(dump_dimension)
+dimensions.add_command(show_dimension)
 dimensions.add_command(update_dimension)
 
 dimension_mappings.add_command(list_dimension_mappings)
 dimension_mappings.add_command(register_dimension_mappings)
 dimension_mappings.add_command(dump_dimension_mapping)
+dimension_mappings.add_command(show_dimension_mapping)
 dimension_mappings.add_command(update_dimension_mapping)
 
 projects.add_command(list_projects)

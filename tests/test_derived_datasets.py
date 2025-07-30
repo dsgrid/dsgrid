@@ -88,21 +88,19 @@ def test_create_derived_dataset_config(tmp_path):
     dataset_id = "resstock_conus_2022_projected"
     query_output_base = tmp_path / "query_output"
     runner = CliRunner()
-    result = runner.invoke(
-        cli,
-        [
-            "--offline",
-            "--url",
-            conn.url,
-            "query",
-            "project",
-            "run",
-            str(RESSTOCK_PROJECTION_QUERY),
-            "-o",
-            str(query_output_base),
-            "--overwrite",
-        ],
-    )
+    cmd = [
+        "--offline",
+        "--url",
+        conn.url,
+        "query",
+        "project",
+        "run",
+        str(RESSTOCK_PROJECTION_QUERY),
+        "-o",
+        str(query_output_base),
+        "--overwrite",
+    ]
+    result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
     query_output = query_output_base / dataset_id
     assert query_output.exists()

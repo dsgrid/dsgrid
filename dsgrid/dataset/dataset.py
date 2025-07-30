@@ -94,7 +94,10 @@ class StandaloneDataset(DatasetBase):
         cls,
         config: DatasetConfig,
         dimension_mgr: DimensionRegistryManager,
+        dimension_mapping_mgr: DimensionMappingRegistryManager,
         store: DataStoreInterface,
+        mapping_references: list[DimensionMappingReferenceListModel] | None = None,
+        conn: Connection | None = None,
     ):
         """Load a dataset from a store.
 
@@ -108,13 +111,13 @@ class StandaloneDataset(DatasetBase):
         Dataset
 
         """
-        # TODO DT
         return cls(
             make_dataset_schema_handler(
-                None,
+                conn,
                 config,
                 dimension_mgr,
-                None,
+                dimension_mapping_mgr,
                 store=store,
+                mapping_references=mapping_references,
             )
         )

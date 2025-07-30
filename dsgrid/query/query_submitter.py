@@ -1,19 +1,25 @@
 import abc
 import json
 import logging
+import os
 import shutil
 from pathlib import Path
 from typing import Optional
 from zipfile import ZipFile
 
+from chronify.utils.path_utils import check_overwrite
 from semver import VersionInfo
 from sqlalchemy import Connection
 
 from dsgrid.common import VALUE_COLUMN
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.config.dimension_config import DimensionBaseConfig
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
+from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionCategory, DimensionType
 from dsgrid.dimension.dimension_filters import SubsetDimensionFilterModel
@@ -22,6 +28,7 @@ from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.query.dataset_mapping_plan import MapOperationCheckpoint
 from dsgrid.query.query_context import QueryContext
 from dsgrid.query.report_factory import make_report
+from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.functions import pivot
 from dsgrid.spark.types import DataFrame
 from dsgrid.project import Project
@@ -35,6 +42,7 @@ from dsgrid.utils.spark import (
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.files import delete_if_exists, compute_hash, load_data
 from dsgrid.query.models import (
+    DatasetQueryModel,
     ProjectQueryModel,
     ColumnType,
     CreateCompositeDatasetQueryModel,
@@ -43,6 +51,7 @@ from dsgrid.query.models import (
     ProjectionDatasetModel,
     StandaloneDatasetModel,
 )
+from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 
 
 logger = logging.getLogger(__name__)
@@ -646,6 +655,171 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         filename = output_dir / "table.parquet"
         self._save_result(context, df, filename, repartition)
         self.metadata_filename(output_dir).write_text(context.metadata.model_dump_json(indent=2))
+
+
+class DatasetQuerySubmitter(QuerySubmitterBase):
+    """Submits queries for a project."""
+
+    @track_timing(timer_stats_collector)
+    def submit(
+        self,
+        query: DatasetQueryModel,
+        mgr: RegistryManager,
+        scratch_dir: Path | None = None,
+        checkpoint_file: Path | None = None,
+        overwrite: bool = False,
+    ) -> DataFrame:
+        """Submits a dataset query to produce a result table."""
+        if not query.to_dimension_references:
+            msg = "A dataset query must specify at least one dimension to map."
+            raise DSGInvalidQuery(msg)
+
+        dataset_config = mgr.dataset_manager.get_by_id(query.dataset_id)
+        to_dimension_mapping_refs, dims = self._build_mappings(query, dataset_config, mgr)
+        handler = make_dataset_schema_handler(
+            conn=None,
+            config=dataset_config,
+            dimension_mgr=mgr.dimension_manager,
+            dimension_mapping_mgr=mgr.dimension_mapping_manager,
+            store=mgr.dataset_manager.store,
+            mapping_references=to_dimension_mapping_refs,
+        )
+
+        base_dim_names = DatasetBaseDimensionNamesModel()
+        scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
+        time_dim = dims.get(DimensionType.TIME) or dataset_config.get_time_dimension()
+        time_zone = None if time_dim is None else time_dim.get_time_zone()
+        checkpoint = self._check_checkpoint_file(checkpoint_file, query)
+        with ScratchDirContext(scratch_dir) as scratch_dir_context:
+            context = QueryContext(
+                query, base_dim_names, scratch_dir_context, checkpoint=checkpoint
+            )
+            output_dir = self._query_output_dir(context)
+            check_overwrite(output_dir, overwrite)
+            args = (context, handler)
+            kwargs = {
+                "geography_dimension": dims.get(DimensionType.GEOGRAPHY),
+                "metric_dimension": dims.get(DimensionType.METRIC),
+                "time_dimension": time_dim,
+            }
+            if time_dim is not None and time_zone is not None:
+                with custom_time_zone(time_zone.tz_name):
+                    df = self._run_query(*args, **kwargs)
+            else:
+                df = self._run_query(*args, **kwargs)
+        return df
+
+    def _build_mappings(
+        self, query: DatasetQueryModel, config: DatasetConfig, mgr: RegistryManager
+    ) -> tuple[list[DimensionMappingReferenceModel], dict[DimensionType, DimensionBaseConfig]]:
+        config = mgr.dataset_manager.get_by_id(query.dataset_id)
+        to_dimension_mapping_refs: list[DimensionMappingReferenceModel] = []
+        mapped_dimension_types: set[DimensionType] = set()
+        dimensions: dict[DimensionType, DimensionBaseConfig] = {}
+        with mgr.dimension_mapping_manager.db.engine.connect() as conn:
+            graph = mgr.dimension_mapping_manager.build_graph(conn=conn)
+            for to_dim_ref in query.to_dimension_references:
+                to_dim = mgr.dimension_manager.get_by_id(
+                    to_dim_ref.dimension_id, version=to_dim_ref.version
+                )
+                if to_dim.model.dimension_type in mapped_dimension_types:
+                    msg = f"A dataset query cannot map multiple dimensions of the same type: {to_dim.model.dimension_type}"
+                    raise DSGInvalidQuery(msg)
+                dataset_dim = config.get_dimension(to_dim.model.dimension_type)
+                if to_dim.model.dimension_id == dataset_dim.model.dimension_id:
+                    if to_dim.model.version != dataset_dim.model.version:
+                        msg = (
+                            f"A to_dimension_reference cannot point to a different version of a "
+                            f"dataset's dimension dimension: dataset version = {dataset_dim.model.version}, "
+                            f"dimension version = {to_dim.model.version}"
+                        )
+                        raise DSGInvalidQuery(msg)
+                    # No mapping is required.
+                    continue
+                if to_dim.model.dimension_type != DimensionType.TIME:
+                    refs = mgr.dimension_mapping_manager.list_mappings_between_dimensions(
+                        graph, dataset_dim.model.dimension_id, to_dim.model.dimension_id
+                    )
+                    if len(refs) > 1 and not os.getenv("DSGRID_ALLOW_MULTI_HOP_MAPPINGS"):
+                        # Not yet sure if this is safe in all cases.
+                        # It should be fine for dataset county -> project county -> state.
+                        msg = (
+                            f"Found multiple hops between dimensions {dataset_dim.model.dimension_id} "
+                            f"and {to_dim.model.dimension_id}. This is not allowed unless the "
+                            f"DSGRID_ALLOW_MULTI_HOP_MAPPINGS environment variable is set."
+                        )
+                        raise DSGInvalidQuery(msg)
+                    to_dimension_mapping_refs += refs
+                mapped_dimension_types.add(to_dim.model.dimension_type)
+                dimensions[to_dim.model.dimension_type] = to_dim
+        return to_dimension_mapping_refs, dimensions
+
+    def _check_checkpoint_file(
+        self, checkpoint_file: Path | None, query: DatasetQueryModel
+    ) -> MapOperationCheckpoint | None:
+        if checkpoint_file is None:
+            return None
+
+        if query.mapping_plan is None:
+            msg = f"Query {query.name} does not have a mapping plan. A checkpoint file cannot be used."
+            raise DSGInvalidQuery(msg)
+
+        checkpoint = MapOperationCheckpoint.from_file(checkpoint_file)
+        if query.dataset_id != checkpoint.dataset_id:
+            msg = (
+                f"The dataset_id in the checkpoint file {checkpoint.dataset_id} does not match "
+                f"the query dataset_id {query.dataset_id}."
+            )
+            raise DSGInvalidQuery(msg)
+
+        if query.mapping_plan.compute_hash() != checkpoint.mapping_plan_hash:
+            msg = (
+                f"The hash of the mapping plan for dataset {checkpoint.dataset_id} "
+                "does not match the checkpoint file. Cannot use the checkpoint."
+            )
+            raise DSGInvalidParameter(msg)
+
+        return checkpoint
+
+    def _run_query(
+        self,
+        context: QueryContext,
+        handler: DatasetSchemaHandlerBase,
+        **kwargs,
+    ) -> DataFrame:
+        df = handler.make_mapped_dataframe(context, **kwargs)
+        df = self._postprocess(context, df)
+        self._save_results(context, df)
+        return df
+
+    def _postprocess(self, context: QueryContext, df: DataFrame) -> DataFrame:
+        if context.model.result.sort_columns:
+            df = df.sort(*context.model.result.sort_columns)
+
+        if isinstance(context.model.result.table_format, PivotedTableFormatModel):
+            df = _pivot_table(df, context)
+
+        return df
+
+    def _query_output_dir(self, context: QueryContext) -> Path:
+        return self._output_dir / context.model.name
+
+    @track_timing(timer_stats_collector)
+    def _save_results(self, context: QueryContext, df) -> Path:
+        output_dir = self._query_output_dir(context)
+        output_dir.mkdir(exist_ok=True)
+        filename = output_dir / f"table.{context.model.result.output_format}"
+        suffix = filename.suffix
+        if suffix == ".csv":
+            df.toPandas().to_csv(filename, header=True, index=False)
+        elif suffix == ".parquet":
+            df = write_dataframe_and_auto_partition(df, filename)
+        else:
+            msg = f"Unsupported output_format={suffix}"
+            raise NotImplementedError(msg)
+
+        logger.info("Wrote query=%s output table to %s", context.model.name, filename)
+        return filename
 
 
 def _pivot_table(df: DataFrame, context: QueryContext):

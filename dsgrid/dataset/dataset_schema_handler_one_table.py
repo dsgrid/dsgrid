@@ -3,10 +3,15 @@ from typing import Iterable, Self
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig, MissingDimensionAssociations
+from dsgrid.config.dimension_config import (
+    DimensionBaseConfigWithFiles,
+)
 from dsgrid.config.project_config import ProjectConfig
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dataset.models import TableFormatType
+from dsgrid.query.models import DatasetQueryModel
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.spark.types import (
     DataFrame,
@@ -229,7 +234,48 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN}, mapping_manager)
             project_metric_records = self._get_project_metric_records(project_config)
             ld_df = self._convert_units(ld_df, project_metric_records, mapping_manager)
+            input_dataset = project_config.get_dataset(self._config.model.dataset_id)
             ld_df = self._convert_time_dimension(
-                ld_df, project_config, VALUE_COLUMN, mapping_manager
+                load_data_df=ld_df,
+                to_time_dim=project_config.get_base_time_dimension(),
+                value_column=VALUE_COLUMN,
+                mapping_manager=mapping_manager,
+                wrap_time_allowed=input_dataset.wrap_time_allowed,
+                time_based_data_adjustment=input_dataset.time_based_data_adjustment,
+                to_geo_dim=project_config.get_base_dimension(DimensionType.GEOGRAPHY),
             )
             return self._finalize_table(context, ld_df, project_config)
+
+    def make_mapped_dataframe(
+        self,
+        context: QueryContext,
+        geography_dimension: DimensionBaseConfigWithFiles | None = None,
+        metric_dimension: DimensionBaseConfigWithFiles | None = None,
+        time_dimension: TimeDimensionBaseConfig | None = None,
+    ) -> DataFrame:
+        query = context.model
+        assert isinstance(query, DatasetQueryModel)
+        plan = query.mapping_plan
+        if plan is None:
+            plan = self.build_default_dataset_mapping_plan()
+        with context.dataset_mapping_manager(self.dataset_id, plan) as mapping_manager:
+            ld_df = mapping_manager.try_read_checkpointed_table()
+            if ld_df is None:
+                ld_df = self._load_data
+
+            ld_df = self._remap_dimension_columns(ld_df, mapping_manager)
+            ld_df = self._apply_fraction(ld_df, {VALUE_COLUMN}, mapping_manager)
+            if metric_dimension is not None:
+                metric_records = metric_dimension.get_records_dataframe()
+                ld_df = self._convert_units(ld_df, metric_records, mapping_manager)
+            if time_dimension is not None:
+                ld_df = self._convert_time_dimension(
+                    load_data_df=ld_df,
+                    to_time_dim=time_dimension,
+                    value_column=VALUE_COLUMN,
+                    mapping_manager=mapping_manager,
+                    wrap_time_allowed=query.wrap_time_allowed,
+                    time_based_data_adjustment=query.time_based_data_adjustment,
+                    to_geo_dim=geography_dimension,
+                )
+        return ld_df

@@ -7,6 +7,7 @@ from pydantic import field_validator, model_validator, Field, field_serializer, 
 from semver import VersionInfo
 from typing_extensions import Annotated
 
+from dsgrid.config.dimensions import DimensionReferenceModel
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dataset.models import (
@@ -23,6 +24,7 @@ from dsgrid.dimension.dimension_filters import (
     SubsetDimensionFilterModel,
     SupplementalDimensionFilterColumnOperatorModel,
 )
+from dsgrid.dimension.time import TimeBasedDataAdjustmentModel
 from dsgrid.query.dataset_mapping_plan import (
     DatasetMappingPlan,
 )
@@ -477,21 +479,6 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
 QUERY_FORMAT_VERSION = VersionInfo.parse("0.1.0")
 
 
-class QueryBaseModel(CacheableQueryBaseModel, abc.ABC):
-    """Base class for all queries"""
-
-    name: str = Field(description="Name of query")
-    # TODO #204: This field is not being used. Wait until development slows down.
-    version: str = Field(
-        description="Version of the query structure. Changes to the major or minor version invalidate cached tables.",
-        default=str(QUERY_FORMAT_VERSION),  # TODO: str shouldn't be required
-    )
-
-    def serialize_cached_content(self) -> dict[str, Any]:
-        """Return a JSON-able representation of the model that can be used for caching purposes."""
-        return self.model_dump(mode="json", exclude={"name"})
-
-
 class QueryResultParamsModel(CacheableQueryBaseModel):
     """Controls post-processing and storage of CompositeDatasets"""
 
@@ -580,15 +567,30 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         return self
 
 
+class QueryBaseModel(CacheableQueryBaseModel, abc.ABC):
+    """Base class for all queries"""
+
+    name: str = Field(description="Name of query")
+    # TODO #204: This field is not being used. Wait until development slows down.
+    version: str = Field(
+        description="Version of the query structure. Changes to the major or minor version invalidate cached tables.",
+        default=str(QUERY_FORMAT_VERSION),  # TODO: str shouldn't be required
+    )
+    result: QueryResultParamsModel = Field(
+        default=QueryResultParamsModel(),
+        description="Controls the output results",
+    )
+
+    def serialize_cached_content(self) -> dict[str, Any]:
+        """Return a JSON-able representation of the model that can be used for caching purposes."""
+        return self.model_dump(mode="json", exclude={"name"})
+
+
 class ProjectQueryModel(QueryBaseModel):
     """Represents a user query on a Project."""
 
     project: ProjectQueryParamsModel = Field(
         description="Defines the datasets to use and how to transform them.",
-    )
-    result: QueryResultParamsModel = Field(
-        default=QueryResultParamsModel(),
-        description="Controls the output results",
     )
 
     def serialize_cached_content(self) -> dict[str, Any]:
@@ -598,6 +600,34 @@ class ProjectQueryModel(QueryBaseModel):
             "version",  # We use the project major version as a separate field.
         }
         return self.project.model_dump(mode="json", exclude=exclude)
+
+
+class DatasetQueryModel(QueryBaseModel):
+    """Defines how to transform a dataset"""
+
+    dataset_id: str = Field(description="Dataset ID for query")
+    to_dimension_references: list[DimensionReferenceModel] = Field(
+        description="Map the dataset to these dimensions. Mappings must exist in the registry. "
+        "There cannot be duplicate mappings."
+    )
+    mapping_plan: DatasetMappingPlan | None = Field(
+        default=None,
+        description="Defines the order in which to map the dimensions of the dataset.",
+    )
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel = Field(
+        description="Defines how the rest of the dataframe is adjusted with respect to time. "
+        "E.g., when drop associated data when dropping a leap day timestamp.",
+        default=TimeBasedDataAdjustmentModel(),
+    )
+    wrap_time_allowed: bool = Field(
+        default=False,
+        description="Whether to allow dataset time to be wrapped to the destination time "
+        "dimension, if different.",
+    )
+    result: QueryResultParamsModel = Field(
+        default=QueryResultParamsModel(),
+        description="Controls the output results",
+    )
 
 
 def make_query_for_standalone_dataset(

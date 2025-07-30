@@ -465,7 +465,7 @@ class RegistryDatabase:
             select(table.c.model)
             .where(table.c.model_type == model_type)
             .where(table.c.model_id == model_id)
-            .where(table.c.version == version)
+            .where(table.c.version == str(version))
         )
         rows = conn.execute(stmt).fetchall()
         if not rows:

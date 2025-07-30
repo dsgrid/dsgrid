@@ -122,7 +122,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         conn: Connection,
         config: DatasetConfig,
         missing_dimension_associations: MissingDimensionAssociations,
-    ) -> DataFrame:
+    ) -> DataFrame | None:
         schema_handler = make_dataset_schema_handler(
             conn,
             config,

@@ -79,7 +79,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(
         self, missing_dimension_associations: MissingDimensionAssociations
-    ) -> DataFrame:
+    ) -> DataFrame | None:
         self._check_lookup_data_consistency()
         self._check_dataset_internal_consistency()
         return self._check_dimension_associations(missing_dimension_associations)

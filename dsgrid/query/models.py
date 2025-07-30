@@ -630,6 +630,31 @@ class DatasetQueryModel(QueryBaseModel):
     )
 
 
+def make_dataset_query(
+    name: str,
+    dataset_id: str,
+    to_dimension_references: list[DimensionReferenceModel],
+    plan: DatasetMappingPlan | None = None,
+) -> DatasetQueryModel:
+    """Create a query to map a dataset to alternate dimensions.
+
+    Parameters
+    ----------
+    dataset_id: str
+    plan: DatasetMappingPlan | None
+        Optional plan to control the mapping operation.
+    """
+    plans: list[DatasetMappingPlan] = []
+    if plan is not None:
+        plans.append(plan)
+    return DatasetQueryModel(
+        name=name,
+        dataset_id=dataset_id,
+        to_dimension_references=to_dimension_references,
+        mapping_plan=plan,
+    )
+
+
 def make_query_for_standalone_dataset(
     project_id: str,
     dataset_id: str,

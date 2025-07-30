@@ -60,7 +60,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_consistency(
         self, missing_dimension_associations: MissingDimensionAssociations
-    ) -> DataFrame:
+    ) -> DataFrame | None:
         self._check_one_table_data_consistency()
         return self._check_dimension_associations(missing_dimension_associations)
 
@@ -139,14 +139,16 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     def get_expected_missing_dimension_associations(
         self, missing_dimension_associations: DataFrame | None, context: ScratchDirContext
-    ) -> DataFrame:
-        null_df = self._load_data.drop(VALUE_COLUMN)
+    ) -> DataFrame | None:
         time_dim = self._config.get_time_dimension()
-        if time_dim is not None:
-            time_cols = time_dim.get_load_data_time_columns()
-            if time_cols:
-                null_df = null_df.filter(f"{time_cols[0]} is NULL")
+        if time_dim is None:
+            return missing_dimension_associations
 
+        time_cols = time_dim.get_load_data_time_columns()
+        if not time_cols:
+            return missing_dimension_associations
+
+        null_df = self._load_data.drop(VALUE_COLUMN).filter(f"{time_cols[0]} is NULL")
         dim_cols = self._list_dimension_columns(null_df)
         null_df = null_df.select(*dim_cols).distinct()
 

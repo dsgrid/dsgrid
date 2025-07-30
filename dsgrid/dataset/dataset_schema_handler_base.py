@@ -125,7 +125,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @abc.abstractmethod
     def check_consistency(
         self, missing_dimension_associations: MissingDimensionAssociations
-    ) -> DataFrame:
+    ) -> DataFrame | None:
         """
         Check all data consistencies, including data columns, dataset to dimension records, and time
 
@@ -149,7 +149,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         self,
         missing_dimension_associations: DataFrame | None,
         context: ScratchDirContext,
-    ) -> DataFrame:
+    ) -> DataFrame | None:
         """Return a dataframe containing one row for each dimension association that is expected
         to be missing from the data.
         """
@@ -175,9 +175,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if not not_covered_dims:
             return df
 
+        expected_table = self.make_expected_dimension_association_table_from_records(
+            not_covered_dims, context
+        )
+        if expected_table is None:
+            return missing_dimension_associations
+
         df2 = cross_join(
             missing_dimension_associations,
-            self.make_expected_dimension_association_table_from_records(not_covered_dims, context),
+            expected_table,
         )
         assert sorted(df.columns) == sorted(df2.columns)
         df2 = df2.select(*df.columns)
@@ -185,29 +191,34 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def make_expected_dimension_association_table_from_records(
         self, dimension_types: Iterable[DimensionType], context: ScratchDirContext
-    ) -> DataFrame:
+    ) -> DataFrame | None:
         """Return a dataframe containing one row for each unique dimension combination except time.
         Use dimensions in the dataset's dimension records.
         """
         data: dict[str, list[str]] = {}
         for dim_type in dimension_types:
             dim = self._config.get_dimension_with_records(dim_type)
-            assert dim is not None
-            data[dim_type.value] = list(dim.get_unique_ids())
+            # TODO stride
+            # assert dim is not None
+            if dim is not None:
+                data[dim_type.value] = list(dim.get_unique_ids())
 
+        if not data:
+            return None
         return create_dataframe_from_product(data, context)
 
     @track_timing(timer_stats_collector)
     def _check_dimension_associations(
         self, missing_dimension_associations: MissingDimensionAssociations
-    ) -> DataFrame:
+    ) -> DataFrame | None:
         """Check that a cross-join of dimension records is present, unless explicitly excepted.
 
         Returns
         -------
-        DataFrame
-            A dataframe containing one row for each dimension association that is expected to be
-            missing from the data. The dataframe will contain all dimension columns except time.
+        DataFrame | None
+            If set, a dataframe containing one row for each dimension association that is expected
+            to be missing from the data. The dataframe will contain all dimension columns except
+            time.
         """
         context = ScratchDirContext(Path(tempfile.gettempdir()))
         if (
@@ -217,17 +228,19 @@ class DatasetSchemaHandlerBase(abc.ABC):
             assert missing_dimension_associations.df is not None
             full_expected_missing = missing_dimension_associations.df
         else:
-            assoc_df = missing_dimension_associations.df
             full_expected_missing = self.get_expected_missing_dimension_associations(
-                assoc_df, context
+                missing_dimension_associations.df, context
             )
         assoc_by_records = self.make_expected_dimension_association_table_from_records(
             [x for x in DimensionType if x != DimensionType.TIME], context
         )
         assoc_by_data = self.make_dimension_association_table()
-        required_assoc = filter_out_expected_missing_associations(
-            assoc_by_records, full_expected_missing
-        )
+        if full_expected_missing is None:
+            required_assoc = assoc_by_records
+        else:
+            required_assoc = filter_out_expected_missing_associations(
+                assoc_by_records, full_expected_missing
+            )
         cols = sorted(required_assoc.columns)
         diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
         cache(diff)

@@ -1217,19 +1217,16 @@ def list_project_dimension_names(
     )
 
     dimensions = sorted(DimensionType, key=lambda x: x.value)
-    lines = []
+    print("Dimension names:")
     for dim_type in dimensions:
-        lines.append(f"  {dim_type.value}:")
+        print(f"  {dim_type.value}:")
         if base:
             base_str = " ".join(base[dim_type])
-            lines.append(f"    base: {base_str}")
+            print(f"    base: {base_str}")
         if sub:
-            lines.append("    subset: " + " ".join(sub[dim_type]))
+            print("    subset: " + " ".join(sub[dim_type]))
         if supp:
-            lines.append("    supplemental: " + " ".join(supp[dim_type]))
-    print("Dimension names:")
-    for line in lines:
-        print(line)
+            print("    supplemental: " + " ".join(supp[dim_type]))
 
 
 _generate_project_config_epilog = """

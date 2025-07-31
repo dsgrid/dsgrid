@@ -70,7 +70,7 @@ class FilesystemDataStore(DataStoreInterface):
     ) -> None:
         filename = self._lookup_table_filename(dataset_id, version)
         filename.parent.mkdir(parents=True, exist_ok=True)
-        write_dataframe(coalesce(df, 1), filename)
+        write_dataframe(coalesce(df, 1), filename, overwrite=overwrite)
 
     def write_missing_associations_table(
         self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False

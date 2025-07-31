@@ -397,10 +397,8 @@ class RegistryDatabase:
                 select(table.c.value).where(table.c.key == "data_store_type")
             ).fetchone()
             if row is None:
-                # Allow legacy registries to keep working for some time.
+                # Allow legacy registries to keep working.
                 return DataStoreType.FILESYSTEM
-                # msg = "Bug: received no result in query for data_store_type"
-                # raise Exception(msg)
             return DataStoreType(row.value)
 
     def _get_table(self, table_type: RegistryTables) -> Table:

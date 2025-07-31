@@ -1209,11 +1209,8 @@ class ProjectConfig(ConfigBase):
         """Add project base dimension query names represented in the dataset."""
         for field in type(base_dimension_names).model_fields:
             if getattr(base_dimension_names, field) is None:
-                # TODO: stride
-                continue
-                logger.warning("Dataset %s does not have dimension %s", dataset_id, field)
-                # msg = f"DatasetBaseDimensionNamesModel {field} cannot be None"
-                # raise DSGInvalidParameter(msg)
+                msg = f"DatasetBaseDimensionNamesModel {field} cannot be None"
+                raise DSGInvalidParameter(msg)
         dataset = self.get_dataset(dataset_id)
         dataset.base_dimension_names = base_dimension_names
 

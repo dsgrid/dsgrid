@@ -572,23 +572,20 @@ def filter_out_expected_missing_associations(
     main_df: DataFrame, missing_df: DataFrame
 ) -> DataFrame:
     """Filter out rows that are expected to be missing from the main dataframe."""
-    main_columns = ",".join((f"main_view.{x}" for x in main_df.columns))
     missing_columns = [DimensionType.from_column(x).value for x in missing_df.columns]
     spark = get_spark_session()
+    main_view = make_temp_view_name()
+    assoc_view = make_temp_view_name()
+    main_columns = ",".join((f"{main_view}.{x}" for x in main_df.columns))
 
-    try:
-        main_df.createOrReplaceTempView("main_view")
-        missing_df.createOrReplaceTempView("assoc_view")
-        join_str = " AND ".join((f"main_view.{x} = assoc_view.{x}" for x in missing_columns))
-        query = f"""
-            SELECT {main_columns}
-            FROM main_view
-            ANTI JOIN assoc_view
-            ON {join_str}
-        """
-        res = spark.sql(query)
-        return res
-    finally:
-        pass
-        # spark.sql("DROP VIEW IF EXISTS main_view")
-        # spark.sql("DROP VIEW IF EXISTS assoc_view")
+    main_df.createOrReplaceTempView(main_view)
+    missing_df.createOrReplaceTempView(assoc_view)
+    join_str = " AND ".join((f"{main_view}.{x} = {assoc_view}.{x}" for x in missing_columns))
+    query = f"""
+        SELECT {main_columns}
+        FROM {main_view}
+        ANTI JOIN {assoc_view}
+        ON {join_str}
+    """
+    res = spark.sql(query)
+    return res

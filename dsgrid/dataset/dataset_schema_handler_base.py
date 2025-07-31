@@ -198,8 +198,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         data: dict[str, list[str]] = {}
         for dim_type in dimension_types:
             dim = self._config.get_dimension_with_records(dim_type)
-            # TODO stride
-            # assert dim is not None
             if dim is not None:
                 data[dim_type.value] = list(dim.get_unique_ids())
 
@@ -475,6 +473,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
         return df
 
     def _finalize_table(self, context: QueryContext, df: DataFrame, project_config: ProjectConfig):
+        # TODO: remove ProjectConfig so that dataset queries can use this.
+        # Pass in the dimensions instead.
+        # Applies throughout this file...it should be a dataset file only, with dimensions
+        # and mappings.
         table_handler = make_table_format_handler(
             self._config.get_table_format_type(),
             project_config,

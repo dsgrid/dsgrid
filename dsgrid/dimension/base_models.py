@@ -165,17 +165,17 @@ def check_required_dataset_dimensions(dimensions, tag):
         Raised if a required dimension is not provided.
 
     """
-    dimension_types = {x.dimension_type for x in dimensions}
+    # dimension_types = {x.dimension_type for x in dimensions}
     # TODO: stride
-    required_dim_types = {
-        DimensionType.GEOGRAPHY,
-        # DimensionType.MODEL_YEAR,
-        # DimensionType.SCENARIO,
-        # DimensionType.SECTOR,
-    }
-    missing = required_dim_types.difference(dimension_types)
-    if missing:
-        raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
+    # required_dim_types = {
+    #     DimensionType.GEOGRAPHY,
+    #     DimensionType.MODEL_YEAR,
+    #     DimensionType.SCENARIO,
+    #     DimensionType.SECTOR,
+    # }
+    # missing = required_dim_types.difference(dimension_types)
+    # if missing:
+    #     raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
 
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 

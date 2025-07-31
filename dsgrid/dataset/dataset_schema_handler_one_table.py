@@ -105,14 +105,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     raise DSGInvalidDataset(msg)
                 dimension_types.add(dim_type)
 
-        # TODO: stride
-        # expected_dimensions = DimensionType.get_dimension_types_allowed_as_columns()
-        # missing_dimensions = expected_dimensions.difference(dimension_types)
-        # if missing_dimensions:
-        #     raise DSGInvalidDataset(
-        #         f"load_data is missing dimensions: {missing_dimensions}. "
-        #         "If these are trivial dimensions, make sure to specify them in the Dataset Config."
-        #     )
         self._check_dimension_records_by_dimension_type(dimension_types)
 
     def _check_dimension_records_by_dimension_type(

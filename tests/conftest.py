@@ -148,7 +148,6 @@ def registry_with_duckdb_store(tmp_path):
         "bulk-register",
         str(TEST_EFS_REGISTRATION_FILE),
     ]
-    print(" ".join(cmd))
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
     conn = DatabaseConnection(url=url)

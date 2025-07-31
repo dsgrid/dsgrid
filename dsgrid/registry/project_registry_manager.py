@@ -1368,22 +1368,15 @@ class ProjectRegistryManager(RegistryManagerBase):
                 base_dimension_names[dim_type] = project_base_dims_by_type[dim_type][0].model.name
                 continue
             if dim_type not in base_dimension_names:
-                try:
-                    dataset_dim = dataset_config.get_dimension_with_records(dim_type)
-                except DSGValueNotRegistered:
-                    # TODO: stride
-                    logger.warning(
-                        "Dataset %s does not have dimension type %s", dataset_id, dim_type.value
-                    )
-                    continue
-                dataset_records = dataset_dim.get_records_dataframe()
-                dataset_record_ids = get_unique_values(dataset_records, "id")
                 project_base_dims = project_base_dims_by_type[dim_type]
                 if len(project_base_dims) > 1:
                     for project_dim in project_base_dims:
                         assert isinstance(project_dim, DimensionBaseConfigWithFiles)
                         project_records = project_dim.get_records_dataframe()
                         project_record_ids = get_unique_values(project_records, "id")
+                        dataset_dim = dataset_config.get_dimension_with_records(dim_type)
+                        dataset_records = dataset_dim.get_records_dataframe()
+                        dataset_record_ids = get_unique_values(dataset_records, "id")
                         if dataset_record_ids.issubset(project_record_ids):
                             project_dim_name = project_dim.model.name
                             if dim_type in base_dimension_names:
@@ -1397,7 +1390,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                             base_dimension_names[dim_type] = project_dim_name
                     if dim_type not in base_dimension_names:
                         msg = (
-                            f"{dim_type} has multiple base dimensions in the project, dataset "
+                            f"Bug: {dim_type} has multiple base dimensions in the project, dataset "
                             f"{dataset_id} does not specify a mapping, and dsgrid could not "
                             "discern which base dimension to use."
                         )

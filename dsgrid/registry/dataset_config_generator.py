@@ -28,7 +28,6 @@ def generate_config_from_dataset(
     dataset_path: Path,
     schema_type: DataSchemaType,
     metric_type: str,
-    included_dimensions: list[DimensionType] | None = None,
     pivoted_dimension_type: DimensionType | None = None,
     time_type: TimeDimensionType | None = None,
     time_columns: set[str] | None = None,
@@ -79,7 +78,6 @@ def generate_config_from_dataset(
     config = make_unvalidated_dataset_config(
         dataset_id,
         metric_type,
-        included_dimensions=included_dimensions,
         dimension_references=dimension_references,
         time_type=time_type,
     )

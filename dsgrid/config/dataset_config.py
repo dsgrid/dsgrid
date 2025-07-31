@@ -359,11 +359,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         description="Additional user defined metadata fields",
         default={},
     )
-    included_dimensions: list[DimensionType] = Field(
-        title="included_dimensions",
-        default=[],
-        description="List of dimensions included in the dataset.",
-    )
     trivial_dimensions: list[DimensionType] = Field(
         title="trivial_dimensions",
         default=[],
@@ -505,7 +500,6 @@ def make_unvalidated_dataset_config(
         "source": "",
         "data_classification": data_classification,
         "use_project_geography_time_zone": True,
-        "included_dimensions": [x.value for x in included_dimensions or []],
         "dimensions": dimensions,
         "dimension_references": [x.model_dump(mode="json") for x in dimension_references or []],
         "tags": [],
@@ -588,10 +582,7 @@ class DatasetConfig(ConfigBase):
         for dim_config in self.dimensions.values():
             if dim_config.model.dimension_type == dimension_type:
                 return dim_config
-
         return None
-        # msg = f"Dimension {dimension_type} not found in dataset {self.config_id}"
-        # raise DSGValueNotRegistered(msg)
 
     def get_time_dimension(self) -> TimeDimensionBaseConfig | None:
         """Return the time dimension of the dataset."""
@@ -608,10 +599,6 @@ class DatasetConfig(ConfigBase):
                 dim_config, DimensionBaseConfigWithFiles
             ):
                 return dim_config
-
-        # TODO: stride
-        # msg = f"Dimension {dimension_type} not found in dataset {self.config_id} or does not have records"
-        # raise DSGValueNotRegistered(msg)
         return None
 
     def get_pivoted_dimension_type(self) -> DimensionType | None:

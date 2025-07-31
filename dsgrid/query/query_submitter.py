@@ -1,7 +1,6 @@
 import abc
 import json
 import logging
-import os
 import shutil
 from pathlib import Path
 from typing import Optional
@@ -740,15 +739,6 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
                     refs = mgr.dimension_mapping_manager.list_mappings_between_dimensions(
                         graph, dataset_dim.model.dimension_id, to_dim.model.dimension_id
                     )
-                    if len(refs) > 1 and not os.getenv("DSGRID_ALLOW_MULTI_HOP_MAPPINGS"):
-                        # Not yet sure if this is safe in all cases.
-                        # It should be fine for dataset county -> project county -> state.
-                        msg = (
-                            f"Found multiple hops between dimensions {dataset_dim.model.dimension_id} "
-                            f"and {to_dim.model.dimension_id}. This is not allowed unless the "
-                            f"DSGRID_ALLOW_MULTI_HOP_MAPPINGS environment variable is set."
-                        )
-                        raise DSGInvalidQuery(msg)
                     to_dimension_mapping_refs += refs
                 mapped_dimension_types.add(to_dim.model.dimension_type)
                 dimensions[to_dim.model.dimension_type] = to_dim

@@ -2,7 +2,6 @@ import abc
 import copy
 import logging
 import math
-import os
 import shutil
 import subprocess
 import tempfile
@@ -537,14 +536,7 @@ def test_map_dataset(tmp_path):
         assert_frame_equal(dfp1, dfp2)
 
 
-@pytest.fixture
-def allow_multi_hop_mappings():
-    os.environ["DSGRID_ALLOW_MULTI_HOP_MAPPINGS"] = "1"
-    yield
-    os.environ.pop("DSGRID_ALLOW_MULTI_HOP_MAPPINGS")
-
-
-def test_dataset_queries(tmp_path, allow_multi_hop_mappings):
+def test_dataset_queries(tmp_path):
     output_dir = tmp_path / "queries"
     scratch_dir = tmp_path / "scratch"
     for query in ("resstock_county", "resstock_project_county", "resstock_state"):

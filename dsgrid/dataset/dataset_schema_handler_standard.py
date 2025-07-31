@@ -87,13 +87,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def check_time_consistency(self):
         time_dim = self._config.get_time_dimension()
-        if time_dim is not None:
-            if time_dim.supports_chronify():
-                self._check_dataset_time_consistency_with_chronify()
-            else:
-                self._check_dataset_time_consistency(
-                    self._load_data.join(self._load_data_lookup, on="id")
-                )
+        if time_dim is None:
+            return None
+
+        if time_dim.supports_chronify():
+            self._check_dataset_time_consistency_with_chronify()
+        else:
+            self._check_dataset_time_consistency(
+                self._load_data.join(self._load_data_lookup, on="id")
+            )
 
     def get_expected_missing_dimension_associations(
         self,

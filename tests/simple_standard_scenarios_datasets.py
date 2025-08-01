@@ -4,6 +4,9 @@ from collections import defaultdict, namedtuple
 from pathlib import Path
 
 from dsgrid.config.mapping_tables import MappingTableRecordModel
+from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
@@ -21,6 +24,7 @@ from dsgrid.utils.files import (
     load_line_delimited_json,
     dump_line_delimited_json,
 )
+from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     models_to_dataframe,
     get_spark_session,
@@ -226,10 +230,20 @@ def build_tempo():
     value_columns = tempo._handler.config.get_value_columns()
     assert len(value_columns) == 1
     value_column = next(iter(value_columns))
-    tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-        load_data.join(lookup, on="id").drop("id"), project.config, value_column, ["L1andL2"]
-    )
-    return tempo_data_mapped_time
+    input_dataset = project.config.get_dataset(tempo._config.model.dataset_id)
+    plan = tempo._handler.build_default_dataset_mapping_plan()
+    context = ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir())
+    with DatasetMappingManager(tempo._handler.dataset_id, plan, context) as mgr:
+        tempo_data_mapped_time = tempo._handler._convert_time_dimension(
+            load_data_df=load_data.join(lookup, on="id").drop("id"),
+            to_time_dim=project.config.get_base_time_dimension(),
+            mapping_manager=mgr,
+            value_column=value_column,
+            wrap_time_allowed=input_dataset.wrap_time_allowed,
+            time_based_data_adjustment=input_dataset.time_based_data_adjustment,
+            to_geo_dim=project.config.get_base_dimension(DimensionType.GEOGRAPHY),
+        )
+        return tempo_data_mapped_time
 
 
 def generate_raw_stats(datasets):

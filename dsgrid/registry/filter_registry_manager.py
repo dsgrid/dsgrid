@@ -92,9 +92,13 @@ class FilterRegistryManager(RegistryManager):
                 dim.model.records = handle_dimension(simple_dim, dim)
                 self.dimension_manager.db.replace(conn, dim.model)
             handler = make_dataset_schema_handler(
-                conn, dataset_config, self._dimension_mgr, self._dimension_mapping_mgr
+                conn,
+                dataset_config,
+                self._dimension_mgr,
+                self._dimension_mapping_mgr,
+                store=self._data_store,
             )
-            handler.filter_data(dataset.dimensions)
+            handler.filter_data(dataset.dimensions, self._data_store)
 
         logger.info("Filter dimension mapping records")
         for mapping in self._dimension_mapping_mgr.iter_configs():

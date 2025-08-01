@@ -349,24 +349,18 @@ class TimeBasedDataAdjustmentModel(DSGBaseModel):
     """
 
     leap_day_adjustment: LeapDayAdjustmentType = Field(
-        title="leap_day_adjustment",
-        description="Leap day adjustment method applied to time data",
         default=LeapDayAdjustmentType.NONE,
-        json_schema_extra={
-            "options": LeapDayAdjustmentType.format_descriptions_for_docs(),
-            "notes": (
-                "The dsgrid default is None, i.e., no adjustment made to leap years.",
-                "Adjustments are made to leap years only.",
-            ),
-        },
+        title="leap_day_adjustment",
+        description="Leap day adjustment method applied to time data. The dsgrid default is None, "
+        "i.e., no adjustment made to leap years. Adjustments are made to leap years only.",
     )
     daylight_saving_adjustment: DaylightSavingAdjustmentModel = Field(
         title="daylight_saving_adjustment",
         description="Daylight saving adjustment method applied to time data",
-        default={
-            "spring_forward_hour": DaylightSavingSpringForwardType.NONE,
-            "fall_back_hour": DaylightSavingFallBackType.NONE,
-        },
+        default=DaylightSavingAdjustmentModel(
+            spring_forward_hour=DaylightSavingSpringForwardType.NONE,
+            fall_back_hour=DaylightSavingFallBackType.NONE,
+        ),
     )
 
 

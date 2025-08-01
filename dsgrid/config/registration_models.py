@@ -15,7 +15,7 @@ class ProjectRegistrationModel(DSGBaseModel):
 
     project_id: str = Field(description="Project ID")
     config_file: Path = Field(description="Path to project.json5")
-    log_message: Optional[str] = Field(
+    log_message: str | None = Field(
         default=None,
         description="Log message to use when registering the project. Defaults to an auto-generated message.",
     )
@@ -41,6 +41,10 @@ class DatasetRegistrationModel(DSGBaseModel):
         description="Directory containing load_data/load_data_lookup.parquet"
     )
     config_file: Path = Field(description="Path to dataset.json5")
+    missing_dimension_associations_file: Path | None = Field(
+        default=None,
+        description="Path to file containing missing dimension associations for the dataset.",
+    )
     replace_dimension_names_with_ids: bool = Field(
         description="Replace the dimension entries with IDs of dimensions in the database "
         "with matching names. Typically only useful for tests.",
@@ -67,6 +71,7 @@ class DatasetRegistrationModel(DSGBaseModel):
                 "config_file",
                 "dimension_mapping_file",
                 "dimension_mapping_references_file",
+                "missing_dimension_associations_file",
             ),
         )
         return data

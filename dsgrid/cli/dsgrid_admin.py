@@ -1,18 +1,23 @@
 """Main CLI command for dsgrid."""
 
 import logging
-import shutil
 import sys
 from pathlib import Path
 
 import rich_click as click
+from chronify.utils.path_utils import check_overwrite
 
 from dsgrid.cli.common import get_value_from_context
 from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.loggers import setup_logging, check_log_file_size
-from dsgrid.registry.common import DatabaseConnection, DatasetRegistryStatus, VersionUpdateType
+from dsgrid.registry.common import (
+    DataStoreType,
+    DatabaseConnection,
+    DatasetRegistryStatus,
+    VersionUpdateType,
+)
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.utils.files import load_data
@@ -158,23 +163,28 @@ $ dsgrid-admin create-registry sqlite:////projects/dsgrid/my_project/registry.db
     default=False,
     help="Delete registry_path and the database if they already exist.",
 )
+@click.option(
+    "-t",
+    "--data-store-type",
+    type=click.Choice([x.value for x in DataStoreType]),
+    default=DataStoreType.FILESYSTEM.value,
+    show_default=True,
+    help="Type of store to use for the registry data.",
+    callback=lambda *x: DataStoreType(x[2]),
+)
 @click.pass_context
-def create_registry(ctx, url, data_path, overwrite):
+def create_registry(
+    ctx, url: str, data_path: Path, overwrite: bool, data_store_type: DataStoreType
+):
     """Create a new registry."""
-    if data_path.exists():
-        if overwrite:
-            shutil.rmtree(data_path)
-        else:
-            print(f"{data_path} already exists. Set --overwrite to overwrite.", file=sys.stderr)
-            sys.exit(1)
-
+    check_overwrite(data_path, overwrite)
     conn = DatabaseConnection(
         url=url,  # This may change if/when we support a server database.
         # url=get_value_from_context(ctx, "url"),
         # username=get_value_from_context(ctx, "username"),
         # password=get_value_from_context(ctx, "password"),
     )
-    RegistryManager.create(conn, data_path, overwrite=overwrite)
+    RegistryManager.create(conn, data_path, overwrite=overwrite, data_store_type=data_store_type)
 
 
 """

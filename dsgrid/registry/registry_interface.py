@@ -163,7 +163,7 @@ class RegistryInterfaceBase(abc.ABC):
 
     def iter_models(
         self,
-        conn: Optional[Connection],
+        conn: Connection | None = None,
         all_versions: bool = False,
         filter_config: Optional[dict[str, Any]] = None,
     ) -> Generator[DSGBaseDatabaseModel, None, None]:

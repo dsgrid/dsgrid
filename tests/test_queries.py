@@ -70,6 +70,7 @@ from dsgrid.spark.types import (
 )
 from dsgrid.tests.common import (
     CACHED_TEST_REGISTRY_DB,
+    SIMPLE_STANDARD_SCENARIOS,
     SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
     TEST_PROJECT_PATH,
 )
@@ -533,6 +534,82 @@ def test_map_dataset(tmp_path):
         df2 = read_parquet(Path(out_dir) / dataset_id / "table.parquet")
         dfp2 = df2.sort(*columns).toPandas()
         assert_frame_equal(dfp1, dfp2)
+
+
+def test_dataset_queries(tmp_path):
+    output_dir = tmp_path / "queries"
+    scratch_dir = tmp_path / "scratch"
+    for query in ("resstock_county", "resstock_project_county", "resstock_state"):
+        cmd = [
+            "--scratch-dir",
+            str(scratch_dir),
+            "--offline",
+            "--url",
+            SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB,
+            "query",
+            "dataset",
+            "run",
+            str(SIMPLE_STANDARD_SCENARIOS / "queries" / f"{query}.json5"),
+            "--output",
+            str(output_dir),
+        ]
+        runner = CliRunner()
+        result = runner.invoke(cli, cmd)
+        assert result.exit_code == 0
+
+    rcounty = read_parquet(output_dir / "resstock_county" / "table.parquet")
+    rcounty_renamed = rcounty.withColumn(
+        "geography",
+        F.when(F.col("geography") == "G0600370", "06037")
+        .when(F.col("geography") == "G0600730", "06073")
+        .when(F.col("geography") == "G3600470", "36047")
+        .when(F.col("geography") == "G3600810", "36081"),
+    )
+
+    def add_state(df: DataFrame) -> DataFrame:
+        return df.withColumn(
+            "state",
+            F.when(F.col("geography") == "06037", "CA")
+            .when(F.col("geography") == "06073", "CA")
+            .when(F.col("geography") == "36047", "NY")
+            .when(F.col("geography") == "36081", "NY"),
+        )
+
+    rpcounty = read_parquet(output_dir / "resstock_project_county" / "table.parquet")
+    rstate = read_parquet(output_dir / "resstock_state" / "table.parquet")
+
+    rcounty_renamed = add_state(rcounty_renamed)
+    rpcounty = add_state(rpcounty)
+
+    res_rcounty = (
+        rcounty_renamed.groupBy("geography", "metric")
+        .agg(F.sum("value").alias("value"))
+        .sort("geography", "metric")
+        .toPandas()
+    )
+    res_rpcounty = (
+        rpcounty.groupBy("geography", "metric")
+        .agg(F.sum("value").alias("value"))
+        .sort("geography", "metric")
+        .toPandas()
+    )
+    assert_frame_equal(res_rcounty, res_rpcounty)
+
+    res_rpcounty_state = (
+        rpcounty.drop("geography")
+        .withColumnRenamed("state", "geography")
+        .groupBy("geography", "metric")
+        .agg(F.sum("value").alias("value"))
+        .sort("geography", "metric")
+        .toPandas()
+    )
+    res_state = (
+        rstate.groupBy("geography", "metric")
+        .agg(F.sum("value").alias("value"))
+        .sort("geography", "metric")
+        .toPandas()
+    )
+    assert_frame_equal(res_rpcounty_state, res_state)
 
 
 _projects = {}

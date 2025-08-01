@@ -301,7 +301,7 @@ Spark jobs with dsgrid.
 
 1. Choose compute node(s) with fast local storage. This example will allocate one node. Refer to this
    `Kestrel documentation` <https://nrel.github.io/HPC/Documentation/Systems/Kestrel/Filesystems/#node-file-system>_
-   for more information for this type of compute node. 
+   for more information for this type of compute node.
 
 .. code-block:: console
 

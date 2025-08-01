@@ -4,7 +4,6 @@ import json
 import logging
 
 from pathlib import Path
-from typing import Optional
 from semver import VersionInfo
 from sqlalchemy import Connection
 
@@ -25,6 +24,7 @@ from dsgrid.query.models import (
     DatasetConstructionMethod,
     ColumnType,
 )
+from dsgrid.registry.dataset_registry_manager import DatasetRegistryManager
 from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
 from dsgrid.utils.files import compute_hash
@@ -55,12 +55,14 @@ class Project:
         dataset_configs,
         dimension_mgr: DimensionRegistryManager,
         dimension_mapping_mgr: DimensionMappingRegistryManager,
+        dataset_mgr: DatasetRegistryManager,
     ):
         self._spark = get_active_session()
         self._config = config
         self._version = version
         self._dataset_configs = dataset_configs
         self._datasets = {}
+        self._dataset_mgr = dataset_mgr
         self._dimension_mgr = dimension_mgr
         self._dimension_mapping_mgr = dimension_mapping_mgr
 
@@ -132,7 +134,7 @@ class Project:
             dataset = self.load_dataset(dataset_id, conn=conn)
         return dataset
 
-    def load_dataset(self, dataset_id, conn: Optional[Connection] = None) -> Dataset:
+    def load_dataset(self, dataset_id, conn: Connection | None = None) -> Dataset:
         """Loads a dataset.
 
         Parameters
@@ -154,8 +156,8 @@ class Project:
             config,
             self._dimension_mgr,
             self._dimension_mapping_mgr,
+            self._dataset_mgr.store,
             mapping_references=input_dataset.mapping_references,
-            project_time_dim=self._config.get_base_time_dimension(),
             conn=conn,
         )
         self._datasets[dataset_id] = dataset
@@ -329,7 +331,12 @@ class Project:
 
     @track_timing(timer_stats_collector)
     def _build_projection_dataset(
-        self, context, cached_datasets_dir, dataset, dataset_path, metadata_file
+        self,
+        context: QueryContext,
+        cached_datasets_dir: Path,
+        dataset: ProjectionDatasetModel,
+        dataset_path: Path,
+        metadata_file: Path,
     ):
         def get_myear_column(dataset_id):
             match context.model.result.column_type:
@@ -372,6 +379,7 @@ class Project:
             case ColumnType.DIMENSION_TYPES:
                 dset = self.get_dataset(dataset.initial_value_dataset_id)
                 time_dim = dset.config.get_dimension(DimensionType.TIME)
+                assert time_dim is not None
                 time_columns = set(time_dim.get_load_data_time_columns())
             case _:
                 raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
@@ -394,10 +402,13 @@ class Project:
                     raise NotImplementedError(f"BUG: Unsupported {dataset.construction_method=}")
             df = write_dataframe_and_auto_partition(df, dataset_path)
 
+            time_dim = self._config.get_base_time_dimension()
+            assert time_dim is not None
+            time_columns = time_dim.get_load_data_time_columns()
             context.set_dataset_metadata(
                 dataset.dataset_id,
                 context.model.result.column_type,
-                self._config,
+                time_columns,
             )
             context.serialize_dataset_metadata_to_file(dataset.dataset_id, metadata_file)
 

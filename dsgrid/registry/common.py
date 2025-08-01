@@ -98,6 +98,13 @@ class DatabaseConnection(DSGBaseModel):
         return Path(match.group(1))
 
 
+class DataStoreType(StrEnum):
+    """Specifies the type of data store used for the registry."""
+
+    FILESYSTEM = "filesystem"
+    DUCKDB = "duckdb"
+
+
 class RegistryType(StrEnum):
     """Registry types"""
 

@@ -373,10 +373,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         lookup = lookup.drop(*drop_columns)
 
         lookup2 = coalesce(lookup, 1)
-        store.write_lookup_table(
-            lookup2, self.dataset_id, self._config.model.version, overwrite=True
-        )
-        unpersist(lookup)
+        store.replace_lookup_table(lookup2, self.dataset_id, self._config.model.version)
         ids = collect_list(lookup2.select("id").distinct(), "id")
         load_df = self._load_data.filter(self._load_data.id.isin(ids))
         ld_columns = set(load_df.columns)
@@ -385,5 +382,5 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             if column in ld_columns:
                 load_df = load_df.filter(load_df[column].isin(dim.record_ids))
 
-        store.write_table(load_df, self.dataset_id, self._config.model.version, overwrite=True)
+        store.replace_table(load_df, self.dataset_id, self._config.model.version)
         logger.info("Rewrote simplified %s", self._config.model.dataset_id)

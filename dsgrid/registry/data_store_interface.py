@@ -31,8 +31,16 @@ class DataStoreInterface(abc.ABC):
         """Read a table from the data store."""
 
     @abc.abstractmethod
+    def replace_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+        """Replace a table in the data store."""
+
+    @abc.abstractmethod
     def read_lookup_table(self, dataset_id: str, version: str) -> DataFrame:
         """Read a lookup table from the data store."""
+
+    @abc.abstractmethod
+    def replace_lookup_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+        """Replace a lookup table in the data store."""
 
     @abc.abstractmethod
     def write_table(

@@ -204,7 +204,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             drop_columns.append(col)
         load_df = load_df.drop(*drop_columns)
 
-        store.write_table(load_df, self.dataset_id, self._config.model.version, overwrite=True)
+        store.replace_table(load_df, self.dataset_id, self._config.model.version)
         logger.info("Rewrote simplified %s", self._config.model.dataset_id)
 
     def make_project_dataframe(

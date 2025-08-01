@@ -59,11 +59,21 @@ class DuckDbDataStore(DataStoreInterface):
         df = con.sql(f"SELECT * FROM {table_name}").to_df()
         return get_spark_session().createDataFrame(df)
 
+    def replace_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+        schema = TABLE_TYPE_TO_SCHEMA["data"]
+        short_name = _make_table_short_name(dataset_id, version)
+        self._replace_table(df, schema, short_name)
+
     def read_lookup_table(self, dataset_id: str, version: str) -> DataFrame:
         con = self._get_connection()
         table_name = _make_table_full_name("lookup", dataset_id, version)
         df = con.sql(f"SELECT * FROM {table_name}").to_df()
         return get_spark_session().createDataFrame(df)
+
+    def replace_lookup_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+        schema = TABLE_TYPE_TO_SCHEMA["lookup"]
+        short_name = _make_table_short_name(dataset_id, version)
+        self._replace_table(df, schema, short_name)
 
     def read_missing_associations_table(self, dataset_id: str, version: str) -> DataFrame | None:
         con = self._get_connection()
@@ -130,10 +140,23 @@ class DuckDbDataStore(DataStoreInterface):
             > 0
         )
 
+    def _replace_table(self, df: DataFrame, schema: str, table_name: str) -> None:
+        con = self._get_connection()
+        if not self._has_table(con, schema, table_name):
+            _create_table_from_dataframe(con, df, table_name)
+            return
 
-def _create_table_from_dataframe(con: DuckDBPyConnection, df: DataFrame, table_name: str) -> None:
+        tmp_name = f"{schema}.{table_name}_tmp"
+        _create_table_from_dataframe(con, df, tmp_name)
+        con.sql(f"DROP TABLE {table_name}")
+        con.sql(f"ALTER TABLE {tmp_name} RENAME TO {table_name}")
+
+
+def _create_table_from_dataframe(
+    con: DuckDBPyConnection, df: DataFrame, full_table_name: str
+) -> None:
     pdf = df.toPandas()  # noqa: F841
-    con.sql(f"CREATE TABLE {table_name} AS SELECT * from pdf")
+    con.sql(f"CREATE TABLE {full_table_name} AS SELECT * from pdf")
 
 
 def _make_table_full_name(

@@ -414,6 +414,8 @@ class RegistryManager:
         """
         src_db = RegistryDatabase.connect(src)
         src_data_path = src_db.get_data_path()
+        # TODO: This does not support the duckdb data store. Need to implement this copy operation
+        # in the DataStoreInterface.
         if not {x.name for x in src_data_path.iterdir()}.issuperset({"data"}):
             raise DSGInvalidParameter(f"{src_data_path} is not a valid registry")
 

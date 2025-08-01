@@ -43,14 +43,26 @@ class FilesystemDataStore(DataStoreInterface):
             raise FileNotFoundError(msg)
         return read_dataframe(filename)
 
+    def replace_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+        filename = self._get_existing_table_filename(dataset_id, version)
+        if filename is None:
+            self.write_table(df, dataset_id, version)
+            return
+        self._replace_table(df, filename)
+
     def read_lookup_table(self, dataset_id: str, version: str) -> DataFrame:
-        filename = self._lookup_table_filename(dataset_id, version)
-        if not filename.exists():
-            filename = self._alt_lookup_table_filename(dataset_id, version)
-        if not filename.exists():
-            msg = f"Lookup table does not exist for dataset {dataset_id}, version {version} at {filename.parent}."
+        filename = self._get_existing_lookup_table_filename(dataset_id, version)
+        if filename is None:
+            msg = f"Table does not exist for dataset {dataset_id}, version {version}."
             raise FileNotFoundError(msg)
         return read_dataframe(filename)
+
+    def replace_lookup_table(self, df: DataFrame, dataset_id: str, version: str) -> None:
+        filename = self._get_existing_lookup_table_filename(dataset_id, version)
+        if filename is None:
+            self.write_lookup_table(df, dataset_id, version)
+            return
+        self._replace_table(df, filename)
 
     def read_missing_associations_table(self, dataset_id: str, version: str) -> DataFrame | None:
         filename = self._missing_associations_table_filename(dataset_id, version)
@@ -102,3 +114,28 @@ class FilesystemDataStore(DataStoreInterface):
 
     def _alt_table_filename(self, dataset_id: str, version: str) -> Path:
         return self._data_dir / dataset_id / version / ALT_TABLE_FILENAME
+
+    def _get_existing_lookup_table_filename(self, dataset_id: str, version: str) -> Path | None:
+        filename = self._lookup_table_filename(dataset_id, version)
+        if filename.exists():
+            return filename
+        alt_filename = self._alt_lookup_table_filename(dataset_id, version)
+        if alt_filename.exists():
+            return alt_filename
+        return None
+
+    def _get_existing_table_filename(self, dataset_id: str, version: str) -> Path | None:
+        filename = self._table_filename(dataset_id, version)
+        if filename.exists():
+            return filename
+        alt_filename = self._alt_table_filename(dataset_id, version)
+        if alt_filename.exists():
+            return alt_filename
+        return None
+
+    @staticmethod
+    def _replace_table(df: DataFrame, filename: Path) -> None:
+        tmp_name = filename.parent / f"{filename.stem}_tmp.parquet"
+        write_dataframe(df, tmp_name)
+        delete_if_exists(filename)
+        tmp_name.rename(filename)

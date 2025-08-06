@@ -26,7 +26,7 @@ def make_data_store_factory(
         case DataStoreType.DUCKDB:
             cls = DuckDbDataStore
         case _:
-            msg = f"Unsupported data store type: {DataStoreType}"
+            msg = f"Unsupported data store type: {data_store_type}"
             raise NotImplementedError(msg)
 
     if initialize:

@@ -70,7 +70,7 @@ def make_base_dimension_template(
             "type": x.value,
             "class": DIMENSION_CLASS_MAP[x],
             "name": x.value,
-            "description": DimensionType.METRIC.value,
+            "description": x.value,
             "file": f"dimensions/{x.value}.csv",
             "module": "dsgrid.dimension.standard",
         }

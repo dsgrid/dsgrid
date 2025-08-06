@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 
 
 class DuckDbDataStore(DataStoreInterface):
-    """Data store that stores tables in Parquet files on the local or remote filesystem."""
+    """Data store that stores tables in a DuckDB database."""
 
     def __init__(self, base_path: Path):
         super().__init__(base_path)

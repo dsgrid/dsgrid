@@ -5,6 +5,9 @@ from typing import Literal, Self
 import duckdb
 from duckdb import DuckDBPyConnection
 
+import dsgrid
+from dsgrid.common import BackendEngine
+from dsgrid.exceptions import DSGInvalidOperation
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.spark.functions import get_spark_session
 from dsgrid.spark.types import DataFrame
@@ -28,6 +31,13 @@ class DuckDbDataStore(DataStoreInterface):
 
     def __init__(self, base_path: Path):
         super().__init__(base_path)
+        if dsgrid.runtime_config.backend_engine == BackendEngine.SPARK:
+            # This currently doesn't work because we convert Spark DataFrames to Pandas DataFrames
+            # and Pandas does not support null values. This causes it to convert integer columns
+            # to floats and there isn't a great workaround as of now. This is not important
+            # because we wouldn't ever want to use Spark backed by a DuckDB database.
+            msg = "Spark backend engine is not supported with DuckDbDataStore."
+            raise DSGInvalidOperation(msg)
 
     @classmethod
     def create(cls, base_path: Path) -> Self:

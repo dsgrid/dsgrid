@@ -8,6 +8,7 @@ import pytest
 from click.testing import CliRunner
 from pydantic import ValidationError
 
+from dsgrid.common import BackendEngine
 from dsgrid.cli.dsgrid import cli
 from dsgrid.cli.dsgrid_admin import cli as cli_admin
 from dsgrid.config.input_dataset_requirements import (
@@ -16,6 +17,7 @@ from dsgrid.config.input_dataset_requirements import (
     InputDatasetListModel,
 )
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
@@ -394,6 +396,10 @@ def test_add_supplemental_dimension(mutable_cached_registry, tmp_path):
     assert found_new_dimension
 
 
+@pytest.mark.skipif(
+    DsgridRuntimeConfig.load().backend_engine == BackendEngine.SPARK,
+    reason="Spark backend is not supported with a DuckDB data store",
+)
 def test_register_with_duckdb_store(registry_with_duckdb_store):
     conn = registry_with_duckdb_store
     manager = RegistryManager.load(conn, offline_mode=True)

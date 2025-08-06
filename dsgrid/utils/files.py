@@ -91,6 +91,16 @@ def load_data(filename, **kwargs) -> dict[str, Any]:
     return data
 
 
+def dump_json_file(data, filename, indent=None) -> None:
+    """Dump data to the JSON or JSON5 filename."""
+    dump_data(data, filename, indent=indent)
+
+
+def load_json_file(filename: Path | str) -> dict[str, Any]:
+    """Load data from the JSON or JSON5 file."""
+    return load_data(filename)
+
+
 def dump_line_delimited_json(data, filename, mode="w"):
     """Dump a list of objects to the file as line-delimited JSON.
 

@@ -25,6 +25,7 @@ from dsgrid.dimension.base_models import (
 # GEOGRAPHIC DIMENSIONS
 # ---------------------------
 
+
 class Geography(GeographyDimensionBaseModel):
     """Generic geography with optional time_zone"""
 
@@ -57,6 +58,7 @@ class County(GeographyDimensionBaseModel):
 # SECTOR DIMENSIONS
 # ---------------------------
 
+
 class Sector(SectorDimensionBaseModel):
     """Sector attributes"""
 
@@ -71,6 +73,7 @@ class Sector(SectorDimensionBaseModel):
 # SUBSECTOR DIMENSIONS
 # ---------------------------
 
+
 class Subsector(SubsectorDimensionBaseModel):
     """Subsector attributes"""
 
@@ -81,6 +84,7 @@ class Subsector(SubsectorDimensionBaseModel):
 # ---------------------------
 # METRIC DIMENSIONS
 # ---------------------------
+
 
 class FunctionalForm(StrEnum):
     """Functional forms for regression parameters"""
@@ -169,6 +173,7 @@ class PeggedIndex(MetricDimensionBaseModel):
 # TIME DIMENSIONS
 # ---------------------------
 
+
 class Time(DateTimeDimensionModel):
     """Time attributes"""
 
@@ -195,6 +200,7 @@ class NoOpTime(NoOpTimeDimensionModel):
 # ---------------------------
 # OTHER DIMENSIONS
 # ---------------------------
+
 
 class WeatherYear(WeatherYearDimensionBaseModel):
     """Weather Year attributes"""

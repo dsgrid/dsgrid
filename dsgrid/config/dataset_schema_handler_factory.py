@@ -1,19 +1,21 @@
-from typing import Optional
-
 from sqlalchemy import Connection
 
+from dsgrid.config.dataset_config import DataSchemaType, DatasetConfig
 from dsgrid.dataset.dataset_schema_handler_standard import StandardDatasetSchemaHandler
 from dsgrid.dataset.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
-from .dataset_config import DataSchemaType
+from dsgrid.registry.data_store_interface import DataStoreInterface
+from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
+from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 
 
 def make_dataset_schema_handler(
-    conn: Optional[Connection],
-    config,
-    dimension_mgr,
-    dimension_mapping_mgr,
-    mapping_references=None,
-    project_time_dim=None,
+    conn: Connection | None,
+    config: DatasetConfig,
+    dimension_mgr: DimensionRegistryManager,
+    dimension_mapping_mgr: DimensionMappingRegistryManager,
+    store: DataStoreInterface | None = None,
+    mapping_references: list[DimensionMappingReferenceModel] | None = None,
 ):
     match config.get_data_schema_type():
         case DataSchemaType.STANDARD:
@@ -22,8 +24,8 @@ def make_dataset_schema_handler(
                 conn,
                 dimension_mgr,
                 dimension_mapping_mgr,
+                store=store,
                 mapping_references=mapping_references,
-                project_time_dim=project_time_dim,
             )
         case DataSchemaType.ONE_TABLE:
             return OneTableDatasetSchemaHandler.load(
@@ -31,8 +33,8 @@ def make_dataset_schema_handler(
                 conn,
                 dimension_mgr,
                 dimension_mapping_mgr,
+                store=store,
                 mapping_references=mapping_references,
-                project_time_dim=project_time_dim,
             )
         case _:
             raise NotImplementedError(f"{config.model.data_schema.data_schema_type=}")

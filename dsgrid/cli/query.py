@@ -5,6 +5,7 @@ import sys
 from pathlib import Path
 
 import rich_click as click
+from chronify.utils.path_utils import check_overwrite
 from pydantic import ValidationError
 
 from dsgrid.common import REMOTE_REGISTRY
@@ -29,6 +30,7 @@ from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan
 from dsgrid.query.derived_dataset import create_derived_dataset_config_from_query
 from dsgrid.query.models import (
     AggregationModel,
+    DatasetQueryModel,
     DimensionNamesModel,
     ProjectQueryModel,
     ProjectQueryParamsModel,
@@ -40,10 +42,12 @@ from dsgrid.query.models import (
     make_query_for_standalone_dataset,
 )
 from dsgrid.query.query_submitter import (
+    DatasetQuerySubmitter,
     ProjectQuerySubmitter,
 )  # , CompositeDatasetQuerySubmitter
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.files import dump_json_file
 
 
 QUERY_OUTPUT_DIR = "query_output"
@@ -160,16 +164,7 @@ def create_project_query(
     remote_path,
 ):
     """Create a default query file for a dsgrid project."""
-    if query_file.exists():
-        if overwrite:
-            query_file.unlink()
-        else:
-            print(
-                f"{query_file} already exists. Choose a different name or pass --overwrite to overwrite it.",
-                file=sys.stderr,
-            )
-            return 1
-
+    check_overwrite(query_file, overwrite)
     conn = DatabaseConnection(
         url=get_value_from_context(ctx, "url"),
     )
@@ -250,7 +245,7 @@ def create_project_query(
             ]
 
     query_file.write_text(query.model_dump_json(indent=2))
-    print(f"Wrote query to {query_file}")
+    print(f"Wrote query to {query_file}", file=sys.stderr)
 
 
 @click.command("validate")
@@ -443,6 +438,138 @@ def map_dataset(
     )
 
 
+@click.command("create-query")
+@click.argument("name", type=str)
+@click.argument("dataset_id", type=str)
+@click.option(
+    "-f",
+    "--query-file",
+    default="dataset_query.json5",
+    show_default=True,
+    help="Query file to create.",
+    callback=path_callback,
+)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite query file if it exists.",
+)
+@click.pass_context
+def create_dataset_query(
+    ctx,
+    name: str,
+    dataset_id: str,
+    query_file: Path,
+    overwrite: bool,
+):
+    """Create a query file to be used for mapping a dataset to an arbitrary list of dimensions."""
+    query = DatasetQueryModel(name=name, dataset_id=dataset_id, to_dimension_references=[])
+    check_overwrite(query_file, overwrite)
+    data = query.model_dump(mode="json")
+    unsupported_result_fields = (
+        "column_type",
+        "replace_ids_with_names",
+        "aggregations",
+        "aggregate_each_dataset",
+        "reports",
+        "dimension_filters",
+        "time_zone",
+    )
+    data.pop("version")
+    for field in unsupported_result_fields:
+        data["result"].pop(field)
+
+    dump_json_file(data, query_file, indent=2)
+    print(f"Wrote query to {query_file}", file=sys.stderr)
+
+
+_run_dataset_query_epilog = """
+Examples:\n
+$ dsgrid query dataset run query.json5
+"""
+
+
+@click.command("run", epilog=_run_dataset_query_epilog)
+@click.argument("query_definition_file", type=click.Path(exists=True))
+@click.option(
+    "-c",
+    "--checkpoint-file",
+    type=click.Path(exists=True),
+    callback=path_callback,
+    help="Checkpoint file created by a previous map operation. If passed, the code will "
+    "read it and resume from the last persisted file.",
+)
+@click.option(
+    "-o",
+    "--output",
+    default=QUERY_OUTPUT_DIR,
+    show_default=True,
+    type=str,
+    help="Output directory for query results",
+    callback=path_callback,
+)
+@click.option(
+    "--overwrite",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Overwrite results directory if it exists.",
+)
+@add_options(_COMMON_REGISTRY_OPTIONS)
+@click.pass_context
+def run_dataset_query(
+    ctx: click.Context,
+    query_definition_file: Path,
+    checkpoint_file: Path | None,
+    output: Path,
+    overwrite: bool,
+    remote_path: str,
+):
+    """Run a query on a dsgrid dataset."""
+    query = DatasetQueryModel.from_file(query_definition_file)
+    _run_dataset_query(
+        ctx,
+        query,
+        checkpoint_file,
+        remote_path,
+        output,
+        overwrite,
+    )
+
+
+def _run_dataset_query(
+    ctx: click.Context,
+    query: DatasetQueryModel,
+    checkpoint_file: Path | None,
+    remote_path,
+    output: Path,
+    overwrite: bool,
+) -> None:
+    conn = DatabaseConnection(
+        url=get_value_from_context(ctx, "url"),
+    )
+    scratch_dir = get_value_from_context(ctx, "scratch_dir")
+    registry_manager = RegistryManager.load(
+        conn,
+        remote_path=remote_path,
+        offline_mode=get_value_from_context(ctx, "offline"),
+    )
+    fs_interface = make_filesystem_interface(output)
+    submitter = DatasetQuerySubmitter(fs_interface.path(output))
+    res = handle_dsgrid_exception(
+        ctx,
+        submitter.submit,
+        query,
+        registry_manager,
+        scratch_dir,
+        overwrite=overwrite,
+    )
+    if res[1] != 0:
+        ctx.exit(res[1])
+
+
 @click.command("create_dataset")
 @click.argument("query_definition_file", type=click.Path(exists=True))
 @add_options(_COMMON_RUN_OPTIONS)
@@ -560,16 +687,24 @@ def project():
 
 
 @click.group()
+def dataset():
+    """Dataset group commands"""
+
+
+@click.group()
 def composite_dataset():
     """Composite dataset group commands"""
 
 
 query.add_command(composite_dataset)
 query.add_command(project)
+query.add_command(dataset)
 project.add_command(create_project_query)
 project.add_command(validate_project_query)
 project.add_command(run_project_query)
 project.add_command(create_derived_dataset_config)
 project.add_command(map_dataset)
+dataset.add_command(create_dataset_query)
+dataset.add_command(run_dataset_query)
 composite_dataset.add_command(create_composite_dataset)
 composite_dataset.add_command(query_composite_dataset)

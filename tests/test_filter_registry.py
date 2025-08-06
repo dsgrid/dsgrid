@@ -1,4 +1,7 @@
 import shutil
+from pathlib import Path
+
+import pytest
 
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
@@ -38,9 +41,19 @@ FILTER_CONFIG = {
 
 
 def test_filter_registry(cached_registry, tmp_path):
+    src_conn = cached_registry
+    run_filter_registry_test(src_conn, tmp_path)
+
+
+@pytest.mark.skip(reason="FilterRegistryManager does not support the DuckDB store yet.")
+def test_filter_registry2(registry_with_duckdb_store, tmp_path):
+    src_conn = registry_with_duckdb_store
+    run_filter_registry_test(src_conn, tmp_path)
+
+
+def run_filter_registry_test(src_conn: DatabaseConnection, tmp_path: Path) -> None:
     simple_model = RegistrySimpleModel(**FILTER_CONFIG)
     dst_data_path = tmp_path / "test-dsgrid-registry"
-    src_conn = cached_registry
     dst_conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/registry.db")
 
     try:

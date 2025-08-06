@@ -6,6 +6,7 @@ from typing import Optional
 from pathlib import Path
 from uuid import uuid4
 
+import networkx as nx
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
@@ -15,6 +16,7 @@ from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
 from dsgrid.exceptions import (
     DSGInvalidDimensionMapping,
     DSGValueNotRegistered,
+    DSGInvalidParameter,
 )
 from dsgrid.spark.types import F
 from dsgrid.registry.registry_interface import DimensionMappingRegistryInterface
@@ -260,6 +262,64 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         self._mappings[key] = config
         return config
 
+    def build_graph(self, conn: Connection | None = None) -> nx.Graph:
+        """Build a graph of dimension mappings"""
+        if conn is None:
+            with self.db.engine.connect() as conn:
+                return self._build_graph(conn)
+        else:
+            return self._build_graph(conn)
+
+    def _build_graph(self, conn: Connection) -> nx.Graph:
+        graph = nx.Graph()
+        for model in self.db.iter_models(conn):
+            graph.add_edge(model.from_dimension.dimension_id, model.to_dimension.dimension_id)
+        return graph
+
+    def list_mappings_between_dimensions(
+        self, graph: nx.Graph, from_dimension_id: str, to_dimension_id: str
+    ) -> list[DimensionMappingReferenceModel]:
+        """List all mappings between two dimensions"""
+        if not nx.has_path(graph, from_dimension_id, to_dimension_id):
+            msg = f"There is no path between {from_dimension_id=} and {to_dimension_id=}"
+            raise DSGInvalidDimensionMapping(msg)
+        path = nx.shortest_path(graph, from_dimension_id, to_dimension_id)
+        assert len(path) >= 2
+        return [
+            self.get_mapping_with_dimension_ids(path[i - 1], path[i]) for i in range(1, len(path))
+        ]
+
+    def get_mapping_with_dimension_ids(
+        self, from_dimension_id: str, to_dimension_id: str, conn: Connection | None = None
+    ) -> DimensionMappingReferenceModel:
+        """Return a dimension mapping with the specified from and to dimension IDs.
+        Only looks at the latest versions of the mappings.
+        """
+        valid_mappings: list[DimensionMappingReferenceModel] = []
+        for mapping in self.db.iter_models(conn):
+            if (
+                mapping.from_dimension.dimension_id == from_dimension_id
+                and mapping.to_dimension.dimension_id == to_dimension_id
+            ):
+                valid_mappings.append(
+                    DimensionMappingReferenceModel(
+                        from_dimension_type=mapping.from_dimension.dimension_type,
+                        to_dimension_type=mapping.to_dimension.dimension_type,
+                        mapping_id=mapping.mapping_id,
+                        version=mapping.version,
+                    )
+                )
+        if not valid_mappings:
+            msg = f"No dimension mapping found with {from_dimension_id=} and {to_dimension_id=}"
+            raise DSGInvalidParameter(msg)
+        if len(valid_mappings) > 1:
+            msg = (
+                f"Multiple dimension mappings found with {from_dimension_id=} and "
+                f"{to_dimension_id=} {valid_mappings=}"
+            )
+            raise DSGInvalidParameter(msg)
+        return valid_mappings[0]
+
     def load_dimension_mappings(
         self,
         dimension_mapping_references: list[DimensionMappingReferenceModel],
@@ -446,6 +506,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         all_field_names = (
             "Type [From, To]",
             "ID",
+            "From ID",
+            "To ID",
             "Version",
             "Date",
             "Submitter",
@@ -458,7 +520,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         if max_width is None:
             table._max_width = {
-                "ID": 34,
+                "ID": 40,
+                "From ID": 40,
+                "To ID": 40,
                 "Date": 10,
                 "Description": 34,
             }
@@ -478,6 +542,8 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             all_fields = (
                 f"[{from_dim}, {to_dim}]",
                 model.mapping_id,
+                model.from_dimension.dimension_id,
+                model.to_dimension.dimension_id,
                 model.version,
                 registration.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
                 registration.submitter,

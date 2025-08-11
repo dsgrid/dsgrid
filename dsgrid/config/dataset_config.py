@@ -85,7 +85,8 @@ def check_load_data_filename(path: str | Path) -> Path:
             return filename
 
     # Use ValueError because this gets called in Pydantic model validation.
-    raise ValueError(f"no load_data file exists in {path_}")
+    msg = f"no load_data file exists in {path_}"
+    raise ValueError(msg)
 
 
 def check_load_data_lookup_filename(path: str | Path) -> Path:
@@ -116,7 +117,8 @@ def check_load_data_lookup_filename(path: str | Path) -> Path:
             return filename
 
     # Use ValueError because this gets called in Pydantic model validation.
-    raise ValueError(f"no load_data_lookup file exists in {path_}")
+    msg = f"no load_data_lookup file exists in {path_}"
+    raise ValueError(msg)
 
 
 class InputDatasetType(DSGEnum):

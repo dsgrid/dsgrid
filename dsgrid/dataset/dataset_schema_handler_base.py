@@ -391,22 +391,25 @@ class DatasetSchemaHandlerBase(abc.ABC):
         counts = load_data_df.groupBy(*time_cols).count().select("count")
         distinct_counts = counts.select("count").distinct().collect()
         if len(distinct_counts) != 1:
-            raise DSGInvalidDataset(
+            msg = (
                 "All time arrays must be repeated the same number of times: "
                 f"unique timestamp repeats = {len(distinct_counts)}"
             )
+            raise DSGInvalidDataset(msg)
         ta_counts = load_data_df.groupBy(*unique_array_cols).count().select("count")
         distinct_ta_counts = ta_counts.select("count").distinct().collect()
         if len(distinct_ta_counts) != 1:
-            raise DSGInvalidDataset(
+            msg = (
                 "All combinations of non-time dimensions must have the same time array length: "
                 f"unique time array lengths = {len(distinct_ta_counts)}"
             )
+            raise DSGInvalidDataset(msg)
 
     def _check_load_data_unpivoted_value_column(self, df):
         logger.info("Check load data unpivoted columns.")
         if VALUE_COLUMN not in df.columns:
-            raise DSGInvalidDataset(f"value_column={VALUE_COLUMN} is not in columns={df.columns}")
+            msg = f"value_column={VALUE_COLUMN} is not in columns={df.columns}"
+            raise DSGInvalidDataset(msg)
 
     def _convert_units(
         self,

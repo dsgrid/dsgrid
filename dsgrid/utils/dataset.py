@@ -227,11 +227,12 @@ def check_null_value_in_dimension_rows(dim_table, exclude_columns=None):
             exclude.update(exclude_columns)
         check_for_nulls(dim_table, exclude_columns=exclude)
     except DSGInvalidField as exc:
-        raise DSGInvalidDimensionMapping(
+        msg = (
             "Invalid dimension mapping application. "
             "Combination of remapped dataset dimensions contain NULL value(s) for "
             f"dimension(s): \n{str(exc)}"
         )
+        raise DSGInvalidDimensionMapping(msg)
 
 
 def handle_dimension_association_errors(
@@ -256,10 +257,11 @@ def handle_dimension_association_errors(
         out_file,
     )
     _look_for_error_contributors(df, dataset_table)
-    raise DSGInvalidDataset(
+    msg = (
         f"Dataset {dataset_id} is missing required dimension records. "
         "Please look in the log file for more information."
     )
+    raise DSGInvalidDataset(msg)
 
 
 def _look_for_error_contributors(diff: DataFrame, dataset_table: DataFrame) -> None:

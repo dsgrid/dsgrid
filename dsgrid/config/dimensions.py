@@ -680,7 +680,8 @@ def handle_dimension_union(values):
                 values[i] = NoOpTimeDimensionModel(**value)
             else:
                 options = [x.value for x in TimeDimensionType]
-                raise ValueError(f"{value['time_type']} not supported, valid options: {options}")
+                msg = f"{value['time_type']} not supported, valid options: {options}"
+                raise ValueError(msg)
         else:
             values[i] = DimensionModel(**value)
     return values

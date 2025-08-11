@@ -296,16 +296,18 @@ def _make_new_supplemental_dimension(orig_dim_config, unique_data_records, path:
     if not unique_data_records.issubset(project_record_ids):
         diff = project_record_ids.difference(unique_data_records)
         if diff:
-            raise DSGInvalidDataset(
+            msg = (
                 f"The derived dataset records do not include some project base dimension "
                 f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff=}"
             )
+            raise DSGInvalidDataset(msg)
         assert unique_data_records.issuperset(project_record_ids)
         diff = unique_data_records.difference(project_record_ids)
-        raise DSGInvalidDataset(
+        msg = (
             f"The derived dataset records is a superset of the project base dimension "
             f"records. Dimension type = {orig_dim_config.model.dimension_type} {diff=}"
         )
+        raise DSGInvalidDataset(msg)
 
     new_dim_path = path / orig_dim_config.model.dimension_type.value
     new_dim_path.mkdir(parents=True)
@@ -354,7 +356,8 @@ def _get_unique_data_records(df, dim_model: DimensionModel, column_type: ColumnT
         case ColumnType.DIMENSION_TYPES:
             column = dim_model.dimension_type.value
         case _:
-            raise NotImplementedError(f"BUG: unhandled: {column_type=}")
+            msg = f"BUG: unhandled: {column_type=}"
+            raise NotImplementedError(msg)
 
     return get_unique_values(df, column)
 

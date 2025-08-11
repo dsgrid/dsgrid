@@ -296,15 +296,15 @@ class RegistryManager:
             If no_prompts is False, the user will be prompted to continue sync pulling the registry if lock files exist. By default, True.
         """
         if not project_id and not dataset_id:
-            raise ValueError("Must provide a dataset_id or project_id for dsgrid data-sync.")
+            msg = "Must provide a dataset_id or project_id for dsgrid data-sync."
+            raise ValueError(msg)
 
         if project_id:
             config = self.project_manager.get_by_id(project_id)
             if dataset_id:
                 if dataset_id not in config.list_registered_dataset_ids():
-                    raise DSGValueNotRegistered(
-                        f"No registered dataset ID = '{dataset_id}' registered to project ID = '{project_id}'"
-                    )
+                    msg = f"No registered dataset ID = '{dataset_id}' registered to project ID = '{project_id}'"
+                    raise DSGValueNotRegistered(msg)
                 datasets = [(dataset_id, str(config.get_dataset(dataset_id).version))]
             else:
                 datasets = []
@@ -313,7 +313,8 @@ class RegistryManager:
 
         if dataset_id and not project_id:
             if not self.dataset_manager.has_id(dataset_id):
-                raise DSGValueNotRegistered(f"No registered dataset ID = '{dataset_id}'")
+                msg = f"No registered dataset ID = '{dataset_id}'"
+                raise DSGValueNotRegistered(msg)
             version = self.dataset_manager.get_latest_version(dataset_id)
             datasets = [(dataset_id, version)]
 
@@ -325,7 +326,8 @@ class RegistryManager:
         offline_mode = self._params.offline
 
         if offline_mode:
-            raise ValueError("dsgrid data-sync only works in online mode.")
+            msg = "dsgrid data-sync only works in online mode."
+            raise ValueError(msg)
         sync = True
 
         lock_files = list(
@@ -416,14 +418,16 @@ class RegistryManager:
         # TODO: This does not support the duckdb data store. Need to implement this copy operation
         # in the DataStoreInterface.
         if not {x.name for x in src_data_path.iterdir()}.issuperset({"data"}):
-            raise DSGInvalidParameter(f"{src_data_path} is not a valid registry")
+            msg = f"{src_data_path} is not a valid registry"
+            raise DSGInvalidParameter(msg)
 
         if mode in ("copy", "data-symlinks"):
             if dst_data_path.exists():
                 if force:
                     shutil.rmtree(dst_data_path)
                 else:
-                    raise DSGInvalidParameter(f"{dst_data_path} already exists.")
+                    msg = f"{dst_data_path} already exists."
+                    raise DSGInvalidParameter(msg)
         RegistryDatabase.copy(src, dst, dst_data_path)
         if mode == "rsync":
             cmd = f"rsync -a {src_data_path}/ {dst_data_path}"
@@ -438,17 +442,19 @@ class RegistryManager:
                     dst_path = dst_data_path / "data" / path.name
                     shutil.copytree(path, dst_path, symlinks=True)
         else:
-            raise DSGInvalidParameter(f"mode={mode} is not supported")
+            msg = f"mode={mode} is not supported"
+            raise DSGInvalidParameter(msg)
 
     @staticmethod
     def _check_environment_variables(params):
         if not params.offline:
             illegal_vars = [x for x in os.environ if x.startswith("__DSGRID_SKIP_CHECK")]
             if illegal_vars:
-                raise Exception(
+                msg = (
                     f"Internal environment variables to skip checks are not allowed to be set "
                     f"in online mode: {illegal_vars}"
                 )
+                raise Exception(msg)
 
 
 def _make_data_symlinks(src, dst):
@@ -483,12 +489,13 @@ def get_registry_path(registry_path=None):
             LOCAL_REGISTRY  # TEMPORARY: Replace with S3_REGISTRY when that is supported
         )
     if not os.path.exists(registry_path):
-        raise ValueError(
+        msg = (
             f"Registry path {registry_path} does not exist. To create the registry, "
             "run the following command:\n"
             "  dsgrid registry create $DSGRID_REGISTRY_PATH\n"
             "Then register dimensions, dimension mappings, projects, and datasets."
         )
+        raise ValueError(msg)
     return registry_path
 
 

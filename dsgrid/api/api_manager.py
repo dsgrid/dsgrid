@@ -43,7 +43,8 @@ class ApiManager:
             num_outstanding = len(self._store.data.outstanding_async_tasks)
             # TODO: implement queueing so that we don't return an error
             if num_outstanding > self._max_concurrent_async_tasks:
-                raise Exception(f"Too many async tasks are already running: {num_outstanding}")
+                msg = f"Too many async tasks are already running: {num_outstanding}"
+                raise Exception(msg)
             async_task_id = self._get_next_async_task_id()
             task = AsyncTaskModel(
                 async_task_id=async_task_id,
@@ -116,7 +117,8 @@ class ApiManager:
             if async_task_ids is not None:
                 diff = set(async_task_ids).difference(self._store.data.async_tasks.keys())
                 if diff:
-                    raise DSGValueNotStored(f"async_task_ids={diff} are not stored")
+                    msg = f"async_task_ids={diff} are not stored"
+                    raise DSGValueNotStored(msg)
             tasks = (
                 self._store.data.async_tasks.keys() if async_task_ids is None else async_task_ids
             )
@@ -156,7 +158,6 @@ class ApiManager:
 
 
 class Store:
-
     STORE_FILENAME = "api_server_store.json"
 
     def __init__(self, store_file: Path, data: StoreModel):

@@ -22,7 +22,8 @@ def check_run_command(*args, **kwargs):
     """
     ret = run_command(*args, **kwargs)
     if ret != 0:
-        raise DSGRuntimeError(f"command returned error code: {ret}")
+        msg = f"command returned error code: {ret}"
+        raise DSGRuntimeError(msg)
 
 
 def run_command(cmd: str, output=None, cwd=None):

@@ -34,18 +34,18 @@ logger = logging.getLogger(__name__)
 def check_config_id_loose(config_id, tag):
     # Raises ValueError because this is used in Pydantic models.
     if not REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE.search(config_id):
-        raise ValueError(
-            f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, underscores, and dashes."
-        )
+        msg = f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, underscores, and dashes."
+        raise ValueError(msg)
 
 
 def check_config_id_strict(config_id, tag):
     # Raises ValueError because this is used in Pydantic models.
     if not REGEX_VALID_REGISTRY_CONFIG_ID_STRICT.search(config_id):
-        raise ValueError(
+        msg = (
             f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, and underscores. "
             "Cannot start with a number."
         )
+        raise ValueError(msg)
 
 
 class DatabaseConnection(DSGBaseModel):

@@ -143,9 +143,8 @@ def shift_time_interval(
         new_time_column = time_column
 
     if TimeIntervalType.INSTANTANEOUS in (from_time_interval, to_time_interval):
-        raise NotImplementedError(
-            "aligning time intervals with instantaneous is not yet supported"
-        )
+        msg = "aligning time intervals with instantaneous is not yet supported"
+        raise NotImplementedError(msg)
 
     match (from_time_interval, to_time_interval):
         case (TimeIntervalType.PERIOD_BEGINNING, TimeIntervalType.PERIOD_ENDING):
@@ -220,7 +219,8 @@ def check_tempo_load_sum(project_time_dim, tempo, raw_data, converted_data):
             elif col == "month":
                 model_time_tz[col] = model_time_tz["local_time"].dt.month
             else:
-                raise ValueError(f"{col} does not have a function specified in test.")
+                msg = f"{col} does not have a function specified in test."
+                raise ValueError(msg)
         model_time_df.append(model_time_tz)
 
     model_time_df = pd.concat(model_time_df, axis=0).reset_index(drop=True)

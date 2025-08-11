@@ -1,5 +1,5 @@
-"""Example script to programmatically generate dimenions.json5
-"""
+"""Example script to programmatically generate dimenions.json5"""
+
 import os
 
 from dsgrid.config.dimension_config import DimensionModel

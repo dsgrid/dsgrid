@@ -58,7 +58,6 @@ class RepresentativePeriodTimeDimensionConfig(TimeDimensionBaseConfig):
         if isinstance(self._format_handler, OneWeekPerMonthByHourHandler) or isinstance(
             self._format_handler, OneWeekdayDayAndWeekendDayPerMonthByHourHandler
         ):
-
             return chronify.RepresentativePeriodTimeTZ(
                 measurement_type=self._model.measurement_type,
                 interval_type=self._model.time_interval_type,

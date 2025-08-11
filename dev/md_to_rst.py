@@ -13,7 +13,8 @@ def convert_files(file_registry):
     base_path = os.path.dirname(file_registry)
 
     if not os.path.exists(file_registry):
-        raise ValueError("File registry {} not found".format(file_registry))
+        msg = "File registry {} not found".format(file_registry)
+        raise ValueError(msg)
 
     # loop through registry of md files
     with open(file_registry, "r") as registry:
@@ -23,7 +24,8 @@ def convert_files(file_registry):
                 p = os.path.join(base_path, line.strip())
                 p_md = p + ".md"
                 if not os.path.exists(p_md):
-                    raise ValueError("There is no {} file.".format(p_md))
+                    msg = "There is no {} file.".format(p_md)
+                    raise ValueError(msg)
                 # run pandoc
                 p_rst = p + ".rst"
                 try:

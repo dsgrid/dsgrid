@@ -18,10 +18,11 @@ class DatasetExpressionHandler:
         orig_self_count = self.df.count()
         orig_other_count = other.df.count()
         if orig_self_count != orig_other_count:
-            raise DSGInvalidOperation(
+            msg = (
                 f"{op=} requires that the datasets have the same length "
                 f"{orig_self_count=} {orig_other_count=}"
             )
+            raise DSGInvalidOperation(msg)
 
         def renamed(col):
             return col + "_other"
@@ -38,10 +39,11 @@ class DatasetExpressionHandler:
         df = df.select(*self.df.columns)
         joined_count = df.count()
         if joined_count != orig_self_count:
-            raise DSGInvalidOperation(
+            msg = (
                 f"join for operation {op=} has a different row count than the original. "
                 f"{orig_self_count=} {joined_count=}"
             )
+            raise DSGInvalidOperation(msg)
 
         return DatasetExpressionHandler(df, self.dimension_columns, self.value_columns)
 
@@ -56,10 +58,11 @@ class DatasetExpressionHandler:
 
     def __or__(self, other):
         if self.df.columns != other.df.columns:
-            raise DSGInvalidOperation(
+            msg = (
                 "Union is only allowed when datasets have identical columns: "
                 f"{self.df.columns=} vs {other.df.columns=}"
             )
+            raise DSGInvalidOperation(msg)
         return DatasetExpressionHandler(
             self.df.union(other.df), self.dimension_columns, self.value_columns
         )

@@ -123,10 +123,11 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             diff = actual_from_records.difference(allowed_from_records)
             if diff:
                 dim_id = from_dimension.model.dimension_id
-                raise DSGInvalidDimensionMapping(
+                msg = (
                     f"Dimension mapping={mapping.filename} has invalid 'from_id' records: {diff}, "
                     f"they are missing from dimension_id={dim_id}"
                 )
+                raise DSGInvalidDimensionMapping(msg)
 
             # Note: this code cannot complete verify 'to' records. A dataset may be registering a
             # mapping to a project's dimension for a specific data source, but that information
@@ -141,10 +142,11 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             diff = actual_to_records.difference(allowed_to_records)
             if diff:
                 dim_id = from_dimension.model.dimension_id
-                raise DSGInvalidDimensionMapping(
+                msg = (
                     f"Dimension mapping={mapping.filename} has invalid 'to_id' records: {diff}, "
                     f"they are missing from dimension_id={dim_id}"
                 )
+                raise DSGInvalidDimensionMapping(msg)
 
     def validate_records(self, config: DimensionMappingsConfig):
         """Validate dimension mapping records.
@@ -195,11 +197,12 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             if mapping.mapping_type.value == "duplication":
                 fractions = {x.from_fraction for x in mapping.records}
                 if not (len(fractions) == 1 and 1 in fractions):
-                    raise DSGInvalidDimensionMapping(
+                    msg = (
                         f"dimension_mapping={mapping.filename} has mapping_type={mapping.mapping_type.value}, "
                         f"which does not allow non-one from_fractions. "
                         "\nConsider removing from_fraction column or using mapping_type: 'one_to_many_explicit_multipliers'. "
                     )
+                    raise DSGInvalidDimensionMapping(msg)
 
     @staticmethod
     def _check_for_duplicates_in_list(
@@ -208,10 +211,11 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         """Check list for duplicates"""
         dups = [x for x, n in Counter(lst).items() if n > 1]
         if len(dups) > 0 and not allow_dup:
-            raise DSGInvalidDimensionMapping(
+            msg = (
                 f"dimension_mapping={mapping_name} has mapping_type={mapping_type}, "
                 f"which does not allow duplicated {id_type} records. \nDuplicated {id_type}={dups}. "
             )
+            raise DSGInvalidDimensionMapping(msg)
 
     @staticmethod
     def _check_fraction_sum(
@@ -229,20 +233,22 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             id_greater_than_one = {
                 x[group_by] for x in fracs_greater_than_one[[group_by]].distinct().collect()
             }
-            raise DSGInvalidDimensionMapping(
+            msg = (
                 f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a "
                 f"tolerance of {tolerance}, which does not allow from_fraction sum <> 1. "
                 f"Mapping contains from_fraction sum greater than 1 for {group_by}={id_greater_than_one}. "
             )
+            raise DSGInvalidDimensionMapping(msg)
         elif fracs_less_than_one.count() > 0:
             id_less_than_one = {
                 x[group_by] for x in fracs_less_than_one[[group_by]].distinct().collect()
             }
-            raise DSGInvalidDimensionMapping(
+            msg = (
                 f"dimension_mapping={mapping_name} has mapping_type={mapping_type} and a"
                 f" tolerance of {tolerance}, which does not allow from_fraction sum <> 1. "
                 f"Mapping contains from_fraction sum less than 1 for {group_by}={id_less_than_one}. "
             )
+            raise DSGInvalidDimensionMapping(msg)
 
     def get_by_id(
         self, mapping_id, version=None, conn: Connection | None = None
@@ -399,9 +405,11 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             from_id = mapping.from_dimension.dimension_id
             to_id = mapping.to_dimension.dimension_id
             if not self.dimension_manager.has_id(from_id, conn=conn):
-                raise DSGValueNotRegistered(f"from_dimension ID {from_id} is not registered")
+                msg = f"from_dimension ID {from_id} is not registered"
+                raise DSGValueNotRegistered(msg)
             if not self.dimension_manager.has_id(to_id, conn=conn):
-                raise DSGValueNotRegistered(f"to_dimension ID {to_id} is not registered")
+                msg = f"to_dimension ID {to_id} is not registered"
+                raise DSGValueNotRegistered(msg)
 
             if mapping.id is None:
                 assert mapping.mapping_id is None

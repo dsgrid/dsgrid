@@ -105,10 +105,11 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
         time_cols = self.get_load_data_time_columns()
         if len(time_cols) > 1:
-            raise NotImplementedError(
+            msg = (
                 "Handling of multiple time columns needs to be implemented in the child class: "
                 f"{type(self)}: {time_cols=}"
             )
+            raise NotImplementedError(msg)
 
         time_col = time_cols[0]
         if time_col not in df.columns:

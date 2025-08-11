@@ -1,5 +1,4 @@
-"""Copy example configs from the US Project Repo to use for docs.
-"""
+"""Copy example configs from the US Project Repo to use for docs."""
 
 from dsgrid.filesystem.local_filesystem import LocalFilesystem
 import os

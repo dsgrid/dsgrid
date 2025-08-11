@@ -28,8 +28,9 @@ def make_version(version):
 
     """
     try:
-        version = VersionInfo.parse(version)
+        return VersionInfo.parse(version)
     except Exception as exc:
-        raise ValueError(f"Failed to create VersionInfo: {exc}") from exc
+        msg = f"Failed to create VersionInfo: {exc}"
+        raise ValueError(msg) from exc
 
     return version

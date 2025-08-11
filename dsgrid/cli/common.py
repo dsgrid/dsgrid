@@ -49,7 +49,8 @@ def get_log_level_from_str(level):
         case "error":
             return logging.ERROR
         case _:
-            raise Exception(f"Unsupported level={level}")
+            msg = f"Unsupported level={level}"
+            raise Exception(msg)
 
 
 def get_value_from_context(ctx, field) -> Any:

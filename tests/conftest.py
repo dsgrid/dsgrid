@@ -39,8 +39,7 @@ from dsgrid.tests.make_us_data_registry import make_test_data_registry
 def pytest_sessionstart(session):
     if not os.listdir(TEST_PROJECT_PATH):
         print(
-            "The dsgrid-test-data submodule has not been initialized. "
-            "Please run these commands:"
+            "The dsgrid-test-data submodule has not been initialized. Please run these commands:"
         )
         print("git submodule init")
         print("git submodule update")

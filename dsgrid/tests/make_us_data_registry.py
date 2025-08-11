@@ -58,7 +58,8 @@ def make_test_data_registry(
         Type of store to use for the registry data.
     """
     if not include_projects and include_datasets:
-        raise Exception("If include_datasets is True then include_projects must also be True.")
+        msg = "If include_datasets is True then include_projects must also be True."
+        raise Exception(msg)
 
     if dataset_path is None:
         dataset_path = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY)

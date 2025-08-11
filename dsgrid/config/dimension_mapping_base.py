@@ -229,11 +229,12 @@ class DimensionMappingBaseModel(DSGBaseDatabaseModel):
         if archetype is None:
             archetype = assigned_archetype
         elif archetype != assigned_archetype:
-            raise DSGInvalidDimensionMapping(
+            msg = (
                 '"mapping_type" and "archetype" are both defined AND they DO NOT correspond to each other. '
                 "archetype can be removed from config so that it can be assigned automatically based on mapping_type. "
                 f"Otherwise, {mapping_type=} should have archetype={assigned_archetype} "
             )
+            raise DSGInvalidDimensionMapping(msg)
         return archetype
 
 

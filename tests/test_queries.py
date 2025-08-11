@@ -4,6 +4,7 @@ import logging
 import math
 import shutil
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -656,7 +657,9 @@ def run_query_test(test_query_cls, *args, expected_values=None):
             )
             assert query.validate(expected_values=expected_values)
             metadata_file = output_dir / query.name / "metadata.json"
-            subprocess.run(["python", "scripts/table_metadata.py", str(metadata_file)], check=True)
+            subprocess.run(
+                [sys.executable, "scripts/table_metadata.py", str(metadata_file)], check=True
+            )
     finally:
         if output_dir.exists():
             shutil.rmtree(output_dir)
@@ -1892,7 +1895,8 @@ def run_query(
     if dimension_name == QueryTestElectricityValues.NAME:
         query = QueryTestElectricityValues(True, registry_path, project, output_dir=output_dir)
     else:
-        raise Exception(f"no query for {dimension_name}")
+        msg = f"no query for {dimension_name}"
+        raise Exception(msg)
 
     ProjectQuerySubmitter(project, output_dir).submit(
         query.make_query(),

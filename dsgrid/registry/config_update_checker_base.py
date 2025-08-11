@@ -24,7 +24,8 @@ class ConfigUpdateCheckerBase(abc.ABC):
             if old != new:
                 extra = attrs.json_schema_extra
                 if extra and not extra.get("updateable", True):
-                    raise DSGInvalidOperation(f"{self._type}.{field} cannot be updated")
+                    msg = f"{self._type}.{field} cannot be updated"
+                    raise DSGInvalidOperation(msg)
                 self._changed_fields.add(field)
                 logger.info("%s %s changed from %s to %s.", self._type, field, old, new)
         # FUTURE: We could recurse into each dsgrid pydantic model and check each individual

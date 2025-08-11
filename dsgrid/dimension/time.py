@@ -1,4 +1,5 @@
 """Dimensions related to time"""
+
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import logging
@@ -247,7 +248,8 @@ class TimeZone(DSGEnum):
             return TimeZone.EST
         if self == TimeZone.ARIZONA:
             return TimeZone.ARIZONA
-        raise NotImplementedError(f"BUG: case not covered: {self}")
+        msg = f"BUG: case not covered: {self}"
+        raise NotImplementedError(msg)
 
     def get_prevailing_time(self):
         """get equivalent prevailing time"""
@@ -267,7 +269,8 @@ class TimeZone(DSGEnum):
             return TimeZone.EPT
         if self == TimeZone.ARIZONA:
             return TimeZone.ARIZONA
-        raise NotImplementedError(f"BUG: case not covered: {self}")
+        msg = f"BUG: case not covered: {self}"
+        raise NotImplementedError(msg)
 
     def is_standard(self):
         lst = [

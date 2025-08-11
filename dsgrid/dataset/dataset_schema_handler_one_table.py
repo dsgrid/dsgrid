@@ -116,18 +116,16 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             dim_records = dimension.get_unique_ids()
             data_records = get_unique_values(self._load_data, name)
             if None in data_records:
-                raise DSGInvalidDataset(
-                    f"{self._config.config_id} has a NULL value for {dimension_type}"
-                )
+                msg = f"{self._config.config_id} has a NULL value for {dimension_type}"
+                raise DSGInvalidDataset(msg)
             if dim_records != data_records:
                 logger.error(
                     "Mismatch in load_data records. dimension=%s mismatched=%s",
                     name,
                     data_records.symmetric_difference(dim_records),
                 )
-                raise DSGInvalidDataset(
-                    f"load_data records do not match dimension records for {name}"
-                )
+                msg = f"load_data records do not match dimension records for {name}"
+                raise DSGInvalidDataset(msg)
 
     def get_expected_missing_dimension_associations(
         self, missing_dimension_associations: DataFrame | None, context: ScratchDirContext

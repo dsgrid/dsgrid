@@ -23,7 +23,6 @@ class AsyncTaskType(enum.Enum):
 
 
 class ProjectQueryAsyncResultModel(DSGBaseModel):
-
     # metadata: DatasetMetadataModel  # TODO: not sure if we need this
     data_file: str
     archive_file: str
@@ -43,14 +42,12 @@ class AsyncTaskModel(DSGBaseModel):
 
 
 class StoreModel(DSGBaseModel):
-
     next_async_task_id: int = 1
     async_tasks: dict[int, AsyncTaskModel] = {}
     outstanding_async_tasks: set[int] = set()
 
 
 class SparkSubmitProjectQueryRequest(DSGBaseModel):
-
     use_spark_submit: bool = Field(
         default=True,
         description="If True, run the query command through spark-submit. If False, run the "

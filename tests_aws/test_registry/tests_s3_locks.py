@@ -23,7 +23,6 @@ def test_make_and_release_lock():
 
 
 def test_sync_push_fail_if_lock_exists():
-
     s3 = S3StorageInterface(
         local_path="",
         remote_path=TEST_REMOTE_REGISTRY,

@@ -116,5 +116,5 @@ if __name__ == "__main__":
     metadata = TableMetadata.from_file(filename)
     print(metadata)
     print("\nColumns by dimension type:")
-    for field in metadata.dimensions.model_fields:
+    for field in type(metadata.dimensions).model_fields:
         print(f"{field}: ", metadata.list_columns(field))

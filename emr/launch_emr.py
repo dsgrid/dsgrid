@@ -36,7 +36,6 @@ def build_package():
 
 
 def launchemr(dir_to_sync=None, name=None):
-
     if name is None:
         name = f"dsgrid-SparkEMR ({getpass.getuser()})"
 
@@ -207,7 +206,8 @@ def launchemr(dir_to_sync=None, name=None):
             break
         elif state in ["TERMINATED", "TERMINATED_WITH_ERRORS"]:
             print(f"EMR Cluster is {state}", message)
-            raise RuntimeError(f"EMR Cluster is {state}: {message}")
+            msg = f"EMR Cluster is {state}: {message}"
+            raise RuntimeError(msg)
         time.sleep(30)
 
     master_instance = emr.list_instances(ClusterId=job_flow_id, InstanceGroupTypes=["MASTER"])

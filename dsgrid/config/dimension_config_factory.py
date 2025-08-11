@@ -59,6 +59,7 @@ def load_dimension_config(filename):
         elif data["time_type"] == TimeDimensionType.INDEX.value:
             return IndexTimeDimensionConfig.load(filename)
         else:
-            raise ValueError(f"time_type={data['time_type']} not supported")
+            msg = f"time_type={data['time_type']} not supported"
+            raise ValueError(msg)
 
     return DimensionConfig.load(filename)

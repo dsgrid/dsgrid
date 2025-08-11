@@ -37,4 +37,5 @@ def make_dataset_schema_handler(
                 mapping_references=mapping_references,
             )
         case _:
-            raise NotImplementedError(f"{config.model.data_schema.data_schema_type=}")
+            msg = f"{config.model.data_schema.data_schema_type=}"
+            raise NotImplementedError(msg)

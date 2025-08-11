@@ -47,10 +47,11 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
     def check_dataset_time_consistency(self, load_data_df, time_columns) -> None:
         logger.info("Check AnnualTimeDimensionConfig dataset time consistency.")
         if len(time_columns) > 1:
-            raise ValueError(
+            msg = (
                 "AnnualTimeDimensionConfig expects only one column from "
                 f"get_load_data_time_columns, but has {time_columns}"
             )
+            raise ValueError(msg)
         time_col = time_columns[0]
         time_ranges = self.get_time_ranges()
         assert len(time_ranges) == 1, len(time_ranges)
@@ -70,9 +71,8 @@ class AnnualTimeDimensionConfig(TimeDimensionBaseConfig):
             mismatch = sorted(
                 set(expected_timestamps).symmetric_difference(set(actual_timestamps))
             )
-            raise DSGInvalidDataset(
-                f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
-            )
+            msg = f"load_data {time_col}s do not match expected times. mismatch={mismatch}"
+            raise DSGInvalidDataset(msg)
 
     def build_time_dataframe(self) -> DataFrame:
         time_col = self.get_load_data_time_columns()

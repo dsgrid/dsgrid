@@ -148,9 +148,8 @@ def _check_model_years(dataset, initial_value_df, growth_rate_df, model_year_col
     elif dataset.base_year in iv_years:
         base_year = dataset.base_year
     else:
-        raise DSGInvalidQuery(
-            f"ProjectionDatasetModel base_year={dataset.base_year} is not in {iv_years_sorted}"
-        )
+        msg = f"ProjectionDatasetModel base_year={dataset.base_year} is not in {iv_years_sorted}"
+        raise DSGInvalidQuery(msg)
 
     if len(iv_years) > 1:
         # TODO #198: needs test case

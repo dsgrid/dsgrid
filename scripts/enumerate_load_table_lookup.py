@@ -74,12 +74,11 @@ class EnumerateTable:
         logger.info(f"  # rows in df_lookup: {N_df_lookup}")
         logger.info(f"  # rows in df_lookup (fully enumerated): {N_df_lookup_full}")
         logger.info(
-            f"  # of rows without data: {N_df_lookup_null} ({(N_df_lookup_null/N_df_lookup_full*100):.02f}%)"
+            f"  # of rows without data: {N_df_lookup_null} ({(N_df_lookup_null / N_df_lookup_full * 100):.02f}%)"
         )
 
     @timed_info
     def assertion_checks(self, df_lookup_full, df_lookup, keys):
-
         # 1) set of (data) id is the same before and after enumeration
         df_lookup_ids = df_lookup.select("id").distinct().collect()[0]
         df_lookup_full_ids = df_lookup_full.select("id").distinct().collect()[0]

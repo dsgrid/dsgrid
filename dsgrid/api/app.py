@@ -52,13 +52,16 @@ from .response_models import (
 logger = setup_logging(__name__, "dsgrid_api.log")
 DSGRID_REGISTRY_DATABASE_URL = os.environ.get("DSGRID_REGISTRY_DATABASE_URL")
 if DSGRID_REGISTRY_DATABASE_URL is None:
-    raise Exception("The environment variable DSGRID_REGISTRY_DATABASE_URL must be set.")
+    msg = "The environment variable DSGRID_REGISTRY_DATABASE_URL must be set."
+    raise Exception(msg)
 if "DSGRID_QUERY_OUTPUT_DIR" not in os.environ:
-    raise Exception("The environment variable DSGRID_QUERY_OUTPUT_DIR must be set.")
+    msg = "The environment variable DSGRID_QUERY_OUTPUT_DIR must be set."
+    raise Exception(msg)
 QUERY_OUTPUT_DIR = os.environ["DSGRID_QUERY_OUTPUT_DIR"]
 API_SERVER_STORE_DIR = os.environ.get("DSGRID_API_SERVER_STORE_DIR")
 if API_SERVER_STORE_DIR is None:
-    raise Exception("The environment variable DSGRID_API_SERVER_STORE_DIR must be set.")
+    msg = "The environment variable DSGRID_API_SERVER_STORE_DIR must be set."
+    raise Exception(msg)
 
 offline_mode = True
 no_prompts = True
@@ -325,13 +328,12 @@ def get_async_task_data(async_task_id: int):
     """Return the data for a completed async task."""
     task = api_mgr.get_async_task_status(async_task_id)
     if task.status != AsyncTaskStatus.COMPLETE:
-        raise HTTPException(
-            422,
-            detail=f"Data can only be read for completed tasks: async_task_id={async_task_id} status={task.status}",
-        )
+        msg = f"Data can only be read for completed tasks: async_task_id={async_task_id} status={task.status}"
+        raise HTTPException(422, detail=msg)
     if task.task_type == AsyncTaskType.PROJECT_QUERY:
         if not task.result.data_file:
-            raise HTTPException(400, f"{task.result.data_file=} is invalid")
+            msg = f"{task.result.data_file=} is invalid"
+            raise HTTPException(400, msg)
         # TODO: Sending data this way has major limitations. We lose all the benefits of Parquet and
         # compression.
         # We should also check how much data we can read through the Spark driver.
@@ -341,7 +343,8 @@ def get_async_task_data(async_task_id: int):
             .to_json(orient="split", index=False)
         )
     else:
-        raise NotImplementedError(f"task type {task.task_type} is not implemented")
+        msg = f"task type {task.task_type} is not implemented"
+        raise NotImplementedError(msg)
 
     return Response(content=text, media_type="application/json")
 
@@ -351,10 +354,8 @@ def download_async_task_archive_file(async_task_id: int):
     """Download the archive file for a completed async task."""
     task = api_mgr.get_async_task_status(async_task_id)
     if task.status != AsyncTaskStatus.COMPLETE:
-        raise HTTPException(
-            422,
-            detail=f"Data can only be downloaded for completed tasks: async_task_id={async_task_id} status={task.status}",
-        )
+        msg = f"Data can only be downloaded for completed tasks: async_task_id={async_task_id} status={task.status}"
+        raise HTTPException(422, detail=msg)
     return FileResponse(task.result.archive_file)
 
 
@@ -411,7 +412,8 @@ def _find_exec(name):
         exec_path = Path(path) / name
         if exec_path.exists():
             return exec_path
-    raise Exception(f"Did not find {name}")
+    msg = f"Did not find {name}"
+    raise Exception(msg)
 
 
 def _list_enums(enum_type):

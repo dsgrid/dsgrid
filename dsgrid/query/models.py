@@ -71,7 +71,8 @@ class ColumnModel(DSGBaseModel):
 
         func = getattr(F, function_name, None)
         if func is None:
-            raise ValueError(f"function={function_name} is not defined in pyspark.sql.functions")
+            msg = f"function={function_name} is not defined in pyspark.sql.functions"
+            raise ValueError(msg)
         return func
 
     @field_validator("alias")
@@ -149,16 +150,19 @@ class AggregationModel(DSGBaseModel):
         if isinstance(aggregation_function, str):
             aggregation_function = getattr(F, aggregation_function, None)
             if aggregation_function is None:
-                raise ValueError(f"{aggregation_function} is not defined in pyspark.sql.functions")
+                msg = f"{aggregation_function} is not defined in pyspark.sql.functions"
+                raise ValueError(msg)
         elif aggregation_function is None:
-            raise ValueError("aggregation_function cannot be None")
+            msg = "aggregation_function cannot be None"
+            raise ValueError(msg)
         return aggregation_function
 
     @field_validator("dimensions")
     @classmethod
     def check_for_metric(cls, dimensions):
         if not dimensions.metric:
-            raise ValueError("An AggregationModel must include the metric dimension.")
+            msg = "An AggregationModel must include the metric dimension."
+            raise ValueError(msg)
         return dimensions
 
     @field_serializer("aggregation_function")

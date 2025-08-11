@@ -63,7 +63,8 @@ def convert_units_unpivoted(
     elif units.issubset(POWER_UNITS):
         func = power.from_any_to_any
     else:
-        raise ValueError(f"Unsupported unit conversion: {units}")
+        msg = f"Unsupported unit conversion: {units}"
+        raise ValueError(msg)
 
     return df.withColumn(VALUE_COLUMN, func("from_unit", "to_unit", VALUE_COLUMN)).drop(
         "from_unit", "to_unit"

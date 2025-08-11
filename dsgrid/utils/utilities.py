@@ -1,6 +1,7 @@
 """
 Helpful utility functions for dsgrid
 """
+
 import logging
 import inspect
 import json
@@ -47,19 +48,22 @@ def safe_json_load(fpath):
     """
 
     if not isinstance(fpath, str):
-        raise TypeError("Filepath must be str to load json: {}".format(fpath))
+        msg = "Filepath must be str to load json: {}".format(fpath)
+        raise TypeError(msg)
 
     if not fpath.endswith(".json"):
-        raise DSGJSONError("Filepath must end in .json to load json: {}".format(fpath))
+        msg = "Filepath must end in .json to load json: {}".format(fpath)
+        raise DSGJSONError(msg)
 
     if not os.path.isfile(fpath):
-        raise DSGJSONError("Could not find json file to load: {}".format(fpath))
+        msg = "Could not find json file to load: {}".format(fpath)
+        raise DSGJSONError(msg)
 
     try:
         with open(fpath, "r") as f:
             j = json.load(f)
     except json.decoder.JSONDecodeError as e:
-        emsg = "JSON Error:\n{}\nCannot read json file: " '"{}"'.format(e, fpath)
+        emsg = 'JSON Error:\n{}\nCannot read json file: "{}"'.format(e, fpath)
         raise DSGJSONError(emsg)
 
     return j
@@ -100,7 +104,8 @@ def check_uniqueness(iterable: Iterable, tag: str) -> set[str]:
     values = set()
     for item in iterable:
         if item in values:
-            raise ValueError(f"duplicate {tag}: {item}")
+            msg = f"duplicate {tag}: {item}"
+            raise ValueError(msg)
         values.add(item)
     return values
 
@@ -127,16 +132,19 @@ def convert_record_dicts_to_classes(iterable, cls, check_duplicates: None | list
     length = None
     for row in iterable:
         if None in row:
-            raise ValueError(f"row has a key that is None: {row=}")
+            msg = f"row has a key that is None: {row=}"
+            raise ValueError(msg)
         if length is None:
             length = len(row)
         elif len(row) != length:
-            raise ValueError(f"Rows have inconsistent length: first_row_length={length} {row=}")
+            msg = f"Rows have inconsistent length: first_row_length={length} {row=}"
+            raise ValueError(msg)
         record = cls(**row)
         for name in check_duplicates:
             val = getattr(record, name)
             if val in values[name]:
-                raise ValueError(f"{val} is listed multiple times")
+                msg = f"{val} is listed multiple times"
+                raise ValueError(msg)
             values[name].add(val)
         records.append(record)
 

@@ -109,10 +109,13 @@ class MappingTableModel(DimensionMappingBaseModel):
     def check_filename(cls, filename):
         """Validate record file"""
         if filename is not None:
-            if not os.path.isfile(filename):
-                raise ValueError(f"{filename} does not exist")
-            if not filename.endswith(".csv"):
-                raise ValueError(f"only CSV is supported: {filename}")
+            if filename:
+                if not os.path.isfile(filename):
+                    msg = f"{filename} does not exist"
+                    raise ValueError(msg)
+                if not filename.endswith(".csv"):
+                    msg = f"only CSV is supported: {filename}"
+                    raise ValueError(msg)
         return filename
 
     @field_validator("file_hash")

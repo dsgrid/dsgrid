@@ -30,24 +30,26 @@ def transform_and_validate_filters(filter_expressions):
                 op = opp
 
         if np.sum(check_ops) < 1:
-            raise DSGInvalidParameter(f"invalid operation detected, valid ops: {ACCEPTED_OPS}")
+            msg = f"invalid operation detected, valid ops: {ACCEPTED_OPS}"
+            raise DSGInvalidParameter(msg)
         elif np.sum(check_ops) > 2:
-            raise DSGInvalidParameter(
-                f"too many operations detected, choose one of the valid ops: {ACCEPTED_OPS}"
-            )
+            msg = f"too many operations detected, choose one of the valid ops: {ACCEPTED_OPS}"
+            raise DSGInvalidParameter(msg)
 
         fields = [x.strip() for x in expr_str.split(op) if x != ""]
 
         if len(fields) < 2:
-            raise DSGInvalidParameter(
+            msg = (
                 f"filter expression: '{expr_str}' contains too few arguments, must be in the format 'field operation value' "
                 "(ex: 'Submitter == username')"
             )
+            raise DSGInvalidParameter(msg)
         elif len(fields) > 2:
-            raise DSGInvalidParameter(
+            msg = (
                 f"filter expression: '{expr_str}' contains too many arguments, must be in the format 'field operation value', "
                 "(ex: 'Submitter == username')"
             )
+            raise DSGInvalidParameter(msg)
 
         field = fields[0]
         value = fields[1]
@@ -84,9 +86,8 @@ def matches_filters(row, field_to_index, transformed_filters):
     for tfilter in transformed_filters:
         [field, op, value] = tfilter
         if field not in field_to_index_lower:
-            raise DSGInvalidParameter(
-                f"field='{field}' is not a valid column name, valid fields: {list(field_to_index.keys())}"
-            )
+            msg = f"field='{field}' is not a valid column name, valid fields: {list(field_to_index.keys())}"
+            raise DSGInvalidParameter(msg)
         obj_val = row[field_to_index_lower[field]].lower()  # to accept case-insensitive comparison
         if not matches_filter(val=obj_val, op=op, required_value=value):
             return False

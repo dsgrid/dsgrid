@@ -249,7 +249,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             dimension_types.add(DimensionType.from_column(col))
 
         if not found_id:
-            raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
+            msg = "load_data_lookup does not include an 'id' column"
+            raise DSGInvalidDataset(msg)
 
         load_data_dimensions = set(self._list_dimension_types_in_load_data(self._load_data))
         expected_dimensions = {
@@ -259,10 +260,11 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         }
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
-            raise DSGInvalidDataset(
+            msg = (
                 f"load_data_lookup is missing dimensions: {missing_dimensions}. "
                 "If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
+            raise DSGInvalidDataset(msg)
 
         self._check_dimension_records_by_dimension_type(dimension_types)
 
@@ -276,18 +278,16 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             dim_records = dimension.get_unique_ids()
             lookup_records = get_unique_values(self._load_data_lookup, name)
             if None in lookup_records:
-                raise DSGInvalidDataset(
-                    f"{self._config.config_id} has a NULL value for {dimension_type}"
-                )
+                msg = f"{self._config.config_id} has a NULL value for {dimension_type}"
+                raise DSGInvalidDataset(msg)
             if dim_records != lookup_records:
                 logger.error(
                     "Mismatch in load_data_lookup records. dimension=%s mismatched=%s",
                     name,
                     lookup_records.symmetric_difference(dim_records),
                 )
-                raise DSGInvalidDataset(
-                    f"load_data_lookup records do not match dimension records for {name}"
-                )
+                msg = f"load_data_lookup records do not match dimension records for {name}"
+                raise DSGInvalidDataset(msg)
 
     @track_timing(timer_stats_collector)
     def _check_dataset_internal_consistency(self):
@@ -325,9 +325,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
         with Timer(timer_stats_collector, "check load_data for nulls"):
             if not is_dataframe_empty(self._load_data.select("id").filter("id IS NULL")):
-                raise DSGInvalidDataset(
-                    f"load_data for dataset {self._config.config_id} has a null ID"
-                )
+                msg = f"load_data for dataset {self._config.config_id} has a null ID"
+                raise DSGInvalidDataset(msg)
 
         ldl_id_count = ldl_ids.count()
         data_id_count = ld_ids.count()
@@ -349,9 +348,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     limit,
                     diff_list,
                 )
-            raise DSGInvalidDataset(
-                f"Data IDs for {self._config.config_id} data/lookup are inconsistent"
-            )
+            msg = f"Data IDs for {self._config.config_id} data/lookup are inconsistent"
+            raise DSGInvalidDataset(msg)
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):

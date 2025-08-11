@@ -116,5 +116,6 @@ def _get_metric_column_name(context: QueryContext, metric_query_name):
         case ColumnType.DIMENSION_NAMES:
             metric_column = metric_query_name
         case _:
-            raise NotImplementedError(f"Bug: unhandled: {context.model.result.column_type}")
+            msg = f"Bug: unhandled: {context.model.result.column_type}"
+            raise NotImplementedError(msg)
     return metric_column

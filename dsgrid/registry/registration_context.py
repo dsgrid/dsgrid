@@ -128,9 +128,8 @@ class RegistrationContext:
 
         diff = set(config_ids).intersection(manager_context.ids)
         if diff:
-            raise DSGInvalidParameter(
-                f"One or more config IDs are already tracked: {registry_type} {diff}"
-            )
+            msg = f"One or more config IDs are already tracked: {registry_type} {diff}"
+            raise DSGInvalidParameter(msg)
 
         logger.debug("Added registered IDs: %s %s", registry_type, config_ids)
         manager_context.ids += config_ids

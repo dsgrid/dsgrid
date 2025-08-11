@@ -33,7 +33,8 @@ def versioning(registry_type, id_handle, update):
 
     # TODO: remove when done. project path should be set somewhere else
     if not os.path.exists(registry_path):
-        raise ValueError(f"Path does not exist: {registry_path}")
+        msg = f"Path does not exist: {registry_path}"
+        raise ValueError(msg)
 
     # if config.update is False, then assume major=1, minor=0, patch=0
     if not update:
@@ -41,7 +42,7 @@ def versioning(registry_type, id_handle, update):
         registry_file = f"{registry_path}/{version}.json5"
         # Raise error if v1.0.0 registry exists for project_id
         if os.path.exists(registry_file):
-            raise ValueError(
+            msg = (
                 f'{registry_type} registry for "{registry_file}" already '
                 f"exists. If you want to update the project registration"
                 f" with a new {registry_type} version, then you will need to"
@@ -50,6 +51,7 @@ def versioning(registry_type, id_handle, update):
                 "will need to specify a new version handle in the "
                 f"{registry_type} config."
             )
+            raise ValueError(msg)
     # if update is true...
     else:
         # list existing project registries
@@ -59,12 +61,13 @@ def versioning(registry_type, id_handle, update):
                 existing_versions.append(int(f.split("-v")[1].split(".")[0]))
         # check for existing project registries
         if len(existing_versions) == 0:
-            raise ValueError(
+            msg = (
                 "Registration.update=True, however, no updates can be made "
                 f"because there are no existing registries for {registry_type}"
                 f" ID = {id_handle}. Check project_id or set "
                 f"Registration.update=True in the {registry_type} Config."
             )
+            raise ValueError(msg)
         # find the latest registry version
         # NOTE: this is currently based on major verison only
         last_vmajor_nbr = sorted(existing_versions)[-1]

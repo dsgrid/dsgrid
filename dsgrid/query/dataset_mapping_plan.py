@@ -39,8 +39,7 @@ class MapOperation(DSGBaseModel):
     )
     mapping_reference: DimensionMappingReferenceModel | None = Field(
         default=None,
-        description="Reference to the model used to map the dimension. "
-        "Set at runtime by dsgrid.",
+        description="Reference to the model used to map the dimension. Set at runtime by dsgrid.",
     )
 
 

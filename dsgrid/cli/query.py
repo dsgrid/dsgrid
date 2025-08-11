@@ -229,7 +229,8 @@ def create_project_query(
                     dimension_names=["commercial_subsectors", "residential_subsectors"],
                 )
             case _:
-                raise NotImplementedError(f"Bug: {filter_type}")
+                msg = f"Bug: {filter_type}"
+                raise NotImplementedError(msg)
         query.project.dataset.params.dimension_filters.append(flt)
 
     if default_result_aggregation:

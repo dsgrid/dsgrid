@@ -7,20 +7,19 @@ from typing import Any, Iterable
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-import pandas as pd
+import duckdb
 
 import dsgrid
-from dsgrid.exceptions import DSGInvalidDimension
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
 from dsgrid.loggers import disable_console_logging
 from dsgrid.spark.types import (
     DataFrame,
     F,
     SparkConf,
     SparkSession,
-    TimestampType,
     use_duckdb,
 )
-from dsgrid.utils.files import load_line_delimited_json, dump_data
+from dsgrid.utils.files import load_json_file, load_line_delimited_json, dump_data
 
 logger = logging.getLogger(__name__)
 
@@ -261,6 +260,58 @@ def set_current_time_zone(time_zone: str) -> None:
     spark.conf.set("spark.sql.session.timeZone", time_zone)
 
 
+DUCKDB_COLUMN_TYPES = {
+    "BOOLEAN": "BOOLEAN",
+    "INT": "INTEGER",
+    "INTEGER": "INTEGER",
+    "TINYINT": "TINYINT",
+    "SMALLINT": "INTEGER",
+    "BIGINT": "BIGINT",
+    "FLOAT": "FLOAT",
+    "DOUBLE": "DOUBLE",
+    "TIMESTAMP_TZ": "TIMESTAMP WITH TIME ZONE",
+    "TIMESTAMP_NTZ": "TIMESTAMP",
+    "STRING": "VARCHAR",
+    "TEXT": "VARCHAR",
+    "VARCHAR": "VARCHAR",
+}
+
+SPARK_COLUMN_TYPES = {
+    "BOOLEAN": "BOOLEAN",
+    "INT": "INT",
+    "INTEGER": "INT",
+    "TINYINT": "TINYINT",
+    "SMALLINT": "SMALLINT",
+    "BIGINT": "BIGINT",
+    "FLOAT": "FLOAT",
+    "DOUBLE": "DOUBLE",
+    "STRING": "STRING",
+    "TEXT": "STRING",
+    "VARCHAR": "STRING",
+    "TIMESTAMP_TZ": "TIMESTAMP",
+    "TIMESTAMP_NTZ": "TIMESTAMP_NTZ",
+}
+
+assert sorted(DUCKDB_COLUMN_TYPES.keys()) == sorted(SPARK_COLUMN_TYPES.keys())
+
+
+def decode_schema(filename: Path) -> dict[str, str]:
+    """Decode the schema in filename for application when reading a CSV file.
+    The returned values will be valid for the current backend.
+    """
+    data = load_json_file(filename)
+    mapping = DUCKDB_COLUMN_TYPES if use_duckdb() else SPARK_COLUMN_TYPES
+    schema: dict[str, str] = {}
+    for key, val in data.items():
+        col_type = val.upper()
+        if col_type not in mapping:
+            options = " ".join(sorted(mapping.keys()))
+            msg = f"column type = {val} is not supported. {options=}"
+            raise DSGInvalidField(msg)
+        schema[key] = mapping[col_type]
+    return schema
+
+
 def init_spark(name="dsgrid", check_env=True, spark_conf=None) -> SparkSession:
     """Initialize a SparkSession.
 
@@ -398,28 +449,66 @@ def prepare_timestamps_for_dataframe(timestamps: Iterable[datetime]) -> Iterable
     return timestamps
 
 
-def read_csv(path: Path | str, cast_timestamp: bool = True) -> DataFrame:
+def read_csv(path: Path | str, require_schema: bool = True) -> DataFrame:
     """Return a DataFrame from a CSV file, handling special cases with duckdb."""
+    df, schema = _read_csv(path, require_schema=require_schema)
+    if schema is not None:
+        if set(df.columns).symmetric_difference(schema.keys()):
+            msg = (
+                f"Mismatch in CSV schema ({sorted(schema.keys())}) "
+                f"vs DataFrame columns ({df.columns})"
+            )
+            raise DSGInvalidDataset(msg)
+    return df
+
+
+def _read_csv(
+    path: Path | str, require_schema: bool = True
+) -> tuple[DataFrame, dict[str, str] | None]:
+    schema_file = _get_schema_file(path)
+    if schema_file is None and require_schema:
+        msg = f"A schema file is required for data files in CSV format: {path}"
+        raise DSGInvalidDataset(msg)
+
+    schema = None if schema_file is None else decode_schema(schema_file)
+    func = _read_csv_duckdb if use_duckdb() else _read_csv_spark
+    df = func(path, schema)
+    return df, schema
+
+
+def _read_csv_spark(path: Path | str, schema: dict[str, str] | None) -> DataFrame:
     spark = get_spark_session()
-    if use_duckdb():
-        path_ = path if isinstance(path, Path) else Path(path)
-        if path_.is_dir():
-            path_str = str(path_) + "**/*.csv"
-        else:
-            path_str = str(path_)
-        df = spark.createDataFrame(pd.read_csv(path_str))
-        if cast_timestamp and "timestamp" in df.columns:
-            if "PYTEST_VERSION" not in os.environ:
-                msg = f"cast_timestamp in read_csv can only be set in a test environment: {path=}"
-                raise Exception(msg)
-            # TODO: need a better way of guessing and setting the correct type.
-            df = df.withColumn("timestamp", F.col("timestamp").cast(TimestampType()))
-        dup_cols = [x for x in df.columns if x.endswith(".1")]
-        if dup_cols:
-            msg = f"Detected a duplicate column in the dataset: {dup_cols}"
-            raise DSGInvalidDimension(msg)
-        return df
-    return spark.read.csv(str(path), header=True, inferSchema=True)
+    if schema is None:
+        return spark.read.csv(str(path), header=True, inferSchema=True)
+
+    schema_str = ",".join([f"{key} {val}" for key, val in schema.items()])
+    return spark.read.csv(str(path), header=True, schema=schema_str)
+
+
+def _read_csv_duckdb(path: Path | str, schema: dict[str, str] | None) -> DataFrame:
+    path_ = path if isinstance(path, Path) else Path(path)
+    if path_.is_dir():
+        path_str = str(path_) + "**/*.csv"
+    else:
+        path_str = str(path_)
+
+    spark = get_spark_session()
+    if schema is None:
+        return spark.read.csv(str(path), header=True)
+
+    dtypes = {k: duckdb.type(v) for k, v in schema.items()}
+    rel = duckdb.read_csv(path_str, header=True, dtype=dtypes)
+    columns = ",".join(schema.keys())
+    return spark.createDataFrame(rel.select(columns).to_df())
+
+
+def _get_schema_file(filename: Path | str) -> Path | None:
+    table_path = Path(filename)
+    for ext in (".json", ".json5"):
+        schema_file = table_path.with_name(f"{table_path.stem}_schema{ext}")
+        if schema_file.exists():
+            return schema_file
+    return None
 
 
 def read_json(path: Path | str) -> DataFrame:

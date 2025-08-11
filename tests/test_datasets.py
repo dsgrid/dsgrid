@@ -19,7 +19,9 @@ from dsgrid.utils.id_remappings import (
     replace_dimension_names_with_current_ids,
 )
 from dsgrid.utils.files import (
+    dump_json_file,
     dump_line_delimited_json,
+    load_json_file,
     load_line_delimited_json,
     load_data,
     delete_if_exists,
@@ -270,6 +272,7 @@ def test_invalid_load_data_lookup_null_id(register_dataset):
 def test_invalid_load_data_extra_column(register_dataset):
     _, dataset_path, expected_errors = register_dataset
     data_file = dataset_path / "load_data.csv"
+    schema_file = dataset_path / "load_data_schema.json"
     lines = data_file.read_text().splitlines()
     with open(data_file, "w") as f_out:
         f_out.write(lines[0])
@@ -277,6 +280,9 @@ def test_invalid_load_data_extra_column(register_dataset):
         for line in lines[1:]:
             f_out.write(line)
             f_out.write(",0\n")
+    schema = load_json_file(schema_file)
+    schema["extra"] = "INT"
+    dump_json_file(schema, schema_file)
 
     expected_errors["exception"] = DSGInvalidDataset
     expected_errors["match_msg"] = r"column.*is not expected in load_data"

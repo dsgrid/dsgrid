@@ -8,7 +8,6 @@ from tempfile import TemporaryDirectory, gettempdir
 
 import pandas as pd
 import pytest
-from dsgrid.spark.types import use_duckdb
 
 from dsgrid.tests.common import (
     TEST_PROJECT_PATH,
@@ -16,11 +15,12 @@ from dsgrid.tests.common import (
 )
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
+from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.files import dump_json_file, load_json_file
 from dsgrid.utils.spark import get_unique_values
 
 
@@ -96,6 +96,9 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
         data_dir = make_test_data_dir_module / "test_aeo_data" / dataset
 
         shutil.copyfile(data_dir / "load_data.csv", data_dir / "load_data_original.csv")
+        shutil.copyfile(
+            data_dir / "load_data_schema.json", data_dir / "load_data_schema_original.json"
+        )
 
         try:
             logger.info("1. normal registration: ")
@@ -105,22 +108,19 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
             _modify_data_file(data_dir, export_index=True)
             with pytest.raises(DSGInvalidDataset, match=r"column.*is not expected"):
                 _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
+            shutil.copyfile(
+                data_dir / "load_data_schema_original.json", data_dir / "load_data_schema.json"
+            )
 
             logger.info("3. with a duplicated dimension: ")
             _modify_data_file(data_dir, duplicate_col="subsector")
-            # This is not really a valuable test any more.
-            # Spark doesn't allow duplicate columns in CSV files. Maybe previous versions did.
-            # It appends the column index to each duplicate column name.
-            # DuckDB appends ".1" to the duplicate, and our code catches that.
-            exc = DSGInvalidDimension if use_duckdb() else DSGInvalidDataset
-            with pytest.raises((ValueError, exc)):
-                _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
+            # This used to be a negative test. We now remove the duplicate column.
+            _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("4. with a duplicated pivot col: ")
             _modify_data_file(data_dir, duplicate_col="elec_heating")
-            exc = DSGInvalidDimension if use_duckdb() else DSGInvalidDataset
-            with pytest.raises((ValueError, exc)):
-                _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
+            # This used to be a negative test. We now remove the duplicate column.
+            _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("5. End Uses dataset only - missing time ")
             if "End_Uses" in dataset:
@@ -133,6 +133,9 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
         finally:
             RegistryDatabase.delete(conn)
             shutil.copyfile(data_dir / "load_data_original.csv", data_dir / "load_data.csv")
+            shutil.copyfile(
+                data_dir / "load_data_schema_original.json", data_dir / "load_data_schema.json"
+            )
 
 
 def _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset):
@@ -203,5 +206,11 @@ def _modify_data_file(
         df_data = df_data.iloc[1:]
     if export_index:
         df_data.reset_index(inplace=True)
+        schema_file = data_dir / "load_data_schema.json"
+        schema = load_json_file(schema_file)
+        # Note: order is important for Spark.
+        new_schema = {"index": "INTEGER"}
+        new_schema.update(schema)
+        dump_json_file(new_schema, schema_file)
     logger.info(df_data)
     df_data.to_csv(data_dir / "load_data.csv", index=False)

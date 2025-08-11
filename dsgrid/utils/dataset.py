@@ -562,7 +562,7 @@ def convert_types_if_necessary(df: DataFrame) -> DataFrame:
 
 def get_missing_dimension_associations(filename: Path | str) -> DataFrame:
     """Get the missing dimension associations from filename."""
-    df = read_csv(filename)
+    df = read_csv(filename, require_schema=False)
     for field in df.schema.fields:
         if field.dataType != StringType():
             df = df.withColumn(field.name, F.col(field.name).cast(StringType()))

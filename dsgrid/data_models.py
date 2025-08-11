@@ -3,7 +3,7 @@
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Self
+from typing import Any, Optional, Self
 
 from pydantic import ConfigDict, BaseModel, Field, ValidationError
 
@@ -46,7 +46,8 @@ class DSGBaseModel(BaseModel):
         """
         filename = Path(filename)
         if not filename.is_file():
-            raise DSGInvalidParameter(f"{filename} is not a file")
+            msg = f"{filename} is not a file"
+            raise DSGInvalidParameter(msg)
 
         with in_other_dir(filename.parent):
             try:
@@ -73,7 +74,7 @@ class DSGBaseModel(BaseModel):
     def _handle_kwargs(**kwargs):
         return {k: v for k, v in kwargs.items() if k not in ("by_alias",)}
 
-    def serialize(self, *args, **kwargs):
+    def serialize(self, *args, **kwargs) -> dict[str, Any]:
         return self.model_dump(*args, mode="json", **kwargs)
 
     @classmethod

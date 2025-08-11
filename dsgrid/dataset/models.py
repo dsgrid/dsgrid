@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from typing import Literal, Union
 
 from pydantic import Field, model_validator
@@ -8,7 +8,7 @@ from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 
 
-class TableFormatType(str, Enum):
+class TableFormatType(StrEnum):
     """Defines the format of value columns in a dataset."""
 
     PIVOTED = "pivoted"

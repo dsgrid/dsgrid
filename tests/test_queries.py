@@ -1395,7 +1395,7 @@ class QueryTestAnnualElectricityUseByState(QueryTestBase):
 
     def validate(self, expected_values):
         filename = self.output_dir / self.name / "table.csv"
-        df = read_csv(filename)
+        df = read_csv(filename, require_schema=False)
         years = df.select("year").distinct().collect()
         assert len(years) == 1
         assert years[0].year == 2012

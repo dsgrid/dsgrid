@@ -9,6 +9,7 @@ import shutil
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from types import UnionType
 from typing import Any, Generator, Iterable, Sequence, Type, Union, get_origin, get_args
 
 import duckdb
@@ -356,7 +357,8 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
             if i == 0:
                 if val is None:
                     python_type = cls.model_fields[f].annotation
-                    if get_origin(python_type) is Union:
+                    origin = get_origin(python_type)
+                    if origin is Union or origin is UnionType:
                         python_type = get_type_from_union(python_type)
                     # else: will likely fail below
                     # Need to add more logic to detect the actual type or add to

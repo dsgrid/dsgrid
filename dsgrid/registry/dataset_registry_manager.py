@@ -3,7 +3,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, Optional, Self, Type, Union
+from typing import Any, Self, Type, Union
 
 import pandas as pd
 from prettytable import PrettyTable
@@ -218,7 +218,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         """
         return f"configs/.locks/{config_id}.lock"
 
-    def _update_dimensions(self, conn: Optional[Connection], config: DatasetConfig):
+    def _update_dimensions(self, conn: Connection | None, config: DatasetConfig):
         dimensions = self._dimension_mgr.load_dimensions(
             config.model.dimension_references, conn=conn
         )

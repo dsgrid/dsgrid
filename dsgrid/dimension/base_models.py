@@ -1,6 +1,5 @@
 """Dimension types for dsgrid"""
 
-from typing import Optional
 
 from pydantic import Field
 
@@ -73,7 +72,7 @@ class MetricDimensionBaseModel(DimensionRecordBaseModel):
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
-    time_zone: Optional[TimeZone] = Field(
+    time_zone: TimeZone | None = Field(
         default=None,
         title="Local Prevailing Time Zone",
         description="""

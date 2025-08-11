@@ -2,7 +2,7 @@ from dsgrid.dataset.models import UnpivotedTableFormatModel
 import logging
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Literal, Union
+from typing import Any, Literal, Union
 
 from pydantic import field_validator, model_validator, Field
 
@@ -250,7 +250,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         description="Additional metadata to include related to the dataset_qualifier",
         discriminator="dataset_qualifier_type",
     )
-    sector_description: Optional[str] = Field(
+    sector_description: str | None = Field(
         default=None,
         title="sector_description",
         description="Sectoral description (e.g., residential, commercial, industrial, "

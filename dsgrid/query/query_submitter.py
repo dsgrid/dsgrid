@@ -3,7 +3,7 @@ import json
 import logging
 import shutil
 from pathlib import Path
-from typing import Optional
+
 from zipfile import ZipFile
 
 from chronify.utils.path_utils import check_overwrite
@@ -190,7 +190,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     def _check_datasets(
         self, query_model: ProjectQueryModel, conn: Connection
     ) -> DatasetBaseDimensionNamesModel:
-        base_dimension_names: Optional[DatasetBaseDimensionNamesModel] = None
+        base_dimension_names: DatasetBaseDimensionNamesModel | None = None
         dataset_ids: list[str] = []
         query_names: list[DatasetBaseDimensionNamesModel] = []
         for dataset in query_model.project.dataset.source_datasets:
@@ -420,7 +420,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         return sorted(dim_columns), sorted(time_columns)
 
     def _process_aggregations(
-        self, df: DataFrame, context: QueryContext, dataset_id: Optional[str] = None
+        self, df: DataFrame, context: QueryContext, dataset_id: str | None = None
     ) -> DataFrame:
         handler = make_table_format_handler(
             TableFormatType.UNPIVOTED, self._project.config, dataset_id=dataset_id
@@ -587,7 +587,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
     def create_dataset(
         self,
         model: CreateCompositeDatasetQueryModel,
-        scratch_dir: Optional[Path] = None,
+        scratch_dir: Path | None = None,
         persist_intermediate_table=False,
         load_cached_table=True,
         force=False,
@@ -635,7 +635,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
         Parameters
         ----------
         query : CompositeDatasetQueryModel
-        scratch_dir : Optional[Path]
+        scratch_dir : Path | None
         """
         tz = self._project.config.get_base_time_dimension().get_time_zone()
         assert tz is not None

@@ -6,7 +6,7 @@ import tempfile
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any, Optional, Type, Union
+from typing import Any, Type, Union
 
 from dsgrid.utils.dataset import handle_dimension_association_errors
 import json5
@@ -201,7 +201,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         self._projects[key] = config
         return config
 
-    def _update_dimensions_and_mappings(self, conn: Optional[Connection], config: ProjectConfig):
+    def _update_dimensions_and_mappings(self, conn: Connection | None, config: ProjectConfig):
         base_dimensions = self._dimension_mgr.load_dimensions(
             config.model.dimensions.base_dimension_references, conn=conn
         )
@@ -403,7 +403,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             raise Exception(msg)
 
         for dim, ref in zip(dimensions, dimension_references):
-            base_dim: Optional[DimensionBaseConfig] = None
+            base_dim: DimensionBaseConfig | None = None
             if dim.mapping.project_base_dimension_name is None:
                 base_dims = base_dim_mapping[ref.dimension_type]
                 if len(base_dims) > 1:
@@ -846,12 +846,12 @@ class ProjectRegistryManager(RegistryManagerBase):
         self,
         project_id: str,
         dataset_id: str,
-        submitter: Optional[str] = None,
-        log_message: Optional[str] = None,
-        dimension_mapping_file: Optional[Path] = None,
-        dimension_mapping_references_file: Optional[Path] = None,
-        autogen_reverse_supplemental_mappings: Optional[list[DimensionType]] = None,
-        context: Optional[RegistrationContext] = None,
+        submitter: str | None = None,
+        log_message: str | None = None,
+        dimension_mapping_file: Path | None = None,
+        dimension_mapping_references_file: Path | None = None,
+        autogen_reverse_supplemental_mappings: list[DimensionType] | None = None,
+        context: RegistrationContext | None = None,
     ):
         """Registers a dataset with a project. This can only be performed on the
         latest version of the project.
@@ -1459,7 +1459,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         config: ProjectConfig,
         update_type: VersionUpdateType,
         log_message: str,
-        submitter: Optional[str] = None,
+        submitter: str | None = None,
     ) -> ProjectConfig:
         with RegistrationContext(self.db, log_message, update_type, submitter) as context:
             self._update_dimensions_and_mappings(context.connection, config)

@@ -2,7 +2,7 @@ import itertools
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Annotated, Any, Generator, Iterable, Optional, Type
+from typing import Annotated, Any, Generator, Iterable, Type
 
 import pandas as pd
 from pydantic import field_validator, model_validator, Field
@@ -107,7 +107,7 @@ class SubsetDimensionGroupModel(DSGBaseModel):
             "options": DimensionType.format_for_docs(),
         },
     )
-    filename: Optional[str] = Field(
+    filename: str | None = Field(
         default=None,
         title="filename",
         alias="file",
@@ -129,7 +129,7 @@ class SubsetDimensionGroupModel(DSGBaseModel):
         "the subsets.",
         default=True,
     )
-    base_dimension_name: Optional[str] = Field(
+    base_dimension_name: str | None = Field(
         default=None,
         title="base_dimension_name",
         description="Name of base dimension for the supplemental dimension mapping, if "
@@ -327,7 +327,7 @@ class RequiredSupplementalDimensionRecordsModel(DSGBaseModel):
 
 class RequiredBaseDimensionModel(DSGBaseModel):
     record_ids: list[str] = []
-    dimension_name: Optional[str] = Field(
+    dimension_name: str | None = Field(
         default=None,
         description="Identifies which base dimension contains the record IDs. Required if there "
         "is more than one base dimension for a given dimension type.",
@@ -790,7 +790,7 @@ class ProjectConfig(ConfigBase):
         return dims[0]
 
     def get_base_dimension_and_version(
-        self, dimension_type: DimensionType, dimension_name: Optional[str] = None
+        self, dimension_type: DimensionType, dimension_name: str | None = None
     ) -> tuple[DimensionBaseConfig, str]:
         """Return the base dimension and version matching dimension_type."""
         res: tuple[DimensionBaseConfig, str] | None = None
@@ -867,7 +867,7 @@ class ProjectConfig(ConfigBase):
         raise DSGInvalidDimension(msg)
 
     def list_base_dimensions(
-        self, dimension_type: Optional[DimensionType] = None
+        self, dimension_type: DimensionType | None = None
     ) -> list[DimensionBaseConfig]:
         """Return all base dimensions, optionally filtering to the dimension_type.
 

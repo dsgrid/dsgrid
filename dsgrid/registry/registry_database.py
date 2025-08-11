@@ -3,7 +3,7 @@ import logging
 import sqlite3
 from pathlib import Path
 from datetime import datetime
-from typing import Any, Generator, Optional
+from typing import Any, Generator
 
 from chronify.utils.path_utils import check_overwrite
 from sqlalchemy import (
@@ -329,7 +329,7 @@ class RegistryDatabase:
         self,
         conn: Connection,
         db_id: int,
-        parent_model_type: Optional[RegistryType] = None,
+        parent_model_type: RegistryType | None = None,
     ) -> list[tuple[RegistryType, dict[str, Any]]]:
         table1 = self.get_table(RegistryTables.CONTAINS)
         table2 = self.get_table(RegistryTables.MODELS)
@@ -350,7 +350,7 @@ class RegistryDatabase:
         child_model_type: RegistryType,
         model_id: str,
         version: str,
-        parent_model_type: Optional[RegistryType] = None,
+        parent_model_type: RegistryType | None = None,
     ):
         db_id = self._get_db_id(conn, child_model_type, model_id, version)
         return self.get_containing_models_by_db_id(
@@ -574,7 +574,7 @@ class RegistryDatabase:
         conn: Connection,
         model_type: RegistryType,
         model_id: str,
-        version: Optional[str] = None,
+        version: str | None = None,
     ) -> bool:
         """Return True if the database has a document matching the inputs."""
         table = self.get_table(RegistryTables.MODELS)

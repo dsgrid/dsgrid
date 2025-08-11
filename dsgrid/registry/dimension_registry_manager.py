@@ -3,7 +3,7 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Generator, Optional, Sequence, Union
+from typing import Any, Generator, Sequence, Union
 from uuid import uuid4
 
 from prettytable import PrettyTable
@@ -171,7 +171,7 @@ class DimensionRegistryManager(RegistryManagerBase):
     def load_dimensions(
         self,
         dimension_references: Sequence[DimensionReferenceModel],
-        conn: Optional[Connection] = None,
+        conn: Connection | None = None,
     ) -> dict[ConfigKey, DimensionBaseConfig]:
         """Load dimensions from the database.
 
@@ -279,11 +279,11 @@ class DimensionRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        conn: Optional[Connection] = None,
-        filters: Optional[list[str]] = None,
-        max_width: Optional[Union[int, dict]] = None,
-        drop_fields: Optional[list[str]] = None,
-        dimension_ids: Optional[set[str]] = None,
+        conn: Connection | None = None,
+        filters: list[str] | None = None,
+        max_width: Union[int, dict] | None = None,
+        drop_fields: list[str] | None = None,
+        dimension_ids: set[str] | None = None,
         return_table: bool = False,
         **kwargs,
     ):
@@ -383,7 +383,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         config,
         update_type: VersionUpdateType,
         log_message: str,
-        submitter: Optional[str] = None,
+        submitter: str | None = None,
     ) -> DimensionConfig:
         with RegistrationContext(self.db, log_message, update_type, submitter) as context:
             return self.update_with_context(config, context)
@@ -405,7 +405,7 @@ class DimensionRegistryManager(RegistryManagerBase):
             for key in [x for x in self._dimensions if x.id in config_ids]:
                 self._dimensions.pop(key)
 
-    def remove(self, dimension_id, conn: Optional[Connection] = None):
+    def remove(self, dimension_id, conn: Connection | None = None):
         self.db.delete_all(conn, dimension_id)
         for key in [x for x in self._dimensions if x.id == dimension_id]:
             self._dimensions.pop(key)

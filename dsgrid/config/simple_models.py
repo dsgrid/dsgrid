@@ -1,6 +1,5 @@
 """Defines simplified data models for testing and filtering."""
 
-from typing import Optional
 
 from pydantic import field_validator, model_validator, Field
 
@@ -11,7 +10,7 @@ from dsgrid.dimension.base_models import DimensionType
 class DimensionSimpleModel(DSGBaseModel):
 
     dimension_type: DimensionType
-    dimension_name: Optional[str] = None
+    dimension_name: str | None = None
     record_ids: list[str]
 
 

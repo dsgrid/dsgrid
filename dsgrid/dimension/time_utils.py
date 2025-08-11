@@ -3,7 +3,7 @@
 from datetime import datetime
 
 import logging
-from typing import Optional
+
 
 import pandas as pd
 
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def build_time_ranges(
     time_ranges: TimeRangeModel,
     str_format: str,
-    tz: Optional[TimeZone] = None,
+    tz: TimeZone | None = None,
 ):
     ranges = []
     for time_range in time_ranges:

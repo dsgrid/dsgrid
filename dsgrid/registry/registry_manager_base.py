@@ -4,7 +4,7 @@ import abc
 import copy
 import logging
 from pathlib import Path
-from typing import Any, Optional, Self, Type
+from typing import Any, Self, Type
 
 from semver import VersionInfo
 from sqlalchemy import Connection
@@ -236,7 +236,7 @@ class RegistryManagerBase(abc.ABC):
         config_id,
         directory,
         version=None,
-        conn: Optional[Connection] = None,
+        conn: Connection | None = None,
         force: bool = False,
     ):
         """Dump the config file to directory.
@@ -285,7 +285,7 @@ class RegistryManagerBase(abc.ABC):
         """Return True if there is to be no syncing with the remote registry."""
         return self._params.offline
 
-    def get_latest_version(self, config_id, conn: Optional[Connection] = None):
+    def get_latest_version(self, config_id, conn: Connection | None = None):
         """Return the current version in the registry.
 
         Returns
@@ -309,7 +309,7 @@ class RegistryManagerBase(abc.ABC):
         """
         return Path(self._params.base_path) / "data" / config_id
 
-    def has_id(self, config_id, version=None, conn: Optional[Connection] = None):
+    def has_id(self, config_id, version=None, conn: Connection | None = None):
         """Return True if an item matching the parameters is stored.
 
         Parameters
@@ -325,12 +325,12 @@ class RegistryManagerBase(abc.ABC):
         """
         return self.db.has(conn, config_id, version=version)
 
-    def iter_configs(self, conn: Optional[Connection] = None):
+    def iter_configs(self, conn: Connection | None = None):
         """Return an iterator over the registered configs."""
         for config_id in self.iter_ids(conn):
             yield self.get_by_id(config_id, conn=conn)
 
-    def iter_ids(self, conn: Optional[Connection] = None):
+    def iter_ids(self, conn: Connection | None = None):
         """Return an iterator over the registered dsgrid IDs."""
         yield from self.db.list_model_ids(conn)
 

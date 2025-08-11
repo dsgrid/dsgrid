@@ -495,7 +495,7 @@ class AnnualTimeDimensionModel(TimeDimensionBaseModel):
     str_format: str = Field(
         title="str_format",
         default="%Y",
-        description="Timestamp string format "
+        description="Timestamp string format. "
         "The string format is used to parse the timestamps provided in the time ranges. "
         "Cheatsheet reference: `<https://strftime.org/>`_.",
     )

@@ -610,7 +610,7 @@ class DimensionMappingsModel(DSGBaseModel):
         title="dataset_to_project",
         description="Dataset-to-project mappings map dataset dimensions to project dimensions. "
         "Once a dataset is submitted to a project, dsgrid adds the dataset-to-project mappings "
-        "to the project config "
+        "to the project config. "
         "Some projects may not have any dataset-to-project mappings. Dataset-to-project "
         " mappings are only supplied if a dataset's dimensions do not match the project's "
         "dimension.",

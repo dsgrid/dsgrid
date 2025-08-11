@@ -798,6 +798,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             return load_data_df
         self._validate_daylight_saving_adjustment(time_based_data_adjustment)
         time_dim = self._config.get_time_dimension()
+        assert time_dim is not None
         if time_dim.model.is_time_zone_required_in_geography():
             if self._config.model.use_project_geography_time_zone:
                 if to_geo_dim is None:
@@ -884,9 +885,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
             == DaylightSavingAdjustmentModel()
         ):
             return
-        time_dim = self._config.get_dimension(DimensionType.TIME)
+        time_dim = self._config.get_time_dimension()
         if not isinstance(time_dim, IndexTimeDimensionConfig):
-            msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.time_dim.model.time_type=} time type, it applies to INDEX time type only."
+            assert time_dim is not None
+            msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.model.time_type=} time type, it applies to INDEX time type only."
             logger.warning(msg)
 
     def _remove_non_dimension_columns(self, df: DataFrame) -> DataFrame:

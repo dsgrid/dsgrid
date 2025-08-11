@@ -244,7 +244,9 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
                 f"Mapping contains from_fraction sum less than 1 for {group_by}={id_less_than_one}. "
             )
 
-    def get_by_id(self, mapping_id, version=None, conn: Optional[Connection] = None):
+    def get_by_id(
+        self, mapping_id, version=None, conn: Optional[Connection] = None
+    ) -> MappingTableConfig:
         if version is None:
             version = self._db.get_latest_version(conn, mapping_id)
 
@@ -443,8 +445,6 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         log_message: str,
         submitter: Optional[str] = None,
     ) -> MappingTableConfig:
-        # lock_file_path = self.get_registry_lock_file(None)
-        # with self.cloud_interface.make_lock_file_managed(lock_file_path):
         with RegistrationContext(self.db, log_message, update_type, submitter) as context:
             return self.update_with_context(config, context)
 

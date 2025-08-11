@@ -178,9 +178,9 @@ class ProjectRegistryManager(RegistryManagerBase):
     def get_by_id(
         self,
         project_id: str,
-        version: Optional[str] = None,
-        conn: Optional[Connection] = None,
-    ):
+        version: str | None = None,
+        conn: Connection | None = None,
+    ) -> ProjectConfig:
         if version is None:
             assert self._db is not None
             version = self._db.get_latest_version(conn, project_id)
@@ -215,10 +215,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         config.set_dimensions(base_dimensions, subset_dimensions, supplemental_dimensions)
         config.set_dimension_mappings(base_to_supp_mappings)
 
-    def _get_subset_dimensions(self, conn: Optional[Connection], config: ProjectConfig):
-        subset_dimensions: dict[
-            DimensionType, dict[str, dict[ConfigKey, DimensionBaseConfig]]
-        ] = defaultdict(dict)
+    def _get_subset_dimensions(self, conn: Connection | None, config: ProjectConfig):
+        subset_dimensions: dict[DimensionType, dict[str, dict[ConfigKey, DimensionBaseConfig]]] = (
+            defaultdict(dict)
+        )
         for subset_dim in config.model.dimensions.subset_dimensions:
             selectors = {
                 ConfigKey(x.dimension_id, x.version): self._dimension_mgr.get_by_id(
@@ -232,8 +232,8 @@ class ProjectRegistryManager(RegistryManagerBase):
     def load_project(
         self,
         project_id: str,
-        version: Optional[str] = None,
-        conn: Optional[Connection] = None,
+        version: str | None = None,
+        conn: Connection | None = None,
     ) -> Project:
         """Load a project from the registry.
 
@@ -485,7 +485,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     if ref.dimension_type == subset_dimension.dimension_type:
                         base_dim = self._dimension_mgr.get_by_id(ref.dimension_id, conn=conn)
                         break
-                assert base_dim is not None, subset_dimension
+                assert isinstance(base_dim, DimensionBaseConfigWithFiles), subset_dimension
                 base_records = base_dim.get_records_dataframe()
                 self._check_subset_dimension_consistency(subset_dimension, base_records)
                 for selector in subset_dimension.selectors:
@@ -493,9 +493,9 @@ class ProjectRegistryManager(RegistryManagerBase):
                     filename = tmp_path / f"{subset_dimension.name}_{selector.name}.csv"
                     new_records.toPandas().to_csv(filename, index=False)
                     dim = DimensionModel(
-                        filename=str(filename),
+                        file=str(filename),
                         name=selector.name,
-                        dimension_type=subset_dimension.dimension_type,
+                        type=subset_dimension.dimension_type,
                         module=base_dim.model.module,
                         class_name=base_dim.model.class_name,
                         description=selector.description,
@@ -503,7 +503,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                     dimensions.append(dim)
                     key = (subset_dimension.dimension_type, selector.name)
                     if key in subset_refs:
-                        raise Exception(f"Bug: unhandled case of duplicate dimension name: {key=}")
+                        msg = f"Bug: unhandled case of duplicate dimension name: {key=}"
+                        raise Exception(msg)
                     subset_refs[key] = subset_dimension
 
             dim_model = DimensionsConfigModel(dimensions=dimensions)
@@ -516,7 +517,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 subset_dim.selector_references.append(
                     DimensionReferenceModel(
                         dimension_id=dimension_id,
-                        dimension_type=subset_dim.dimension_type,
+                        type=subset_dim.dimension_type,
                         version="1.0.0",
                     )
                 )
@@ -607,14 +608,14 @@ class ProjectRegistryManager(RegistryManagerBase):
                 pd.DataFrame.from_records(mapping_records).to_csv(map_record_file, index=False)
 
                 dim = SupplementalDimensionModel(
-                    filename=str(filename),
+                    file=str(filename),
                     name=subset_dimension_group.name,
-                    dimension_type=dimension_type,
+                    type=dimension_type,
                     module=base_dim.model.module,
                     class_name=base_dim.model.class_name,
                     description=subset_dimension_group.description,
                     mapping=MappingTableByNameModel(
-                        filename=str(map_record_file),
+                        file=str(map_record_file),
                         mapping_type=DimensionMappingType.MANY_TO_MANY_EXPLICIT_MULTIPLIERS,
                         description=f"Aggregation map for {subset_dimension_group.name}",
                         project_base_dimension_name=base_dim.model.name,
@@ -623,7 +624,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 dimensions.append(dim)
 
             self._register_supplemental_dimensions_from_models(
-                tmpdir,
+                tmp_path,
                 model,
                 dimensions,
                 context,
@@ -649,6 +650,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 dim_config = self._dimension_mgr.get_by_id(
                     dim_ref.dimension_id, conn=context.connection
                 )
+                assert isinstance(dim_config, DimensionBaseConfigWithFiles)
                 dt_str = dimension_type.value
                 if dt_str.endswith("y"):
                     dt_plural = dt_str[:-1] + "ies"
@@ -671,14 +673,14 @@ class ProjectRegistryManager(RegistryManagerBase):
 
                 with in_other_dir(src_dir):
                     new_dim = SupplementalDimensionModel(
-                        filename=str(dim_record_file),
+                        file=str(dim_record_file),
                         name=dim_name,
-                        dimension_type=dimension_type,
+                        type=dimension_type,
                         module="dsgrid.dimension.base_models",
                         class_name="DimensionRecordBaseModel",
                         description=dim_name_formal,
                         mapping=MappingTableByNameModel(
-                            filename=str(map_record_file),
+                            file=str(map_record_file),
                             mapping_type=DimensionMappingType.MANY_TO_ONE_AGGREGATION,
                             description=f"Aggregation map for all {dt_str}s",
                         ),
@@ -1006,9 +1008,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         self,
         project_config: ProjectConfig,
         dataset_id: str,
-        dimension_mapping_file: Optional[Path],
-        dimension_mapping_references_file: Optional[Path],
-        autogen_reverse_supplemental_mappings: Optional[list[DimensionType]],
+        dimension_mapping_file: Path | None,
+        dimension_mapping_references_file: Path | None,
+        autogen_reverse_supplemental_mappings: list[DimensionType] | None,
         context: RegistrationContext,
     ) -> None:
         logger.info("Submit dataset=%s to project=%s.", dataset_id, project_config.config_id)
@@ -1031,7 +1033,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                 if not self.dimension_mapping_manager.has_id(
                     ref.mapping_id, version=ref.version, conn=context.connection
                 ):
-                    raise DSGValueNotRegistered(f"mapping_id={ref.mapping_id}")
+                    msg = f"mapping_id={ref.mapping_id}"
+                    raise DSGValueNotRegistered(msg)
                 references.append(ref)
 
         if autogen_reverse_supplemental_mappings:
@@ -1039,7 +1042,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 project_config,
                 dataset_config,
                 references,
-                set(autogen_reverse_supplemental_mappings),
+                set((x.value for x in autogen_reverse_supplemental_mappings)),
                 context,
             )
 
@@ -1050,10 +1053,11 @@ class ProjectRegistryManager(RegistryManagerBase):
         dataset_model = project_config.get_dataset(dataset_id)
         status = dataset_model.status
         if status != DatasetRegistryStatus.UNREGISTERED:
-            raise DSGDuplicateValueRegistered(
+            msg = (
                 f"{dataset_id=} cannot be submitted to project={project_config.config_id} with "
                 f"{status=}"
             )
+            raise DSGDuplicateValueRegistered(msg)
 
     def _register_mappings_from_file(
         self,
@@ -1068,7 +1072,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             **load_data(dimension_mapping_file)
         ).mappings
         dataset_mapping = {x.dimension_type: x for x in dataset_config.model.dimension_references}
-        project_mapping: dict[str, list[DimensionBaseConfig]] = defaultdict(list)
+        project_mapping: dict[DimensionType, list[DimensionBaseConfig]] = defaultdict(list)
         project_mapping_refs: dict[str, DimensionReferenceModel] = {}
         for ref in project_config.model.dimensions.base_dimension_references:
             dim = self._dimension_mgr.get_by_id(
@@ -1078,7 +1082,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             project_mapping_refs[dim.model.dimension_id] = ref
         mapping_tables = []
         for mapping in mappings:
-            base_dim: Optional[DimensionBaseConfig] = None
+            base_dim: DimensionBaseConfig | None = None
             if mapping.project_base_dimension_name is None:
                 base_dims = project_mapping[mapping.dimension_type]
                 if len(base_dims) > 1:
@@ -1162,10 +1166,11 @@ class ProjectRegistryManager(RegistryManagerBase):
             #     checked in the dimension association table.
 
         if len(needs_mapping) != len(autogen_reverse_supplemental_mappings):
-            raise DSGInvalidDimensionMapping(
+            msg = (
                 f"Mappings to autgen [{needs_mapping}] does not match user-specified "
                 f"autogen_reverse_supplemental_mappings={autogen_reverse_supplemental_mappings}"
             )
+            raise DSGInvalidDimensionMapping(msg)
 
         new_mappings = []
         for from_id, from_version in needs_mapping:
@@ -1186,11 +1191,12 @@ class ProjectRegistryManager(RegistryManagerBase):
                 records = models_to_dataframe(p_mapping.model.records)
                 fraction_vals = get_unique_values(records, "from_fraction")
                 if len(fraction_vals) != 1 and next(iter(fraction_vals)) != 1.0:
-                    raise DSGInvalidDimensionMapping(
+                    msg = (
                         f"Cannot auto-generate a dataset-to-project mapping from from a project "
                         "supplemental dimension unless the from_fraction column is empty or only "
                         f"has values of 1.0: {p_mapping.model.mapping_id} - {fraction_vals}"
                     )
+                    raise DSGInvalidDimensionMapping(msg)
                 reverse_records = (
                     records.drop("from_fraction")
                     .select(F.col("to_id").alias("from_id"), F.col("from_id").alias("to_id"))
@@ -1209,6 +1215,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                     }
                 )
             else:
+                assert version is not None
                 reference = DimensionMappingReferenceModel(
                     from_dimension_type=to_dim.model.dimension_type,
                     to_dimension_type=to_dim.model.dimension_type,
@@ -1387,6 +1394,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                         project_records = project_dim.get_records_dataframe()
                         project_record_ids = get_unique_values(project_records, "id")
                         dataset_dim = dataset_config.get_dimension_with_records(dim_type)
+                        assert dataset_dim is not None
                         dataset_records = dataset_dim.get_records_dataframe()
                         dataset_record_ids = get_unique_values(dataset_records, "id")
                         if dataset_record_ids.issubset(project_record_ids):
@@ -1438,7 +1446,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         update_type: VersionUpdateType,
         log_message: str,
         version: str,
-    ):
+    ) -> ProjectConfig:
         with RegistrationContext(self.db, log_message, update_type, submitter) as context:
             config = ProjectConfig.load(config_file)
             self._update_dimensions_and_mappings(context.connection, config)
@@ -1472,6 +1480,7 @@ class ProjectRegistryManager(RegistryManagerBase):
         old_version = config.model.version
         old_key = ConfigKey(config.config_id, old_version)
         model = self._update_config(config, context)
+        assert isinstance(model, ProjectConfigModel)
         new_config = ProjectConfig(model)
         self._update_dimensions_and_mappings(context.connection, new_config)
         new_key = ConfigKey(new_config.model.project_id, new_config.model.version)
@@ -1485,16 +1494,16 @@ class ProjectRegistryManager(RegistryManagerBase):
             for key in [x for x in self._projects if x.id in config_ids]:
                 self._projects.pop(key)
 
-    def remove(self, project_id: str, conn: Optional[Connection] = None):
-        self.db.delete_all(conn, project_id)
-        for key in [x for x in self._projects if x.id == project_id]:
+    def remove(self, config_id: str, conn: Connection | None = None) -> None:
+        self.db.delete_all(conn, config_id)
+        for key in [x for x in self._projects if x.id == config_id]:
             self._projects.pop(key)
 
-        logger.info("Removed %s from the registry.", project_id)
+        logger.info("Removed %s from the registry.", config_id)
 
     def show(
         self,
-        conn: Optional[Connection] = None,
+        conn: Connection | None = None,
         filters: list[str] | None = None,
         max_width: Union[int, dict] | None = None,
         drop_fields: list[str] | None = None,
@@ -1547,11 +1556,11 @@ class ProjectRegistryManager(RegistryManagerBase):
         elif isinstance(max_width, dict):
             table._max_width = max_width
 
-        if filters:
-            transformed_filters = transform_and_validate_filters(filters)
+        transformed_filters = transform_and_validate_filters(filters) if filters else None
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for model in self.db.iter_models(conn):
+            assert isinstance(model, ProjectConfigModel)
             registration = self.db.get_registration(conn, model)
             all_fields = (
                 model.project_id,

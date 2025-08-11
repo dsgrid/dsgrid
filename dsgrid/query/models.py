@@ -1,6 +1,6 @@
 import abc
 import itertools
-from enum import Enum
+from enum import StrEnum
 from typing import Any, Generator, Optional, Union, Literal, Self, TypeAlias
 
 from pydantic import field_validator, model_validator, Field, field_serializer, ValidationInfo
@@ -100,7 +100,7 @@ class ColumnModel(DSGBaseModel):
         return f"{self.function.__name__}__{self.dimension_name})"
 
 
-class ColumnType(str, Enum):
+class ColumnType(StrEnum):
     """Defines what the columns of a dataset table represent."""
 
     DIMENSION_TYPES = "dimension_types"
@@ -180,7 +180,7 @@ class AggregationModel(DSGBaseModel):
         ]
 
 
-class ReportType(str, Enum):
+class ReportType(StrEnum):
     """Pre-defined reports"""
 
     PEAK_LOAD = "peak_load"
@@ -271,7 +271,7 @@ class DatasetMetadataModel(DSGBaseModel):
 
 
 class CacheableQueryBaseModel(DSGBaseModel):
-    def serialize(self):
+    def serialize_with_hash(self, *args, **kwargs) -> tuple[str, str]:
         """Return a JSON representation of the model along with a hash that uniquely identifies it."""
         text = self.model_dump_json(indent=2)
         return compute_hash(text.encode()), text
@@ -293,7 +293,7 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
     )
 
 
-class DatasetType(str, Enum):
+class DatasetType(StrEnum):
     """Defines the type of a dataset in a query."""
 
     PROJECTION = "projection"
@@ -301,7 +301,7 @@ class DatasetType(str, Enum):
     DERIVED = "derived"
 
 
-class DatasetConstructionMethod(str, Enum):
+class DatasetConstructionMethod(StrEnum):
     """Defines the type of construction method for DatasetType.PROJECTION."""
 
     EXPONENTIAL_GROWTH = "exponential_growth"
@@ -375,7 +375,7 @@ class DatasetModel(DSGBaseModel):
     source_datasets: list[AbstractDatasetModel] = Field(
         description="Datasets from which to read. Each must be of type DatasetBaseModel.",
     )
-    expression: Optional[str] = Field(
+    expression: str | None = Field(
         description="Expression to combine datasets. Default is to take a union of all datasets.",
         default=None,
     )
@@ -423,11 +423,14 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
     @classmethod
     def check_unsupported_fields(cls, values):
         if values.get("include_dsgrid_dataset_components", False):
-            raise ValueError("Setting include_dsgrid_dataset_components=true is not supported yet")
+            msg = "Setting include_dsgrid_dataset_components=true is not supported yet"
+            raise ValueError(msg)
         if values.get("drop_dimensions", []):
-            raise ValueError("drop_dimensions is not supported yet")
+            msg = "drop_dimensions is not supported yet"
+            raise ValueError(msg)
         if values.get("excluded_dataset_ids", []):
-            raise ValueError("excluded_dataset_ids is not supported yet")
+            msg = "excluded_dataset_ids is not supported yet"
+            raise ValueError(msg)
         return values
 
     @model_validator(mode="after")
@@ -551,7 +554,8 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     def check_format(cls, fmt):
         allowed = {"csv", "parquet"}
         if fmt not in allowed:
-            raise ValueError(f"output_format={fmt} is not supported. Allowed={allowed}")
+            msg = f"output_format={fmt} is not supported. Allowed={allowed}"
+            raise ValueError(msg)
         return fmt
 
     @model_validator(mode="after")
@@ -561,9 +565,8 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
                 for dim_type in DimensionType:
                     columns = getattr(agg.dimensions, dim_type.value)
                     if len(columns) > 1:
-                        raise ValueError(
-                            f"Multiple columns are incompatible with {self.column_type=}. {columns=}"
-                        )
+                        msg = f"Multiple columns are incompatible with {self.column_type=}. {columns=}"
+                        raise ValueError(msg)
         return self
 
 

@@ -3,7 +3,7 @@
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Generator, Optional, Sequence, Union
+from typing import Any, Generator, Optional, Sequence, Union
 from uuid import uuid4
 
 from prettytable import PrettyTable
@@ -17,6 +17,8 @@ from dsgrid.config.dimension_config import (
 )
 from dsgrid.config.dimensions_config import DimensionsConfig
 from dsgrid.config.dimensions import (
+    DimensionBaseModel,
+    DimensionModel,
     TimeDimensionBaseModel,
     DimensionReferenceModel,
 )
@@ -49,20 +51,23 @@ class DimensionRegistryManager(RegistryManagerBase):
         return self._db
 
     @db.setter
-    def db(self, db: DimensionRegistryInterface):
+    def db(self, db: DimensionRegistryInterface) -> None:
         self._db = db
 
     @staticmethod
-    def name():
+    def name() -> str:
         return "Dimensions"
 
-    def _replace_duplicates(self, config: DimensionsConfig, context: RegistrationContext):
+    def _replace_duplicates(
+        self, config: DimensionsConfig, context: RegistrationContext
+    ) -> set[str]:
         hashes = defaultdict(list)
         time_dims = {}
         for dimension in self._db.iter_models(context.connection, all_versions=True):
             if isinstance(dimension, TimeDimensionBaseModel):
                 time_dims[dimension.id] = dimension
             else:
+                assert isinstance(dimension, DimensionModel)
                 hashes[dimension.file_hash].append(dimension)
 
         existing_ids = set()
@@ -114,8 +119,8 @@ class DimensionRegistryManager(RegistryManagerBase):
         return None
 
     def get_by_id(
-        self, config_id: str, version: Optional[str] = None, conn: Optional[Connection] = None
-    ):
+        self, config_id: str, version: str | None = None, conn: Connection | None = None
+    ) -> DimensionBaseConfig:
         if version is None:
             version = self._db.get_latest_version(conn, config_id)
 
@@ -134,7 +139,10 @@ class DimensionRegistryManager(RegistryManagerBase):
         return config
 
     def list_ids(
-        self, dimension_type: Optional[DimensionType] = None, conn: Optional[Connection] = None
+        self,
+        conn: Connection | None = None,
+        dimension_type: DimensionType | None = None,
+        **kwargs: Any,
     ) -> list[str]:
         """Return the dimension ids for the given type.
 
@@ -152,7 +160,7 @@ class DimensionRegistryManager(RegistryManagerBase):
             ids = super().list_ids(conn)
         else:
             ids = [
-                x.dimension_id
+                x.dimension_id  # type: ignore
                 for x in self.db.iter_models(
                     conn, filter_config={"dimension_type": dimension_type}
                 )
@@ -192,7 +200,7 @@ class DimensionRegistryManager(RegistryManagerBase):
     ) -> list[str]:
         return self._register(config, context)
 
-    def register(self, config_file, submitter: str, log_message: str) -> list[str]:
+    def register(self, config_file: Path, submitter: str, log_message: str) -> list[str]:
         with RegistrationContext(
             self.db, log_message, VersionUpdateType.MAJOR, submitter
         ) as context:
@@ -212,6 +220,7 @@ class DimensionRegistryManager(RegistryManagerBase):
                 dim.dimension_id = str(uuid4())
                 dim.version = "1.0.0"
                 dim = self.db.insert(context.connection, dim, context.registration)
+                assert isinstance(dim, DimensionBaseModel)
                 final_dimension_ids.append(dim.dimension_id)
                 registered_dimension_ids.append(dim.dimension_id)
                 logger.info(
@@ -245,10 +254,12 @@ class DimensionRegistryManager(RegistryManagerBase):
         refs = []
         for dim_id in dimension_ids:
             dim = self.db.get_latest(conn, dim_id)
+            assert isinstance(dim, DimensionBaseModel)
+            assert isinstance(dim.version, str)
             refs.append(
                 DimensionReferenceModel(
                     dimension_id=dim_id,
-                    dimension_type=dim.dimension_type,
+                    type=dim.dimension_type,
                     version=dim.version,
                 )
             )
@@ -261,6 +272,7 @@ class DimensionRegistryManager(RegistryManagerBase):
         with self.db.engine.connect() as conn:
             filter_config = {"dimension_type": dimension_type}
             for model in self.db.iter_models(filter_config=filter_config, conn=conn):
+                assert isinstance(model, DimensionBaseModel)
                 config = self.get_by_id(model.dimension_id, conn=conn)
                 if sorted_record_ids == sorted(config.get_unique_ids()):
                     yield config

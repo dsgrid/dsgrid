@@ -106,7 +106,7 @@ class QueryContext:
         assert isinstance(metadata.table_format, PivotedTableFormatModel)
         return metadata.table_format.pivoted_dimension_type
 
-    def get_table_format_type(self, dataset_id=None) -> TableFormatType:
+    def get_table_format_type(self, dataset_id: str | None = None) -> TableFormatType:
         val = self._get_metadata(dataset_id).table_format.format_type
         if not isinstance(val, TableFormatType):
             val = TableFormatType(val)
@@ -222,7 +222,8 @@ class QueryContext:
         for metadata in self.get_dimension_metadata(dimension_type, dataset_id=dataset_id):
             if metadata.dimension_name == name:
                 return metadata.column_names
-        raise Exception(f"No dimension match: {dimension_type=} {name=}")
+        msg = f"No dimension match: {dimension_type=} {name=}"
+        raise Exception(msg)
 
     def get_dimension_metadata(
         self,

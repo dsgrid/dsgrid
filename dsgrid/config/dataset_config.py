@@ -35,6 +35,7 @@ from .dimensions import (
     DimensionsListModel,
     DimensionReferenceModel,
     DimensionModel,
+    TimeDimensionBaseModel,
 )
 
 
@@ -235,15 +236,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     dataset_id: str = Field(
         title="dataset_id",
         description="Unique dataset identifier.",
-        json_schema_extra={
-            "requirements": (
-                "When registering a dataset to a project, the dataset_id must match the expected ID "
-                "defined in the project config.",
-                "For posterity, dataset_id cannot be the same as the ``data_source``"
-                " (e.g., dataset cannot be 'ComStock')",
-            ),
-            "updateable": False,
-        },
     )
     dataset_type: InputDatasetType = Field(
         title="dataset_type",
@@ -267,12 +259,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     data_source: str = Field(
         title="data_source",
         description="Data source name, e.g. 'ComStock'.",
-        json_schema_extra={
-            "requirements": (
-                "When registering a dataset to a project, the `data_source` field must match one of "
-                "the dimension ID records defined by the project's base data source dimension.",
-            ),
-        },
         # TODO: it would be nice to extend the description here with a CLI example of how to list the project's data source IDs.
     )
     data_schema: Union[StandardDataSchemaModel, OneTableDataSchemaModel] = Field(
@@ -342,25 +328,11 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         description="List of dimensions that make up the dimensions of dataset. They will be "
         "automatically registered during dataset registration and then converted "
         "to dimension_references.",
-        json_schema_extra={
-            "requirements": (
-                "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined",
-                "* Only one dimension reference per type is allowed",
-                "* Each reference is to an existing registered dimension.",
-            ),
-        },
         default=[],
     )
     dimension_references: list[DimensionReferenceModel] = Field(
         title="dimensions",
         description="List of registered dimension references that make up the dimensions of dataset.",
-        json_schema_extra={
-            "requirements": (
-                "* All :class:`~dsgrid.dimension.base_models.DimensionType` must be defined",
-                "* Only one dimension reference per type is allowed",
-                "* Each reference is to an existing registered dimension.",
-            ),
-        },
         default=[],
         # TODO: Add to notes - link to registering dimensions page
         # TODO: Add to notes - link to example of how to list dimensions to find existing registered dimensions
@@ -373,14 +345,10 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     trivial_dimensions: list[DimensionType] = Field(
         title="trivial_dimensions",
         default=[],
-        description="List of trivial dimensions (i.e., 1-element dimensions) that"
-        " do not exist in the load_data_lookup. List the dimensions by dimension type.",
-        json_schema_extra={
-            "notes": (
-                "Trivial dimensions are 1-element dimensions that are not present in the parquet data"
-                " columns. Instead they are added by dsgrid as an alias column.",
-            ),
-        },
+        description="List of trivial dimensions (i.e., 1-element dimensions) that "
+        "do not exist in the load_data_lookup. List the dimensions by dimension type. "
+        "Trivial dimensions are 1-element dimensions that are not present in the parquet data "
+        "columns. Instead they are added by dsgrid as an alias column.",
     )
 
     # This function can be deleted once all dataset repositories have been updated.
@@ -394,12 +362,14 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
 
         if "data_schema_type" in values:
             if "data_schema_type" in values["data_schema"]:
-                raise ValueError(f"Unknown data_schema format: {values=}")
+                msg = f"Unknown data_schema format: {values=}"
+                raise ValueError(msg)
             values["data_schema"]["data_schema_type"] = values.pop("data_schema_type")
 
         if "leap_day_adjustment" in values:
             if values["leap_day_adjustment"] != "none":
-                raise ValueError(f"Unknown leap day adjustment: {values=}")
+                msg = f"Unknown leap day adjustment: {values=}"
+                raise ValueError(msg)
             values.pop("leap_day_adjustment")
 
         return values
@@ -416,9 +386,8 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     def check_time_not_trivial(cls, trivial_dimensions):
         for dim in trivial_dimensions:
             if dim == DimensionType.TIME:
-                raise ValueError(
-                    "The time dimension is currently not a dsgrid supported trivial dimension."
-                )
+                msg = "The time dimension is currently not a dsgrid supported trivial dimension."
+                raise ValueError(msg)
         return trivial_dimensions
 
     @field_validator("dimensions")
@@ -453,6 +422,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         if not self.use_project_geography_time_zone:
             for dimension in self.dimensions:
                 if dimension.dimension_type == DimensionType.TIME:
+                    assert isinstance(dimension, TimeDimensionBaseModel)
                     geo_requires_time_zone = dimension.is_time_zone_required_in_geography()
                     time_dim = dimension
                     break
@@ -546,9 +516,11 @@ class DatasetConfig(ConfigBase):
         schema_type = config.get_data_schema_type()
         if str(dataset_path).startswith("s3://"):
             # TODO: This may need to handle AWS s3 at some point.
-            raise DSGInvalidParameter("Registering a dataset from an S3 path is not supported.")
+            msg = "Registering a dataset from an S3 path is not supported."
+            raise DSGInvalidParameter(msg)
         if not dataset_path.exists():
-            raise DSGInvalidParameter(f"Dataset {dataset_path} does not exist")
+            msg = f"Dataset {dataset_path} does not exist"
+            raise DSGInvalidParameter(msg)
         dataset_path = str(dataset_path)
         if schema_type == DataSchemaType.STANDARD:
             check_load_data_filename(dataset_path)
@@ -556,7 +528,8 @@ class DatasetConfig(ConfigBase):
         elif schema_type == DataSchemaType.ONE_TABLE:
             check_load_data_filename(dataset_path)
         else:
-            raise DSGInvalidParameter(f"data_schema_type={schema_type} not supported.")
+            msg = f"data_schema_type={schema_type} not supported."
+            raise DSGInvalidParameter(msg)
 
         config.dataset_path = dataset_path
         return config
@@ -628,7 +601,9 @@ class DatasetConfig(ConfigBase):
         if self.get_table_format_type() != TableFormatType.PIVOTED:
             return []
         dim_type = self.model.data_schema.table_format.pivoted_dimension_type
-        return sorted(list(self.get_dimension_with_records(dim_type).get_unique_ids()))
+        dim = self.get_dimension_with_records(dim_type)
+        assert dim is not None
+        return sorted(list(dim.get_unique_ids()))
 
     def get_value_columns(self) -> list[str]:
         """Return the table's columns that contain values."""
@@ -666,9 +641,8 @@ class DatasetConfig(ConfigBase):
     def _check_trivial_record_length(self, records):
         """Check that trivial dimensions have only 1 record."""
         if len(records) > 1:
-            raise DSGInvalidDimension(
-                f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
-            )
+            msg = f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
+            raise DSGInvalidDimension(msg)
 
 
 def get_unique_dimension_record_ids(

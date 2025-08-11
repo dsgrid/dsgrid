@@ -57,7 +57,7 @@ def get_value_from_context(ctx, field) -> Any:
     return ctx.find_root().params[field]
 
 
-def handle_dsgrid_exception(ctx, func, *args, **kwargs):
+def handle_dsgrid_exception(ctx, func, *args, **kwargs) -> tuple[Any, int]:
     """Handle any dsgrid exceptions as specified by the CLI parameters."""
     res = None
     try:

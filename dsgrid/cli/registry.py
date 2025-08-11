@@ -1,5 +1,3 @@
-from dsgrid.config.dataset_config import DataSchemaType
-
 """Manages a dsgrid registry."""
 
 import getpass
@@ -17,6 +15,7 @@ from dsgrid.cli.common import (
     path_callback,
 )
 from dsgrid.common import REMOTE_REGISTRY
+from dsgrid.config.dataset_config import DataSchemaType
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.config.common import SUPPORTED_METRIC_TYPES
@@ -32,7 +31,7 @@ from dsgrid.utils.filters import ACCEPTED_OPS
 logger = logging.getLogger(__name__)
 
 
-def _version_info_callback(*args) -> VersionInfo:
+def _version_info_callback(*args) -> VersionInfo | None:
     val = args[2]
     if val is None:
         return val

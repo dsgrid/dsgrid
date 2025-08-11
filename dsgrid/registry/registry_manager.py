@@ -130,7 +130,8 @@ class RegistryManager:
         uid = str(uuid.uuid4())
 
         if str(data_path).startswith("s3"):
-            raise Exception(f"s3 is not currently supported: {data_path}")
+            msg = f"s3 is not currently supported: {data_path}"
+            raise Exception(msg)
 
         fs_interface = make_filesystem_interface(data_path)
         logger.info("Created registry with database=%s data_path=%s", conn.url, data_path)

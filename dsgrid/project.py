@@ -110,9 +110,8 @@ class Project:
             If dataset_id is not in this project's config.
         """
         if dataset_id not in self.list_datasets():
-            raise DSGValueNotRegistered(
-                f"{dataset_id} is not expected by {self.config.model.project_id}"
-            )
+            msg = f"{dataset_id} is not expected by {self.config.model.project_id}"
+            raise DSGValueNotRegistered(msg)
 
         return dataset_id in self._dataset_configs
 
@@ -195,7 +194,8 @@ class Project:
             elif isinstance(dataset, ProjectionDatasetModel):
                 path = self._process_projection_dataset(context, cached_datasets_dir, dataset)
             else:
-                raise NotImplementedError(f"Unsupported type: {type(dataset)}")
+                msg = f"Unsupported type: {type(dataset)}"
+                raise NotImplementedError(msg)
             df_filenames[dataset.dataset_id] = path
 
         if not df_filenames:
@@ -210,7 +210,8 @@ class Project:
             if dim_type == DimensionType.TIME:
                 # TODO #196
                 # This needs to handled by the dataset handler function _prefilter_time_dimension
-                raise NotImplementedError("Pre-filtering time is not supported yet")
+                msg = "Pre-filtering time is not supported yet"
+                raise NotImplementedError(msg)
             if isinstance(dim_filter, SubsetDimensionFilterModel):
                 df = dim_filter.get_filtered_records_dataframe(self._config.get_dimension).select(
                     "id"
@@ -242,7 +243,8 @@ class Project:
             if dim_type in record_ids:
                 df = record_ids[dim_type].join(df, "id")
             if is_dataframe_empty(df):
-                raise DSGInvalidQuery(f"Query filter produced empty records: {dim_filter}")
+                msg = f"Query filter produced empty records: {dim_filter}"
+                raise DSGInvalidQuery(msg)
             record_ids[dim_type] = df
 
         for dimension_type, ids in record_ids.items():
@@ -345,9 +347,8 @@ class Project:
                 case ColumnType.DIMENSION_NAMES:
                     pass
                 case _:
-                    raise NotImplementedError(
-                        f"BUG: unhandled {context.model.result.column_type=}"
-                    )
+                    msg = f"BUG: unhandled {context.model.result.column_type=}"
+                    raise NotImplementedError(msg)
             names = list(
                 context.get_dimension_column_names(DimensionType.MODEL_YEAR, dataset_id=dataset_id)
             )
@@ -367,10 +368,11 @@ class Project:
         model_year_column = get_myear_column(dataset.initial_value_dataset_id)
         model_year_column_gr = get_myear_column(dataset.growth_rate_dataset_id)
         if model_year_column != model_year_column_gr:
-            raise Exception(
+            msg = (
                 "BUG: initial_value and growth rate datasets have different model_year columns: "
                 f"{model_year_column=} {model_year_column_gr=}"
             )
+            raise Exception(msg)
         match context.model.result.column_type:
             case ColumnType.DIMENSION_NAMES:
                 time_columns = context.get_dimension_column_names(
@@ -378,11 +380,12 @@ class Project:
                 )
             case ColumnType.DIMENSION_TYPES:
                 dset = self.get_dataset(dataset.initial_value_dataset_id)
-                time_dim = dset.config.get_dimension(DimensionType.TIME)
+                time_dim = dset.config.get_time_dimension()
                 assert time_dim is not None
                 time_columns = set(time_dim.get_load_data_time_columns())
             case _:
-                raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
+                msg = f"BUG: unhandled {context.model.result.column_type=}"
+                raise NotImplementedError(msg)
         with restart_spark_with_custom_conf(
             conf=context.model.project.get_spark_conf(dataset.dataset_id),
             force=True,
@@ -399,7 +402,8 @@ class Project:
                 case DatasetConstructionMethod.ANNUAL_MULTIPLIER:
                     df = apply_annual_multiplier(iv_df, gr_df, time_columns, value_columns)
                 case _:
-                    raise NotImplementedError(f"BUG: Unsupported {dataset.construction_method=}")
+                    msg = f"BUG: Unsupported {dataset.construction_method=}"
+                    raise NotImplementedError(msg)
             df = write_dataframe_and_auto_partition(df, dataset_path)
 
             time_dim = self._config.get_base_time_dimension()

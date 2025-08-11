@@ -1,6 +1,7 @@
 import abc
 import logging
 from pathlib import Path
+from typing import Type
 
 import json5
 
@@ -58,7 +59,7 @@ class ConfigBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def config_filename():
+    def config_filename() -> str:
         """Return the config filename.
 
         Returns
@@ -69,7 +70,7 @@ class ConfigBase(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def config_id(self):
+    def config_id(self) -> str:
         """Return the configuration ID.
 
         Returns
@@ -91,7 +92,7 @@ class ConfigBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def model_class():
+    def model_class() -> Type:
         """Return the data model class backing the config"""
 
     def serialize(self, path, force=False):

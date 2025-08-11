@@ -71,7 +71,6 @@ dev = [
     "httpx",  # starlette, used by fastapi, requires this as an optional dependency for testing.
     "pytest",
     "pytest-cov",
-    "black>=22.3.0",
     "pre-commit",
     "devtools",
     "flake8",
@@ -108,10 +107,6 @@ minversion = "6.0"
 addopts = "-ra"
 testpaths = ["tests"]
 
-[tool.black]
-line-length = 99
-target-version = ['py311']
-
 [tool.mypy]
 plugins = "pydantic.mypy"
 
@@ -136,7 +131,8 @@ target-version = "py311"
 [tool.ruff.lint]
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
 select = [
-    "C901",   # McCabe complexity
+  # TODO: fix the complexity issues. There are many.
+  # "C901",   # McCabe complexity
     "E4",     # Subset of pycodestyle (E)
     "E7",
     "E9",

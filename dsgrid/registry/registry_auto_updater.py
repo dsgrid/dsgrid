@@ -1,5 +1,5 @@
 import logging
-from typing import Any, Optional
+from typing import Any
 
 from dsgrid.config.mapping_tables import MappingTableConfig, MappingTableModel
 from dsgrid.config.dataset_config import DatasetConfig, DatasetConfigModel
@@ -34,7 +34,7 @@ class RegistryAutoUpdater:
         original_version: str,
         update_type: VersionUpdateType,
         log_message: str,
-        submitter: Optional[None] = None,
+        submitter: str | None = None,
     ):
         """Update all configs that consume this config. Recursive.
         This is an in incomplete, experimental feature, and is subject to change.
@@ -197,9 +197,9 @@ class RegistryAutoUpdater:
     def _update_projects(
         self,
         context: RegistrationContext,
-        dimensions: Optional[dict[ConfigKey, DimensionConfig]] = None,
-        dimension_mappings: Optional[dict[ConfigKey, MappingTableConfig]] = None,
-        datasets: Optional[dict[ConfigKey, DatasetConfig]] = None,
+        dimensions: dict[ConfigKey, DimensionConfig] | None = None,
+        dimension_mappings: dict[ConfigKey, MappingTableConfig] | None = None,
+        datasets: dict[ConfigKey, DatasetConfig] | None = None,
     ) -> None:
         updated_projects = {}
         if dimensions is not None:

@@ -1,7 +1,7 @@
 import abc
 import itertools
 from enum import StrEnum
-from typing import Any, Generator, Optional, Union, Literal, Self, TypeAlias
+from typing import Any, Generator, Union, Literal, Self, TypeAlias
 
 from pydantic import field_validator, model_validator, Field, field_serializer, ValidationInfo
 from semver import VersionInfo
@@ -59,7 +59,7 @@ class ColumnModel(DSGBaseModel):
     function: Any = Field(
         default=None, description="Function or name of function in pyspark.sql.functions."
     )
-    alias: Optional[str] = Field(default=None, description="Name of the resulting column.")
+    alias: str | None = Field(default=None, description="Name of the resulting column.")
 
     @field_validator("function")
     @classmethod
@@ -349,7 +349,7 @@ class ProjectionDatasetModel(DatasetBaseModel):
         default=DatasetConstructionMethod.EXPONENTIAL_GROWTH,
         description="Specifier for the code that applies the growth rate to the principal dataset",
     )
-    base_year: Optional[int] = Field(
+    base_year: int | None = Field(
         description="Base year of the dataset to use in growth rate application. Must be a year "
         "defined in the principal dataset's model year dimension. If None, there must be only "
         "one model year in that dimension and it will be used.",
@@ -405,7 +405,7 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
     )
     # TODO #203: default needs to change
     include_dsgrid_dataset_components: bool = Field(description="", default=False)
-    version: Optional[str] = Field(
+    version: str | None = Field(
         default=None,
         description="Version of project or dataset on which the query is based. "
         "Should not be set by the user",
@@ -523,7 +523,7 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         default=[],
     )
     # TODO #205: implement
-    time_zone: Optional[str] = Field(
+    time_zone: str | None = Field(
         description="Convert the results to this time zone.",
         default=None,
     )

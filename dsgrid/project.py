@@ -146,9 +146,8 @@ class Project:
 
         """
         if dataset_id not in self._dataset_configs:
-            raise DSGValueNotRegistered(
-                f"dataset_id={dataset_id} is not registered in the project"
-            )
+            msg = f"dataset_id={dataset_id} is not registered in the project"
+            raise DSGValueNotRegistered(msg)
         config = self._dataset_configs[dataset_id]
         input_dataset = self._config.get_dataset(dataset_id)
         dataset = Dataset.load(

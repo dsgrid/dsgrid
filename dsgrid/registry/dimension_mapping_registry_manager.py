@@ -2,7 +2,7 @@
 
 import logging
 from collections import Counter
-from typing import Optional
+
 from pathlib import Path
 from uuid import uuid4
 
@@ -110,7 +110,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
 
         return existing_ids
 
-    def _check_records_against_dimension_records(self, conn: Optional[Connection], config):
+    def _check_records_against_dimension_records(self, conn: Connection | None, config):
         """
         Check that records in mappings are subsets of from and to dimension records.
         """
@@ -245,7 +245,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             )
 
     def get_by_id(
-        self, mapping_id, version=None, conn: Optional[Connection] = None
+        self, mapping_id, version=None, conn: Connection | None = None
     ) -> MappingTableConfig:
         if version is None:
             version = self._db.get_latest_version(conn, mapping_id)
@@ -325,7 +325,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
     def load_dimension_mappings(
         self,
         dimension_mapping_references: list[DimensionMappingReferenceModel],
-        conn: Optional[Connection] = None,
+        conn: Connection | None = None,
     ) -> dict[ConfigKey, MappingTableConfig]:
         """Load dimension_mappings from files.
 
@@ -348,7 +348,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         return mappings
 
     def make_dimension_mapping_references(
-        self, mapping_ids: list[str], conn: Optional[Connection] = None
+        self, mapping_ids: list[str], conn: Connection | None = None
     ) -> list[DimensionMappingReferenceModel]:
         """Return a list of dimension mapping references from a list of registered mapping IDs.
 
@@ -443,7 +443,7 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
         config: MappingTableConfig,
         update_type: VersionUpdateType,
         log_message: str,
-        submitter: Optional[str] = None,
+        submitter: str | None = None,
     ) -> MappingTableConfig:
         with RegistrationContext(self.db, log_message, update_type, submitter) as context:
             return self.update_with_context(config, context)
@@ -472,17 +472,17 @@ class DimensionMappingRegistryManager(RegistryManagerBase):
             for key in [x for x in self._mappings if x.id in config_ids]:
                 self._mappings.pop(key)
 
-    def remove(self, mapping_id: str, conn: Optional[Connection] = None):
+    def remove(self, mapping_id: str, conn: Connection | None = None):
         self.db.delete_all(conn, mapping_id)
         for key in [x for x in self._mappings if x.id == mapping_id]:
             self._mappings.pop(key)
 
     def show(
         self,
-        conn: Optional[Connection] = None,
-        filters: Optional[list[str]] = None,
+        conn: Connection | None = None,
+        filters: list[str] | None = None,
         max_width: int | dict | None = None,
-        drop_fields: Optional[list[str]] = None,
+        drop_fields: list[str] | None = None,
         return_table: bool = False,
         **kwargs,
     ):

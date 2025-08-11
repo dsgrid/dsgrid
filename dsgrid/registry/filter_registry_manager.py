@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 from sqlalchemy import Connection
 
@@ -17,7 +16,7 @@ class FilterRegistryManager(RegistryManager):
     """Specialized RegistryManager that performs filtering operations."""
 
     @track_timing(timer_stats_collector)
-    def filter(self, simple_model: RegistrySimpleModel, conn: Optional[Connection] = None):
+    def filter(self, simple_model: RegistrySimpleModel, conn: Connection | None = None):
         """Filter the registry as described by simple_model.
 
         Parameters

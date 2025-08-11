@@ -8,7 +8,7 @@ import shutil
 import sys
 import uuid
 from pathlib import Path
-from typing import Optional
+
 from sqlalchemy import Connection
 
 from dsgrid.common import (
@@ -370,9 +370,7 @@ class RegistryManager:
     def path(self):
         return self._params.base_path
 
-    def show(
-        self, conn: Optional[Connection] = None, filters=None, max_width=None, drop_fields=None
-    ):
+    def show(self, conn: Connection | None = None, filters=None, max_width=None, drop_fields=None):
         """Show tables of all registry configs."""
         self.project_manager.show(
             conn=conn, filters=filters, max_width=max_width, drop_fields=drop_fields

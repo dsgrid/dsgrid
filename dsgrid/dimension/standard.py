@@ -1,7 +1,6 @@
 """Standard dimension classes for dsgrid"""
 
 from enum import StrEnum
-from typing import Optional
 
 from pydantic import Field
 
@@ -43,7 +42,7 @@ class CensusRegion(GeographyDimensionBaseModel):
 class State(GeographyDimensionBaseModel):
     """State attributes"""
 
-    is_conus: Optional[bool] = None
+    is_conus: bool | None = None
     census_division: str = ""
     census_region: str = ""
 

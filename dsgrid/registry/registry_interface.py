@@ -1,7 +1,7 @@
 import abc
 import itertools
 import logging
-from typing import Any, Generator, Optional
+from typing import Any, Generator
 
 import pandas as pd
 from sqlalchemy import Connection, Engine
@@ -56,24 +56,22 @@ class RegistryInterfaceBase(abc.ABC):
     def _make_dsgrid_model(db_data: dict) -> Any:
         """Convert the database object into a dsgrid model."""
 
-    def delete_all(self, conn: Optional[Connection], model_id: str) -> None:
+    def delete_all(self, conn: Connection | None, model_id: str) -> None:
         """Delete all database instances with model_id."""
         if conn is None:
             with self._db.engine.begin() as conn:
                 return self._db.delete_models(conn, self._model_type(), model_id)
         return self._db.delete_models(conn, self._model_type(), model_id)
 
-    def get_by_version(
-        self, conn: Optional[Connection], model_id, version
-    ) -> DSGBaseDatabaseModel:
+    def get_by_version(self, conn: Connection | None, model_id, version) -> DSGBaseDatabaseModel:
         """Return the model by version"""
         return self._make_dsgrid_model(self._get_by_version(conn, model_id, version))
 
-    def get_latest(self, conn: Optional[Connection], model_id) -> DSGBaseModel:
+    def get_latest(self, conn: Connection | None, model_id) -> DSGBaseModel:
         """Return the model with the latest version."""
         return self._make_dsgrid_model(self._get_latest(conn, model_id))
 
-    def get_latest_version(self, conn: Optional[Connection], model_id: str) -> str:
+    def get_latest_version(self, conn: Connection | None, model_id: str) -> str:
         """Return the latest version of the model_id.
 
         Parameters
@@ -91,7 +89,7 @@ class RegistryInterfaceBase(abc.ABC):
         return self._db.get_latest_version(conn, self._model_type(), model_id)
 
     def get_registration(
-        self, conn: Optional[Connection], model: DSGBaseDatabaseModel
+        self, conn: Connection | None, model: DSGBaseDatabaseModel
     ) -> RegistrationModel:
         """Return the registration information for the model."""
         if conn is None:
@@ -100,7 +98,7 @@ class RegistryInterfaceBase(abc.ABC):
         return self._db.get_registration(conn, model.id)
 
     def get_initial_registration(
-        self, conn: Optional[Connection], model_id: str
+        self, conn: Connection | None, model_id: str
     ) -> RegistrationModel:
         """Return the initial registration information for the model."""
         if conn is None:
@@ -108,9 +106,7 @@ class RegistryInterfaceBase(abc.ABC):
                 return self._db.get_initial_registration(conn, self._model_type(), model_id)
         return self._db.get_initial_registration(conn, self._model_type(), model_id)
 
-    def has(
-        self, conn: Optional[Connection], model_id: str, version: Optional[str] = None
-    ) -> bool:
+    def has(self, conn: Connection | None, model_id: str, version: str | None = None) -> bool:
         """Return True if the model_id is stored in the database."""
         if conn is None:
             with self._db.engine.connect() as conn:
@@ -119,7 +115,7 @@ class RegistryInterfaceBase(abc.ABC):
 
     def insert(
         self,
-        conn: Optional[Connection],
+        conn: Connection | None,
         model: DSGBaseDatabaseModel,
         registration: RegistrationModel,
     ) -> DSGBaseModel:
@@ -141,7 +137,7 @@ class RegistryInterfaceBase(abc.ABC):
         return new_model
 
     def insert_registration(
-        self, conn: Optional[Connection], registration: RegistrationModel
+        self, conn: Connection | None, registration: RegistrationModel
     ) -> RegistrationModel:
         """Add the registration to the database.
 
@@ -154,7 +150,7 @@ class RegistryInterfaceBase(abc.ABC):
                 return self._db.insert_registration(conn, registration)
         return self._db.insert_registration(conn, registration)
 
-    def list_model_ids(self, conn: Optional[Connection] = None) -> list[str]:
+    def list_model_ids(self, conn: Connection | None = None) -> list[str]:
         """Return a list of all distinct dsgrid model IDs."""
         if conn is None:
             with self._db.engine.connect() as conn:
@@ -165,7 +161,7 @@ class RegistryInterfaceBase(abc.ABC):
         self,
         conn: Connection | None = None,
         all_versions: bool = False,
-        filter_config: Optional[dict[str, Any]] = None,
+        filter_config: dict[str, Any] | None = None,
     ) -> Generator[DSGBaseDatabaseModel, None, None]:
         """Return a generator of dsgrid models converted from database objects.
 
@@ -192,7 +188,7 @@ class RegistryInterfaceBase(abc.ABC):
         self,
         conn: Connection,
         all_versions: bool = False,
-        filter_config: Optional[dict[str, Any]] = None,
+        filter_config: dict[str, Any] | None = None,
     ) -> Generator[DSGBaseDatabaseModel, None, None]:
         for data in self._db.iter_models(conn, self._model_type(), all_versions=all_versions):
             model = self._make_dsgrid_model(data)
@@ -201,10 +197,10 @@ class RegistryInterfaceBase(abc.ABC):
 
     def get_containing_models(
         self,
-        conn: Optional[Connection],
+        conn: Connection | None,
         model: DSGBaseDatabaseModel,
-        version: Optional[str] = None,
-        parent_model_type: Optional[RegistryType] = None,
+        version: str | None = None,
+        parent_model_type: RegistryType | None = None,
     ) -> dict[RegistryType, list[DSGBaseDatabaseModel]]:
         """Return all models that contain the given model. If version is not set, use the current
         version of model. Only looks at the latest version of each parent model.
@@ -237,7 +233,7 @@ class RegistryInterfaceBase(abc.ABC):
         child_model_type: RegistryType,
         model_id: str,
         version: str,
-        parent_model_type: Optional[RegistryType] = None,
+        parent_model_type: RegistryType | None = None,
     ) -> dict[RegistryType, list[DSGBaseDatabaseModel]]:
         results = {x: [] for x in RegistryType}
         for model_type, data in self._db.get_containing_models(
@@ -254,7 +250,7 @@ class RegistryInterfaceBase(abc.ABC):
                 return False
         return True
 
-    def replace(self, conn: Optional[Connection], model: DSGBaseDatabaseModel):
+    def replace(self, conn: Connection | None, model: DSGBaseDatabaseModel):
         """Replace an existing model in the database."""
         if conn is None:
             with self._db.engine.begin() as conn:
@@ -266,7 +262,7 @@ class RegistryInterfaceBase(abc.ABC):
 
     def update(
         self,
-        conn: Optional[Connection],
+        conn: Connection | None,
         model: DSGBaseDatabaseModel,
         registration: RegistrationModel,
     ) -> DSGBaseDatabaseModel:
@@ -287,13 +283,13 @@ class RegistryInterfaceBase(abc.ABC):
         self._insert_contains_edges(conn, new_model)
         return new_model
 
-    def _get_by_version(self, conn: Optional[Connection], model_id, version) -> dict[str, Any]:
+    def _get_by_version(self, conn: Connection | None, model_id, version) -> dict[str, Any]:
         if conn is None:
             with self._db.engine.connect() as conn:
                 return self._db._get_by_version(conn, self._model_type(), model_id, version)
         return self._db._get_by_version(conn, self._model_type(), model_id, version)
 
-    def _get_latest(self, conn: Optional[Connection], model_id: str) -> dict[str, Any]:
+    def _get_latest(self, conn: Connection | None, model_id: str) -> dict[str, Any]:
         if conn is None:
             with self._db.engine.connect() as conn:
                 return self._db.get_latest(conn, self._model_type(), model_id)
@@ -320,7 +316,7 @@ class RegistryInterfaceBase(abc.ABC):
             yield from self._db.iter_models(conn, RegistryType.PROJECT)
 
     def sql(
-        self, query: str, params: Optional[Any] = None, conn: Optional[Connection] = None
+        self, query: str, params: Any | None = None, conn: Connection | None = None
     ) -> pd.DataFrame:
         """Return the results of a query as a Pandas DataFrame."""
         if conn is None:

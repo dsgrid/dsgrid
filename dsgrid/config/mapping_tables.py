@@ -1,7 +1,7 @@
 import csv
 import logging
 import os
-from typing import Optional
+
 
 from pydantic import field_validator, Field, ValidationInfo, field_serializer
 
@@ -27,7 +27,7 @@ class MappingTableRecordModel(DSGBaseModel):
         title="from_id",
         description="Source mapping",
     )
-    to_id: Optional[str] = Field(
+    to_id: str | None = Field(
         default=None,
         title="to_id",
         description="Destination mapping",
@@ -80,14 +80,14 @@ class DatasetBaseToProjectMappingTableListModel(DSGBaseModel):
 class MappingTableModel(DimensionMappingBaseModel):
     """Attributes for a dimension mapping table"""
 
-    filename: Optional[str] = Field(
+    filename: str | None = Field(
         title="filename",
         alias="file",
         default=None,
         description="Filename containing association table records. Only assigned for user input "
         "and output purposes. The registry database stores records in the mapping JSON document.",
     )
-    file_hash: Optional[str] = Field(
+    file_hash: str | None = Field(
         title="file_hash",
         description="Hash of the contents of the file, computed by dsgrid.",
         json_schema_extra={

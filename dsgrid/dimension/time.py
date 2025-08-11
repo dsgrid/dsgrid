@@ -4,7 +4,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 import logging
 from pydantic import Field
 from enum import Enum
-from typing import Optional
+
 
 from dsgrid.data_models import DSGEnum, EnumValue, DSGBaseModel
 
@@ -370,7 +370,7 @@ class DatetimeRange:
         start,
         end,
         frequency,
-        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+        time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
     ):
         if time_based_data_adjustment is None:
             time_based_data_adjustment = TimeBasedDataAdjustmentModel()
@@ -474,7 +474,7 @@ class IndexTimeRange(DatetimeRange):
         end,
         frequency,
         start_index,
-        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+        time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
     ):
         super().__init__(
             start, end, frequency, time_based_data_adjustment=time_based_data_adjustment

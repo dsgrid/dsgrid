@@ -4,7 +4,7 @@ import importlib
 import logging
 import os
 from datetime import datetime, timedelta
-from typing import Any, Optional, Union, Literal
+from typing import Any, Union, Literal
 import copy
 
 from pydantic import field_serializer, field_validator, model_validator, Field, ValidationInfo
@@ -86,7 +86,7 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
         description="A description of the dimension records that is helpful, memorable, and "
         "identifiable",
     )
-    id: Optional[int] = Field(
+    id: int | None = Field(
         default=None,
         description="Registry database ID",
         json_schema_extra={
@@ -188,14 +188,14 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
 class DimensionModel(DimensionBaseModel):
     """Defines a non-time dimension"""
 
-    filename: Optional[str] = Field(
+    filename: str | None = Field(
         title="filename",
         alias="file",
         default=None,
         description="Filename containing dimension records. Only assigned for user input and "
         "output purposes. The registry database stores records in the dimension JSON document.",
     )
-    file_hash: Optional[str] = Field(
+    file_hash: str | None = Field(
         title="file_hash",
         description="Hash of the contents of the file",
         json_schema_extra={

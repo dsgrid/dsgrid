@@ -1,8 +1,7 @@
-from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 import logging
 import os
 from pathlib import Path
-from typing import Iterable, Optional
+from typing import Iterable
 
 import chronify
 from chronify.models import TableSchema
@@ -11,6 +10,7 @@ import dsgrid
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dimension_mapping_base import DimensionMappingType
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
+from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import (
     DaylightSavingFallBackType,
@@ -60,7 +60,7 @@ def map_and_reduce_stacked_dimension(
     records: DataFrame,
     column: str,
     drop_column: bool = True,
-    to_column: Optional[str] = None,
+    to_column: str | None = None,
 ) -> DataFrame:
     to_column_ = to_column or column
     if "fraction" not in df.columns:
@@ -243,7 +243,7 @@ def handle_dimension_association_errors(
     out_file = f"{dataset_id}__missing_dimension_record_combinations.csv"
     write_csv(diff, out_file, header=True, overwrite=True)
     logger.error(
-        "Dataset %s is missing required dimension records. " "Recorded missing records in %s",
+        "Dataset %s is missing required dimension records. Recorded missing records in %s",
         dataset_id,
         out_file,
     )
@@ -285,7 +285,7 @@ def map_time_dimension_with_chronify_duckdb(
     to_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
     wrap_time_allowed: bool = False,
-    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
 ) -> DataFrame:
     """Create a time-mapped table with chronify and DuckDB.
     All operations are performed in memory.
@@ -317,7 +317,7 @@ def map_time_dimension_with_chronify_spark_hive(
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
-    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
     wrap_time_allowed: bool = False,
 ) -> DataFrame:
     """Create a time-mapped table with chronify and Spark and a Hive Metastore.
@@ -356,7 +356,7 @@ def map_time_dimension_with_chronify_spark_path(
     to_time_dim: TimeDimensionBaseConfig,
     scratch_dir_context: ScratchDirContext,
     wrap_time_allowed: bool = False,
-    time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+    time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
 ) -> DataFrame:
     """Create a time-mapped table with chronify and Spark using the local filesystem.
     Chronify will store the mapped table in a Parquet file within scratch_dir_context.
@@ -378,8 +378,8 @@ def map_time_dimension_with_chronify_spark_path(
 
 
 def _to_chronify_time_based_data_adjustment(
-    adj: Optional[TimeBasedDataAdjustmentModel],
-) -> Optional[chronify.TimeBasedDataAdjustment]:
+    adj: TimeBasedDataAdjustmentModel | None,
+) -> chronify.TimeBasedDataAdjustment | None:
     if adj is None:
         return None
     if (
@@ -416,7 +416,7 @@ def _get_mapping_schemas(
     value_column: str,
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
-    src_name: Optional[str] = None,
+    src_name: str | None = None,
 ) -> tuple[TableSchema, TableSchema]:
     src = src_name or "src_" + make_temp_view_name()
     time_array_id_columns = [

@@ -1,7 +1,7 @@
 import logging
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Generator, Optional
+from typing import Generator
 
 from dsgrid.dataset.models import (
     TableFormatType,
@@ -118,13 +118,13 @@ class QueryContext:
         self._metadata.table_format.format_type = val
 
     def get_dimension_column_names(
-        self, dimension_type: DimensionType, dataset_id: Optional[str] = None
+        self, dimension_type: DimensionType, dataset_id: str | None = None
     ) -> set[str]:
         """Return the load data column names for the dimension."""
         return self._get_metadata(dataset_id).dimensions.get_column_names(dimension_type)
 
     def get_all_dimension_column_names(
-        self, dataset_id: Optional[str] = None, exclude: Optional[set[DimensionType]] = None
+        self, dataset_id: str | None = None, exclude: set[DimensionType] | None = None
     ) -> set[str]:
         names = set()
         for dimension_type in DimensionType:
@@ -134,12 +134,12 @@ class QueryContext:
         return names
 
     def get_dimension_names(
-        self, dimension_type: DimensionType, dataset_id: Optional[str] = None
+        self, dimension_type: DimensionType, dataset_id: str | None = None
     ) -> set[str]:
         return self._get_metadata(dataset_id).dimensions.get_dimension_names(dimension_type)
 
     def get_all_dimension_names(
-        self, dataset_id: Optional[str] = None, exclude: Optional[set[DimensionType]] = None
+        self, dataset_id: str | None = None, exclude: set[DimensionType] | None = None
     ) -> set[str]:
         names = set()
         for dimension_type in DimensionType:
@@ -216,7 +216,7 @@ class QueryContext:
         self,
         dimension_type: DimensionType,
         name: str,
-        dataset_id: Optional[str] = None,
+        dataset_id: str | None = None,
     ) -> list[str]:
         """Return the load data column names for the dimension."""
         for metadata in self.get_dimension_metadata(dimension_type, dataset_id=dataset_id):
@@ -228,7 +228,7 @@ class QueryContext:
     def get_dimension_metadata(
         self,
         dimension_type: DimensionType,
-        dataset_id: Optional[str] = None,
+        dataset_id: str | None = None,
     ) -> list[DimensionMetadataModel]:
         return self._get_metadata(dataset_id).dimensions.get_metadata(dimension_type)
 
@@ -236,7 +236,7 @@ class QueryContext:
         self,
         dimension_type: DimensionType,
         dimension_metadata: list[DimensionMetadataModel],
-        dataset_id: Optional[str] = None,
+        dataset_id: str | None = None,
     ) -> None:
         self._get_metadata(dataset_id).dimensions.replace_metadata(
             dimension_type, dimension_metadata
@@ -248,7 +248,7 @@ class QueryContext:
             dataset_id,
         )
 
-    def _get_metadata(self, dataset_id: Optional[str] = None) -> DatasetMetadataModel:
+    def _get_metadata(self, dataset_id: str | None = None) -> DatasetMetadataModel:
         return self._metadata if dataset_id is None else self._dataset_metadata[dataset_id]
 
     def get_record_ids(self) -> dict[DimensionType, DataFrame]:
@@ -258,7 +258,7 @@ class QueryContext:
             for k, v in self._record_ids_by_dimension_type.items()
         }
 
-    def try_get_record_ids_by_dimension_type(self, dim_type: DimensionType) -> Optional[DataFrame]:
+    def try_get_record_ids_by_dimension_type(self, dim_type: DimensionType) -> DataFrame | None:
         records = self._record_ids_by_dimension_type.get(dim_type)
         if records is None:
             return records

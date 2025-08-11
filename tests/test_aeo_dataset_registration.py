@@ -208,7 +208,9 @@ def _modify_data_file(
         df_data.reset_index(inplace=True)
         schema_file = data_dir / "load_data_schema.json"
         schema = load_json_file(schema_file)
-        schema["index"] = "INTEGER"
-        dump_json_file(schema, schema_file)
+        # Note: order is important for Spark.
+        new_schema = {"index": "INTEGER"}
+        new_schema.update(schema)
+        dump_json_file(new_schema, schema_file)
     logger.info(df_data)
     df_data.to_csv(data_dir / "load_data.csv", index=False)

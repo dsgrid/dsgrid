@@ -215,6 +215,7 @@ class DimensionsModel(DSGBaseModel):
         title="supplemental_dimensions",
         description="List of supplemental dimensions. They will be automatically registered. "
         "during project registration and then converted to supplemental_dimension_references. "
+        "Supplemental dimensions are used to support additional querying and transformations "
         "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's "
         "base data.",
         default=[],

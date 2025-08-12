@@ -82,7 +82,9 @@ from dsgrid.utils.spark import (
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
-from dsgrid.registry.dimension_mapping_registry_manager import DimensionMappingRegistryManager
+from dsgrid.registry.dimension_mapping_registry_manager import (
+    DimensionMappingRegistryManager,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -360,10 +362,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 write_dataframe(load_data_df, src_path)
 
             store_file = context.get_temp_filename(suffix=".db")
-            store = create_store(store_file)
-            # This performs all of the checks.
-            store.create_view_from_parquet(src_path, schema)
-            store.drop_view(schema.name)
+            with create_store(store_file) as store:
+                # This performs all of the checks.
+                store.create_view_from_parquet(src_path, schema)
+                store.drop_view(schema.name)
 
         self._check_model_year_time_consistency(load_data_df)
 

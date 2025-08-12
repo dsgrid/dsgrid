@@ -212,10 +212,10 @@ def _check_time_dimension_with_chronify(
             value_column=VALUE_COLUMN,
         )
         store_file = scratch_dir_context.get_temp_filename(suffix=".db")
-        store = create_store(store_file)
-        # This performs all of the checks.
-        store.create_view_from_parquet(df_path, schema)
-        store.drop_view(schema.name)
+        with create_store(store_file) as store:
+            # This performs all of the checks.
+            store.create_view_from_parquet(df_path, schema)
+            store.drop_view(schema.name)
 
 
 def _is_dimension_valid_for_dataset(
@@ -231,7 +231,9 @@ def _is_dimension_valid_for_dataset(
 
 
 def _get_matching_supplemental_dimension(
-    project_config: ProjectConfig, dimension_type: DimensionType, unique_data_records: DataFrame
+    project_config: ProjectConfig,
+    dimension_type: DimensionType,
+    unique_data_records: DataFrame,
 ) -> DimensionBaseConfigWithFiles | None:
     for dim_config in project_config.list_supplemental_dimensions(dimension_type):
         if _is_dimension_valid_for_dataset(dim_config, unique_data_records):

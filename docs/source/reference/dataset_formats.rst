@@ -31,9 +31,10 @@ Recommendations
 
 CSV Files
 =========
-While not generally recommended for data files, dsgrid does support CSV files as long as a schema
-file is provided. The schema file is required so that there are no ambiguities for data types, such
-as integer vs string, integer vs float, and timestamps with time zones.
+While not generally recommended for data files, dsgrid does support CSV files. By default,
+dsgrid will let Spark and DuckDB attempt to infer the schema of the file. Because there may be
+cases of type ambiguities, such as integer vs string, integer vs float, and timestamps with time
+zones, dsgrid provides a mechanism of defining a schema.
 
 Consider this example::
 
@@ -48,12 +49,15 @@ The default behavior of IO libraries like Pandas, Spark, and DuckDB is to infer 
 inspecting the data. They will all decide that the geography column contains integers. The
 leading zeros will be dropped. All comparisons with the project's dimensions will fail.
 
-To address this ambiguity, dsgrid requires that there be a schema file in the same directory as
-the data file. For example, if your data file is called ``load_data.csv``, then there must be
-a file called ``load_data_schema.json`` (or ``load_data_schema.json5``). The format of the
-schema file is an object where keys are columns and values are data types.
+Secondly, you may want to specify the minimum required size for each number. For example,
+if you don't need the precision that comes with 8-byte floats, choose ``FLOAT`` and
+Spark/DuckDB will store all values in 4-byte floats, halving the required storage size.
 
-The supported types are:
+dsgrid will look for a schema file in the same directory as the data file. For example, if
+your data file is called ``load_data.csv``, dsgrid will look for ``load_data_schema.json``
+(or ``load_data_schema.json5``). The format of the schema file is shown below.
+
+The supported data types are:
 
     - BOOLEAN: boolean
     - INT: 4-byte integer
@@ -74,12 +78,32 @@ Example schema file:
 .. code-block:: json
 
     {
-      "timestamp": "TIMESTAMP_TZ",
-      "geography": "STRING",
-      "scenario": "STRING",
-      "subsector": "STRING",
-      "value": "FLOAT",
+      "columns": [
+        {
+          "name": "timestamp",
+          "data_type": "TIMESTAMP_TZ"
+        },
+        {
+          "name": "geography",
+          "data_type": "STRING"
+        },
+        {
+          "name": "scenario",
+          "data_type": "STRING"
+        },
+        {
+          "name": "subsector",
+          "data_type": "STRING"
+        },
+        {
+          "name": "value",
+          "data_type": "FLOAT"
+        }
+      ]
     }
+
+  .. warning:: Definition of data_type must be consistent across all columns. All must
+     define a value or none can.
 
 
 Time

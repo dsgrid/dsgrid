@@ -281,7 +281,7 @@ def test_invalid_load_data_extra_column(register_dataset):
             f_out.write(line)
             f_out.write(",0\n")
     schema = load_json_file(schema_file)
-    schema["extra"] = "INT"
+    schema["columns"].append({"name": "extra", "data_type": "INT"})
     dump_json_file(schema, schema_file)
 
     expected_errors["exception"] = DSGInvalidDataset

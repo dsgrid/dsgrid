@@ -195,7 +195,26 @@ def test_read_csv(tmp_path: Path) -> None:
     filename = tmp_path / "load_data.csv"
     pdf.to_csv(filename, header=True, index=False)
     schema_file = tmp_path / "load_data_schema.json"
-    schema = {"a": "integer", "b": "STRING", "c": "DOUBLE", "d": "TIMESTAMP_TZ"}
+    schema = {
+        "columns": [
+            {
+                "name": "a",
+                "data_type": "integer",
+            },
+            {
+                "name": "b",
+                "data_type": "string",
+            },
+            {
+                "name": "c",
+                "data_type": "DOUBLE",
+            },
+            {
+                "name": "d",
+                "data_type": "TIMESTAMP_TZ",
+            },
+        ]
+    }
     dump_json_file(schema, schema_file)
     df = read_csv(filename)
     values = df.collect()

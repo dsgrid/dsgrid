@@ -3,11 +3,7 @@ from typing import Iterable, Self
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig, MissingDimensionAssociations
-from dsgrid.config.dimension_config import (
-    DimensionBaseConfigWithFiles,
-)
 from dsgrid.config.project_config import ProjectConfig
-from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dataset.models import TableFormatType
@@ -44,7 +40,11 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @classmethod
     def load(
-        cls, config: DatasetConfig, *args, store: DataStoreInterface | None = None, **kwargs
+        cls,
+        config: DatasetConfig,
+        *args,
+        store: DataStoreInterface | None = None,
+        **kwargs,
     ) -> Self:
         if store is None:
             df = read_dataframe(config.load_data_path)
@@ -130,7 +130,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 )
 
     def get_expected_missing_dimension_associations(
-        self, missing_dimension_associations: DataFrame | None, context: ScratchDirContext
+        self,
+        missing_dimension_associations: DataFrame | None,
+        context: ScratchDirContext,
     ) -> DataFrame | None:
         time_dim = self._config.get_time_dimension()
         if time_dim is None:
@@ -240,18 +242,15 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
             return self._finalize_table(context, ld_df, project_config)
 
-    def make_mapped_dataframe(
-        self,
-        context: QueryContext,
-        geography_dimension: DimensionBaseConfigWithFiles | None = None,
-        metric_dimension: DimensionBaseConfigWithFiles | None = None,
-        time_dimension: TimeDimensionBaseConfig | None = None,
-    ) -> DataFrame:
+    def make_mapped_dataframe(self, context: QueryContext) -> DataFrame:
         query = context.model
         assert isinstance(query, DatasetQueryModel)
         plan = query.mapping_plan
         if plan is None:
             plan = self.build_default_dataset_mapping_plan()
+        geography_dimension = self._get_mapping_to_dimension(DimensionType.GEOGRAPHY)
+        metric_dimension = self._get_mapping_to_dimension(DimensionType.METRIC)
+        time_dimension = self._get_mapping_to_dimension(DimensionType.TIME)
         with context.dataset_mapping_manager(self.dataset_id, plan) as mapping_manager:
             ld_df = mapping_manager.try_read_checkpointed_table()
             if ld_df is None:

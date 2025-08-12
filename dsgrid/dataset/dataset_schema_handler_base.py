@@ -15,6 +15,7 @@ from dsgrid.config.annual_time_dimension_config import (
     map_annual_time_to_date_time,
 )
 from dsgrid.config.dimension_config import (
+    DimensionBaseConfig,
     DimensionBaseConfigWithFiles,
 )
 from dsgrid.config.noop_time_dimension_config import NoOpTimeDimensionConfig
@@ -309,11 +310,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def make_mapped_dataframe(
         self,
         context: QueryContext,
-        geography_dimension: DimensionBaseConfigWithFiles | None = None,
-        metric_dimension: DimensionBaseConfigWithFiles | None = None,
-        time_dimension: TimeDimensionBaseConfig | None = None,
     ) -> DataFrame:
-        """Return a load_data dataframe with dimensions mapped as specified by the QueryContext."""
+        """Return a load_data dataframe with dimensions mapped as stored in the handler."""
 
     @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency(self, load_data_df: DataFrame):
@@ -535,6 +533,17 @@ class DatasetSchemaHandlerBase(abc.ABC):
             if ref.from_dimension_type == dimension_type:
                 return ref
         return
+
+    def _get_mapping_to_dimension(
+        self, dimension_type: DimensionType
+    ) -> DimensionBaseConfig | None:
+        ref = self._get_dataset_to_project_mapping_reference(dimension_type)
+        if ref is None:
+            return None
+        config = self._dimension_mapping_mgr.get_by_id(ref.mapping_id, conn=self._conn)
+        return self._dimension_mgr.get_by_id(
+            config.model.to_dimension.dimension_id, conn=self._conn
+        )
 
     def _get_project_metric_records(self, project_config: ProjectConfig) -> DataFrame:
         metric_dim_query_name = getattr(

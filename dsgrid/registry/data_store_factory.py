@@ -6,7 +6,7 @@ from dsgrid.registry.duckdb_data_store import DuckDbDataStore
 from dsgrid.registry.filesystem_data_store import FilesystemDataStore
 
 
-def make_data_store_factory(
+def make_data_store(
     base_path: Path, data_store_type: DataStoreType, initialize: bool = False
 ) -> DataStoreInterface:
     """Factory function to create a data store.

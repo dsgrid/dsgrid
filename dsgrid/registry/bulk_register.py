@@ -28,7 +28,7 @@ def bulk_register(
     """Bulk register projects, datasets, and their dimensions. If any failure occurs, the code
     records successfully registered project and dataset IDs to a journal file and prints its
     filename to the console. Users can pass that filename with the --journal-file option to
-    avoid registering those projects and datasets on subsequent attempts.
+    avoid re-registering those projects and datasets on subsequent attempts.
 
     The JSON/JSON5 filename must match the data model defined by this documentation:
 

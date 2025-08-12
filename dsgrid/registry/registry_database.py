@@ -39,7 +39,7 @@ from dsgrid.registry.common import (
     MODEL_TYPE_TO_ID_FIELD_MAPPING,
 )
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.registry.data_store_factory import make_data_store_factory
+from dsgrid.registry.data_store_factory import make_data_store
 from dsgrid.utils.files import dump_data
 
 
@@ -69,7 +69,7 @@ class RegistryDatabase:
         for path in (filename, data_path):
             check_overwrite(path, overwrite=overwrite)
         data_path.mkdir()
-        data_store = make_data_store_factory(data_path, data_store_type, initialize=True)
+        data_store = make_data_store(data_path, data_store_type, initialize=True)
         db = cls(create_engine(conn.url, **connect_kwargs), data_store)
         db.initialize_db(data_path, data_store_type)
         return db
@@ -86,7 +86,7 @@ class RegistryDatabase:
         """Create a new registry database with existing registry data."""
         filename = conn.get_filename()
         check_overwrite(filename, overwrite=overwrite)
-        store = make_data_store_factory(data_path, data_store_type, initialize=False)
+        store = make_data_store(data_path, data_store_type, initialize=False)
         db = RegistryDatabase(create_engine(conn.url, **connect_kwargs), store)
         db.initialize_db(data_path, data_store_type)
         return db
@@ -105,7 +105,7 @@ class RegistryDatabase:
         db.update_sqlalchemy_metadata()
         base_path = db.get_data_path()
         data_store_type = db.get_data_store_type()
-        db.data_store = make_data_store_factory(base_path, data_store_type, initialize=False)
+        db.data_store = make_data_store(base_path, data_store_type, initialize=False)
         return db
 
     def update_sqlalchemy_metadata(self) -> None:
@@ -178,7 +178,10 @@ class RegistryDatabase:
 
     @classmethod
     def copy(
-        cls, src_conn: DatabaseConnection, dst_conn: DatabaseConnection, dst_data_path: Path
+        cls,
+        src_conn: DatabaseConnection,
+        dst_conn: DatabaseConnection,
+        dst_data_path: Path,
     ) -> "RegistryDatabase":
         """Copy the contents of a source database to a destination and return the destination.
         Currently, only supports SQLite backends.
@@ -323,7 +326,10 @@ class RegistryDatabase:
         logger.debug("Set the current version of %s %s to %s", model_type, model_id, db_id)
 
     def get_containing_models_by_db_id(
-        self, conn: Connection, db_id: int, parent_model_type: Optional[RegistryType] = None
+        self,
+        conn: Connection,
+        db_id: int,
+        parent_model_type: Optional[RegistryType] = None,
     ) -> list[tuple[RegistryType, dict[str, Any]]]:
         table1 = self.get_table(RegistryTables.CONTAINS)
         table2 = self.get_table(RegistryTables.MODELS)

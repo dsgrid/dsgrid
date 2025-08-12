@@ -351,7 +351,8 @@ class DatasetRegistryManager(RegistryManagerBase):
                     # TODO: Add this parameter when this code is merged with the CSV PR.
                     # return read_csv(path, require_schema=False)
                     df = read_csv(path)
-                df = read_dataframe(path)
+                else:
+                    df = read_dataframe(path)
                 for field in df.schema.fields:
                     if field.dataType != StringType():
                         df = df.withColumn(field.name, F.col(field.name).cast(StringType()))

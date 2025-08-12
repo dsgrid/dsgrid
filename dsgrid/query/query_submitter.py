@@ -15,7 +15,10 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionBaseConfig
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
-from dsgrid.dataset.dataset_expression_handler import DatasetExpressionHandler, evaluate_expression
+from dsgrid.dataset.dataset_expression_handler import (
+    DatasetExpressionHandler,
+    evaluate_expression,
+)
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -421,7 +424,11 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         return df
 
     def _process_aggregations_and_save(
-        self, df: DataFrame, context: QueryContext, repartition: bool, zip_file: bool = False
+        self,
+        df: DataFrame,
+        context: QueryContext,
+        repartition: bool,
+        zip_file: bool = False,
     ) -> Path:
         df = self._process_aggregations(df, context)
 
@@ -441,7 +448,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 )
                 column = next(iter(column_names))
                 df = df.join(
-                    records.select("id"), on=getattr(df, column) == getattr(records, "id")
+                    records.select("id"),
+                    on=getattr(df, column) == getattr(records, "id"),
                 ).drop("id")
             else:
                 query_name = dim_filter.dimension_name
@@ -456,7 +464,12 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
     @track_timing(timer_stats_collector)
     def _save_query_results(
-        self, context: QueryContext, df, repartition, aggregation_name=None, zip_file=False
+        self,
+        context: QueryContext,
+        df,
+        repartition,
+        aggregation_name=None,
+        zip_file=False,
     ):
         output_dir = self._output_dir / context.model.name
         output_dir.mkdir(exist_ok=True)
@@ -645,7 +658,10 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
                 f"There is no composite dataset with dataset_id={dataset_id}"
             )
         metadata_file = self.metadata_filename(self._composite_datasets_dir() / dataset_id)
-        return (read_dataframe(filename), DatasetMetadataModel(**load_data(metadata_file)))
+        return (
+            read_dataframe(filename),
+            DatasetMetadataModel(**load_data(metadata_file)),
+        )
 
     @track_timing(timer_stats_collector)
     def _save_composite_dataset(self, context: QueryContext, df, repartition):
@@ -696,16 +712,11 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
             output_dir = self._query_output_dir(context)
             check_overwrite(output_dir, overwrite)
             args = (context, handler)
-            kwargs = {
-                "geography_dimension": dims.get(DimensionType.GEOGRAPHY),
-                "metric_dimension": dims.get(DimensionType.METRIC),
-                "time_dimension": time_dim,
-            }
             if time_dim is not None and time_zone is not None:
                 with custom_time_zone(time_zone.tz_name):
-                    df = self._run_query(*args, **kwargs)
+                    df = self._run_query(*args)
             else:
-                df = self._run_query(*args, **kwargs)
+                df = self._run_query(*args)
         return df
 
     def _build_mappings(
@@ -737,7 +748,9 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
                     continue
                 if to_dim.model.dimension_type != DimensionType.TIME:
                     refs = mgr.dimension_mapping_manager.list_mappings_between_dimensions(
-                        graph, dataset_dim.model.dimension_id, to_dim.model.dimension_id
+                        graph,
+                        dataset_dim.model.dimension_id,
+                        to_dim.model.dimension_id,
                     )
                     to_dimension_mapping_refs += refs
                 mapped_dimension_types.add(to_dim.model.dimension_type)
@@ -775,9 +788,8 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         self,
         context: QueryContext,
         handler: DatasetSchemaHandlerBase,
-        **kwargs,
     ) -> DataFrame:
-        df = handler.make_mapped_dataframe(context, **kwargs)
+        df = handler.make_mapped_dataframe(context)
         df = self._postprocess(context, df)
         self._save_results(context, df)
         return df

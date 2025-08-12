@@ -83,7 +83,6 @@ def register_dataset(setup_registry):
     dataset_config_file = dataset_config_path / "dataset.json5"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
     dataset_path = test_dir / dataset_id
-    missing_assoc_file = dataset_path / "missing_associations.csv"
     # This dict must get filled in by each test.
     expected_errors = {"exception": None, "match_msg": None}
     yield dataset_config_path, dataset_path, expected_errors
@@ -94,7 +93,6 @@ def register_dataset(setup_registry):
                 dataset_path,
                 getpass.getuser(),
                 "register invalid dataset",
-                missing_dimension_associations_file=missing_assoc_file,
             )
             expected_errors.clear()
     finally:
@@ -121,7 +119,6 @@ def register_dataset(setup_registry):
 #             dataset_path,
 #             getpass.getuser(),
 #             "register bad dataset",
-#             missing_dimension_associations_file=missing_assoc_file,
 #         )
 #         project = manager.project_manager.load_project(PROJECT_ID)
 #         assert not project.is_registered(dataset_id)
@@ -300,7 +297,6 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
     dim_mapping_file = dataset_config_path / "dimension_mappings.json5"
     dataset_id = load_data(dataset_config_file)["dataset_id"]
     dataset_path = test_dir / dataset_id
-    missing_assoc_file = dataset_path / "missing_associations.csv"
 
     try:
         with pytest.raises(DSGInvalidDataset):
@@ -321,7 +317,6 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
             PROJECT_ID,
             getpass.getuser(),
             "register and submit",
-            missing_dimension_associations_file=missing_assoc_file,
             dimension_mapping_file=dim_mapping_file,
         )
 

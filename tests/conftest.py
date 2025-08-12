@@ -114,7 +114,10 @@ def src_tmp_registry_db(tmp_path_factory):
     RegistryDatabase.delete(conn)
     registry_dir = tmp_path_factory.mktemp("registry_data")
     make_test_data_registry(
-        registry_dir, project_dir, dataset_path=TEST_DATASET_DIRECTORY, database_url=conn.url
+        registry_dir,
+        project_dir,
+        dataset_path=TEST_DATASET_DIRECTORY,
+        database_url=conn.url,
     )
     yield conn, project_dir
     RegistryDatabase.delete(conn)

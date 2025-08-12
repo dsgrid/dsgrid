@@ -66,10 +66,10 @@ def make_test_data_registry(
     url = f"sqlite:///{registry_path}/registry.db" if database_url is None else database_url
     conn = DatabaseConnection(url=url)
     create_local_test_registry(registry_path, conn=conn, data_store_type=data_store_type)
-    dataset_dirs = [Path("datasets/modeled/comstock"), Path("datasets/modeled/comstock_unpivoted")]
-    missing_dimension_associations_file = (
-        dataset_path / "test_efs_comstock" / "missing_associations.csv"
-    )
+    dataset_dirs = [
+        Path("datasets/modeled/comstock"),
+        Path("datasets/modeled/comstock_unpivoted"),
+    ]
 
     user = getpass.getuser()
     log_message = "Initial registration"
@@ -108,7 +108,6 @@ def make_test_data_registry(
                 dataset_path / dataset_id,
                 user,
                 log_message,
-                missing_dimension_associations_file=missing_dimension_associations_file,
             )
             print(f"\n 3. submit dataset {dataset_id} to project\n")
             manager.project_manager.submit_dataset(
@@ -160,7 +159,11 @@ def make_test_data_registry(
     callback=lambda *x: DataStoreType(x[2]),
 )
 @click.option(
-    "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
+    "--verbose",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Enable verbose log output.",
 )
 def run(
     registry_path: Path,

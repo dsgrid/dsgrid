@@ -14,7 +14,10 @@ import pandas as pd
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
-from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionBaseConfigWithFiles
+from dsgrid.config.dimension_config import (
+    DimensionBaseConfig,
+    DimensionBaseConfigWithFiles,
+)
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
@@ -136,7 +139,12 @@ class ProjectRegistryManager(RegistryManagerBase):
         db: ProjectRegistryInterface,
     ):
         return cls._load(
-            path, params, dataset_manager, dimension_manager, dimension_mapping_manager, db
+            path,
+            params,
+            dataset_manager,
+            dimension_manager,
+            dimension_mapping_manager,
+            db,
         )
 
     @staticmethod
@@ -168,7 +176,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         return self._dimension_mapping_mgr
 
     def get_by_id(
-        self, project_id: str, version: Optional[str] = None, conn: Optional[Connection] = None
+        self,
+        project_id: str,
+        version: Optional[str] = None,
+        conn: Optional[Connection] = None,
     ):
         if version is None:
             assert self._db is not None
@@ -219,7 +230,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         return subset_dimensions
 
     def load_project(
-        self, project_id: str, version: Optional[str] = None, conn: Optional[Connection] = None
+        self,
+        project_id: str,
+        version: Optional[str] = None,
+        conn: Optional[Connection] = None,
     ) -> Project:
         """Load a project from the registry.
 
@@ -792,7 +806,6 @@ class ProjectRegistryManager(RegistryManagerBase):
         project_id: str,
         submitter: str,
         log_message: str,
-        missing_dimension_associations_file: Path | str | None = None,
         dimension_mapping_file=None,
         dimension_mapping_references_file=None,
         autogen_reverse_supplemental_mappings=None,
@@ -816,7 +829,6 @@ class ProjectRegistryManager(RegistryManagerBase):
                 dataset_config_file,
                 dataset_path,
                 context=context,
-                missing_dimension_associations_file=missing_dimension_associations_file,
             )
             self.submit_dataset(
                 project_id,

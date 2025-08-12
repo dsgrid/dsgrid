@@ -28,7 +28,6 @@ from dsgrid.spark.functions import (
     create_temp_view,
     handle_column_spaces,
     make_temp_view_name,
-    read_csv,
     read_parquet,
     is_dataframe_empty,
     join,
@@ -73,7 +72,8 @@ def map_and_reduce_stacked_dimension(
     df = df.withColumnRenamed("to_id", to_column_)
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
     df = df.select(
-        *nonfraction_cols, (F.col("fraction") * F.col("from_fraction")).alias("fraction")
+        *nonfraction_cols,
+        (F.col("fraction") * F.col("from_fraction")).alias("fraction"),
     )
     return df
 
@@ -455,7 +455,9 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
     stacked = list(stacked_columns)
     return (
         join_multiple_columns(
-            df, count_distinct_on_group_by(df, stacked, time_column, "count_time"), stacked
+            df,
+            count_distinct_on_group_by(df, stacked, time_column, "count_time"),
+            stacked,
         )
         .filter(f"{handle_column_spaces(time_column)} IS NOT NULL OR count_time = 0")
         .select(orig_columns)
@@ -529,7 +531,10 @@ def repartition_if_needed_by_mapping(
 
 
 def unpivot_dataframe(
-    df: DataFrame, value_columns: Iterable[str], variable_column: str, time_columns: list[str]
+    df: DataFrame,
+    value_columns: Iterable[str],
+    variable_column: str,
+    time_columns: list[str],
 ) -> DataFrame:
     """Unpivot the dataframe, accounting for time columns."""
     values = value_columns if isinstance(value_columns, set) else set(value_columns)
@@ -549,22 +554,15 @@ def unpivot_dataframe(
 
 def convert_types_if_necessary(df: DataFrame) -> DataFrame:
     """Convert the types of the dataframe if necessary."""
-    allowed_int_columns = (DimensionType.MODEL_YEAR.value, DimensionType.WEATHER_YEAR.value)
+    allowed_int_columns = (
+        DimensionType.MODEL_YEAR.value,
+        DimensionType.WEATHER_YEAR.value,
+    )
     int_types = {IntegerType(), LongType(), ShortType()}
     existing_columns = set(df.columns)
     for column in allowed_int_columns:
         if column in existing_columns and df.schema[column].dataType in int_types:
             df = df.withColumn(column, F.col(column).cast(StringType()))
-    return df
-
-
-def get_missing_dimension_associations(filename: Path | str) -> DataFrame:
-    """Get the missing dimension associations from filename."""
-    df = read_csv(filename)
-    for field in df.schema.fields:
-        if field.dataType != StringType():
-            df = df.withColumn(field.name, F.col(field.name).cast(StringType()))
-
     return df
 
 

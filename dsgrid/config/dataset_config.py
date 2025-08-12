@@ -8,9 +8,16 @@ from pydantic import field_validator, model_validator, Field
 
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.common import make_base_dimension_template
-from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionBaseConfigWithFiles
+from dsgrid.config.dimension_config import (
+    DimensionBaseConfig,
+    DimensionBaseConfigWithFiles,
+)
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
+from dsgrid.dataset.models import (
+    PivotedTableFormatModel,
+    TableFormatModel,
+    TableFormatType,
+)
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.exceptions import DSGInvalidParameter
@@ -41,6 +48,10 @@ ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.json",
 )
 ALLOWED_DATA_FILES = ALLOWED_LOAD_DATA_FILENAMES + ALLOWED_LOAD_DATA_LOOKUP_FILENAMES
+ALLOWED_MISSING_DIMENSION_ASSOCATIONS_FILENAMES = (
+    "missing_associations.csv",
+    "missing_associations.parquet",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -480,7 +491,9 @@ def make_unvalidated_dataset_config(
             exclude_dimension_types.add(dim_type)
 
     dimensions = make_base_dimension_template(
-        [metric_type], exclude_dimension_types=exclude_dimension_types, time_type=time_type
+        [metric_type],
+        exclude_dimension_types=exclude_dimension_types,
+        time_type=time_type,
     )
     return {
         "dataset_id": dataset_id,

@@ -93,7 +93,10 @@ def _run_bulk_registration(
             if not dataset.config_file.is_absolute():
                 dataset.config_file = base_repo_dir / dataset.config_file
         for dataset in registration.dataset_submissions:
-            for field in ("dimension_mapping_file", "dimension_mapping_references_file"):
+            for field in (
+                "dimension_mapping_file",
+                "dimension_mapping_references_file",
+            ):
                 path = getattr(dataset, field)
                 if path is not None and not path.is_absolute():
                     setattr(dataset, field, base_repo_dir / path)
@@ -126,7 +129,6 @@ def _run_bulk_registration(
             dataset.dataset_path,
             user,
             dataset.log_message,
-            missing_dimension_associations_file=dataset.missing_dimension_associations_file,
         )
         journal.add_dataset(dataset.dataset_id)
 

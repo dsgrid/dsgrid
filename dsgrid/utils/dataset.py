@@ -241,13 +241,21 @@ def handle_dimension_association_errors(
 ) -> None:
     """Record missing dimension record combinations in a CSV file and log an error."""
     out_file = f"{dataset_id}__missing_dimension_record_combinations.csv"
-    write_csv(diff, out_file, header=True, overwrite=True)
+    df = diff
+    changed = False
+    for column in diff.columns:
+        if diff.select(column).distinct().count() == 1:
+            df = df.drop(column)
+            changed = True
+    if changed:
+        df = df.distinct()
+    write_csv(df, out_file, header=True, overwrite=True)
     logger.error(
-        "Dataset %s is missing required dimension records. " "Recorded missing records in %s",
+        "Dataset %s is missing required dimension records. Recorded missing records in %s",
         dataset_id,
         out_file,
     )
-    _look_for_error_contributors(diff, dataset_table)
+    _look_for_error_contributors(df, dataset_table)
     raise DSGInvalidDataset(
         f"Dataset {dataset_id} is missing required dimension records. "
         "Please look in the log file for more information."
@@ -587,3 +595,16 @@ def filter_out_expected_missing_associations(
     """
     res = spark.sql(query)
     return res
+
+
+def split_expected_missing_rows(
+    df: DataFrame, time_columns: list[str]
+) -> tuple[DataFrame, DataFrame | None]:
+    """Split a DataFrame into two if it contains expected missing data."""
+    null_df = df.filter(f"{VALUE_COLUMN} IS NULL")
+    if is_dataframe_empty(null_df):
+        return df, None
+
+    drop_columns = time_columns + [VALUE_COLUMN]
+    missing_associations = null_df.drop(*drop_columns)
+    return df.filter(f"{VALUE_COLUMN} IS NOT NULL"), missing_associations

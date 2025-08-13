@@ -1,4 +1,5 @@
 import copy
+import fileinput
 import getpass
 import json
 import logging
@@ -13,7 +14,7 @@ import pytest
 from chronify import InvalidTable
 
 from dsgrid.config.dataset_config import DatasetConfigModel
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension, DSGInvalidField
 from dsgrid.utils.id_remappings import (
     map_dimension_names_to_ids,
     replace_dimension_names_with_current_ids,
@@ -178,9 +179,16 @@ def test_invalid_load_data_lookup_mismatched_records(register_dataset):
     _, dataset_path, expected_errors = register_dataset
     lookup_file = dataset_path / "load_data_lookup.json"
     data = load_line_delimited_json(lookup_file)
-    dump_line_delimited_json(data[:1], lookup_file)
+    first_id = data[0]["id"]
+    dump_line_delimited_json(data[1:], lookup_file)
+
+    data_file = dataset_path / "load_data.csv"
+    with fileinput.input(files=[data_file], inplace=True) as f:
+        for line in f:
+            if not line.startswith(f"{first_id},"):
+                print(line, end="")
     expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = r"load_data_lookup records do not match dimension records"
+    expected_errors["match_msg"] = r"is missing required dimension records"
 
 
 def test_invalid_load_data_missing_timestamp(register_dataset):
@@ -236,8 +244,8 @@ def test_invalid_load_data_null_id(register_dataset):
     new_line_fields[0] = ""
     lines.append(",".join(new_line_fields))
     data_file.write_text("\n".join(lines))
-    expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = r"load_data .*has a null ID"
+    expected_errors["exception"] = DSGInvalidField
+    expected_errors["match_msg"] = r"DataFrame contains NULL value.*id"
 
 
 def test_invalid_load_data_lookup_mismatched_ids(register_dataset):
@@ -260,8 +268,8 @@ def test_invalid_load_data_lookup_null_id(register_dataset):
     item["geography"] = None
     data.append(item)
     dump_line_delimited_json(data, lookup_file)
-    expected_errors["exception"] = DSGInvalidDataset
-    expected_errors["match_msg"] = r"has a NULL value"
+    expected_errors["exception"] = DSGInvalidField
+    expected_errors["match_msg"] = r"DataFrame contains NULL value.*geography"
 
 
 def test_invalid_load_data_extra_column(register_dataset):
@@ -281,10 +289,8 @@ def test_invalid_load_data_extra_column(register_dataset):
 
 def test_invalid_load_data_lookup_missing_records(register_dataset):
     _, dataset_path, expected_errors = register_dataset
-    lookup_file = dataset_path / "load_data_lookup.json"
-    data = load_line_delimited_json(lookup_file)
-    bad_data = [x for x in data if x["id"] is not None]
-    dump_line_delimited_json(bad_data, lookup_file)
+    associations_file = dataset_path / "missing_associations.csv"
+    associations_file.unlink()
     expected_errors["exception"] = DSGInvalidDataset
     expected_errors["match_msg"] = r"missing required dimension records"
 

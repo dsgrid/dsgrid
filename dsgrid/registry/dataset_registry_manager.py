@@ -5,16 +5,18 @@ import os
 from pathlib import Path
 from typing import Optional, Type, Union
 
+import pandas as pd
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
+from dsgrid.common import SCALING_FACTOR_COLUMN
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     ALLOWED_LOAD_DATA_FILENAMES,
     ALLOWED_LOAD_DATA_LOOKUP_FILENAMES,
     ALLOWED_MISSING_DIMENSION_ASSOCATIONS_FILENAMES,
 )
-from dsgrid.config.dataset_config import DataSchemaType, MissingDimensionAssociations
+from dsgrid.config.dataset_config import DataSchemaType
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dataset.models import TableFormatType, UnpivotedTableFormatModel
@@ -28,9 +30,12 @@ from dsgrid.registry.dimension_mapping_registry_manager import (
 )
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.registry_interface import DatasetRegistryInterface
-from dsgrid.spark.functions import is_dataframe_empty, read_csv
+from dsgrid.spark.functions import (
+    get_spark_session,
+    is_dataframe_empty,
+)
 from dsgrid.spark.types import DataFrame, F, StringType
-from dsgrid.utils.dataset import unpivot_dataframe
+from dsgrid.utils.dataset import split_expected_missing_rows, unpivot_dataframe
 from dsgrid.utils.spark import (
     read_dataframe,
 )
@@ -107,7 +112,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
-        missing_dimension_associations: MissingDimensionAssociations,
+        missing_dimension_associations: DataFrame | None,
     ) -> DataFrame | None:
         logger.info("Run dataset registration checks.")
         check_required_dataset_dimensions(config.model.dimension_references, "dataset dimensions")
@@ -124,7 +129,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
-        missing_dimension_associations: MissingDimensionAssociations,
+        missing_dimension_associations: DataFrame | None,
     ) -> DataFrame | None:
         schema_handler = make_dataset_schema_handler(
             conn,
@@ -296,7 +301,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             missing_associations = self._run_checks(
                 context.connection,
                 config,
-                MissingDimensionAssociations(df=assoc_df, needs_processing=True),
+                assoc_df,
             )
             if missing_associations is not None and not is_dataframe_empty(missing_associations):
                 # Note that the table may have been updated.
@@ -332,13 +337,27 @@ class DatasetRegistryManager(RegistryManagerBase):
         )
         schema_handler.check_time_consistency()
 
-    def _read_lookup_table_from_user_path(self, path: Path) -> DataFrame:
+    def _read_lookup_table_from_user_path(self, path: Path) -> tuple[DataFrame, DataFrame | None]:
         for filename in ALLOWED_LOAD_DATA_LOOKUP_FILENAMES:
             lk_path = path / filename
             if lk_path.exists():
-                return read_dataframe(lk_path)
+                df = read_dataframe(lk_path)
+                if "id" not in df.columns:
+                    msg = "load_data_lookup does not include an 'id' column"
+                    raise DSGInvalidDataset(msg)
+                missing = df.filter("id IS NULL").drop("id")
+                if is_dataframe_empty(missing):
+                    missing_df = None
+                else:
+                    missing_df = missing
+                    if SCALING_FACTOR_COLUMN in missing_df.columns:
+                        missing_df = missing_df.drop(SCALING_FACTOR_COLUMN)
+                return df, missing_df
 
-        msg = f"Did not find any lookup data files in {path}. Expected one of {ALLOWED_LOAD_DATA_LOOKUP_FILENAMES}"
+        msg = (
+            f"Did not find any lookup data files in {path}. "
+            "Expected one of {ALLOWED_LOAD_DATA_LOOKUP_FILENAMES}"
+        )
         raise DSGInvalidDataset(msg)
 
     def _read_missing_associations_table_from_user_path(
@@ -348,9 +367,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             path = dataset_path / filename
             if path.exists():
                 if path.suffix.lower() == ".csv":
-                    # TODO: Add this parameter when this code is merged with the CSV PR.
-                    # return read_csv(path, require_schema=False)
-                    df = read_csv(path)
+                    df = get_spark_session().createDataFrame(pd.read_csv(path, dtype="string"))
                 else:
                     df = read_dataframe(path)
                 for field in df.schema.fields:
@@ -359,7 +376,9 @@ class DatasetRegistryManager(RegistryManagerBase):
                 return df
         return None
 
-    def _read_table_from_user_path(self, config: DatasetConfig, path: Path) -> DataFrame:
+    def _read_table_from_user_path(
+        self, config: DatasetConfig, path: Path
+    ) -> tuple[DataFrame, DataFrame | None]:
         ld_path: Path | None = None
         for filename in ALLOWED_LOAD_DATA_FILENAMES:
             tmp = path / filename
@@ -382,15 +401,16 @@ class DatasetRegistryManager(RegistryManagerBase):
             pivoted_dimension_type = None
 
         df = read_dataframe(ld_path)
+
         time_dim = config.get_time_dimension()
         time_columns: list[str] = []
         if time_dim is not None:
+            time_columns.extend(time_dim.get_load_data_time_columns())
             df = time_dim.convert_time_format(df, update_model=True)
+
         if needs_unpivot:
             assert pivoted_columns is not None
             assert pivoted_dimension_type is not None
-            if time_dim is not None:
-                time_columns = time_dim.get_load_data_time_columns()
             existing_columns = set(df.columns)
             if diff := set(time_columns) - existing_columns:
                 msg = f"Expected time columns are not present in the table: {diff=}"
@@ -399,7 +419,8 @@ class DatasetRegistryManager(RegistryManagerBase):
                 msg = f"Expected pivoted_columns are not present in the table: {diff=}"
                 raise DSGInvalidDataset(msg)
             df = unpivot_dataframe(df, pivoted_columns, pivoted_dimension_type.value, time_columns)
-        return df
+
+        return split_expected_missing_rows(df, time_columns)
 
     def _write_to_registry(
         self,
@@ -419,10 +440,17 @@ class DatasetRegistryManager(RegistryManagerBase):
                     )
                     ld_df = self._store.read_table(config.model.dataset_id, orig_version)
                 else:
-                    missing_df = self._read_missing_associations_table_from_user_path(
+                    # Note: config will be updated if this is a pivoted table.
+                    ld_df, missing_df1 = self._read_table_from_user_path(
+                        config, config.dataset_path
+                    )
+                    missing_df2 = self._read_missing_associations_table_from_user_path(
                         config.dataset_path
                     )
-                    ld_df = self._read_table_from_user_path(config, config.dataset_path)
+                    missing_df = self._check_duplicate_missing_associations(
+                        missing_df1, missing_df2
+                    )
+
             case DataSchemaType.STANDARD:
                 if config.dataset_path is None:
                     assert (
@@ -434,12 +462,23 @@ class DatasetRegistryManager(RegistryManagerBase):
                         config.model.dataset_id, orig_version
                     )
                 else:
-                    missing_df = self._read_missing_associations_table_from_user_path(
+                    # Note: config will be updated if this is a pivoted table.
+                    ld_df, tmp = self._read_table_from_user_path(config, config.dataset_path)
+                    if tmp is not None:
+                        msg = (
+                            "NULL rows cannot be present in the load_data table in standard format. "
+                            "They must be provided in the load_data_lookup table."
+                        )
+                        raise DSGInvalidDataset(msg)
+                    lk_df, missing_df1 = self._read_lookup_table_from_user_path(
+                        Path(config.dataset_path)
+                    )
+                    missing_df2 = self._read_missing_associations_table_from_user_path(
                         config.dataset_path
                     )
-                    lk_df = self._read_lookup_table_from_user_path(Path(config.dataset_path))
-                    # Note: config will be updated if this is a pivoted table.
-                    ld_df = self._read_table_from_user_path(config, config.dataset_path)
+                    missing_df = self._check_duplicate_missing_associations(
+                        missing_df1, missing_df2
+                    )
             case _:
                 msg = f"Unsupported data schema type: {config.get_data_schema_type()}"
                 raise Exception(msg)
@@ -451,6 +490,16 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._store.write_missing_associations_table(
                 missing_df, config.model.dataset_id, config.model.version
             )
+
+    @staticmethod
+    def _check_duplicate_missing_associations(
+        df1: DataFrame | None, df2: DataFrame | None
+    ) -> DataFrame | None:
+        if df1 is not None and df2 is not None:
+            msg = "A dataset cannot have expected missing rows in the data and "
+            "provide a missing_associations file. Provide one or the other."
+            raise DSGInvalidDataset(msg)
+        return df1 or df2
 
     def _copy_dataset_config(self, conn: Connection, config: DatasetConfig) -> DatasetConfig:
         new_config = DatasetConfig(config.model)
@@ -523,10 +572,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         assoc_df = self._store.read_missing_associations_table(
             updated_config.model.dataset_id, updated_config.model.version
         )
-        assoc = MissingDimensionAssociations(
-            df=assoc_df, needs_processing=updated_config.dataset_path is not None
-        )
-        missing_associations = self._run_checks(conn, updated_config, assoc)
+        missing_associations = self._run_checks(conn, updated_config, assoc_df)
         if missing_associations is not None and not is_dataframe_empty(missing_associations):
             self._store.write_missing_associations_table(
                 missing_associations,

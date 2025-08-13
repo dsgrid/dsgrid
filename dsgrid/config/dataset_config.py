@@ -568,7 +568,7 @@ class DatasetConfig(ConfigBase):
         return self._dataset_path
 
     @dataset_path.setter
-    def dataset_path(self, dataset_path: Path | str) -> None:
+    def dataset_path(self, dataset_path: Path | str | None) -> None:
         """Set the dataset path."""
         if isinstance(dataset_path, str):
             dataset_path = Path(dataset_path)
@@ -576,10 +576,12 @@ class DatasetConfig(ConfigBase):
 
     @property
     def load_data_path(self):
-        return check_load_data_filename(self.dataset_path)
+        assert self._dataset_path is not None
+        return check_load_data_filename(self._dataset_path)
 
     @property
     def load_data_lookup_path(self):
+        assert self._dataset_path is not None
         return check_load_data_lookup_filename(self._dataset_path)
 
     def update_dimensions(self, dimensions):
@@ -668,13 +670,6 @@ class DatasetConfig(ConfigBase):
             raise DSGInvalidDimension(
                 f"Trivial dimensions must have only 1 record but {len(records)} records found for dimension: {records}"
             )
-
-
-class MissingDimensionAssociations(DSGBaseModel):
-    """Container for missing dimension associations."""
-
-    df: DataFrame | None
-    needs_processing: bool
 
 
 def get_unique_dimension_record_ids(

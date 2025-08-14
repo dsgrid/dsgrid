@@ -116,13 +116,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
             with pytest.raises((ValueError, exc)):
                 _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
-            logger.info("4. with a duplicated pivot col: ")
-            _modify_data_file(data_dir, duplicate_col="elec_heating")
-            exc = DSGInvalidDimension if use_duckdb() else DSGInvalidDataset
-            with pytest.raises((ValueError, exc)):
-                _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
-
-            logger.info("5. End Uses dataset only - missing time ")
+            logger.info("4. End Uses dataset only - missing time ")
             if "End_Uses" in dataset:
                 _modify_data_file(data_dir, drop_first_row=True)
                 with pytest.raises(

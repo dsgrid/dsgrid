@@ -29,7 +29,6 @@ from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     InputDatasetType,
-    MissingDimensionAssociations,
 )
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
@@ -63,7 +62,7 @@ from dsgrid.utils.dataset import (
     filter_out_expected_missing_associations,
     handle_dimension_association_errors,
     is_noop_mapping,
-    map_and_reduce_stacked_dimension,
+    map_stacked_dimension,
     add_time_zone,
     map_time_dimension_with_chronify_duckdb,
     map_time_dimension_with_chronify_spark_hive,
@@ -74,6 +73,7 @@ from dsgrid.utils.dataset import (
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
+    check_for_nulls,
     create_dataframe_from_product,
     persist_intermediate_table,
     read_dataframe,
@@ -126,21 +126,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def check_consistency(
-        self, missing_dimension_associations: MissingDimensionAssociations
-    ) -> DataFrame | None:
+    def check_consistency(self, missing_dimension_associations: DataFrame | None) -> None:
         """
         Check all data consistencies, including data columns, dataset to dimension records, and time
-
-        Parameters
-        ----------
-        missing_dimension_associations : MissingDimensionAssociations
-
-        Returns
-        -------
-        DataFrame
-            A dataframe containing one row for each dimension association that is expected to be
-            missing from the data. The dataframe will include all dimension columns except time.
         """
 
     @abc.abstractmethod
@@ -148,53 +136,15 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """Check the time consistency of the dataset."""
 
     @abc.abstractmethod
-    def get_expected_missing_dimension_associations(
-        self,
-        missing_dimension_associations: DataFrame | None,
-        context: ScratchDirContext,
-    ) -> DataFrame | None:
-        """Return a dataframe containing one row for each dimension association that is expected
-        to be missing from the data.
-        """
+    def _get_load_data_table(self) -> DataFrame:
+        """Return the full load data table."""
 
-    @abc.abstractmethod
-    def make_dimension_association_table(self) -> DataFrame:
-        """Return a dataframe containing one row for each unique dimension combination except time.
-        Use dimensions in the dataset's table.
-        """
+    def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
+        return self._remove_non_dimension_columns(self._get_load_data_table()).distinct()
 
-    def _union_null_rows_from_missing_dimension_associations(
-        self,
-        missing_dimension_associations: DataFrame,
-        df: DataFrame,
-        context: ScratchDirContext,
-    ) -> DataFrame:
-        missing_cols = set(missing_dimension_associations.columns)
-        not_covered_dims: list[DimensionType] = []
-        for dim in DimensionType:
-            if dim != DimensionType.TIME and dim.value not in missing_cols:
-                not_covered_dims.append(dim)
-
-        if not not_covered_dims:
-            return df
-
-        expected_table = self.make_expected_dimension_association_table_from_records(
-            not_covered_dims, context
-        )
-        if expected_table is None:
-            return missing_dimension_associations
-
-        df2 = cross_join(
-            missing_dimension_associations,
-            expected_table,
-        )
-        assert sorted(df.columns) == sorted(df2.columns)
-        df2 = df2.select(*df.columns)
-        return union([df, df2]).distinct()
-
-    def make_expected_dimension_association_table_from_records(
+    def _make_expected_dimension_association_table_from_records(
         self, dimension_types: Iterable[DimensionType], context: ScratchDirContext
-    ) -> DataFrame | None:
+    ) -> DataFrame:
         """Return a dataframe containing one row for each unique dimension combination except time.
         Use dimensions in the dataset's dimension records.
         """
@@ -205,42 +155,25 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 data[dim_type.value] = list(dim.get_unique_ids())
 
         if not data:
-            return None
+            msg = "Bug: did not find any dimension records"
+            raise Exception(msg)
         return create_dataframe_from_product(data, context)
 
     @track_timing(timer_stats_collector)
     def _check_dimension_associations(
-        self, missing_dimension_associations: MissingDimensionAssociations
-    ) -> DataFrame | None:
-        """Check that a cross-join of dimension records is present, unless explicitly excepted.
-
-        Returns
-        -------
-        DataFrame | None
-            If set, a dataframe containing one row for each dimension association that is expected
-            to be missing from the data. The dataframe will contain all dimension columns except
-            time.
-        """
+        self, missing_dimension_associations: DataFrame | None
+    ) -> None:
+        """Check that a cross-join of dimension records is present, unless explicitly excepted."""
         context = ScratchDirContext(Path(tempfile.gettempdir()))
-        if (
-            missing_dimension_associations is not None
-            and not missing_dimension_associations.needs_processing
-        ):
-            assert missing_dimension_associations.df is not None
-            full_expected_missing = missing_dimension_associations.df
-        else:
-            full_expected_missing = self.get_expected_missing_dimension_associations(
-                missing_dimension_associations.df, context
-            )
-        assoc_by_records = self.make_expected_dimension_association_table_from_records(
+        assoc_by_records = self._make_expected_dimension_association_table_from_records(
             [x for x in DimensionType if x != DimensionType.TIME], context
         )
-        assoc_by_data = self.make_dimension_association_table()
-        if full_expected_missing is None:
+        assoc_by_data = self._make_actual_dimension_association_table_from_data()
+        if missing_dimension_associations is None:
             required_assoc = assoc_by_records
         else:
             required_assoc = filter_out_expected_missing_associations(
-                assoc_by_records, full_expected_missing
+                assoc_by_records, missing_dimension_associations
             )
         cols = sorted(required_assoc.columns)
         diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
@@ -251,15 +184,47 @@ class DatasetSchemaHandlerBase(abc.ABC):
         finally:
             unpersist(diff)
 
-        return full_expected_missing
-
-    @abc.abstractmethod
     def make_mapped_dimension_association_table(
         self, store: DataStoreInterface, context: ScratchDirContext
     ) -> DataFrame:
         """Return a dataframe containing one row for each unique dimension combination except time.
         Use mapped dimensions.
         """
+        df = self._make_actual_dimension_association_table_from_data()
+        missing_associations = store.read_missing_associations_table(
+            self._config.model.dataset_id, self._config.model.version
+        )
+        if missing_associations is not None:
+            missing_associations = self._union_not_covered_dimensions(
+                missing_associations, context
+            )
+            assert sorted(df.columns) == sorted(missing_associations.columns)
+            df = union([df, missing_associations.select(*df.columns)])
+        mapping_plan = self.build_default_dataset_mapping_plan()
+        with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
+            df = self._remap_dimension_columns(df, mapping_manager).drop("fraction").distinct()
+        check_for_nulls(df)
+        return df
+
+    def _union_not_covered_dimensions(
+        self, df: DataFrame, context: ScratchDirContext
+    ) -> DataFrame:
+        columns = set(df.columns)
+        not_covered_dims: list[DimensionType] = []
+        for dim in DimensionType:
+            if dim != DimensionType.TIME and dim.value not in columns:
+                not_covered_dims.append(dim)
+
+        if not not_covered_dims:
+            return df
+
+        expected_table = self._make_expected_dimension_association_table_from_records(
+            not_covered_dims, context
+        )
+        return cross_join(
+            df,
+            expected_table,
+        )
 
     @abc.abstractmethod
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
@@ -413,8 +378,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         unique_array_cols = set(DimensionType.get_allowed_dimension_column_names()).intersection(
             load_data_df.columns
         )
-        for col in time_cols:
-            load_data_df = load_data_df.filter(f"{col} is not null")
         counts = load_data_df.groupBy(*time_cols).count().select("count")
         distinct_counts = counts.select("count").distinct().collect()
         if len(distinct_counts) != 1:
@@ -772,7 +735,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 continue
             if column in df.columns:
                 persisted_file: Path | None = None
-                df = map_and_reduce_stacked_dimension(df, records, column)
+                df = map_stacked_dimension(df, records, column)
                 df, persisted_file = repartition_if_needed_by_mapping(
                     df,
                     mapping_config.model.mapping_type,

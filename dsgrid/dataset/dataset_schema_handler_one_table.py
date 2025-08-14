@@ -5,6 +5,7 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.query.models import DatasetQueryModel
 from dsgrid.registry.data_store_interface import DataStoreInterface
@@ -162,7 +163,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             )
             return self._finalize_table(context, ld_df, project_config)
 
-    def make_mapped_dataframe(self, context: QueryContext) -> DataFrame:
+    def make_mapped_dataframe(
+        self, context: QueryContext, time_dimension: TimeDimensionBaseConfig | None = None
+    ) -> DataFrame:
         query = context.model
         assert isinstance(query, DatasetQueryModel)
         plan = query.mapping_plan
@@ -170,7 +173,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             plan = self.build_default_dataset_mapping_plan()
         geography_dimension = self._get_mapping_to_dimension(DimensionType.GEOGRAPHY)
         metric_dimension = self._get_mapping_to_dimension(DimensionType.METRIC)
-        time_dimension = self._get_mapping_to_dimension(DimensionType.TIME)
         with context.dataset_mapping_manager(self.dataset_id, plan) as mapping_manager:
             ld_df = mapping_manager.try_read_checkpointed_table()
             if ld_df is None:

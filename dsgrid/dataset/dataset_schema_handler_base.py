@@ -275,8 +275,18 @@ class DatasetSchemaHandlerBase(abc.ABC):
     def make_mapped_dataframe(
         self,
         context: QueryContext,
+        time_dimension: TimeDimensionBaseConfig | None = None,
     ) -> DataFrame:
-        """Return a load_data dataframe with dimensions mapped as stored in the handler."""
+        """Return a load_data dataframe with dimensions mapped as stored in the handler.
+
+        Parameters
+        ----------
+        context
+        time_dimension
+            Required if the time dimension is being mapped.
+            This should be the destination time dimension.
+
+        """
 
     @track_timing(timer_stats_collector)
     def _check_dataset_time_consistency(self, load_data_df: DataFrame):

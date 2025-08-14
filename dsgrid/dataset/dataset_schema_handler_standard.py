@@ -5,6 +5,7 @@ from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
@@ -134,6 +135,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
     def make_mapped_dataframe(
         self,
         context: QueryContext,
+        time_dimension: TimeDimensionBaseConfig | None = None,
     ) -> DataFrame:
         query = context.model
         assert isinstance(query, DatasetQueryModel)
@@ -142,7 +144,6 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             plan = self.build_default_dataset_mapping_plan()
         geography_dimension = self._get_mapping_to_dimension(DimensionType.GEOGRAPHY)
         metric_dimension = self._get_mapping_to_dimension(DimensionType.METRIC)
-        time_dimension = self._get_mapping_to_dimension(DimensionType.TIME)
         with context.dataset_mapping_manager(self.dataset_id, plan) as mapping_manager:
             ld_df = mapping_manager.try_read_checkpointed_table()
             if ld_df is None:

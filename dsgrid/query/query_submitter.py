@@ -15,6 +15,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionBaseConfig
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.config.dimension_mapping_base import DimensionMappingReferenceModel
+from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.dataset_expression_handler import (
     DatasetExpressionHandler,
     evaluate_expression,
@@ -712,11 +713,12 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
             output_dir = self._query_output_dir(context)
             check_overwrite(output_dir, overwrite)
             args = (context, handler)
+            kwargs = {"time_dimension": dims.get(DimensionType.TIME)}
             if time_dim is not None and time_zone is not None:
                 with custom_time_zone(time_zone.tz_name):
-                    df = self._run_query(*args)
+                    df = self._run_query(*args, **kwargs)
             else:
-                df = self._run_query(*args)
+                df = self._run_query(*args, **kwargs)
         return df
 
     def _build_mappings(
@@ -788,8 +790,9 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
         self,
         context: QueryContext,
         handler: DatasetSchemaHandlerBase,
+        time_dimension: TimeDimensionBaseConfig | None,
     ) -> DataFrame:
-        df = handler.make_mapped_dataframe(context)
+        df = handler.make_mapped_dataframe(context, time_dimension=time_dimension)
         df = self._postprocess(context, df)
         self._save_results(context, df)
         return df

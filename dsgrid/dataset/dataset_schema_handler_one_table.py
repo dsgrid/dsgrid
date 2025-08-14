@@ -168,7 +168,6 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         plan = query.mapping_plan
         if plan is None:
             plan = self.build_default_dataset_mapping_plan()
-        breakpoint()
         geography_dimension = self._get_mapping_to_dimension(DimensionType.GEOGRAPHY)
         metric_dimension = self._get_mapping_to_dimension(DimensionType.METRIC)
         time_dimension = self._get_mapping_to_dimension(DimensionType.TIME)

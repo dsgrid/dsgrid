@@ -5,7 +5,6 @@ from dsgrid.common import VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
-from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.query.models import DatasetQueryModel
 from dsgrid.registry.data_store_interface import DataStoreInterface
@@ -16,11 +15,9 @@ from dsgrid.spark.types import (
 from dsgrid.utils.dataset import (
     convert_types_if_necessary,
 )
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     check_for_nulls,
     read_dataframe,
-    union,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -104,29 +101,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 dimension_types.add(dim_type)
         check_for_nulls(self._load_data)
 
-    def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
-        return self._remove_non_dimension_columns(self._load_data).distinct()
-
-    def make_mapped_dimension_association_table(
-        self,
-        store: DataStoreInterface,
-        context: ScratchDirContext,
-    ) -> DataFrame:
-        df = self._make_actual_dimension_association_table_from_data()
-        missing_associations = store.read_missing_associations_table(
-            self._config.model.dataset_id, self._config.model.version
-        )
-        if missing_associations is not None:
-            missing_associations = self._union_not_covered_dimensions(
-                missing_associations, context
-            )
-            assert sorted(df.columns) == sorted(missing_associations.columns)
-            df = union([df, missing_associations.select(*df.columns)])
-        plan = self.build_default_dataset_mapping_plan()
-        with DatasetMappingManager(self.dataset_id, plan, context) as mapping_manager:
-            df = self._remap_dimension_columns(df, mapping_manager)
-        check_for_nulls(df)
-        return df
+    def _get_load_data_table(self) -> DataFrame:
+        return self._load_data
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
@@ -192,6 +168,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         plan = query.mapping_plan
         if plan is None:
             plan = self.build_default_dataset_mapping_plan()
+        breakpoint()
         geography_dimension = self._get_mapping_to_dimension(DimensionType.GEOGRAPHY)
         metric_dimension = self._get_mapping_to_dimension(DimensionType.METRIC)
         time_dimension = self._get_mapping_to_dimension(DimensionType.TIME)

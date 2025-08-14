@@ -73,10 +73,12 @@ from dsgrid.utils.dataset import (
 
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
+    check_for_nulls,
     create_dataframe_from_product,
     persist_intermediate_table,
     read_dataframe,
     save_to_warehouse,
+    union,
     write_dataframe,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
@@ -134,10 +136,11 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """Check the time consistency of the dataset."""
 
     @abc.abstractmethod
+    def _get_load_data_table(self) -> DataFrame:
+        """Return the full load data table."""
+
     def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
-        """Return a dataframe containing one row for each unique dimension combination except time.
-        Use dimensions in the dataset's table.
-        """
+        return self._remove_non_dimension_columns(self._get_load_data_table()).distinct()
 
     def _make_expected_dimension_association_table_from_records(
         self, dimension_types: Iterable[DimensionType], context: ScratchDirContext
@@ -181,13 +184,27 @@ class DatasetSchemaHandlerBase(abc.ABC):
         finally:
             unpersist(diff)
 
-    @abc.abstractmethod
     def make_mapped_dimension_association_table(
         self, store: DataStoreInterface, context: ScratchDirContext
     ) -> DataFrame:
         """Return a dataframe containing one row for each unique dimension combination except time.
         Use mapped dimensions.
         """
+        df = self._make_actual_dimension_association_table_from_data()
+        missing_associations = store.read_missing_associations_table(
+            self._config.model.dataset_id, self._config.model.version
+        )
+        if missing_associations is not None:
+            missing_associations = self._union_not_covered_dimensions(
+                missing_associations, context
+            )
+            assert sorted(df.columns) == sorted(missing_associations.columns)
+            df = union([df, missing_associations.select(*df.columns)])
+        mapping_plan = self.build_default_dataset_mapping_plan()
+        with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
+            df = self._remap_dimension_columns(df, mapping_manager).drop("fraction")
+        check_for_nulls(df)
+        return df
 
     def _union_not_covered_dimensions(
         self, df: DataFrame, context: ScratchDirContext

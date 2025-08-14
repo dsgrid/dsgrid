@@ -5,7 +5,6 @@ from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
-from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
@@ -29,11 +28,9 @@ from dsgrid.utils.dataset import (
     apply_scaling_factor,
     convert_types_if_necessary,
 )
-from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     check_for_nulls,
     read_dataframe,
-    union,
 )
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
@@ -89,33 +86,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if time_dim.supports_chronify():
             self._check_dataset_time_consistency_with_chronify()
         else:
-            self._check_dataset_time_consistency(
-                self._load_data.join(self._load_data_lookup, on="id")
-            )
+            self._check_dataset_time_consistency(self._get_load_data_table())
 
-    def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
-        return self._remove_non_dimension_columns(
-            self._load_data.join(self._load_data_lookup, on="id")
-        ).distinct()
-
-    def make_mapped_dimension_association_table(
-        self, store: DataStoreInterface, context: ScratchDirContext
-    ) -> DataFrame:
-        df = self._make_actual_dimension_association_table_from_data()
-        missing_associations = store.read_missing_associations_table(
-            self._config.model.dataset_id, self._config.model.version
-        )
-        if missing_associations is not None:
-            missing_associations = self._union_not_covered_dimensions(
-                missing_associations, context
-            )
-            assert sorted(df.columns) == sorted(missing_associations.columns)
-            df = union([df, missing_associations.select(*df.columns)])
-        mapping_plan = self.build_default_dataset_mapping_plan()
-        with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
-            df = self._remap_dimension_columns(df, mapping_manager).drop("fraction")
-        check_for_nulls(df)
-        return df
+    def _get_load_data_table(self) -> DataFrame:
+        return self._load_data.join(self._load_data_lookup, on="id")
 
     def make_project_dataframe(
         self, context: QueryContext, project_config: ProjectConfig

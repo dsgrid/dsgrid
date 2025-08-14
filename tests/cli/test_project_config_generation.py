@@ -25,7 +25,7 @@ def test_generate_project_config(cached_registry, tmp_path):
         description,
         "--time-type",
         TimeDimensionType.DATETIME.value,
-        "--metric-types",
+        "--metric-type",
         "EnergyEndUse",
         "--output",
         str(tmp_path),

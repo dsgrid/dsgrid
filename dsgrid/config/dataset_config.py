@@ -429,8 +429,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
             (
                 x.filename
                 for x in values
-                if isinstance(x, DimensionModel)
-                if x.filename is not None
+                if isinstance(x, DimensionModel) and x.filename is not None
             ),
             "dimension record filename",
         )

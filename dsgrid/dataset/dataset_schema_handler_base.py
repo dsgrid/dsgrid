@@ -117,8 +117,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
         config: DatasetConfig
         store: DataStoreInterface | None
             If provided, the dataset must already be registered.
-            If not provided, the dataset must not be registered and the file paths must be
-            availabled via the DatasetConfig.
+            If not provided, the dataset must not be registered and the file path must be
+            available via the DatasetConfig.
 
         Returns
         -------
@@ -447,9 +447,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _finalize_table(self, context: QueryContext, df: DataFrame, project_config: ProjectConfig):
         # TODO: remove ProjectConfig so that dataset queries can use this.
-        # Pass in the dimensions instead.
-        # Applies throughout this file...it should be a dataset file only, with dimensions
-        # and mappings.
+        # Issue #370
         table_handler = make_table_format_handler(
             self._config.get_table_format_type(),
             project_config,

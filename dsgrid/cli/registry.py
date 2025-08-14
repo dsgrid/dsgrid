@@ -264,7 +264,13 @@ def show_dimension(
     if res[1] != 0:
         ctx.exit(res[1])
     dim = res[0]
-    print(f"type={dim.model.dimension_type} id={dim.model.dimension_id} name={dim.model.name}")
+    print(
+        f"""id={dim.model.dimension_id}
+type={dim.model.dimension_type.value}
+name={dim.model.name}
+description={dim.model.description}
+"""
+    )
     if dim.model.dimension_type != DimensionType.TIME:
         records = dim.get_records_dataframe()
         records.show(n=4000)
@@ -497,11 +503,12 @@ def show_dimension_mapping(
     print(
         f"""
 type={mapping.model.from_dimension.dimension_type}
-from_name={from_dim.model.name} to_name={to_dim.model.name}
+from_id={mapping.model.from_dimension.dimension_id}
+from_name={from_dim.model.name}
 from_description={from_dim.model.description}
+to_id={mapping.model.to_dimension.dimension_id}
 to_name={to_dim.model.name}
 to_description={to_dim.model.description}
-from_id={mapping.model.from_dimension.dimension_id} to_id={mapping.model.to_dimension.dimension_id}
 """
     )
     records = mapping.get_records_dataframe()
@@ -1252,7 +1259,7 @@ $ dsgrid registry projects generate-config \\ \n
 @click.argument("dataset_ids", nargs=-1)
 @click.option(
     "-m",
-    "--metric-types",
+    "--metric-type",
     multiple=True,
     type=click.Choice(sorted(SUPPORTED_METRIC_TYPES)),
     help="Metric types available in the project",
@@ -1300,7 +1307,7 @@ def generate_project_config_from_ids(
     ctx: click.Context,
     project_id: str,
     dataset_ids: tuple[str],
-    metric_types: tuple[str],
+    metric_type: tuple[str],
     name: str | None,
     description: str | None,
     time_type: TimeDimensionType,
@@ -1313,7 +1320,7 @@ def generate_project_config_from_ids(
         generate_project_config,
         project_id,
         dataset_ids,
-        metric_types,
+        metric_type,
         name=name,
         description=description,
         time_type=time_type,

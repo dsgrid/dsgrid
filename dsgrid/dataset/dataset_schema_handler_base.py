@@ -62,7 +62,7 @@ from dsgrid.utils.dataset import (
     filter_out_expected_missing_associations,
     handle_dimension_association_errors,
     is_noop_mapping,
-    map_and_reduce_stacked_dimension,
+    map_stacked_dimension,
     add_time_zone,
     map_time_dimension_with_chronify_duckdb,
     map_time_dimension_with_chronify_spark_hive,
@@ -735,7 +735,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 continue
             if column in df.columns:
                 persisted_file: Path | None = None
-                df = map_and_reduce_stacked_dimension(df, records, column)
+                df = map_stacked_dimension(df, records, column)
                 df, persisted_file = repartition_if_needed_by_mapping(
                     df,
                     mapping_config.model.mapping_type,

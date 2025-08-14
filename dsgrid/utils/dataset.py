@@ -54,7 +54,7 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 logger = logging.getLogger(__name__)
 
 
-def map_and_reduce_stacked_dimension(
+def map_stacked_dimension(
     df: DataFrame,
     records: DataFrame,
     column: str,

@@ -202,7 +202,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             df = union([df, missing_associations.select(*df.columns)])
         mapping_plan = self.build_default_dataset_mapping_plan()
         with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
-            df = self._remap_dimension_columns(df, mapping_manager).drop("fraction")
+            df = self._remap_dimension_columns(df, mapping_manager).drop("fraction").distinct()
         check_for_nulls(df)
         return df
 

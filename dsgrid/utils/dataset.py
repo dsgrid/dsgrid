@@ -18,7 +18,11 @@ from dsgrid.dimension.time import (
     TimeBasedDataAdjustmentModel,
     TimeZone,
 )
-from dsgrid.exceptions import DSGInvalidField, DSGInvalidDimensionMapping, DSGInvalidDataset
+from dsgrid.exceptions import (
+    DSGInvalidField,
+    DSGInvalidDimensionMapping,
+    DSGInvalidDataset,
+)
 from dsgrid.spark.functions import (
     count_distinct_on_group_by,
     create_temp_view,
@@ -29,6 +33,7 @@ from dsgrid.spark.functions import (
     join,
     join_multiple_columns,
     unpivot,
+    write_csv,
 )
 from dsgrid.spark.functions import except_all, get_spark_session
 from dsgrid.spark.types import (
@@ -49,7 +54,7 @@ from dsgrid.utils.timing import timer_stats_collector, track_timing
 logger = logging.getLogger(__name__)
 
 
-def map_and_reduce_stacked_dimension(
+def map_stacked_dimension(
     df: DataFrame,
     records: DataFrame,
     column: str,
@@ -67,7 +72,8 @@ def map_and_reduce_stacked_dimension(
     df = df.withColumnRenamed("to_id", to_column_)
     nonfraction_cols = [x for x in df.columns if x not in {"fraction", "from_fraction"}]
     df = df.select(
-        *nonfraction_cols, (F.col("fraction") * F.col("from_fraction")).alias("fraction")
+        *nonfraction_cols,
+        (F.col("fraction") * F.col("from_fraction")).alias("fraction"),
     )
     return df
 
@@ -119,7 +125,7 @@ def add_null_rows_from_load_data_lookup(df: DataFrame, lookup: DataFrame) -> Dat
     df
         load data table
     lookup
-        load data lookup table that has been filtered for nulls and mapped to project dimensions.
+        load data lookup table that has been filtered for nulls.
     """
     if not is_dataframe_empty(lookup):
         intersect_cols = set(lookup.columns).intersection(df.columns)
@@ -226,6 +232,47 @@ def check_null_value_in_dimension_rows(dim_table, exclude_columns=None):
             "Combination of remapped dataset dimensions contain NULL value(s) for "
             f"dimension(s): \n{str(exc)}"
         )
+
+
+def handle_dimension_association_errors(
+    diff: DataFrame,
+    dataset_table: DataFrame,
+    dataset_id: str,
+) -> None:
+    """Record missing dimension record combinations in a CSV file and log an error."""
+    out_file = f"{dataset_id}__missing_dimension_record_combinations.csv"
+    df = diff
+    changed = False
+    for column in diff.columns:
+        if diff.select(column).distinct().count() == 1:
+            df = df.drop(column)
+            changed = True
+    if changed:
+        df = df.distinct()
+    write_csv(df, out_file, header=True, overwrite=True)
+    logger.error(
+        "Dataset %s is missing required dimension records. Recorded missing records in %s",
+        dataset_id,
+        out_file,
+    )
+    _look_for_error_contributors(df, dataset_table)
+    raise DSGInvalidDataset(
+        f"Dataset {dataset_id} is missing required dimension records. "
+        "Please look in the log file for more information."
+    )
+
+
+def _look_for_error_contributors(diff: DataFrame, dataset_table: DataFrame) -> None:
+    diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
+    for col in diff.columns:
+        dataset_count = dataset_table.select(col).distinct().count()
+        if dataset_count != diff_counts[col]:
+            logger.error(
+                "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
+                col,
+                dataset_count,
+                diff_counts[col],
+            )
 
 
 def is_noop_mapping(records: DataFrame) -> bool:
@@ -416,7 +463,9 @@ def remove_invalid_null_timestamps(df, time_columns, stacked_columns):
     stacked = list(stacked_columns)
     return (
         join_multiple_columns(
-            df, count_distinct_on_group_by(df, stacked, time_column, "count_time"), stacked
+            df,
+            count_distinct_on_group_by(df, stacked, time_column, "count_time"),
+            stacked,
         )
         .filter(f"{handle_column_spaces(time_column)} IS NOT NULL OR count_time = 0")
         .select(orig_columns)
@@ -490,7 +539,10 @@ def repartition_if_needed_by_mapping(
 
 
 def unpivot_dataframe(
-    df: DataFrame, value_columns: Iterable[str], variable_column: str, time_columns: list[str]
+    df: DataFrame,
+    value_columns: Iterable[str],
+    variable_column: str,
+    time_columns: list[str],
 ) -> DataFrame:
     """Unpivot the dataframe, accounting for time columns."""
     values = value_columns if isinstance(value_columns, set) else set(value_columns)
@@ -510,10 +562,49 @@ def unpivot_dataframe(
 
 def convert_types_if_necessary(df: DataFrame) -> DataFrame:
     """Convert the types of the dataframe if necessary."""
-    allowed_int_columns = (DimensionType.MODEL_YEAR.value, DimensionType.WEATHER_YEAR.value)
+    allowed_int_columns = (
+        DimensionType.MODEL_YEAR.value,
+        DimensionType.WEATHER_YEAR.value,
+    )
     int_types = {IntegerType(), LongType(), ShortType()}
     existing_columns = set(df.columns)
     for column in allowed_int_columns:
         if column in existing_columns and df.schema[column].dataType in int_types:
             df = df.withColumn(column, F.col(column).cast(StringType()))
     return df
+
+
+def filter_out_expected_missing_associations(
+    main_df: DataFrame, missing_df: DataFrame
+) -> DataFrame:
+    """Filter out rows that are expected to be missing from the main dataframe."""
+    missing_columns = [DimensionType.from_column(x).value for x in missing_df.columns]
+    spark = get_spark_session()
+    main_view = make_temp_view_name()
+    assoc_view = make_temp_view_name()
+    main_columns = ",".join((f"{main_view}.{x}" for x in main_df.columns))
+
+    main_df.createOrReplaceTempView(main_view)
+    missing_df.createOrReplaceTempView(assoc_view)
+    join_str = " AND ".join((f"{main_view}.{x} = {assoc_view}.{x}" for x in missing_columns))
+    query = f"""
+        SELECT {main_columns}
+        FROM {main_view}
+        ANTI JOIN {assoc_view}
+        ON {join_str}
+    """
+    res = spark.sql(query)
+    return res
+
+
+def split_expected_missing_rows(
+    df: DataFrame, time_columns: list[str]
+) -> tuple[DataFrame, DataFrame | None]:
+    """Split a DataFrame into two if it contains expected missing data."""
+    null_df = df.filter(f"{VALUE_COLUMN} IS NULL")
+    if is_dataframe_empty(null_df):
+        return df, None
+
+    drop_columns = time_columns + [VALUE_COLUMN]
+    missing_associations = null_df.drop(*drop_columns)
+    return df.filter(f"{VALUE_COLUMN} IS NOT NULL"), missing_associations

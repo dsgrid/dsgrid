@@ -283,7 +283,11 @@ class DimensionsModel(DSGBaseModel):
     def check_files(cls, values: list) -> list:
         """Validate dimension files are unique across all dimensions"""
         check_uniqueness(
-            (x.filename for x in values if isinstance(x, DimensionModel)),
+            (
+                x.filename
+                for x in values
+                if isinstance(x, DimensionModel) and x.filename is not None
+            ),
             "dimension record filename",
         )
         return values
@@ -533,14 +537,14 @@ class DatasetBaseDimensionNamesModel(DSGBaseModel):
     # This is here because Pydantic doesn't like fields that start with 'model_'
     model_config = make_model_config(protected_namespaces=())
 
-    geography: Optional[str] = None
-    metric: Optional[str] = None
-    model_year: Optional[str] = None
-    scenario: Optional[str] = None
-    sector: Optional[str] = None
-    subsector: Optional[str] = None
-    time: Optional[str] = None
-    weather_year: Optional[str] = None
+    geography: str | None = None
+    metric: str | None = None
+    model_year: str | None = None
+    scenario: str | None = None
+    sector: str | None = None
+    subsector: str | None = None
+    time: str | None = None
+    weather_year: str | None = None
 
 
 class InputDatasetModel(DSGBaseModel):
@@ -731,6 +735,7 @@ class ProjectConfigModel(DSGBaseDatabaseModel):
 def make_unvalidated_project_config(
     project_id: str,
     dataset_ids: Iterable[str],
+    metric_types: Iterable[str],
     name: str | None = None,
     description: str | None = None,
     time_type: TimeDimensionType = TimeDimensionType.DATETIME,
@@ -741,7 +746,7 @@ def make_unvalidated_project_config(
         "name": name or "",
         "description": description or "",
         "dimensions": {
-            "base_dimensions": make_base_dimension_template(time_type=time_type),
+            "base_dimensions": make_base_dimension_template(metric_types, time_type=time_type),
             "subset_dimensions": [],
             "supplemental_dimensions": [],
         },
@@ -1202,7 +1207,7 @@ class ProjectConfig(ConfigBase):
         self, dataset_id: str, base_dimension_names: DatasetBaseDimensionNamesModel
     ):
         """Add project base dimension query names represented in the dataset."""
-        for field in base_dimension_names.model_fields:
+        for field in type(base_dimension_names).model_fields:
             if getattr(base_dimension_names, field) is None:
                 msg = f"DatasetBaseDimensionNamesModel {field} cannot be None"
                 raise DSGInvalidParameter(msg)
@@ -1437,7 +1442,7 @@ class ProjectConfig(ConfigBase):
         for df in multi_dfs:
             existing.update(set(df.columns))
 
-        single_dfs = {}
+        single_dfs: dict[str, list[str]] = {}
         for field in (x for x in RequiredDimensionRecordsModel.model_fields if x not in existing):
             req = getattr(required_dimensions.single_dimensional, field)
             record_ids = self._get_required_dimension_record_ids(req)

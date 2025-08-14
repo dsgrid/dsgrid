@@ -13,7 +13,7 @@ from dsgrid.query.models import (
     DimensionMetadataModel,
 )
 from dsgrid.spark.types import DataFrame
-from dsgrid.utils.dataset import map_and_reduce_stacked_dimension, remove_invalid_null_timestamps
+from dsgrid.utils.dataset import map_stacked_dimension, remove_invalid_null_timestamps
 from dsgrid.utils.spark import persist_intermediate_query
 from dsgrid.utils.timing import track_timing, timer_stats_collector
 
@@ -89,7 +89,7 @@ class TableFormatHandlerBase(abc.ABC):
                     "Bug: Non-time dimensions cannot have more than one base dimension column"
                 )
             expected_base_dim_col = expected_base_dim_cols[0]
-            df = map_and_reduce_stacked_dimension(
+            df = map_stacked_dimension(
                 df,
                 records,
                 expected_base_dim_col,

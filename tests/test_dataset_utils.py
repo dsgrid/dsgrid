@@ -74,7 +74,11 @@ def dataframes():
         [
             {"from_id": "res_elec", "to_id": "all_electricity", "from_fraction": 1.0},
             {"from_id": "com_elec", "to_id": "all_electricity", "from_fraction": 1.0},
-            {"from_id": "common_elec", "to_id": "all_electricity", "from_fraction": 1.0},
+            {
+                "from_id": "common_elec",
+                "to_id": "all_electricity",
+                "from_fraction": 1.0,
+            },
         ]
     )
     pivoted_columns = {"com_elec", "res_elec", "common_elec"}
@@ -267,15 +271,50 @@ def test_remove_invalid_null_timestamps():
     df = create_dataframe_from_dicts(
         [
             # No nulls
-            {"timestamp": 1, "county": "Jefferson", "subsector": "warehouse", "value": 4},
-            {"timestamp": 2, "county": "Jefferson", "subsector": "warehouse", "value": 5},
+            {
+                "timestamp": 1,
+                "county": "Jefferson",
+                "subsector": "warehouse",
+                "value": 4,
+            },
+            {
+                "timestamp": 2,
+                "county": "Jefferson",
+                "subsector": "warehouse",
+                "value": 5,
+            },
             # Nulls and valid values
-            {"timestamp": None, "county": "Boulder", "subsector": "large_office", "value": 0},
-            {"timestamp": 1, "county": "Boulder", "subsector": "large_office", "value": 4},
-            {"timestamp": 2, "county": "Boulder", "subsector": "large_office", "value": 5},
+            {
+                "timestamp": None,
+                "county": "Boulder",
+                "subsector": "large_office",
+                "value": 0,
+            },
+            {
+                "timestamp": 1,
+                "county": "Boulder",
+                "subsector": "large_office",
+                "value": 4,
+            },
+            {
+                "timestamp": 2,
+                "county": "Boulder",
+                "subsector": "large_office",
+                "value": 5,
+            },
             # Only nulls
-            {"timestamp": None, "county": "Adams", "subsector": "retail_stripmall", "value": 0},
-            {"timestamp": None, "county": "Denver", "subsector": "hospital", "value": 0},
+            {
+                "timestamp": None,
+                "county": "Adams",
+                "subsector": "retail_stripmall",
+                "value": 0,
+            },
+            {
+                "timestamp": None,
+                "county": "Denver",
+                "subsector": "hospital",
+                "value": 0,
+            },
         ]
     )
     stacked = ["county", "subsector"]
@@ -359,3 +398,50 @@ def test_convert_types_if_necessary(data_type):
     assert row.model_year == "2030"
     assert row.weather_year == "2018"
     assert row.bystander == 2040
+
+
+@pytest.fixture
+def missing_dimension_associations(tmp_path):
+    filename = tmp_path / "missing_associations.csv"
+    with open(filename, "w") as f:
+        f.write("sector,subsector\n")
+        f.write("com,midrise_apartment\n")
+        f.write("res,hotel\n")
+        f.write("res,hospital\n")
+
+    df_from_records_cross_join = create_dataframe_from_dicts(
+        [
+            {
+                "sector": "res",
+                "subsector": "midrise_apartment",
+                "geography": "36047",
+            },
+            {
+                "sector": "com",
+                "subsector": "midrise_apartment",
+                "geography": "36047",
+            },
+            {
+                "sector": "com",
+                "subsector": "hotel",
+                "geography": "36047",
+            },
+            {
+                "sector": "res",
+                "subsector": "hotel",
+                "geography": "36047",
+            },
+            {
+                "sector": "com",
+                "subsector": "hospital",
+                "geography": "36047",
+            },
+            {
+                "sector": "res",
+                "subsector": "hospital",
+                "geography": "36047",
+            },
+        ]
+    )
+    yield filename, df_from_records_cross_join
+    filename.unlink()

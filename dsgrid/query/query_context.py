@@ -10,14 +10,14 @@ from dsgrid.dataset.models import (
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.dataset.models import PivotedTableFormatModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.config.project_config import DatasetBaseDimensionNamesModel, ProjectConfig
+from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
 from dsgrid.query.dataset_mapping_plan import DatasetMappingPlan, MapOperationCheckpoint
 from dsgrid.spark.functions import drop_temp_tables_and_views
 from dsgrid.spark.types import DataFrame
 from dsgrid.utils.spark import get_spark_session
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from .models import ColumnType, DatasetMetadataModel, DimensionMetadataModel, ProjectQueryModel
+from .models import ColumnType, DatasetMetadataModel, DimensionMetadataModel, QueryBaseModel
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ class QueryContext:
 
     def __init__(
         self,
-        model: ProjectQueryModel,
+        model: QueryBaseModel,
         base_dimension_names: DatasetBaseDimensionNamesModel,
         scratch_dir_context: ScratchDirContext,
         checkpoint: MapOperationCheckpoint | None = None,
@@ -52,7 +52,7 @@ class QueryContext:
         self._metadata = val
 
     @property
-    def model(self) -> ProjectQueryModel:
+    def model(self) -> QueryBaseModel:
         return self._model
 
     @property
@@ -152,7 +152,7 @@ class QueryContext:
         self,
         dataset_id: str,
         column_type: ColumnType,
-        project_config: ProjectConfig,
+        mapped_time_columns: list[str],
     ) -> None:
         table_format = UnpivotedTableFormatModel()
         self._dataset_metadata[dataset_id] = DatasetMetadataModel(table_format=table_format)
@@ -162,9 +162,7 @@ class QueryContext:
             assert name is not None
             match (column_type, dim_type):
                 case (ColumnType.DIMENSION_TYPES, DimensionType.TIME):
-                    # This uses the project dimension because the dataset is being mapped.
-                    time_columns = project_config.get_load_data_time_columns(name)
-                    column_names = time_columns
+                    column_names = mapped_time_columns
                 case (ColumnType.DIMENSION_NAMES, _):
                     column_names = [name]
                 case (ColumnType.DIMENSION_TYPES, _):

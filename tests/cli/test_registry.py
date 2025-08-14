@@ -221,13 +221,15 @@ def test_list_project_dimension_names(cached_registry):
     ]
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
-    assert "base: US Counties" in result.stdout
-    assert "subset: commercial_subsectors2 residential_subsectors" in result.stdout
+    # Line breaks are inexplicably sometimes present in single lines, only in tests.
+    normalized_output = " ".join(result.stdout.split())
+    assert "base: US Counties" in normalized_output
+    assert "subset: commercial_subsectors2 residential_subsectors" in normalized_output
     assert (
         "supplemental: Commercial Subsectors Subsectors by Sector all_test_efs_subsectors"
-        in result.stdout
+        in normalized_output
     )
-    assert "supplemental: US Census Divisions US Census Regions US States" in result.stdout
+    assert "supplemental: US Census Divisions US Census Regions US States" in normalized_output
 
 
 def test_register_dsgrid_projects(tmp_registry_db):

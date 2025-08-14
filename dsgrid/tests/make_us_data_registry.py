@@ -7,8 +7,9 @@ from pathlib import Path
 
 import rich_click as click
 
+from dsgrid.cli.common import path_callback
 from dsgrid.loggers import setup_logging, check_log_file_size
-from dsgrid.registry.common import DatabaseConnection
+from dsgrid.registry.common import DataStoreType, DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.tests.common import (
     create_local_test_registry,
@@ -34,7 +35,8 @@ def make_test_data_registry(
     include_projects=True,
     include_datasets=True,
     offline_mode=True,
-    database_url="sqlite:///dsgrid-test.db",
+    database_url: str | None = None,
+    data_store_type: DataStoreType = DataStoreType.FILESYSTEM,
 ) -> RegistryManager:
     """Creates a local registry from a dsgrid project source directory for testing.
 
@@ -52,6 +54,8 @@ def make_test_data_registry(
         If False, do not register any datasets.
     offline_mode : bool
         If False, use the test remote registry.
+    data_store_type: DataStoreType
+        Type of store to use for the registry data.
     """
     if not include_projects and include_datasets:
         raise Exception("If include_datasets is True then include_projects must also be True.")
@@ -59,9 +63,13 @@ def make_test_data_registry(
     if dataset_path is None:
         dataset_path = os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY)
     dataset_path = Path(dataset_path)
-    conn = DatabaseConnection(url=database_url)
-    create_local_test_registry(registry_path, conn=conn)
-    dataset_dirs = [Path("datasets/modeled/comstock"), Path("datasets/modeled/comstock_unpivoted")]
+    url = f"sqlite:///{registry_path}/registry.db" if database_url is None else database_url
+    conn = DatabaseConnection(url=url)
+    create_local_test_registry(registry_path, conn=conn, data_store_type=data_store_type)
+    dataset_dirs = [
+        Path("datasets/modeled/comstock"),
+        Path("datasets/modeled/comstock_unpivoted"),
+    ]
 
     user = getpass.getuser()
     log_message = "Initial registration"
@@ -113,7 +121,12 @@ def make_test_data_registry(
 
 
 @click.command()
-@click.argument("registry-path", type=Path, default=f"{Path.home()}/.dsgrid-test-registry")
+@click.argument(
+    "registry-path",
+    type=Path,
+    default=f"{Path.home()}/.dsgrid-test-registry",
+    callback=path_callback,
+)
 @click.option(
     "-f",
     "--force",
@@ -126,20 +139,40 @@ def make_test_data_registry(
     "-p",
     "--project-dir",
     default=TEST_PROJECT_REPO,
-    required=True,
     help="path to a project repository",
+    callback=path_callback,
 )
 @click.option(
     "-d",
     "--dataset-dir",
     default=TEST_DATASET_DIRECTORY,
-    required=True,
     help="path to your local datasets",
+    callback=path_callback,
 )
 @click.option(
-    "--verbose", is_flag=True, default=False, show_default=True, help="Enable verbose log output."
+    "-t",
+    "--data-store-type",
+    type=click.Choice([x.value for x in DataStoreType]),
+    default=DataStoreType.FILESYSTEM.value,
+    show_default=True,
+    help="Type of store to use for the registry data.",
+    callback=lambda *x: DataStoreType(x[2]),
 )
-def run(registry_path, force, project_dir, dataset_dir, verbose):
+@click.option(
+    "--verbose",
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help="Enable verbose log output.",
+)
+def run(
+    registry_path: Path,
+    force: bool,
+    project_dir: Path,
+    dataset_dir: Path,
+    data_store_type: DataStoreType,
+    verbose: bool,
+):
     """Creates a local registry from a dsgrid project source directory for testing."""
     level = logging.DEBUG if verbose else logging.INFO
     log_file = Path("test_dsgrid_project.log")
@@ -156,7 +189,12 @@ def run(registry_path, force, project_dir, dataset_dir, verbose):
         shutil.rmtree(tmp_project_dir)
     shutil.copytree(project_dir, tmp_project_dir)
     try:
-        make_test_data_registry(registry_path, tmp_project_dir / "dsgrid_project", dataset_dir)
+        make_test_data_registry(
+            registry_path,
+            tmp_project_dir / "dsgrid_project",
+            dataset_dir,
+            data_store_type=data_store_type,
+        )
     finally:
         timer_stats_collector.log_stats()
 

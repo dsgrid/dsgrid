@@ -444,12 +444,12 @@ def check_for_nulls(df, exclude_columns=None):
         exclude_columns = set()
     cols_to_check = set(df.columns).difference(exclude_columns)
     cols_str = ", ".join(cols_to_check)
-    filter_str = " OR ".join((f"{x} is NULL" for x in cols_to_check))
-    df.createOrReplaceTempView("tmp_table")
+    filter_str = " OR ".join((f"{x} IS NULL" for x in cols_to_check))
+    df.createOrReplaceTempView("tmp_view")
 
     try:
         # Avoid iterating with many checks unless we know there is at least one failure.
-        nulls = sql(f"SELECT {cols_str} FROM tmp_table WHERE {filter_str}")
+        nulls = sql(f"SELECT {cols_str} FROM tmp_view WHERE {filter_str}")
         if not is_dataframe_empty(nulls):
             cols_with_null = set()
             for col in cols_to_check:
@@ -461,7 +461,7 @@ def check_for_nulls(df, exclude_columns=None):
                 f"DataFrame contains NULL value(s) for column(s): {cols_with_null}"
             )
     finally:
-        sql("DROP VIEW tmp_table")
+        sql("DROP VIEW tmp_view")
 
 
 @track_timing(timer_stats_collector)

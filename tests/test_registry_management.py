@@ -8,6 +8,7 @@ import pytest
 from click.testing import CliRunner
 from pydantic import ValidationError
 
+from dsgrid.common import BackendEngine
 from dsgrid.cli.dsgrid import cli
 from dsgrid.cli.dsgrid_admin import cli as cli_admin
 from dsgrid.config.input_dataset_requirements import (
@@ -16,6 +17,7 @@ from dsgrid.config.input_dataset_requirements import (
     InputDatasetListModel,
 )
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import (
     DSGDuplicateValueRegistered,
     DSGInvalidDataset,
@@ -394,6 +396,31 @@ def test_add_supplemental_dimension(mutable_cached_registry, tmp_path):
     assert found_new_dimension
 
 
+@pytest.mark.skipif(
+    DsgridRuntimeConfig.load().backend_engine == BackendEngine.SPARK,
+    reason="Spark backend is not supported with a DuckDB data store",
+)
+def test_register_with_duckdb_store(registry_with_duckdb_store):
+    conn = registry_with_duckdb_store
+    manager = RegistryManager.load(conn, offline_mode=True)
+    project_mgr = manager.project_manager
+    dataset_mgr = manager.dataset_manager
+    project_ids = project_mgr.list_ids()
+    assert len(project_ids) == 1
+    project_id = project_ids[0]
+    dataset_ids = dataset_mgr.list_ids()
+    assert len(dataset_ids) == 2
+    project = project_mgr.load_project(project_id)
+    found_lookup = False
+    for dataset_id in dataset_ids:
+        dataset = project.load_dataset(dataset_id)
+        assert isinstance(dataset._handler._load_data, DataFrame)
+        if dataset_id == "test_efs_comstock":
+            assert isinstance(dataset._handler._load_data_lookup, DataFrame)
+            found_lookup = True
+    assert found_lookup
+
+
 def test_remove_dataset(mutable_cached_registry):
     mgr, _ = mutable_cached_registry
     project_mgr = mgr.project_manager
@@ -663,7 +690,11 @@ def test_invalid_dimension_mapping(tmp_registry_db):
 def test_register_submit_dataset_long_workflow(tmp_registry_db):
     src_dir, tmp_path, url = tmp_registry_db
     manager = make_test_data_registry(
-        tmp_path, src_dir, include_projects=False, include_datasets=False, database_url=url
+        tmp_path,
+        src_dir,
+        include_projects=False,
+        include_datasets=False,
+        database_url=url,
     )
     dim_mapping_mgr = manager.dimension_mapping_manager
     project_config_file = src_dir / "project_with_dimension_ids.json5"
@@ -700,7 +731,12 @@ def test_register_submit_dataset_long_workflow(tmp_registry_db):
 
     manager.project_manager.register(project_config_file, user, "register project")
     dataset_path = TEST_DATASET_DIRECTORY / dataset_id
-    manager.dataset_manager.register(dataset_config_file, dataset_path, user, "register dataset")
+    manager.dataset_manager.register(
+        dataset_config_file,
+        dataset_path,
+        user,
+        "register dataset",
+    )
     manager.project_manager.submit_dataset(
         project_id,
         dataset_id,

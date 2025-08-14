@@ -128,7 +128,7 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
             raise ValueError(f'Empty description field for dimension: "{cls}"')
 
         # TODO: improve validation for allowable dimension record names.
-        prohibited_names = [x.value for x in DimensionType] + [
+        prohibited_names = [
             "county",
             "counties",
             "year",
@@ -246,7 +246,7 @@ class DimensionModel(DimensionBaseModel):
     @field_validator("file_hash")
     @classmethod
     def compute_file_hash(cls, file_hash, info: ValidationInfo):
-        if "filename" not in info.data:
+        if info.data.get("filename") is None:
             return file_hash
 
         if file_hash is None:

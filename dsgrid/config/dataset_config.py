@@ -8,12 +8,19 @@ from pydantic import field_validator, model_validator, Field
 
 from dsgrid.common import SCALING_FACTOR_COLUMN, VALUE_COLUMN
 from dsgrid.config.common import make_base_dimension_template
-from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionBaseConfigWithFiles
+from dsgrid.config.dimension_config import (
+    DimensionBaseConfig,
+    DimensionBaseConfigWithFiles,
+)
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dataset.models import PivotedTableFormatModel, TableFormatModel, TableFormatType
+from dsgrid.dataset.models import (
+    PivotedTableFormatModel,
+    TableFormatModel,
+    TableFormatType,
+)
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.dimension.time import TimeDimensionType
-from dsgrid.exceptions import DSGInvalidParameter, DSGValueNotRegistered
+from dsgrid.exceptions import DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
@@ -35,11 +42,16 @@ from .dimensions import (
 ALLOWED_LOAD_DATA_FILENAMES = ("load_data.parquet", "load_data.csv", "table.parquet")
 ALLOWED_LOAD_DATA_LOOKUP_FILENAMES = (
     "load_data_lookup.parquet",
+    "lookup_table.parquet",
     # The next two are only used for test data.
     "load_data_lookup.csv",
     "load_data_lookup.json",
 )
 ALLOWED_DATA_FILES = ALLOWED_LOAD_DATA_FILENAMES + ALLOWED_LOAD_DATA_LOOKUP_FILENAMES
+ALLOWED_MISSING_DIMENSION_ASSOCATIONS_FILENAMES = (
+    "missing_associations.csv",
+    "missing_associations.parquet",
+)
 
 logger = logging.getLogger(__name__)
 
@@ -414,7 +426,11 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     def check_files(cls, values: list) -> list:
         """Validate dimension files are unique across all dimensions"""
         check_uniqueness(
-            (x.filename for x in values if isinstance(x, DimensionModel)),
+            (
+                x.filename
+                for x in values
+                if isinstance(x, DimensionModel) and x.filename is not None
+            ),
             "dimension record filename",
         )
         return values
@@ -455,10 +471,12 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
 
 def make_unvalidated_dataset_config(
     dataset_id,
+    metric_type: str,
     table_format: dict[str, str] | None = None,
     data_classification=DataClassificationType.MODERATE.value,
     dataset_type=InputDatasetType.MODELED,
-    time_type: TimeDimensionType = TimeDimensionType.DATETIME,
+    included_dimensions: list[DimensionType] | None = None,
+    time_type: TimeDimensionType | None = None,
     use_project_geography_time_zone: bool = False,
     dimension_references: list[DimensionReferenceModel] | None = None,
     trivial_dimensions: list[DimensionType] | None = None,
@@ -467,7 +485,15 @@ def make_unvalidated_dataset_config(
     table_format_ = table_format or UnpivotedTableFormatModel().model_dump()
     trivial_dimensions_ = trivial_dimensions or []
     exclude_dimension_types = {x.dimension_type for x in dimension_references or []}
-    dimensions = make_base_dimension_template(exclude_dimension_types, time_type=time_type)
+    if included_dimensions is not None:
+        for dim_type in set(DimensionType).difference(included_dimensions):
+            exclude_dimension_types.add(dim_type)
+
+    dimensions = make_base_dimension_template(
+        [metric_type],
+        exclude_dimension_types=exclude_dimension_types,
+        time_type=time_type,
+    )
     return {
         "dataset_id": dataset_id,
         "dataset_type": dataset_type.value,
@@ -500,7 +526,7 @@ class DatasetConfig(ConfigBase):
     def __init__(self, model):
         super().__init__(model)
         self._dimensions = {}  # ConfigKey to DimensionConfig
-        self._dataset_path = None
+        self._dataset_path: Path | None = None
 
     @staticmethod
     def config_filename():
@@ -513,14 +539,6 @@ class DatasetConfig(ConfigBase):
     @staticmethod
     def model_class():
         return DatasetConfigModel
-
-    @classmethod
-    def load_from_registry(cls, model, registry_data_path):
-        # Join with forward slashes instead of Path because this might be an s3 path and
-        # we don't want backslashes on Windows.
-        config = cls(model)
-        config.dataset_path = f"{registry_data_path}/data/{model.dataset_id}/{model.version}"
-        return config
 
     @classmethod
     def load_from_user_path(cls, config_file, dataset_path) -> "DatasetConfig":
@@ -544,21 +562,25 @@ class DatasetConfig(ConfigBase):
         return config
 
     @property
-    def dataset_path(self):
+    def dataset_path(self) -> Path | None:
         """Return the directory containing the dataset file(s)."""
         return self._dataset_path
 
     @dataset_path.setter
-    def dataset_path(self, dataset_path):
+    def dataset_path(self, dataset_path: Path | str | None) -> None:
         """Set the dataset path."""
+        if isinstance(dataset_path, str):
+            dataset_path = Path(dataset_path)
         self._dataset_path = dataset_path
 
     @property
     def load_data_path(self):
+        assert self._dataset_path is not None
         return check_load_data_filename(self._dataset_path)
 
     @property
     def load_data_lookup_path(self):
+        assert self._dataset_path is not None
         return check_load_data_lookup_filename(self._dataset_path)
 
     def update_dimensions(self, dimensions):
@@ -569,33 +591,29 @@ class DatasetConfig(ConfigBase):
     def dimensions(self):
         return self._dimensions
 
-    def get_dimension(self, dimension_type: DimensionType) -> DimensionBaseConfig:
+    def get_dimension(self, dimension_type: DimensionType) -> DimensionBaseConfig | None:
         """Return the dimension matching dimension_type."""
         for dim_config in self.dimensions.values():
             if dim_config.model.dimension_type == dimension_type:
                 return dim_config
+        return None
 
-        msg = f"Dimension {dimension_type} not found in dataset {self.config_id}"
-        raise DSGValueNotRegistered(msg)
-
-    def get_time_dimension(self) -> TimeDimensionBaseConfig:
+    def get_time_dimension(self) -> TimeDimensionBaseConfig | None:
         """Return the time dimension of the dataset."""
         dim = self.get_dimension(DimensionType.TIME)
-        assert isinstance(dim, TimeDimensionBaseConfig)
+        assert dim is None or isinstance(dim, TimeDimensionBaseConfig)
         return dim
 
     def get_dimension_with_records(
         self, dimension_type: DimensionType
-    ) -> DimensionBaseConfigWithFiles:
+    ) -> DimensionBaseConfigWithFiles | None:
         """Return the dimension matching dimension_type."""
         for dim_config in self.dimensions.values():
             if dim_config.model.dimension_type == dimension_type and isinstance(
                 dim_config, DimensionBaseConfigWithFiles
             ):
                 return dim_config
-
-        msg = f"Dimension {dimension_type} not found in dataset {self.config_id} or does not have records"
-        raise DSGValueNotRegistered(msg)
+        return None
 
     def get_pivoted_dimension_type(self) -> DimensionType | None:
         """Return the table's pivoted dimension type or None if the table isn't pivoted."""

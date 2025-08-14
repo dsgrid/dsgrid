@@ -8,12 +8,16 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any, Optional, Type, Union
 
+from dsgrid.utils.dataset import handle_dimension_association_errors
 import json5
 import pandas as pd
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
-from dsgrid.config.dimension_config import DimensionBaseConfig, DimensionBaseConfigWithFiles
+from dsgrid.config.dimension_config import (
+    DimensionBaseConfig,
+    DimensionBaseConfigWithFiles,
+)
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import (
     DSGInvalidDataset,
@@ -72,7 +76,6 @@ from dsgrid.spark.functions import (
     except_all,
     is_dataframe_empty,
     unpersist,
-    write_csv,
 )
 from dsgrid.spark.types import (
     DataFrame,
@@ -136,7 +139,12 @@ class ProjectRegistryManager(RegistryManagerBase):
         db: ProjectRegistryInterface,
     ):
         return cls._load(
-            path, params, dataset_manager, dimension_manager, dimension_mapping_manager, db
+            path,
+            params,
+            dataset_manager,
+            dimension_manager,
+            dimension_mapping_manager,
+            db,
         )
 
     @staticmethod
@@ -168,7 +176,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         return self._dimension_mapping_mgr
 
     def get_by_id(
-        self, project_id: str, version: Optional[str] = None, conn: Optional[Connection] = None
+        self,
+        project_id: str,
+        version: Optional[str] = None,
+        conn: Optional[Connection] = None,
     ):
         if version is None:
             assert self._db is not None
@@ -219,7 +230,10 @@ class ProjectRegistryManager(RegistryManagerBase):
         return subset_dimensions
 
     def load_project(
-        self, project_id: str, version: Optional[str] = None, conn: Optional[Connection] = None
+        self,
+        project_id: str,
+        version: Optional[str] = None,
+        conn: Optional[Connection] = None,
     ) -> Project:
         """Load a project from the registry.
 
@@ -253,6 +267,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             dataset_configs,
             self._dimension_mgr,
             self._dimension_mapping_mgr,
+            self._dataset_mgr,
         )
 
     def register(
@@ -1302,18 +1317,21 @@ class ProjectRegistryManager(RegistryManagerBase):
     ):
         """Check that a dataset has all project-required dimension records."""
         logger.info("Check dataset-base-to-project-base dimension mappings.")
+        data_store = self._dataset_mgr.store
         handler = make_dataset_schema_handler(
             context.connection,
             dataset_config,
             self._dimension_mgr,
             self._dimension_mapping_mgr,
-            mapping_references,
-            project_time_dim=project_config.get_base_time_dimension(),
+            store=data_store,
+            mapping_references=mapping_references,
         )
         dataset_id = dataset_config.config_id
 
         with ScratchDirContext(self._params.scratch_dir) as scontext:
-            mapped_dataset_table = handler.make_dimension_association_table(scontext)
+            mapped_dataset_table = handler.make_mapped_dimension_association_table(
+                data_store, scontext
+            )
             project_table = self._make_dimension_associations(project_config, dataset_id, scontext)
             cols = sorted(project_table.columns)
             cache(mapped_dataset_table)
@@ -1327,9 +1345,8 @@ class ProjectRegistryManager(RegistryManagerBase):
                 diff = except_all(project_table.select(*cols), mapped_dataset_table.select(*cols))
                 cache(diff)
                 if not is_dataframe_empty(diff):
-                    _handle_dimension_association_errors(
-                        diff, mapped_dataset_table, dataset_config, project_config.config_id
-                    )
+                    dataset_id = dataset_config.model.dataset_id
+                    handle_dimension_association_errors(diff, mapped_dataset_table, dataset_id)
             finally:
                 unpersist(mapped_dataset_table)
                 if diff is not None:
@@ -1588,39 +1605,3 @@ def _check_distinct_column_values(project_table: DataFrame, mapped_dataset_table
             "more columns. Please look in the log file for the exact records."
         )
         raise DSGInvalidDataset(msg)
-
-
-def _handle_dimension_association_errors(
-    diff: DataFrame,
-    mapped_dataset_table: DataFrame,
-    dataset_config: DatasetConfig,
-    project_id: str,
-):
-    dataset_id = dataset_config.config_id
-    out_file = f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
-    write_csv(diff, out_file, header=True, overwrite=True)
-    logger.error(
-        "Dataset %s is missing required dimension records from project %s. "
-        "Recorded missing records in %s",
-        dataset_id,
-        project_id,
-        out_file,
-    )
-    _look_for_error_contributors(diff, mapped_dataset_table)
-    raise DSGInvalidDataset(
-        f"Dataset {dataset_config.config_id} is missing required dimension records. "
-        "Please look in the log file for more information."
-    )
-
-
-def _look_for_error_contributors(diff: DataFrame, mapped_dataset_table: DataFrame) -> None:
-    diff_counts = {x: diff.select(x).distinct().count() for x in diff.columns}
-    for col in diff.columns:
-        dataset_count = mapped_dataset_table.select(col).distinct().count()
-        if dataset_count != diff_counts[col]:
-            logger.error(
-                "Error contributor: column=%s dataset_distinct_count=%s missing_distinct_count=%s",
-                col,
-                dataset_count,
-                diff_counts[col],
-            )

@@ -27,8 +27,9 @@ def generate_config_from_dataset(
     dataset_id: str,
     dataset_path: Path,
     schema_type: DataSchemaType,
+    metric_type: str,
     pivoted_dimension_type: DimensionType | None = None,
-    time_type: TimeDimensionType = TimeDimensionType.DATETIME,
+    time_type: TimeDimensionType | None = None,
     time_columns: set[str] | None = None,
     output_directory: Path | None = None,
     project_id: str | None = None,
@@ -75,7 +76,10 @@ def generate_config_from_dataset(
             dimension_references.append(ref)
 
     config = make_unvalidated_dataset_config(
-        dataset_id, dimension_references=dimension_references, time_type=time_type
+        dataset_id,
+        metric_type,
+        dimension_references=dimension_references,
+        time_type=time_type,
     )
     dump_data(config, dataset_file, indent=2)
     logger.info("Wrote dataset config to %s", dataset_file)
@@ -83,11 +87,13 @@ def generate_config_from_dataset(
 
 def write_dimension_records(ids: Iterable[str], filename: Path) -> None:
     with open(filename, "w", encoding="utf-8") as f:
-        f.write("id,name\n")
+        header = ["id", "name"]
+        f.write(",".join(header))
+        f.write("\n")
         for id_ in ids:
-            f.write(id_)
-            f.write(",")
-            f.write(id_.title().replace("_", " "))
+            str_id = str(id_)
+            values = [str_id, str_id.title().replace("_", " ")]
+            f.write(",".join(values))
             f.write("\n")
     logger.info("Wrote dimension records to %s", filename)
 

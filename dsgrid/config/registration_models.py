@@ -15,7 +15,7 @@ class ProjectRegistrationModel(DSGBaseModel):
 
     project_id: str = Field(description="Project ID")
     config_file: Path = Field(description="Path to project.json5")
-    log_message: Optional[str] = Field(
+    log_message: str | None = Field(
         default=None,
         description="Log message to use when registering the project. Defaults to an auto-generated message.",
     )
@@ -181,7 +181,9 @@ class RegistrationModel(DSGBaseModel):
             )
         )
         return RegistrationModel(
-            projects=projects, datasets=datasets, dataset_submissions=dataset_submissions
+            projects=projects,
+            datasets=datasets,
+            dataset_submissions=dataset_submissions,
         )
 
 

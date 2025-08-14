@@ -26,13 +26,12 @@ class DimensionType(DSGEnum):
         return self.value < other.value
 
     @classmethod
-    def from_column(cls, column) -> "DimensionType":
+    def from_column(cls, column: str) -> "DimensionType":
         try:
             return cls(column)
         except ValueError:
-            raise DSGInvalidDimension(
-                f"column={column} is not expected or of a known dimension type."
-            )
+            msg = f"column={column} is not expected or of a known dimension type."
+            raise DSGInvalidDimension(msg)
 
     @staticmethod
     def get_dimension_types_allowed_as_columns() -> set["DimensionType"]:
@@ -146,6 +145,37 @@ def check_required_dimensions(dimensions, tag):
     missing = required_dim_types.difference(dimension_types)
     if missing:
         raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
+
+    check_uniqueness((x.dimension_type for x in dimensions), tag)
+
+
+def check_required_dataset_dimensions(dimensions, tag):
+    """Check that a dataset config contains all required dimensions.
+
+    Parameters
+    ----------
+    dimensions : list
+        list of DimensionReferenceModel
+    tag : str
+        User-defined string to include in exception messages
+
+    Raises
+    ------
+    ValueError
+        Raised if a required dimension is not provided.
+
+    """
+    # dimension_types = {x.dimension_type for x in dimensions}
+    # TODO: stride
+    # required_dim_types = {
+    #     DimensionType.GEOGRAPHY,
+    #     DimensionType.MODEL_YEAR,
+    #     DimensionType.SCENARIO,
+    #     DimensionType.SECTOR,
+    # }
+    # missing = required_dim_types.difference(dimension_types)
+    # if missing:
+    #     raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
 
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 

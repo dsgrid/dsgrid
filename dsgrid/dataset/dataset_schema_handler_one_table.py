@@ -58,11 +58,9 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return cls(load_data_df, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
-    def check_consistency(
-        self, missing_dimension_associations: DataFrame | None
-    ) -> DataFrame | None:
+    def check_consistency(self, missing_dimension_associations: DataFrame | None) -> None:
         self._check_one_table_data_consistency()
-        return self._check_dimension_associations(missing_dimension_associations)
+        self._check_dimension_associations(missing_dimension_associations)
 
     @track_timing(timer_stats_collector)
     def check_time_consistency(self):
@@ -104,22 +102,17 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     msg = f"dimension column {column} must have data type = StringType"
                     raise DSGInvalidDataset(msg)
                 dimension_types.add(dim_type)
-        check_for_nulls(self._load_data, exclude_columns={VALUE_COLUMN})
+        check_for_nulls(self._load_data)
 
     def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
-        dim_cols = self._list_dimension_columns(self._load_data)
-        df = self._load_data.select(*dim_cols).distinct()
-        df = self._remove_non_dimension_columns(df).distinct()
-        return df
+        return self._remove_non_dimension_columns(self._load_data).distinct()
 
     def make_mapped_dimension_association_table(
         self,
         store: DataStoreInterface,
         context: ScratchDirContext,
     ) -> DataFrame:
-        df = self._load_data
-        dim_cols = self._list_dimension_columns(self._load_data)
-        df = df.select(*dim_cols).distinct()
+        df = self._make_actual_dimension_association_table_from_data()
         missing_associations = store.read_missing_associations_table(
             self._config.model.dataset_id, self._config.model.version
         )
@@ -127,13 +120,13 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
             missing_associations = self._union_not_covered_dimensions(
                 missing_associations, context
             )
-        if missing_associations is not None:
             assert sorted(df.columns) == sorted(missing_associations.columns)
             df = union([df, missing_associations.select(*df.columns)])
         plan = self.build_default_dataset_mapping_plan()
         with DatasetMappingManager(self.dataset_id, plan, context) as mapping_manager:
             df = self._remap_dimension_columns(df, mapping_manager)
-        return self._remove_non_dimension_columns(df).distinct()
+        check_for_nulls(df)
+        return df
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):

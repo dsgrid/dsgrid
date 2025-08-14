@@ -113,24 +113,23 @@ class DatasetRegistryManager(RegistryManagerBase):
         conn: Connection,
         config: DatasetConfig,
         missing_dimension_associations: DataFrame | None,
-    ) -> DataFrame | None:
+    ) -> None:
         logger.info("Run dataset registration checks.")
         check_required_dataset_dimensions(config.model.dimension_references, "dataset dimensions")
         check_uniqueness((x.model.name for x in config.model.dimensions), "dimension name")
         if not os.environ.get("__DSGRID_SKIP_CHECK_DATASET_CONSISTENCY__"):
-            return self._check_dataset_consistency(
+            self._check_dataset_consistency(
                 conn,
                 config,
                 missing_dimension_associations,
             )
-        return None
 
     def _check_dataset_consistency(
         self,
         conn: Connection,
         config: DatasetConfig,
         missing_dimension_associations: DataFrame | None,
-    ) -> DataFrame | None:
+    ) -> None:
         schema_handler = make_dataset_schema_handler(
             conn,
             config,
@@ -138,7 +137,7 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._dimension_mapping_mgr,
             store=self._store,
         )
-        return schema_handler.check_consistency(missing_dimension_associations)
+        schema_handler.check_consistency(missing_dimension_associations)
 
     @property
     def dimension_manager(self) -> DimensionRegistryManager:
@@ -298,19 +297,11 @@ class DatasetRegistryManager(RegistryManagerBase):
             config.model.dataset_id, config.model.version
         )
         try:
-            missing_associations = self._run_checks(
+            self._run_checks(
                 context.connection,
                 config,
                 assoc_df,
             )
-            if missing_associations is not None and not is_dataframe_empty(missing_associations):
-                # Note that the table may have been updated.
-                self._store.write_missing_associations_table(
-                    missing_associations,
-                    config.model.dataset_id,
-                    config.model.version,
-                    overwrite=True,
-                )
         except Exception:
             self._store.remove_tables(config.model.dataset_id, config.model.version)
             raise
@@ -572,13 +563,13 @@ class DatasetRegistryManager(RegistryManagerBase):
         assoc_df = self._store.read_missing_associations_table(
             updated_config.model.dataset_id, updated_config.model.version
         )
-        missing_associations = self._run_checks(conn, updated_config, assoc_df)
-        if missing_associations is not None and not is_dataframe_empty(missing_associations):
-            self._store.write_missing_associations_table(
-                missing_associations,
-                config.model.dataset_id,
-                updated_config.model.version,
+        try:
+            self._run_checks(conn, updated_config, assoc_df)
+        except Exception:
+            self._store.remove_tables(
+                updated_config.model.dataset_id, updated_config.model.version
             )
+            raise
 
         old_key = ConfigKey(dataset_id, cur_config.model.version)
         new_key = ConfigKey(dataset_id, updated_config.model.version)

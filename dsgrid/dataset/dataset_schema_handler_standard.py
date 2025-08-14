@@ -75,12 +75,10 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return cls(load_data_df, load_data_lookup, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
-    def check_consistency(
-        self, missing_dimension_associations: DataFrame | None
-    ) -> DataFrame | None:
+    def check_consistency(self, missing_dimension_associations: DataFrame | None) -> None:
         self._check_lookup_data_consistency()
         self._check_dataset_internal_consistency()
-        return self._check_dimension_associations(missing_dimension_associations)
+        self._check_dimension_associations(missing_dimension_associations)
 
     @track_timing(timer_stats_collector)
     def check_time_consistency(self):
@@ -95,29 +93,15 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 self._load_data.join(self._load_data_lookup, on="id")
             )
 
-    def get_expected_missing_dimension_associations(
-        self,
-        missing_dimension_associations: DataFrame | None,
-        context: ScratchDirContext,
-    ) -> DataFrame:
-        dim_cols = self._list_dimension_columns(self._load_data)
-        df = self._load_data.select(*dim_cols).distinct()
-
-        if missing_dimension_associations is None:
-            return df
-
     def _make_actual_dimension_association_table_from_data(self) -> DataFrame:
-        lk_df = self._load_data_lookup
-        if SCALING_FACTOR_COLUMN in lk_df.columns:
-            lk_df = lk_df.drop(SCALING_FACTOR_COLUMN)
-        dim_cols = self._list_dimension_columns(self._load_data)
-        df = self._load_data.select("id", *dim_cols).distinct()
-        return df.join(lk_df, on="id").drop("id").distinct()
+        return self._remove_non_dimension_columns(
+            self._load_data.join(self._load_data_lookup, on="id")
+        ).distinct()
 
     def make_mapped_dimension_association_table(
         self, store: DataStoreInterface, context: ScratchDirContext
     ) -> DataFrame:
-        lk_df = self._load_data_lookup
+        df = self._make_actual_dimension_association_table_from_data()
         missing_associations = store.read_missing_associations_table(
             self._config.model.dataset_id, self._config.model.version
         )
@@ -125,15 +109,12 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             missing_associations = self._union_not_covered_dimensions(
                 missing_associations, context
             )
-        dim_cols = self._list_dimension_columns(self._load_data)
-        df = self._load_data.select("id", *dim_cols).distinct()
-        df = df.join(lk_df, on="id").drop("id")
-        if missing_associations is not None:
             assert sorted(df.columns) == sorted(missing_associations.columns)
             df = union([df, missing_associations.select(*df.columns)])
         mapping_plan = self.build_default_dataset_mapping_plan()
         with DatasetMappingManager(self.dataset_id, mapping_plan, context) as mapping_manager:
             df = self._remap_dimension_columns(df, mapping_manager).drop("fraction")
+        check_for_nulls(df)
         return df
 
     def make_project_dataframe(
@@ -287,7 +268,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             msg = "load_data does not include an 'id' column"
             raise DSGInvalidDataset(msg)
 
-        check_for_nulls(self._load_data, exclude_columns={VALUE_COLUMN})
+        check_for_nulls(self._load_data)
         ld_ids = self._load_data.select("id").distinct()
         ldl_ids = self._load_data_lookup.select("id").distinct()
         ldl_id_count = ldl_ids.count()

@@ -124,21 +124,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def check_consistency(
-        self, missing_dimension_associations: DataFrame | None
-    ) -> DataFrame | None:
+    def check_consistency(self, missing_dimension_associations: DataFrame | None) -> None:
         """
         Check all data consistencies, including data columns, dataset to dimension records, and time
-
-        Parameters
-        ----------
-        missing_dimension_associations : DataFrame | None
-
-        Returns
-        -------
-        DataFrame
-            A dataframe containing one row for each dimension association that is expected to be
-            missing from the data. The dataframe will include all dimension columns except time.
         """
 
     @abc.abstractmethod
@@ -171,16 +159,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
     @track_timing(timer_stats_collector)
     def _check_dimension_associations(
         self, missing_dimension_associations: DataFrame | None
-    ) -> DataFrame | None:
-        """Check that a cross-join of dimension records is present, unless explicitly excepted.
-
-        Returns
-        -------
-        DataFrame | None
-            If set, a dataframe containing one row for each dimension association that is expected
-            to be missing from the data. The dataframe will contain all dimension columns except
-            time.
-        """
+    ) -> None:
+        """Check that a cross-join of dimension records is present, unless explicitly excepted."""
         context = ScratchDirContext(Path(tempfile.gettempdir()))
         assoc_by_records = self._make_expected_dimension_association_table_from_records(
             [x for x in DimensionType if x != DimensionType.TIME], context
@@ -200,8 +180,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
         finally:
             unpersist(diff)
-
-        return missing_dimension_associations
 
     @abc.abstractmethod
     def make_mapped_dimension_association_table(
@@ -226,9 +204,6 @@ class DatasetSchemaHandlerBase(abc.ABC):
         expected_table = self._make_expected_dimension_association_table_from_records(
             not_covered_dims, context
         )
-        if expected_table is None:
-            return df
-
         return cross_join(
             df,
             expected_table,

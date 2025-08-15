@@ -9,7 +9,7 @@ import pandas as pd
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
-from dsgrid.common import SCALING_FACTOR_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     ALLOWED_LOAD_DATA_FILENAMES,

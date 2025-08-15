@@ -76,18 +76,16 @@ class TableFormatHandlerBase(abc.ABC):
 
             if column.function is not None:
                 # TODO #200: Do we want to allow this?
-                raise NotImplementedError(
-                    f"Applying a SQL function to added column={name} is not supported yet"
-                )
+                msg = f"Applying a SQL function to added column={name} is not supported yet"
+                raise NotImplementedError(msg)
             expected_base_dim_cols = context.get_dimension_column_names_by_name(
                 supp_dim.model.dimension_type,
                 base_dim.model.name,
                 dataset_id=self._dataset_id,
             )
             if len(expected_base_dim_cols) > 1:
-                raise Exception(
-                    "Bug: Non-time dimensions cannot have more than one base dimension column"
-                )
+                msg = "Bug: Non-time dimensions cannot have more than one base dimension column"
+                raise Exception(msg)
             expected_base_dim_col = expected_base_dim_cols[0]
             df = map_stacked_dimension(
                 df,
@@ -217,9 +215,8 @@ class TableFormatHandlerBase(abc.ABC):
                         # or alias, and so the old name must be removed.
                         final_metadata.remove_metadata(dim_type, column.dimension_name)
                 case _:
-                    raise NotImplementedError(
-                        f"Bug: unhandled: {context.model.result.column_type}"
-                    )
+                    msg = f"Bug: unhandled: {context.model.result.column_type}"
+                    raise NotImplementedError(msg)
             final_metadata.add_metadata(
                 dim_type,
                 DimensionMetadataModel(
@@ -246,7 +243,8 @@ class TableFormatHandlerBase(abc.ABC):
             # This is an expensive operation, so only do it if the dataframe changed.
             value_columns = context.get_value_columns()
             if not value_columns:
-                raise Exception("Bug: value_columns cannot be empty")
+                msg = "Bug: value_columns cannot be empty"
+                raise Exception(msg)
             time_columns = context.get_dimension_column_names(
                 DimensionType.TIME, dataset_id=self._dataset_id
             )

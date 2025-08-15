@@ -1,7 +1,5 @@
 """Dimension types for dsgrid"""
 
-from typing import Optional
-
 from pydantic import Field
 
 from dsgrid.exceptions import DSGInvalidDimension
@@ -73,7 +71,7 @@ class MetricDimensionBaseModel(DimensionRecordBaseModel):
 class GeographyDimensionBaseModel(DimensionRecordBaseModel):
     """Base class for all geography dimensions"""
 
-    time_zone: Optional[TimeZone] = Field(
+    time_zone: TimeZone | None = Field(
         default=None,
         title="Local Prevailing Time Zone",
         description="""
@@ -120,7 +118,8 @@ def get_record_base_model(type_enum):
     """Return the dimension model class for a DimensionType."""
     dim_model = _DIMENSION_TO_MODEL.get(type_enum)
     if dim_model is None:
-        raise DSGInvalidDimension(f"no mapping for {type_enum}")
+        msg = f"no mapping for {type_enum}"
+        raise DSGInvalidDimension(msg)
     return dim_model
 
 
@@ -144,7 +143,8 @@ def check_required_dimensions(dimensions, tag):
     required_dim_types = set(DimensionType)
     missing = required_dim_types.difference(dimension_types)
     if missing:
-        raise ValueError(f"Required dimension(s) {missing} are not in {tag}.")
+        msg = f"Required dimension(s) {missing} are not in {tag}."
+        raise ValueError(msg)
 
     check_uniqueness((x.dimension_type for x in dimensions), tag)
 
@@ -196,10 +196,11 @@ def check_timezone_in_geography(dimension, err_msg=None):
 
     """
     if dimension.dimension_type != DimensionType.GEOGRAPHY:
-        raise DSGInvalidDimension(
+        msg = (
             f"Dimension has type {dimension.dimension_type}, "
             "Can only check timezone for Geography."
         )
+        raise DSGInvalidDimension(msg)
 
     if not hasattr(dimension.records[0], "time_zone"):
         if err_msg is None:
@@ -210,7 +211,8 @@ def check_timezone_in_geography(dimension, err_msg=None):
     record_tz = {rec.time_zone for rec in dimension.records}
     diff = record_tz.difference(tz)
     if diff:
-        raise DSGInvalidDimension(
+        msg = (
             f"Geography dimension {dimension.dimension_id} has invalid timezone(s) in records: "
             f"{dimension.filename}: {diff}. Use dsgrid TimeZone enum values only ({tz})."
         )
+        raise DSGInvalidDimension(msg)

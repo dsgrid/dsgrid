@@ -1,7 +1,7 @@
 """Contains data models to control bulk registration of projects and datasets."""
 
 from pathlib import Path
-from typing import Any, Iterable, Optional
+from typing import Any, Iterable
 
 from pydantic import Field, ValidationInfo, field_validator, model_validator
 
@@ -46,7 +46,7 @@ class DatasetRegistrationModel(DSGBaseModel):
         "with matching names. Typically only useful for tests.",
         default=False,
     )
-    log_message: Optional[str] = Field(
+    log_message: str | None = Field(
         default=None,
         description="Log message to use when registering the dataset. Defaults to an auto-generated message.",
     )
@@ -77,11 +77,11 @@ class DatasetSubmissionModel(DSGBaseModel):
 
     dataset_id: str
     project_id: str
-    dimension_mapping_file: Optional[Path] = Field(
+    dimension_mapping_file: Path | None = Field(
         description="Path to file containing mappings of dataset-to-project dimensions",
         default=None,
     )
-    dimension_mapping_references_file: Optional[Path] = Field(
+    dimension_mapping_references_file: Path | None = Field(
         description="Path to file containing references to mappings of dataset-to-project dimensions",
         default=None,
     )
@@ -94,7 +94,7 @@ class DatasetSubmissionModel(DSGBaseModel):
         description="Dimensions on which to attempt create reverse mappings from supplemental dimensions.",
         default=set(),
     )
-    log_message: Optional[str] = Field(
+    log_message: str | None = Field(
         default=None,
         description="Log message to use when submitting the dataset. Defaults to an auto-generated message.",
     )

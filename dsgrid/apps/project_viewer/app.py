@@ -207,7 +207,8 @@ def check_request(endpoint, url):
     target = f"{url}/{endpoint}"
     response = requests.get(target)
     if response.status_code != 200:
-        raise Exception(f"request to {target} failed: {response.status_code}")
+        msg = f"request to {target} failed: {response.status_code}"
+        raise Exception(msg)
     return response.json()
 
 

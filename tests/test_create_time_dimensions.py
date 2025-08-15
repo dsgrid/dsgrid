@@ -143,7 +143,8 @@ def create_index_time_dataframe(interval="1h"):
         indices = np.arange(0, 8784 * 2 - 1).tolist()
         values = np.arange(0.0, 8783.5, 0.5).tolist()
     else:
-        raise ValueError("Unsupported {interval=}")
+        msg = f"Unsupported {interval=}"
+        raise ValueError(msg)
     df_tz = get_spark_session().createDataFrame(zip(indices, values), ["time_index", "value"])
     for geo, tz in zip(geography, time_zones):
         df = df.union(

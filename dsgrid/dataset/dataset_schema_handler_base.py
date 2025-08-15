@@ -391,22 +391,25 @@ class DatasetSchemaHandlerBase(abc.ABC):
         counts = load_data_df.groupBy(*time_cols).count().select("count")
         distinct_counts = counts.select("count").distinct().collect()
         if len(distinct_counts) != 1:
-            raise DSGInvalidDataset(
+            msg = (
                 "All time arrays must be repeated the same number of times: "
                 f"unique timestamp repeats = {len(distinct_counts)}"
             )
+            raise DSGInvalidDataset(msg)
         ta_counts = load_data_df.groupBy(*unique_array_cols).count().select("count")
         distinct_ta_counts = ta_counts.select("count").distinct().collect()
         if len(distinct_ta_counts) != 1:
-            raise DSGInvalidDataset(
+            msg = (
                 "All combinations of non-time dimensions must have the same time array length: "
                 f"unique time array lengths = {len(distinct_ta_counts)}"
             )
+            raise DSGInvalidDataset(msg)
 
     def _check_load_data_unpivoted_value_column(self, df):
         logger.info("Check load data unpivoted columns.")
         if VALUE_COLUMN not in df.columns:
-            raise DSGInvalidDataset(f"value_column={VALUE_COLUMN} is not in columns={df.columns}")
+            msg = f"value_column={VALUE_COLUMN} is not in columns={df.columns}"
+            raise DSGInvalidDataset(msg)
 
     def _convert_units(
         self,
@@ -798,6 +801,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             return load_data_df
         self._validate_daylight_saving_adjustment(time_based_data_adjustment)
         time_dim = self._config.get_time_dimension()
+        assert time_dim is not None
         if time_dim.model.is_time_zone_required_in_geography():
             if self._config.model.use_project_geography_time_zone:
                 if to_geo_dim is None:
@@ -884,9 +888,10 @@ class DatasetSchemaHandlerBase(abc.ABC):
             == DaylightSavingAdjustmentModel()
         ):
             return
-        time_dim = self._config.get_dimension(DimensionType.TIME)
+        time_dim = self._config.get_time_dimension()
         if not isinstance(time_dim, IndexTimeDimensionConfig):
-            msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.time_dim.model.time_type=} time type, it applies to INDEX time type only."
+            assert time_dim is not None
+            msg = f"time_based_data_adjustment.daylight_saving_adjustment does not apply to {time_dim.model.time_type=} time type, it applies to INDEX time type only."
             logger.warning(msg)
 
     def _remove_non_dimension_columns(self, df: DataFrame) -> DataFrame:

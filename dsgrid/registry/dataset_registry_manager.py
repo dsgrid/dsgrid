@@ -3,18 +3,19 @@
 import logging
 import os
 from pathlib import Path
-from typing import Optional, Type, Union
+from typing import Any, Self, Type, Union
 
 import pandas as pd
 from prettytable import PrettyTable
 from sqlalchemy import Connection
 
-from dsgrid.common import SCALING_FACTOR_COLUMN
+from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     ALLOWED_LOAD_DATA_FILENAMES,
     ALLOWED_LOAD_DATA_LOOKUP_FILENAMES,
     ALLOWED_MISSING_DIMENSION_ASSOCATIONS_FILENAMES,
+    DatasetConfigModel,
 )
 from dsgrid.config.dataset_config import DataSchemaType
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
@@ -81,7 +82,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         dimension_mapping_manager: DimensionMappingRegistryManager,
         db: DatasetRegistryInterface,
         store: DataStoreInterface,
-    ):
+    ) -> Self:
         return cls._load(path, params, dimension_manager, dimension_mapping_manager, db, store)
 
     @staticmethod
@@ -164,19 +165,21 @@ class DatasetRegistryManager(RegistryManagerBase):
                     self.sync_push(self.get_registry_data_directory(dataset_id))
                 self.cloud_interface.remove_lock_file(lock_file)
 
-    def get_by_id(self, dataset_id: str, version=None, conn: Connection | None = None):
+    def get_by_id(
+        self, config_id: str, version: str | None = None, conn: Connection | None = None
+    ) -> DatasetConfig:
         if version is None:
-            version = self._db.get_latest_version(conn, dataset_id)
+            version = self._db.get_latest_version(conn, config_id)
 
-        key = ConfigKey(dataset_id, version)
+        key = ConfigKey(config_id, version)
         dataset = self._datasets.get(key)
         if dataset is not None:
             return dataset
 
         if version is None:
-            model = self.db.get_latest(conn, dataset_id)
+            model = self.db.get_latest(conn, config_id)
         else:
-            model = self.db.get_by_version(conn, dataset_id, version)
+            model = self.db.get_by_version(conn, config_id, version)
 
         config = DatasetConfig(model)
         self._update_dimensions(conn, config)
@@ -184,14 +187,38 @@ class DatasetRegistryManager(RegistryManagerBase):
         return config
 
     def acquire_registry_locks(self, config_ids: list[str]):
+        """Acquire lock(s) on the registry for all config_ids.
+
+        Parameters
+        ----------
+        config_ids : list[str]
+
+        Raises
+        ------
+        DSGRegistryLockError
+            Raised if a lock cannot be acquired.
+
+        """
         for dataset_id in config_ids:
             lock_file = self.get_registry_lock_file(dataset_id)
             self.cloud_interface.make_lock_file(lock_file)
 
     def get_registry_lock_file(self, config_id: str):
+        """Return registry lock file path.
+
+        Parameters
+        ----------
+        config_id : str
+            Config ID
+
+        Returns
+        -------
+        str
+            Lock file path
+        """
         return f"configs/.locks/{config_id}.lock"
 
-    def _update_dimensions(self, conn: Optional[Connection], config: DatasetConfig):
+    def _update_dimensions(self, conn: Connection | None, config: DatasetConfig):
         dimensions = self._dimension_mgr.load_dimensions(
             config.model.dimension_references, conn=conn
         )
@@ -248,9 +275,8 @@ class DatasetRegistryManager(RegistryManagerBase):
         # TODO S3: This requires downloading data to the local system.
         # Can we perform all validation on S3 with an EC2 instance?
         if str(dataset_path).startswith("s3://"):
-            raise DSGInvalidDataset(
-                f"Loading a dataset from S3 is not currently supported: {dataset_path}"
-            )
+            msg = f"Loading a dataset from S3 is not currently supported: {dataset_path}"
+            raise DSGInvalidDataset(msg)
 
         conn = context.connection
         self._check_if_already_registered(conn, config.model.dataset_id)
@@ -494,6 +520,7 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def _copy_dataset_config(self, conn: Connection, config: DatasetConfig) -> DatasetConfig:
         new_config = DatasetConfig(config.model)
+        assert config.dataset_path is not None
         new_config.dataset_path = config.dataset_path
         self._update_dimensions(conn, new_config)
         return new_config
@@ -581,13 +608,13 @@ class DatasetRegistryManager(RegistryManagerBase):
 
         return updated_config
 
-    def remove(self, dataset_id: str, conn: Connection | None = None):
-        for key in [x for x in self._datasets if x.id == dataset_id]:
-            self.remove_data(dataset_id, key.version)
+    def remove(self, config_id: str, conn: Connection | None = None):
+        for key in [x for x in self._datasets if x.id == config_id]:
+            self.remove_data(config_id, key.version)
             self._datasets.pop(key)
 
-        self.db.delete_all(conn, dataset_id)
-        logger.info("Removed %s from the registry.", dataset_id)
+        self.db.delete_all(conn, config_id)
+        logger.info("Removed %s from the registry.", config_id)
 
     def remove_data(self, dataset_id: str, version: str):
         self._store.remove_tables(dataset_id, version)
@@ -595,12 +622,12 @@ class DatasetRegistryManager(RegistryManagerBase):
 
     def show(
         self,
-        conn: Optional[Connection] = None,
+        conn: Connection | None = None,
         filters: list[str] | None = None,
         max_width: Union[int, dict] | None = None,
         drop_fields: list[str] | None = None,
         return_table: bool = False,
-        **kwargs,
+        **kwargs: Any,
     ):
         """Show registry in PrettyTable
 
@@ -647,8 +674,8 @@ class DatasetRegistryManager(RegistryManagerBase):
         field_to_index = {x: i for i, x in enumerate(table.field_names)}
         rows = []
         for model in self.db.iter_models(conn, all_versions=True):
+            assert isinstance(model, DatasetConfigModel)
             registration = self.db.get_registration(conn, model)
-
             all_fields = (
                 model.dataset_id,
                 model.version,
@@ -672,3 +699,36 @@ class DatasetRegistryManager(RegistryManagerBase):
         if return_table:
             return table
         display_table(table)
+
+    def sync_pull(self, path):
+        """Synchronizes files from the remote registry to local.
+        Deletes any files locally that do not exist on remote.
+
+        path : Path
+            Local path
+
+        """
+        remote_path = self.relative_remote_path(path)
+        self.cloud_interface.sync_pull(
+            remote_path, path, exclude=SYNC_EXCLUDE_LIST, delete_local=True
+        )
+
+    def sync_push(self, path):
+        """Synchronizes files from the local path to the remote registry.
+
+        path : Path
+            Local path
+
+        """
+        remote_path = self.relative_remote_path(path)
+        lock_file_path = self.get_registry_lock_file(path.name)
+        self.cloud_interface.check_lock_file(lock_file_path)
+        try:
+            self.cloud_interface.sync_push(
+                remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
+            )
+        except Exception:
+            logger.exception(
+                "Please report this error to the dsgrid team. The registry may need recovery."
+            )
+            raise

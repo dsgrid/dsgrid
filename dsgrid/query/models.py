@@ -1,7 +1,7 @@
 import abc
 import itertools
-from enum import Enum
-from typing import Any, Generator, Optional, Union, Literal, Self, TypeAlias
+from enum import StrEnum
+from typing import Any, Generator, Union, Literal, Self, TypeAlias
 
 from pydantic import field_validator, model_validator, Field, field_serializer, ValidationInfo
 from semver import VersionInfo
@@ -59,7 +59,7 @@ class ColumnModel(DSGBaseModel):
     function: Any = Field(
         default=None, description="Function or name of function in pyspark.sql.functions."
     )
-    alias: Optional[str] = Field(default=None, description="Name of the resulting column.")
+    alias: str | None = Field(default=None, description="Name of the resulting column.")
 
     @field_validator("function")
     @classmethod
@@ -71,7 +71,8 @@ class ColumnModel(DSGBaseModel):
 
         func = getattr(F, function_name, None)
         if func is None:
-            raise ValueError(f"function={function_name} is not defined in pyspark.sql.functions")
+            msg = f"function={function_name} is not defined in pyspark.sql.functions"
+            raise ValueError(msg)
         return func
 
     @field_validator("alias")
@@ -100,7 +101,7 @@ class ColumnModel(DSGBaseModel):
         return f"{self.function.__name__}__{self.dimension_name})"
 
 
-class ColumnType(str, Enum):
+class ColumnType(StrEnum):
     """Defines what the columns of a dataset table represent."""
 
     DIMENSION_TYPES = "dimension_types"
@@ -149,16 +150,19 @@ class AggregationModel(DSGBaseModel):
         if isinstance(aggregation_function, str):
             aggregation_function = getattr(F, aggregation_function, None)
             if aggregation_function is None:
-                raise ValueError(f"{aggregation_function} is not defined in pyspark.sql.functions")
+                msg = f"{aggregation_function} is not defined in pyspark.sql.functions"
+                raise ValueError(msg)
         elif aggregation_function is None:
-            raise ValueError("aggregation_function cannot be None")
+            msg = "aggregation_function cannot be None"
+            raise ValueError(msg)
         return aggregation_function
 
     @field_validator("dimensions")
     @classmethod
     def check_for_metric(cls, dimensions):
         if not dimensions.metric:
-            raise ValueError("An AggregationModel must include the metric dimension.")
+            msg = "An AggregationModel must include the metric dimension."
+            raise ValueError(msg)
         return dimensions
 
     @field_serializer("aggregation_function")
@@ -180,7 +184,7 @@ class AggregationModel(DSGBaseModel):
         ]
 
 
-class ReportType(str, Enum):
+class ReportType(StrEnum):
     """Pre-defined reports"""
 
     PEAK_LOAD = "peak_load"
@@ -271,7 +275,7 @@ class DatasetMetadataModel(DSGBaseModel):
 
 
 class CacheableQueryBaseModel(DSGBaseModel):
-    def serialize(self):
+    def serialize_with_hash(self, *args, **kwargs) -> tuple[str, str]:
         """Return a JSON representation of the model along with a hash that uniquely identifies it."""
         text = self.model_dump_json(indent=2)
         return compute_hash(text.encode()), text
@@ -293,7 +297,7 @@ class ProjectQueryDatasetParamsModel(CacheableQueryBaseModel):
     )
 
 
-class DatasetType(str, Enum):
+class DatasetType(StrEnum):
     """Defines the type of a dataset in a query."""
 
     PROJECTION = "projection"
@@ -301,7 +305,7 @@ class DatasetType(str, Enum):
     DERIVED = "derived"
 
 
-class DatasetConstructionMethod(str, Enum):
+class DatasetConstructionMethod(StrEnum):
     """Defines the type of construction method for DatasetType.PROJECTION."""
 
     EXPONENTIAL_GROWTH = "exponential_growth"
@@ -349,7 +353,7 @@ class ProjectionDatasetModel(DatasetBaseModel):
         default=DatasetConstructionMethod.EXPONENTIAL_GROWTH,
         description="Specifier for the code that applies the growth rate to the principal dataset",
     )
-    base_year: Optional[int] = Field(
+    base_year: int | None = Field(
         description="Base year of the dataset to use in growth rate application. Must be a year "
         "defined in the principal dataset's model year dimension. If None, there must be only "
         "one model year in that dimension and it will be used.",
@@ -375,7 +379,7 @@ class DatasetModel(DSGBaseModel):
     source_datasets: list[AbstractDatasetModel] = Field(
         description="Datasets from which to read. Each must be of type DatasetBaseModel.",
     )
-    expression: Optional[str] = Field(
+    expression: str | None = Field(
         description="Expression to combine datasets. Default is to take a union of all datasets.",
         default=None,
     )
@@ -405,7 +409,7 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
     )
     # TODO #203: default needs to change
     include_dsgrid_dataset_components: bool = Field(description="", default=False)
-    version: Optional[str] = Field(
+    version: str | None = Field(
         default=None,
         description="Version of project or dataset on which the query is based. "
         "Should not be set by the user",
@@ -423,11 +427,14 @@ class ProjectQueryParamsModel(CacheableQueryBaseModel):
     @classmethod
     def check_unsupported_fields(cls, values):
         if values.get("include_dsgrid_dataset_components", False):
-            raise ValueError("Setting include_dsgrid_dataset_components=true is not supported yet")
+            msg = "Setting include_dsgrid_dataset_components=true is not supported yet"
+            raise ValueError(msg)
         if values.get("drop_dimensions", []):
-            raise ValueError("drop_dimensions is not supported yet")
+            msg = "drop_dimensions is not supported yet"
+            raise ValueError(msg)
         if values.get("excluded_dataset_ids", []):
-            raise ValueError("excluded_dataset_ids is not supported yet")
+            msg = "excluded_dataset_ids is not supported yet"
+            raise ValueError(msg)
         return values
 
     @model_validator(mode="after")
@@ -520,7 +527,7 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         default=[],
     )
     # TODO #205: implement
-    time_zone: Optional[str] = Field(
+    time_zone: str | None = Field(
         description="Convert the results to this time zone.",
         default=None,
     )
@@ -551,7 +558,8 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     def check_format(cls, fmt):
         allowed = {"csv", "parquet"}
         if fmt not in allowed:
-            raise ValueError(f"output_format={fmt} is not supported. Allowed={allowed}")
+            msg = f"output_format={fmt} is not supported. Allowed={allowed}"
+            raise ValueError(msg)
         return fmt
 
     @model_validator(mode="after")
@@ -561,9 +569,8 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
                 for dim_type in DimensionType:
                     columns = getattr(agg.dimensions, dim_type.value)
                     if len(columns) > 1:
-                        raise ValueError(
-                            f"Multiple columns are incompatible with {self.column_type=}. {columns=}"
-                        )
+                        msg = f"Multiple columns are incompatible with {self.column_type=}. {columns=}"
+                        raise ValueError(msg)
         return self
 
 

@@ -2,10 +2,10 @@ import itertools
 import logging
 from collections import defaultdict
 from pathlib import Path
-from typing import Any, Generator, Iterable, Optional, Type
+from typing import Annotated, Any, Generator, Iterable, Type
 
 import pandas as pd
-from pydantic import conlist, field_validator, model_validator, Field
+from pydantic import field_validator, model_validator, Field
 
 from dsgrid.config.common import make_base_dimension_template
 from dsgrid.config.dataset_config import DatasetConfig
@@ -107,7 +107,7 @@ class SubsetDimensionGroupModel(DSGBaseModel):
             "options": DimensionType.format_for_docs(),
         },
     )
-    filename: Optional[str] = Field(
+    filename: str | None = Field(
         default=None,
         title="filename",
         alias="file",
@@ -129,7 +129,7 @@ class SubsetDimensionGroupModel(DSGBaseModel):
         "the subsets.",
         default=True,
     )
-    base_dimension_name: Optional[str] = Field(
+    base_dimension_name: str | None = Field(
         default=None,
         title="base_dimension_name",
         description="Name of base dimension for the supplemental dimension mapping, if "
@@ -147,9 +147,8 @@ class SubsetDimensionGroupModel(DSGBaseModel):
             for selector in selectors[1:]:
                 columns = sorted(selector.column_values.keys())
                 if columns != first:
-                    raise ValueError(
-                        f"All selectors must define the same columns: {first=} {columns=}"
-                    )
+                    msg = f"All selectors must define the same columns: {first=} {columns=}"
+                    raise ValueError(msg)
 
         return selectors
 
@@ -167,9 +166,8 @@ class SubsetDimensionGroupModel(DSGBaseModel):
 
         diff = selector_names.symmetric_difference(mappings)
         if diff:
-            raise ValueError(
-                f"subset dimension {self.name} selectors have a mismatch with the records file column names: {diff}"
-            )
+            msg = f"subset dimension {self.name} selectors have a mismatch with the records file column names: {diff}"
+            raise ValueError(msg)
 
         for dim in self.selectors:
             dim.records = mappings[dim.name]
@@ -181,8 +179,8 @@ class SubsetDimensionGroupModel(DSGBaseModel):
 class SubsetDimensionGroupListModel(DSGBaseModel):
     """Defines a list of subset dimensions."""
 
-    subset_dimensions: conlist(SubsetDimensionGroupModel, min_length=1) = Field(
-        description="List of subset dimensions to be registered"
+    subset_dimensions: Annotated[list[SubsetDimensionGroupModel], Field(min_length=1)] = Field(
+        description="List of subset dimensions to be registered",
     )
 
 
@@ -194,69 +192,40 @@ class DimensionsModel(DSGBaseModel):
         description="List of dimensions for a project's base dimensions. They will be "
         "automatically registered during project registration and then converted to "
         "base_dimension_references.",
-        json_schema_extra={
-            "requirements": (
-                "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
-                " one dimension reference per type is allowed.",
-            ),
-        },
         default=[],
     )
     base_dimension_references: list[DimensionReferenceModel] = Field(
         title="base_dimensions",
         description="List of registry references (``DimensionReferenceModel``) for a project's "
         "base dimensions.",
-        json_schema_extra={
-            "requirements": (
-                "All base :class:`dsgrid.dimensions.base_model.DimensionType` must be defined and only"
-                " one dimension reference per type is allowed.",
-            ),
-        },
         default=[],
     )
     subset_dimensions: list[SubsetDimensionGroupModel] = Field(
         title="subset_dimensions",
-        description="List of subset dimension groups",
-        json_schema_extra={
-            "notes": (
-                "Subset dimension groups are used to specify subsets of base dimension records that a "
-                "dataset must support, dimensionality of derived datasets, and query filters. "
-                "Subset dimension groups also define a new supplemental dimension whose records "
-                "correspond to the table columns/subset selectors, such that defining a subset "
-                "dimension group can be a convenient way to define reporting at a different level of "
-                "aggregation as compared to the project's base dimensions.",
-            ),
-        },
+        description="List of subset dimension groups. "
+        "Subset dimension groups are used to specify subsets of base dimension records that a "
+        "dataset must support, dimensionality of derived datasets, and query filters. "
+        "Subset dimension groups also define a new supplemental dimension whose records "
+        "correspond to the table columns/subset selectors, such that defining a subset "
+        "dimension group can be a convenient way to define reporting at a different level of "
+        "aggregation as compared to the project's base dimensions.",
         default=[],
     )
     supplemental_dimensions: list[SupplementalDimensionModel] = Field(
         title="supplemental_dimensions",
-        description="List of supplemental dimensions. They will be automatically registered "
-        "during project registration and then converted to supplemental_dimension_references.",
-        json_schema_extra={
-            "notes": (
-                "Supplemental dimensions are used to support additional querying and transformations ",
-                "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
-                "base data.",
-            ),
-        },
+        description="List of supplemental dimensions. They will be automatically registered. "
+        "during project registration and then converted to supplemental_dimension_references. "
+        "Supplemental dimensions are used to support additional querying and transformations "
+        "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's "
+        "base data.",
         default=[],
     )
     supplemental_dimension_references: list[DimensionReferenceModel] = Field(
         title="supplemental_dimension_references",
-        description="List of registry references for a project's supplemental dimensions.",
-        json_schema_extra={
-            "requirements": (
-                "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType`"
-                " are allowed for supplemental dimension references (i.e., multiple `Geography` types"
-                " are allowed).",
-            ),
-            "notes": (
-                "Supplemental dimensions are used to support additional querying and transformations ",
-                "(e.g., aggregations, disgaggregations, filtering, scaling, etc.) of the project's ",
-                "base data.",
-            ),
-        },
+        description="List of registry references for a project's supplemental dimensions. "
+        "Dimensions references of the same :class:`dsgrid.dimensions.base_model.DimensionType` "
+        "are allowed for supplemental dimension references (i.e., multiple `Geography` types "
+        "are allowed).",
         default=[],
     )
 
@@ -274,7 +243,8 @@ class DimensionsModel(DSGBaseModel):
         if not values.get("base_dimensions", []) and not values.get(
             "base_dimension_references", []
         ):
-            raise ValueError("Either base_dimensions or base_dimension_references must be defined")
+            msg = "Either base_dimensions or base_dimension_references must be defined"
+            raise ValueError(msg)
 
         return values
 
@@ -328,7 +298,8 @@ class DimensionsModel(DSGBaseModel):
 
         def add_name(name):
             if name in names:
-                raise ValueError(f"dimension_name={name} is not unique in the project")
+                msg = f"dimension_name={name} is not unique in the project"
+                raise ValueError(msg)
             names.add(name)
 
         for dim in self.base_dimensions:
@@ -344,13 +315,11 @@ class DimensionsModel(DSGBaseModel):
 
 
 class RequiredSubsetDimensionRecordsModel(DSGBaseModel):
-
     name: str = Field(description="Name of a subset dimension")
     selectors: list[str] = Field(description="One or more selectors in the subset dimension")
 
 
 class RequiredSupplementalDimensionRecordsModel(DSGBaseModel):
-
     name: str = Field(description="Name of a supplemental dimension")
     record_ids: list[str] = Field(
         description="One or more record IDs in the supplemental dimension"
@@ -358,9 +327,8 @@ class RequiredSupplementalDimensionRecordsModel(DSGBaseModel):
 
 
 class RequiredBaseDimensionModel(DSGBaseModel):
-
     record_ids: list[str] = []
-    dimension_name: Optional[str] = Field(
+    dimension_name: str | None = Field(
         default=None,
         description="Identifies which base dimension contains the record IDs. Required if there "
         "is more than one base dimension for a given dimension type.",
@@ -368,7 +336,6 @@ class RequiredBaseDimensionModel(DSGBaseModel):
 
 
 class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
-
     base: RequiredBaseDimensionModel = RequiredBaseDimensionModel()
     base_missing: RequiredBaseDimensionModel = RequiredBaseDimensionModel()
     subset: list[RequiredSubsetDimensionRecordsModel] = []
@@ -403,7 +370,6 @@ class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
 
 
 class RequiredDimensionRecordsModel(DSGBaseModel):
-
     # This is here because Pydantic doesn't like fields that start with 'model_'
     model_config = make_model_config(protected_namespaces=())
 
@@ -565,22 +531,14 @@ class InputDatasetModel(DSGBaseModel):
             "updateable": False,
         },
     )
-    version: str = Field(
+    version: str | None = Field(
         title="version",
-        description="Version of the registered dataset",
+        description="Version of the registered dataset. "
+        "The version specification is optional. If no version is supplied, then the latest "
+        "version in the registry is assumed. "
+        "The version string must be in semver format (e.g., '1.0.0') and it must be a "
+        "valid/existing version in the registry.",
         default=None,
-        json_schema_extra={
-            "requirements": (
-                # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
-                # TODO: need to assume the latest version. DSGRID-190
-                "The version specification is optional. If no version is supplied, then the latest"
-                " version in the registry is assumed.",
-                "The version string must be in semver format (e.g., '1.0.0') and it must be a valid/"
-                "existing version in the registry.",
-            ),
-            "updateable": False,
-            # TODO: add notes about warnings for outdated versions? DSGRID-189.
-        },
     )
     required_dimensions: RequiredDimensionsModel = Field(
         title="required_dimensions",
@@ -650,19 +608,13 @@ class DimensionMappingsModel(DSGBaseModel):
     )
     dataset_to_project: dict[str, list[DimensionMappingReferenceModel]] = Field(
         title="dataset_to_project",
-        description="Dataset-to-project mappings map dataset dimensions to project dimensions.",
+        description="Dataset-to-project mappings map dataset dimensions to project dimensions. "
+        "Once a dataset is submitted to a project, dsgrid adds the dataset-to-project mappings "
+        "to the project config. "
+        "Some projects may not have any dataset-to-project mappings. Dataset-to-project "
+        " mappings are only supplied if a dataset's dimensions do not match the project's "
+        "dimension.",
         default={},
-        json_schema_extra={
-            "dsgrid_internal": True,
-            "notes": (
-                "Once a dataset is submitted to a project, dsgrid adds the dataset-to-project mappings"
-                " to the project config",
-                "Some projects may not have any dataset-to-project mappings. Dataset-to-project"
-                " mappings are only supplied if a dataset's dimensions do not match the project's"
-                " dimension.",
-            ),
-            "updateable": False,
-        },
         # TODO: need to document missing dimension records, fill values, etc. DSGRID-191.
     )
 
@@ -674,10 +626,6 @@ class ProjectConfigModel(DSGBaseDatabaseModel):
         title="project_id",
         description="A unique project identifier that is project-specific (e.g., "
         "'standard-scenarios-2021').",
-        json_schema_extra={
-            "requirements": ("Must not contain any dashes (`-`)",),
-            "updateable": False,
-        },
     )
     name: str = Field(
         title="name",
@@ -686,12 +634,6 @@ class ProjectConfigModel(DSGBaseDatabaseModel):
     description: str = Field(
         title="description",
         description="Detailed project description.",
-        json_schema_extra={
-            "notes": (
-                "The description will get stored in the project registry and may be used for"
-                " searching",
-            ),
-        },
     )
     status: ProjectRegistryStatus = Field(
         title="status",
@@ -716,9 +658,6 @@ class ProjectConfigModel(DSGBaseDatabaseModel):
         " base-to-supplemental mappings. dataset-to-project mappings are added by dsgrid as"
         " datasets get registered with the project.",
         default=DimensionMappingsModel(),
-        json_schema_extra={
-            "notes": ("`[dimension_mappings]` are optional at the project level.",),
-        },
     )
 
     @field_validator("project_id")
@@ -726,7 +665,8 @@ class ProjectConfigModel(DSGBaseDatabaseModel):
     def check_project_id_handle(cls, project_id):
         """Check for valid characters in project id"""
         if "-" in project_id:
-            raise ValueError('invalid character "-" in project id')
+            msg = 'invalid character "-" in project id'
+            raise ValueError(msg)
 
         check_config_id_strict(project_id, "Project")
         return project_id
@@ -808,7 +748,7 @@ class ProjectConfig(ConfigBase):
         return "project.json5"
 
     def get_base_dimension(
-        self, dimension_type: DimensionType, dimension_name: Optional[str] = None
+        self, dimension_type: DimensionType, dimension_name: str | None = None
     ) -> DimensionBaseConfig:
         """Return the base dimension matching dimension_type.
         If there is more than one base dimension of the given type, dimension_name is
@@ -851,7 +791,7 @@ class ProjectConfig(ConfigBase):
         return dims[0]
 
     def get_base_dimension_and_version(
-        self, dimension_type: DimensionType, dimension_name: Optional[str] = None
+        self, dimension_type: DimensionType, dimension_name: str | None = None
     ) -> tuple[DimensionBaseConfig, str]:
         """Return the base dimension and version matching dimension_type."""
         res: tuple[DimensionBaseConfig, str] | None = None
@@ -875,7 +815,8 @@ class ProjectConfig(ConfigBase):
         """Return the dimension with name."""
         dim = self._dimensions_by_name.get(name)
         if dim is None:
-            raise DSGValueNotRegistered(f"dimension_name={name} is not stored")
+            msg = f"dimension_name={name} is not stored"
+            raise DSGValueNotRegistered(msg)
         return dim
 
     def get_time_dimension(self, name: str) -> TimeDimensionBaseConfig:
@@ -899,7 +840,8 @@ class ProjectConfig(ConfigBase):
         """Return a dimension config matching name that has records."""
         dim = self._dimensions_by_name.get(name)
         if dim is None:
-            raise DSGInvalidDimension(f"{name=} is not stored")
+            msg = f"{name=} is not stored"
+            raise DSGInvalidDimension(msg)
         if not isinstance(dim, DimensionBaseConfigWithFiles):
             msg = f"{dim.model.label} does not have records"
             raise DSGInvalidParameter(msg)
@@ -922,10 +864,11 @@ class ProjectConfig(ConfigBase):
             if ref.dimension_id == dimension_id:
                 return ref
 
-        raise DSGInvalidDimension(f"{dimension_id} is not stored")
+        msg = f"{dimension_id} is not stored"
+        raise DSGInvalidDimension(msg)
 
     def list_base_dimensions(
-        self, dimension_type: Optional[DimensionType] = None
+        self, dimension_type: DimensionType | None = None
     ) -> list[DimensionBaseConfig]:
         """Return all base dimensions, optionally filtering to the dimension_type.
 
@@ -1090,7 +1033,8 @@ class ProjectConfig(ConfigBase):
             case DimensionCategory.SUPPLEMENTAL:
                 method = self._iter_supplemental_dimensions
             case _:
-                raise NotImplementedError(f"{category=}")
+                msg = f"{category=}"
+                raise NotImplementedError(msg)
 
         return sorted((x.model.name for x in method()))
 
@@ -1166,9 +1110,8 @@ class ProjectConfig(ConfigBase):
         self._dimensions_by_name.clear()
         for dim in self.iter_dimensions():
             if dim.model.name in self._dimensions_by_name:
-                raise DSGInvalidDimension(
-                    f"name={dim.model.name} exists multiple times in project " f"{self.config_id}"
-                )
+                msg = f"name={dim.model.name} exists multiple times in project {self.config_id}"
+                raise DSGInvalidDimension(msg)
             self._dimensions_by_name[dim.model.name] = dim
 
     def set_dimension_mappings(
@@ -1222,17 +1165,16 @@ class ProjectConfig(ConfigBase):
     def config_id(self) -> str:
         return self._model.project_id
 
-    def get_dataset(self, dataset_id) -> InputDatasetModel:
+    def get_dataset(self, dataset_id: str) -> InputDatasetModel:
         """Return a dataset by ID."""
         for dataset in self.model.datasets:
             if dataset.dataset_id == dataset_id:
                 return dataset
 
-        raise DSGInvalidField(
-            f"project_id={self._model.project_id} does not have dataset_id={dataset_id}"
-        )
+        msg = f"project_id={self._model.project_id} does not have dataset_id={dataset_id}"
+        raise DSGInvalidField(msg)
 
-    def has_dataset(self, dataset_id: str, status=None | DatasetRegistryStatus) -> bool:
+    def has_dataset(self, dataset_id: str, status: DatasetRegistryStatus | None) -> bool:
         """Return True if the dataset_id is present in the configuration.
 
         Parameters
@@ -1318,7 +1260,7 @@ class ProjectConfig(ConfigBase):
 
     def _build_multi_dim_requirement_associations(
         self, multi_dim_reqs: list[RequiredDimensionRecordsModel], context: ScratchDirContext
-    ):
+    ) -> list[DataFrame]:
         dfs_by_dim_combo: dict[tuple[str, ...], DataFrame] = {}
 
         # Example: Partial sector and subsector combinations are required.
@@ -1404,7 +1346,7 @@ class ProjectConfig(ConfigBase):
 
         return record_ids
 
-    def _get_subset_dimension_records(self, name: str, selector_name):
+    def _get_subset_dimension_records(self, name: str, selector_name: str) -> set[str]:
         for group in self.model.dimensions.subset_dimensions:
             if group.name == name:
                 for ref in group.selector_references:
@@ -1417,7 +1359,9 @@ class ProjectConfig(ConfigBase):
         msg = f"subset dimension selector not found: {name=} {selector_name=}"
         raise DSGInvalidDimension(msg)
 
-    def _get_required_record_ids_from_subsets(self, req: RequiredDimensionRecordsByTypeModel):
+    def _get_required_record_ids_from_subsets(
+        self, req: RequiredDimensionRecordsByTypeModel
+    ) -> set[str]:
         record_ids = set()
         for subset in req.subset:
             for selector_name in subset.selectors:
@@ -1426,7 +1370,7 @@ class ProjectConfig(ConfigBase):
 
     @track_timing(timer_stats_collector)
     def make_dimension_association_table(
-        self, dataset_id, context: ScratchDirContext
+        self, dataset_id: str, context: ScratchDirContext
     ) -> DataFrame:
         """Build a table that includes all combinations of dimension records that must be provided
         by the dataset.
@@ -1506,9 +1450,8 @@ def load_subset_dimensions(filename: Path) -> tuple[set[str], dict[str, list[str
     """Return a mapping of subset dimension name to record IDs."""
     df = pd.read_csv(filename, index_col="id")
     if len(df.columns) == 0:
-        raise DSGInvalidDimension(
-            "A subset dimension records file must at least one dimension column."
-        )
+        msg = "A subset dimension records file must at least one dimension column."
+        raise DSGInvalidDimension(msg)
     record_ids = set(df.index.values)
     subset_by_dim_name = {x: df[x].dropna().index.to_list() for x in df.columns}
     return record_ids, subset_by_dim_name

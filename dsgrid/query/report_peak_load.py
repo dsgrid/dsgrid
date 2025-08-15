@@ -20,7 +20,6 @@ logger = logging.getLogger(__name__)
 
 
 class PeakLoadInputModel(DSGBaseModel):
-
     group_by_columns: list[str]
 
 
@@ -40,11 +39,12 @@ class PeakLoadReport(ReportsBase):
         output_dir: Path,
         context: QueryContext,
         inputs: PeakLoadInputModel,
-    ):
+    ) -> Path:
         value_columns = [VALUE_COLUMN]
         metric_columns = context.get_dimension_column_names(DimensionType.METRIC)
         if len(metric_columns) > 1:
-            raise Exception(f"Bug: {metric_columns=}")
+            msg = f"Bug: {metric_columns=}"
+            raise Exception(msg)
         metric_column = next(iter(metric_columns))
         group_by_columns = inputs.group_by_columns[:]
         if metric_column not in group_by_columns:
@@ -57,7 +57,8 @@ class PeakLoadReport(ReportsBase):
         time_columns = context.get_dimension_column_names(DimensionType.TIME)
         diff = time_columns.difference(df.columns)
         if diff:
-            raise Exception(f"BUG: expected time column(s) {diff} are not present in table")
+            msg = f"BUG: expected time column(s) {diff} are not present in table"
+            raise Exception(msg)
         columns = ordered_subset_columns(df, time_columns) + join_cols
         with_time = join_multiple_columns(peak_load, df.select(*columns), join_cols).sort(
             *group_by_columns

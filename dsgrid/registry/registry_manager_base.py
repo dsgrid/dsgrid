@@ -4,12 +4,12 @@ import abc
 import copy
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Self, Type
 
 from semver import VersionInfo
 from sqlalchemy import Connection
 
-from dsgrid.common import SYNC_EXCLUDE_LIST
+from dsgrid.config.config_base import ConfigBase
 from dsgrid.exceptions import (
     DSGInvalidParameter,
     DSGValueNotRegistered,
@@ -45,11 +45,11 @@ class RegistryManagerBase(abc.ABC):
 
     @db.setter
     @abc.abstractmethod
-    def db(self, db: RegistryInterfaceBase):
+    def db(self, db: RegistryInterfaceBase) -> None:
         """Return the database interface."""
 
     @classmethod
-    def load(cls, path, params, db, *args, **kwargs):
+    def load(cls, path, params, db, *args: Any, **kwargs: Any) -> Self:
         """Load the registry manager.
 
         path : str
@@ -71,11 +71,13 @@ class RegistryManagerBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def config_class():
+    def config_class() -> Type:
         """Return the class used for storing the config."""
 
     @abc.abstractmethod
-    def get_by_id(self, config_id, version=None, conn: Optional[Connection] = None):
+    def get_by_id(
+        self, config_id: str, version: str | None = None, conn: Connection | None = None
+    ) -> ConfigBase:
         """Get the item matching matching ID. Returns from cache if already loaded.
 
         Parameters
@@ -97,7 +99,7 @@ class RegistryManagerBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def name():
+    def name() -> str:
         """Return the name of the registry, used for reporting.
 
         Returns
@@ -107,20 +109,8 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def register(self, config_file, submitter, log_message, force=False, context=None):
+    def register(self, *args: Any, **kwargs: Any) -> Any:
         """Registers a config file in the registry.
-
-        Parameters
-        ----------
-        config_file : str
-            Path to  config file
-        submitter : str
-            Submitter name
-        log_message : str
-        force : bool
-            If true, register even if an ID is duplicate.
-        context : None or RegistrationContext
-            If not None, assign the config IDs that get registered.
 
         Raises
         ------
@@ -132,20 +122,8 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def register_from_config(self, config, submitter, log_message, force=False, context=None):
+    def register_from_config(self, config: ConfigBase, *args: Any, **kwargs) -> Any:
         """Registers a config file in the registry.
-
-        Parameters
-        ----------
-        config : ConfigBase
-            Configuration instance
-        submitter : str
-            Submitter name
-        log_message : str
-        force : bool
-            If true, register even if an ID is duplicate.
-        context : None or RegistrationContext
-            If not None, assign the config IDs that get registered.
 
         Raises
         ------
@@ -157,21 +135,8 @@ class RegistryManagerBase(abc.ABC):
         """
 
     @abc.abstractmethod
-    def update_from_file(
-        self, config_file, config_id, submitter, update_type, log_message, version
-    ):
+    def update_from_file(self, *args: Any, **kwargs: Any) -> ConfigBase:
         """Updates the current registry with new parameters or data from a config file.
-
-        Parameters
-        ----------
-        config_file : str
-            Path to project config file
-        config_id : str
-        submitter : str
-        update_type : VersionUpdateType
-        log_message : str
-        version : str
-            Version to update. Must be the current version.
 
         Raises
         ------
@@ -186,20 +151,11 @@ class RegistryManagerBase(abc.ABC):
     @abc.abstractmethod
     def update(
         self,
-        config,
-        update_type: VersionUpdateType,
-        log_message: str,
-        submitter: Optional[str] = None,
-    ):
+        config: ConfigBase,
+        *args: Any,
+        **kwargs: Any,
+    ) -> ConfigBase:
         """Updates the current registry with new parameters or data.
-
-        Parameters
-        ----------
-        config : ConfigBase
-        update_type : VersionUpdateType
-        log_message : str
-        submitter : str | None
-            Submitter name. Use current user if None.
 
         Raises
         ------
@@ -211,15 +167,17 @@ class RegistryManagerBase(abc.ABC):
 
         """
 
-    def _check_update(self, conn: Connection, config, config_id, version):
+    def _check_update(
+        self, conn: Connection, config: ConfigBase, config_id: str, version: str
+    ) -> None:
         if config.config_id != config_id:
-            raise DSGInvalidParameter(
-                f"ID={config_id} does not match ID in file: {config.config_id}"
-            )
+            msg = f"ID={config_id} does not match ID in file: {config.config_id}"
+            raise DSGInvalidParameter(msg)
 
         cur_version = self.get_latest_version(config_id, conn=conn)
         if version != cur_version:
-            raise DSGInvalidParameter(f"version={version} is not current. Current={cur_version}")
+            msg = f"version={version} is not current. Current={cur_version}"
+            raise DSGInvalidParameter(msg)
 
     @staticmethod
     def get_next_version(version: str, update_type: VersionUpdateType):
@@ -231,7 +189,8 @@ class RegistryManagerBase(abc.ABC):
         elif update_type == VersionUpdateType.PATCH:
             next_version = ver.bump_patch()
         else:
-            raise NotImplementedError(f"invalid version {update_type=}")
+            msg = f"invalid version {update_type=}"
+            raise NotImplementedError(msg)
 
         return str(next_version)
 
@@ -251,11 +210,13 @@ class RegistryManagerBase(abc.ABC):
 
     def _check_if_already_registered(self, conn: Connection, config_id):
         if self.db.has(conn, config_id):
-            raise DSGDuplicateValueRegistered(f"{self.name()}={config_id}")
+            msg = f"{self.name()}={config_id}"
+            raise DSGDuplicateValueRegistered(msg)
 
     def _check_if_not_registered(self, conn: Connection, config_id):
         if not self.db.has(conn, config_id):
-            raise DSGValueNotRegistered(f"{self.name()}={config_id}")
+            msg = f"{self.name()}={config_id}"
+            raise DSGValueNotRegistered(msg)
 
     def _log_offline_mode_prefix(self):
         return "* OFFLINE MODE * |" if self.offline_mode else ""
@@ -275,7 +236,7 @@ class RegistryManagerBase(abc.ABC):
         config_id,
         directory,
         version=None,
-        conn: Optional[Connection] = None,
+        conn: Connection | None = None,
         force: bool = False,
     ):
         """Dump the config file to directory.
@@ -324,7 +285,7 @@ class RegistryManagerBase(abc.ABC):
         """Return True if there is to be no syncing with the remote registry."""
         return self._params.offline
 
-    def get_latest_version(self, config_id, conn: Optional[Connection] = None):
+    def get_latest_version(self, config_id, conn: Connection | None = None):
         """Return the current version in the registry.
 
         Returns
@@ -333,36 +294,6 @@ class RegistryManagerBase(abc.ABC):
 
         """
         return self.db.get_latest_version(conn, config_id)
-
-    # @abc.abstractmethod
-    # def acquire_registry_locks(self, config_ids: list[str]):
-    #    """Acquire lock(s) on the registry for all config_ids.
-
-    #    Parameters
-    #    ----------
-    #    config_ids : list[str]
-
-    #    Raises
-    #    ------
-    #    DSGRegistryLockError
-    #        Raised if a lock cannot be acquired.
-
-    #    """
-
-    # @abc.abstractmethod
-    # def get_registry_lock_file(self, config_id):
-    #    """Return registry lock file path.
-
-    #    Parameters
-    #    ----------
-    #    config_id : str
-    #        Config ID
-
-    #    Returns
-    #    -------
-    #    str
-    #        Lock file path
-    #    """
 
     def get_registry_data_directory(self, config_id):
         """Return the directory containing data for config_id (parquet files).
@@ -378,7 +309,7 @@ class RegistryManagerBase(abc.ABC):
         """
         return Path(self._params.base_path) / "data" / config_id
 
-    def has_id(self, config_id, version=None, conn: Optional[Connection] = None):
+    def has_id(self, config_id, version=None, conn: Connection | None = None):
         """Return True if an item matching the parameters is stored.
 
         Parameters
@@ -394,16 +325,16 @@ class RegistryManagerBase(abc.ABC):
         """
         return self.db.has(conn, config_id, version=version)
 
-    def iter_configs(self, conn: Optional[Connection] = None):
+    def iter_configs(self, conn: Connection | None = None):
         """Return an iterator over the registered configs."""
         for config_id in self.iter_ids(conn):
             yield self.get_by_id(config_id, conn=conn)
 
-    def iter_ids(self, conn: Optional[Connection] = None):
+    def iter_ids(self, conn: Connection | None = None):
         """Return an iterator over the registered dsgrid IDs."""
         yield from self.db.list_model_ids(conn)
 
-    def list_ids(self, conn: Optional[Connection] = None, **kwargs):
+    def list_ids(self, conn: Connection | None = None, **kwargs: Any):
         """Return the IDs.
 
         Returns
@@ -420,7 +351,7 @@ class RegistryManagerBase(abc.ABC):
         return remote_path
 
     @abc.abstractmethod
-    def remove(self, config_id: str, conn: Optional[Connection] = None):
+    def remove(self, config_id: str, conn: Connection | None = None) -> None:
         """Remove an item from the registry.
 
         Parameters
@@ -434,36 +365,3 @@ class RegistryManagerBase(abc.ABC):
 
         """
         # TODO: Do we want to handle specific versions? This removes all configs.
-
-    def sync_pull(self, path):
-        """Synchronizes files from the remote registry to local.
-        Deletes any files locally that do not exist on remote.
-
-        path : Path
-            Local path
-
-        """
-        remote_path = self.relative_remote_path(path)
-        self.cloud_interface.sync_pull(
-            remote_path, path, exclude=SYNC_EXCLUDE_LIST, delete_local=True
-        )
-
-    def sync_push(self, path):
-        """Synchronizes files from the local path to the remote registry.
-
-        path : Path
-            Local path
-
-        """
-        remote_path = self.relative_remote_path(path)
-        lock_file_path = self.get_registry_lock_file(path.name)
-        self.cloud_interface.check_lock_file(lock_file_path)
-        try:
-            self.cloud_interface.sync_push(
-                remote_path=remote_path, local_path=path, exclude=SYNC_EXCLUDE_LIST
-            )
-        except Exception:
-            logger.exception(
-                "Please report this error to the dsgrid team. The registry may need recovery."
-            )
-            raise

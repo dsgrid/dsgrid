@@ -1,5 +1,4 @@
 import logging
-from typing import Optional
 
 import dsgrid.units.energy as energy
 import dsgrid.units.power as power
@@ -17,7 +16,7 @@ def convert_units_unpivoted(
     df: DataFrame,
     metric_column: str,
     from_records: DataFrame,
-    from_to_records: Optional[DataFrame],
+    from_to_records: DataFrame | None,
     to_unit_records: DataFrame,
 ) -> DataFrame:
     """Convert the value column of the dataframe to the target units.
@@ -64,7 +63,8 @@ def convert_units_unpivoted(
     elif units.issubset(POWER_UNITS):
         func = power.from_any_to_any
     else:
-        raise ValueError(f"Unsupported unit conversion: {units}")
+        msg = f"Unsupported unit conversion: {units}"
+        raise ValueError(msg)
 
     return df.withColumn(VALUE_COLUMN, func("from_unit", "to_unit", VALUE_COLUMN)).drop(
         "from_unit", "to_unit"

@@ -49,7 +49,8 @@ class DimensionFilterBaseModel(DSGBaseModel, abc.ABC):
         elif isinstance(value, int) or isinstance(value, float):
             return str(value)
         else:
-            raise DSGInvalidField(f"Unsupported type: {type(value)}")
+            msg = f"Unsupported type: {type(value)}"
+            raise DSGInvalidField(msg)
 
     def _make_values_str(self, values):
         return ", ".join((f"{self._make_value_str(x)}" for x in values))
@@ -154,9 +155,8 @@ DIMENSION_COLUMN_FILTER_OPERATORS = {
 
 def check_operator(operator):
     if operator not in DIMENSION_COLUMN_FILTER_OPERATORS:
-        raise ValueError(
-            f"operator={operator} is not supported. Allowed={DIMENSION_COLUMN_FILTER_OPERATORS}"
-        )
+        msg = f"operator={operator} is not supported. Allowed={DIMENSION_COLUMN_FILTER_OPERATORS}"
+        raise ValueError(msg)
     return operator
 
 
@@ -239,11 +239,13 @@ class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
     @classmethod
     def check_dimension_names(cls, dimension_names):
         if not dimension_names:
-            raise ValueError("dimension_names cannot be empty")
+            msg = "dimension_names cannot be empty"
+            raise ValueError(msg)
         return dimension_names
 
     def apply_filter(self, df, column=None):
-        raise NotImplementedError(f"apply_filter must not be called on {self.__class__.__name__}")
+        msg = f"apply_filter must not be called on {self.__class__.__name__}"
+        raise NotImplementedError(msg)
 
     def get_filtered_records_dataframe(self, dimension_accessor) -> DataFrame:
         """Return a dataframe containing the filter records."""
@@ -257,15 +259,17 @@ class SubsetDimensionFilterModel(DimensionFilterMultipleQueryNameBaseModel):
                 dim_type = dim.model.dimension_type
             else:
                 if dim.model.dimension_type != dim_type:
-                    raise DSGInvalidParameter(
+                    msg = (
                         f"Mismatch in dimension types for {self}: "
                         f"{dim_type} != {dim.model.dimension_type}"
                     )
+                    raise DSGInvalidParameter(msg)
                 if records.columns != df.columns:
-                    raise DSGInvalidParameter(
+                    msg = (
                         f"Mismatch in records columns for {self}: "
                         f"{df.columns} != {records.columns}"
                     )
+                    raise DSGInvalidParameter(msg)
                 df = df.union(records)
 
         assert df is not None

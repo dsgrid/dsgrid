@@ -9,6 +9,7 @@ import shutil
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from types import UnionType
 from typing import Any, Generator, Iterable, Sequence, Type, Union, get_origin, get_args
 
 import duckdb
@@ -161,7 +162,8 @@ def create_dataframe_from_dicts(records: list[dict[str, Any]]) -> DataFrame:
     spark.createDataFrame. This can be removed if pyspark fixes the type annotations.
     """
     if not records:
-        raise DSGInvalidParameter("records cannot be empty in create_dataframe_from_dicts")
+        msg = "records cannot be empty in create_dataframe_from_dicts"
+        raise DSGInvalidParameter(msg)
 
     data = [tuple(row.values()) for row in records]
     columns = list(records[0].keys())
@@ -249,7 +251,8 @@ def read_dataframe(
 
 def _read_with_spark(filename):
     if not os.path.exists(filename):
-        raise FileNotFoundError(f"{filename} does not exist")
+        msg = f"{filename} does not exist"
+        raise FileNotFoundError(msg)
     suffix = Path(filename).suffix
     if suffix == ".csv":
         df = read_csv(filename)
@@ -259,11 +262,13 @@ def _read_with_spark(filename):
         except AnalysisException as exc:
             if "Unable to infer schema for Parquet. It must be specified manually." in str(exc):
                 logger.exception("Failed to read Parquet file=%s. File may be invalid", filename)
-                raise DSGInvalidFile(f"Cannot read {filename=}")
+                msg = f"Cannot read {filename=}"
+                raise DSGInvalidFile(msg)
             raise
         except duckdb.duckdb.IOException:
             logger.exception("Failed to read Parquet file=%s. File may be invalid", filename)
-            raise DSGInvalidFile(f"Cannot read {filename=}")
+            msg = f"Cannot read {filename=}"
+            raise DSGInvalidFile(msg)
 
     elif suffix == ".json":
         df = read_json(filename)
@@ -299,7 +304,8 @@ def _post_process_dataframe(df, table_name=None, require_unique=None):
             for column in require_unique:
                 unique = df.select(column).distinct()
                 if unique.count() != df.count():
-                    raise DSGInvalidField(f"DataFrame has duplicate entries for {column}")
+                    msg = f"DataFrame has duplicate entries for {column}"
+                    raise DSGInvalidField(msg)
 
 
 def cross_join_dfs(dfs: list[DataFrame]) -> DataFrame:
@@ -356,7 +362,8 @@ def models_to_dataframe(models: list[DSGBaseModel], table_name: str | None = Non
             if i == 0:
                 if val is None:
                     python_type = cls.model_fields[f].annotation
-                    if get_origin(python_type) is Union:
+                    origin = get_origin(python_type)
+                    if origin is Union or origin is UnionType:
                         python_type = get_type_from_union(python_type)
                     # else: will likely fail below
                     # Need to add more logic to detect the actual type or add to
@@ -457,9 +464,8 @@ def check_for_nulls(df, exclude_columns=None):
                     cols_with_null.add(col)
             assert cols_with_null, "Did not find any columns with NULL values"
 
-            raise DSGInvalidField(
-                f"DataFrame contains NULL value(s) for column(s): {cols_with_null}"
-            )
+            msg = f"DataFrame contains NULL value(s) for column(s): {cols_with_null}"
+            raise DSGInvalidField(msg)
     finally:
         sql("DROP VIEW tmp_view")
 
@@ -906,6 +912,7 @@ def union(dfs: list[DataFrame]) -> DataFrame:
     if len(dfs) > 1:
         for dft in dfs[1:]:
             if df.columns != dft.columns:
-                raise Exception(f"columns don't match: {df.columns=} {dft.columns=}")
+                msg = f"columns don't match: {df.columns=} {dft.columns=}"
+                raise Exception(msg)
             df = df.union(dft)
     return df

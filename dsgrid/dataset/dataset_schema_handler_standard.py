@@ -196,7 +196,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
             dimension_types.add(DimensionType.from_column(col))
 
         if not found_id:
-            raise DSGInvalidDataset("load_data_lookup does not include an 'id' column")
+            msg = "load_data_lookup does not include an 'id' column"
+            raise DSGInvalidDataset(msg)
 
         check_for_nulls(self._load_data_lookup)
         load_data_dimensions = set(self._list_dimension_types_in_load_data(self._load_data))
@@ -207,7 +208,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         }
         missing_dimensions = expected_dimensions.difference(dimension_types)
         if missing_dimensions:
-            raise DSGInvalidDataset(
+            msg = (
                 f"load_data_lookup is missing dimensions: {missing_dimensions}. "
                 "If these are trivial dimensions, make sure to specify them in the Dataset Config."
             )
@@ -266,9 +267,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                     limit,
                     diff_list,
                 )
-            raise DSGInvalidDataset(
-                f"Data IDs for {self._config.config_id} data/lookup are inconsistent"
-            )
+            msg = f"Data IDs for {self._config.config_id} data/lookup are inconsistent"
+            raise DSGInvalidDataset(msg)
 
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):

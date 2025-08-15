@@ -49,7 +49,8 @@ def get_log_level_from_str(level):
         case "error":
             return logging.ERROR
         case _:
-            raise Exception(f"Unsupported level={level}")
+            msg = f"Unsupported level={level}"
+            raise Exception(msg)
 
 
 def get_value_from_context(ctx, field) -> Any:
@@ -57,7 +58,7 @@ def get_value_from_context(ctx, field) -> Any:
     return ctx.find_root().params[field]
 
 
-def handle_dsgrid_exception(ctx, func, *args, **kwargs):
+def handle_dsgrid_exception(ctx, func, *args, **kwargs) -> tuple[Any, int]:
     """Handle any dsgrid exceptions as specified by the CLI parameters."""
     res = None
     try:

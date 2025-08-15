@@ -1,6 +1,7 @@
 import abc
 import logging
 from pathlib import Path
+from typing import Type
 
 import json5
 
@@ -58,7 +59,7 @@ class ConfigBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def config_filename():
+    def config_filename() -> str:
         """Return the config filename.
 
         Returns
@@ -69,7 +70,7 @@ class ConfigBase(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def config_id(self):
+    def config_id(self) -> str:
         """Return the configuration ID.
 
         Returns
@@ -91,7 +92,7 @@ class ConfigBase(abc.ABC):
 
     @staticmethod
     @abc.abstractmethod
-    def model_class():
+    def model_class() -> Type:
         """Return the data model class backing the config"""
 
     def serialize(self, path, force=False):
@@ -105,7 +106,8 @@ class ConfigBase(abc.ABC):
         """
         filename = Path(path) / self.config_filename()
         if filename.exists() and not force:
-            raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
+            msg = f"{filename} exists. Set force=True to overwrite."
+            raise DSGInvalidOperation(msg)
         filename.write_text(self.model.model_dump_json(indent=2))
         return filename
 
@@ -136,7 +138,8 @@ class ConfigWithRecordFileBase(ConfigBase, abc.ABC):
         records_file = path / "records.csv"
         for filename in (dst_config_file, records_file):
             if filename.exists() and not force:
-                raise DSGInvalidOperation(f"{filename} exists. Set force=True to overwrite.")
+                msg = f"{filename} exists. Set force=True to overwrite."
+                raise DSGInvalidOperation(msg)
 
         self.get_records_dataframe().toPandas().to_csv(records_file, index=False)
         model_data = self.model.serialize()

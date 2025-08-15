@@ -6,7 +6,7 @@ from collections import namedtuple
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Optional
+
 
 from pydantic import Field
 
@@ -34,18 +34,18 @@ logger = logging.getLogger(__name__)
 def check_config_id_loose(config_id, tag):
     # Raises ValueError because this is used in Pydantic models.
     if not REGEX_VALID_REGISTRY_CONFIG_ID_LOOSE.search(config_id):
-        raise ValueError(
-            f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, underscores, and dashes."
-        )
+        msg = f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, underscores, and dashes."
+        raise ValueError(msg)
 
 
 def check_config_id_strict(config_id, tag):
     # Raises ValueError because this is used in Pydantic models.
     if not REGEX_VALID_REGISTRY_CONFIG_ID_STRICT.search(config_id):
-        raise ValueError(
+        msg = (
             f"{tag} ID={config_id} is invalid. Restricted to letters, numbers, and underscores. "
             "Cannot start with a number."
         )
+        raise ValueError(msg)
 
 
 class DatabaseConnection(DSGBaseModel):
@@ -183,7 +183,7 @@ RegistryManagerParams = namedtuple(
 class RegistrationModel(DSGBaseModel):
     """Registration fields required by the ProjectConfig and DatasetConfig"""
 
-    id: Optional[int] = Field(default=None, description="database ID of the registration")
+    id: int | None = Field(default=None, description="database ID of the registration")
     timestamp: datetime = Field(
         title="timestamp",
         description="Registration timestamp",
@@ -192,7 +192,7 @@ class RegistrationModel(DSGBaseModel):
         title="submitter",
         description="Username that submitted the registration",
     )
-    log_message: Optional[str] = Field(
+    log_message: str | None = Field(
         default=None,
         title="log_message",
         description="Reason for the update",

@@ -55,15 +55,15 @@ class S3StorageInterface(CloudStorageInterface):
                 not self._uuid == lock_contents["uuid"]
                 or not self._user == lock_contents["username"]
             ):
-                raise DSGRegistryLockError(
-                    f"Registry path {str(filepath)} is currently locked by {lock_contents['username']}, timestamp={lock_contents['timestamp']}, uuid={lock_contents['uuid']}."
-                )
+                msg = f"Registry path {str(filepath)} is currently locked by {lock_contents['username']}, timestamp={lock_contents['timestamp']}, uuid={lock_contents['uuid']}."
+                raise DSGRegistryLockError(msg)
 
     def check_valid_lock_file(self, path):
         path = Path(path)
         # check that lock file is of type .lock
         if path.suffix != ".lock":
-            raise DSGMakeLockError(f"Lock file path provided ({path}) must be a valid .lock path")
+            msg = f"Lock file path provided ({path}) must be a valid .lock path"
+            raise DSGMakeLockError(msg)
         # check that lock file in expected dirs
         relative_path = Path(path).parent
         if str(relative_path).startswith("s3:/nrel-dsgrid-registry/"):
@@ -126,9 +126,8 @@ class S3StorageInterface(CloudStorageInterface):
                     not self._uuid == lockfile_contents["uuid"]
                     and not self._user == lockfile_contents["username"]
                 ):
-                    raise DSGRegistryLockError(
-                        f"Registry path {str(filepath)} is currently locked by {lockfile_contents['username']}. Lock created as {lockfile_contents['timestamp']} with uuid={lockfile_contents['uuid']}."
-                    )
+                    msg = f"Registry path {str(filepath)} is currently locked by {lockfile_contents['username']}. Lock created as {lockfile_contents['timestamp']} with uuid={lockfile_contents['uuid']}."
+                    raise DSGRegistryLockError(msg)
             if force:
                 logger.warning(
                     "Force removed lock file with user=%s and uuid=%s",

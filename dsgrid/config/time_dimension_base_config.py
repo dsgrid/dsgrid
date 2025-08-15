@@ -1,7 +1,7 @@
 import abc
 import logging
 from datetime import timedelta, tzinfo
-from typing import Optional, Any
+from typing import Any
 
 import chronify
 
@@ -105,10 +105,11 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         """
         time_cols = self.get_load_data_time_columns()
         if len(time_cols) > 1:
-            raise NotImplementedError(
+            msg = (
                 "Handling of multiple time columns needs to be implemented in the child class: "
                 f"{type(self)}: {time_cols=}"
             )
+            raise NotImplementedError(msg)
 
         time_col = time_cols[0]
         if time_col not in df.columns:
@@ -170,7 +171,7 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
 
     def list_expected_dataset_timestamps(
         self,
-        time_based_data_adjustment: Optional[TimeBasedDataAdjustmentModel] = None,
+        time_based_data_adjustment: TimeBasedDataAdjustmentModel | None = None,
     ) -> list[tuple]:
         """Return a list of the timestamps expected in the load_data table.
         Parameters
@@ -194,6 +195,6 @@ class TimeDimensionBaseConfig(DimensionBaseConfigWithoutFiles, abc.ABC):
         self,
         time_ranges: TimeRangeModel,
         str_format: str,
-        tz: Optional[TimeZone] = None,
+        tz: TimeZone | None = None,
     ):
         return build_time_ranges(time_ranges, str_format, tz=tz)

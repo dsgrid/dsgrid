@@ -3,7 +3,7 @@ import json
 import logging
 import shutil
 from pathlib import Path
-from typing import Optional
+
 from zipfile import ZipFile
 
 from chronify.utils.path_utils import check_overwrite
@@ -76,7 +76,7 @@ class QuerySubmitterBase:
         self._cached_project_mapped_datasets_dir().mkdir(exist_ok=True, parents=True)
 
     @abc.abstractmethod
-    def submit(self, *args, **kwargs):
+    def submit(self, *args, **kwargs) -> DataFrame:
         """Submit a query for execution"""
 
     def _composite_datasets_dir(self):
@@ -132,6 +132,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
           - Change to a project's dimension requirements for a dataset
           - Change to a dataset dimension mapping
         """
+        assert isinstance(context.model, ProjectQueryModel) or isinstance(
+            context.model, CreateCompositeDatasetQueryModel
+        )
         data = {
             "project_major_version": VersionInfo.parse(self._project.config.model.version).major,
             "project_query": context.model.serialize_cached_content(),
@@ -170,11 +173,12 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         x.model.name
                         for x in self._project.config.list_base_dimensions(dimension_type=dim_type)
                     ]
-                    raise DSGInvalidQuery(
+                    msg = (
                         f"Subset dimensions cannot be used in aggregations: "
                         f"{dimension_name=}. Only base and supplemental dimensions are "
                         f"allowed. base={base_names} supplemental={supp_names}"
                     )
+                    raise DSGInvalidQuery(msg)
 
         for report_inputs in model.result.reports:
             report = make_report(report_inputs.report_type)
@@ -186,7 +190,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
     def _check_datasets(
         self, query_model: ProjectQueryModel, conn: Connection
     ) -> DatasetBaseDimensionNamesModel:
-        base_dimension_names: Optional[DatasetBaseDimensionNamesModel] = None
+        base_dimension_names: DatasetBaseDimensionNamesModel | None = None
         dataset_ids: list[str] = []
         query_names: list[DatasetBaseDimensionNamesModel] = []
         for dataset in query_model.project.dataset.source_datasets:
@@ -268,14 +272,18 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             scratch_dir_context=scratch_dir_context,
             checkpoint=checkpoint,
         )
+        assert isinstance(context.model, ProjectQueryModel) or isinstance(
+            context.model, CreateCompositeDatasetQueryModel
+        )
         context.model.project.version = str(self._project.version)
         output_dir = self._output_dir / context.model.name
         if output_dir.exists() and not overwrite:
-            raise DSGInvalidParameter(
+            msg = (
                 f"output directory {self._output_dir} and query name={context.model.name} will "
                 "overwrite an existing query results directory. "
                 "Choose a different path or pass force=True."
             )
+            raise DSGInvalidParameter(msg)
 
         df = None
         if load_cached_table:
@@ -374,6 +382,10 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         # All dataset columns need to be in the same order.
         context.consolidate_dataset_metadata()
         datasets = self._convert_datasets(context, df_filenames)
+        assert isinstance(context.model, ProjectQueryModel) or isinstance(
+            context.model, CreateCompositeDatasetQueryModel
+        )
+        assert context.model.project.dataset.expression is not None
         return evaluate_expression(context.model.project.dataset.expression, datasets).df
 
     def _convert_datasets(self, context: QueryContext, filenames: dict[str, Path]):
@@ -386,7 +398,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             df = read_dataframe(path)
             unexpected = sorted(set(df.columns).difference(expected_columns))
             if unexpected:
-                raise Exception(f"Unexpected columns are present in {dataset_id=} {unexpected=}")
+                msg = f"Unexpected columns are present in {dataset_id=} {unexpected=}"
+                raise Exception(msg)
             datasets[dataset_id] = DatasetExpressionHandler(
                 df.select(*expected_columns), time_columns + dim_columns, [VALUE_COLUMN]
             )
@@ -401,12 +414,13 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 dim_columns = {x.value for x in DimensionType if x != DimensionType.TIME}
                 time_columns = context.get_dimension_column_names(DimensionType.TIME)
             case _:
-                raise NotImplementedError(f"BUG: unhandled {context.model.result.column_type=}")
+                msg = f"BUG: unhandled {context.model.result.column_type=}"
+                raise NotImplementedError(msg)
 
         return sorted(dim_columns), sorted(time_columns)
 
     def _process_aggregations(
-        self, df: DataFrame, context: QueryContext, dataset_id: Optional[str] = None
+        self, df: DataFrame, context: QueryContext, dataset_id: str | None = None
     ) -> DataFrame:
         handler = make_table_format_handler(
             TableFormatType.UNPIVOTED, self._project.config, dataset_id=dataset_id
@@ -430,19 +444,18 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         context: QueryContext,
         repartition: bool,
         zip_file: bool = False,
-    ) -> Path:
+    ) -> DataFrame:
         df = self._process_aggregations(df, context)
 
-        table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
-        return table_filename
+        self._save_query_results(context, df, repartition, zip_file=zip_file)
+        return df
 
     def _apply_filters(self, df, context: QueryContext):
         for dim_filter in context.model.result.dimension_filters:
             column_names = context.get_dimension_column_names(dim_filter.dimension_type)
             if len(column_names) > 1:
-                raise NotImplementedError(
-                    f"Cannot filter {dim_filter} when there are multiple {column_names=}"
-                )
+                msg = f"Cannot filter {dim_filter} when there are multiple {column_names=}"
+                raise NotImplementedError(msg)
             if isinstance(dim_filter, SubsetDimensionFilterModel):
                 records = dim_filter.get_filtered_records_dataframe(
                     self.project.config.get_dimension
@@ -457,9 +470,8 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 if query_name not in df.columns:
                     # Consider catching this exception and still write to a file.
                     # It could mean writing a lot of data the user doesn't want.
-                    raise DSGInvalidParameter(
-                        f"filter column {query_name} is not in the dataframe: {df.columns}"
-                    )
+                    msg = f"filter column {query_name} is not in the dataframe: {df.columns}"
+                    raise DSGInvalidParameter(msg)
                 df = dim_filter.apply_filter(df, column=query_name)
         return df
 
@@ -498,8 +510,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 delete_if_exists(filename)
                 write_dataframe(df, filename, overwrite=True)
         else:
-            raise NotImplementedError(f"Unsupported output_format={suffix}")
-        self.query_filename(output_dir).write_text(context.model.serialize()[1])
+            msg = f"Unsupported output_format={suffix}"
+            raise NotImplementedError(msg)
+        self.query_filename(output_dir).write_text(context.model.serialize_with_hash()[1])
         self.metadata_filename(output_dir).write_text(context.metadata.model_dump_json(indent=2))
         logger.info("Wrote query=%s output table to %s", context.model.name, filename)
 
@@ -517,7 +530,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         load_cached_table: bool = True,
         zip_file: bool = False,
         overwrite: bool = False,
-    ):
+    ) -> DataFrame:
         """Submits a project query to consolidate datasets and produce result tables.
 
         Parameters
@@ -574,7 +587,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
     def create_dataset(
         self,
         model: CreateCompositeDatasetQueryModel,
-        scratch_dir: Optional[Path] = None,
+        scratch_dir: Path | None = None,
         persist_intermediate_table=False,
         load_cached_table=True,
         force=False,
@@ -599,7 +612,7 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             # of the local computer.
             # If any other settings get customized here, handle them in restart_spark()
             # as well. This change won't persist Spark session restarts.
-            with custom_time_zone(tz.tz_name):
+            with custom_time_zone(tz.tz_name):  # type: ignore
                 df, context = self._run_query(
                     scratch_dir_context,
                     model,
@@ -615,16 +628,17 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
     def submit(
         self,
         query: CompositeDatasetQueryModel,
-        scratch_dir: Optional[Path] = None,
-    ):
+        scratch_dir: Path | None = None,
+    ) -> DataFrame:
         """Submit a query to an composite dataset and produce result tables.
 
         Parameters
         ----------
         query : CompositeDatasetQueryModel
-        scratch_dir : Optional[Path]
+        scratch_dir : Path | None
         """
         tz = self._project.config.get_base_time_dimension().get_time_zone()
+        assert tz is not None
         scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
         # orig_query = self._load_composite_dataset_query(query.dataset_id)
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
@@ -644,9 +658,10 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
             context.metadata = metadata
             # Refer to the comment in ProjectQuerySubmitter.submit for an explanation or if
             # you add a new customization.
-            with custom_time_zone(tz.tz_name):
-                self._process_aggregations_and_save(df, context, repartition=False)
+            with custom_time_zone(tz.tz_name):  # type: ignore
+                df = self._process_aggregations_and_save(df, context, repartition=False)
             context.finalize()
+            return df
 
     def _load_composite_dataset_query(self, dataset_id):
         filename = self._composite_datasets_dir() / dataset_id / "query.json5"
@@ -655,9 +670,8 @@ class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):
     def _read_dataset(self, dataset_id) -> tuple[DataFrame, DatasetMetadataModel]:
         filename = self._composite_datasets_dir() / dataset_id / "table.parquet"
         if not filename.exists():
-            raise DSGInvalidParameter(
-                f"There is no composite dataset with dataset_id={dataset_id}"
-            )
+            msg = f"There is no composite dataset with dataset_id={dataset_id}"
+            raise DSGInvalidParameter(msg)
         metadata_file = self.metadata_filename(self._composite_datasets_dir() / dataset_id)
         return (
             read_dataframe(filename),
@@ -738,6 +752,7 @@ class DatasetQuerySubmitter(QuerySubmitterBase):
                     msg = f"A dataset query cannot map multiple dimensions of the same type: {to_dim.model.dimension_type}"
                     raise DSGInvalidQuery(msg)
                 dataset_dim = config.get_dimension(to_dim.model.dimension_type)
+                assert dataset_dim is not None
                 if to_dim.model.dimension_id == dataset_dim.model.dimension_id:
                     if to_dim.model.version != dataset_dim.model.version:
                         msg = (

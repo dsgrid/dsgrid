@@ -1,7 +1,7 @@
 import getpass
 import logging
 from datetime import datetime
-from typing import Optional, Self
+from typing import Self
 
 from sqlalchemy import Connection
 
@@ -23,9 +23,9 @@ class RegistrationContext:
         db: RegistryInterfaceBase,
         log_message: str,
         update_type: VersionUpdateType,
-        submitter: Optional[str],
+        submitter: str | None,
     ):
-        self._conn: Optional[Connection] = None
+        self._conn: Connection | None = None
         self._db = db
         self._registration = RegistrationModel(
             timestamp=datetime.now(),
@@ -33,7 +33,7 @@ class RegistrationContext:
             log_message=log_message,
             update_type=update_type,
         )
-        self._managers: dict[RegistryType, Optional[RegistryManagerContext]] = {
+        self._managers: dict[RegistryType, RegistryManagerContext | None] = {
             # This order is required for cleanup in self.finalize().
             RegistryType.PROJECT: None,
             RegistryType.DATASET: None,
@@ -128,9 +128,8 @@ class RegistrationContext:
 
         diff = set(config_ids).intersection(manager_context.ids)
         if diff:
-            raise DSGInvalidParameter(
-                f"One or more config IDs are already tracked: {registry_type} {diff}"
-            )
+            msg = f"One or more config IDs are already tracked: {registry_type} {diff}"
+            raise DSGInvalidParameter(msg)
 
         logger.debug("Added registered IDs: %s %s", registry_type, config_ids)
         manager_context.ids += config_ids

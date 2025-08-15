@@ -71,9 +71,7 @@ def get_field_details(cls):
     field_items_list = []
     class_name_list = []
     for prop, vals in schema["properties"].items():
-
         if "dsg_internal" not in vals:
-
             if vals["title"] == prop:
                 field_name = "``" + prop + "``"
             else:
@@ -244,7 +242,6 @@ def make_config_rst(output):
     ):
         output_file = output / (cls.__name__ + ".rst")
         with open(output_file, "w") as f_out:
-
             field_items_list, class_name_list = get_field_details(cls)
 
             for x, field_items in enumerate(field_items_list):

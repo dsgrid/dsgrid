@@ -71,7 +71,6 @@ dev = [
     "httpx",  # starlette, used by fastapi, requires this as an optional dependency for testing.
     "pytest",
     "pytest-cov",
-    "black>=22.3.0",
     "pre-commit",
     "devtools",
     "flake8",
@@ -84,6 +83,7 @@ doc = [
     "ghp-import",
     "numpydoc",
     "pandas-stubs",
+    "ruff",
     "sphinx~=7.2",
     "sphinx-click~=5.0",
     "sphinx-copybutton~=0.5.2",
@@ -107,9 +107,58 @@ minversion = "6.0"
 addopts = "-ra"
 testpaths = ["tests"]
 
-[tool.black]
-line-length = 99
-target-version = ['py311']
-
 [tool.mypy]
 plugins = "pydantic.mypy"
+
+[tool.ruff]
+# Exclude a variety of commonly ignored directories.
+exclude = [
+    ".git",
+    ".ruff_cache",
+    ".venv",
+    "_build",
+    "build",
+    "dist",
+    "env",
+    "venv",
+]
+
+extend-exclude = [
+    "dsgrid/utils/py_expression_eval/*.py",
+    "dsgrid/notebooks/*.ipynb"
+]
+
+line-length = 99
+indent-width = 4
+
+target-version = "py311"
+
+[tool.ruff.lint]
+# Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
+select = [
+  # TODO: fix the complexity issues. There are many.
+  # "C901",   # McCabe complexity
+    "E4",     # Subset of pycodestyle (E)
+    "E7",
+    "E9",
+    "EM",     # string formatting in an exception message
+    "F",      # Pyflakes
+    "W",      # pycodestyle warnings
+]
+ignore = []
+
+# Allow fix for all enabled rules (when `--fix`) is provided.
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+docstring-code-format = true
+docstring-code-line-length = "dynamic"
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["E402"]
+"**/{tests,docs,tools}/*" = ["E402"]

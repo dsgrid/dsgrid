@@ -9,9 +9,8 @@ you need a new format, please contact the dsgrid team to discuss it.
 
 Requirements
 =============
-1. Metric data should usually be stored in Parquet files. Tiny datasets like those for growth rates
-   can be stored in CSV files. If you need or want another optimized columnar file format, please
-   contact the dsgrid team.
+1. Metric data should usually be stored in Parquet files. CSV files are also supported. If you
+   need or want another optimized columnar file format, please contact the dsgrid team.
 2. If the data tables contain time-series data, each unique time array must contain an identical
    range of timestamps.
 3. Values of dimension columns must be strings. This includes ``model_year`` and ``weather_year``.
@@ -29,8 +28,83 @@ Recommendations
 4. Consider the appropriate floating point precision. 64-bit floats may be needed but will double
    the storage space. 32-bit floats may be acceptable.
 
-.. warning:: Currently, the pivoted dimension must be the metric dimension. This limitation is
-   expected to be fixed soon.
+
+CSV Files
+=========
+While not generally recommended for data files, dsgrid does support CSV files. By default,
+dsgrid will let Spark and DuckDB attempt to infer the schema of the file. Because there may be
+cases of type ambiguities, such as integer vs string, integer vs float, and timestamps with time
+zones, dsgrid provides a mechanism of defining a schema.
+
+Consider this example::
+
+    +----------------------+---------+------------------+--------------------+-------+
+    |             timestamp|geography|          scenario|           subsector|  value|
+    +----------------------+---------+------------------+--------------------+-------|
+    |2011-12-31 22:00:00-07|    01001|      efs_high_ldv|full_service_rest...| 1.234 |
+    |2011-12-31 22:00:00-07|    01001|      efs_high_ldv|      primary_school| 2.345 |
+    +----------------------+---------+------------------+--------------------+-------|
+
+The default behavior of IO libraries like Pandas, Spark, and DuckDB is to infer data types by
+inspecting the data. They will all decide that the geography column contains integers. The
+leading zeros will be dropped. All comparisons with the project's dimensions will fail.
+
+Secondly, you may want to specify the minimum required size for each number. For example,
+if you don't need the precision that comes with 8-byte floats, choose ``FLOAT`` and
+Spark/DuckDB will store all values in 4-byte floats, halving the required storage size.
+
+dsgrid will look for a schema file in the same directory as the data file. For example, if
+your data file is called ``load_data.csv``, dsgrid will look for ``load_data_schema.json``
+(or ``load_data_schema.json5``). The format of the schema file is shown below.
+
+The supported data types are:
+
+    - BOOLEAN: boolean
+    - INT: 4-byte integer
+    - INTEGER: 4-byte integer
+    - TINYINT: 1-byte integer
+    - SMALLINT: 2-byte integer
+    - BIGINT: 8-byte-integer
+    - FLOAT: 4-byte float
+    - DOUBLE: 8-byte float
+    - STRING: string
+    - TEXT: string
+    - VARCHAR: string
+    - TIMESTAMP_TZ: timestamp with time zone
+    - TIMESTAMP_NTZ: timestamp without time zone
+
+Example schema file:
+
+.. code-block:: json
+
+    {
+      "columns": [
+        {
+          "name": "timestamp",
+          "data_type": "TIMESTAMP_TZ"
+        },
+        {
+          "name": "geography",
+          "data_type": "STRING"
+        },
+        {
+          "name": "scenario",
+          "data_type": "STRING"
+        },
+        {
+          "name": "subsector",
+          "data_type": "STRING"
+        },
+        {
+          "name": "value",
+          "data_type": "FLOAT"
+        }
+      ]
+    }
+
+.. warning:: Definition of data_type must be consistent across all columns. All must
+     define a value or none can.
+
 
 Time
 ====

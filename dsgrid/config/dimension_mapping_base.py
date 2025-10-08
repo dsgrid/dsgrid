@@ -182,7 +182,8 @@ class DimensionMappingBaseModel(DSGBaseDatabaseModel):
         description="Tolerance to apply when checking to_fraction column sums",
         default=1e-6,
     )
-    description: str = Field(
+    description: str | None = Field(
+        default=None,
         title="description",
         description="Description of dimension mapping",
     )
@@ -260,7 +261,8 @@ class DimensionMappingPreRegisteredBaseModel(DSGBaseModel):
             "options": DimensionMappingArchetype.format_for_docs(),
         },
     )
-    description: str = Field(
+    description: str | None = Field(
+        default=None,
         title="description",
         description="Description of dimension mapping",
     )
@@ -324,20 +326,13 @@ class DimensionMappingReferenceModel(DSGBaseModel):
     version: str = Field(
         title="version",
         description="Version of the dimension",
-        # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
+    # ETH@20251008 - This doesn't appear to be used. Should we go ahead and remove it?
     required_for_validation: bool = Field(
         title="version",
         description="Set to False if a given dimension association is NOT required for input dataset validation; default is True",
         default=True,
-        # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
-
-    # @field_validator("required_for_validation")
-    # @classmethod
-    # def check_required_for_validation_field(cls, value):
-    #     # TODO if base_to_supplemental, raise error
-    #     return value
 
 
 class DimensionMappingReferenceListModel(DSGBaseModel):

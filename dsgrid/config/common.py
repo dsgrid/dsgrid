@@ -53,7 +53,7 @@ def make_base_dimension_template(
     dimensions: list[dict[str, Any]] = []
     for metric_type in metric_types:
         if metric_type not in SUPPORTED_METRIC_TYPES:
-            msg = f"{metric_type=} is not one of the {SUPPORTED_METRIC_TYPES}"
+            msg = f"{metric_type=} is not one of the {SUPPORTED_METRIC_TYPES=}"
             raise DSGInvalidParameter(msg)
         dim = {
             "type": DimensionType.METRIC.value,

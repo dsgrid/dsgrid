@@ -125,6 +125,7 @@ class InputDatasetType(DSGEnum):
     MODELED = "modeled"
     HISTORICAL = "historical"
     BENCHMARK = "benchmark"
+    UNSPECIFIED = "unspecified"
 
 
 class DataSchemaType(str, Enum):
@@ -150,34 +151,31 @@ class DSGDatasetParquetType(DSGEnum):
         load_data_lookup is a file with multiple data dimension columns and an ID column that maps to load_data file.
         """,
     )
-    # # These are not currently supported by dsgrid but may be needed in the near future
-    # DATASET_DIMENSION_MAPPING = EnumValue(
-    #     value="dataset_dimension_mapping",
-    #     description="",
-    # )  # optional
-    # PROJECT_DIMENSION_MAPPING = EnumValue(
-    #     value="project_dimension_mapping",
-    #     description="",
-    # )  # optional
 
 
 class DataClassificationType(DSGEnum):
     """Data risk classification type.
 
-    See https://uit.stanford.edu/guide/riskclassifications for more information.
+    See FIPS 199, https://csrc.nist.gov/files/pubs/fips/199/final/docs/fips-pub-199-final.pdf
+    for more information. In general these classifications describe potential impact on
+    organizations and individuals. In more detailed schemes a separate classification could
+    be applied to confidentiality, integrity, and availability.
     """
-
-    # TODO: can we get NREL/DOE definitions for these instead of standford's?
 
     LOW = EnumValue(
         value="low",
-        description="Low risk data that does not require special data management",
+        description=(
+            "The loss of confidentiality, integrity, or availability could be "
+            "expected to have a limited adverse effect on organizational operations, "
+            "organizational assets, or individuals."
+        ),
     )
     MODERATE = EnumValue(
         value="moderate",
         description=(
-            "The moderate class includes all data under an NDA, data classified as business sensitive, "
-            "data classification as Critical Energy Infrastructure Infromation (CEII), or data with Personal Identifiable Information (PII)."
+            "The loss of confidentiality, integrity, or availability could be expected "
+            "to have a serious adverse effect on organizational operations, organizational "
+            "assets, or individuals."
         ),
     )
 
@@ -240,6 +238,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         description="Unique dataset identifier.",
     )
     dataset_type: InputDatasetType = Field(
+        default=InputDatasetType.UNSPECIFIED,
         title="dataset_type",
         description="Input dataset type.",
         json_schema_extra={
@@ -252,67 +251,103 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         description="Additional metadata to include related to the dataset_qualifier",
         discriminator="dataset_qualifier_type",
     )
+    data_schema: Union[StandardDataSchemaModel, OneTableDataSchemaModel] = Field(
+        title="data_schema",
+        description="Schema (table layouts) used for writing out the dataset",
+        discriminator="data_schema_type",
+    )
+    description: str | None = Field(
+        default=None,
+        title="description",
+        description="A detailed description of the dataset",
+    )
     sector_description: str | None = Field(
         default=None,
         title="sector_description",
         description="Sectoral description (e.g., residential, commercial, industrial, "
         "transportation, electricity)",
     )
-    data_source: str = Field(
+    data_source: str | None = Field(
+        default=None,
         title="data_source",
-        description="Data source name, e.g. 'ComStock'.",
-        # TODO: it would be nice to extend the description here with a CLI example of how to list the project's data source IDs.
+        description="Original data source name, e.g. 'ComStock', 'EIA 861'.",
     )
-    data_schema: Union[StandardDataSchemaModel, OneTableDataSchemaModel] = Field(
-        title="data_schema",
-        description="Schema (table layouts) used for writing out the dataset",
-        discriminator="data_schema_type",
+    # for old data, port from origin_date
+    data_source_date: str | None = Field(
+        default=None,
+        title="data_source_date",
+        description="Date or year the original source data were published, e.g., '2021' for 'EIA AEO 2021'.",
     )
-    description: str = Field(
-        title="description",
-        description="A detailed description of the dataset.",
+    # for old data, port from origin_version or drop
+    data_source_version: str | None = Field(
+        default=None,
+        title="data_source_version",
+        description=(
+            "Source data version, if applicable. For example, could specify preliminary "
+            "versus final data."
+        ),
     )
-    origin_creator: str = Field(
+    data_source_authors: list[str] | None = Field(
+        default=None,
+        title="data_source_authors",
+        description="List of authors for the original data source.",
+    )
+    data_source_doi_url: str | None = Field(
+        default=None,
+        title="data_source_doi_url",
+        description="Original data source doi or other url",
+    )
+    origin_creator: str | None = Field(
+        default=None,
         title="origin_creator",
-        description="Origin data creator's name (first and last)",
+        description="First and last name of the person who formatted this dataset for dsgrid",
     )
-    origin_organization: str = Field(
+    origin_organization: str | None = Field(
+        default=None,
         title="origin_organization",
-        description="Origin organization name, e.g., NREL",
+        description="Organization name of the origin_creator, e.g., 'NREL'",
     )
-    origin_contributors: list[str] = Field(
+    origin_contributors: list[str] | None = Field(
+        default=None,
         title="origin_contributors",
-        description="List of origin data contributor's first and last names"
-        """ e.g., ["Harry Potter", "Ronald Weasley"]""",
-        default=[],
+        description=(
+            "List of contributors to the compilation of this dataset for dsgrid, "
+            " e.g., ['Harry Potter', 'Ronald Weasley']"
+        ),
     )
-    origin_project: str = Field(
+    origin_project: str | None = Field(
+        default=None,
         title="origin_project",
-        description="Origin project name",
+        description=(
+            "Name of the project for/from which this dataset was compiled, e.g., "
+            "'IEF', 'Building Standard Scenarios'."
+        ),
     )
-    origin_date: str = Field(
-        title="origin_date",
-        description="Date the source data was generated",
+    # DEPRECATE - For backward compatibility, just drop when read in?
+    # source: str | None = Field(
+    #     default=None,
+    #     title="source",
+    #     description="Source of the data (text description or link)",
+    # )
+    # ETH@20251008 - Although we could define a default DataClassificationType,
+    # it seems better to default to 'low' by priniting in the template, so that
+    # the base assumption of low risk is clear to dataset contributors.
+    user_defined_metadata: dict[str, Any] = Field(
+        title="user_defined_metadata",
+        description="Additional user defined metadata fields",
+        default={},
     )
-    origin_version: str = Field(
-        title="origin_version",
-        description="Version of the origin data",
-    )
-    source: str = Field(
-        title="source",
-        description="Source of the data (text description or link)",
+    tags: list[str] | None = Field(
+        default=None,
+        title="tags",
+        description="List of data tags",
     )
     data_classification: DataClassificationType = Field(
         title="data_classification",
-        description="Data security classification (e.g., low, moderate, high)",
+        description="Data security classification (e.g., low, moderate).",
         json_schema_extra={
             "options": DataClassificationType.format_for_docs(),
         },
-    )
-    tags: list[str] = Field(
-        title="source",
-        description="List of data tags",
-        default=[],
     )
     enable_unit_conversion: bool = Field(
         default=True,
@@ -321,7 +356,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     )
     # This field must be listed before dimensions.
     use_project_geography_time_zone: bool = Field(
-        default=False,
+        default=False,  # ETH@20251008 - Default here conflicts with make_unvalidated_dataset_config
         description="If true, time zones will be applied from the project's geography dimension. "
         "If false, the dataset's geography dimension records must provide a time zone column.",
     )
@@ -336,13 +371,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         title="dimensions",
         description="List of registered dimension references that make up the dimensions of dataset.",
         default=[],
-        # TODO: Add to notes - link to registering dimensions page
-        # TODO: Add to notes - link to example of how to list dimensions to find existing registered dimensions
-    )
-    user_defined_metadata: dict[str, Any] = Field(
-        title="user_defined_metadata",
-        description="Additional user defined metadata fields",
-        default={},
     )
     trivial_dimensions: list[DimensionType] = Field(
         title="trivial_dimensions",
@@ -373,6 +401,19 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
                 msg = f"Unknown leap day adjustment: {values=}"
                 raise ValueError(msg)
             values.pop("leap_day_adjustment")
+
+        if "source" in values:
+            values.pop("source")
+
+        if "origin_date" in values:
+            val = values.pop("origin_date")
+            if val is not None:
+                values["data_source_date"] = val
+
+        if "origin_version" in values:
+            val = values.pop("origin_version")
+            if val is not None:
+                values["data_source_version"] = val
 
         return values
 
@@ -445,13 +486,14 @@ def make_unvalidated_dataset_config(
     dataset_id,
     metric_type: str,
     table_format: dict[str, str] | None = None,
-    data_classification=DataClassificationType.MODERATE.value,
-    dataset_type=InputDatasetType.MODELED,
+    data_classification=DataClassificationType.LOW.value,
+    dataset_type=InputDatasetType.UNSPECIFIED,
     included_dimensions: list[DimensionType] | None = None,
     time_type: TimeDimensionType | None = None,
     use_project_geography_time_zone: bool = False,
     dimension_references: list[DimensionReferenceModel] | None = None,
     trivial_dimensions: list[DimensionType] | None = None,
+    slim: bool = True,
 ) -> dict[str, Any]:
     """Create a dataset config as a dictionary, skipping validation."""
     table_format_ = table_format or UnpivotedTableFormatModel().model_dump()
@@ -466,28 +508,53 @@ def make_unvalidated_dataset_config(
         exclude_dimension_types=exclude_dimension_types,
         time_type=time_type,
     )
+    if slim:
+        return {
+            "dataset_id": dataset_id,
+            "version": "1.0.0",
+            "dataset_type": dataset_type.value,
+            "data_schema": {
+                "data_schema_type": DataSchemaType.ONE_TABLE.value,
+                "table_format": table_format_,
+            },
+            "description": "",
+            "data_classification": data_classification,
+            "use_project_geography_time_zone": True,
+            "dimensions": dimensions,
+            "dimension_references": [
+                x.model_dump(mode="json") for x in dimension_references or []
+            ],
+            "trivial_dimensions": [x.value for x in trivial_dimensions_],
+        }
     return {
         "dataset_id": dataset_id,
+        "version": "1.0.0",
         "dataset_type": dataset_type.value,
+        "dataset_qualifier_metadata": {
+            "dataset_qualifier_type": DatasetQualifierType.QUANTITY.value
+        },
         "data_schema": {
             "data_schema_type": DataSchemaType.ONE_TABLE.value,
             "table_format": table_format_,
         },
-        "version": "1.0.0",
         "description": "",
+        "sector_description": "",
+        "data_source": "",
+        "data_source_date": "",
+        "data_source_version": "",
+        "data_source_authors": [],
+        "data_source_doi_url": "",
         "origin_creator": "",
         "origin_organization": "",
-        "origin_date": "",
+        "origin_contributors": [],
         "origin_project": "",
-        "origin_version": "",
-        "data_source": "",
-        "source": "",
+        "user_defined_metadata": {},
+        "tags": [],
         "data_classification": data_classification,
+        "enable_unit_conversion": True,
         "use_project_geography_time_zone": True,
         "dimensions": dimensions,
         "dimension_references": [x.model_dump(mode="json") for x in dimension_references or []],
-        "tags": [],
-        "user_defined_metadata": {},
         "trivial_dimensions": [x.value for x in trivial_dimensions_],
     }
 

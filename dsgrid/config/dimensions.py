@@ -81,7 +81,8 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
             "dsgrid_internal": True,
         },
     )
-    description: str = Field(
+    description: str | None = Field(
+        default=None,
         title="description",
         description="A description of the dimension records that is helpful, memorable, and "
         "identifiable",
@@ -101,39 +102,6 @@ class DimensionBaseModel(DSGBaseDatabaseModel):
             msg = f"dimension name={name} does not meet the requirements"
             raise ValueError(msg)
         return name
-
-    @field_validator("description")
-    @classmethod
-    def check_description(cls, description):
-        if description == "":
-            msg = f'Empty description field for dimension: "{cls}"'
-            raise ValueError(msg)
-
-        # TODO: improve validation for allowable dimension record names.
-        prohibited_names = [
-            "county",
-            "counties",
-            "year",
-            "hourly",
-            "comstock",
-            "resstock",
-            "tempo",
-            "model",
-            "source",
-            "data-source",
-            "dimension",
-        ]
-        prohibited_names = prohibited_names + [x + "s" for x in prohibited_names]
-        if description.lower() in prohibited_names:
-            msg = f"""
-                 Dimension description '{description}' is insufficient. Please be more descriptive.
-                 Hint: try adding a vintage, or other distinguishable text that will be this dimension memorable,
-                 identifiable, and reusable for other datasets and projects.
-                 e.g., 'Time dimension, 2012 hourly EST, period-beginning, no DST, no Leap Day Adjustment, total value'
-                 is a good description.
-                 """
-            raise ValueError(msg)
-        return description
 
     @field_validator("module")
     @classmethod
@@ -203,6 +171,9 @@ class DimensionModel(DimensionBaseModel):
         },
         default=None,
     )
+    # ETH@20251008 - This isn't strictly internal. Records can be supplied directly instead
+    # of from a file. I think this means we can remove json_schema_extra and should provide
+    # an example in the description text?
     records: list = Field(
         title="records",
         description="Dimension records in filename that get loaded at runtime",

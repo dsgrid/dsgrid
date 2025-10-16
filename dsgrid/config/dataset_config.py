@@ -1,4 +1,3 @@
-from dsgrid.dataset.models import UnpivotedTableFormatModel
 import logging
 from enum import Enum
 from pathlib import Path
@@ -14,7 +13,9 @@ from dsgrid.config.dimension_config import (
 )
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import (
+    TableFormatModelBase,
     PivotedTableFormatModel,
+    UnpivotedTableFormatModel,
     TableFormatModel,
     TableFormatType,
 )
@@ -479,7 +480,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
 def make_unvalidated_dataset_config(
     dataset_id,
     metric_type: str,
-    table_format: dict[str, str] | None = None,
+    table_format: TableFormatModelBase = UnpivotedTableFormatModel(),
     data_classification=DataClassificationType.LOW.value,
     dataset_type=InputDatasetType.UNSPECIFIED,
     included_dimensions: list[DimensionType] | None = None,
@@ -488,9 +489,9 @@ def make_unvalidated_dataset_config(
     dimension_references: list[DimensionReferenceModel] | None = None,
     trivial_dimensions: list[DimensionType] | None = None,
     slim: bool = True,
+    metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Create a dataset config as a dictionary, skipping validation."""
-    table_format_ = table_format or UnpivotedTableFormatModel().model_dump()
     trivial_dimensions_ = trivial_dimensions or []
     exclude_dimension_types = {x.dimension_type for x in dimension_references or []}
     if included_dimensions is not None:
@@ -502,55 +503,65 @@ def make_unvalidated_dataset_config(
         exclude_dimension_types=exclude_dimension_types,
         time_type=time_type,
     )
+
+    result = None
     if slim:
-        return {
+        result = {
             "dataset_id": dataset_id,
             "version": "1.0.0",
             "dataset_type": dataset_type.value,
             "data_schema": {
                 "data_schema_type": DataSchemaType.ONE_TABLE.value,
-                "table_format": table_format_,
+                "table_format": table_format.model_dump(mode="json"),
             },
             "description": "",
             "data_classification": data_classification,
-            "use_project_geography_time_zone": True,
+            "use_project_geography_time_zone": use_project_geography_time_zone,
             "dimensions": dimensions,
             "dimension_references": [
                 x.model_dump(mode="json") for x in dimension_references or []
             ],
             "trivial_dimensions": [x.value for x in trivial_dimensions_],
         }
-    return {
-        "dataset_id": dataset_id,
-        "version": "1.0.0",
-        "dataset_type": dataset_type.value,
-        "dataset_qualifier_metadata": {
-            "dataset_qualifier_type": DatasetQualifierType.QUANTITY.value
-        },
-        "data_schema": {
-            "data_schema_type": DataSchemaType.ONE_TABLE.value,
-            "table_format": table_format_,
-        },
-        "description": "",
-        "sector_description": "",
-        "data_source": "",
-        "data_source_date": "",
-        "data_source_version": "",
-        "data_source_authors": [],
-        "data_source_doi_url": "",
-        "origin_creator": "",
-        "origin_organization": "",
-        "origin_contributors": [],
-        "origin_project": "",
-        "user_defined_metadata": {},
-        "tags": [],
-        "data_classification": data_classification,
-        "enable_unit_conversion": True,
-        "use_project_geography_time_zone": True,
-        "dimensions": dimensions,
-        "dimension_references": [x.model_dump(mode="json") for x in dimension_references or []],
-        "trivial_dimensions": [x.value for x in trivial_dimensions_],
-    }
+    else:
+        result = {
+            "dataset_id": dataset_id,
+            "version": "1.0.0",
+            "dataset_type": dataset_type.value,
+            "dataset_qualifier_metadata": {
+                "dataset_qualifier_type": DatasetQualifierType.QUANTITY.value
+            },
+            "data_schema": {
+                "data_schema_type": DataSchemaType.ONE_TABLE.value,
+                "table_format": table_format.model_dump(mode="json"),
+            },
+            "description": "",
+            "sector_description": "",
+            "data_source": "",
+            "data_source_date": "",
+            "data_source_version": "",
+            "data_source_authors": [],
+            "data_source_doi_url": "",
+            "origin_creator": "",
+            "origin_organization": "",
+            "origin_contributors": [],
+            "origin_project": "",
+            "user_defined_metadata": {},
+            "tags": [],
+            "data_classification": data_classification,
+            "enable_unit_conversion": True,
+            "use_project_geography_time_zone": use_project_geography_time_zone,
+            "dimensions": dimensions,
+            "dimension_references": [
+                x.model_dump(mode="json") for x in dimension_references or []
+            ],
+            "trivial_dimensions": [x.value for x in trivial_dimensions_],
+        }
+
+    if metadata:
+        result.update(metadata)
+
+    return result
 
 
 class DatasetConfig(ConfigBase):

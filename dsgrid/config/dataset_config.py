@@ -323,12 +323,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
             "'IEF', 'Building Standard Scenarios'."
         ),
     )
-    # DEPRECATE - For backward compatibility, just drop when read in?
-    # source: str | None = Field(
-    #     default=None,
-    #     title="source",
-    #     description="Source of the data (text description or link)",
-    # )
     # ETH@20251008 - Although we could define a default DataClassificationType,
     # it seems better to default to 'low' by priniting in the template, so that
     # the base assumption of low risk is clear to dataset contributors.

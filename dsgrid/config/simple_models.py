@@ -5,8 +5,6 @@ from pydantic import field_validator, model_validator, Field
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 
-# ETH@20251008 - I don't see that these classes are used anywhere. Safe to delete this file?
-
 
 class DimensionSimpleModel(DSGBaseModel):
     dimension_type: DimensionType

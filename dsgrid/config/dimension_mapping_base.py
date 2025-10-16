@@ -327,12 +327,6 @@ class DimensionMappingReferenceModel(DSGBaseModel):
         title="version",
         description="Version of the dimension",
     )
-    # ETH@20251008 - This doesn't appear to be used. Should we go ahead and remove it?
-    required_for_validation: bool = Field(
-        title="version",
-        description="Set to False if a given dimension association is NOT required for input dataset validation; default is True",
-        default=True,
-    )
 
 
 class DimensionMappingReferenceListModel(DSGBaseModel):

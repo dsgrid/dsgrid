@@ -171,15 +171,14 @@ class DimensionModel(DimensionBaseModel):
         },
         default=None,
     )
-    # ETH@20251008 - This isn't strictly internal. Records can be supplied directly instead
-    # of from a file. I think this means we can remove json_schema_extra and should provide
-    # an example in the description text?
     records: list = Field(
         title="records",
-        description="Dimension records in filename that get loaded at runtime",
-        json_schema_extra={
-            "dsgrid_internal": True,
-        },
+        description="Dimension records that can either be loaded from filename at "
+        "runtime or provided directly. Example of records provided directly:\n"
+        "records: [\n"
+        "    {id: 'scenario_1', name: 'Scenario 1'},\n"
+        "    {id: 'scenario_2', name: 'Scenario 2'},\n"
+        "],",
         default=[],
     )
 

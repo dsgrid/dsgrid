@@ -3,6 +3,7 @@ import json
 import logging
 import shutil
 from pathlib import Path
+import copy
 
 from zipfile import ZipFile
 
@@ -10,7 +11,8 @@ from chronify.utils.path_utils import check_overwrite
 from semver import VersionInfo
 from sqlalchemy import Connection
 
-from dsgrid.common import VALUE_COLUMN
+import dsgrid
+from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.dimension_config import DimensionBaseConfig
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
@@ -54,8 +56,14 @@ from dsgrid.query.models import (
     ProjectionDatasetModel,
     StandaloneDatasetModel,
 )
+from dsgrid.utils.dataset import (
+    add_time_zone,
+    convert_time_zone_with_chronify_duckdb,
+    convert_time_zone_by_column_with_chronify_duckdb,
+)
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
-
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
+from dsgrid.dimension.time import TimeZone
 
 logger = logging.getLogger(__name__)
 
@@ -320,6 +328,188 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
         return df, context
 
+    def _convert_time_zone(
+        self,
+        scratch_dir_context: ScratchDirContext,
+        model: ProjectQueryModel,
+        load_cached_table: bool,
+        checkpoint_file: Path | None,
+        persist_intermediate_table: bool,
+        zip_file: bool = False,
+        overwrite: bool = False,
+    ):
+        base_dimension_names = self._run_checks(model)
+        checkpoint = self._check_checkpoint_file(checkpoint_file, model)
+        context = QueryContext(
+            model,
+            base_dimension_names,
+            scratch_dir_context=scratch_dir_context,
+            checkpoint=checkpoint,
+        )
+        assert isinstance(context.model, ProjectQueryModel) or isinstance(
+            context.model, CreateCompositeDatasetQueryModel
+        )
+        context.model.project.version = str(self._project.version)
+        output_dir = self._output_dir / context.model.name
+        if output_dir.exists() and not overwrite:
+            msg = (
+                f"output directory {self._output_dir} and query name={context.model.name} will "
+                "overwrite an existing query results directory. "
+                "Choose a different path or pass force=True."
+            )
+            raise DSGInvalidParameter(msg)
+
+        df = None
+        if load_cached_table:
+            df, metadata = self._try_read_cache(context)
+        if df is None:
+            df_filenames = self._project.process_query(
+                context, self._cached_project_mapped_datasets_dir()
+            )
+            df = self._postprocess_datasets(context, scratch_dir_context, df_filenames)
+            is_cached = False
+        else:
+            context.metadata = metadata
+            is_cached = True
+
+        if persist_intermediate_table and not is_cached:
+            df = self._persist_intermediate_result(context, df)
+
+        # New stuff
+        config = dsgrid.runtime_config
+        # breakpoint()
+        if isinstance(model.result.time_zone, TimeZone):
+            time_dim = copy.deepcopy(self._project.config.get_base_time_dimension())
+            # time_col = context.get_dimension_column_names(DimensionType.TIME)
+            # time_dim.model.name = time_col
+            if time_dim.supports_chronify():
+                # use chronify
+                match (config.backend_engine, config.use_hive_metastore):
+                    case (BackendEngine.SPARK, True):
+                        # table_name = make_temp_view_name()
+                        # df = map_time_dimension_with_chronify_spark_hive(
+                        #     df=save_to_warehouse(df, table_name),
+                        #     table_name=table_name,
+                        #     value_column=VALUE_COLUMN,
+                        #     from_time_dim=time_dim,
+                        #     to_time_dim=to_time_dim,
+                        #     scratch_dir_context=scratch_dir_context,
+                        # )
+                        pass
+
+                    case (BackendEngine.SPARK, False):
+                        # filename = persist_intermediate_table(
+                        #     df,
+                        #     scratch_dir_context,
+                        #     tag="project query before time mapping",
+                        # )
+                        # df = map_time_dimension_with_chronify_spark_path(
+                        #     df=read_dataframe(filename),
+                        #     filename=filename,
+                        #     value_column=VALUE_COLUMN,
+                        #     from_time_dim=time_dim,
+                        #     to_time_dim=to_time_dim,
+                        #     scratch_dir_context=scratch_dir_context,
+                        # )
+                        pass
+                    case (BackendEngine.DUCKDB, _):
+                        # df = map_time_dimension_with_chronify_duckdb(
+                        #     df=df,
+                        #     value_column=VALUE_COLUMN,
+                        #     from_time_dim=time_dim,
+                        #     to_time_dim=to_time_dim,
+                        #     scratch_dir_context=scratch_dir_context,
+                        # )
+                        df = convert_time_zone_with_chronify_duckdb(
+                            df=df,
+                            value_column=VALUE_COLUMN,
+                            from_time_dim=time_dim,
+                            time_zone=model.result.time_zone,
+                            scratch_dir_context=scratch_dir_context,
+                        )
+
+            else:
+                msg = "time_dim must support Chronify"
+                raise ValueError(msg)
+
+        elif model.result.time_zone == "geography":
+            time_dim = self._project.config.get_base_time_dimension()
+
+            if not isinstance(time_dim, DateTimeDimensionConfig):
+                msg = f"Cannot convert query to {model.result.time_zone} because time dimension is not datetime"
+                raise DSGInvalidParameter(msg)
+
+            if "time_zone" not in df.columns:
+                geo_dim = self._project.config.get_base_dimension(DimensionType.GEOGRAPHY)
+                # assert geo_dim record has time_zone col
+                df = add_time_zone(df, geo_dim)
+
+            if time_dim.supports_chronify():
+                # use chronify
+                match (config.backend_engine, config.use_hive_metastore):
+                    case (BackendEngine.SPARK, True):
+                        # table_name = make_temp_view_name()
+                        # df = map_time_dimension_with_chronify_spark_hive(
+                        #     df=save_to_warehouse(df, table_name),
+                        #     table_name=table_name,
+                        #     value_column=VALUE_COLUMN,
+                        #     from_time_dim=time_dim,
+                        #     to_time_dim=to_time_dim,
+                        #     scratch_dir_context=scratch_dir_context,
+                        # )
+                        pass
+
+                    case (BackendEngine.SPARK, False):
+                        # filename = persist_intermediate_table(
+                        #     df,
+                        #     scratch_dir_context,
+                        #     tag="project query before time mapping",
+                        # )
+                        # df = map_time_dimension_with_chronify_spark_path(
+                        #     df=read_dataframe(filename),
+                        #     filename=filename,
+                        #     value_column=VALUE_COLUMN,
+                        #     from_time_dim=time_dim,
+                        #     to_time_dim=to_time_dim,
+                        #     scratch_dir_context=scratch_dir_context,
+                        # )
+                        pass
+                    case (BackendEngine.DUCKDB, _):
+                        # df = map_time_dimension_with_chronify_duckdb(
+                        #     df=df,
+                        #     value_column=VALUE_COLUMN,
+                        #     from_time_dim=time_dim,
+                        #     to_time_dim=to_time_dim,
+                        #     scratch_dir_context=scratch_dir_context,
+                        # )
+                        df = convert_time_zone_by_column_with_chronify_duckdb(
+                            df=df,
+                            value_column=VALUE_COLUMN,
+                            from_time_dim=time_dim,
+                            time_zone_column="time_zone",
+                            scratch_dir_context=scratch_dir_context,
+                            wrap_time_allowed=False,
+                        )
+
+            else:
+                msg = "time_dim must support Chronify"
+                raise ValueError(msg)
+
+            df = df.drop("time_zone")
+        else:
+            msg = f"Unknown input {model.result.time_zone=}"
+            raise ValueError(msg)
+
+        repartition = not persist_intermediate_table
+        table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)
+
+        for report_inputs in context.model.result.reports:
+            report = make_report(report_inputs.report_type)
+            output_dir = self._output_dir / context.model.name
+            report.generate(table_filename, output_dir, context, report_inputs.inputs)
+
+        return df, context
+
     def _check_checkpoint_file(
         self, checkpoint_file: Path | None, model: ProjectQueryModel
     ) -> MapOperationCheckpoint | None:
@@ -560,6 +750,7 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
         """
         tz = self._project.config.get_base_time_dimension().get_time_zone()
         assert tz is not None, "Project base time dimension must have a time zone"
+
         scratch_dir = scratch_dir or DsgridRuntimeConfig.load().get_scratch_dir()
         with ScratchDirContext(scratch_dir) as scratch_dir_context:
             # Ensure that queries that aggregate time reflect the project's time zone instead
@@ -577,7 +768,19 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
                     overwrite=overwrite,
                 )
                 context.finalize()
-                return df
+            if model.result.time_zone:
+                df, context = self._convert_time_zone(
+                    scratch_dir_context,
+                    model,
+                    load_cached_table,
+                    checkpoint_file=checkpoint_file,
+                    persist_intermediate_table=persist_intermediate_table,
+                    zip_file=zip_file,
+                    overwrite=overwrite,
+                )
+                context.finalize()
+
+            return df
 
 
 class CompositeDatasetQuerySubmitter(ProjectBasedQuerySubmitter):

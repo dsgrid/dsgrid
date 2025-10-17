@@ -2,6 +2,7 @@ import logging
 import os
 from pathlib import Path
 from typing import Iterable
+from zoneinfo import ZoneInfo
 
 import chronify
 from chronify.models import TableSchema
@@ -18,6 +19,7 @@ from dsgrid.dimension.time import (
     TimeBasedDataAdjustmentModel,
     TimeZone,
 )
+from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.exceptions import (
     DSGInvalidField,
     DSGInvalidDimensionMapping,
@@ -320,6 +322,56 @@ def map_time_dimension_with_chronify_duckdb(
     return df.session.createDataFrame(pandas_df)
 
 
+def convert_time_zone_with_chronify_duckdb(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    time_zone: str | TimeZone,
+    scratch_dir_context: ScratchDirContext,
+) -> DataFrame:
+    """Create a single time zone-converted table with chronify and DuckDB.
+    All operations are performed in memory.
+    """
+    src_schema = _get_src_schema(df, value_column, from_time_dim)
+    store = chronify.Store.create_in_memory_db()
+    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
+    zone_info_tz = time_zone.tz if isinstance(time_zone, TimeZone) else ZoneInfo(time_zone)
+    dst_schema = store.convert_time_zone(
+        src_schema.name,
+        zone_info_tz,
+        scratch_dir=scratch_dir_context.scratch_dir,
+    )
+    pandas_df = store.read_table(dst_schema.name)
+    store.drop_table(dst_schema.name)
+    return df.session.createDataFrame(pandas_df)
+
+
+def convert_time_zone_by_column_with_chronify_duckdb(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    time_zone_column: str,
+    scratch_dir_context: ScratchDirContext,
+    wrap_time_allowed: bool = False,
+) -> DataFrame:
+    """Create a multiple time zone-converted table (based on a time_zone_column)
+    using chronify and DuckDB.
+    All operations are performed in memory.
+    """
+    src_schema = _get_src_schema(df, value_column, from_time_dim)
+    store = chronify.Store.create_in_memory_db()
+    store.ingest_table(df.relation, src_schema, skip_time_checks=True)
+    dst_schema = store.convert_time_zone_by_column(
+        src_schema.name,
+        time_zone_column,
+        wrap_time_allowed=wrap_time_allowed,
+        scratch_dir=scratch_dir_context.scratch_dir,
+    )
+    pandas_df = store.read_table(dst_schema.name)
+    store.drop_table(dst_schema.name)
+    return df.session.createDataFrame(pandas_df)
+
+
 def map_time_dimension_with_chronify_spark_hive(
     df: DataFrame,
     table_name: str,
@@ -421,6 +473,64 @@ def _to_chronify_time_based_data_adjustment(
     )
 
 
+def _get_src_schema(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    src_name: str | None = None,
+) -> TableSchema:
+    src = src_name or "src_" + make_temp_view_name()
+    # TODO - this is a hack
+    time_col_list = from_time_dim.get_load_data_time_columns()
+    time_config = from_time_dim.to_chronify()
+    if isinstance(from_time_dim, DateTimeDimensionConfig):
+        assert len(time_col_list) == 1
+        if time_col_list[0] not in df.columns:
+            time_col_list = [from_time_dim.model.name]
+            time_config.time_column = from_time_dim.model.name
+
+    time_array_id_columns = [
+        x
+        for x in df.columns
+        if x in set(df.columns).difference(set(time_col_list)) - {value_column}
+    ]
+    src_schema = chronify.TableSchema(
+        name=src,
+        time_config=time_config,
+        time_array_id_columns=time_array_id_columns,
+        value_column=value_column,
+    )
+    return src_schema
+
+
+def _get_dst_schema(
+    df: DataFrame,
+    value_column: str,
+    from_time_dim: TimeDimensionBaseConfig,
+    to_time_dim: TimeDimensionBaseConfig,
+) -> TableSchema:
+    # TODO - this is a hack
+    time_col_list = from_time_dim.get_load_data_time_columns()
+    time_config = to_time_dim.to_chronify()
+    if isinstance(from_time_dim, DateTimeDimensionConfig):
+        assert len(time_col_list) == 1
+        if time_col_list[0] not in df.columns:
+            time_col_list = [from_time_dim.model.name]
+
+    time_array_id_columns = [
+        x
+        for x in df.columns
+        if x in set(df.columns).difference(set(time_col_list)) - {value_column}
+    ]
+    dst_schema = chronify.TableSchema(
+        name="dst_" + make_temp_view_name(),
+        time_config=time_config,
+        time_array_id_columns=time_array_id_columns,
+        value_column=value_column,
+    )
+    return dst_schema
+
+
 def _get_mapping_schemas(
     df: DataFrame,
     value_column: str,
@@ -428,25 +538,8 @@ def _get_mapping_schemas(
     to_time_dim: TimeDimensionBaseConfig,
     src_name: str | None = None,
 ) -> tuple[TableSchema, TableSchema]:
-    src = src_name or "src_" + make_temp_view_name()
-    time_array_id_columns = [
-        x
-        for x in df.columns
-        if x
-        in set(df.columns).difference(from_time_dim.get_load_data_time_columns()) - {value_column}
-    ]
-    src_schema = chronify.TableSchema(
-        name=src,
-        time_config=from_time_dim.to_chronify(),
-        time_array_id_columns=time_array_id_columns,
-        value_column=value_column,
-    )
-    dst_schema = chronify.TableSchema(
-        name="dst_" + make_temp_view_name(),
-        time_config=to_time_dim.to_chronify(),
-        time_array_id_columns=time_array_id_columns,
-        value_column=value_column,
-    )
+    src_schema = _get_src_schema(df, value_column, from_time_dim, src_name=src_name)
+    dst_schema = _get_dst_schema(df, value_column, from_time_dim, to_time_dim)
     return src_schema, dst_schema
 
 

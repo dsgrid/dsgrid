@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dsgrid"
+name = "dsgrid-toolkit"
 dynamic = ["version"]
-copyright = "Copyright 2023, The Alliance for Sustainable Energy, LLC"
+copyright = "Copyright 2025, The Alliance for Sustainable Energy, LLC"
 description = "Python API for accessing demand-side grid model (dsgrid) datasets"
 url = "https://github.com/dsgrid/dsgrid"
 requires-python = ">=3.11"
@@ -19,7 +19,7 @@ authors = [
     {name = "Daniel Thom", email = "daniel.thom@nrel.gov"},
 ]
 maintainers = [{name = "Elaine Hale", email = "elaine.hale@nrel.gov"}]
-include_package_data = true
+include_package_data = false
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -52,8 +52,19 @@ dependencies = [
     "tzdata",  # time zone stuff
 ]
 
+[project.urls]
+GitHub = "https://github.com/dsgrid/dsgrid"
+Documentation = "https://dsgrid.github.io/dsgrid/"
+Homepage = "https://www.nrel.gov/analysis/dsgrid"
+
 [tool.hatch.version]
 path = "dsgrid/__init__.py"
+
+[tool.hatch.build.targets.sdist]
+packages = ["dsgrid"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["dsgrid"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -61,7 +72,7 @@ allow-direct-references = true
 [project.optional-dependencies]
 spark = [
     "chronify[spark]",
-    "pyhive @ git+https://github.com/apache/kyuubi.git#egg=pyhive&subdirectory=python",
+    # "pyhive",
     "pyspark==4.0.0",  # Keep this synced with the spark version in Dockerfile.
     "thrift",
     "thrift_sasl",

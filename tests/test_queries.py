@@ -79,6 +79,7 @@ from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
 from dsgrid.utils.spark import custom_time_zone
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
+from dsgrid.dimension.time import TimeZone
 
 
 DIMENSION_MAPPING_SCHEMA = StructType(
@@ -807,6 +808,7 @@ class QueryTestElectricityValues(QueryTestBase):
             result=QueryResultParamsModel(
                 replace_ids_with_names=True,
                 table_format=UnpivotedTableFormatModel(),
+                # time_zone=TimeZone.PST, #TODO
             ),
         )
         match self._category:
@@ -853,8 +855,20 @@ class QueryTestElectricityValues(QueryTestBase):
         non_value_columns.update({"id", "timestamp"})
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         expected = [VALUE_COLUMN]
+
+        pdf = df.toPandas()
+        if self._model.result.time_zone:
+            expected.append("time_zone")
+            if isinstance(self._model.result.time_zone, TimeZone):
+                assert set(pdf["time_zone"]) == {self._model.result.time_zone.tz_name}
+                pdf["time_est"]  # TODO
+                assert pdf.loc[0, "time_est"].tz is None
+
+        else:
+            assert pdf.loc[0, "time_est"].tz is not None
+
         # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating"]
-        success = value_columns == expected
+        success = set(value_columns) == set(expected)
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
         if not df.select("county").distinct().filter(f"county == '{county_name}'").collect():
@@ -870,6 +884,7 @@ class QueryTestElectricityValues(QueryTestBase):
             expected = self.get_raw_stats()["by_county"][county]["comstock_resstock"]["sum"]
             assert math.isclose(total_cooling, expected["electricity_cooling"])
             assert math.isclose(total_heating, expected["electricity_heating"])
+
         return success
 
 

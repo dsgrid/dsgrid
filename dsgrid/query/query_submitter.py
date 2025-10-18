@@ -57,7 +57,11 @@ from dsgrid.query.models import (
 )
 from dsgrid.utils.dataset import (
     add_time_zone,
+    convert_time_zone_with_chronify_spark_hive,
+    convert_time_zone_with_chronify_spark_path,
     convert_time_zone_with_chronify_duckdb,
+    convert_time_zone_by_column_with_chronify_spark_hive,
+    convert_time_zone_by_column_with_chronify_spark_path,
     convert_time_zone_by_column_with_chronify_duckdb,
 )
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
@@ -345,40 +349,29 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 # use chronify
                 match (config.backend_engine, config.use_hive_metastore):
                     case (BackendEngine.SPARK, True):
-                        # table_name = make_temp_view_name()
-                        # df = map_time_dimension_with_chronify_spark_hive(
-                        #     df=save_to_warehouse(df, table_name),
-                        #     table_name=table_name,
-                        #     value_column=VALUE_COLUMN,
-                        #     from_time_dim=time_dim,
-                        #     to_time_dim=to_time_dim,
-                        #     scratch_dir_context=scratch_dir_context,
-                        # )
-                        pass
+                        df = convert_time_zone_with_chronify_spark_hive(
+                            df=df,
+                            value_column=VALUE_COLUMN,
+                            from_time_dim=time_dim,
+                            time_zone=model.result.time_zone,
+                            scratch_dir_context=scratch_dir_context,
+                        )
 
                     case (BackendEngine.SPARK, False):
-                        # filename = persist_intermediate_table(
-                        #     df,
-                        #     scratch_dir_context,
-                        #     tag="project query before time mapping",
-                        # )
-                        # df = map_time_dimension_with_chronify_spark_path(
-                        #     df=read_dataframe(filename),
-                        #     filename=filename,
-                        #     value_column=VALUE_COLUMN,
-                        #     from_time_dim=time_dim,
-                        #     to_time_dim=to_time_dim,
-                        #     scratch_dir_context=scratch_dir_context,
-                        # )
-                        pass
+                        filename = persist_intermediate_table(
+                            df,
+                            scratch_dir_context,
+                            tag="project query before time mapping",
+                        )
+                        df = convert_time_zone_with_chronify_spark_path(
+                            df=df,
+                            filename=filename,
+                            value_column=VALUE_COLUMN,
+                            from_time_dim=time_dim,
+                            time_zone=model.result.time_zone,
+                            scratch_dir_context=scratch_dir_context,
+                        )
                     case (BackendEngine.DUCKDB, _):
-                        # df = map_time_dimension_with_chronify_duckdb(
-                        #     df=df,
-                        #     value_column=VALUE_COLUMN,
-                        #     from_time_dim=time_dim,
-                        #     to_time_dim=to_time_dim,
-                        #     scratch_dir_context=scratch_dir_context,
-                        # )
                         df = convert_time_zone_with_chronify_duckdb(
                             df=df,
                             value_column=VALUE_COLUMN,
@@ -415,47 +408,37 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 # use chronify
                 match (config.backend_engine, config.use_hive_metastore):
                     case (BackendEngine.SPARK, True):
-                        # table_name = make_temp_view_name()
-                        # df = map_time_dimension_with_chronify_spark_hive(
-                        #     df=save_to_warehouse(df, table_name),
-                        #     table_name=table_name,
-                        #     value_column=VALUE_COLUMN,
-                        #     from_time_dim=time_dim,
-                        #     to_time_dim=to_time_dim,
-                        #     scratch_dir_context=scratch_dir_context,
-                        # )
-                        pass
-
+                        df = convert_time_zone_by_column_with_chronify_spark_hive(
+                            df=df,
+                            value_column=VALUE_COLUMN,
+                            from_time_dim=time_dim,
+                            time_zone_column="time_zone",
+                            scratch_dir_context=scratch_dir_context,
+                            wrap_time_allowed=False,  # LIXI TODO make this a param
+                        )
                     case (BackendEngine.SPARK, False):
-                        # filename = persist_intermediate_table(
-                        #     df,
-                        #     scratch_dir_context,
-                        #     tag="project query before time mapping",
-                        # )
-                        # df = map_time_dimension_with_chronify_spark_path(
-                        #     df=read_dataframe(filename),
-                        #     filename=filename,
-                        #     value_column=VALUE_COLUMN,
-                        #     from_time_dim=time_dim,
-                        #     to_time_dim=to_time_dim,
-                        #     scratch_dir_context=scratch_dir_context,
-                        # )
-                        pass
+                        filename = persist_intermediate_table(
+                            df,
+                            scratch_dir_context,
+                            tag="project query before time mapping",
+                        )
+                        df = convert_time_zone_by_column_with_chronify_spark_path(
+                            df=df,
+                            filename=filename,
+                            value_column=VALUE_COLUMN,
+                            from_time_dim=time_dim,
+                            time_zone_column="time_zone",
+                            scratch_dir_context=scratch_dir_context,
+                            wrap_time_allowed=False,  # LIXI TODO make this a param
+                        )
                     case (BackendEngine.DUCKDB, _):
-                        # df = map_time_dimension_with_chronify_duckdb(
-                        #     df=df,
-                        #     value_column=VALUE_COLUMN,
-                        #     from_time_dim=time_dim,
-                        #     to_time_dim=to_time_dim,
-                        #     scratch_dir_context=scratch_dir_context,
-                        # )
                         df = convert_time_zone_by_column_with_chronify_duckdb(
                             df=df,
                             value_column=VALUE_COLUMN,
                             from_time_dim=time_dim,
                             time_zone_column="time_zone",
                             scratch_dir_context=scratch_dir_context,
-                            wrap_time_allowed=False,
+                            wrap_time_allowed=False,  # LIXI TODO make this a param
                         )
 
             else:

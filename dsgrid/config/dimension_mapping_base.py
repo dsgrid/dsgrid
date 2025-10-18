@@ -1,7 +1,7 @@
 import logging
 
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.dimension.base_models import DimensionType
@@ -327,6 +327,15 @@ class DimensionMappingReferenceModel(DSGBaseModel):
         title="version",
         description="Version of the dimension",
     )
+
+    # This function can be deleted once all dataset repositories have been updated.
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values):
+        if "required_for_validation" in values:
+            values.pop("required_for_validation")
+
+        return values
 
 
 class DimensionMappingReferenceListModel(DSGBaseModel):

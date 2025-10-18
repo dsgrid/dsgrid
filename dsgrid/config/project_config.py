@@ -1189,7 +1189,6 @@ class ProjectConfig(ConfigBase):
                     return True
                 return False
 
-        # TODO: what about benchmark and historical?
         return False
 
     def get_load_data_time_columns(self, name: str) -> list[str]:

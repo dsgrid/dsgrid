@@ -15,7 +15,11 @@ class TableFormatType(StrEnum):
     UNPIVOTED = "unpivoted"
 
 
-class PivotedTableFormatModel(DSGBaseModel):
+class TableFormatModelBase(DSGBaseModel):
+    format_type: TableFormatType
+
+
+class PivotedTableFormatModel(TableFormatModelBase):
     format_type: Literal[TableFormatType.PIVOTED] = TableFormatType.PIVOTED
     pivoted_dimension_type: DimensionType = Field(
         title="pivoted_dimension_type",
@@ -24,7 +28,7 @@ class PivotedTableFormatModel(DSGBaseModel):
     )
 
 
-class UnpivotedTableFormatModel(DSGBaseModel):
+class UnpivotedTableFormatModel(TableFormatModelBase):
     format_type: Literal[TableFormatType.UNPIVOTED] = TableFormatType.UNPIVOTED
 
     @model_validator(mode="before")

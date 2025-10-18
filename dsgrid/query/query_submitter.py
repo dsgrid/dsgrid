@@ -3,7 +3,6 @@ import json
 import logging
 import shutil
 from pathlib import Path
-import copy
 
 from zipfile import ZipFile
 
@@ -332,54 +331,14 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         self,
         scratch_dir_context: ScratchDirContext,
         model: ProjectQueryModel,
-        load_cached_table: bool,
-        checkpoint_file: Path | None,
+        df,
+        context,
         persist_intermediate_table: bool,
         zip_file: bool = False,
-        overwrite: bool = False,
     ):
-        base_dimension_names = self._run_checks(model)
-        checkpoint = self._check_checkpoint_file(checkpoint_file, model)
-        context = QueryContext(
-            model,
-            base_dimension_names,
-            scratch_dir_context=scratch_dir_context,
-            checkpoint=checkpoint,
-        )
-        assert isinstance(context.model, ProjectQueryModel) or isinstance(
-            context.model, CreateCompositeDatasetQueryModel
-        )
-        context.model.project.version = str(self._project.version)
-        output_dir = self._output_dir / context.model.name
-        if output_dir.exists() and not overwrite:
-            msg = (
-                f"output directory {self._output_dir} and query name={context.model.name} will "
-                "overwrite an existing query results directory. "
-                "Choose a different path or pass force=True."
-            )
-            raise DSGInvalidParameter(msg)
-
-        df = None
-        if load_cached_table:
-            df, metadata = self._try_read_cache(context)
-        if df is None:
-            df_filenames = self._project.process_query(
-                context, self._cached_project_mapped_datasets_dir()
-            )
-            df = self._postprocess_datasets(context, scratch_dir_context, df_filenames)
-            is_cached = False
-        else:
-            context.metadata = metadata
-            is_cached = True
-
-        if persist_intermediate_table and not is_cached:
-            df = self._persist_intermediate_result(context, df)
-
-        # New stuff
         config = dsgrid.runtime_config
-        # breakpoint()
         if isinstance(model.result.time_zone, TimeZone):
-            time_dim = copy.deepcopy(self._project.config.get_base_time_dimension())
+            time_dim = self._project.config.get_base_time_dimension()
             # time_col = context.get_dimension_column_names(DimensionType.TIME)
             # time_dim.model.name = time_col
             if time_dim.supports_chronify():
@@ -440,9 +399,17 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 raise DSGInvalidParameter(msg)
 
             if "time_zone" not in df.columns:
-                geo_dim = self._project.config.get_base_dimension(DimensionType.GEOGRAPHY)
-                # assert geo_dim record has time_zone col
-                df = add_time_zone(df, geo_dim)
+                geo_cols = list(context.get_dimension_column_names(DimensionType.GEOGRAPHY))
+                assert len(geo_cols) == 1
+                geo_col = next(iter(geo_cols))
+                geo_dim = self._project.config.get_base_dimension(
+                    DimensionType.GEOGRAPHY
+                )  # LIXI TODO get dim record from name
+                if model.result.replace_ids_with_names:
+                    dim_key = "name"
+                else:
+                    dim_key = "id"
+                df = add_time_zone(df, geo_dim, df_key=geo_col, dim_key=dim_key)
 
             if time_dim.supports_chronify():
                 # use chronify
@@ -494,8 +461,6 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
             else:
                 msg = "time_dim must support Chronify"
                 raise ValueError(msg)
-
-            df = df.drop("time_zone")
         else:
             msg = f"Unknown input {model.result.time_zone=}"
             raise ValueError(msg)
@@ -767,18 +732,16 @@ class ProjectQuerySubmitter(ProjectBasedQuerySubmitter):
                     zip_file=zip_file,
                     overwrite=overwrite,
                 )
-                context.finalize()
             if model.result.time_zone:
                 df, context = self._convert_time_zone(
                     scratch_dir_context,
                     model,
-                    load_cached_table,
-                    checkpoint_file=checkpoint_file,
+                    df,
+                    context,
                     persist_intermediate_table=persist_intermediate_table,
                     zip_file=zip_file,
-                    overwrite=overwrite,
                 )
-                context.finalize()
+            context.finalize()
 
             return df
 

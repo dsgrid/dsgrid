@@ -467,7 +467,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         if context.model.result.column_type == ColumnType.DIMENSION_NAMES:
             df = table_handler.convert_columns_to_query_names(
                 df, self._config.model.dataset_id, context
-            )  # LIXI look
+            )
 
         return df
 

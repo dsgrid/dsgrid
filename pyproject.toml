@@ -3,9 +3,9 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "dsgrid-toolkit"
+name = "dsgrid"
 dynamic = ["version"]
-copyright = "Copyright 2025, The Alliance for Sustainable Energy, LLC"
+copyright = "Copyright 2023, The Alliance for Sustainable Energy, LLC"
 description = "Python API for accessing demand-side grid model (dsgrid) datasets"
 url = "https://github.com/dsgrid/dsgrid"
 requires-python = ">=3.11"
@@ -19,7 +19,7 @@ authors = [
     {name = "Daniel Thom", email = "daniel.thom@nrel.gov"},
 ]
 maintainers = [{name = "Elaine Hale", email = "elaine.hale@nrel.gov"}]
-include_package_data = false
+include_package_data = true
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -32,7 +32,7 @@ dependencies = [
     # "awscliv2",
     # "boto3",
     # "s3path",
-    "chronify ~= 0.4.0",
+    "chronify @ git+https://github.com/NREL/chronify.git#ll/to_local_time",
     "click>=8.2, < 9",
     "dash",
     "dash_bootstrap_components",
@@ -52,28 +52,8 @@ dependencies = [
     "tzdata",  # time zone stuff
 ]
 
-[dependency-groups]
-# This can be removed when the Apache Kyuubi project releases a new version of pyhive.
-# This is currently synced with chronify.
-pyhive = [
-    "pyhive @ git+https://github.com/apache/kyuubi.git@3b205a3924e0e3a75c425de1396089729cf22ee5#subdirectory=python",
-    "thrift",
-    "thrift_sasl",
-]
-
-[project.urls]
-GitHub = "https://github.com/dsgrid/dsgrid"
-Documentation = "https://dsgrid.github.io/dsgrid/"
-Homepage = "https://www.nrel.gov/analysis/dsgrid"
-
 [tool.hatch.version]
 path = "dsgrid/__init__.py"
-
-[tool.hatch.build.targets.sdist]
-packages = ["dsgrid"]
-
-[tool.hatch.build.targets.wheel]
-packages = ["dsgrid"]
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -81,7 +61,7 @@ allow-direct-references = true
 [project.optional-dependencies]
 spark = [
     "chronify[spark]",
-    # "pyhive",
+    "pyhive @ git+https://github.com/apache/kyuubi.git#egg=pyhive&subdirectory=python",
     "pyspark==4.0.0",  # Keep this synced with the spark version in Dockerfile.
     "thrift",
     "thrift_sasl",

@@ -95,8 +95,6 @@ class MappingTableModel(DimensionMappingBaseModel):
         },
         default=None,
     )
-    # ETH@20251008 - Similar to Dimension records, these probably aren't strictly internal.
-    # Remove json_schema_extra and provide example in description.
     records: list = Field(
         title="records",
         description="dimension mapping records in filename that get loaded at runtime",

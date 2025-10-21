@@ -324,9 +324,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
             "'IEF', 'Building Standard Scenarios'."
         ),
     )
-    # ETH@20251008 - Although we could define a default DataClassificationType,
-    # it seems better to default to 'low' by priniting in the template, so that
-    # the base assumption of low risk is clear to dataset contributors.
     user_defined_metadata: dict[str, Any] = Field(
         title="user_defined_metadata",
         description="Additional user defined metadata fields",
@@ -337,6 +334,9 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         title="tags",
         description="List of data tags",
     )
+    # ETH@20251008 - Although we could define a default DataClassificationType,
+    # it seems better to default to 'low' by priniting in the template, so that
+    # the base assumption of low risk is clear to dataset contributors.
     data_classification: DataClassificationType = Field(
         title="data_classification",
         description="Data security classification (e.g., low, moderate).",

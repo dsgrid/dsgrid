@@ -32,7 +32,7 @@ dependencies = [
     # "awscliv2",
     # "boto3",
     # "s3path",
-    "chronify @ git+https://github.com/NREL/chronify.git#ll/to_local_time",
+    "chronify @ git+https://github.com/NREL/chronify.git@ll/to_local_time",
     "click>=8.2, < 9",
     "dash",
     "dash_bootstrap_components",

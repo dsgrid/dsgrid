@@ -24,7 +24,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install '.[dev,spark]'
-        python -m pip install git+https://github.com/apache/kyuubi.git#egg=pyhive&subdirectory=python
+        python -m pip install 'git+https://github.com/apache/kyuubi.git#egg=pyhive&subdirectory=python'
         wget https://archive.apache.org/dist/spark/spark-3.5.4/spark-3.5.4-bin-hadoop3.tgz
         tar -xzf spark-3.5.4-bin-hadoop3.tgz
         export SPARK_HOME=$(pwd)/spark-3.5.4-bin-hadoop3

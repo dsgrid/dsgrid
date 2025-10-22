@@ -32,7 +32,7 @@ dependencies = [
     # "awscliv2",
     # "boto3",
     # "s3path",
-    "chronify ~= 0.3.1",
+    "chronify ~= 0.4.0",
     "click>=8.2, < 9",
     "dash",
     "dash_bootstrap_components",
@@ -50,6 +50,15 @@ dependencies = [
     "sqlalchemy >= 2, < 3",
     "uvicorn",
     "tzdata",  # time zone stuff
+]
+
+[dependency-groups]
+# This can be removed when the Apache Kyuubi project releases a new version of pyhive.
+# This is currently synced with chronify.
+pyhive = [
+    "pyhive @ git+https://github.com/apache/kyuubi.git@3b205a3924e0e3a75c425de1396089729cf22ee5#subdirectory=python",
+    "thrift",
+    "thrift_sasl",
 ]
 
 [project.urls]

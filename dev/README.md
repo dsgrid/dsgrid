@@ -17,8 +17,8 @@ pip install -e .[tests]
 
 # or
 
-pip install -e .[dev,spark] # includes what is needed for tests and code development
-(Leave off `spark` if you don't need/want to use it.)
+pip install -e .[dev,spark] --group=pyhive # includes what is needed for tests and code development
+(Leave off `spark` and `pyhive` if you don't need/want to use spark.)
 
 # or
 

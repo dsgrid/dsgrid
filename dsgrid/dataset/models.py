@@ -1,3 +1,4 @@
+from asyncio.log import logger
 from enum import StrEnum
 from typing import Literal, Union
 
@@ -34,7 +35,10 @@ class UnpivotedTableFormatModel(TableFormatModelBase):
     @model_validator(mode="before")
     @classmethod
     def handle_legacy(cls, values: dict) -> dict:
-        values.pop("value_column", None)
+        if "value_column" in values:
+            logger.warning("Removing deprecated value_column field from unpivoted table format.")
+            values.pop("value_column")
+
         return values
 
 

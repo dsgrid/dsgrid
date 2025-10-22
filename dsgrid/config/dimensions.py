@@ -403,9 +403,15 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
             if values["leap_day_adjustment"] != "none":
                 msg = f"Unknown data_schema format: {values=}"
                 raise ValueError(msg)
+            logger.warning(
+                "Dropping deprecated leap_day_adjustment field from the datetime config."
+            )
             values.pop("leap_day_adjustment")
 
         if "timezone" in values:
+            logger.warning(
+                "Moving legacy timezone field to new datetime_format struct within the datetime config."
+            )
             values["datetime_format"] = {
                 "format_type": DatetimeFormat.ALIGNED.value,
                 "timezone": values["timezone"],

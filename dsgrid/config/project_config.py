@@ -350,9 +350,15 @@ class RequiredDimensionRecordsByTypeModel(DSGBaseModel):
         # This can be removed once we've updated existing dsgrid project repositories.
         for field in ("base", "base_missing"):
             if field in values and isinstance(values[field], list):
+                logger.warning(f"Fixing up {field} to conform to new format")
                 values[field] = {"record_ids": values[field]}
 
-        values.pop("supplemental", None)
+        if "supplemental" in values:
+            logger.warning(
+                "Removing deprecated supplemental dimension requirements from the project config."
+            )
+            values.pop("supplemental")
+
         return values
 
     @model_validator(mode="after")

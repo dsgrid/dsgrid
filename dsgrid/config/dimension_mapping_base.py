@@ -333,6 +333,9 @@ class DimensionMappingReferenceModel(DSGBaseModel):
     @classmethod
     def handle_legacy_fields(cls, values):
         if "required_for_validation" in values:
+            logger.warning(
+                "Removing deprecated required_for_validation field from a dimension mapping reference."
+            )
             values.pop("required_for_validation")
 
         return values

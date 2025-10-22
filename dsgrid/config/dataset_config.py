@@ -189,6 +189,9 @@ class StandardDataSchemaModel(DSGBaseModel):
     @classmethod
     def handle_legacy(cls, values: dict) -> dict:
         if "load_data_column_dimension" in values:
+            logger.warning(
+                "Moving legacy load_data_column_dimension field to table_format struct."
+            )
             values["table_format"] = PivotedTableFormatModel(
                 pivoted_dimension_type=values.pop("load_data_column_dimension")
             )
@@ -203,6 +206,9 @@ class OneTableDataSchemaModel(DSGBaseModel):
     @classmethod
     def handle_legacy(cls, values: dict) -> dict:
         if "load_data_column_dimension" in values:
+            logger.warning(
+                "Moving legacy load_data_column_dimension field to table_format struct."
+            )
             values["table_format"] = PivotedTableFormatModel(
                 pivoted_dimension_type=values.pop("load_data_column_dimension")
             )
@@ -381,6 +387,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     @classmethod
     def handle_legacy_fields(cls, values):
         if "dataset_version" in values:
+            logger.warning("Moving data in legacy dataset_version field to version field.")
             val = values.pop("dataset_version")
             if val is not None:
                 values["version"] = val
@@ -389,23 +396,30 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
             if "data_schema_type" in values["data_schema"]:
                 msg = f"Unknown data_schema format: {values=}"
                 raise ValueError(msg)
+            logger.warning("Moving legacy data_schema_type field into data_schema struct.")
             values["data_schema"]["data_schema_type"] = values.pop("data_schema_type")
 
         if "leap_day_adjustment" in values:
             if values["leap_day_adjustment"] != "none":
                 msg = f"Unknown leap day adjustment: {values=}"
                 raise ValueError(msg)
+            logger.warning(
+                "Dropping deprecated leap_day_adjustment field from the dataset config."
+            )
             values.pop("leap_day_adjustment")
 
         if "source" in values:
+            logger.warning("Dropping deprecated source field from the dataset config.")
             values.pop("source")
 
         if "origin_date" in values:
+            logger.warning("Moving legacy origin_date field to new data_source_date field.")
             val = values.pop("origin_date")
             if val is not None:
                 values["data_source_date"] = val
 
         if "origin_version" in values:
+            logger.warning("Moving legacy origin_version field to new data_source_version field.")
             val = values.pop("origin_version")
             if val is not None:
                 values["data_source_version"] = val

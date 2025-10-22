@@ -1,0 +1,15 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.mapping_tables.MappingTableByNameModel
+
+Attributes for a dimension mapping table for soon&#45;to&#45;be registered dimensions by name.
+This will be converted to a MappingTableModel as soon as the dimensions are registered.
+" alt="" coords="1115,400,1631,624"/>
+<area shape="rect" id="node2" title="dsgrid.config.supplemental_dimension.SupplementalDimensionModel
+
+Defines a supplemental dimension.
+" alt="" coords="617,35,971,427"/>
+<area shape="rect" id="node3" title="dsgrid.config.supplemental_dimension.SupplementalDimensionsListModel
+
+Defines a list of supplemental dimensions.
+" alt="" coords="5,5,473,61"/>
+</map>

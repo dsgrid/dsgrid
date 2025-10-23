@@ -17,7 +17,7 @@ Python API for contributing to and accessing demand-side grid model (dsgrid) pro
 Create a virtual environment in which to install dsgrid. Anaconda or miniconda is recommended.
 
 ```
-conda create -n dsgrid python=3.10
+conda create -n dsgrid python=3.11
 conda activate dsgrid
 ```
 
@@ -26,7 +26,7 @@ conda activate dsgrid
 dsgrid uses [Apache Spark](#https://spark.apache.org/) to manage big data. There are no separate installation steps for Apache Spark beyond installing the dsgrid package and installing:
 
 ```
-pip install git+https://github.com/apache/kyuubi.git#egg=pyhive&subdirectory=python
+pip install "dsgrid-toolkit[spark]" --group=pyhive
 ```
 
 Otherwise installing the pyspark Python dependency handles it.
@@ -51,7 +51,11 @@ To install Apache Spark on Windows, follow [these instructions](https://towardsd
 
 ### From PIPY/pip
 
-*Not yet available*
+pip install dsgrid-toolkit
+
+or
+
+pip install "dsgrid-toolkit[spark]" --group=pyhive
 
 ### From pip+git
 
@@ -88,12 +92,12 @@ cloned repository.
 
 **Users:**
 ```
-pip install -e .
+pip install -e . --group=pyhive
 ```
 
 **Developers:**
 ```
-pip install -e '.[dev]'
+pip install -e '.[dev,spark]' --group=pyhive
 ```
 
 ## Usage

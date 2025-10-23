@@ -6,8 +6,8 @@ Installation
 
 Python Environment
 ==================
-dsgrid requires python=3.10 or later. If you do not already have a python environment with
-python>=3.10, we recommend using `Conda <https://conda.io/projects/conda/en/latest/index.html>`_ to
+dsgrid requires python=3.11 or later. If you do not already have a python environment with
+python>=3.11, we recommend using `Conda <https://conda.io/projects/conda/en/latest/index.html>`_ to
 help manage your python packages and environments.
 
 Steps to make a dsgrid Conda environment:
@@ -56,20 +56,17 @@ Both of these commands must work:
 
 Package Installation
 =====================
+To use DuckDB as the backend:
 
-With ssh keys:
+.. code-block:: console
 
-.. code-block:: bash
+    $ pip install dsgrid-toolkit
 
-    pip install git+ssh://git@github.com/dsgrid/dsgrid.git@main
+To use Apache Spark as the backend:
 
-Or from http:
+.. code-block:: console
 
-.. code-block:: bash
-
-    pip install git+https://github.com/dsgrid/dsgrid.git@main
-
-.. todo:: pipy.org/pip installation not available yet.
+    $ pip install "dsgrid-toolkit[spark]" --group=pyhive
 
 
 Registry

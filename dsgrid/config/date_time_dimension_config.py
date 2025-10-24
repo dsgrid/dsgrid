@@ -8,7 +8,6 @@ import chronify
 
 from dsgrid.dimension.time import TimeZone
 from dsgrid.spark.types import DataFrame, F
-from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.dimension.time import DatetimeFormat, TimeIntervalType
 from .dimensions import DateTimeDimensionModel
 from .time_dimension_base_config import TimeDimensionBaseConfig
@@ -71,7 +70,7 @@ class DateTimeDimensionConfig(TimeDimensionBaseConfig):
         return lengths
 
     def get_load_data_time_columns(self) -> list[str]:
-        return list(DatetimeTimestampType._fields)
+        return [self.model.time_column]
 
     def get_time_zone(self) -> TimeZone | None:
         if self.model.datetime_format.format_type == DatetimeFormat.ALIGNED:

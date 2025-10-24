@@ -21,7 +21,6 @@ from dsgrid.dimension.time import (
     TimeBasedDataAdjustmentModel,
     TimeZone,
 )
-from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.exceptions import (
     DSGInvalidField,
     DSGInvalidDimensionMapping,
@@ -607,15 +606,8 @@ def _get_src_schema(
     src_name: str | None = None,
 ) -> TableSchema:
     src = src_name or "src_" + make_temp_view_name()
-    # LIXI TODO - this is a hack
     time_col_list = from_time_dim.get_load_data_time_columns()
     time_config = from_time_dim.to_chronify()
-    if isinstance(from_time_dim, DateTimeDimensionConfig):
-        assert len(time_col_list) == 1
-        if time_col_list[0] not in df.columns:
-            time_col_list = [from_time_dim.model.name]
-            time_config.time_column = from_time_dim.model.name
-
     time_array_id_columns = [
         x
         for x in df.columns
@@ -636,14 +628,8 @@ def _get_dst_schema(
     from_time_dim: TimeDimensionBaseConfig,
     to_time_dim: TimeDimensionBaseConfig,
 ) -> TableSchema:
-    # LIXI TODO - this is a hack
-    time_col_list = from_time_dim.get_load_data_time_columns()
     time_config = to_time_dim.to_chronify()
-    if isinstance(from_time_dim, DateTimeDimensionConfig):
-        assert len(time_col_list) == 1
-        if time_col_list[0] not in df.columns:
-            time_col_list = [from_time_dim.model.name]
-
+    time_col_list = from_time_dim.get_load_data_time_columns()
     time_array_id_columns = [
         x
         for x in df.columns

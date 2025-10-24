@@ -3,7 +3,7 @@ import json
 import logging
 import shutil
 from pathlib import Path
-
+import copy
 from zipfile import ZipFile
 
 from chronify.utils.path_utils import check_overwrite
@@ -67,6 +67,7 @@ from dsgrid.utils.dataset import (
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.date_time_dimension_config import DateTimeDimensionConfig
 from dsgrid.dimension.time import TimeZone
+from dsgrid.exceptions import DSGInvalidOperation
 
 logger = logging.getLogger(__name__)
 
@@ -340,11 +341,17 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         persist_intermediate_table: bool,
         zip_file: bool = False,
     ):
+        time_dim = copy.deepcopy(self._project.config.get_base_time_dimension())
+        if not isinstance(time_dim, DateTimeDimensionConfig):
+            msg = f"Only DateTimeDimensionConfig allowed for time zone conversion. {time_dim.__class__.__name__}"
+            raise DSGInvalidOperation(msg)
+        time_cols = list(context.get_dimension_column_names(DimensionType.TIME))
+        assert len(time_cols) == 1
+        time_col = next(iter(time_cols))
+        time_dim.model.time_column = time_col
+
         config = dsgrid.runtime_config
         if isinstance(model.result.time_zone, TimeZone):
-            time_dim = self._project.config.get_base_time_dimension()
-            # time_col = context.get_dimension_column_names(DimensionType.TIME)
-            # time_dim.model.name = time_col
             if time_dim.supports_chronify():
                 # use chronify
                 match (config.backend_engine, config.use_hive_metastore):
@@ -385,8 +392,6 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 raise ValueError(msg)
 
         elif model.result.time_zone == "geography":
-            time_dim = self._project.config.get_base_time_dimension()
-
             if not isinstance(time_dim, DateTimeDimensionConfig):
                 msg = f"Cannot convert query to {model.result.time_zone} because time dimension is not datetime"
                 raise DSGInvalidParameter(msg)
@@ -395,9 +400,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                 geo_cols = list(context.get_dimension_column_names(DimensionType.GEOGRAPHY))
                 assert len(geo_cols) == 1
                 geo_col = next(iter(geo_cols))
-                geo_dim = self._project.config.get_base_dimension(
-                    DimensionType.GEOGRAPHY
-                )  # LIXI TODO get dim record from name
+                geo_dim = self._project.config.get_base_dimension(DimensionType.GEOGRAPHY)
                 if model.result.replace_ids_with_names:
                     dim_key = "name"
                 else:

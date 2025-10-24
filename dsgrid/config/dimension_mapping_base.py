@@ -1,7 +1,7 @@
 import logging
 
 
-from pydantic import Field, ValidationInfo, field_validator
+from pydantic import Field, ValidationInfo, field_validator, model_validator
 
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.dimension.base_models import DimensionType
@@ -182,7 +182,8 @@ class DimensionMappingBaseModel(DSGBaseDatabaseModel):
         description="Tolerance to apply when checking to_fraction column sums",
         default=1e-6,
     )
-    description: str = Field(
+    description: str | None = Field(
+        default=None,
         title="description",
         description="Description of dimension mapping",
     )
@@ -260,7 +261,8 @@ class DimensionMappingPreRegisteredBaseModel(DSGBaseModel):
             "options": DimensionMappingArchetype.format_for_docs(),
         },
     )
-    description: str = Field(
+    description: str | None = Field(
+        default=None,
         title="description",
         description="Description of dimension mapping",
     )
@@ -324,20 +326,19 @@ class DimensionMappingReferenceModel(DSGBaseModel):
     version: str = Field(
         title="version",
         description="Version of the dimension",
-        # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
-    )
-    required_for_validation: bool = Field(
-        title="version",
-        description="Set to False if a given dimension association is NOT required for input dataset validation; default is True",
-        default=True,
-        # TODO: add notes about warnings for outdated versions DSGRID-189 & DSGRID-148
     )
 
-    # @field_validator("required_for_validation")
-    # @classmethod
-    # def check_required_for_validation_field(cls, value):
-    #     # TODO if base_to_supplemental, raise error
-    #     return value
+    # This function can be deleted once all dataset repositories have been updated.
+    @model_validator(mode="before")
+    @classmethod
+    def handle_legacy_fields(cls, values):
+        if "required_for_validation" in values:
+            logger.warning(
+                "Removing deprecated required_for_validation field from a dimension mapping reference."
+            )
+            values.pop("required_for_validation")
+
+        return values
 
 
 class DimensionMappingReferenceListModel(DSGBaseModel):

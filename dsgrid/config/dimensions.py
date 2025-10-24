@@ -21,6 +21,7 @@ from dsgrid.dimension.time import (
     RepresentativePeriodFormat,
     DatetimeFormat,
 )
+from dsgrid.time.types import DatetimeTimestampType
 from dsgrid.registry.common import REGEX_VALID_REGISTRY_NAME
 from dsgrid.utils.files import compute_file_hash
 from dsgrid.utils.utilities import convert_record_dicts_to_classes
@@ -424,6 +425,12 @@ class DateTimeDimensionModel(TimeDimensionBaseModel):
         json_schema_extra={
             "options": TimeIntervalType.format_descriptions_for_docs(),
         },
+    )
+    time_column: str = Field(
+        title="time_column",
+        description="Name of time column in the dataframe. It should be updated during the query process to reflect "
+        "any changes to the dataframe time column.",
+        default=next(iter(DatetimeTimestampType._fields)),
     )
 
     @model_validator(mode="before")

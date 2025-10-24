@@ -13,7 +13,6 @@ from dsgrid.config.dimension_config import (
 )
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import (
-    TableFormatModelBase,
     PivotedTableFormatModel,
     UnpivotedTableFormatModel,
     TableFormatModel,
@@ -357,7 +356,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
     )
     # This field must be listed before dimensions.
     use_project_geography_time_zone: bool = Field(
-        default=False,  # ETH@20251008 - Default here conflicts with make_unvalidated_dataset_config
+        default=False,
         description="If true, time zones will be applied from the project's geography dimension. "
         "If false, the dataset's geography dimension records must provide a time zone column.",
     )
@@ -494,7 +493,7 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
 def make_unvalidated_dataset_config(
     dataset_id,
     metric_type: str,
-    table_format: TableFormatModelBase = UnpivotedTableFormatModel(),
+    pivoted_dimension_type: DimensionType | None = None,
     data_classification=DataClassificationType.LOW.value,
     dataset_type=InputDatasetType.UNSPECIFIED,
     included_dimensions: list[DimensionType] | None = None,
@@ -517,6 +516,11 @@ def make_unvalidated_dataset_config(
         exclude_dimension_types=exclude_dimension_types,
         time_type=time_type,
     )
+
+    if pivoted_dimension_type is None:
+        table_format = UnpivotedTableFormatModel()
+    else:
+        table_format = PivotedTableFormatModel(pivoted_dimension_type=pivoted_dimension_type)
 
     result = None
     if slim:

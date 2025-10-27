@@ -53,7 +53,7 @@ def make_base_dimension_template(
     dimensions: list[dict[str, Any]] = []
     for metric_type in metric_types:
         if metric_type not in SUPPORTED_METRIC_TYPES:
-            msg = f"{metric_type=} is not one of the {SUPPORTED_METRIC_TYPES}"
+            msg = f"{metric_type=} is not one of the {SUPPORTED_METRIC_TYPES=}"
             raise DSGInvalidParameter(msg)
         dim = {
             "type": DimensionType.METRIC.value,
@@ -97,9 +97,11 @@ def make_base_time_dimension_template(time_type: TimeDimensionType) -> dict[str,
         case TimeDimensionType.DATETIME:
             time_dim["class"] = "Time"
             time_dim["frequency"] = "P0DT1H"
-            time_dim["leap_day_adjustment"] = "none"
             time_dim["str_format"] = "%Y-%m-%d %H:%M:%S"
-            time_dim["timezone"] = "EasternStandard"
+            time_dim["datetime_format"] = {
+                "format_type": "aligned",
+                "timezone": "EasternStandard",
+            }
             time_dim["measurement_type"] = MeasurementType.TOTAL.value
             time_dim["ranges"] = [
                 {

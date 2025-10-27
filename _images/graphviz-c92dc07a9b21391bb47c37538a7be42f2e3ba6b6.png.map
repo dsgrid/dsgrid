@@ -1,0 +1,17 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.config.dimension_mapping_base.DimensionMappingReferenceModel
+
+Reference to a dimension mapping stored in the registry.
+
+The DimensionMappingReferenceModel is utilized by the project configuration (project.json5) as well as by the
+dimension mapping reference configuration (dimension_mapping_references.json5) that may be required when submitting a dataset to a project.
+" alt="" coords="1108,231,1403,371"/>
+<area shape="rect" id="node2" title="dsgrid.query.dataset_mapping_plan.DatasetMappingPlan
+
+Defines how to map a dataset to a list of dimensions.
+" alt="" coords="5,5,341,229"/>
+<area shape="rect" id="node3" title="dsgrid.query.dataset_mapping_plan.MapOperation
+
+Defines one mapping operation for a dataset.
+" alt="" coords="485,118,964,258"/>
+</map>

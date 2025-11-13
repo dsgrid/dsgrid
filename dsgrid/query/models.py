@@ -529,7 +529,9 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
     )
     # TODO #205: implement
     time_zone: TimeZone | Literal["geography"] | None = Field(
-        description="Convert the results to this time zone.",
+        description="Convert the results to this time zone. If 'geography', use the time zone "
+        "of the geography dimension. The resulting time column will be time zone-naive with "
+        "time zone recorded in a separate column.",
         default=None,
     )
 

@@ -122,10 +122,10 @@ def add_time_zone(
 
 def add_column_from_records(df, dimension_records, record_column, df_key, record_key: str = "id"):
     df = join(
-        df,  # left_df
-        dimension_records.select(F.col(record_key).alias("record_id"), record_column),  # right_df
-        df_key,  # left_key
-        "record_id",  # right_key
+        df1=df,
+        df2=dimension_records.select(F.col(record_key).alias("record_id"), record_column),
+        column1=df_key,
+        column2="record_id",
         how="inner",
     ).drop("record_id")
     return df
@@ -165,7 +165,7 @@ def apply_scaling_factor(
     func = _apply_scaling_factor_duckdb if use_duckdb() else _apply_scaling_factor_spark
     df = func(df, value_column, scaling_factor_column)
     if mapping_manager.plan.apply_scaling_factor_op.persist:
-        df = mapping_manager.persist_intermediate_table(df, op)
+        df = mapping_manager.persist_table(df, op)
     return df
 
 
@@ -406,7 +406,6 @@ def map_time_dimension_with_chronify_spark_hive(
         # This bypasses checks because the table should already be valid.
         store.schema_manager.add_schema(conn, src_schema)
     try:
-        # TODO: https://github.com/NREL/chronify/issues/37
         store.map_table_time_config(
             src_schema.name,
             dst_schema,
@@ -439,7 +438,6 @@ def convert_time_zone_with_chronify_spark_hive(
         store.schema_manager.add_schema(conn, src_schema)
     zone_info_tz = time_zone.tz if isinstance(time_zone, TimeZone) else ZoneInfo(time_zone)
     try:
-        # TODO: https://github.com/NREL/chronify/issues/37
         dst_schema = store.convert_time_zone(
             src_schema.name,
             zone_info_tz,
@@ -470,7 +468,6 @@ def convert_time_zone_by_column_with_chronify_spark_hive(
         # This bypasses checks because the table should already be valid.
         store.schema_manager.add_schema(conn, src_schema)
     try:
-        # TODO: https://github.com/NREL/chronify/issues/37
         dst_schema = store.convert_time_zone_by_column(
             src_schema.name,
             time_zone_column,

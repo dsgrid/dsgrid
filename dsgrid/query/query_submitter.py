@@ -42,6 +42,7 @@ from dsgrid.utils.spark import (
     try_read_dataframe,
     write_dataframe,
     write_dataframe_and_auto_partition,
+    persist_table,
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.files import delete_if_exists, compute_hash, load_data
@@ -353,7 +354,6 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         config = dsgrid.runtime_config
         if isinstance(model.result.time_zone, TimeZone):
             if time_dim.supports_chronify():
-                # use chronify
                 match (config.backend_engine, config.use_hive_metastore):
                     case (BackendEngine.SPARK, True):
                         df = convert_time_zone_with_chronify_spark_hive(
@@ -365,7 +365,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                         )
 
                     case (BackendEngine.SPARK, False):
-                        filename = persist_intermediate_table(
+                        filename = persist_table(
                             df,
                             scratch_dir_context,
                             tag="project query before time mapping",
@@ -389,13 +389,9 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
 
             else:
                 msg = "time_dim must support Chronify"
-                raise ValueError(msg)
-
-        elif model.result.time_zone == "geography":
-            if not isinstance(time_dim, DateTimeDimensionConfig):
-                msg = f"Cannot convert query to {model.result.time_zone} because time dimension is not datetime"
                 raise DSGInvalidParameter(msg)
 
+        elif model.result.time_zone == "geography":
             if "time_zone" not in df.columns:
                 geo_cols = list(context.get_dimension_column_names(DimensionType.GEOGRAPHY))
                 assert len(geo_cols) == 1
@@ -417,10 +413,10 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                             from_time_dim=time_dim,
                             time_zone_column="time_zone",
                             scratch_dir_context=scratch_dir_context,
-                            wrap_time_allowed=False,  # LIXI TODO make this a param
+                            wrap_time_allowed=False,
                         )
                     case (BackendEngine.SPARK, False):
-                        filename = persist_intermediate_table(
+                        filename = persist_table(
                             df,
                             scratch_dir_context,
                             tag="project query before time mapping",
@@ -432,7 +428,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                             from_time_dim=time_dim,
                             time_zone_column="time_zone",
                             scratch_dir_context=scratch_dir_context,
-                            wrap_time_allowed=False,  # LIXI TODO make this a param
+                            wrap_time_allowed=False,
                         )
                     case (BackendEngine.DUCKDB, _):
                         df = convert_time_zone_by_column_with_chronify_duckdb(
@@ -441,15 +437,15 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
                             from_time_dim=time_dim,
                             time_zone_column="time_zone",
                             scratch_dir_context=scratch_dir_context,
-                            wrap_time_allowed=False,  # LIXI TODO make this a param
+                            wrap_time_allowed=False,
                         )
 
             else:
                 msg = "time_dim must support Chronify"
-                raise ValueError(msg)
+                raise DSGInvalidParameter(msg)
         else:
             msg = f"Unknown input {model.result.time_zone=}"
-            raise ValueError(msg)
+            raise DSGInvalidParameter(msg)
 
         repartition = not persist_intermediate_table
         table_filename = self._save_query_results(context, df, repartition, zip_file=zip_file)

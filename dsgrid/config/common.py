@@ -7,11 +7,14 @@ from dsgrid.dimension.standard import (
     EnergyEndUse,
     EnergyIntensity,
     EnergyIntensityRegression,
-    EnergyServiceEndUse,
+    EnergyServiceDemand,
+    EnergyServiceDemandRegression,
     FractionalIndex,
     PeggedIndex,
     Population,
     Stock,
+    StockShare,
+    StockRegression,
 )
 from dsgrid.exceptions import DSGInvalidParameter
 
@@ -23,11 +26,14 @@ SUPPORTED_METRIC_TYPES = {
         EnergyEndUse,
         EnergyIntensity,
         EnergyIntensityRegression,
-        EnergyServiceEndUse,
+        EnergyServiceDemand,
+        EnergyServiceDemandRegression,
         FractionalIndex,
         PeggedIndex,
         Population,
         Stock,
+        StockShare,
+        StockRegression,
     )
 }
 

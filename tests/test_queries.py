@@ -147,7 +147,6 @@ def la_expected_electricity_hour_16(tmp_path_factory):
 @pytest.mark.parametrize("category", list(DimensionCategory))
 @pytest.mark.parametrize("to_time_zone", [None, TimeZone.PPT, "geography"])
 def test_electricity_values(category, to_time_zone):
-    # LIXI TODO: test other 3 engine methods
     run_query_test(QueryTestElectricityValues, category, to_time_zone=to_time_zone)
 
 

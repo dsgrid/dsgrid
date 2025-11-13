@@ -102,15 +102,28 @@ class EnergyEndUse(MetricDimensionBaseModel):
     unit: str
 
 
-class EnergyServiceEndUse(MetricDimensionBaseModel):
-    """Energy Service Demand End Use attributes"""
+class EnergyServiceDemand(MetricDimensionBaseModel):
+    """Energy Service Demand attributes"""
 
+    unit: str
+
+
+class EnergyServiceDemandRegression(MetricDimensionBaseModel):
+    """Energy Service Demand, can be per floor area, vehicle, etc., regression
+    over time or other variables
+    """
+
+    regression_type: FunctionalForm = Field(
+        default=FunctionalForm.LINEAR,
+        description="Specifies the functional form of the regression model",
+    )
     unit: str
 
 
 class EnergyEfficiency(MetricDimensionBaseModel):
     """Energy Efficiency of building stock or equipment"""
 
+    fuel_id: str
     unit: str
 
 
@@ -138,6 +151,26 @@ class Population(MetricDimensionBaseModel):
 
 class Stock(MetricDimensionBaseModel):
     """Stock attributes - e.g., GDP, building stock, equipment"""
+
+    unit: str
+
+
+class StockRegression(MetricDimensionBaseModel):
+    """Stock, can be per capita, GDP, etc., regression over time or other variables"""
+
+    regression_type: FunctionalForm = Field(
+        default=FunctionalForm.LINEAR,
+        description="Specifies the functional form of the regression model",
+    )
+    unit: str
+
+
+class StockShare(MetricDimensionBaseModel):
+    """Stock Share attributes - e.g., market share of a technology
+
+    Generally dimensionless, but a unit string can be provided to assist with
+    calculations.
+    """
 
     unit: str
 

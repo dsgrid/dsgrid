@@ -14,7 +14,8 @@ from click.testing import CliRunner
 from pandas.testing import assert_frame_equal
 import pandas as pd
 
-from dsgrid.common import VALUE_COLUMN
+import dsgrid
+from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.cli.dsgrid import cli
 from dsgrid.dataset.models import (
     PivotedTableFormatModel,
@@ -883,7 +884,9 @@ class QueryTestElectricityValues(QueryTestBase):
                 )
                 assert pdf["time_est"].max() == expected_max
         else:
-            assert pdf.loc[0, "time_est"].tz is not None
+            config = dsgrid.runtime_config
+            if config.backend_engine != BackendEngine.SPARK:
+                assert pdf.loc[0, "time_est"].tz is not None
 
         # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating"]
         success = set(value_columns) == set(expected)

@@ -75,7 +75,7 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     check_for_nulls,
     create_dataframe_from_product,
-    persist_intermediate_table,
+    persist_table,
     read_dataframe,
     save_to_warehouse,
     union,
@@ -445,7 +445,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             project_metric_records,
         )
         if op.persist:
-            df = mapping_manager.persist_intermediate_table(df, op)
+            df = mapping_manager.persist_table(df, op)
         return df
 
     def _finalize_table(self, context: QueryContext, df: DataFrame, project_config: ProjectConfig):
@@ -754,7 +754,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     repartition=dim_mapping.handle_data_skew,
                 )
                 if dim_mapping.persist and persisted_file is None:
-                    mapping_manager.persist_intermediate_table(df, dim_mapping)
+                    mapping_manager.persist_table(df, dim_mapping)
                 if persisted_file is not None:
                     mapping_manager.save_checkpoint(persisted_file, dim_mapping)
 
@@ -782,7 +782,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         df = df.groupBy(*ordered_subset_columns(df, gcols)).agg(*agg_ops)
         df = df.drop("fraction")
         if op.persist:
-            df = mapping_manager.persist_intermediate_table(df, op)
+            df = mapping_manager.persist_table(df, op)
         return df
 
     @track_timing(timer_stats_collector)
@@ -849,7 +849,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 )
 
             case (BackendEngine.SPARK, False):
-                filename = persist_intermediate_table(
+                filename = persist_table(
                     load_data_df,
                     mapping_manager.scratch_dir_context,
                     tag="query before time mapping",
@@ -879,7 +879,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             load_data_df = load_data_df.drop("time_zone")
 
         if op.persist:
-            load_data_df = mapping_manager.persist_intermediate_table(load_data_df, op)
+            load_data_df = mapping_manager.persist_table(load_data_df, op)
         return load_data_df
 
     def _validate_daylight_saving_adjustment(self, time_based_data_adjustment):

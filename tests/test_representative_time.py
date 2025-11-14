@@ -46,7 +46,7 @@ from dsgrid.utils.dataset import (
 )
 from dsgrid.utils.spark import (
     get_spark_session,
-    persist_intermediate_table,
+    persist_table,
     read_dataframe,
 )
 
@@ -142,7 +142,7 @@ def test_time_mapping(
             scratch_dir_context,
         )
     else:
-        filename = persist_intermediate_table(
+        filename = persist_table(
             df,
             scratch_dir_context,
             tag="tmp query",

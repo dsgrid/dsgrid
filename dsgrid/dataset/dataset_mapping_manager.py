@@ -64,7 +64,7 @@ class DatasetMappingManager:
         """Return True if the mapping operation has been completed."""
         return op.name in self.get_completed_mapping_operations()
 
-    def persist_intermediate_table(self, df: DataFrame, op: MapOperation) -> DataFrame:
+    def persist_table(self, df: DataFrame, op: MapOperation) -> DataFrame:
         """Persist the intermediate table to the filesystem and return the persisted DataFrame."""
         persisted_file = self._scratch_dir_context.get_temp_filename(
             suffix=".parquet", add_tracked_path=False

@@ -656,16 +656,16 @@ def write_dataframe(df: DataFrame, filename: str | Path, overwrite: bool = False
 
 
 @track_timing(timer_stats_collector)
-def persist_intermediate_table(df: DataFrame, context: ScratchDirContext, tag=None) -> Path:
+def persist_table(df: DataFrame, context: ScratchDirContext, tag=None) -> Path:
     """Persist a table to the scratch directory. This can be helpful to avoid multiple
     evaluations of the same query.
     """
     # Note: This does not use the Spark warehouse because we are not properly configuring or
     # managing it across sessions. And, we are already using the scratch dir for our own files.
     path = context.get_temp_filename(suffix=".parquet")
-    logger.info("Start persist_intermediate_table %s %s", path, tag or "")
+    logger.info("Start persist_table %s %s", path, tag or "")
     write_dataframe(df, path)
-    logger.info("Completed persist_intermediate_table %s %s", path, tag or "")
+    logger.info("Completed persist_table %s %s", path, tag or "")
     return path
 
 

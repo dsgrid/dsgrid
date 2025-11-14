@@ -27,7 +27,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
     def to_chronify(
         self,
     ) -> Union[
-        chronify.IndexTimeRangeTZ, chronify.IndexTimeRangeNTZ, chronify.IndexTimeRangeLocalTime
+        chronify.IndexTimeRangeTZ, chronify.IndexTimeRangeNTZ, chronify.IndexTimeRangeWithTZColumn
     ]:
         time_cols = self.get_load_data_time_columns()
         assert len(self._model.ranges) == 1
@@ -35,7 +35,7 @@ class IndexTimeDimensionConfig(TimeDimensionBaseConfig):
 
         # IndexTimeDimensionModel does not map to IndexTimeRangeNTZ and TZ at the moment
         assert self.get_time_zone() is None
-        config = chronify.IndexTimeRangeLocalTime(
+        config = chronify.IndexTimeRangeWithTZColumn(
             time_column=time_cols[0],
             start=self._model.ranges[0].start,
             length=self.get_lengths()[0],

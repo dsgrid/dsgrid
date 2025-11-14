@@ -89,7 +89,7 @@ from dsgrid.utils.scratch_dir_context import ScratchDirContext
 from dsgrid.utils.spark import (
     models_to_dataframe,
     get_unique_values,
-    persist_intermediate_table,
+    persist_table,
     read_dataframe,
 )
 from dsgrid.utils.utilities import check_uniqueness, display_table
@@ -216,9 +216,9 @@ class ProjectRegistryManager(RegistryManagerBase):
         config.set_dimension_mappings(base_to_supp_mappings)
 
     def _get_subset_dimensions(self, conn: Connection | None, config: ProjectConfig):
-        subset_dimensions: dict[DimensionType, dict[str, dict[ConfigKey, DimensionBaseConfig]]] = (
-            defaultdict(dict)
-        )
+        subset_dimensions: dict[
+            DimensionType, dict[str, dict[ConfigKey, DimensionBaseConfig]]
+        ] = defaultdict(dict)
         for subset_dim in config.model.dimensions.subset_dimensions:
             selectors = {
                 ConfigKey(x.dimension_id, x.version): self._dimension_mgr.get_by_id(
@@ -1434,7 +1434,7 @@ class ProjectRegistryManager(RegistryManagerBase):
             df2 = df
         else:
             # This operation is slow with Spark. Ensure that we only evaluate the query once.
-            df2 = read_dataframe(persist_intermediate_table(df, context, "dimension_associations"))
+            df2 = read_dataframe(persist_table(df, context, "dimension_associations"))
         logger.info("Wrote dimension associations for dataset %s", dataset_id)
         return df2
 

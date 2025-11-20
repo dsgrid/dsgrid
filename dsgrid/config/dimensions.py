@@ -546,8 +546,72 @@ class RepresentativePeriodTimeDimensionModel(TimeDimensionBaseModel):
         return True
 
 
+class LocalTimeDimensionModel(TimeDimensionBaseModel):
+    """Defines a time dimension where timestamps are tz-naive and require localizing to a time zone
+    using a time zone column."""
+
+    time_type: TimeDimensionType = Field(default=TimeDimensionType.INDEX)
+    measurement_type: MeasurementType = Field(
+        title="measurement_type",
+        default=MeasurementType.TOTAL,
+        description="""
+        The type of measurement represented by a value associated with a timestamp:
+            e.g., mean, total
+        """,
+        json_schema_extra={
+            "options": MeasurementType.format_for_docs(),
+        },
+    )
+    ranges: list[TimeRangeModel] = Field(
+        title="time_ranges",
+        description="Defines the continuous ranges of time in the data, inclusive of start and end time. "
+        "If the timestamps are tz-naive, they will be localized to the time zones provided in the geography dimension records.",
+    )
+    frequency: timedelta = Field(
+        title="frequency",
+        description="Resolution of the timestamps for which the ranges represent.",
+    )
+    str_format: str = Field(
+        title="str_format",
+        default="%Y-%m-%d %H:%M:%s",
+        description="Timestamp string format. "
+        "The string format is used to parse the starting timestamp provided. "
+        "Cheatsheet reference: `<https://strftime.org/>`_.",
+    )
+    time_interval_type: TimeIntervalType = Field(
+        title="time_interval",
+        description="The range of time that the value associated with a timestamp represents, e.g., period-beginning",
+        json_schema_extra={
+            "options": TimeIntervalType.format_descriptions_for_docs(),
+        },
+    )
+
+    @field_validator("frequency")
+    @classmethod
+    def check_frequency(cls, frequency: timedelta) -> timedelta:
+        if frequency in [timedelta(days=365), timedelta(days=366)]:
+            msg = (
+                f"{frequency=}, datetime config does not allow 365 or 366 days frequency, "
+                "use class=AnnualTime, time_type=annual to specify a year series."
+            )
+            raise ValueError(msg)
+        return frequency
+
+    @field_validator("ranges")
+    @classmethod
+    def check_times(
+        cls, ranges: list[TimeRangeModel], info: ValidationInfo
+    ) -> list[TimeRangeModel]:
+        if "str_format" not in info.data or "frequency" not in info.data:
+            return ranges
+        return _check_time_ranges(ranges, info.data["str_format"], info.data["frequency"])
+
+    def is_time_zone_required_in_geography(self) -> bool:
+        return True
+
+
 class IndexTimeDimensionModel(TimeDimensionBaseModel):
-    """Defines a time dimension where timestamps are indices."""
+    """Defines a time dimension where timestamps are indices and requires converting to datetime."""
 
     time_type: TimeDimensionType = Field(default=TimeDimensionType.INDEX)
     measurement_type: MeasurementType = Field(

@@ -18,6 +18,7 @@ class TimeDimensionType(DSGEnum):
     DATETIME = "datetime"
     ANNUAL = "annual"
     REPRESENTATIVE_PERIOD = "representative_period"
+    DATETIME_MULTI_TIME_ZONES = "datetime_multi_time_zones"
     INDEX = "index"
     NOOP = "noop"
 

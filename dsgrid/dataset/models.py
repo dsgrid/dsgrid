@@ -1,3 +1,4 @@
+from asyncio.log import logger
 from enum import StrEnum
 from typing import Literal, Union
 
@@ -15,7 +16,11 @@ class TableFormatType(StrEnum):
     UNPIVOTED = "unpivoted"
 
 
-class PivotedTableFormatModel(DSGBaseModel):
+class TableFormatModelBase(DSGBaseModel):
+    format_type: TableFormatType
+
+
+class PivotedTableFormatModel(TableFormatModelBase):
     format_type: Literal[TableFormatType.PIVOTED] = TableFormatType.PIVOTED
     pivoted_dimension_type: DimensionType = Field(
         title="pivoted_dimension_type",
@@ -24,13 +29,16 @@ class PivotedTableFormatModel(DSGBaseModel):
     )
 
 
-class UnpivotedTableFormatModel(DSGBaseModel):
+class UnpivotedTableFormatModel(TableFormatModelBase):
     format_type: Literal[TableFormatType.UNPIVOTED] = TableFormatType.UNPIVOTED
 
     @model_validator(mode="before")
     @classmethod
     def handle_legacy(cls, values: dict) -> dict:
-        values.pop("value_column", None)
+        if "value_column" in values:
+            logger.warning("Removing deprecated value_column field from unpivoted table format.")
+            values.pop("value_column")
+
         return values
 
 

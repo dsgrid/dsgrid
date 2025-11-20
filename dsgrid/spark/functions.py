@@ -295,7 +295,7 @@ def init_spark(name="dsgrid", check_env=True, spark_conf=None) -> SparkSession:
             "produced undesired results.",
             out_ts_type,
         )
-    # conf.set("spark.sql.legacy.parquet.nanosAsLong", "true")
+    conf.set("spark.sql.legacy.parquet.nanosAsLong", "true")
 
     if check_env and cluster is not None:
         logger.info("Create SparkSession %s on existing cluster %s", name, cluster)

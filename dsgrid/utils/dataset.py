@@ -429,7 +429,6 @@ def convert_time_zone_with_chronify_spark_hive(
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark and a Hive Metastore.
-    All operations are performed in memory.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -460,7 +459,6 @@ def convert_time_zone_by_column_with_chronify_spark_hive(
 ) -> DataFrame:
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and Spark and a Hive Metastore.
-    All operations are performed in memory.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -519,7 +517,6 @@ def convert_time_zone_with_chronify_spark_path(
     scratch_dir_context: ScratchDirContext,
 ) -> DataFrame:
     """Create a single time zone-converted table with chronify and Spark using the local filesystem.
-    All operations are performed in memory.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)
@@ -546,7 +543,6 @@ def convert_time_zone_by_column_with_chronify_spark_path(
 ) -> DataFrame:
     """Create a multiple time zone-converted table (based on a time_zone_column)
     using chronify and Spark using the local filesystem.
-    All operations are performed in memory.
     """
     src_schema = _get_src_schema(df, value_column, from_time_dim)
     store = chronify.Store.create_new_hive_store(dsgrid.runtime_config.thrift_server_url)

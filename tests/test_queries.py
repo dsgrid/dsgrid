@@ -7,12 +7,15 @@ import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import pytest
 from click.testing import CliRunner
 from pandas.testing import assert_frame_equal
+import pandas as pd
 
-from dsgrid.common import VALUE_COLUMN
+import dsgrid
+from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.cli.dsgrid import cli
 from dsgrid.dataset.models import (
     PivotedTableFormatModel,
@@ -79,6 +82,7 @@ from dsgrid.tests.utils import read_parquet
 from dsgrid.utils.files import load_data, dump_data
 from dsgrid.utils.spark import custom_time_zone
 from .simple_standard_scenarios_datasets import REGISTRY_PATH, load_dataset_stats
+from dsgrid.dimension.time import TimeZone
 
 
 DIMENSION_MAPPING_SCHEMA = StructType(
@@ -142,8 +146,9 @@ def la_expected_electricity_hour_16(tmp_path_factory):
 
 
 @pytest.mark.parametrize("category", list(DimensionCategory))
-def test_electricity_values(category):
-    run_query_test(QueryTestElectricityValues, category)
+@pytest.mark.parametrize("to_time_zone", [None, TimeZone.PPT, "geography"])
+def test_electricity_values(category, to_time_zone):
+    run_query_test(QueryTestElectricityValues, category, to_time_zone=to_time_zone)
 
 
 @pytest.mark.parametrize(
@@ -640,14 +645,16 @@ def shutdown_project():
             spark.stop()
 
 
-def run_query_test(test_query_cls, *args, expected_values=None):
+def run_query_test(test_query_cls, *args, expected_values=None, to_time_zone=None):
     output_dir = Path(tempfile.gettempdir()) / "queries"
     if output_dir.exists():
         shutil.rmtree(output_dir)
 
     project = get_project(test_query_cls.get_db_connection(), test_query_cls.get_project_id())
     try:
-        query = test_query_cls(*args, REGISTRY_PATH, project, output_dir=output_dir)
+        query = test_query_cls(
+            *args, REGISTRY_PATH, project, output_dir=output_dir, to_time_zone=to_time_zone
+        )
         for load_cached_table in (False, True):
             ProjectQuerySubmitter(project, output_dir).submit(
                 query.make_query(),
@@ -673,12 +680,14 @@ class QueryTestBase(abc.ABC):
         registry_path,
         project,
         output_dir=Path("queries"),
+        to_time_zone=None,
     ):
         self._registry_path = Path(registry_path)
         self._project = project
         self._output_dir = Path(output_dir)
         self._model = None
         self._cached_stats = None
+        self._to_time_zone = to_time_zone
 
     @staticmethod
     def get_db_connection() -> DatabaseConnection:
@@ -807,6 +816,7 @@ class QueryTestElectricityValues(QueryTestBase):
             result=QueryResultParamsModel(
                 replace_ids_with_names=True,
                 table_format=UnpivotedTableFormatModel(),
+                time_zone=self._to_time_zone,
             ),
         )
         match self._category:
@@ -853,8 +863,33 @@ class QueryTestElectricityValues(QueryTestBase):
         non_value_columns.update({"id", "timestamp"})
         value_columns = sorted((x for x in df.columns if x not in non_value_columns))
         expected = [VALUE_COLUMN]
+
+        pdf = df.toPandas()
+        # Check time zone conversion
+        if self._model.result.time_zone:
+            expected.append("time_zone")
+            if isinstance(self._model.result.time_zone, TimeZone):
+                assert set(pdf["time_zone"]) == {self._model.result.time_zone.tz_name}
+                assert pdf.loc[0, "time_est"].tz is None
+                expected_min = (
+                    pd.Timestamp("2012-01-01", tz=ZoneInfo("EST"))
+                    .tz_convert(self._to_time_zone.tz)
+                    .tz_localize(None)
+                )
+                assert pdf["time_est"].min() == expected_min
+                expected_max = (
+                    pd.Timestamp("2012-12-31 23:00", tz=ZoneInfo("EST"))
+                    .tz_convert(self._to_time_zone.tz)
+                    .tz_localize(None)
+                )
+                assert pdf["time_est"].max() == expected_max
+        else:
+            config = dsgrid.runtime_config
+            if config.backend_engine != BackendEngine.SPARK:
+                assert pdf.loc[0, "time_est"].tz is not None
+
         # expected = ["electricity_cooling", "electricity_ev_l1l2", "electricity_heating"]
-        success = value_columns == expected
+        success = set(value_columns) == set(expected)
         if not success:
             logger.error("Mismatch in columns: actual=%s expected=%s", value_columns, expected)
         if not df.select("county").distinct().filter(f"county == '{county_name}'").collect():
@@ -870,6 +905,7 @@ class QueryTestElectricityValues(QueryTestBase):
             expected = self.get_raw_stats()["by_county"][county]["comstock_resstock"]["sum"]
             assert math.isclose(total_cooling, expected["electricity_cooling"])
             assert math.isclose(total_heating, expected["electricity_heating"])
+
         return success
 
 

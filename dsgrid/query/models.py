@@ -30,6 +30,7 @@ from dsgrid.query.dataset_mapping_plan import (
 )
 from dsgrid.spark.types import F
 from dsgrid.utils.files import compute_hash
+from dsgrid.dimension.time import TimeZone
 
 
 DimensionFilters: TypeAlias = Annotated[
@@ -527,8 +528,10 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         default=[],
     )
     # TODO #205: implement
-    time_zone: str | None = Field(
-        description="Convert the results to this time zone.",
+    time_zone: TimeZone | Literal["geography"] | None = Field(
+        description="Convert the results to this time zone. If 'geography', use the time zone "
+        "of the geography dimension. The resulting time column will be time zone-naive with "
+        "time zone recorded in a separate column.",
         default=None,
     )
 

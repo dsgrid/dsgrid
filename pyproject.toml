@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
 
 [project]
 name = "dsgrid-toolkit"
@@ -66,14 +66,11 @@ GitHub = "https://github.com/dsgrid/dsgrid"
 Documentation = "https://dsgrid.github.io/dsgrid/"
 Homepage = "https://www.nrel.gov/analysis/dsgrid"
 
-[tool.hatch.version]
-path = "dsgrid/__init__.py"
-
-[tool.hatch.build.targets.sdist]
-packages = ["dsgrid"]
-
-[tool.hatch.build.targets.wheel]
-packages = ["dsgrid"]
+[tool.maturin]
+module-name = "dsgrid.minimal_patterns"
+python-source = "."
+features = ["pyo3/extension-module"]
+manifest-path = "rust/Cargo.toml"
 
 [tool.hatch.metadata]
 allow-direct-references = true

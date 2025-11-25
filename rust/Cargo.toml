@@ -1,0 +1,17 @@
+[package]
+name = "dsgrid-patterns"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "minimal_patterns"
+crate-type = ["cdylib"]
+
+[dependencies]
+pyo3 = { version = "0.22", features = ["extension-module"] }
+arrow2 = { version = "0.18", features = ["io_parquet"] }
+parquet2 = "0.17"
+roaring = "0.10"
+rayon = "1.8"
+ahash = "0.8"
+anyhow = "1.0"

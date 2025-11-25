@@ -136,7 +136,7 @@ def register_dataset(setup_registry):
 #     finally:
 #         shutil.rmtree(test_dir)
 #         missing_record_file = Path(
-#             f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
+#             f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.parquet"
 #         )
 #         delete_if_exists(missing_record_file)
 
@@ -329,7 +329,7 @@ def test_recovery_dataset_registration_failure_recovery(setup_registry_single):
     finally:
         shutil.rmtree(test_dir)
         missing_record_file = Path(
-            f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.csv"
+            f"{dataset_id}__{PROJECT_ID}__missing_dimension_record_combinations.parquet"
         )
         delete_if_exists(missing_record_file)
 

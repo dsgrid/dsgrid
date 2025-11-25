@@ -1,0 +1,6 @@
+<map id="Entity Relationship Diagram created by erdantic" name="Entity Relationship Diagram created by erdantic">
+<area shape="rect" id="node1" title="dsgrid.query.models.SparkConfByDataset
+
+Defines a custom Spark configuration to use while running a query on a dataset.
+" alt="" coords="5,5,192,89"/>
+</map>

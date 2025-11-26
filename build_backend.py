@@ -4,11 +4,9 @@ This allows `pip install -e .` to succeed even without a Rust toolchain installe
 while still building the Rust extension when building wheels for distribution.
 """
 
-import logging
 import shutil
 import sys
-
-logger = logging.getLogger(__name__)
+import warnings
 
 # Check if Rust toolchain is available
 RUST_AVAILABLE = shutil.which("cargo") is not None
@@ -16,16 +14,21 @@ RUST_AVAILABLE = shutil.which("cargo") is not None
 
 def _warn_no_rust():
     """Warn that Rust extension will not be built."""
-    logger.warning(
+    msg = (
         "Rust toolchain (cargo) not found. The dsgrid Rust extension (minimal_patterns) "
         "will not be built. Some functionality will be unavailable. "
         "To build the Rust extension, install Rust from https://rustup.rs/"
     )
-    # Also print to stderr for visibility during pip install
-    print(
-        "WARNING: Rust toolchain not found. Building without Rust extension.",
-        file=sys.stderr,
-    )
+    # Use warnings module - this is typically shown by pip
+    warnings.warn(msg, UserWarning, stacklevel=2)
+    # Also print directly to stderr for visibility
+    print(f"\n{'='*70}", file=sys.stderr)
+    print("WARNING: Rust toolchain not found.", file=sys.stderr)
+    print("Building dsgrid without Rust extension (minimal_patterns).", file=sys.stderr)
+    print("Some functionality will be unavailable.", file=sys.stderr)
+    print(f"{'='*70}\n", file=sys.stderr)
+    # Flush to ensure it appears
+    sys.stderr.flush()
 
 
 # For wheel builds (CI), always use maturin

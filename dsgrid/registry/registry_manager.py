@@ -159,6 +159,14 @@ class RegistryManager:
         """Dispose the database engine and release all connections."""
         self._db.dispose()
 
+    def __enter__(self) -> "RegistryManager":
+        """Enter context manager."""
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        """Exit context manager and dispose resources."""
+        self.dispose()
+
     @property
     def dataset_manager(self) -> DatasetRegistryManager:
         """Return the dataset manager."""

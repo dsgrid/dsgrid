@@ -47,11 +47,10 @@ logger = logging.getLogger(__name__)
 @pytest.fixture
 def project():
     conn = DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB)
-    registry_mgr = RegistryManager.load(conn, offline_mode=True)
-    project_id = "dsgrid_conus_2022"
-    project = registry_mgr.project_manager.load_project(project_id)
-    yield project
-    registry_mgr.dispose()
+    with RegistryManager.load(conn, offline_mode=True) as registry_mgr:
+        project_id = "dsgrid_conus_2022"
+        project = registry_mgr.project_manager.load_project(project_id)
+        yield project
 
 
 @pytest.fixture

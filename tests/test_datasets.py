@@ -36,34 +36,30 @@ PROJECT_ID = "test_efs"
 DATASET_ID = "test_efs_comstock"
 
 
-def make_registry(base_dir, test_project_dir, test_data_dir):
-    if DATASET_ID not in os.listdir(test_data_dir):
-        logger.error("test_invalid_datasets requires the dsgrid-test-data repository")
-        sys.exit(1)
-
-    manager = make_test_data_registry(
-        base_dir,
-        test_project_dir,
-        dataset_path=test_data_dir,
-        include_datasets=False,
-        database_url=f"sqlite:///{base_dir}/registry.db",
-    )
-    dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
-    assert dataset_config_path.exists()
-    dataset_config_file = dataset_config_path / "dataset.json5"
-    mappings = map_dimension_names_to_ids(manager.dimension_manager)
-    replace_dimension_names_with_current_ids(dataset_config_file, mappings)
-    return manager, dataset_config_path
-
-
 @pytest.fixture(scope="module")
 def setup_registry(tmp_path_factory, make_test_project_dir_module, make_test_data_dir_module):
     """Tests that don't successfully register the dataset can share this fixture."""
     base_dir = tmp_path_factory.mktemp("dsgrid")
     test_project_dir = make_test_project_dir_module
     test_data_dir = make_test_data_dir_module
-    manager, dataset_config_path = make_registry(base_dir, test_project_dir, test_data_dir)
-    yield manager, base_dir, dataset_config_path, test_data_dir
+
+    if DATASET_ID not in os.listdir(test_data_dir):
+        logger.error("test_invalid_datasets requires the dsgrid-test-data repository")
+        sys.exit(1)
+
+    with make_test_data_registry(
+        base_dir,
+        test_project_dir,
+        dataset_path=test_data_dir,
+        include_datasets=False,
+        database_url=f"sqlite:///{base_dir}/registry.db",
+    ) as manager:
+        dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
+        assert dataset_config_path.exists()
+        dataset_config_file = dataset_config_path / "dataset.json5"
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(dataset_config_file, mappings)
+        yield manager, base_dir, dataset_config_path, test_data_dir
 
 
 @pytest.fixture(scope="function")
@@ -72,8 +68,24 @@ def setup_registry_single(tmp_path_factory, make_test_project_dir, make_test_dat
     base_dir = tmp_path_factory.mktemp("dsgrid")
     test_project_dir = make_test_project_dir
     test_data_dir = make_test_data_dir
-    manager, dataset_config_path = make_registry(base_dir, test_project_dir, test_data_dir)
-    yield manager, base_dir, dataset_config_path, test_data_dir
+
+    if DATASET_ID not in os.listdir(test_data_dir):
+        logger.error("test_invalid_datasets requires the dsgrid-test-data repository")
+        sys.exit(1)
+
+    with make_test_data_registry(
+        base_dir,
+        test_project_dir,
+        dataset_path=test_data_dir,
+        include_datasets=False,
+        database_url=f"sqlite:///{base_dir}/registry.db",
+    ) as manager:
+        dataset_config_path = test_project_dir / "datasets" / "modeled" / "comstock"
+        assert dataset_config_path.exists()
+        dataset_config_file = dataset_config_path / "dataset.json5"
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(dataset_config_file, mappings)
+        yield manager, base_dir, dataset_config_path, test_data_dir
 
 
 @pytest.fixture

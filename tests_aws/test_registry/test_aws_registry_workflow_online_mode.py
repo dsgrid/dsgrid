@@ -33,32 +33,32 @@ def test_aws_registry_workflow_online_mode(make_test_project_dir, make_test_data
             clean_remote_registry(s3_cloud_storage._s3_filesystem)
             create_empty_remote_registry(s3_cloud_storage._s3_filesystem)
 
-            manager = make_test_data_registry(
+            with make_test_data_registry(
                 base_dir,
                 make_test_project_dir,
                 dataset_path=make_test_data_dir,
                 include_datasets=True,
                 offline_mode=False,
-            )
-            dataset_dir = make_test_project_dir / "datasets" / "modeled" / "comstock"
-            assert dataset_dir.exists()
-            dimension_mapping_refs = dataset_dir / "dimension_mapping_references.json5"
-            assert dimension_mapping_refs.exists()
+            ) as manager:
+                dataset_dir = make_test_project_dir / "datasets" / "modeled" / "comstock"
+                assert dataset_dir.exists()
+                dimension_mapping_refs = dataset_dir / "dimension_mapping_references.json5"
+                assert dimension_mapping_refs.exists()
 
-            # TODO: finish workflow when ready (submit dataset)
+                # TODO: finish workflow when ready (submit dataset)
 
-            # check that we didn't push unexpected things...
-            s3 = manager.dimension_manager.cloud_interface._s3_filesystem
-            assert s3.listdir("") == ["configs", "data"]
-            check_configs_dimensions(s3)
-            check_configs_dimension_mappings(s3)
-            check_configs_projects_and_datasets(s3)
-            check_data(s3)
-            updated_ids = check_configs_update(base_dir, manager)
-            check_dimension_version(s3, *updated_ids[0])
-            check_dimension_mapping_version(s3, *updated_ids[1])
-            check_dataset_version(s3, *updated_ids[2])
-            check_project_version(s3, *updated_ids[3])
+                # check that we didn't push unexpected things...
+                s3 = manager.dimension_manager.cloud_interface._s3_filesystem
+                assert s3.listdir("") == ["configs", "data"]
+                check_configs_dimensions(s3)
+                check_configs_dimension_mappings(s3)
+                check_configs_projects_and_datasets(s3)
+                check_data(s3)
+                updated_ids = check_configs_update(base_dir, manager)
+                check_dimension_version(s3, *updated_ids[0])
+                check_dimension_mapping_version(s3, *updated_ids[1])
+                check_dataset_version(s3, *updated_ids[2])
+                check_project_version(s3, *updated_ids[3])
     finally:
         clean_remote_registry(s3_cloud_storage._s3_filesystem)
 

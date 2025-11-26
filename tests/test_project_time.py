@@ -50,7 +50,8 @@ def project():
     registry_mgr = RegistryManager.load(conn, offline_mode=True)
     project_id = "dsgrid_conus_2022"
     project = registry_mgr.project_manager.load_project(project_id)
-    return project
+    yield project
+    registry_mgr.dispose()
 
 
 @pytest.fixture

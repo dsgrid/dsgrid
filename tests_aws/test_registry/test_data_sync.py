@@ -25,43 +25,46 @@ from dsgrid.tests.make_us_data_registry import make_test_data_registry
 def local_registry(make_test_project_dir):
     with TemporaryDirectory() as tmpdir:
         base_dir = Path(tmpdir)
-        make_test_data_registry(str(base_dir), make_test_project_dir, TEST_DATASET_DIRECTORY)
+        with make_test_data_registry(str(base_dir), make_test_project_dir, TEST_DATASET_DIRECTORY):
+            # create resstock data
+            shutil.copytree(
+                base_dir / "data" / "test_efs_comstock", base_dir / "data" / "test_efs_resstock"
+            )
+            with open(base_dir / "data" / "test_efs_resstock" / "registry.json5") as f:
+                registry_json5 = json5.load(f)
+            registry_json5["dataset_id"] = "test_efs_resstock"
+            with open(base_dir / "data" / "test_efs_resstock" / "registry.json5", "w") as f:
+                json5.dump(registry_json5, f)
 
-        # create resstock data
-        shutil.copytree(
-            base_dir / "data" / "test_efs_comstock", base_dir / "data" / "test_efs_resstock"
-        )
-        with open(base_dir / "data" / "test_efs_resstock" / "registry.json5") as f:
-            registry_json5 = json5.load(f)
-        registry_json5["dataset_id"] = "test_efs_resstock"
-        with open(base_dir / "data" / "test_efs_resstock" / "registry.json5", "w") as f:
-            json5.dump(registry_json5, f)
+            # create resstock dataset config
+            shutil.copytree(
+                base_dir / "configs" / "datasets" / "test_efs_comstock",
+                base_dir / "configs" / "datasets" / "test_efs_resstock",
+            )
+            with open(
+                base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.json5"
+            ) as f:
+                registry_json5 = json5.load(f)
+            registry_json5["dataset_id"] = "test_efs_resstock"
+            with open(
+                base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.json5", "w"
+            ) as f:
+                json5.dump(registry_json5, f)
 
-        # create resstock dataset config
-        shutil.copytree(
-            base_dir / "configs" / "datasets" / "test_efs_comstock",
-            base_dir / "configs" / "datasets" / "test_efs_resstock",
-        )
-        with open(base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.json5") as f:
-            registry_json5 = json5.load(f)
-        registry_json5["dataset_id"] = "test_efs_resstock"
-        with open(
-            base_dir / "configs" / "datasets" / "test_efs_resstock" / "registry.json5", "w"
-        ) as f:
-            json5.dump(registry_json5, f)
+            # add ressotck dataset to the project config
+            with open(
+                base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.json5"
+            ) as f:
+                registry_json5 = json5.load(f)
+            x = registry_json5["datasets"][0].copy()
+            x["dataset_id"] = "test_efs_resstock"
+            registry_json5["datasets"] = [registry_json5["datasets"][0], x]
+            with open(
+                base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.json5", "w"
+            ) as f:
+                json5.dump(registry_json5, f)
 
-        # add ressotck dataset to the project config
-        with open(base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.json5") as f:
-            registry_json5 = json5.load(f)
-        x = registry_json5["datasets"][0].copy()
-        x["dataset_id"] = "test_efs_resstock"
-        registry_json5["datasets"] = [registry_json5["datasets"][0], x]
-        with open(
-            base_dir / "configs" / "projects" / "test_efs" / "1.1.0" / "project.json5", "w"
-        ) as f:
-            json5.dump(registry_json5, f)
-
-        yield base_dir
+            yield base_dir
 
 
 def test_data_sync_project_id(local_registry):

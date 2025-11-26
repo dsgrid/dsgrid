@@ -217,33 +217,33 @@ def make_projection_df(aeo, ld_df, join_columns):
 
 def build_tempo():
     conn = DatabaseConnection(database="simple-standard-scenarios")
-    mgr = RegistryManager.load(
+    with RegistryManager.load(
         conn,
         offline_mode=True,
-    )
-    project = mgr.project_manager.load_project("dsgrid_conus_2022")
-    dataset_id = "tempo_conus_2022"
-    project.load_dataset(dataset_id)
-    tempo = project.get_dataset(dataset_id)
-    lookup = tempo._handler._load_data_lookup
-    load_data = tempo._handler._load_data
-    value_columns = tempo._handler.config.get_value_columns()
-    assert len(value_columns) == 1
-    value_column = next(iter(value_columns))
-    input_dataset = project.config.get_dataset(tempo._config.model.dataset_id)
-    plan = tempo._handler.build_default_dataset_mapping_plan()
-    context = ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir())
-    with DatasetMappingManager(tempo._handler.dataset_id, plan, context) as mgr:
-        tempo_data_mapped_time = tempo._handler._convert_time_dimension(
-            load_data_df=load_data.join(lookup, on="id").drop("id"),
-            to_time_dim=project.config.get_base_time_dimension(),
-            mapping_manager=mgr,
-            value_column=value_column,
-            wrap_time_allowed=input_dataset.wrap_time_allowed,
-            time_based_data_adjustment=input_dataset.time_based_data_adjustment,
-            to_geo_dim=project.config.get_base_dimension(DimensionType.GEOGRAPHY),
-        )
-        return tempo_data_mapped_time
+    ) as registry_mgr:
+        project = registry_mgr.project_manager.load_project("dsgrid_conus_2022")
+        dataset_id = "tempo_conus_2022"
+        project.load_dataset(dataset_id)
+        tempo = project.get_dataset(dataset_id)
+        lookup = tempo._handler._load_data_lookup
+        load_data = tempo._handler._load_data
+        value_columns = tempo._handler.config.get_value_columns()
+        assert len(value_columns) == 1
+        value_column = next(iter(value_columns))
+        input_dataset = project.config.get_dataset(tempo._config.model.dataset_id)
+        plan = tempo._handler.build_default_dataset_mapping_plan()
+        context = ScratchDirContext(DsgridRuntimeConfig.load().get_scratch_dir())
+        with DatasetMappingManager(tempo._handler.dataset_id, plan, context) as mapping_mgr:
+            tempo_data_mapped_time = tempo._handler._convert_time_dimension(
+                load_data_df=load_data.join(lookup, on="id").drop("id"),
+                to_time_dim=project.config.get_base_time_dimension(),
+                mapping_manager=mapping_mgr,
+                value_column=value_column,
+                wrap_time_allowed=input_dataset.wrap_time_allowed,
+                time_based_data_adjustment=input_dataset.time_based_data_adjustment,
+                to_geo_dim=project.config.get_base_dimension(DimensionType.GEOGRAPHY),
+            )
+            return tempo_data_mapped_time
 
 
 def generate_raw_stats(datasets):

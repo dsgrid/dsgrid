@@ -619,11 +619,16 @@ def test_dataset_queries(tmp_path):
 
 
 _projects = {}
+_managers = {}
 
 
 def get_project(conn: DatabaseConnection, project_id: str):
     """Load a Project and cache it for future calls.
     Loading is slow and the Project isn't being changed by these tests.
+
+    Note: This function uses manual dispose() via shutdown_project() instead of
+    context managers because the managers need to persist across multiple test calls.
+    The cached managers are cleaned up in shutdown_project().
     """
     key = (conn.url, project_id)
     if key in _projects:
@@ -632,6 +637,7 @@ def get_project(conn: DatabaseConnection, project_id: str):
         conn,
         offline_mode=True,
     )
+    _managers[key] = mgr
     _projects[key] = mgr.project_manager.load_project(project_id)
     return _projects[key]
 
@@ -639,6 +645,9 @@ def get_project(conn: DatabaseConnection, project_id: str):
 def shutdown_project():
     """Shutdown a project and stop the SparkSession so that another process can create one."""
     _projects.clear()
+    for mgr in _managers.values():
+        mgr.dispose()
+    _managers.clear()
     if not use_duckdb():
         spark = SparkSession.getActiveSession()
         if spark is not None:
@@ -1953,29 +1962,29 @@ def run_composite_dataset(
         "dsgrid", "query.log", console_level=logging.INFO, file_level=logging.INFO, mode="w"
     )
     conn = DatabaseConnection(url=SIMPLE_STANDARD_SCENARIOS_REGISTRY_DB)
-    mgr = RegistryManager.load(
+    with RegistryManager.load(
         conn,
         offline_mode=True,
-    )
-    project = mgr.project_manager.load_project("dsgrid_conus_2022")
-    query = QueryTestElectricityValuesCompositeDataset(
-        registry_path, project, output_dir=output_dir
-    )
-    CompositeDatasetQuerySubmitter(project, output_dir).create_dataset(
-        query.make_query(),
-        persist_intermediate_table=persist_intermediate_table,
-        load_cached_table=load_cached_table,
-    )
-    assert query.validate()
+    ) as mgr:
+        project = mgr.project_manager.load_project("dsgrid_conus_2022")
+        query = QueryTestElectricityValuesCompositeDataset(
+            registry_path, project, output_dir=output_dir
+        )
+        CompositeDatasetQuerySubmitter(project, output_dir).create_dataset(
+            query.make_query(),
+            persist_intermediate_table=persist_intermediate_table,
+            load_cached_table=load_cached_table,
+        )
+        assert query.validate()
 
-    query2 = QueryTestElectricityValuesCompositeDatasetAgg(
-        registry_path, project, output_dir=output_dir, geography="county"
-    )
-    CompositeDatasetQuerySubmitter(project, output_dir).submit(query2.make_query())
-    assert query2.validate()
+        query2 = QueryTestElectricityValuesCompositeDatasetAgg(
+            registry_path, project, output_dir=output_dir, geography="county"
+        )
+        CompositeDatasetQuerySubmitter(project, output_dir).submit(query2.make_query())
+        assert query2.validate()
 
-    query3 = QueryTestElectricityValuesCompositeDatasetAgg(
-        registry_path, project, output_dir=output_dir, geography="state"
-    )
-    CompositeDatasetQuerySubmitter(project, output_dir).submit(query3.make_query())
-    assert query3.validate()
+        query3 = QueryTestElectricityValuesCompositeDatasetAgg(
+            registry_path, project, output_dir=output_dir, geography="state"
+        )
+        CompositeDatasetQuerySubmitter(project, output_dir).submit(query3.make_query())
+        assert query3.validate()

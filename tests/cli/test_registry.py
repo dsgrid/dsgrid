@@ -55,9 +55,9 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0
     conn = DatabaseConnection(url=url)
-    manager = RegistryManager.load(conn, offline_mode=True)
-    mappings = map_dimension_names_to_ids(manager.dimension_manager)
-    replace_dimension_names_with_current_ids(project_dimension_mapping_config, mappings)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(project_dimension_mapping_config, mappings)
 
     # Registering duplicates is allowed.
     result = runner.invoke(cli, cmd)
@@ -119,9 +119,9 @@ def test_register_project_and_dataset(tmp_registry_db):
     )
     assert result.exit_code == 0
     conn = DatabaseConnection(url=url)
-    manager = RegistryManager.load(conn, offline_mode=True)
-    mappings = map_dimension_names_to_ids(manager.dimension_manager)
-    replace_dimension_names_with_current_ids(dataset_config, mappings)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(dataset_config, mappings)
     cmd = [
         "--url",
         url,
@@ -150,8 +150,9 @@ def test_register_project_and_dataset(tmp_registry_db):
     regex_dataset = re.compile(rf"{dataset_id}.*1\.0\.0")
     assert regex_project.search(result.stdout) is not None, result.stdout
     assert regex_dataset.search(result.stdout) is not None, result.stdout
-    dim_id = manager.dimension_manager.list_ids()[0]
-    dim_map_id = manager.dimension_mapping_manager.list_ids()[0]
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        dim_id = manager.dimension_manager.list_ids()[0]
+        dim_map_id = manager.dimension_mapping_manager.list_ids()[0]
 
     result = runner.invoke(
         admin_cli,
@@ -272,11 +273,11 @@ def test_register_dsgrid_projects(tmp_registry_db):
         assert result.exit_code == 0
 
     conn = DatabaseConnection(url=url)
-    manager = RegistryManager.load(conn, offline_mode=True)
-    project = manager.project_manager.load_project("US_DOE_IEF_2023")
-    config = project.config
-    context = ScratchDirContext(tmpdir)
-    config.make_dimension_association_table("ief_2023_transport", context)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        project = manager.project_manager.load_project("US_DOE_IEF_2023")
+        config = project.config
+        context = ScratchDirContext(tmpdir)
+        config.make_dimension_association_table("ief_2023_transport", context)
 
 
 def test_bulk_register(tmp_registry_db):

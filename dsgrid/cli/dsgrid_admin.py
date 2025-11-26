@@ -330,9 +330,8 @@ def make_filtered_registry(
         mode=mode,
         force=overwrite,
     )
-    mgr = FilterRegistryManager.load(dst_conn, offline_mode=True, use_remote_data=False)
-    mgr.filter(simple_model=simple_model)
-    mgr.dispose()
+    with FilterRegistryManager.load(dst_conn, offline_mode=True, use_remote_data=False) as mgr:
+        mgr.filter(simple_model=simple_model)
 
 
 cli.add_command(registry)

@@ -55,6 +55,10 @@ class RegistryDatabase:
         self._engine = engine
         self._data_store = data_store
 
+    def dispose(self) -> None:
+        """Dispose the database engine and release all connections."""
+        self._engine.dispose()
+
     @classmethod
     def create(
         cls,
@@ -212,6 +216,7 @@ class RegistryDatabase:
                 dst_conn_.execute(stmt)
 
         logger.info("Copied database %s to %s", src_conn.url, dst_conn.url)
+        dst.dispose()
         return dst
 
     @staticmethod

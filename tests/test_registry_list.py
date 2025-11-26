@@ -15,6 +15,7 @@ def load_registry_manager(cached_registry):
         no_prompts=True,
     )
     yield conn, manager
+    manager.dispose()
 
 
 def test_registry_list_all(load_registry_manager):

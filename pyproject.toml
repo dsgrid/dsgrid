@@ -1,13 +1,13 @@
 [build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.0,<2.0", "setuptools>=61.0"]
+build-backend = "build_backend"
+backend-path = ["."]
 
 [project]
 name = "dsgrid-toolkit"
 dynamic = ["version"]
-copyright = "Copyright 2025, The Alliance for Sustainable Energy, LLC"
+# Note: 'copyright', 'url', 'include_package_data' moved to [tool.dsgrid] for setuptools compatibility
 description = "Python API for accessing demand-side grid model (dsgrid) datasets"
-url = "https://github.com/dsgrid/dsgrid"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 readme = "README.md"
@@ -19,7 +19,6 @@ authors = [
     {name = "Daniel Thom", email = "daniel.thom@nrel.gov"},
 ]
 maintainers = [{name = "Elaine Hale", email = "elaine.hale@nrel.gov"}]
-include_package_data = false
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
@@ -66,14 +65,26 @@ GitHub = "https://github.com/dsgrid/dsgrid"
 Documentation = "https://dsgrid.github.io/dsgrid/"
 Homepage = "https://www.nrel.gov/analysis/dsgrid"
 
-[tool.hatch.version]
-path = "dsgrid/__init__.py"
+[tool.maturin]
+module-name = "dsgrid.minimal_patterns"
+python-source = "."
+features = ["pyo3/extension-module"]
+manifest-path = "rust/Cargo.toml"
 
-[tool.hatch.build.targets.sdist]
-packages = ["dsgrid"]
+[tool.setuptools]
+# Used as fallback when Rust toolchain is not available
+include-package-data = false
 
-[tool.hatch.build.targets.wheel]
-packages = ["dsgrid"]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dsgrid*"]
+
+[tool.setuptools.dynamic]
+version = {attr = "dsgrid.__version__"}
+
+[tool.dsgrid]
+# Metadata that isn't part of PEP 621 standard
+copyright = "Copyright 2025, The Alliance for Sustainable Energy, LLC"
 
 [tool.hatch.metadata]
 allow-direct-references = true

@@ -37,7 +37,8 @@ def create_local_test_registry(
     if conn is None:
         conn = DatabaseConnection(url=f"sqlite:///{tmpdir}/dsgrid-test.db")
     data_path = tmpdir / "registry_data"
-    RegistryManager.create(conn, data_path, data_store_type=data_store_type, overwrite=True)
+    mgr = RegistryManager.create(conn, data_path, data_store_type=data_store_type, overwrite=True)
+    mgr.dispose()
     return data_path
 
 

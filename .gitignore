@@ -158,3 +158,10 @@ metastore_db
 __dsgrid_scratch__
 *.tgz
 *.db
+
+# Rust / Cargo
+rust/target/
+rust/Cargo.lock
+**/*.rs.bk
+*.pyd
+*.pyo

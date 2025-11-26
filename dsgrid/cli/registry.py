@@ -1362,7 +1362,7 @@ def list_datasets(registry_manager, filter):
 
 _register_dataset_epilog = """
 Examples:\n
-$ dsgrid registry datasets register dataset.json5 -l "Register dataset my-dataset-id."\n
+$ dsgrid registry datasets register dataset.json5 /path/to/dataset-directory -l "Register dataset my-dataset-id."\n
 """
 
 

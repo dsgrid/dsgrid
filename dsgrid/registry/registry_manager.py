@@ -48,6 +48,7 @@ class RegistryManager:
     """Manages registration of all projects and datasets."""
 
     def __init__(self, params: RegistryManagerParams, db: RegistryDatabase):
+        self._db = db
         self._data_store = db.data_store
         self._check_environment_variables(params)
         if get_active_session() is None:
@@ -153,6 +154,10 @@ class RegistryManager:
             conn, data_path, data_store_type=data_store_type, overwrite=overwrite
         )
         return cls(params, db)
+
+    def dispose(self) -> None:
+        """Dispose the database engine and release all connections."""
+        self._db.dispose()
 
     @property
     def dataset_manager(self) -> DatasetRegistryManager:
@@ -415,6 +420,7 @@ class RegistryManager:
         """
         src_db = RegistryDatabase.connect(src)
         src_data_path = src_db.get_data_path()
+        src_db.engine.dispose()
         # TODO: This does not support the duckdb data store. Need to implement this copy operation
         # in the DataStoreInterface.
         if not {x.name for x in src_data_path.iterdir()}.issuperset({"data"}):

@@ -15,11 +15,20 @@ jobs:
             python-version: "3.13"
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
+
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v6
       with:
         python-version: ${{ matrix.python-version }}
+
+    - name: Cache Spark
+      id: cache-spark
+      uses: actions/cache@v4
+      with:
+        path: spark-4.0.0-bin-hadoop3
+        key: spark-4.0.0-bin-hadoop3
+
     - name: Install dependencies
       run: |
         python -m venv .venv
@@ -27,10 +36,19 @@ jobs:
         pip install --upgrade pip
         pip install maturin
         pip install -e '.[dev,spark]' --group=pyhive
-        wget https://archive.apache.org/dist/spark/spark-4.0.0/spark-4.0.0-bin-hadoop3.tgz
-        tar -xzf spark-4.0.0-bin-hadoop3.tgz
+
+        # Only download if cache miss
+        if [ ! -d "spark-4.0.0-bin-hadoop3" ]; then
+          echo "Spark cache missed, downloading..."
+          wget -q https://archive.apache.org/dist/spark/spark-4.0.0/spark-4.0.0-bin-hadoop3.tgz
+          tar -xzf spark-4.0.0-bin-hadoop3.tgz
+        else
+          echo "Spark restored from cache."
+        fi
+
         export SPARK_HOME=$(pwd)/spark-4.0.0-bin-hadoop3
         ${SPARK_HOME}/sbin/start-thriftserver.sh
+
     - name: Run tests
       run: |
         # This does not run the AWS tests.
@@ -42,6 +60,7 @@ jobs:
         # Restart from scratch.
         rm -rf tests/data/registry
         DSGRID_BACKEND_ENGINE=spark python -m pytest -v --disable-warnings --cov=./ --cov-append --cov-report=xml:coverage.xml tests
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4.2.0
       with:

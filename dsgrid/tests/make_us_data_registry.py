@@ -1,3 +1,4 @@
+import contextlib
 import getpass
 import logging
 import os
@@ -28,6 +29,7 @@ from dsgrid.utils.id_remappings import (
 logger = logging.getLogger(__name__)
 
 
+@contextlib.contextmanager
 def make_test_data_registry(
     registry_path,
     src_dir,
@@ -37,8 +39,10 @@ def make_test_data_registry(
     offline_mode=True,
     database_url: str | None = None,
     data_store_type: DataStoreType = DataStoreType.FILESYSTEM,
-) -> RegistryManager:
+):
     """Creates a local registry from a dsgrid project source directory for testing.
+
+    This is a context manager that yields the RegistryManager and disposes it on exit.
 
     Parameters
     ----------
@@ -56,6 +60,10 @@ def make_test_data_registry(
         If False, use the test remote registry.
     data_store_type: DataStoreType
         Type of store to use for the registry data.
+
+    Yields
+    ------
+    RegistryManager
     """
     if not include_projects and include_datasets:
         msg = "If include_datasets is True then include_projects must also be True."
@@ -81,44 +89,51 @@ def make_test_data_registry(
             conn, remote_path=TEST_REMOTE_REGISTRY, offline_mode=offline_mode
         )
 
-    project_config_file = src_dir / "project.json5"
-    project_id = load_data(project_config_file)["project_id"]
-    dataset_config_files = [src_dir / path / "dataset.json5" for path in dataset_dirs]
-    dataset_mapping_files = [src_dir / path / "dimension_mappings.json5" for path in dataset_dirs]
-    for i, filename in enumerate(dataset_mapping_files):
-        if not filename.exists():
-            dataset_mapping_files[i] = None
-    dataset_ids = [load_data(config_file)["dataset_id"] for config_file in dataset_config_files]
+    try:
+        project_config_file = src_dir / "project.json5"
+        project_id = load_data(project_config_file)["project_id"]
+        dataset_config_files = [src_dir / path / "dataset.json5" for path in dataset_dirs]
+        dataset_mapping_files = [
+            src_dir / path / "dimension_mappings.json5" for path in dataset_dirs
+        ]
+        for i, filename in enumerate(dataset_mapping_files):
+            if not filename.exists():
+                dataset_mapping_files[i] = None
+        dataset_ids = [
+            load_data(config_file)["dataset_id"] for config_file in dataset_config_files
+        ]
 
-    if include_projects:
-        print("\n 1. register project: \n")
-        manager.project_manager.register(
-            project_config_file,
-            user,
-            log_message,
-        )
-    if include_datasets:
-        for i, dataset_config_file in enumerate(dataset_config_files):
-            dataset_id = dataset_ids[i]
-            print(f"\n 2. register dataset {dataset_id}: \n")
-            dataset_mapping_file = dataset_mapping_files[i]
-            mappings = map_dimension_names_to_ids(manager.dimension_manager)
-            replace_dimension_names_with_current_ids(dataset_config_file, mappings)
-            manager.dataset_manager.register(
-                dataset_config_file,
-                dataset_path / dataset_id,
+        if include_projects:
+            print("\n 1. register project: \n")
+            manager.project_manager.register(
+                project_config_file,
                 user,
                 log_message,
             )
-            print(f"\n 3. submit dataset {dataset_id} to project\n")
-            manager.project_manager.submit_dataset(
-                project_id,
-                dataset_id,
-                user,
-                log_message,
-                dimension_mapping_file=dataset_mapping_file,
-            )
-    return manager
+        if include_datasets:
+            for i, dataset_config_file in enumerate(dataset_config_files):
+                dataset_id = dataset_ids[i]
+                print(f"\n 2. register dataset {dataset_id}: \n")
+                dataset_mapping_file = dataset_mapping_files[i]
+                mappings = map_dimension_names_to_ids(manager.dimension_manager)
+                replace_dimension_names_with_current_ids(dataset_config_file, mappings)
+                manager.dataset_manager.register(
+                    dataset_config_file,
+                    dataset_path / dataset_id,
+                    user,
+                    log_message,
+                )
+                print(f"\n 3. submit dataset {dataset_id} to project\n")
+                manager.project_manager.submit_dataset(
+                    project_id,
+                    dataset_id,
+                    user,
+                    log_message,
+                    dimension_mapping_file=dataset_mapping_file,
+                )
+        yield manager
+    finally:
+        manager.dispose()
 
 
 @click.command()
@@ -190,12 +205,13 @@ def run(
         shutil.rmtree(tmp_project_dir)
     shutil.copytree(project_dir, tmp_project_dir)
     try:
-        make_test_data_registry(
+        with make_test_data_registry(
             registry_path,
             tmp_project_dir / "dsgrid_project",
             dataset_dir,
             data_store_type=data_store_type,
-        )
+        ):
+            pass  # Manager is created and disposed in context manager
     finally:
         timer_stats_collector.log_stats()
 

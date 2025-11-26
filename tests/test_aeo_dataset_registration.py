@@ -75,11 +75,10 @@ def make_registry_for_aeo(
     dataset_dir = Path(f"datasets/benchmark/{dataset_name}")
     user = getpass.getuser()
     log_message = "Initial registration"
-    manager = RegistryManager.load(conn, offline_mode=True)
-
-    dataset_config_file = src_dir / dataset_dir / "dataset.json5"
-    manager.dataset_manager.register(dataset_config_file, dataset_path, user, log_message)
-    logger.info(f"dataset={dataset_name} registered successfully!\n")
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        dataset_config_file = src_dir / dataset_dir / "dataset.json5"
+        manager.dataset_manager.register(dataset_config_file, dataset_path, user, log_message)
+        logger.info(f"dataset={dataset_name} registered successfully!\n")
     return manager
 
 
@@ -166,11 +165,12 @@ def test_filter_aeo_dataset(make_test_project_dir, make_test_data_dir_module):
             dataset_path=data_dir,
         )
         try:
-            FilterRegistryManager.load(conn, offline_mode=True).filter(simple_model)
-            mgr = RegistryManager.load(conn, offline_mode=True)
-            config = mgr.dataset_manager.get_by_id(dataset_id)
-            geo = config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
-            assert get_unique_values(geo, "id") == {geography_record}
+            with FilterRegistryManager.load(conn, offline_mode=True) as filter_mgr:
+                filter_mgr.filter(simple_model)
+            with RegistryManager.load(conn, offline_mode=True) as mgr:
+                config = mgr.dataset_manager.get_by_id(dataset_id)
+                geo = config.get_dimension(DimensionType.GEOGRAPHY).get_records_dataframe()
+                assert get_unique_values(geo, "id") == {geography_record}
         finally:
             RegistryDatabase.delete(conn)
 

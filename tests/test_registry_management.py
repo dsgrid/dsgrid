@@ -122,37 +122,37 @@ def test_duplicate_dimensions(tmp_registry_db):
     create_local_test_registry(tmp_path, conn=conn)
     user = getpass.getuser()
     log_message = "Initial registration"
-    manager = RegistryManager.load(conn, offline_mode=True)
-    dimension_mgr = manager.dimension_manager
-    dimension_mgr.register(test_project_dir / "dimensions.json5", user, log_message)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        dimension_mgr = manager.dimension_manager
+        dimension_mgr.register(test_project_dir / "dimensions.json5", user, log_message)
 
-    # Registering duplicate dimensions and mappings are allowed.
-    # If names are the same, they are replaced. Otherwise, new ones get registered.
-    dimension_ids = dimension_mgr.list_ids()
-    dim_config_file = test_project_dir / "dimensions.json5"
+        # Registering duplicate dimensions and mappings are allowed.
+        # If names are the same, they are replaced. Otherwise, new ones get registered.
+        dimension_ids = dimension_mgr.list_ids()
+        dim_config_file = test_project_dir / "dimensions.json5"
 
-    dimension_mgr.register(dim_config_file, user, log_message)
-    assert len(dimension_mgr.list_ids()) == len(dimension_ids)
+        dimension_mgr.register(dim_config_file, user, log_message)
+        assert len(dimension_mgr.list_ids()) == len(dimension_ids)
 
-    data = load_data(dim_config_file)
-    data["dimensions"][0]["name"] += " new"
-    dump_data(data, dim_config_file)
+        data = load_data(dim_config_file)
+        data["dimensions"][0]["name"] += " new"
+        dump_data(data, dim_config_file)
 
-    dimension_mgr.register(dim_config_file, user, log_message)
-    assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 1
+        dimension_mgr.register(dim_config_file, user, log_message)
+        assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 1
 
-    data = load_data(dim_config_file)
-    found = False
-    for dim in data["dimensions"]:
-        if dim["type"] == "time":
-            assert dim["time_interval_type"] == "period_beginning"
-            dim["time_interval_type"] = "period_ending"
-            found = True
-    assert found
-    dump_data(data, dim_config_file)
+        data = load_data(dim_config_file)
+        found = False
+        for dim in data["dimensions"]:
+            if dim["type"] == "time":
+                assert dim["time_interval_type"] == "period_beginning"
+                dim["time_interval_type"] = "period_ending"
+                found = True
+        assert found
+        dump_data(data, dim_config_file)
 
-    dimension_mgr.register(dim_config_file, user, log_message)
-    assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 2
+        dimension_mgr.register(dim_config_file, user, log_message)
+        assert len(dimension_mgr.list_ids()) == len(dimension_ids) + 2
 
 
 def test_duplicate_project_dimension_names(tmp_registry_db):
@@ -161,106 +161,107 @@ def test_duplicate_project_dimension_names(tmp_registry_db):
     create_local_test_registry(tmp_path, conn=conn)
     user = getpass.getuser()
     log_message = "Initial registration"
-    manager = RegistryManager.load(conn, offline_mode=True)
-
-    project_file = test_project_dir / "project.json5"
-    data = load_data(project_file)
-    for dim in data["dimensions"]["supplemental_dimensions"]:
-        if dim["name"] == "US States":
-            dim["name"] = "US Counties 2010 - ComStock Only"
-    dump_data(data, project_file)
-    with pytest.raises(ValidationError):
-        manager.project_manager.register(project_file, user, log_message)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        project_file = test_project_dir / "project.json5"
+        data = load_data(project_file)
+        for dim in data["dimensions"]["supplemental_dimensions"]:
+            if dim["name"] == "US States":
+                dim["name"] = "US Counties 2010 - ComStock Only"
+        dump_data(data, project_file)
+        with pytest.raises(ValidationError):
+            manager.project_manager.register(project_file, user, log_message)
 
 
 def test_register_duplicate_project_rollback_dimensions(tmp_registry_db):
     test_project_dir, tmp_path, url = tmp_registry_db
     src_dir = test_project_dir
-    manager = make_test_data_registry(
+    with make_test_data_registry(
         tmp_path,
         test_project_dir,
         dataset_path=TEST_DATASET_DIRECTORY,
         database_url=url,
         include_projects=False,
         include_datasets=False,
-    )
-    project_file = src_dir / "project.json5"
-    orig_dimension_ids = manager.dimension_manager.list_ids()
+    ) as manager:
+        project_file = src_dir / "project.json5"
+        orig_dimension_ids = manager.dimension_manager.list_ids()
 
-    data = load_data(project_file)
-    # Inject an invalid project ID so that we can test rollback of dimensions.
-    data["project_id"] = "project-with-dashes"
-    dump_data(data, project_file)
+        data = load_data(project_file)
+        # Inject an invalid project ID so that we can test rollback of dimensions.
+        data["project_id"] = "project-with-dashes"
+        dump_data(data, project_file)
 
-    with pytest.raises(ValueError):
-        manager.project_manager.register(
-            project_file,
-            getpass.getuser(),
-            "register duplicate project",
-        )
+        with pytest.raises(ValueError):
+            manager.project_manager.register(
+                project_file,
+                getpass.getuser(),
+                "register duplicate project",
+            )
 
-    # Dimensions and mappings should have been registered and then cleared.
-    assert manager.dimension_manager.list_ids() == orig_dimension_ids
-    assert not manager.dimension_mapping_manager.list_ids()
+        # Dimensions and mappings should have been registered and then cleared.
+        assert manager.dimension_manager.list_ids() == orig_dimension_ids
+        assert not manager.dimension_mapping_manager.list_ids()
 
 
 def test_register_and_submit_rollback_on_failure(tmp_registry_db):
     test_project_dir, tmp_path, url = tmp_registry_db
     conn = DatabaseConnection(url=url)
     create_local_test_registry(tmp_path, conn=conn)
-    manager = RegistryManager.load(conn, offline_mode=True)
-    project_file = test_project_dir / "project.json5"
-    project_id = load_data(project_file)["project_id"]
-    dataset_dir = test_project_dir / "datasets" / "modeled" / "comstock"
-    dataset_config_file = dataset_dir / "dataset.json5"
-    dataset_id = load_data(dataset_config_file)["dataset_id"]
-    dataset_mapping_file = dataset_dir / "dimension_mappings.json5"
-    dataset_path = (
-        Path(os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY))
-        / "test_efs_comstock"
-    )
-    subsectors_file = (
-        dataset_dir / "dimension_mappings" / "lookup_comstock_subsectors_to_project_subsectors.csv"
-    )
-    # Remove some records.
-    data = subsectors_file.read_text().splitlines()[:-2]
-    subsectors_file.write_text("\n".join(data))
-
-    manager.project_manager.register(
-        project_file,
-        getpass.getuser(),
-        "register project",
-    )
-
-    mappings = map_dimension_names_to_ids(manager.dimension_manager)
-    replace_dimension_names_with_current_ids(dataset_config_file, mappings)
-    orig_dimension_ids = manager.dimension_manager.list_ids()
-    orig_mapping_ids = manager.dimension_mapping_manager.list_ids()
-
-    try:
-        with pytest.raises(DSGInvalidDataset):
-            manager.project_manager.register_and_submit_dataset(
-                dataset_config_file,
-                dataset_path,
-                project_id,
-                getpass.getuser(),
-                "register dataset and submit",
-                dimension_mapping_file=dataset_mapping_file,
-            )
-    finally:
-        missing_record_file = Path(
-            f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        project_file = test_project_dir / "project.json5"
+        project_id = load_data(project_file)["project_id"]
+        dataset_dir = test_project_dir / "datasets" / "modeled" / "comstock"
+        dataset_config_file = dataset_dir / "dataset.json5"
+        dataset_id = load_data(dataset_config_file)["dataset_id"]
+        dataset_mapping_file = dataset_dir / "dimension_mappings.json5"
+        dataset_path = (
+            Path(os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY))
+            / "test_efs_comstock"
         )
-        if missing_record_file.exists():
-            if missing_record_file.is_dir():
-                shutil.rmtree(missing_record_file)
-            else:
-                missing_record_file.unlink()
+        subsectors_file = (
+            dataset_dir
+            / "dimension_mappings"
+            / "lookup_comstock_subsectors_to_project_subsectors.csv"
+        )
+        # Remove some records.
+        data = subsectors_file.read_text().splitlines()[:-2]
+        subsectors_file.write_text("\n".join(data))
 
-    assert manager.dimension_manager.list_ids() == orig_dimension_ids
-    assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids
-    assert not manager.dataset_manager.list_ids()
-    assert manager.project_manager.list_ids() == [project_id]
+        manager.project_manager.register(
+            project_file,
+            getpass.getuser(),
+            "register project",
+        )
+
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(dataset_config_file, mappings)
+        orig_dimension_ids = manager.dimension_manager.list_ids()
+        orig_mapping_ids = manager.dimension_mapping_manager.list_ids()
+
+        try:
+            with pytest.raises(DSGInvalidDataset):
+                manager.project_manager.register_and_submit_dataset(
+                    dataset_config_file,
+                    dataset_path,
+                    project_id,
+                    getpass.getuser(),
+                    "register dataset and submit",
+                    dimension_mapping_file=dataset_mapping_file,
+                )
+        finally:
+            missing_record_file = Path(
+                f"{dataset_id}__{project_id}__missing_dimension_record_combinations.csv"
+            )
+            if missing_record_file.exists():
+                if missing_record_file.is_dir():
+                    shutil.rmtree(missing_record_file)
+                else:
+                    missing_record_file.unlink()
+
+        assert manager.dimension_manager.list_ids() == orig_dimension_ids
+        assert manager.dimension_mapping_manager.list_ids() == orig_mapping_ids
+        assert not manager.dataset_manager.list_ids()
+        assert manager.project_manager.list_ids() == [project_id]
 
 
 def test_add_subset_dimensions(mutable_cached_registry, tmp_path):
@@ -402,23 +403,23 @@ def test_add_supplemental_dimension(mutable_cached_registry, tmp_path):
 )
 def test_register_with_duckdb_store(registry_with_duckdb_store):
     conn = registry_with_duckdb_store
-    manager = RegistryManager.load(conn, offline_mode=True)
-    project_mgr = manager.project_manager
-    dataset_mgr = manager.dataset_manager
-    project_ids = project_mgr.list_ids()
-    assert len(project_ids) == 1
-    project_id = project_ids[0]
-    dataset_ids = dataset_mgr.list_ids()
-    assert len(dataset_ids) == 2
-    project = project_mgr.load_project(project_id)
-    found_lookup = False
-    for dataset_id in dataset_ids:
-        dataset = project.load_dataset(dataset_id)
-        assert isinstance(dataset._handler._load_data, DataFrame)
-        if dataset_id == "test_efs_comstock":
-            assert isinstance(dataset._handler._load_data_lookup, DataFrame)
-            found_lookup = True
-    assert found_lookup
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        project_mgr = manager.project_manager
+        dataset_mgr = manager.dataset_manager
+        project_ids = project_mgr.list_ids()
+        assert len(project_ids) == 1
+        project_id = project_ids[0]
+        dataset_ids = dataset_mgr.list_ids()
+        assert len(dataset_ids) == 2
+        project = project_mgr.load_project(project_id)
+        found_lookup = False
+        for dataset_id in dataset_ids:
+            dataset = project.load_dataset(dataset_id)
+            assert isinstance(dataset._handler._load_data, DataFrame)
+            if dataset_id == "test_efs_comstock":
+                assert isinstance(dataset._handler._load_data_lookup, DataFrame)
+                found_lookup = True
+        assert found_lookup
 
 
 def test_remove_dataset(mutable_cached_registry):
@@ -642,139 +643,138 @@ def test_invalid_dimension_mapping(tmp_registry_db):
     log_message = "Initial registration"
     conn = DatabaseConnection(url=url)
     create_local_test_registry(tmp_path, conn=conn)
-    manager = RegistryManager.load(conn, offline_mode=True)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        dim_mgr = manager.dimension_manager
+        dim_mgr.register(test_project_dir / "dimensions.json5", user, log_message)
+        dim_mapping_mgr = manager.dimension_mapping_manager
+        dimension_mapping_file = test_project_dir / "dimension_mappings_with_ids.json5"
+        mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        replace_dimension_names_with_current_ids(dimension_mapping_file, mappings)
 
-    dim_mgr = manager.dimension_manager
-    dim_mgr.register(test_project_dir / "dimensions.json5", user, log_message)
-    dim_mapping_mgr = manager.dimension_mapping_manager
-    dimension_mapping_file = test_project_dir / "dimension_mappings_with_ids.json5"
-    mappings = map_dimension_names_to_ids(manager.dimension_manager)
-    replace_dimension_names_with_current_ids(dimension_mapping_file, mappings)
+        record_file = (
+            test_project_dir
+            / "dimension_mappings"
+            / "base_to_supplemental"
+            / "lookup_county_to_state.csv"
+        )
+        orig_text = record_file.read_text()
 
-    record_file = (
-        test_project_dir
-        / "dimension_mappings"
-        / "base_to_supplemental"
-        / "lookup_county_to_state.csv"
-    )
-    orig_text = record_file.read_text()
+        # Invalid 'from' record
+        record_file.write_text(orig_text + "invalid county,1,CO\n")
+        with pytest.raises(DSGInvalidDimensionMapping):
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
-    # Invalid 'from' record
-    record_file.write_text(orig_text + "invalid county,1,CO\n")
-    with pytest.raises(DSGInvalidDimensionMapping):
+        # Invalid 'from' record - nulls aren't allowd
+        record_file.write_text(orig_text + ",1.2,CO\n")
+        with pytest.raises(DSGInvalidDimensionMapping):
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+
+        # Invalid 'to' record
+        record_file.write_text(orig_text.replace("CO", "Colorado"))
+        with pytest.raises(DSGInvalidDimensionMapping):
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+
+        # Duplicate "from" record, invalid as mapping_type = one_to_one_multiplication
+        orig_text2 = orig_text.split(",")
+        orig_text2 = ",".join(orig_text2[::2])
+        record_file.write_text(orig_text2 + "\n08031,CO\n")
+        msg = r"dimension_mapping.*has mapping_type.*, which does not allow duplicated.*records"
+        with pytest.raises(DSGInvalidDimensionMapping, match=msg):
+            dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
+
+        # Valid - null value in "to" record (Only one valid test allowed in this test func)
+        record_file.write_text(orig_text.replace("CO", ""))
         dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
-
-    # Invalid 'from' record - nulls aren't allowd
-    record_file.write_text(orig_text + ",1.2,CO\n")
-    with pytest.raises(DSGInvalidDimensionMapping):
-        dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
-
-    # Invalid 'to' record
-    record_file.write_text(orig_text.replace("CO", "Colorado"))
-    with pytest.raises(DSGInvalidDimensionMapping):
-        dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
-
-    # Duplicate "from" record, invalid as mapping_type = one_to_one_multiplication
-    orig_text2 = orig_text.split(",")
-    orig_text2 = ",".join(orig_text2[::2])
-    record_file.write_text(orig_text2 + "\n08031,CO\n")
-    msg = r"dimension_mapping.*has mapping_type.*, which does not allow duplicated.*records"
-    with pytest.raises(DSGInvalidDimensionMapping, match=msg):
-        dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
-
-    # Valid - null value in "to" record (Only one valid test allowed in this test func)
-    record_file.write_text(orig_text.replace("CO", ""))
-    dim_mapping_mgr.register(dimension_mapping_file, user, log_message)
 
 
 def test_register_submit_dataset_long_workflow(tmp_registry_db):
     src_dir, tmp_path, url = tmp_registry_db
-    manager = make_test_data_registry(
+    with make_test_data_registry(
         tmp_path,
         src_dir,
         include_projects=False,
         include_datasets=False,
         database_url=url,
-    )
-    dim_mapping_mgr = manager.dimension_mapping_manager
-    project_config_file = src_dir / "project_with_dimension_ids.json5"
-    project_id = load_data(project_config_file)["project_id"]
-    project_dimension_mapping_config = src_dir / "dimension_mappings_with_ids.json5"
-    project_dimension_file = src_dir / "dimensions.json5"
-    dataset_dir = src_dir / "datasets" / "modeled" / "comstock"
-    dataset_config_file = dataset_dir / "dataset_with_dimension_ids.json5"
-    dataset_id = load_data(dataset_config_file)["dataset_id"]
-    dataset_dimension_file = dataset_dir / "dimensions.json5"
-    dimension_mapping_config = dataset_dir / "dimension_mapping_config_with_ids.json5"
-    dimension_mapping_refs = dataset_dir / "dimension_mapping_references.json5"
-    user = getpass.getuser()
-    log_message = "register"
+    ) as manager:
+        dim_mapping_mgr = manager.dimension_mapping_manager
+        project_config_file = src_dir / "project_with_dimension_ids.json5"
+        project_id = load_data(project_config_file)["project_id"]
+        project_dimension_mapping_config = src_dir / "dimension_mappings_with_ids.json5"
+        project_dimension_file = src_dir / "dimensions.json5"
+        dataset_dir = src_dir / "datasets" / "modeled" / "comstock"
+        dataset_config_file = dataset_dir / "dataset_with_dimension_ids.json5"
+        dataset_id = load_data(dataset_config_file)["dataset_id"]
+        dataset_dimension_file = dataset_dir / "dimensions.json5"
+        dimension_mapping_config = dataset_dir / "dimension_mapping_config_with_ids.json5"
+        dimension_mapping_refs = dataset_dir / "dimension_mapping_references.json5"
+        user = getpass.getuser()
+        log_message = "register"
 
-    manager.dimension_manager.register(project_dimension_file, user, log_message)
-    manager.dimension_manager.register(dataset_dimension_file, user, log_message)
+        manager.dimension_manager.register(project_dimension_file, user, log_message)
+        manager.dimension_manager.register(dataset_dimension_file, user, log_message)
 
-    dim_mappings = map_dimension_names_to_ids(manager.dimension_manager)
-    for filename in (project_dimension_mapping_config, dimension_mapping_config):
-        replace_dimension_names_with_current_ids(filename, dim_mappings)
+        dim_mappings = map_dimension_names_to_ids(manager.dimension_manager)
+        for filename in (project_dimension_mapping_config, dimension_mapping_config):
+            replace_dimension_names_with_current_ids(filename, dim_mappings)
 
-    dim_mapping_mgr.register(project_dimension_mapping_config, user, log_message)
-    dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
-    dim_id_to_name = map_dimension_ids_to_names(manager.dimension_manager)
-    dim_mapping_mappings = map_dimension_mapping_names_to_ids(
-        manager.dimension_mapping_manager, dim_id_to_name
-    )
+        dim_mapping_mgr.register(project_dimension_mapping_config, user, log_message)
+        dim_mapping_mgr.register(dimension_mapping_config, user, log_message)
+        dim_id_to_name = map_dimension_ids_to_names(manager.dimension_manager)
+        dim_mapping_mappings = map_dimension_mapping_names_to_ids(
+            manager.dimension_mapping_manager, dim_id_to_name
+        )
 
-    for filename in (project_config_file, dataset_config_file):
-        replace_dimension_names_with_current_ids(filename, dim_mappings)
-    for filename in (project_config_file, dimension_mapping_refs):
-        replace_dimension_mapping_names_with_current_ids(filename, dim_mapping_mappings)
+        for filename in (project_config_file, dataset_config_file):
+            replace_dimension_names_with_current_ids(filename, dim_mappings)
+        for filename in (project_config_file, dimension_mapping_refs):
+            replace_dimension_mapping_names_with_current_ids(filename, dim_mapping_mappings)
 
-    manager.project_manager.register(project_config_file, user, "register project")
-    dataset_path = TEST_DATASET_DIRECTORY / dataset_id
-    manager.dataset_manager.register(
-        dataset_config_file,
-        dataset_path,
-        user,
-        "register dataset",
-    )
-    manager.project_manager.submit_dataset(
-        project_id,
-        dataset_id,
-        user,
-        log_message,
-        dimension_mapping_references_file=dimension_mapping_refs,
-    )
+        manager.project_manager.register(project_config_file, user, "register project")
+        dataset_path = TEST_DATASET_DIRECTORY / dataset_id
+        manager.dataset_manager.register(
+            dataset_config_file,
+            dataset_path,
+            user,
+            "register dataset",
+        )
+        manager.project_manager.submit_dataset(
+            project_id,
+            dataset_id,
+            user,
+            log_message,
+            dimension_mapping_references_file=dimension_mapping_refs,
+        )
 
-    assert manager.dimension_manager.list_ids()
-    assert manager.dimension_mapping_manager.list_ids()
-    assert manager.project_manager.list_ids() == [project_id]
-    assert manager.dataset_manager.list_ids() == [dataset_id]
+        assert manager.dimension_manager.list_ids()
+        assert manager.dimension_mapping_manager.list_ids()
+        assert manager.project_manager.list_ids() == [project_id]
+        assert manager.dataset_manager.list_ids() == [dataset_id]
 
 
 def test_registry_contains(cached_registry):
     conn = cached_registry
-    mgr = RegistryManager.load(conn)
-    project_mgr = mgr.project_manager
-    dimension_mgr = mgr.dimension_manager
-    county_dim = None
-    for config in dimension_mgr.iter_configs():
-        if config.model.name == "US Counties 2010 - ComStock Only":
-            county_dim = config.model
-            break
-    assert county_dim is not None
-    containing_models = project_mgr.db.get_containing_models(None, county_dim)
-    assert len(containing_models[RegistryType.PROJECT]) == 1
-    assert len(containing_models[RegistryType.DATASET]) == 2
-    assert len(containing_models[RegistryType.DIMENSION_MAPPING]) == 4
-    assert len(containing_models[RegistryType.DIMENSION]) == 0
+    with RegistryManager.load(conn) as mgr:
+        project_mgr = mgr.project_manager
+        dimension_mgr = mgr.dimension_manager
+        county_dim = None
+        for config in dimension_mgr.iter_configs():
+            if config.model.name == "US Counties 2010 - ComStock Only":
+                county_dim = config.model
+                break
+        assert county_dim is not None
+        containing_models = project_mgr.db.get_containing_models(None, county_dim)
+        assert len(containing_models[RegistryType.PROJECT]) == 1
+        assert len(containing_models[RegistryType.DATASET]) == 2
+        assert len(containing_models[RegistryType.DIMENSION_MAPPING]) == 4
+        assert len(containing_models[RegistryType.DIMENSION]) == 0
 
 
 def test_sql(cached_registry):
     conn = cached_registry
-    mgr = RegistryManager.load(conn)
-    project_mgr = mgr.project_manager
-    df = project_mgr.db.sql(f"SELECT * FROM {RegistryTables.REGISTRATIONS.value}")
-    assert "timestamp" in df.columns
+    with RegistryManager.load(conn) as mgr:
+        project_mgr = mgr.project_manager
+        df = project_mgr.db.sql(f"SELECT * FROM {RegistryTables.REGISTRATIONS.value}")
+        assert "timestamp" in df.columns
 
 
 def register_project(project_mgr, config_file, project_id, user, log_message):

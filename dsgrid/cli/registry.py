@@ -84,6 +84,14 @@ def registry(ctx, remote_path):
         )
 
 
+@registry.result_callback()
+@click.pass_context
+def cleanup_registry_manager(ctx, result, **kwargs):
+    """Cleanup the registry manager after the command finishes."""
+    if ctx.obj is not None:
+        ctx.obj.dispose()
+
+
 @click.group()
 @click.pass_obj
 def dimensions(registry_manager: RegistryManager):

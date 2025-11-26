@@ -8,14 +8,13 @@ from dsgrid.exceptions import DSGInvalidParameter
 @pytest.fixture(scope="session")
 def load_registry_manager(cached_registry):
     conn = cached_registry
-    manager = RegistryManager.load(
+    with RegistryManager.load(
         conn,
         remote_path=REMOTE_REGISTRY,
         offline_mode=True,
         no_prompts=True,
-    )
-    yield conn, manager
-    manager.dispose()
+    ) as manager:
+        yield conn, manager
 
 
 def test_registry_list_all(load_registry_manager):

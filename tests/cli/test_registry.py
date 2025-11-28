@@ -274,10 +274,10 @@ def test_register_dsgrid_projects(tmp_registry_db):
 
     conn = DatabaseConnection(url=url)
     with RegistryManager.load(conn, offline_mode=True) as manager:
-        project = manager.project_manager.load_project("US_DOE_IEF_2023")
+        project = manager.project_manager.load_project("US_DOE_IEF_2025")
         config = project.config
         context = ScratchDirContext(tmpdir)
-        config.make_dimension_association_table("ief_2023_transport", context)
+        config.make_dimension_association_table("ief_2025_transport", context)
 
 
 def test_bulk_register(tmp_registry_db):

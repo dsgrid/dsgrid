@@ -85,14 +85,19 @@ class DuckDbDataStore(DataStoreInterface):
         short_name = _make_table_short_name(dataset_id, version)
         self._replace_table(df, schema, short_name)
 
-    def read_missing_associations_table(self, dataset_id: str, version: str) -> DataFrame | None:
+    def read_missing_associations_tables(
+        self, dataset_id: str, version: str
+    ) -> dict[str, DataFrame]:
         con = self._get_connection()
-        full_name = _make_table_full_name("missing_dimension_associations", dataset_id, version)
-        short_name = _make_table_short_name(dataset_id, version)
-        if not self._has_table(con, SCHEMA_MISSING_DIMENSION_ASSOCIATIONS, short_name):
-            return None
-        df = con.sql(f"SELECT * FROM {full_name}").to_df()
-        return get_spark_session().createDataFrame(df)
+        dfs: dict[str, DataFrame] = {}
+        names = self._list_dim_associations_table_names(dataset_id, version)
+        if not names:
+            return dfs
+        for name in names:
+            full_name = f"{SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}.{name}"
+            df = con.sql(f"SELECT * FROM {full_name}").to_df()
+            dfs[name] = get_spark_session().createDataFrame(df)
+        return dfs
 
     def write_table(
         self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
@@ -112,20 +117,27 @@ class DuckDbDataStore(DataStoreInterface):
             con.sql(f"DROP TABLE IF EXISTS {table_name}")
         _create_table_from_dataframe(con, df, table_name)
 
-    def write_missing_associations_table(
-        self, df: DataFrame, dataset_id: str, version: str, overwrite: bool = False
+    def write_missing_associations_tables(
+        self, dfs: dict[str, DataFrame], dataset_id: str, version: str, overwrite: bool = False
     ) -> None:
         con = self._get_connection()
-        table_name = _make_table_full_name("missing_dimension_associations", dataset_id, version)
-        if overwrite:
-            con.sql(f"DROP TABLE IF EXISTS {table_name}")
-        _create_table_from_dataframe(con, df, table_name)
+        for tag, df in dfs.items():
+            table_name = _make_table_full_name(
+                "missing_dimension_associations", dataset_id, version
+            )
+            table_name = f"{table_name}__{tag}"
+            if overwrite:
+                con.sql(f"DROP TABLE IF EXISTS {table_name}")
+            _create_table_from_dataframe(con, df, table_name)
 
     def remove_tables(self, dataset_id: str, version: str) -> None:
         con = self._get_connection()
-        for table_type in ("data", "lookup", "missing_dimension_associations"):
+        for table_type in ("data", "lookup"):
             table_name = _make_table_full_name(table_type, dataset_id, version)
             con.sql(f"DROP TABLE IF EXISTS {table_name}")
+        for name in self._list_dim_associations_table_names(dataset_id, version):
+            full_name = f"{SCHEMA_MISSING_DIMENSION_ASSOCIATIONS}.{name}"
+            con.sql(f"DROP TABLE IF EXISTS {full_name}")
 
     @property
     def _data_dir(self) -> Path:
@@ -160,6 +172,16 @@ class DuckDbDataStore(DataStoreInterface):
         _create_table_from_dataframe(con, df, tmp_name)
         con.sql(f"DROP TABLE {table_name}")
         con.sql(f"ALTER TABLE {tmp_name} RENAME TO {table_name}")
+
+    def _list_dim_associations_table_names(self, dataset_id: str, version: str) -> list[str]:
+        con = self._get_connection()
+        short_name = _make_table_short_name(dataset_id, version)
+        query = f"""
+            SELECT table_name
+            FROM information_schema.tables
+            WHERE table_schema = '{TABLE_TYPE_TO_SCHEMA["missing_dimension_associations"]}' AND table_name LIKE '%{short_name}%'
+        """
+        return [row[0] for row in con.sql(query).fetchall()]
 
 
 def _create_table_from_dataframe(

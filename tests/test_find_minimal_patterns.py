@@ -30,7 +30,7 @@ EXPECTED_SECTOR_SUBSECTOR = [
 
 
 def test_find_minimal_patterns(tmp_path):
-    input_csv = "dsgrid-test-data/datasets/test_efs_comstock/missing_associations.csv"
+    input_csv = "dsgrid-test-data/datasets/test_efs_comstock/full_missing_associations.csv"
     df = pd.read_csv(input_csv, dtype={"geography": str})
 
     parquet_path = tmp_path / "missing_associations.parquet"

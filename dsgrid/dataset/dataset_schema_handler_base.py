@@ -1,7 +1,6 @@
 import abc
 import logging
 import os
-import tempfile
 from pathlib import Path
 from typing import Iterable, Self
 
@@ -163,8 +162,9 @@ class DatasetSchemaHandlerBase(abc.ABC):
         self, missing_dimension_associations: dict[str, DataFrame]
     ) -> None:
         """Check that a cross-join of dimension records is present, unless explicitly excepted."""
+        logger.info("Check dimension associations")
         dsgrid_config = DsgridRuntimeConfig.load()
-        scratch_dir = dsgrid_config.scratch_dir or Path(tempfile.gettempdir())
+        scratch_dir = dsgrid_config.get_scratch_dir()
         with ScratchDirContext(scratch_dir) as context:
             assoc_by_records = self._make_expected_dimension_association_table_from_records(
                 [x for x in DimensionType if x != DimensionType.TIME], context
@@ -195,6 +195,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             try:
                 if not is_dataframe_empty(diff):
                     handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
+                logger.info("Successfully checked dataset dimension associations")
             finally:
                 unpersist(diff)
 

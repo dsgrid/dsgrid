@@ -1336,10 +1336,11 @@ class ProjectRegistryManager(RegistryManagerBase):
         dataset_id = dataset_config.config_id
 
         with ScratchDirContext(self._params.scratch_dir) as scontext:
-            mapped_dataset_table = handler.make_mapped_dimension_association_table(
-                data_store, scontext
-            )
             project_table = self._make_dimension_associations(project_config, dataset_id, scontext)
+            mapped_dataset_table = handler.make_mapped_dimension_association_table(scontext)
+            project_table = handler.remove_expected_missing_mapped_associations(
+                data_store, project_table, scontext
+            )
             cols = sorted(project_table.columns)
             cache(mapped_dataset_table)
             diff: DataFrame | None = None

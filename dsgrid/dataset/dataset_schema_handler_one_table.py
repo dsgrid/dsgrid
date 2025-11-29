@@ -56,7 +56,7 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         return cls(load_data_df, config, *args, **kwargs)
 
     @track_timing(timer_stats_collector)
-    def check_consistency(self, missing_dimension_associations: DataFrame | None) -> None:
+    def check_consistency(self, missing_dimension_associations: dict[str, DataFrame]) -> None:
         self._check_one_table_data_consistency()
         self._check_dimension_associations(missing_dimension_associations)
 

@@ -301,7 +301,7 @@ def test_invalid_load_data_extra_column(register_dataset):
 
 def test_invalid_load_data_lookup_missing_records(register_dataset):
     _, dataset_path, expected_errors = register_dataset
-    associations_file = dataset_path / "missing_associations.csv"
+    associations_file = dataset_path / "missing_associations" / "geography__subsector.csv"
     associations_file.unlink()
     expected_errors["exception"] = DSGInvalidDataset
     expected_errors["match_msg"] = r"missing required dimension records"

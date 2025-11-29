@@ -176,9 +176,12 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 expected = get_unique_values(assoc_by_records, column)
                 actual = get_unique_values(assoc_by_data, column)
                 if actual != expected:
+                    missing = sorted(expected.difference(actual))
+                    extra = sorted(actual.difference(expected))
+                    num_matching = len(actual.intersection(actual))
                     msg = (
-                        f"Dataset records for dimension type {column} are not equal to expected "
-                        f"values. Expected: {expected}, Actual: {actual}"
+                        f"Dataset records for dimension type {column} do not match expected "
+                        f"values. {missing=} {extra=} {expected=} {num_matching=}"
                     )
                     raise DSGInvalidDataset(msg)
 

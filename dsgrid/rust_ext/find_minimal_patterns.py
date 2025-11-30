@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 def find_minimal_patterns_from_file(
     file_path: str | Path,
     max_depth: int = 0,
-    only_missing_values: bool = False,
     prune_miss_empty: bool = True,
     ratio_threshold: float = 50.0,
     threads: int = 0,
@@ -40,8 +39,6 @@ def find_minimal_patterns_from_file(
         Path to the input Parquet file
     max_depth : int, optional
         Maximum pattern size (number of columns). 0 = unlimited. Default: 0.
-    only_missing_values : bool, optional
-        Only expand using values that appear in the data. Default: False.
     prune_miss_empty : bool, optional
         Prune patterns with no matching rows (recommended: True). Default: True.
     ratio_threshold : float, optional
@@ -80,7 +77,6 @@ def find_minimal_patterns_from_file(
     """
     config = PatternConfig(
         max_depth=max_depth,
-        only_missing_values=only_missing_values,
         prune_miss_empty=prune_miss_empty,
         ratio_threshold=ratio_threshold,
         threads=threads,

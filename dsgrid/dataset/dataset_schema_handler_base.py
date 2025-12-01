@@ -178,7 +178,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                 if actual != expected:
                     missing = sorted(expected.difference(actual))
                     extra = sorted(actual.difference(expected))
-                    num_matching = len(actual.intersection(actual))
+                    num_matching = len(actual.intersection(expected))
                     msg = (
                         f"Dataset records for dimension type {column} do not match expected "
                         f"values. {missing=} {extra=} {expected=} {num_matching=}"

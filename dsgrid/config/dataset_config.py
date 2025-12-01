@@ -1,5 +1,5 @@
 import logging
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 from typing import Any, Literal, Union
 
@@ -11,6 +11,7 @@ from dsgrid.config.dimension_config import (
     DimensionBaseConfig,
     DimensionBaseConfigWithFiles,
 )
+from dsgrid.config.file_schemas import FileSchema
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
 from dsgrid.dataset.models import (
     PivotedTableFormatModel,
@@ -20,7 +21,7 @@ from dsgrid.dataset.models import (
 )
 from dsgrid.dimension.base_models import DimensionType, check_timezone_in_geography
 from dsgrid.dimension.time import TimeDimensionType
-from dsgrid.exceptions import DSGInvalidParameter
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidParameter
 from dsgrid.registry.common import check_config_id_strict
 from dsgrid.data_models import DSGBaseDatabaseModel, DSGBaseModel, DSGEnum, EnumValue
 from dsgrid.exceptions import DSGInvalidDimension
@@ -237,12 +238,78 @@ class GrowthRateModel(DSGBaseModel):
     )
 
 
+class TableSchemaSource(StrEnum):
+    REGISTRY = "registry"
+    USER = "user"
+
+
+class UserDatasetSchema(DSGBaseModel):
+    """User-defined dataset schema."""
+
+    data_file: FileSchema = Field(
+        title="data_file",
+        description="Defines the data file",
+    )
+    lookup_data_file: FileSchema | None = Field(
+        default=None,
+        title="lookup_data_file",
+        description="Defines the lookup data file. Required if the table format is 'standard'.",
+    )
+    missing_associations: str | None = Field(
+        default=None,
+        title="missing_associations",
+        description="Path to an all-inclusive missing associations file (e.g., "
+        "missing_associations.parquet) or directory of files containing missing combinations by "
+        "dimension type (e.g., geography__subsector.csv, subsector__metric.csv).",
+    )
+    data_schema: StandardDataSchemaModel | OneTableDataSchemaModel = Field(
+        title="table_schema",
+        description="Schema (table layouts) used for writing out the dataset",
+        discriminator="data_schema_type",  # TODO: rename to table_schema_type?
+    )
+
+
+class RegistryDatasetSchema(DSGBaseModel):
+    """Defines the dataset schema when stored in the dsgrid registry."""
+
+    data_schema: StandardDataSchemaModel | OneTableDataSchemaModel = Field(
+        title="data_schema",
+        description="Schema (table layouts) used for writing out the dataset",
+        discriminator="data_schema_type",
+    )
+
+
+def user_schema_to_registry_schema(user_schema: UserDatasetSchema) -> RegistryDatasetSchema:
+    """Convert a UserDatasetSchema to a RegistryDatasetSchema for registry storage.
+
+    Parameters
+    ----------
+    user_schema : UserDatasetSchema
+        The user schema containing file paths and data schema.
+
+    Returns
+    -------
+    RegistryDatasetSchema
+        A registry schema without file paths, suitable for database storage.
+    """
+    return RegistryDatasetSchema(data_schema=user_schema.data_schema)
+
+
 class DatasetConfigModel(DSGBaseDatabaseModel):
     """Represents dataset configurations."""
 
     dataset_id: str = Field(
         title="dataset_id",
         description="Unique dataset identifier.",
+    )
+    table_schema: UserDatasetSchema | None = Field(
+        title="table_schema",
+        description="Defines the schema (table format and columns) for the dataset.",
+    )
+    registry_schema: RegistryDatasetSchema | None = Field(
+        default=None,
+        title="registry_schema",
+        description="Defines the dataset's schema once stored in the registry.",
     )
     dataset_type: InputDatasetType = Field(
         default=InputDatasetType.UNSPECIFIED,
@@ -257,11 +324,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         title="dataset_qualifier_metadata",
         description="Additional metadata to include related to the dataset_qualifier",
         discriminator="dataset_qualifier_type",
-    )
-    data_schema: Union[StandardDataSchemaModel, OneTableDataSchemaModel] = Field(
-        title="data_schema",
-        description="Schema (table layouts) used for writing out the dataset",
-        discriminator="data_schema_type",
     )
     description: str | None = Field(
         default=None,
@@ -382,49 +444,67 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         "columns. Instead they are added by dsgrid as an alias column.",
     )
 
-    # This function can be deleted once all dataset repositories have been updated.
     @model_validator(mode="before")
     @classmethod
-    def handle_legacy_fields(cls, values):
-        if "dataset_version" in values:
-            logger.warning("Moving data in legacy dataset_version field to version field.")
-            val = values.pop("dataset_version")
-            if val is not None:
-                values["version"] = val
+    def handle_legacy_fields(cls, values: dict) -> dict:
+        """Handle legacy fields in the dataset config.
 
-        if "data_schema_type" in values:
-            if "data_schema_type" in values["data_schema"]:
-                msg = f"Unknown data_schema format: {values=}"
-                raise ValueError(msg)
-            logger.warning("Moving legacy data_schema_type field into data_schema struct.")
-            values["data_schema"]["data_schema_type"] = values.pop("data_schema_type")
+        - Migrates top-level data_schema to table_schema.data_schema
+        - Migrates origin_date to data_source_date
+        - Migrates origin_version to data_source_version
+        - Removes deprecated source field
+        """
+        if "data_schema" in values:
+            if "table_schema" in values and values["table_schema"] is not None:
+                logger.warning(
+                    "Removing legacy top-level data_schema field; "
+                    "using table_schema.data_schema instead."
+                )
+                values.pop("data_schema")
+            else:
+                # If there's no table_schema, we can't migrate easily
+                # as we don't know the data_file path
+                logger.warning(
+                    "Found legacy top-level data_schema without table_schema; ignoring."
+                )
+                values.pop("data_schema")
 
-        if "leap_day_adjustment" in values:
-            if values["leap_day_adjustment"] != "none":
-                msg = f"Unknown leap day adjustment: {values=}"
-                raise ValueError(msg)
-            logger.warning(
-                "Dropping deprecated leap_day_adjustment field from the dataset config."
-            )
-            values.pop("leap_day_adjustment")
-
-        if "source" in values:
-            logger.warning("Dropping deprecated source field from the dataset config.")
-            values.pop("source")
-
+        # Migrate legacy origin_date -> data_source_date
         if "origin_date" in values:
-            logger.warning("Moving legacy origin_date field to new data_source_date field.")
-            val = values.pop("origin_date")
-            if val is not None:
-                values["data_source_date"] = val
+            if "data_source_date" not in values or values.get("data_source_date") is None:
+                values["data_source_date"] = values.pop("origin_date")
+                logger.warning("Migrated legacy origin_date field to data_source_date.")
+            else:
+                values.pop("origin_date")
+                logger.warning("Dropped legacy origin_date field; data_source_date already set.")
 
+        # Migrate legacy origin_version -> data_source_version
         if "origin_version" in values:
-            logger.warning("Moving legacy origin_version field to new data_source_version field.")
-            val = values.pop("origin_version")
-            if val is not None:
-                values["data_source_version"] = val
+            if "data_source_version" not in values or values.get("data_source_version") is None:
+                values["data_source_version"] = values.pop("origin_version")
+                logger.warning("Migrated legacy origin_version field to data_source_version.")
+            else:
+                values.pop("origin_version")
+                logger.warning(
+                    "Dropped legacy origin_version field; data_source_version already set."
+                )
+
+        # Remove deprecated source field (no direct mapping)
+        if "source" in values:
+            values.pop("source")
+            logger.warning(
+                "Dropped deprecated source field. Use data_source_doi_url if applicable."
+            )
 
         return values
+
+    @model_validator(mode="after")
+    def check_schema_fields(self):
+        """Ensure table_schema and registry_schema are mutually exclusive."""
+        if self.table_schema is not None and self.registry_schema is not None:
+            msg = "table_schema and registry_schema cannot both be set"
+            raise ValueError(msg)
+        return self
 
     @field_validator("dataset_id")
     @classmethod
@@ -529,9 +609,14 @@ def make_unvalidated_dataset_config(
             "dataset_id": dataset_id,
             "version": "1.0.0",
             "dataset_type": dataset_type.value,
-            "data_schema": {
-                "data_schema_type": DataSchemaType.ONE_TABLE.value,
-                "table_format": table_format.model_dump(mode="json"),
+            "table_schema": {
+                "data_schema": {
+                    "data_schema_type": DataSchemaType.ONE_TABLE.value,
+                    "table_format": table_format.model_dump(mode="json"),
+                },
+                "data_file": {
+                    "path": "load_data.parquet",
+                },
             },
             "description": "",
             "data_classification": data_classification,
@@ -550,9 +635,14 @@ def make_unvalidated_dataset_config(
             "dataset_qualifier_metadata": {
                 "dataset_qualifier_type": DatasetQualifierType.QUANTITY.value
             },
-            "data_schema": {
-                "data_schema_type": DataSchemaType.ONE_TABLE.value,
-                "table_format": table_format.model_dump(mode="json"),
+            "table_schema": {
+                "data_schema": {
+                    "data_schema_type": DataSchemaType.ONE_TABLE.value,
+                    "table_format": table_format.model_dump(mode="json"),
+                },
+                "data_file": {
+                    "path": "load_data.parquet",
+                },
             },
             "description": "",
             "sector_description": "",
@@ -589,7 +679,6 @@ class DatasetConfig(ConfigBase):
     def __init__(self, model):
         super().__init__(model)
         self._dimensions = {}  # ConfigKey to DimensionConfig
-        self._dataset_path: Path | None = None
 
     @staticmethod
     def config_filename():
@@ -604,50 +693,107 @@ class DatasetConfig(ConfigBase):
         return DatasetConfigModel
 
     @classmethod
-    def load_from_user_path(cls, config_file, dataset_path) -> "DatasetConfig":
+    def load_from_user_path(cls, config_file: Path) -> "DatasetConfig":
+        """Load a dataset config from a user-provided config file.
+
+        The config file must contain a UserDatasetSchema with file paths.
+        This method validates that all required files exist.
+
+        Parameters
+        ----------
+        config_file : Path
+            Path to the dataset configuration file.
+
+        Returns
+        -------
+        DatasetConfig
+
+        Raises
+        ------
+        DSGInvalidParameter
+            If the config doesn't have a UserDatasetSchema or required files don't exist.
+        """
         config = cls.load(config_file)
-        schema_type = config.get_data_schema_type()
-        if str(dataset_path).startswith("s3://"):
-            # TODO: This may need to handle AWS s3 at some point.
-            msg = "Registering a dataset from an S3 path is not supported."
+
+        # Ensure this is a user schema (has file paths)
+        if not isinstance(config.model.table_schema, UserDatasetSchema):
+            msg = "load_from_user_path requires a UserDatasetSchema with file paths"
             raise DSGInvalidParameter(msg)
-        if not dataset_path.exists():
-            msg = f"Dataset {dataset_path} does not exist"
-            raise DSGInvalidParameter(msg)
-        dataset_path = str(dataset_path)
-        if schema_type == DataSchemaType.STANDARD:
-            check_load_data_filename(dataset_path)
-            check_load_data_lookup_filename(dataset_path)
-        elif schema_type == DataSchemaType.ONE_TABLE:
-            check_load_data_filename(dataset_path)
-        else:
-            msg = f"data_schema_type={schema_type} not supported."
+        if config.model.registry_schema is not None:
+            msg = "load_from_user_path requires registry_schema to be None"
             raise DSGInvalidParameter(msg)
 
-        config.dataset_path = dataset_path
+        user_schema = config.model.table_schema
+
+        # Validate data file exists and resolve to absolute path
+        data_path = Path(user_schema.data_file.path)
+        if not data_path.is_absolute():
+            data_path = (config_file.parent / data_path).resolve()
+        if str(data_path).startswith("s3://"):
+            msg = "Registering a dataset from an S3 path is not supported."
+            raise DSGInvalidParameter(msg)
+        if not data_path.exists():
+            msg = f"Data file does not exist: {data_path}"
+            raise DSGInvalidParameter(msg)
+        # Update path to absolute so it works from any working directory
+        user_schema.data_file.path = str(data_path)
+
+        # Validate lookup file for STANDARD schema
+        schema_type = config.get_data_schema_type()
+        if schema_type == DataSchemaType.STANDARD:
+            if user_schema.lookup_data_file is None:
+                msg = "STANDARD schema requires lookup_data_file in table_schema"
+                raise DSGInvalidParameter(msg)
+            lookup_path = Path(user_schema.lookup_data_file.path)
+            if not lookup_path.is_absolute():
+                lookup_path = (config_file.parent / lookup_path).resolve()
+            if not lookup_path.exists():
+                msg = f"Lookup data file does not exist: {lookup_path}"
+                raise DSGInvalidParameter(msg)
+            # Update path to absolute
+            user_schema.lookup_data_file.path = str(lookup_path)
+
+        # Resolve missing_associations path if present
+        if user_schema.missing_associations is not None:
+            missing_path = Path(user_schema.missing_associations)
+            if not missing_path.is_absolute():
+                missing_path = (config_file.parent / missing_path).resolve()
+            user_schema.missing_associations = str(missing_path)
+
         return config
 
     @property
-    def dataset_path(self) -> Path | None:
-        """Return the directory containing the dataset file(s)."""
-        return self._dataset_path
-
-    @dataset_path.setter
-    def dataset_path(self, dataset_path: Path | str | None) -> None:
-        """Set the dataset path."""
-        if isinstance(dataset_path, str):
-            dataset_path = Path(dataset_path)
-        self._dataset_path = dataset_path
+    def has_user_schema(self) -> bool:
+        """Return True if this config has a UserDatasetSchema with file paths."""
+        return isinstance(self.model.table_schema, UserDatasetSchema)
 
     @property
-    def load_data_path(self):
-        assert self._dataset_path is not None
-        return check_load_data_filename(self._dataset_path)
+    def user_schema(self) -> UserDatasetSchema | None:
+        """Return the user schema if this config has one, otherwise None."""
+        if isinstance(self.model.table_schema, UserDatasetSchema):
+            return self.model.table_schema
+        return None
 
     @property
-    def load_data_lookup_path(self):
-        assert self._dataset_path is not None
-        return check_load_data_lookup_filename(self._dataset_path)
+    def data_file_schema(self) -> FileSchema | None:
+        """Return the data file schema if available."""
+        if self.user_schema is not None:
+            return self.user_schema.data_file
+        return None
+
+    @property
+    def lookup_file_schema(self) -> FileSchema | None:
+        """Return the lookup file schema if available."""
+        if self.user_schema is not None:
+            return self.user_schema.lookup_data_file
+        return None
+
+    @property
+    def missing_associations_path(self) -> Path | None:
+        """Return the missing associations path if available."""
+        if self.user_schema is not None and self.user_schema.missing_associations is not None:
+            return Path(self.user_schema.missing_associations)
+        return None
 
     def update_dimensions(self, dimensions):
         """Update all dataset dimensions."""
@@ -685,7 +831,7 @@ class DatasetConfig(ConfigBase):
         """Return the table's pivoted dimension type or None if the table isn't pivoted."""
         if self.get_table_format_type() != TableFormatType.PIVOTED:
             return None
-        return self.model.data_schema.table_format.pivoted_dimension_type
+        return self.model.table_schema.data_schema.table_format.pivoted_dimension_type
 
     def get_pivoted_dimension_columns(self) -> list[str]:
         """Return the table's pivoted dimension columns or an empty list if the table isn't
@@ -693,7 +839,7 @@ class DatasetConfig(ConfigBase):
         """
         if self.get_table_format_type() != TableFormatType.PIVOTED:
             return []
-        dim_type = self.model.data_schema.table_format.pivoted_dimension_type
+        dim_type = self.model.table_schema.data_schema.table_format.pivoted_dimension_type
         dim = self.get_dimension_with_records(dim_type)
         assert dim is not None
         return sorted(list(dim.get_unique_ids()))
@@ -710,11 +856,23 @@ class DatasetConfig(ConfigBase):
 
     def get_data_schema_type(self) -> DataSchemaType:
         """Return the schema type of the table."""
-        return DataSchemaType(self.model.data_schema.data_schema_type)
+        if self.model.table_schema is not None:
+            return DataSchemaType(self.model.table_schema.data_schema.data_schema_type)
+        if self.model.registry_schema is not None:
+            return DataSchemaType(self.model.registry_schema.data_schema.data_schema_type)
+        msg = "Neither table_schema nor registry_schema is set"
+        raise DSGInvalidDataset(msg)
 
     def get_table_format_type(self) -> TableFormatType:
         """Return the format type of the table."""
-        return TableFormatType(self._model.data_schema.table_format.format_type)
+        if self._model.table_schema is not None:
+            return TableFormatType(self._model.table_schema.data_schema.table_format.format_type)
+        if self._model.registry_schema is not None:
+            return TableFormatType(
+                self._model.registry_schema.data_schema.table_format.format_type
+            )
+        msg = "Neither table_schema nor registry_schema is set"
+        raise DSGInvalidDataset(msg)
 
     def add_trivial_dimensions(self, df: DataFrame):
         """Add trivial 1-element dimensions to load_data_lookup."""

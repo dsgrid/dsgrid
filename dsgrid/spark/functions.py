@@ -8,11 +8,9 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo
 
 import duckdb
-from pydantic import ValidationError
 
 import dsgrid
-from dsgrid.config.file_schemas import SUPPORTED_CSV_TYPES, CsvSchema, get_column_renames
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
+from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.loggers import disable_console_logging
 from dsgrid.spark.types import (
     DataFrame,
@@ -262,61 +260,6 @@ def set_current_time_zone(time_zone: str) -> None:
     spark.conf.set("spark.sql.session.timeZone", time_zone)
 
 
-DUCKDB_COLUMN_TYPES = {
-    "BOOLEAN": "BOOLEAN",
-    "INT": "INTEGER",
-    "INTEGER": "INTEGER",
-    "TINYINT": "TINYINT",
-    "SMALLINT": "INTEGER",
-    "BIGINT": "BIGINT",
-    "FLOAT": "FLOAT",
-    "DOUBLE": "DOUBLE",
-    "TIMESTAMP_TZ": "TIMESTAMP WITH TIME ZONE",
-    "TIMESTAMP_NTZ": "TIMESTAMP",
-    "STRING": "VARCHAR",
-    "TEXT": "VARCHAR",
-    "VARCHAR": "VARCHAR",
-}
-
-SPARK_COLUMN_TYPES = {
-    "BOOLEAN": "BOOLEAN",
-    "INT": "INT",
-    "INTEGER": "INT",
-    "TINYINT": "TINYINT",
-    "SMALLINT": "SMALLINT",
-    "BIGINT": "BIGINT",
-    "FLOAT": "FLOAT",
-    "DOUBLE": "DOUBLE",
-    "STRING": "STRING",
-    "TEXT": "STRING",
-    "VARCHAR": "STRING",
-    "TIMESTAMP_TZ": "TIMESTAMP",
-    "TIMESTAMP_NTZ": "TIMESTAMP_NTZ",
-}
-
-assert sorted(DUCKDB_COLUMN_TYPES.keys()) == sorted(SPARK_COLUMN_TYPES.keys())
-assert not SUPPORTED_CSV_TYPES.difference(DUCKDB_COLUMN_TYPES.keys())
-
-
-def decode_schema(csv_schema: CsvSchema) -> dict[str, str] | None:
-    """Decode the schema in filename for application when reading a CSV file.
-    The returned values will be valid for the current backend.
-    """
-    column_types = csv_schema.get_data_type_mapping()
-    if column_types is None:
-        return None
-    mapping = DUCKDB_COLUMN_TYPES if use_duckdb() else SPARK_COLUMN_TYPES
-    mapped_schema: dict[str, str] = {}
-    for key, val in column_types.items():
-        col_type = val.upper()
-        if col_type not in mapping:
-            options = " ".join(sorted(mapping.keys()))
-            msg = f"column type = {val} is not supported. {options=}"
-            raise DSGInvalidField(msg)
-        mapped_schema[key] = mapping[col_type]
-    return mapped_schema
-
-
 def init_spark(name="dsgrid", check_env=True, spark_conf=None) -> SparkSession:
     """Initialize a SparkSession.
 
@@ -455,33 +398,19 @@ def prepare_timestamps_for_dataframe(timestamps: Iterable[datetime]) -> Iterable
     return timestamps
 
 
-def read_csv(path: Path | str) -> DataFrame:
+def read_csv(path: Path | str, schema: dict[str, str] | None = None) -> DataFrame:
     """Return a DataFrame from a CSV file, handling special cases with duckdb."""
-    schema_file = _get_schema_file(path)
-    if schema_file is None:
-        csv_schema = None
-        mapping_schema = None
-    else:
-        try:
-            csv_schema = CsvSchema.from_file(schema_file)
-        except ValidationError:
-            logger.exception("Failed to load the schema file %s", schema_file)
-            msg = f"Invalid {schema_file=}"
-            raise DSGInvalidDataset(msg)
-        mapping_schema = decode_schema(csv_schema)
-    func = _read_csv_duckdb if use_duckdb() else _read_csv_spark
-    df = func(path, mapping_schema)
-    if mapping_schema is not None:
-        if set(df.columns).symmetric_difference(mapping_schema.keys()):
+    func = read_csv_duckdb if use_duckdb() else _read_csv_spark
+    df = func(path, schema)
+    if schema is not None:
+        if set(df.columns).symmetric_difference(schema.keys()):
             msg = (
-                f"Mismatch in CSV schema ({sorted(mapping_schema.keys())}) "
+                f"Mismatch in CSV schema ({sorted(schema.keys())}) "
                 f"vs DataFrame columns ({df.columns})"
             )
             raise DSGInvalidDataset(msg)
 
-    if csv_schema is None:
-        return df
-    return _rename_columns(df, get_column_renames(csv_schema))
+    return df
 
 
 def _read_csv_spark(path: Path | str, schema: dict[str, str] | None) -> DataFrame:
@@ -493,36 +422,29 @@ def _read_csv_spark(path: Path | str, schema: dict[str, str] | None) -> DataFram
     return spark.read.csv(str(path), header=True, schema=schema_str)
 
 
-def _read_csv_duckdb(path: Path | str, schema: dict[str, str] | None) -> DataFrame:
-    path_ = path if isinstance(path, Path) else Path(path)
-    if path_.is_dir():
-        path_str = str(path_) + "**/*.csv"
+def read_csv_duckdb(path_or_str: Path | str, schema: dict[str, str] | None) -> DataFrame:
+    """Read a CSV file using DuckDB and return a Spark DataFrame.
+
+    Parameters
+    ----------
+    path_or_str : Path | str
+        Path to the CSV file or directory containing CSV files.
+    schema : dict[str, str] | None
+        Mapping of column names to DuckDB data types.
+    """
+    path = Path(path_or_str)
+    if path.is_dir():
+        path_str = str(path) + "**/*.csv"
     else:
-        path_str = str(path_)
+        path_str = str(path)
 
     spark = get_spark_session()
-    if schema is None:
-        return spark.read.csv(str(path), header=True)
+    if not schema:
+        return spark.read.csv(path_str, header=True)
 
     dtypes = {k: duckdb.type(v) for k, v in schema.items()}
     rel = duckdb.read_csv(path_str, header=True, dtype=dtypes)
-    columns = ",".join(schema.keys())
-    return spark.createDataFrame(rel.select(columns).to_df())
-
-
-def _get_schema_file(filename: Path | str) -> Path | None:
-    table_path = Path(filename)
-    for ext in (".json", ".json5"):
-        schema_file = table_path.with_name(f"{table_path.stem}_schema{ext}")
-        if schema_file.exists():
-            return schema_file
-    return None
-
-
-def _rename_columns(df: DataFrame, mapping: dict[str, str]) -> DataFrame:
-    for old_name, new_name in mapping.items():
-        df = df.withColumnRenamed(old_name, new_name)
-    return df
+    return spark.createDataFrame(rel.to_df())
 
 
 def read_json(path: Path | str) -> DataFrame:

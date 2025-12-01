@@ -751,10 +751,11 @@ _register_and_submit_dataset_epilog = """
 Examples:\n
 $ dsgrid registry projects register-and-submit-dataset \\ \n
     -c dataset.json5 \\ \n
-    -d path/to/my/dataset \\ \n
     -p my-project-id \\ \n
     -m dimension_mappings.json5 \\ \n
     -l "Register and submit dataset my-dataset to project my-project." \n
+
+Note: The dataset config file must contain a table_schema with data_file paths.
 """
 
 
@@ -765,15 +766,7 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     required=True,
     type=click.Path(exists=True),
     callback=path_callback,
-    help="Dataset config file",
-)
-@click.option(
-    "-d",
-    "--dataset-path",
-    required=True,
-    help="Path to directory containing load data (Parquet) files.",
-    type=click.Path(exists=True),
-    callback=path_callback,
+    help="Dataset config file (must include table_schema with data_file paths)",
 )
 @click.option(
     "-m",
@@ -823,21 +816,23 @@ def register_and_submit_dataset(
     ctx,
     registry_manager,
     dataset_config_file,
-    dataset_path,
     dimension_mapping_file,
     dimension_mapping_references_file,
     autogen_reverse_supplemental_mappings,
     project_id,
     log_message,
 ):
-    """Register a dataset and then submit it to a dsgrid project."""
+    """Register a dataset and then submit it to a dsgrid project.
+
+    The dataset config file must include a table_schema with data_file and optional
+    lookup_data_file paths pointing to the dataset files.
+    """
     submitter = getpass.getuser()
     manager = registry_manager.project_manager
     res = handle_dsgrid_exception(
         ctx,
         manager.register_and_submit_dataset,
         dataset_config_file,
-        dataset_path,
         project_id,
         submitter,
         log_message,
@@ -1370,13 +1365,14 @@ def list_datasets(registry_manager, filter):
 
 _register_dataset_epilog = """
 Examples:\n
-$ dsgrid registry datasets register dataset.json5 /path/to/dataset-directory -l "Register dataset my-dataset-id."\n
+$ dsgrid registry datasets register dataset.json5 -l "Register dataset my-dataset-id."\n
+
+Note: The dataset config file must contain a table_schema with data_file paths.
 """
 
 
 @click.command(name="register", epilog=_register_dataset_epilog)
 @click.argument("dataset-config-file", type=click.Path(exists=True), callback=path_callback)
-@click.argument("dataset-path", type=click.Path(exists=True), callback=path_callback)
 @click.option(
     "-l",
     "--log-message",
@@ -1389,12 +1385,14 @@ def register_dataset(
     ctx: click.Context,
     registry_manager: RegistryManager,
     dataset_config_file: Path,
-    dataset_path: Path,
     log_message: str,
 ):
     """Register a new dataset with the registry. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
+
+    The config file must include a table_schema with data_file and optional
+    lookup_data_file paths pointing to the dataset files.
     """
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
@@ -1402,7 +1400,6 @@ def register_dataset(
         ctx,
         manager.register,
         dataset_config_file,
-        dataset_path,
         submitter,
         log_message,
     )
@@ -1472,13 +1469,6 @@ $ dsgrid registry datasets update \\ \n
     help="reason for submission",
 )
 @click.option(
-    "-p",
-    "--dataset-path",
-    type=click.Path(exists=True),
-    callback=path_callback,
-    help="New dataset path. If not set, use existing dataset.",
-)
-@click.option(
     "-t",
     "--update-type",
     required=True,
@@ -1500,13 +1490,15 @@ def update_dataset(
     dataset_config_file: Path,
     dataset_id: str,
     log_message: str,
-    dataset_path: Path | None,
     update_type: VersionUpdateType,
     version: str,
 ):
     """Update an existing dataset in the registry. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
+
+    If the config file includes a UserDatasetSchema with file paths, the data will be
+    re-read from those paths. Otherwise, the existing data in the registry is used.
     """
     manager = registry_manager.dataset_manager
     submitter = getpass.getuser()
@@ -1519,7 +1511,6 @@ def update_dataset(
         update_type,
         log_message,
         version,
-        dataset_path=dataset_path,
     )
     if res[1] != 0:
         ctx.exit(res[1])

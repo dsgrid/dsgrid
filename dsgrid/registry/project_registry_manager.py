@@ -804,7 +804,6 @@ class ProjectRegistryManager(RegistryManagerBase):
     def register_and_submit_dataset(
         self,
         dataset_config_file: Path,
-        dataset_path: Path,
         project_id: str,
         submitter: str,
         log_message: str,
@@ -820,7 +819,7 @@ class ProjectRegistryManager(RegistryManagerBase):
                 msg = f"{project_id=}"
                 raise DSGValueNotRegistered(msg)
 
-            dataset_config = DatasetConfig.load_from_user_path(dataset_config_file, dataset_path)
+            dataset_config = DatasetConfig.load_from_user_path(dataset_config_file)
             dataset_id = dataset_config.model.dataset_id
             config = self.get_by_id(project_id, conn=conn)
             # This will raise an exception if the dataset_id is not part of the project or already
@@ -829,7 +828,6 @@ class ProjectRegistryManager(RegistryManagerBase):
 
             self._dataset_mgr.register(
                 dataset_config_file,
-                dataset_path,
                 context=context,
             )
             self.submit_dataset(

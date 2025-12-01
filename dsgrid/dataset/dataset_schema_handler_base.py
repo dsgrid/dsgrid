@@ -8,7 +8,7 @@ import chronify
 from sqlalchemy import Connection
 
 import dsgrid
-from dsgrid.chronify import create_store
+from dsgrid.chronify import create_store, create_in_memory_store
 from dsgrid.config.annual_time_dimension_config import (
     AnnualTimeDimensionConfig,
     map_annual_time_to_date_time,
@@ -35,6 +35,7 @@ from dsgrid.config.dimension_mapping_base import (
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.dataset.models import TableFormatType
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
+from dsgrid.config.file_schemas import read_data_file
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import (
@@ -53,7 +54,7 @@ from dsgrid.spark.functions import (
     unpersist,
 )
 from dsgrid.registry.data_store_interface import DataStoreInterface
-from dsgrid.spark.types import DataFrame, F
+from dsgrid.spark.types import DataFrame, F, use_duckdb
 from dsgrid.units.convert import convert_units_unpivoted
 from dsgrid.utils.dataset import (
     check_historical_annual_time_model_year_consistency,
@@ -334,23 +335,36 @@ class DatasetSchemaHandlerBase(abc.ABC):
             return
 
         logger.info("Check dataset time consistency.")
-        path = Path(self._config.load_data_path)
-        assert path.exists()
-        load_data_df = read_dataframe(path)
-        schema = self._get_chronify_schema(load_data_df)
-        scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
-        with ScratchDirContext(scratch_dir) as context:
-            if path.suffix == ".parquet":
-                src_path = path
-            else:
-                src_path = context.get_temp_filename(suffix=".parquet")
-                write_dataframe(load_data_df, src_path)
+        file_schema = self._config.model.table_schema.data_file
+        load_data_df = read_data_file(file_schema)
+        chronify_schema = self._get_chronify_schema(load_data_df)
 
-            store_file = context.get_temp_filename(suffix=".db")
-            with create_store(store_file) as store:
-                # This performs all of the checks.
-                store.create_view_from_parquet(src_path, schema)
-                store.drop_view(schema.name)
+        data_file_path = Path(file_schema.path)
+        if data_file_path.suffix == ".parquet" or not use_duckdb():
+            scratch_dir = DsgridRuntimeConfig.load().get_scratch_dir()
+            with ScratchDirContext(scratch_dir) as context:
+                if data_file_path.suffix == ".csv":
+                    # This is a workaround for time zone issues between Spark, Pandas,
+                    # and Chronify when reading CSV files.
+                    # Chronify can ingest them correctly when we go to Parquet first.
+                    # This is really only a test issue because normal dsgrid users will not
+                    # use Spark with CSV data files.
+                    src_path = context.get_temp_filename(suffix=".parquet")
+                    write_dataframe(load_data_df, src_path)
+                else:
+                    src_path = data_file_path
+                store_file = context.get_temp_filename(suffix=".db")
+                with create_store(store_file) as store:
+                    # This performs all of the checks.
+                    store.create_view_from_parquet(src_path, chronify_schema)
+                    store.drop_view(chronify_schema.name)
+        else:
+            # For CSV and JSON files, use in-memory store with ingest_table.
+            # This avoids the complexity of converting to parquet.
+            with create_in_memory_store() as store:
+                # ingest_table performs all of the time checks.
+                store.ingest_table(load_data_df.toPandas(), chronify_schema)
+                store.drop_table(chronify_schema.name)
 
         self._check_model_year_time_consistency(load_data_df)
 

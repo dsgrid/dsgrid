@@ -1,6 +1,5 @@
 import copy
 import getpass
-import os
 import shutil
 from pathlib import Path
 
@@ -38,7 +37,6 @@ from dsgrid.spark.types import DataFrame
 from dsgrid.tests.common import (
     check_configs_update,
     create_local_test_registry,
-    TEST_DATASET_DIRECTORY,
 )
 from dsgrid.utils.files import dump_data, load_data
 from dsgrid.utils.id_remappings import (
@@ -71,7 +69,6 @@ def test_register_project_and_dataset(mutable_cached_registry, tmp_path):
     dimension_mapping_id = dimension_mapping_ids[0]
     user = getpass.getuser()
     log_message = "initial registration"
-    dataset_path = TEST_DATASET_DIRECTORY / dataset_id
 
     project_config = project_mgr.get_by_id(project_id, "1.2.0")
     assert project_config.model.status == ProjectRegistryStatus.COMPLETE
@@ -91,7 +88,7 @@ def test_register_project_and_dataset(mutable_cached_registry, tmp_path):
         dataset_config_file = (
             test_project_dir / "datasets" / "modeled" / "comstock" / "dataset.json5"
         )
-        dataset_mgr.register(dataset_config_file, dataset_path, user, log_message)
+        dataset_mgr.register(dataset_config_file, user, log_message)
 
     # Duplicate mappings get re-used.
     mapping_ids = dimension_mapping_mgr.list_ids()
@@ -178,7 +175,6 @@ def test_register_duplicate_project_rollback_dimensions(tmp_registry_db):
     with make_test_data_registry(
         tmp_path,
         test_project_dir,
-        dataset_path=TEST_DATASET_DIRECTORY,
         database_url=url,
         include_projects=False,
         include_datasets=False,
@@ -214,10 +210,6 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
         dataset_config_file = dataset_dir / "dataset.json5"
         dataset_id = load_data(dataset_config_file)["dataset_id"]
         dataset_mapping_file = dataset_dir / "dimension_mappings.json5"
-        dataset_path = (
-            Path(os.environ.get("DSGRID_LOCAL_DATA_DIRECTORY", TEST_DATASET_DIRECTORY))
-            / "test_efs_comstock"
-        )
         subsectors_file = (
             dataset_dir
             / "dimension_mappings"
@@ -242,7 +234,6 @@ def test_register_and_submit_rollback_on_failure(tmp_registry_db):
             with pytest.raises(DSGInvalidDataset):
                 manager.project_manager.register_and_submit_dataset(
                     dataset_config_file,
-                    dataset_path,
                     project_id,
                     getpass.getuser(),
                     "register dataset and submit",
@@ -730,10 +721,8 @@ def test_register_submit_dataset_long_workflow(tmp_registry_db):
             replace_dimension_mapping_names_with_current_ids(filename, dim_mapping_mappings)
 
         manager.project_manager.register(project_config_file, user, "register project")
-        dataset_path = TEST_DATASET_DIRECTORY / dataset_id
         manager.dataset_manager.register(
             dataset_config_file,
-            dataset_path,
             user,
             "register dataset",
         )

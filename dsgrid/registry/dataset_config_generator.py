@@ -109,14 +109,16 @@ def find_matching_project_base_dimension(
     if project_config is None:
         return None, checked_project_dim_ids
 
-    for dim_type in (x for x in DimensionType if x != DimensionType.TIME):
-        for dim in project_config.list_base_dimensions_with_records(dimension_type=dim_type):
-            project_records = sorted(dim.get_unique_ids())
-            checked_project_dim_ids.add(dim.model.dimension_id)
-            if sorted_record_ids == project_records and (
-                no_prompts or get_user_input_on_dimension_match(dim, "project base dimension")
-            ):
-                return make_dimension_ref(dim), checked_project_dim_ids
+    if dimension_type == DimensionType.TIME:
+        return None, checked_project_dim_ids
+
+    for dim in project_config.list_base_dimensions_with_records(dimension_type=dimension_type):
+        project_records = sorted(dim.get_unique_ids())
+        checked_project_dim_ids.add(dim.model.dimension_id)
+        if sorted_record_ids == project_records and (
+            no_prompts or get_user_input_on_dimension_match(dim, "project base dimension")
+        ):
+            return make_dimension_ref(dim), checked_project_dim_ids
 
     return None, checked_project_dim_ids
 

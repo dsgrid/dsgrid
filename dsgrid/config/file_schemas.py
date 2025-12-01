@@ -1,12 +1,18 @@
+import logging
+from pathlib import Path
 from typing import Self
+
 from pydantic import Field, field_validator, model_validator
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
+from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidField
+from dsgrid.spark.functions import read_csv_duckdb, read_json, read_parquet
+from dsgrid.spark.types import DataFrame
 from dsgrid.utils.utilities import check_uniqueness
 
 
-SUPPORTED_CSV_TYPES = set(
+SUPPORTED_TYPES = set(
     (
         "BOOLEAN",
         "INT",
@@ -24,6 +30,43 @@ SUPPORTED_CSV_TYPES = set(
     )
 )
 
+DUCKDB_COLUMN_TYPES = {
+    "BOOLEAN": "BOOLEAN",
+    "INT": "INTEGER",
+    "INTEGER": "INTEGER",
+    "TINYINT": "TINYINT",
+    "SMALLINT": "INTEGER",
+    "BIGINT": "BIGINT",
+    "FLOAT": "FLOAT",
+    "DOUBLE": "DOUBLE",
+    "TIMESTAMP_TZ": "TIMESTAMP WITH TIME ZONE",
+    "TIMESTAMP_NTZ": "TIMESTAMP",
+    "STRING": "VARCHAR",
+    "TEXT": "VARCHAR",
+    "VARCHAR": "VARCHAR",
+}
+
+SPARK_COLUMN_TYPES = {
+    "BOOLEAN": "BOOLEAN",
+    "INT": "INT",
+    "INTEGER": "INT",
+    "TINYINT": "TINYINT",
+    "SMALLINT": "SMALLINT",
+    "BIGINT": "BIGINT",
+    "FLOAT": "FLOAT",
+    "DOUBLE": "DOUBLE",
+    "STRING": "STRING",
+    "TEXT": "STRING",
+    "VARCHAR": "STRING",
+    "TIMESTAMP_TZ": "TIMESTAMP",
+    "TIMESTAMP_NTZ": "TIMESTAMP_NTZ",
+}
+
+assert sorted(DUCKDB_COLUMN_TYPES.keys()) == sorted(SPARK_COLUMN_TYPES.keys())
+assert not SUPPORTED_TYPES.difference(DUCKDB_COLUMN_TYPES.keys())
+
+logger = logging.getLogger(__name__)
+
 
 class Column(DSGBaseModel):
     name: str = Field(description="Name of the column")
@@ -34,9 +77,6 @@ class Column(DSGBaseModel):
         "but an alternate name is being used, such as 'county' instead of 'geography'. "
         "dsgrid will rename any column that is set at runtime.",
     )
-
-
-class CsvColumn(Column):
     data_type: str | None = Field(
         description="Type of the data in the column. If None, infer the type."
     )
@@ -48,60 +88,101 @@ class CsvColumn(Column):
             return None
 
         type_upper = data_type.upper()
-        if type_upper not in SUPPORTED_CSV_TYPES:
-            supported_data_types = sorted(SUPPORTED_CSV_TYPES)
+        if type_upper not in SUPPORTED_TYPES:
+            supported_data_types = sorted(SUPPORTED_TYPES)
             msg = f"{data_type=} is not one of {supported_data_types=}"
             raise ValueError(msg)
         return type_upper
 
 
-class CsvSchema(DSGBaseModel):
-    """Defines the format of a CSV data file."""
+class FileSchema(DSGBaseModel):
+    """Defines the format of a data file (CSV, JSON, Parquet)."""
 
-    columns: list[CsvColumn]
-
-    @model_validator(mode="after")
-    def check_consistency(self) -> Self:
-        if len(self.columns) < 1:
-            return self
-        has_data_type = self.columns[0].data_type is not None
-        for column in self.columns[1:]:
-            has_data_type_ = column.data_type is not None
-            if has_data_type_ != has_data_type:
-                msg = (
-                    "All columns must define data_type or no columns can can define "
-                    f"data_type: {self.columns}"
-                )
-                raise ValueError(msg)
-        check_uniqueness([(x.name for x in self.columns)], "column names")
-        return self
-
-    def defines_data_types(self) -> bool:
-        """Return True if the columns define data types."""
-        return self.columns[0].data_type is not None
-
-    def get_data_type_mapping(self) -> dict[str, str] | None:
-        """Return the mapping of column to data type. Return None if data types are not defined."""
-        if not self.defines_data_types():
-            return None
-        return {x.name: x.data_type for x in self.columns}  # type: ignore
-
-
-class ParquetSchema(DSGBaseModel):
-    """Defines the format of a Parquet data file."""
-
-    columns: list[Column]
+    path: str
+    columns: list[Column] = Field(
+        default=[], description="Custom schema for the columns in the file."
+    )
 
     @model_validator(mode="after")
     def check_consistency(self) -> Self:
-        check_uniqueness([(x.name for x in self.columns)], "column names")
+        if len(self.columns) > 1:
+            check_uniqueness((x.name for x in self.columns), "column names")
         return self
 
+    def get_data_type_mapping(self) -> dict[str, str]:
+        """Return the mapping of column to data type."""
+        return {x.name: x.data_type for x in self.columns if x.data_type is not None}
 
-def get_column_renames(schema: CsvSchema | ParquetSchema) -> dict[str, str]:
+
+def read_data_file(schema: FileSchema) -> DataFrame:
+    """Read a data file from a schema.
+
+    Parameters
+    ----------
+    schema : FileSchema
+        Schema defining the file path and column types.
+
+    Returns
+    -------
+    DataFrame
+        A Spark DataFrame containing the file data.
+    """
+    path = Path(schema.path)
+    if not path.exists():
+        msg = f"{path} does not exist"
+        raise FileNotFoundError(msg)
+
+    expected_columns = {x.name for x in schema.columns}
+
+    match path.suffix:
+        case ".parquet":
+            df = read_parquet(path)
+        case ".csv":
+            column_schema = _get_column_schema(schema, DUCKDB_COLUMN_TYPES)
+            df = read_csv_duckdb(path, schema=column_schema)
+        case ".json":
+            df = read_json(path)
+        case _:
+            msg = f"Unsupported file type: {path.suffix}"
+            raise DSGInvalidDataset(msg)
+
+    actual_columns = set(df.columns)
+    diff = expected_columns.difference(actual_columns)
+    if diff:
+        msg = f"Expected columns {diff} are not in {actual_columns=}"
+        raise DSGInvalidDataset(msg)
+
+    renames = _get_column_renames(schema)
+    df = _rename_columns(df, renames)
+    return df
+
+
+def _get_column_renames(schema: FileSchema) -> dict[str, str]:
     """Return a mapping of columns to rename."""
     mapping: dict[str, str] = {}
     for column in schema.columns:
         if column.dimension_type is not None and column.name != column.dimension_type.value:
             mapping[column.name] = column.dimension_type.value
     return mapping
+
+
+def _rename_columns(df: DataFrame, mapping: dict[str, str]) -> DataFrame:
+    for old_name, new_name in mapping.items():
+        df = df.withColumnRenamed(old_name, new_name)
+        logger.info("Renamed column %s to %s", old_name, new_name)
+    return df
+
+
+def _get_column_schema(schema: FileSchema, backend_mapping: dict) -> dict[str, str] | None:
+    column_types = schema.get_data_type_mapping()
+    if column_types is None:
+        return None
+    mapped_schema: dict[str, str] = {}
+    for key, val in column_types.items():
+        col_type = val.upper()
+        if col_type not in backend_mapping:
+            options = " ".join(sorted(backend_mapping.keys()))
+            msg = f"column type = {val} is not supported. {options=}"
+            raise DSGInvalidField(msg)
+        mapped_schema[key] = backend_mapping[col_type]
+    return mapped_schema

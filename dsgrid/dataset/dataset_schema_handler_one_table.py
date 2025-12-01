@@ -16,10 +16,8 @@ from dsgrid.spark.types import (
 from dsgrid.utils.dataset import (
     convert_types_if_necessary,
 )
-from dsgrid.utils.spark import (
-    check_for_nulls,
-    read_dataframe,
-)
+from dsgrid.config.file_schemas import read_data_file
+from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
@@ -45,7 +43,10 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         **kwargs,
     ) -> Self:
         if store is None:
-            df = read_dataframe(config.load_data_path)
+            if config.data_file_schema is None:
+                msg = "Cannot load dataset without data file schema or store"
+                raise DSGInvalidDataset(msg)
+            df = read_data_file(config.data_file_schema)
         else:
             df = store.read_table(config.model.dataset_id, config.model.version)
         load_data_df = config.add_trivial_dimensions(df)

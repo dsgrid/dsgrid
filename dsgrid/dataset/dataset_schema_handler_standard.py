@@ -29,10 +29,8 @@ from dsgrid.utils.dataset import (
     apply_scaling_factor,
     convert_types_if_necessary,
 )
-from dsgrid.utils.spark import (
-    check_for_nulls,
-    read_dataframe,
-)
+from dsgrid.config.file_schemas import read_data_file
+from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
 
@@ -56,8 +54,14 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         **kwargs,
     ) -> Self:
         if store is None:
-            load_data_df = read_dataframe(config.load_data_path)
-            load_data_lookup = read_dataframe(config.load_data_lookup_path)
+            if config.data_file_schema is None:
+                msg = "Cannot load dataset without data file schema or store"
+                raise DSGInvalidDataset(msg)
+            if config.lookup_file_schema is None:
+                msg = "STANDARD schema requires lookup_data_file"
+                raise DSGInvalidDataset(msg)
+            load_data_df = read_data_file(config.data_file_schema)
+            load_data_lookup = read_data_file(config.lookup_file_schema)
         else:
             load_data_df = store.read_table(config.model.dataset_id, config.model.version)
             load_data_lookup = store.read_lookup_table(

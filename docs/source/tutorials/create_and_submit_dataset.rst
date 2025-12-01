@@ -67,7 +67,6 @@ instructions on how to assign values in this file.
 
 .. code-block:: JavaScript
 
-      data_schema_type: "standard",
       trivial_dimensions: [
         "sector",
         "weather_year",
@@ -75,10 +74,19 @@ instructions on how to assign values in this file.
       // The time in this dataset has no time zone. It is based on the local time perceived by the
       // people being modeled. dsgrid will map times to the project's geography time zone.
       use_project_geography_time_zone: true,
-      data_schema: {
-        table_format: {
-          format_type: "pivoted",
-          pivoted_dimension_type: "metric",
+      table_schema: {
+        data_schema: {
+          data_schema_type: "standard",
+          table_format: {
+            format_type: "pivoted",
+            pivoted_dimension_type: "metric",
+          },
+        },
+        data_file: {
+          path: "./load_data.parquet",
+        },
+        lookup_data_file: {
+          path: "./load_data_lookup.parquet",
         },
       },
 
@@ -313,9 +321,10 @@ Records file snippet::
    the data size. Smaller datasets may succeed with Spark in local mode. Refer to
    :ref:`spark-overview` to setup a Spark cluster.
 
-   This command assumes that ``dataset.json5``, ``dimension_mappings.json5``,
-   and the directory containing ``load_data.parquet`` and ``load_data_lookup.parquet`` are in a
-   directory called ``base_dir``.
+   This command assumes that ``dataset.json5`` and ``dimension_mappings.json5`` are in a
+   directory called ``base_dir``, and that the data files (``load_data.parquet`` and
+   ``load_data_lookup.parquet``) are in paths relative to the config file as specified in
+   the ``table_schema`` section.
 
    When running this command dsgrid will perform numerous validations in order to verify dataset
    consistency and that the project requirements are met. It may take up to an hour on an HPC
@@ -331,5 +340,4 @@ Records file snippet::
         --project-id dsgrid_conus_2022 \
         --dimension-mapping-file base_dir/dimension_mappings.json5 \
         --log-message "Register and submit TEMPO dataset" \
-        base_dir/dataset.json5 \
-        base_dir/tempo_load_data
+        base_dir/dataset.json5

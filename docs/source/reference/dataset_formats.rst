@@ -13,7 +13,8 @@ Requirements
    need or want another optimized columnar file format, please contact the dsgrid team.
 2. If the data tables contain time-series data, each unique time array must contain an identical
    range of timestamps.
-3. Values of dimension columns must be strings. This includes ``model_year`` and ``weather_year``.
+3. Values of dimension columns except ``model_year`` and ``weather_year`` must be strings.
+   ``model_year`` and ``weather_year`` can be integers.
 4. Each dimension column name except time must match dsgrid dimension types (geography, sector,
    subsector, etc.).
 5. The values in each dimension column must match the dataset's dimension records.
@@ -34,9 +35,10 @@ CSV Files
 While not generally recommended for data files, dsgrid does support CSV files. By default,
 dsgrid will let Spark and DuckDB attempt to infer the schema of the file. Because there may be
 cases of type ambiguities, such as integer vs string, integer vs float, and timestamps with time
-zones, dsgrid provides a mechanism of defining a schema.
+zones, dsgrid provides a mechanism for defining column data types directly in the dataset
+configuration.
 
-Consider this example::
+Consider this example that uses county FIPS codes to identify the geography of each data point::
 
     +----------------------+---------+------------------+--------------------+-------+
     |             timestamp|geography|          scenario|           subsector|  value|
@@ -46,18 +48,24 @@ Consider this example::
     +----------------------+---------+------------------+--------------------+-------|
 
 The default behavior of IO libraries like Pandas, Spark, and DuckDB is to infer data types by
-inspecting the data. They will all decide that the geography column contains integers. The
-leading zeros will be dropped. All comparisons with the project's dimensions will fail.
+inspecting the data. They will all decide that the geography column contains integers and drop
+the leading zeros. This will result in an invalid geography column, which is required to be a
+string data type, and will not match the project's geography dimension (assuming that the project is
+also defined over county FIPS codes).
 
 Secondly, you may want to specify the minimum required size for each number. For example,
 if you don't need the precision that comes with 8-byte floats, choose ``FLOAT`` and
 Spark/DuckDB will store all values in 4-byte floats, halving the required storage size.
 
-dsgrid will look for a schema file in the same directory as the data file. For example, if
-your data file is called ``load_data.csv``, dsgrid will look for ``load_data_schema.json``
-(or ``load_data_schema.json5``). The format of the schema file is shown below.
+.. _csv-data-types:
 
-The supported data types are:
+Specifying Column Data Types
+----------------------------
+To specify column data types, add a ``columns`` field to the ``data_file`` (or ``lookup_data_file``)
+section in your dataset configuration. You can specify types for all columns or just a subset -
+columns without explicit types will have their types inferred.
+
+The supported data types are (case-insensitive):
 
     - BOOLEAN: boolean
     - INT: 4-byte integer
@@ -73,37 +81,117 @@ The supported data types are:
     - TIMESTAMP_TZ: timestamp with time zone
     - TIMESTAMP_NTZ: timestamp without time zone
 
-Example schema file:
+Example dataset configuration with column data types:
 
-.. code-block:: json
+.. code-block:: JavaScript
 
-    {
-      "columns": [
-        {
-          "name": "timestamp",
-          "data_type": "TIMESTAMP_TZ"
+    table_schema: {
+      data_schema: {
+        data_schema_type: "one_table",
+        table_format: {
+          format_type: "unpivoted",
         },
-        {
-          "name": "geography",
-          "data_type": "STRING"
-        },
-        {
-          "name": "scenario",
-          "data_type": "STRING"
-        },
-        {
-          "name": "subsector",
-          "data_type": "STRING"
-        },
-        {
-          "name": "value",
-          "data_type": "FLOAT"
-        }
-      ]
+      },
+      data_file: {
+        path: "./load_data.csv",
+        columns: [
+          {
+            name: "timestamp",
+            data_type: "TIMESTAMP_TZ",
+          },
+          {
+            name: "geography",
+            data_type: "STRING",
+          },
+          {
+            name: "scenario",
+            data_type: "STRING",
+          },
+          {
+            name: "subsector",
+            data_type: "STRING",
+          },
+          {
+            name: "value",
+            data_type: "FLOAT",
+          },
+        ],
+      },
     }
 
-.. warning:: Definition of data_type must be consistent across all columns. All must
-     define a value or none can.
+You can also specify types for only the columns that need explicit typing:
+
+.. code-block:: JavaScript
+
+    data_file: {
+      path: "./load_data.csv",
+      columns: [
+        {
+          name: "geography",
+          data_type: "STRING",  // Prevent FIPS codes from being read as integers
+        },
+      ],
+    }
+
+
+Custom Column Names
+===================
+By default, dsgrid expects data files to have columns named after the standard dimension types
+(``geography``, ``sector``, ``subsector``, ``metric``, etc.). However, your data files may use
+different column names. dsgrid provides a mechanism to map custom column names to the expected
+dimension types.
+
+To rename columns, add the ``dimension_type`` field to the column definition. This tells dsgrid
+what dimension the column represents, and dsgrid will automatically rename it at runtime.
+
+This feature works for all file formats (Parquet, CSV, JSON), not just CSV files.
+
+Example with custom column names:
+
+.. code-block:: JavaScript
+
+    data_file: {
+      path: "./load_data.parquet",
+      columns: [
+        {
+          name: "county",           // Actual column name in the file
+          dimension_type: "geography",  // Will be renamed to "geography"
+        },
+        {
+          name: "end_use",          // Actual column name in the file
+          dimension_type: "metric",     // Will be renamed to "metric"
+        },
+        {
+          name: "building_type",    // Actual column name in the file
+          dimension_type: "subsector",  // Will be renamed to "subsector"
+        },
+      ],
+    }
+
+You can combine ``dimension_type`` with ``data_type`` when using CSV files:
+
+.. code-block:: JavaScript
+
+    data_file: {
+      path: "./load_data.csv",
+      columns: [
+        {
+          name: "fips_code",
+          data_type: "STRING",
+          dimension_type: "geography",
+        },
+        {
+          name: "fuel_type",
+          data_type: "STRING",
+          dimension_type: "metric",
+        },
+        {
+          name: "consumption",
+          data_type: "DOUBLE",
+          // No dimension_type - column name stays as "consumption"
+        },
+      ],
+    }
 
 
 Time
@@ -131,6 +219,57 @@ Time zone unaware timestamps
 ----------------------------
 Time-zone-unaware timestamps that will be interpreted as local time should be written as UTC
 timestamps (i.e., 12pm with no time zone should be written as 12pm UTC).
+
+
+Table Schema
+============
+The ``table_schema`` section of a dataset configuration defines the data file locations and
+schema type. It has the following structure:
+
+.. code-block:: JavaScript
+
+    table_schema: {
+      data_schema: {
+        data_schema_type: "standard",  // or "one_table"
+        table_format: {
+          format_type: "pivoted",      // or "unpivoted"
+          pivoted_dimension_type: "metric",  // required if pivoted
+        },
+      },
+      data_file: {
+        path: "./load_data.parquet",
+        columns: [                     // optional
+          {
+            name: "column_name",       // actual name in the file
+            data_type: "STRING",       // optional, for type override
+            dimension_type: "geography",  // optional, for column renaming
+          },
+        ],
+      },
+      lookup_data_file: {              // required for "standard" schema
+        path: "./load_data_lookup.parquet",
+        columns: [],                   // optional, same structure as data_file
+      },
+      missing_associations: "./missing_associations.parquet",  // optional
+    }
+
+Fields:
+
+- ``data_schema``: Defines the table structure (schema type and format).
+- ``data_file``: Main data file configuration (required).
+
+  - ``path``: Path to the data file. Can be relative to the config file.
+  - ``columns``: Optional list of column definitions for type overrides and renaming.
+
+    - ``name``: The actual column name in the file (required).
+    - ``data_type``: Data type override (optional). See :ref:`csv-data-types` for supported types.
+    - ``dimension_type``: The dsgrid dimension type this column represents (optional).
+      When specified, the column will be renamed to match the dimension type.
+
+- ``lookup_data_file``: Lookup file configuration (required for ``standard`` schema type).
+  Has the same structure as ``data_file``.
+- ``missing_associations``: Path to a file or directory defining missing dimension combinations
+  (optional, see :ref:`missing-associations`).
 
 
 Formats
@@ -305,3 +444,147 @@ There are no shifts, missing hours, or extra hours for daylight savings time.
 
 dsgrid can add support for other period formats. Please submit requests as
 needed.
+
+.. _missing-associations:
+
+Missing Associations
+====================
+Datasets may have missing dimension combinations (associations) - for example, a building model
+might not have data for certain geography-subsector combinations because those building types
+don't exist in those regions.
+
+dsgrid validates that datasets provide data for all expected dimension combinations. When a
+dataset legitimately lacks data for certain combinations, you must explicitly declare these
+missing associations.
+
+Declaring Missing Associations
+------------------------------
+Specify missing associations in the ``table_schema`` section of your dataset config:
+
+.. code-block:: JavaScript
+
+    table_schema: {
+      data_schema: { ... },
+      data_file: { path: "./load_data.parquet" },
+      missing_associations: "./missing_associations.parquet",
+    }
+
+The ``missing_associations`` field can point to:
+
+1. **A single file** (Parquet) containing all missing combinations
+2. **A directory** containing multiple files, each for different dimension combinations
+
+File Format
+~~~~~~~~~~~
+Missing association files should contain columns for dimension types (all types except time).
+Each row represents a combination of dimension records that legitimately has no data.
+
+A file can contain any subset of the non-time dimension columns. During validation, dsgrid
+filters out rows from the expected associations that match the missing associations on the
+columns present in the file.
+
+Example ``missing_associations.parquet`` with all non-time dimensions::
+
+    +---------+------+-----------+--------+----------+------------+
+    |geography|sector|  subsector|  metric|model_year|weather_year|
+    +---------+------+-----------+--------+----------+------------+
+    |    01001|   com|large_hotel|heating |      2020|        2018|
+    |    01001|   com|  warehouse|cooling |      2020|        2018|
+    |    01003|   com|large_hotel|heating |      2020|        2018|
+    +---------+------+-----------+--------+----------+------------+
+
+You can also use a simplified format with only the columns that vary::
+
+    +---------+-----------+
+    |geography|  subsector|
+    +---------+-----------+
+    |    01001|large_hotel|
+    |    01001|  warehouse|
+    |    01003|large_hotel|
+    +---------+-----------+
+
+Directory Format
+~~~~~~~~~~~~~~~~
+When using a directory, create separate files for different dimension combinations. File names
+should follow the pattern ``<dimension_type1>__<dimension_type2>.csv`` (note the double
+underscore).
+
+Example directory structure::
+
+    missing_associations/
+    ├── geography__subsector.csv
+    ├── geography__metric.csv
+    └── subsector__metric.csv
+
+Each file contains the relevant dimension columns::
+
+    # geography__subsector.csv
+    geography,subsector
+    01001,large_hotel
+    01001,warehouse
+
+Iterative Workflow for Identifying Missing Associations
+-------------------------------------------------------
+If you don't know which dimension combinations are missing in your dataset, dsgrid provides
+an iterative workflow to help you identify them:
+
+1. **Run registration without missing associations**
+
+   Attempt to register your dataset without specifying ``missing_associations``. If there are
+   missing combinations, registration will fail.
+
+2. **Review the generated output file**
+
+   When registration fails due to missing associations, dsgrid writes a Parquet file named
+   ``<dataset_id>__missing_dimension_record_combinations.parquet`` to the current directory.
+   This file contains all the missing dimension combinations with all dimensions. This file can
+   contain huge numbers of rows.
+
+3. **Analyze patterns in the missing data**
+
+   dsgrid also analyzes the missing data to identify minimal patterns that explain the gaps.
+   These patterns are logged and can help you understand *why* data is missing. For example,
+   you might see::
+
+       Pattern 1: geography | subsector = 01001 | large_hotel (150 missing rows)
+       Pattern 2: subsector = warehouse (3000 missing rows)
+
+   This tells you that all combinations involving county 01001 and large_hotel are missing,
+   and all combinations involving warehouse are missing.
+
+   dsgrid records these minimal patterns in dimension-specific combination files, such as
+   ``./missing_associations/geography__subsector.csv`` and
+   ``./missing_associations/sector__subsector.csv``.
+
+4. **Review and edit the missing associations file**
+
+   Examine the generated CSV files to verify that these combinations are legitimately missing
+   (not data errors). You may want to:
+
+   - Keep the files as they are if all missing combinations are expected.
+   - Remove rows that represent data errors you need to fix.
+
+5. **Re-run registration with missing associations**
+
+   Add the ``missing_associations`` field to your ``table_schema`` pointing to the file:
+
+   .. code-block:: JavaScript
+
+       table_schema: {
+         data_schema: { ... },
+         data_file: { path: "./load_data.parquet" },
+         missing_associations: "./missing_associations",
+       }
+
+   Run registration again. If successful, the missing associations will be stored in the
+   registry alongside your dataset.
+
+Validation Behavior
+-------------------
+During dataset registration, dsgrid checks that:
+
+1. All dimension combinations in the data files are valid (records exist in dimensions).
+2. All expected combinations either have data or are declared as missing.
+
+If dsgrid finds unexpected missing combinations, it will report an error and write the
+missing combinations to a file as described above.

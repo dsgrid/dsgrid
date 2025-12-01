@@ -122,12 +122,21 @@ def test_duplicate_dimensions(tmp_registry_db):
     with RegistryManager.load(conn, offline_mode=True) as manager:
         dimension_mgr = manager.dimension_manager
         dimension_mgr.register(test_project_dir / "dimensions.json5", user, log_message)
+    with RegistryManager.load(conn, offline_mode=True) as manager:
+        dimension_mgr = manager.dimension_manager
+        dimension_mgr.register(test_project_dir / "dimensions.json5", user, log_message)
 
         # Registering duplicate dimensions and mappings are allowed.
         # If names are the same, they are replaced. Otherwise, new ones get registered.
         dimension_ids = dimension_mgr.list_ids()
         dim_config_file = test_project_dir / "dimensions.json5"
+        # Registering duplicate dimensions and mappings are allowed.
+        # If names are the same, they are replaced. Otherwise, new ones get registered.
+        dimension_ids = dimension_mgr.list_ids()
+        dim_config_file = test_project_dir / "dimensions.json5"
 
+        dimension_mgr.register(dim_config_file, user, log_message)
+        assert len(dimension_mgr.list_ids()) == len(dimension_ids)
         dimension_mgr.register(dim_config_file, user, log_message)
         assert len(dimension_mgr.list_ids()) == len(dimension_ids)
 

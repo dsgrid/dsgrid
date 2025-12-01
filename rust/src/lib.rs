@@ -102,14 +102,27 @@ struct InternalPattern {
     closed: bool,
 }
 
+/// Flattened row-major encoded dataset for better cache locality
+struct EncodedDataset {
+    /// Flattened row-major data: [row0_col0, row0_col1, ..., row1_col0, ...]
+    data: Vec<u16>,
+    cols: usize,
+    rows: usize,
+}
+
+impl EncodedDataset {
+    #[inline]
+    fn get(&self, row: usize, col: usize) -> u16 {
+        self.data[row * self.cols + col]
+    }
+}
+
 /// Configuration for pattern finding
 #[pyclass]
 #[derive(Clone)]
 pub struct PatternConfig {
     #[pyo3(get, set)]
     pub max_depth: usize,
-    #[pyo3(get, set)]
-    pub only_missing_values: bool,
     #[pyo3(get, set)]
     pub prune_miss_empty: bool,
     #[pyo3(get, set)]
@@ -118,27 +131,29 @@ pub struct PatternConfig {
     pub threads: usize,
     #[pyo3(get, set)]
     pub verbose: bool,
+    #[pyo3(get, set)]
+    pub assume_unique_input: bool,
 }
 
 #[pymethods]
 impl PatternConfig {
     #[new]
-    #[pyo3(signature = (max_depth=0, only_missing_values=false, prune_miss_empty=true, ratio_threshold=50.0, threads=0, verbose=false))]
+    #[pyo3(signature = (max_depth=0, prune_miss_empty=true, ratio_threshold=50.0, threads=0, verbose=false, assume_unique_input=true))]
     fn new(
         max_depth: usize,
-        only_missing_values: bool,
         prune_miss_empty: bool,
         ratio_threshold: f64,
         threads: usize,
         verbose: bool,
+        assume_unique_input: bool,
     ) -> Self {
         PatternConfig {
             max_depth,
-            only_missing_values,
             prune_miss_empty,
             ratio_threshold,
             threads,
             verbose,
+            assume_unique_input,
         }
     }
 }
@@ -146,7 +161,7 @@ impl PatternConfig {
 /// Read and encode a Parquet file in two streaming passes.
 fn read_and_encode_parquet(
     path: &str,
-) -> Result<(Vec<Vec<u16>>, Vec<Vec<String>>, Vec<String>)> {
+) -> Result<(EncodedDataset, Vec<Vec<String>>, Vec<String>)> {
     let mut f = File::open(path).with_context(|| format!("Opening parquet file {}", path))?;
     let metadata = read_metadata(&mut f).context("Reading parquet metadata")?;
     let schema: Schema = infer_schema(&metadata).context("Inferring schema")?;
@@ -218,23 +233,27 @@ fn read_and_encode_parquet(
         dicts.iter().map(|d| d.len()).collect::<Vec<_>>()
     );
 
-    // PASS 2: Encode to u16
-    eprintln!("  Pass 2: Encoding to u16 for {}", path);
+    // PASS 2: Encode to flattened u16 buffer
+    eprintln!("  Pass 2: Encoding to flat u16 buffer for {}", path);
     let mut f2 = File::open(path).with_context(|| format!("Re-opening parquet file {}", path))?;
     let metadata2 = read_metadata(&mut f2).context("Re-reading parquet metadata")?;
     let row_groups2 = metadata2.row_groups.clone();
     let reader2 = FileReader::new(f2, row_groups2, schema.clone(), None, None, None);
 
-    let mut encoded: Vec<Vec<u16>> = Vec::new();
+    let mut data: Vec<u16> = Vec::new();
+    let mut total_rows = 0usize;
 
     for chunk_res in reader2 {
         let chunk = chunk_res.context("Reading parquet chunk in pass 2")?;
         let arrays = chunk.arrays();
         let chunk_len = arrays[0].len();
+        total_rows += chunk_len;
 
-        for row_idx in 0..chunk_len {
-            let mut row = Vec::with_capacity(d);
-            for (ci, arr) in arrays.iter().enumerate() {
+        // Pre-calculate codes for each column in this chunk for better memory access
+        let mut column_codes: Vec<Vec<u16>> = Vec::with_capacity(d);
+        for (ci, arr) in arrays.iter().enumerate() {
+            let mut col_vec = Vec::with_capacity(chunk_len);
+            for row_idx in 0..chunk_len {
                 let val = if arr.is_null(row_idx) {
                     String::new()
                 } else {
@@ -242,27 +261,35 @@ fn read_and_encode_parquet(
                         .with_context(|| format!("Getting string value for column '{}' in pass 2", col_names[ci]))?
                 };
                 let code = *maps[ci].get(&val).unwrap();
-                row.push(code);
+                col_vec.push(code);
             }
-            encoded.push(row);
+            column_codes.push(col_vec);
+        }
+
+        // Interleave into row-major flat buffer
+        for row_idx in 0..chunk_len {
+            for col_idx in 0..d {
+                data.push(column_codes[col_idx][row_idx]);
+            }
         }
     }
 
-    eprintln!("  Encoded {} rows", encoded.len());
+    eprintln!("  Encoded {} rows", total_rows);
+    let encoded = EncodedDataset { data, cols: d, rows: total_rows };
     Ok((encoded, dicts, col_names))
 }
 
 /// Build inverted index
 fn build_index(
-    encoded: &[Vec<u16>],
-    d: usize,
+    encoded: &EncodedDataset,
     dicts: &[Vec<String>],
 ) -> Vec<Vec<RoaringBitmap>> {
-    let mut index: Vec<Vec<RoaringBitmap>> = (0..d)
+    let mut index: Vec<Vec<RoaringBitmap>> = (0..encoded.cols)
         .map(|c| vec![RoaringBitmap::new(); dicts[c].len()])
         .collect();
-    for (rid, row) in encoded.iter().enumerate() {
-        for (c, &val_code) in row.iter().enumerate() {
+    for rid in 0..encoded.rows {
+        for c in 0..encoded.cols {
+            let val_code = encoded.get(rid, c);
             index[c][val_code as usize].insert(rid as u32);
         }
     }
@@ -272,8 +299,9 @@ fn build_index(
 /// Check if a pattern is closed
 fn is_pattern_closed(
     pattern: &InternalPattern,
-    encoded_data: &[Vec<u16>],
+    encoded_data: &EncodedDataset,
     dict_sizes: &[usize],
+    assume_unique: bool,
 ) -> bool {
     let pattern_cols_set: AHashSet<usize> = pattern.cols.iter().copied().collect();
     let remaining_cols: Vec<usize> = (0..dict_sizes.len())
@@ -284,15 +312,32 @@ fn is_pattern_closed(
         return !pattern.row_set.is_empty();
     }
 
-    let expected_combinations: u64 = remaining_cols
-        .iter()
-        .map(|&c| dict_sizes[c] as u64)
-        .product();
+    // Calculate expected combinations with overflow protection
+    let mut expected_combinations: u64 = 1;
+    for &c in &remaining_cols {
+        if let Some(product) = expected_combinations.checked_mul(dict_sizes[c] as u64) {
+            expected_combinations = product;
+        } else {
+            expected_combinations = u64::MAX; // Saturate on overflow
+        }
+    }
 
+    let num_rows = pattern.row_set.len();
+
+    // Fast rejection: if we have fewer rows than expected combinations, can't be closed
+    if num_rows < expected_combinations {
+        return false;
+    }
+
+    // O(1) fast path: if input rows are unique, num_rows == expected_combinations means closed
+    if assume_unique {
+        return num_rows == expected_combinations;
+    }
+
+    // Slow path: actually count unique tuples
     let mut actual_combinations = AHashSet::new();
     for row_id in pattern.row_set.iter() {
-        let row = &encoded_data[row_id as usize];
-        let combo: Vec<u16> = remaining_cols.iter().map(|&c| row[c]).collect();
+        let combo: Vec<u16> = remaining_cols.iter().map(|&c| encoded_data.get(row_id as usize, c)).collect();
         actual_combinations.insert(combo);
     }
 
@@ -345,53 +390,85 @@ fn should_expand(p: &InternalPattern, config: &PatternConfig) -> bool {
     true
 }
 
-/// Expand a single pattern
+/// Expand a single pattern using pivot strategy for efficiency
 fn expand_one(
     pat: &InternalPattern,
     index_data: &[Vec<RoaringBitmap>],
     d: usize,
     config: &PatternConfig,
-    value_sets: Option<&[AHashSet<u16>]>,
+    encoded_data: &EncodedDataset,
 ) -> Vec<InternalPattern> {
     if !should_expand(pat, config) {
         return Vec::new();
     }
     let last_col = *pat.cols.last().unwrap();
     let mut children = Vec::new();
+    let current_rows = pat.row_set.len();
 
     for new_col in (last_col + 1)..d {
         if pat.cols.contains(&new_col) {
             continue;
         }
-        let candidate_values: Vec<usize> = if config.only_missing_values {
-            if let Some(val_sets) = value_sets {
-                val_sets[new_col].iter().map(|&v| v as usize).collect()
-            } else {
-                (0..index_data[new_col].len()).collect()
+
+        let dict_len = index_data[new_col].len();
+
+        // PIVOT OPTIMIZATION:
+        // If the number of rows in the pattern is smaller than the dictionary size,
+        // iterate the rows to find values (sparse approach) rather than iterating
+        // all dictionary values and doing intersections (dense approach).
+        if (current_rows as usize) < dict_len {
+            // Row-based expansion (Sparse) - faster when pattern has few rows
+            let mut seen_values = AHashSet::new();
+            for rid in pat.row_set.iter() {
+                let val = encoded_data.get(rid as usize, new_col);
+                seen_values.insert(val);
+            }
+
+            for val in seen_values {
+                let mut new_row_set = pat.row_set.clone();
+                new_row_set &= &index_data[new_col][val as usize];
+
+                if !new_row_set.is_empty() {
+                    let mut new_cols = pat.cols.clone();
+                    new_cols.push(new_col);
+                    let mut new_vals = pat.vals.clone();
+                    new_vals.push(val);
+
+                    children.push(InternalPattern {
+                        cols: new_cols,
+                        vals: new_vals,
+                        row_set: new_row_set,
+                        closed: false,
+                    });
+                }
             }
         } else {
-            (0..index_data[new_col].len()).collect()
-        };
+            // Value-based expansion (Dense) - faster when dictionary is small
+            for new_val_code in 0..dict_len {
+                // Skip empty global bitmaps
+                if index_data[new_col][new_val_code].is_empty() {
+                    continue;
+                }
 
-        for new_val_code in candidate_values {
-            let mut new_row_set = pat.row_set.clone();
-            new_row_set &= &index_data[new_col][new_val_code];
+                let mut new_row_set = pat.row_set.clone();
+                new_row_set &= &index_data[new_col][new_val_code];
 
-            if new_row_set.is_empty() {
-                continue;
+                if new_row_set.is_empty() {
+                    continue;
+                }
+
+                let mut new_cols = pat.cols.clone();
+                new_cols.push(new_col);
+                let mut new_vals = pat.vals.clone();
+                new_vals.push(new_val_code as u16);
+
+                children.push(InternalPattern {
+                    cols: new_cols,
+                    vals: new_vals,
+                    row_set: new_row_set,
+                    closed: false,
+                });
             }
-
-            let mut new_cols = pat.cols.clone();
-            new_cols.push(new_col);
-            let mut new_vals = pat.vals.clone();
-            new_vals.push(new_val_code as u16);
-
-            children.push(InternalPattern {
-                cols: new_cols,
-                vals: new_vals,
-                row_set: new_row_set,
-                closed: false,
-            });
         }
     }
     children
@@ -404,7 +481,7 @@ fn find_minimal_patterns(
     input_path: String,
     config: Option<PatternConfig>,
 ) -> PyResult<Vec<Pattern>> {
-    let config = config.unwrap_or_else(|| PatternConfig::new(0, false, true, 50.0, 0, false));
+    let config = config.unwrap_or_else(|| PatternConfig::new(0, true, 50.0, 0, false, true));
 
     if config.threads > 0 {
         rayon::ThreadPoolBuilder::new()
@@ -419,30 +496,13 @@ fn find_minimal_patterns(
 
     let d = columns.len();
     eprintln!("Columns ({}): {:?}", d, columns);
-    eprintln!("Input rows: {}", encoded_data.len());
+    eprintln!("Input rows: {}", encoded_data.rows);
 
     let dict_sizes: Vec<usize> = dicts.iter().map(|d| d.len()).collect();
     eprintln!("Dictionary sizes: {:?}", dict_sizes);
 
     eprintln!("Building data index...");
-    let index_data = build_index(&encoded_data, d, &dicts);
-
-    let value_sets: Option<Vec<AHashSet<u16>>> = if config.only_missing_values {
-        let mut mv = Vec::with_capacity(d);
-        for col in 0..d {
-            let mut hs = AHashSet::new();
-            for (val_code, bm) in index_data[col].iter().enumerate() {
-                if !bm.is_empty() {
-                    hs.insert(val_code as u16);
-                }
-            }
-            mv.push(hs);
-        }
-        Some(mv)
-    } else {
-        None
-    };
-
+    let index_data = build_index(&encoded_data, &dicts);
     eprintln!("Finished building index.");
 
     let mut level: Vec<InternalPattern> = Vec::new();
@@ -451,17 +511,7 @@ fn find_minimal_patterns(
 
     eprintln!("Generating single-column patterns...");
     for col in 0..d {
-        let candidate_values: Vec<usize> = if config.only_missing_values {
-            if let Some(vs) = &value_sets {
-                vs[col].iter().map(|&v| v as usize).collect()
-            } else {
-                (0..index_data[col].len()).collect()
-            }
-        } else {
-            (0..index_data[col].len()).collect()
-        };
-
-        for val_code in candidate_values {
+        for val_code in 0..index_data[col].len() {
             let row_set = index_data[col][val_code].clone();
             if row_set.is_empty() {
                 continue;
@@ -474,7 +524,7 @@ fn find_minimal_patterns(
                 closed: false,
             };
 
-            let is_closed = is_pattern_closed(&pat, &encoded_data, &dict_sizes);
+            let is_closed = is_pattern_closed(&pat, &encoded_data, &dict_sizes, config.assume_unique_input);
             pat.closed = is_closed;
 
             if is_closed {
@@ -514,7 +564,7 @@ fn find_minimal_patterns(
                     &index_data,
                     d,
                     &config,
-                    value_sets.as_ref().map(|v| &v[..]),
+                    &encoded_data,
                 )
             })
             .collect();
@@ -531,7 +581,7 @@ fn find_minimal_patterns(
         let mut next_level: Vec<InternalPattern> = Vec::new();
 
         for mut p in expanded {
-            let is_closed = is_pattern_closed(&p, &encoded_data, &dict_sizes);
+            let is_closed = is_pattern_closed(&p, &encoded_data, &dict_sizes, config.assume_unique_input);
             p.closed = is_closed;
 
             if is_closed {

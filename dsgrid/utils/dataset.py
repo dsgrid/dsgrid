@@ -286,7 +286,6 @@ def handle_dimension_association_errors(
         patterns = find_minimal_patterns_from_file(
             filename,
             max_depth=0,
-            only_missing_values=True,
             verbose=False,
         )
 

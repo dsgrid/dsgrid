@@ -181,7 +181,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
                     num_matching = len(actual.intersection(expected))
                     msg = (
                         f"Dataset records for dimension type {column} do not match expected "
-                        f"values. {missing=} {extra=} {expected=} {num_matching=}"
+                        f"values. {missing=} {extra=} {num_matching=}"
                     )
                     raise DSGInvalidDataset(msg)
 

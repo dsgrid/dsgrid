@@ -175,8 +175,9 @@ def _rename_columns(df: DataFrame, mapping: dict[str, str]) -> DataFrame:
 
 def _get_column_schema(schema: FileSchema, backend_mapping: dict) -> dict[str, str] | None:
     column_types = schema.get_data_type_mapping()
-    if column_types is None:
+    if not column_types:
         return None
+
     mapped_schema: dict[str, str] = {}
     for key, val in column_types.items():
         col_type = val.upper()

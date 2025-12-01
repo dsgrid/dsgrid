@@ -1,6 +1,9 @@
 from datetime import datetime
+from pathlib import Path
 from typing import Generator
+from zoneinfo import ZoneInfo
 
+import pandas as pd
 import pytest
 
 from dsgrid.spark.functions import (
@@ -17,6 +20,7 @@ from dsgrid.spark.functions import (
     join,
     join_multiple_columns,
     pivot,
+    read_csv,
     select_expr,
     sql_from_df,
     unpersist,
@@ -26,6 +30,7 @@ from dsgrid.spark.types import (
     DataFrame,
     SparkSession,
 )
+from dsgrid.utils.files import dump_json_file
 from dsgrid.utils.spark import (
     get_spark_session,
 )
@@ -178,51 +183,51 @@ def test_join_multiple_columns(spark, dataframe):
     assert aggregate_single_value(df3, "sum", "value") == 1.0
 
 
-# def test_read_csv(tmp_path: Path) -> None:
-#     pdf = pd.DataFrame(
-#         {
-#             "a": range(3),
-#             "b": ["a", "b", "c"],
-#             "c": [float(i) for i in range(3)],
-#             "d": [datetime(2020, 1, 1, i, tzinfo=ZoneInfo("Etc/GMT+5")) for i in range(3)],
-#         }
-#     )
-#     filename = tmp_path / "load_data.csv"
-#     pdf.to_csv(filename, header=True, index=False)
-#     schema_file = tmp_path / "load_data_schema.json"
-#     schema = {
-#         "columns": [
-#             {
-#                 "name": "a",
-#                 "data_type": "integer",
-#             },
-#             {
-#                 "name": "b",
-#                 "data_type": "string",
-#             },
-#             {
-#                 "name": "c",
-#                 "data_type": "DOUBLE",
-#             },
-#             {
-#                 "name": "d",
-#                 "data_type": "TIMESTAMP_TZ",
-#             },
-#         ]
-#     }
-#     dump_json_file(schema, schema_file)
-#     df = read_csv(filename)
-#     values = df.collect()
-#     row = values[-1]
-#     assert isinstance(row.a, int) and row.a == 2
-#     assert isinstance(row.b, str) and row.b == "c"
-#     assert isinstance(row.c, float) and row.c == 2.0
-#     assert isinstance(row.d, datetime)
+def test_read_csv(tmp_path: Path) -> None:
+    pdf = pd.DataFrame(
+        {
+            "a": range(3),
+            "b": ["a", "b", "c"],
+            "c": [float(i) for i in range(3)],
+            "d": [datetime(2020, 1, 1, i, tzinfo=ZoneInfo("Etc/GMT+5")) for i in range(3)],
+        }
+    )
+    filename = tmp_path / "load_data.csv"
+    pdf.to_csv(filename, header=True, index=False)
+    schema_file = tmp_path / "load_data_schema.json"
+    schema = {
+        "columns": [
+            {
+                "name": "a",
+                "data_type": "integer",
+            },
+            {
+                "name": "b",
+                "data_type": "string",
+            },
+            {
+                "name": "c",
+                "data_type": "DOUBLE",
+            },
+            {
+                "name": "d",
+                "data_type": "TIMESTAMP_TZ",
+            },
+        ]
+    }
+    dump_json_file(schema, schema_file)
+    df = read_csv(filename)
+    values = df.collect()
+    row = values[-1]
+    assert isinstance(row.a, int) and row.a == 2
+    assert isinstance(row.b, str) and row.b == "c"
+    assert isinstance(row.c, float) and row.c == 2.0
+    assert isinstance(row.d, datetime)
 
-#     assert (
-#         len(df.filter("d >= '2020-01-01 00:00:00-05' and d <= '2020-01-01 02:00:00-05'").collect())
-#         == 3
-#     )
+    assert (
+        len(df.filter("d >= '2020-01-01 00:00:00-05' and d <= '2020-01-01 02:00:00-05'").collect())
+        == 3
+    )
 
 
 def test_select_expr(dataframe):

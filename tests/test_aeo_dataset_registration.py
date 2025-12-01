@@ -19,6 +19,7 @@ from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.registry.registry_database import RegistryDatabase
 from dsgrid.registry.registry_manager import RegistryManager
+from dsgrid.utils.files import load_json_file, dump_json_file
 from dsgrid.utils.spark import get_unique_values
 
 
@@ -69,7 +70,6 @@ def make_registry_for_aeo(
         Path to the data files for this dataset.
 
     """
-    from dsgrid.utils.files import load_data, dump_data
 
     create_local_test_registry(registry_path, conn=conn)
     dataset_dir = Path(f"datasets/benchmark/{dataset_name}")
@@ -78,9 +78,9 @@ def make_registry_for_aeo(
     with RegistryManager.load(conn, offline_mode=True) as manager:
         dataset_config_file = src_dir / dataset_dir / "dataset.json5"
         # Update the data file path to point to the actual data location
-        config = load_data(dataset_config_file)
+        config = load_json_file(dataset_config_file)
         config["table_schema"]["data_file"]["path"] = str(data_dir / "load_data.csv")
-        dump_data(config, dataset_config_file)
+        dump_json_file(config, dataset_config_file)
         manager.dataset_manager.register(dataset_config_file, user, log_message)
         logger.info(f"dataset={dataset_name} registered successfully!\n")
     return manager

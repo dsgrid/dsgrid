@@ -185,8 +185,6 @@ def test_invalid_load_data_lookup_column_name(register_dataset):
     for item in data:
         item["invalid_dimension"] = item.pop("subsector")
     dump_line_delimited_json(data, lookup_file)
-    # When columns are specified in the schema, the extra column validation now triggers first.
-    # The renamed column is detected as an unexpected column in the file.
     expected_errors["exception"] = DSGInvalidDimension
     expected_errors["match_msg"] = r"column=.*invalid_dimension.*is not expected"
 

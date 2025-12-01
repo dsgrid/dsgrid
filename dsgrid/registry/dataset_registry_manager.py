@@ -412,9 +412,9 @@ class DatasetRegistryManager(RegistryManagerBase):
             df = get_spark_session().createDataFrame(pd.read_csv(path, dtype="string"))
         else:
             df = read_dataframe(path)
-        for field in df.schema.fields:
-            if field.dataType != StringType():
-                df = df.withColumn(field.name, F.col(field.name).cast(StringType()))
+            for field in df.schema.fields:
+                if field.dataType != StringType():
+                    df = df.withColumn(field.name, F.col(field.name).cast(StringType()))
         return df
 
     def _read_table_from_user_path(
@@ -478,7 +478,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 if not config.has_user_schema:
                     assert (
                         orig_version is not None
-                    ), "orig_version must be set if config has no user schema"
+                    ), "orig_version must be set if config came from the registry"
                     missing_dfs.update(
                         self._store.read_missing_associations_tables(
                             config.model.dataset_id, orig_version
@@ -497,7 +497,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                 if not config.has_user_schema:
                     assert (
                         orig_version is not None
-                    ), "orig_version must be set if config has no user schema"
+                    ), "orig_version must be set if config came from the registry"
                     lk_df = self._store.read_lookup_table(config.model.dataset_id, orig_version)
                     ld_df = self._store.read_table(config.model.dataset_id, orig_version)
                     missing_dfs = self._store.read_missing_associations_tables(

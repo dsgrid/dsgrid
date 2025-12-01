@@ -258,7 +258,7 @@ Fields:
 - ``data_schema``: Defines the table structure (schema type and format).
 - ``data_file``: Main data file configuration (required).
 
-  - ``path``: Path to the data file. Can be relative to the config file.
+  - ``path``: Path to the data file. Can be absolute or relative to the config file.
   - ``columns``: Optional list of column definitions for type overrides and renaming.
 
     - ``name``: The actual column name in the file (required).

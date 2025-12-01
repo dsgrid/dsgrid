@@ -445,8 +445,9 @@ def read_csv_duckdb(path_or_str: Path | str, schema: dict[str, str] | None) -> D
     dtypes = {k: duckdb.type(v) for k, v in schema.items()}
     rel = duckdb.read_csv(path_str, header=True, dtype=dtypes)
     if use_duckdb():
-        return spark.createDataFrame(rel)
+        return spark.createDataFrame(rel.to_df())
 
+    # DT 12/1/2025
     # This obnoxious code block provides the only way I've found to read a CSV file into Spark
     # while allowing these behaviors:
     # - Preserve NULL values. DuckDB -> Pandas -> Spark converts NULLs to NaNs.

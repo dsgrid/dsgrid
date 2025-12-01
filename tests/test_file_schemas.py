@@ -200,7 +200,7 @@ def test_get_column_schema_empty():
     """Test with no typed columns returns empty dict."""
     schema = FileSchema(path="/path/to/file.csv", columns=[])
     result = _get_column_schema(schema, DUCKDB_COLUMN_TYPES)
-    assert result == {}
+    assert not result
 
 
 def test_get_column_schema_invalid_type_raises():
@@ -403,20 +403,8 @@ def test_read_data_file_csv_with_fips_codes_and_energy_data(tmp_path, spark):
     csv_file.write_text(csv_content)
 
     # Specify county as STRING to preserve leading zeros, with dimension_type for renaming
-    # Sector is inferred; value columns use DOUBLE for explicit float handling
     columns = [
         Column(name="county", data_type="STRING", dimension_type=DimensionType.GEOGRAPHY),
-        # Column(name="sector", data_type="STRING", dimension_type=DimensionType.SECTOR),
-        # Column(name="cooling", data_type="DOUBLE"),
-        # Column(name="heating", data_type="DOUBLE"),
-        # Column(name="lighting", data_type="DOUBLE"),
-        # Column(name="ventilation", data_type="DOUBLE"),
-        # Column(name="water_heating", data_type="DOUBLE"),
-        # Column(name="refrigeration", data_type="DOUBLE"),
-        # Column(name="cooking", data_type="DOUBLE"),
-        # Column(name="electronics", data_type="DOUBLE"),
-        # Column(name="motors", data_type="DOUBLE"),
-        # Column(name="misc", data_type="DOUBLE"),
     ]
     schema = FileSchema(path=str(csv_file), columns=columns)
     df = read_data_file(schema)

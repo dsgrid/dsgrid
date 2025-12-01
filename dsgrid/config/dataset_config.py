@@ -1,5 +1,5 @@
 import logging
-from enum import Enum, StrEnum
+from enum import Enum
 from pathlib import Path
 from typing import Any, Literal, Union
 
@@ -238,11 +238,6 @@ class GrowthRateModel(DSGBaseModel):
     )
 
 
-class TableSchemaSource(StrEnum):
-    REGISTRY = "registry"
-    USER = "user"
-
-
 class UserDatasetSchema(DSGBaseModel):
     """User-defined dataset schema."""
 
@@ -443,60 +438,6 @@ class DatasetConfigModel(DSGBaseDatabaseModel):
         "Trivial dimensions are 1-element dimensions that are not present in the parquet data "
         "columns. Instead they are added by dsgrid as an alias column.",
     )
-
-    @model_validator(mode="before")
-    @classmethod
-    def handle_legacy_fields(cls, values: dict) -> dict:
-        """Handle legacy fields in the dataset config.
-
-        - Migrates top-level data_schema to table_schema.data_schema
-        - Migrates origin_date to data_source_date
-        - Migrates origin_version to data_source_version
-        - Removes deprecated source field
-        """
-        if "data_schema" in values:
-            if "table_schema" in values and values["table_schema"] is not None:
-                logger.warning(
-                    "Removing legacy top-level data_schema field; "
-                    "using table_schema.data_schema instead."
-                )
-                values.pop("data_schema")
-            else:
-                # If there's no table_schema, we can't migrate easily
-                # as we don't know the data_file path
-                logger.warning(
-                    "Found legacy top-level data_schema without table_schema; ignoring."
-                )
-                values.pop("data_schema")
-
-        # Migrate legacy origin_date -> data_source_date
-        if "origin_date" in values:
-            if "data_source_date" not in values or values.get("data_source_date") is None:
-                values["data_source_date"] = values.pop("origin_date")
-                logger.warning("Migrated legacy origin_date field to data_source_date.")
-            else:
-                values.pop("origin_date")
-                logger.warning("Dropped legacy origin_date field; data_source_date already set.")
-
-        # Migrate legacy origin_version -> data_source_version
-        if "origin_version" in values:
-            if "data_source_version" not in values or values.get("data_source_version") is None:
-                values["data_source_version"] = values.pop("origin_version")
-                logger.warning("Migrated legacy origin_version field to data_source_version.")
-            else:
-                values.pop("origin_version")
-                logger.warning(
-                    "Dropped legacy origin_version field; data_source_version already set."
-                )
-
-        # Remove deprecated source field (no direct mapping)
-        if "source" in values:
-            values.pop("source")
-            logger.warning(
-                "Dropped deprecated source field. Use data_source_doi_url if applicable."
-            )
-
-        return values
 
     @model_validator(mode="after")
     def check_schema_fields(self):
@@ -715,7 +656,6 @@ class DatasetConfig(ConfigBase):
         """
         config = cls.load(config_file)
 
-        # Ensure this is a user schema (has file paths)
         if not isinstance(config.model.table_schema, UserDatasetSchema):
             msg = "load_from_user_path requires a UserDatasetSchema with file paths"
             raise DSGInvalidParameter(msg)
@@ -725,7 +665,6 @@ class DatasetConfig(ConfigBase):
 
         user_schema = config.model.table_schema
 
-        # Validate data file exists and resolve to absolute path
         data_path = Path(user_schema.data_file.path)
         if not data_path.is_absolute():
             data_path = (config_file.parent / data_path).resolve()
@@ -735,14 +674,12 @@ class DatasetConfig(ConfigBase):
         if not data_path.exists():
             msg = f"Data file does not exist: {data_path}"
             raise DSGInvalidParameter(msg)
-        # Update path to absolute so it works from any working directory
         user_schema.data_file.path = str(data_path)
 
-        # Validate lookup file for STANDARD schema
         schema_type = config.get_data_schema_type()
         if schema_type == DataSchemaType.STANDARD:
             if user_schema.lookup_data_file is None:
-                msg = "STANDARD schema requires lookup_data_file in table_schema"
+                msg = "Standard schema requires lookup_data_file in table_schema"
                 raise DSGInvalidParameter(msg)
             lookup_path = Path(user_schema.lookup_data_file.path)
             if not lookup_path.is_absolute():
@@ -750,10 +687,8 @@ class DatasetConfig(ConfigBase):
             if not lookup_path.exists():
                 msg = f"Lookup data file does not exist: {lookup_path}"
                 raise DSGInvalidParameter(msg)
-            # Update path to absolute
             user_schema.lookup_data_file.path = str(lookup_path)
 
-        # Resolve missing_associations path if present
         if user_schema.missing_associations is not None:
             missing_path = Path(user_schema.missing_associations)
             if not missing_path.is_absolute():
@@ -768,31 +703,27 @@ class DatasetConfig(ConfigBase):
         return isinstance(self.model.table_schema, UserDatasetSchema)
 
     @property
-    def user_schema(self) -> UserDatasetSchema | None:
-        """Return the user schema if this config has one, otherwise None."""
-        if isinstance(self.model.table_schema, UserDatasetSchema):
-            return self.model.table_schema
-        return None
-
-    @property
     def data_file_schema(self) -> FileSchema | None:
         """Return the data file schema if available."""
-        if self.user_schema is not None:
-            return self.user_schema.data_file
+        if self.model.table_schema is not None:
+            return self.model.table_schema.data_file
         return None
 
     @property
     def lookup_file_schema(self) -> FileSchema | None:
         """Return the lookup file schema if available."""
-        if self.user_schema is not None:
-            return self.user_schema.lookup_data_file
+        if self.model.table_schema is not None:
+            return self.model.table_schema.lookup_data_file
         return None
 
     @property
     def missing_associations_path(self) -> Path | None:
         """Return the missing associations path if available."""
-        if self.user_schema is not None and self.user_schema.missing_associations is not None:
-            return Path(self.user_schema.missing_associations)
+        if (
+            self.model.table_schema is not None
+            and self.model.table_schema.missing_associations is not None
+        ):
+            return Path(self.model.table_schema.missing_associations)
         return None
 
     def update_dimensions(self, dimensions):

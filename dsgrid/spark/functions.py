@@ -444,7 +444,23 @@ def read_csv_duckdb(path_or_str: Path | str, schema: dict[str, str] | None) -> D
 
     dtypes = {k: duckdb.type(v) for k, v in schema.items()}
     rel = duckdb.read_csv(path_str, header=True, dtype=dtypes)
-    return spark.createDataFrame(rel.to_df())
+    if use_duckdb():
+        return spark.createDataFrame(rel)
+
+    # This obnoxious code block provides the only way I've found to read a CSV file into Spark
+    # while allowing these behaviors:
+    # - Preserve NULL values. DuckDB -> Pandas -> Spark converts NULLs to NaNs.
+    # - Allow the user to specify a subset of columns with data types. The native Spark CSV
+    #   reader will drop columns not specified in the schema.
+    # This shouldn't matter much because Spark + CSV should never happen with large datasets.
+    with NamedTemporaryFile(suffix=".parquet") as f:
+        f.close()
+        rel.write_parquet(f.name)
+        df = spark.read.parquet(f.name)
+        # Bring the entire table into memory so that we can delete the file.
+        df.cache()
+        df.count()
+    return df
 
 
 def read_json(path: Path | str) -> DataFrame:

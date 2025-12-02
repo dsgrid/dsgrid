@@ -39,6 +39,7 @@ def test_find_minimal_patterns(tmp_path):
     output_dir = tmp_path / "missing_associations"
     find_minimal_patterns_from_file(parquet_path, output_dir=output_dir)
 
+    assert len(list(output_dir.iterdir())) == 2
     geography_subsector_file = output_dir / "geography__subsector.csv"
     sector_subsector_file = output_dir / "sector__subsector.csv"
 

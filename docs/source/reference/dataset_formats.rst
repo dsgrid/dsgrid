@@ -506,7 +506,7 @@ You can also use a simplified format with only the columns that vary::
 Directory Format
 ~~~~~~~~~~~~~~~~
 When using a directory, create separate files for different dimension combinations. File names
-should follow the pattern ``<dimension_type1>__<dimension_type2>.csv`` (note the double
+must follow the pattern ``<dimension_type1>__<dimension_type2>.csv`` (note the double
 underscore).
 
 Example directory structure::
@@ -566,7 +566,8 @@ an iterative workflow to help you identify them:
 
 5. **Re-run registration with missing associations**
 
-   Add the ``missing_associations`` field to your ``table_schema`` pointing to the file:
+   Add the ``missing_associations`` field to your ``table_schema`` pointing to the file or
+   directory:
 
    .. code-block:: JavaScript
 

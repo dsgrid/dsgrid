@@ -12,6 +12,7 @@ from dsgrid.config.file_schemas import (
     DUCKDB_COLUMN_TYPES,
     SPARK_COLUMN_TYPES,
     read_data_file,
+    _drop_ignored_columns,
     _get_column_renames,
     _get_column_schema,
     _rename_columns,
@@ -124,6 +125,108 @@ def test_file_schema_get_data_type_mapping_empty():
     schema = FileSchema(path="/path/to/file.csv")
     mapping = schema.get_data_type_mapping()
     assert mapping == {}
+
+
+# FileSchema ignore_columns tests
+
+
+def test_file_schema_ignore_columns_basic():
+    """Test creating a file schema with ignore_columns."""
+    schema = FileSchema(
+        path="/path/to/file.csv",
+        ignore_columns=["col1", "col2"],
+    )
+    assert schema.ignore_columns == ["col1", "col2"]
+
+
+def test_file_schema_ignore_columns_default_empty():
+    """Test that ignore_columns defaults to empty list."""
+    schema = FileSchema(path="/path/to/file.csv")
+    assert schema.ignore_columns == []
+
+
+def test_file_schema_ignore_columns_overlap_with_columns_raises():
+    """Test that overlapping columns and ignore_columns raises an error."""
+    columns = [
+        Column(name="id", data_type="INTEGER"),
+        Column(name="name", data_type="STRING"),
+    ]
+    with pytest.raises(ValueError, match="cannot be in both"):
+        FileSchema(
+            path="/path/to/file.csv",
+            columns=columns,
+            ignore_columns=["name", "other"],
+        )
+
+
+def test_file_schema_ignore_columns_no_overlap_allowed():
+    """Test that non-overlapping columns and ignore_columns is valid."""
+    columns = [
+        Column(name="id", data_type="INTEGER"),
+        Column(name="name", data_type="STRING"),
+    ]
+    schema = FileSchema(
+        path="/path/to/file.csv",
+        columns=columns,
+        ignore_columns=["extra_col"],
+    )
+    assert schema.ignore_columns == ["extra_col"]
+
+
+# _drop_ignored_columns tests
+
+
+def test_drop_ignored_columns_basic(spark):
+    """Test dropping columns from a DataFrame."""
+    df = spark.createDataFrame(
+        [(1, "a", 1.0), (2, "b", 2.0)],
+        ["id", "name", "value"],
+    )
+    result = _drop_ignored_columns(df, ["name"])
+    assert set(result.columns) == {"id", "value"}
+    assert result.count() == 2
+
+
+def test_drop_ignored_columns_multiple(spark):
+    """Test dropping multiple columns."""
+    df = spark.createDataFrame(
+        [(1, "a", 1.0, "x"), (2, "b", 2.0, "y")],
+        ["id", "name", "value", "extra"],
+    )
+    result = _drop_ignored_columns(df, ["name", "extra"])
+    assert set(result.columns) == {"id", "value"}
+
+
+def test_drop_ignored_columns_empty_list(spark):
+    """Test with empty ignore list returns unchanged DataFrame."""
+    df = spark.createDataFrame(
+        [(1, "a", 1.0)],
+        ["id", "name", "value"],
+    )
+    result = _drop_ignored_columns(df, [])
+    assert set(result.columns) == {"id", "name", "value"}
+
+
+def test_drop_ignored_columns_nonexistent_column_warns(spark, caplog):
+    """Test that dropping a nonexistent column logs a warning."""
+    df = spark.createDataFrame(
+        [(1, "a")],
+        ["id", "name"],
+    )
+    result = _drop_ignored_columns(df, ["nonexistent"])
+    assert set(result.columns) == {"id", "name"}
+    assert "not found" in caplog.text
+
+
+def test_drop_ignored_columns_mixed_existing_nonexistent(spark, caplog):
+    """Test dropping mix of existing and nonexistent columns."""
+    df = spark.createDataFrame(
+        [(1, "a", 1.0)],
+        ["id", "name", "value"],
+    )
+    result = _drop_ignored_columns(df, ["name", "nonexistent"])
+    assert set(result.columns) == {"id", "value"}
+    assert "not found" in caplog.text
 
 
 # _get_column_renames tests
@@ -558,3 +661,100 @@ def test_read_data_file_csv_timestamp_without_timezone(tmp_path, spark):
     # Verify the values are correct
     assert rows[0].com_cooling == 0
     assert abs(rows[0].com_fans - 0.002258824) < 1e-9
+
+
+# read_data_file with ignore_columns tests
+
+
+def test_read_data_file_csv_with_ignore_columns(tmp_path, spark):
+    """Test reading a CSV file with columns to ignore."""
+    csv_file = tmp_path / "test.csv"
+    csv_file.write_text("id,name,extra,value\n1,a,x,1.0\n2,b,y,2.0\n")
+
+    columns = [
+        Column(name="id", data_type="INTEGER"),
+        Column(name="name", data_type="STRING"),
+        Column(name="value", data_type="DOUBLE"),
+    ]
+    schema = FileSchema(
+        path=str(csv_file),
+        columns=columns,
+        ignore_columns=["extra"],
+    )
+    df = read_data_file(schema)
+
+    assert df.count() == 2
+    assert set(df.columns) == {"id", "name", "value"}
+    assert "extra" not in df.columns
+
+
+def test_read_data_file_csv_ignore_multiple_columns(tmp_path, spark):
+    """Test ignoring multiple columns when reading CSV."""
+    csv_file = tmp_path / "test.csv"
+    csv_file.write_text("id,skip1,name,skip2,value\n1,a,test,b,1.0\n")
+
+    columns = [
+        Column(name="id", data_type="INTEGER"),
+        Column(name="name", data_type="STRING"),
+        Column(name="value", data_type="DOUBLE"),
+    ]
+    schema = FileSchema(
+        path=str(csv_file),
+        columns=columns,
+        ignore_columns=["skip1", "skip2"],
+    )
+    df = read_data_file(schema)
+
+    assert set(df.columns) == {"id", "name", "value"}
+    assert "skip1" not in df.columns
+    assert "skip2" not in df.columns
+
+
+def test_read_data_file_csv_ignore_columns_before_rename(tmp_path, spark):
+    """Test that columns are ignored before renaming occurs."""
+    csv_file = tmp_path / "test.csv"
+    csv_file.write_text("county,extra,value\nBoulder,x,1.0\nJefferson,y,2.0\n")
+
+    columns = [
+        Column(name="county", data_type="STRING", dimension_type=DimensionType.GEOGRAPHY),
+        Column(name="value", data_type="DOUBLE"),
+    ]
+    schema = FileSchema(
+        path=str(csv_file),
+        columns=columns,
+        ignore_columns=["extra"],
+    )
+    df = read_data_file(schema)
+
+    # Column renamed from county to geography
+    assert "geography" in df.columns
+    assert "county" not in df.columns
+    # Extra column was ignored
+    assert "extra" not in df.columns
+    assert set(df.columns) == {"geography", "value"}
+
+
+def test_read_data_file_parquet_with_ignore_columns(tmp_path, spark):
+    """Test reading a Parquet file with columns to ignore."""
+    parquet_file = tmp_path / "test.parquet"
+    test_df = spark.createDataFrame(
+        [(1, "a", "extra", 1.0), (2, "b", "extra", 2.0)],
+        ["id", "name", "to_ignore", "value"],
+    )
+    test_df.write.parquet(str(parquet_file))
+
+    columns = [
+        Column(name="id", data_type=None),
+        Column(name="name", data_type=None),
+        Column(name="value", data_type=None),
+    ]
+    schema = FileSchema(
+        path=str(parquet_file),
+        columns=columns,
+        ignore_columns=["to_ignore"],
+    )
+    df = read_data_file(schema)
+
+    assert df.count() == 2
+    assert set(df.columns) == {"id", "name", "value"}
+    assert "to_ignore" not in df.columns

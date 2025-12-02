@@ -755,7 +755,12 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     -m dimension_mappings.json5 \\ \n
     -l "Register and submit dataset my-dataset to project my-project." \n
 
-Note: The dataset config file must contain a table_schema with data_file paths.
+$ dsgrid registry projects register-and-submit-dataset \\ \n
+    -c dataset.json5 \\ \n
+    --data-base-dir /path/to/data \\ \n
+    -p my-project-id \\ \n
+    -m dimension_mappings.json5 \\ \n
+    -l "Register and submit dataset my-dataset to project my-project." \n
 """
 
 
@@ -810,6 +815,22 @@ Note: The dataset config file must contain a table_schema with data_file paths.
     type=str,
     help="reason for submission",
 )
+@click.option(
+    "-D",
+    "--data-base-dir",
+    type=click.Path(exists=True),
+    callback=path_callback,
+    help="Base directory for data files. If set and data file paths are relative, "
+    "prepend them with this path.",
+)
+@click.option(
+    "-M",
+    "--missing-associations-base-dir",
+    type=click.Path(exists=True),
+    callback=path_callback,
+    help="Base directory for missing associations files. If set and missing associations "
+    "paths are relative, prepend them with this path.",
+)
 @click.pass_obj
 @click.pass_context
 def register_and_submit_dataset(
@@ -821,6 +842,8 @@ def register_and_submit_dataset(
     autogen_reverse_supplemental_mappings,
     project_id,
     log_message,
+    data_base_dir,
+    missing_associations_base_dir,
 ):
     """Register a dataset and then submit it to a dsgrid project.
 
@@ -839,6 +862,8 @@ def register_and_submit_dataset(
         dimension_mapping_file=dimension_mapping_file,
         dimension_mapping_references_file=dimension_mapping_references_file,
         autogen_reverse_supplemental_mappings=autogen_reverse_supplemental_mappings,
+        data_base_dir=data_base_dir,
+        missing_associations_base_dir=missing_associations_base_dir,
     )
     if res[1] != 0:
         ctx.exit(res[1])
@@ -1366,8 +1391,7 @@ def list_datasets(registry_manager, filter):
 _register_dataset_epilog = """
 Examples:\n
 $ dsgrid registry datasets register dataset.json5 -l "Register dataset my-dataset-id."\n
-
-Note: The dataset config file must contain a table_schema with data_file paths.
+$ dsgrid registry datasets register dataset.json5 --data-base-dir /path/to/data -l "Register dataset my-dataset-id."\n
 """
 
 
@@ -1379,6 +1403,22 @@ Note: The dataset config file must contain a table_schema with data_file paths.
     required=True,
     help="reason for submission",
 )
+@click.option(
+    "-D",
+    "--data-base-dir",
+    type=click.Path(exists=True),
+    callback=path_callback,
+    help="Base directory for data files. If set and data file paths are relative, "
+    "prepend them with this path.",
+)
+@click.option(
+    "-M",
+    "--missing-associations-base-dir",
+    type=click.Path(exists=True),
+    callback=path_callback,
+    help="Base directory for missing associations files. If set and missing associations "
+    "paths are relative, prepend them with this path.",
+)
 @click.pass_obj
 @click.pass_context
 def register_dataset(
@@ -1386,6 +1426,8 @@ def register_dataset(
     registry_manager: RegistryManager,
     dataset_config_file: Path,
     log_message: str,
+    data_base_dir: Path | None,
+    missing_associations_base_dir: Path | None,
 ):
     """Register a new dataset with the registry. The contents of the JSON/JSON5 file
     must match the data model defined by this documentation:
@@ -1402,6 +1444,8 @@ def register_dataset(
         dataset_config_file,
         submitter,
         log_message,
+        data_base_dir=data_base_dir,
+        missing_associations_base_dir=missing_associations_base_dir,
     )
     if res[1] != 0:
         ctx.exit(res[1])

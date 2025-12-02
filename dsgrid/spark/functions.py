@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 import duckdb
 
 import dsgrid
+from dsgrid.dsgrid_rc import DsgridRuntimeConfig
 from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.loggers import disable_console_logging
 from dsgrid.spark.types import (
@@ -454,7 +455,8 @@ def read_csv_duckdb(path_or_str: Path | str, schema: dict[str, str] | None) -> D
     # - Allow the user to specify a subset of columns with data types. The native Spark CSV
     #   reader will drop columns not specified in the schema.
     # This shouldn't matter much because Spark + CSV should never happen with large datasets.
-    with NamedTemporaryFile(suffix=".parquet") as f:
+    scratch_dir = DsgridRuntimeConfig().get_scratch_dir()
+    with NamedTemporaryFile(suffix=".parquet", dir=scratch_dir) as f:
         f.close()
         rel.write_parquet(f.name)
         df = spark.read.parquet(f.name)

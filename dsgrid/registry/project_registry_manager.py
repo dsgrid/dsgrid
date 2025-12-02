@@ -810,6 +810,8 @@ class ProjectRegistryManager(RegistryManagerBase):
         dimension_mapping_file=None,
         dimension_mapping_references_file=None,
         autogen_reverse_supplemental_mappings=None,
+        data_base_dir: Path | None = None,
+        missing_associations_base_dir: Path | None = None,
     ):
         with RegistrationContext(
             self.db, log_message, VersionUpdateType.MINOR, submitter
@@ -819,7 +821,11 @@ class ProjectRegistryManager(RegistryManagerBase):
                 msg = f"{project_id=}"
                 raise DSGValueNotRegistered(msg)
 
-            dataset_config = DatasetConfig.load_from_user_path(dataset_config_file)
+            dataset_config = DatasetConfig.load_from_user_path(
+                dataset_config_file,
+                data_base_dir=data_base_dir,
+                missing_associations_base_dir=missing_associations_base_dir,
+            )
             dataset_id = dataset_config.model.dataset_id
             config = self.get_by_id(project_id, conn=conn)
             # This will raise an exception if the dataset_id is not part of the project or already
@@ -829,6 +835,8 @@ class ProjectRegistryManager(RegistryManagerBase):
             self._dataset_mgr.register(
                 dataset_config_file,
                 context=context,
+                data_base_dir=data_base_dir,
+                missing_associations_base_dir=missing_associations_base_dir,
             )
             self.submit_dataset(
                 project_id,

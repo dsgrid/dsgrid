@@ -21,7 +21,6 @@ from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_han
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dataset.models import TableFormatType, UnpivotedTableFormatModel
 from dsgrid.dimension.base_models import (
-    DimensionType,
     check_required_dataset_dimensions,
 )
 from dsgrid.exceptions import DSGInvalidDataset
@@ -42,7 +41,7 @@ from dsgrid.utils.spark import (
 )
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.utils.filters import transform_and_validate_filters, matches_filters
-from dsgrid.utils.utilities import check_uniqueness, display_table
+from dsgrid.utils.utilities import check_uniqueness, display_table, make_unique_key
 from .common import (
     VersionUpdateType,
     ConfigKey,
@@ -236,8 +235,14 @@ class DatasetRegistryManager(RegistryManagerBase):
         submitter: str | None = None,
         log_message: str | None = None,
         context: RegistrationContext | None = None,
+        data_base_dir: Path | None = None,
+        missing_associations_base_dir: Path | None = None,
     ):
-        config = DatasetConfig.load_from_user_path(config_file)
+        config = DatasetConfig.load_from_user_path(
+            config_file,
+            data_base_dir=data_base_dir,
+            missing_associations_base_dir=missing_associations_base_dir,
+        )
         if context is None:
             assert submitter is not None
             assert log_message is not None
@@ -378,32 +383,24 @@ class DatasetRegistryManager(RegistryManagerBase):
         Tables can be all-dimension-types-in-one or split by groups of dimension types.
         """
         dfs: dict[str, DataFrame] = {}
-        missing_path = config.missing_associations_path
-        if missing_path is None:
+        missing_paths = config.missing_associations_paths
+        if not missing_paths:
             return dfs
 
-        if missing_path.is_file():
-            # Single file containing all missing associations
-            df = self._read_associations_file(missing_path)
-            dfs[missing_path.stem] = df
-        elif missing_path.is_dir():
-            # Directory containing multiple files split by dimension types
-            for file_path in missing_path.iterdir():
-                if file_path.suffix.lower() in (".csv", ".parquet"):
-                    dim_types_str = file_path.stem.split("__")
-                    if len(dim_types_str) > 1:
-                        for name in dim_types_str:
-                            # Just validate that this is a valid dimension type.
-                            DimensionType.from_column(name)
-                        df = self._read_associations_file(file_path)
-                        if dim_types_str != list(df.columns):
-                            msg = f"Expected columns {dim_types_str} but found {df.columns}"
-                            raise DSGInvalidDataset(msg)
-                        dfs[file_path.stem] = df
-        elif missing_path.exists():
-            msg = f"missing_associations path is not a file or directory: {missing_path}"
-            raise DSGInvalidDataset(msg)
-        # If path doesn't exist, return empty dict (no missing associations specified)
+        def add_df(path):
+            df = self._read_associations_file(path)
+            key = make_unique_key(path.stem, dfs)
+            dfs[key] = df
+
+        for path in missing_paths:
+            if path.suffix.lower() == ".parquet":
+                add_df(path)
+            elif path.is_dir():
+                for file_path in path.iterdir():
+                    if file_path.suffix.lower() in (".csv", ".parquet"):
+                        add_df(file_path)
+            elif path.suffix.lower() in (".csv", ".parquet"):
+                add_df(path)
         return dfs
 
     @staticmethod

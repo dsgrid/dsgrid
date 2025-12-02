@@ -98,15 +98,28 @@ class Column(DSGBaseModel):
 class FileSchema(DSGBaseModel):
     """Defines the format of a data file (CSV, JSON, Parquet)."""
 
-    path: str
+    path: str | None = Field(description="Path to the file. Must be assigned during registration.")
     columns: list[Column] = Field(
         default=[], description="Custom schema for the columns in the file."
+    )
+    ignore_columns: list[str] = Field(
+        default=[],
+        description="List of column names to ignore (drop) when reading the file.",
     )
 
     @model_validator(mode="after")
     def check_consistency(self) -> Self:
         if len(self.columns) > 1:
             check_uniqueness((x.name for x in self.columns), "column names")
+
+        # Check that ignore_columns don't overlap with columns
+        column_names = {x.name for x in self.columns}
+        ignore_set = set(self.ignore_columns)
+        overlap = column_names & ignore_set
+        if overlap:
+            msg = f"Columns cannot be in both 'columns' and 'ignore_columns': {overlap}"
+            raise ValueError(msg)
+
         return self
 
     def get_data_type_mapping(self) -> dict[str, str]:
@@ -127,6 +140,10 @@ def read_data_file(schema: FileSchema) -> DataFrame:
     DataFrame
         A Spark DataFrame containing the file data.
     """
+    if schema.path is None:
+        msg = "File path is not assigned"
+        raise DSGInvalidDataset(msg)
+
     path = Path(schema.path)
     if not path.exists():
         msg = f"{path} does not exist"
@@ -152,6 +169,7 @@ def read_data_file(schema: FileSchema) -> DataFrame:
         msg = f"Expected columns {diff} are not in {actual_columns=}"
         raise DSGInvalidDataset(msg)
 
+    df = _drop_ignored_columns(df, schema.ignore_columns)
     renames = _get_column_renames(schema)
     df = _rename_columns(df, renames)
     return df
@@ -170,6 +188,20 @@ def _rename_columns(df: DataFrame, mapping: dict[str, str]) -> DataFrame:
     for old_name, new_name in mapping.items():
         df = df.withColumnRenamed(old_name, new_name)
         logger.info("Renamed column %s to %s", old_name, new_name)
+    return df
+
+
+def _drop_ignored_columns(df: DataFrame, ignore_columns: list[str]) -> DataFrame:
+    if not ignore_columns:
+        return df
+
+    existing_columns = set(df.columns)
+    for col in ignore_columns:
+        if col in existing_columns:
+            df = df.drop(col)
+            logger.info("Dropped ignored column: %s", col)
+        else:
+            logger.warning("Ignored column '%s' not found in file", col)
     return df
 
 

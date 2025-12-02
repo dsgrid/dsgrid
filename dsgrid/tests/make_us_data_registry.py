@@ -74,13 +74,18 @@ def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
         table_schema["lookup_data_file"]["path"] = relative_path
 
     if "missing_associations" in table_schema and table_schema["missing_associations"] is not None:
-        stem = Path(table_schema["missing_associations"]).stem
-        missing_path = _find_file_with_stem(dataset_data_dir, stem)
-        if missing_path is None:
-            msg = f"Could not find missing associations with stem '{stem}' in {dataset_data_dir}"
-            raise FileNotFoundError(msg)
-        relative_path = os.path.relpath(missing_path, config_dir)
-        table_schema["missing_associations"] = relative_path
+        items = []
+        for item in table_schema["missing_associations"]:
+            stem = Path(item).stem
+            missing_path = _find_file_with_stem(dataset_data_dir, stem)
+            if missing_path is None:
+                msg = (
+                    f"Could not find missing associations with stem '{stem}' in {dataset_data_dir}"
+                )
+                raise FileNotFoundError(msg)
+            relative_path = os.path.relpath(missing_path, config_dir)
+            items.append(relative_path)
+        table_schema["missing_associations"] = items
 
     dump_data(data, config_file)
 

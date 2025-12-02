@@ -194,6 +194,53 @@ You can combine ``dimension_type`` with ``data_type`` when using CSV files:
     }
 
 
+Ignoring Columns
+================
+Data files may contain columns that are not needed for dsgrid processing. Rather than
+modifying your source files, you can tell dsgrid to ignore (drop) specific columns when
+reading the data.
+
+To ignore columns, add an ``ignore_columns`` field to the ``data_file`` (or ``lookup_data_file``)
+section in your dataset configuration. This field accepts a list of column names to drop.
+
+This feature works for all file formats (Parquet, CSV, JSON).
+
+Example with ignored columns:
+
+.. code-block:: JavaScript
+
+    data_file: {
+      path: "load_data.parquet",
+      ignore_columns: ["internal_id", "notes"],
+    }
+
+You can combine ``ignore_columns`` with ``columns`` for type overrides and renaming:
+
+.. code-block:: JavaScript
+
+    data_file: {
+      path: "load_data.csv",
+      columns: [
+        {
+          name: "county",
+          data_type: "STRING",
+          dimension_type: "geography",
+        },
+        {
+          name: "value",
+          data_type: "DOUBLE",
+        },
+      ],
+      ignore_columns: ["intenal_id", "notes"],
+    }
+
+Note that a column cannot appear in both ``columns`` and ``ignore_columns`` - dsgrid will
+raise an error if there is any overlap.
+
+Columns are dropped after the file is read but before any column renaming occurs. This means
+you should use the original column names from the file in the ``ignore_columns`` list.
+
+
 Time
 ====
 
@@ -245,12 +292,17 @@ schema type. It has the following structure:
             dimension_type: "geography",  // optional, for column renaming
           },
         ],
+        ignore_columns: ["col1", "col2"],  // optional, columns to drop
       },
       lookup_data_file: {              // required for "standard" schema
         path: "./load_data_lookup.parquet",
         columns: [],                   // optional, same structure as data_file
+        ignore_columns: [],            // optional, same as data_file
       },
-      missing_associations: "./missing_associations.parquet",  // optional
+      missing_associations: [          // optional, list of paths
+        "missing_associations.parquet",
+        "additional_missing",
+      ],
     }
 
 Fields:
@@ -266,10 +318,15 @@ Fields:
     - ``dimension_type``: The dsgrid dimension type this column represents (optional).
       When specified, the column will be renamed to match the dimension type.
 
+  - ``ignore_columns``: Optional list of column names to drop when reading the file.
+    Cannot overlap with columns defined in ``columns``.
+
 - ``lookup_data_file``: Lookup file configuration (required for ``standard`` schema type).
   Has the same structure as ``data_file``.
-- ``missing_associations``: Path to a file or directory defining missing dimension combinations
-  (optional, see :ref:`missing-associations`).
+- ``missing_associations``: List of paths to files or directories defining missing dimension
+  combinations (optional, see :ref:`missing-associations`). Paths can be absolute or relative
+  to the config file. You can also use the ``--missing-associations-base-dir`` CLI option to
+  specify a different base directory for resolving relative paths.
 
 
 Formats
@@ -459,25 +516,33 @@ missing associations.
 
 Declaring Missing Associations
 ------------------------------
-Specify missing associations in the ``table_schema`` section of your dataset config:
+Specify missing associations in the ``table_schema`` section of your dataset config using
+the ``missing_associations`` field. This field accepts a list of paths to files or directories:
 
 .. code-block:: JavaScript
 
     table_schema: {
       data_schema: { ... },
       data_file: { path: "./load_data.parquet" },
-      missing_associations: "./missing_associations.parquet",
+      missing_associations: [
+        "missing_associations.parquet",
+        "additional_missing",
+      ],
     }
 
-The ``missing_associations`` field can point to:
+Each entry in the list can be:
 
-1. **A single file** (Parquet) containing all missing combinations
+1. **A single file** (CSV or Parquet) containing missing combinations
 2. **A directory** containing multiple files, each for different dimension combinations
+
+Paths can be absolute or relative. Relative paths are resolved relative to the dataset
+configuration file by default.
 
 File Format
 ~~~~~~~~~~~
-Missing association files should contain columns for dimension types (all types except time).
-Each row represents a combination of dimension records that legitimately has no data.
+Missing association files can be in CSV or Parquet format. They should contain columns for
+dimension types (all types except time). Each row represents a combination of dimension
+records that legitimately has no data.
 
 A file can contain any subset of the non-time dimension columns. During validation, dsgrid
 filters out rows from the expected associations that match the missing associations on the
@@ -506,15 +571,15 @@ You can also use a simplified format with only the columns that vary::
 Directory Format
 ~~~~~~~~~~~~~~~~
 When using a directory, create separate files for different dimension combinations. File names
-must follow the pattern ``<dimension_type1>__<dimension_type2>.csv`` (note the double
-underscore).
+must follow the pattern ``<dimension_type1>__<dimension_type2>.csv`` or
+``<dimension_type1>__<dimension_type2>.parquet`` (note the double underscore).
 
 Example directory structure::
 
     missing_associations/
     ├── geography__subsector.csv
     ├── geography__metric.csv
-    └── subsector__metric.csv
+    └── subsector__metric.parquet
 
 Each file contains the relevant dimension columns::
 
@@ -522,6 +587,42 @@ Each file contains the relevant dimension columns::
     geography,subsector
     01001,large_hotel
     01001,warehouse
+
+Using Custom Base Directories
+-----------------------------
+When registering a dataset, you can specify a custom base directory for resolving missing
+associations paths using the ``--missing-associations-base-dir`` (or ``-M``) option:
+
+.. code-block:: bash
+
+    dsgrid registry datasets register dataset.json5 \
+      -l "Register my dataset" \
+      -M /path/to/missing/files
+
+When this option is provided, any relative paths in the ``missing_associations`` list will
+be resolved relative to the specified directory instead of the dataset configuration file's
+directory.
+
+Similarly, you can use ``--data-base-dir`` (or ``-D``) to specify a base directory for
+data files:
+
+.. code-block:: bash
+
+    dsgrid registry datasets register dataset.json5 \
+      -l "Register my dataset" \
+      -D /path/to/data/files \
+      -M /path/to/missing/files
+
+These options are also available for the ``register-and-submit-dataset`` command:
+
+.. code-block:: bash
+
+    dsgrid registry projects register-and-submit-dataset \
+      -c dataset.json5 \
+      -p my-project-id \
+      -l "Register and submit dataset" \
+      -D /path/to/data/files \
+      -M /path/to/missing/files
 
 Iterative Workflow for Identifying Missing Associations
 -------------------------------------------------------
@@ -552,29 +653,54 @@ an iterative workflow to help you identify them:
    This tells you that all combinations involving county 01001 and large_hotel are missing,
    and all combinations involving warehouse are missing.
 
-   dsgrid records these minimal patterns in dimension-specific combination files, such as
-   ``./missing_associations/geography__subsector.csv`` and
-   ``./missing_associations/sector__subsector.csv``.
+   dsgrid records these minimal patterns in dimension-specific combination files in the
+   ``./missing_associations/`` directory, such as ``geography__subsector.csv`` and
+   ``sector__subsector.csv``.
 
-4. **Review and edit the missing associations file**
+4. **Choose which output to use**
 
-   Examine the generated CSV files to verify that these combinations are legitimately missing
+   You have several options for declaring missing associations:
+
+   - **Use the all-inclusive Parquet file**: Reference the generated
+     ``<dataset_id>__missing_dimension_record_combinations.parquet`` file directly. This
+     contains every missing combination but may be very large.
+
+   - **Use the per-dimension CSV files**: Reference the ``./missing_associations/`` directory
+     containing the minimal pattern files. This is more compact and easier to review.
+
+   - **Create your own files**: Create custom CSV or Parquet files based on your understanding
+     of the data. This gives you full control over what is declared as missing.
+
+5. **Review and edit the missing associations files**
+
+   Examine the generated files to verify that these combinations are legitimately missing
    (not data errors). You may want to:
 
    - Keep the files as they are if all missing combinations are expected.
    - Remove rows that represent data errors you need to fix.
+   - Combine multiple sources if needed.
 
-5. **Re-run registration with missing associations**
+6. **Re-run registration with missing associations**
 
-   Add the ``missing_associations`` field to your ``table_schema`` pointing to the file or
-   directory:
+   Add the ``missing_associations`` field to your ``table_schema`` pointing to the files or
+   directories:
 
    .. code-block:: JavaScript
 
        table_schema: {
          data_schema: { ... },
          data_file: { path: "./load_data.parquet" },
-         missing_associations: "./missing_associations",
+         // Option 1: Use the all-inclusive Parquet file
+         missing_associations: ["./my_dataset__missing_dimension_record_combinations.parquet"],
+
+         // Option 2: Use the per-dimension directory
+         // missing_associations: ["./missing_associations"],
+
+         // Option 3: Combine multiple sources
+         // missing_associations: [
+         //   "./missing_associations",
+         //   "./additional_missing.parquet",
+         // ],
        }
 
    Run registration again. If successful, the missing associations will be stored in the
@@ -588,4 +714,4 @@ During dataset registration, dsgrid checks that:
 2. All expected combinations either have data or are declared as missing.
 
 If dsgrid finds unexpected missing combinations, it will report an error and write the
-missing combinations to a file as described above.
+missing combinations to files as described above.

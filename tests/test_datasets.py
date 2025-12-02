@@ -111,8 +111,8 @@ def register_dataset(setup_registry):
             ts["data_file"]["path"] = str(dataset_path / "load_data.csv")
         if "lookup_data_file" in ts and ts["lookup_data_file"] is not None:
             ts["lookup_data_file"]["path"] = str(dataset_path / "load_data_lookup.json")
-        if "missing_associations" in ts and ts["missing_associations"] is not None:
-            ts["missing_associations"] = str(dataset_path / "missing_associations")
+        if "missing_associations" in ts and ts["missing_associations"]:
+            ts["missing_associations"] = [str(dataset_path / "missing_associations")]
     from dsgrid.utils.files import dump_data
 
     dump_data(test_config, test_config_file)

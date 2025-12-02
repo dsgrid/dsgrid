@@ -250,11 +250,11 @@ class UserDatasetSchema(DSGBaseModel):
         title="lookup_data_file",
         description="Defines the lookup data file. Required if the table format is 'standard'.",
     )
-    missing_associations: str | None = Field(
-        default=None,
+    missing_associations: list[str] = Field(
+        default=[],
         title="missing_associations",
-        description="Path to an all-inclusive missing associations file (e.g., "
-        "missing_associations.parquet) or directory of files containing missing combinations by "
+        description="List of paths to missing associations files (e.g., "
+        "missing_associations.parquet) or directories of files containing missing combinations by "
         "dimension type (e.g., geography__subsector.csv, subsector__metric.csv).",
     )
     data_schema: StandardDataSchemaModel | OneTableDataSchemaModel = Field(
@@ -634,7 +634,12 @@ class DatasetConfig(ConfigBase):
         return DatasetConfigModel
 
     @classmethod
-    def load_from_user_path(cls, config_file: Path) -> "DatasetConfig":
+    def load_from_user_path(
+        cls,
+        config_file: Path,
+        data_base_dir: Path | None = None,
+        missing_associations_base_dir: Path | None = None,
+    ) -> "DatasetConfig":
         """Load a dataset config from a user-provided config file.
 
         The config file must contain a UserDatasetSchema with file paths.
@@ -644,6 +649,12 @@ class DatasetConfig(ConfigBase):
         ----------
         config_file : Path
             Path to the dataset configuration file.
+        data_base_dir : Path | None, optional
+            Base directory for data files. If set and data file paths are relative,
+            prepend them with this path instead of using the config file's parent directory.
+        missing_associations_base_dir : Path | None, optional
+            Base directory for missing associations files. If set and paths are relative,
+            prepend them with this path instead of using the config file's parent directory.
 
         Returns
         -------
@@ -664,10 +675,17 @@ class DatasetConfig(ConfigBase):
             raise DSGInvalidParameter(msg)
 
         user_schema = config.model.table_schema
+        if user_schema.data_file.path is None:
+            msg = "load_from_user_path requires data_file.path to be set"
+            raise DSGInvalidParameter(msg)
 
+        # Resolve data file path
         data_path = Path(user_schema.data_file.path)
         if not data_path.is_absolute():
-            data_path = (config_file.parent / data_path).resolve()
+            if data_base_dir is not None:
+                data_path = (data_base_dir / data_path).resolve()
+            else:
+                data_path = (config_file.parent / data_path).resolve()
         if str(data_path).startswith("s3://"):
             msg = "Registering a dataset from an S3 path is not supported."
             raise DSGInvalidParameter(msg)
@@ -676,6 +694,7 @@ class DatasetConfig(ConfigBase):
             raise DSGInvalidParameter(msg)
         user_schema.data_file.path = str(data_path)
 
+        # Resolve lookup file path
         schema_type = config.get_data_schema_type()
         if schema_type == DataSchemaType.STANDARD:
             if user_schema.lookup_data_file is None:
@@ -683,17 +702,26 @@ class DatasetConfig(ConfigBase):
                 raise DSGInvalidParameter(msg)
             lookup_path = Path(user_schema.lookup_data_file.path)
             if not lookup_path.is_absolute():
-                lookup_path = (config_file.parent / lookup_path).resolve()
+                if data_base_dir is not None:
+                    lookup_path = (data_base_dir / lookup_path).resolve()
+                else:
+                    lookup_path = (config_file.parent / lookup_path).resolve()
             if not lookup_path.exists():
                 msg = f"Lookup data file does not exist: {lookup_path}"
                 raise DSGInvalidParameter(msg)
             user_schema.lookup_data_file.path = str(lookup_path)
 
-        if user_schema.missing_associations is not None:
-            missing_path = Path(user_schema.missing_associations)
+        # Resolve missing associations paths
+        resolved_missing_paths: list[str] = []
+        for missing_assoc in user_schema.missing_associations:
+            missing_path = Path(missing_assoc)
             if not missing_path.is_absolute():
-                missing_path = (config_file.parent / missing_path).resolve()
-            user_schema.missing_associations = str(missing_path)
+                if missing_associations_base_dir is not None:
+                    missing_path = (missing_associations_base_dir / missing_path).resolve()
+                else:
+                    missing_path = (config_file.parent / missing_path).resolve()
+            resolved_missing_paths.append(str(missing_path))
+        user_schema.missing_associations = resolved_missing_paths
 
         return config
 
@@ -717,14 +745,11 @@ class DatasetConfig(ConfigBase):
         return None
 
     @property
-    def missing_associations_path(self) -> Path | None:
-        """Return the missing associations path if available."""
-        if (
-            self.model.table_schema is not None
-            and self.model.table_schema.missing_associations is not None
-        ):
-            return Path(self.model.table_schema.missing_associations)
-        return None
+    def missing_associations_paths(self) -> list[Path]:
+        """Return the list of missing associations paths if available."""
+        if self.model.table_schema is not None:
+            return [Path(p) for p in self.model.table_schema.missing_associations]
+        return []
 
     def update_dimensions(self, dimensions):
         """Update all dataset dimensions."""

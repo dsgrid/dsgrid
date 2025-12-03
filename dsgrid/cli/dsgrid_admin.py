@@ -111,6 +111,14 @@ def registry(ctx, remote_path):
         )
 
 
+@registry.result_callback()
+@click.pass_context
+def cleanup_registry_manager(ctx, result, **kwargs):
+    """Cleanup the registry manager after the command finishes."""
+    if ctx.obj is not None:
+        ctx.obj.dispose()
+
+
 @click.group()
 @click.pass_obj
 def dimensions(registry_manager: RegistryManager):
@@ -330,9 +338,8 @@ def make_filtered_registry(
         mode=mode,
         force=overwrite,
     )
-    mgr = FilterRegistryManager.load(dst_conn, offline_mode=True, use_remote_data=False)
-    mgr.filter(simple_model=simple_model)
-    mgr.dispose()
+    with FilterRegistryManager.load(dst_conn, offline_mode=True, use_remote_data=False) as mgr:
+        mgr.filter(simple_model=simple_model)
 
 
 cli.add_command(registry)

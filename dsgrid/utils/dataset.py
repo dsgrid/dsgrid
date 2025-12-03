@@ -265,7 +265,7 @@ def handle_dimension_association_errors(
             changed = True
     if changed:
         df = df.distinct()
-    write_dataframe(coalesce(df, 1), out_file, overwrite=True)
+    df = write_dataframe(coalesce(df, 1), out_file, overwrite=True)
     logger.error(
         "Dataset %s is missing required dimension records. Recorded missing records in %s",
         dataset_id,
@@ -308,7 +308,7 @@ def handle_dimension_association_errors(
             "Rust pattern analysis not available. Install with: pip install -e . "
             "or build with: maturin develop"
         )
-        _look_for_error_contributors(diff, dataset_table)
+        _look_for_error_contributors(df, dataset_table)
     except Exception as e:
         logger.warning("Failed to analyze missing data patterns: %s", e)
 

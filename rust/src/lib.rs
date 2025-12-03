@@ -164,7 +164,7 @@ fn read_and_encode_parquet(
 ) -> Result<(EncodedDataset, Vec<Vec<String>>, Vec<String>)> {
     let mut f = File::open(path).with_context(|| format!("Opening parquet file {}", path))?;
     let metadata = read_metadata(&mut f).context("Reading parquet metadata")?;
-    let schema: Schema = infer_schema(&metadata).context("Inferring schema")?;
+    let schema: Schema = infer_schema(&metadata).context("Inferring parquet schema")?;
 
     // Check column types: allow UTF8 and integers, reject floats
     for field in &schema.fields {
@@ -216,9 +216,8 @@ fn read_and_encode_parquet(
                     let code = dicts[ci].len();
                     if code >= 65536 {
                         anyhow::bail!(
-                            "Column '{}' has {} unique values (max 65535 allowed)",
+                            "Column '{}' has more than unique values than allowed (max 65535)",
                             col_names[ci],
-                            code + 1
                         );
                     }
                     dicts[ci].push(val.clone());

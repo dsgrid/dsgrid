@@ -4,11 +4,11 @@ from pathlib import Path
 from typing import Generator
 
 from dsgrid.dataset.models import (
-    TableFormatType,
-    UnpivotedTableFormatModel,
+    ValueFormat,
+    StackedTableFormatModel,
+    PivotedTableFormatModel,
 )
 from dsgrid.common import VALUE_COLUMN
-from dsgrid.dataset.models import PivotedTableFormatModel
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.dataset.dataset_mapping_manager import DatasetMappingManager
@@ -82,17 +82,17 @@ class QueryContext:
 
     def get_value_columns(self) -> set[str]:
         """Return the value columns in the final dataset."""
-        match self.get_table_format_type():
-            case TableFormatType.PIVOTED:
+        match self.get_value_format():
+            case ValueFormat.PIVOTED:
                 return self.get_pivoted_columns()
-            case TableFormatType.UNPIVOTED:
+            case ValueFormat.STACKED:
                 return {VALUE_COLUMN}
             case _:
-                msg = str(self.get_table_format_type())
+                msg = str(self.get_value_format())
                 raise NotImplementedError(msg)
 
     def get_pivoted_columns(self) -> set[str]:
-        if self.get_table_format_type() != TableFormatType.PIVOTED:
+        if self.get_value_format() != ValueFormat.PIVOTED:
             msg = "Bug: get_pivoted_columns is only supported on a pivoted table"
             raise Exception(msg)
         metadata = self._get_metadata()
@@ -100,22 +100,22 @@ class QueryContext:
         return self.get_dimension_column_names(metadata.table_format.pivoted_dimension_type)
 
     def get_pivoted_dimension_type(self) -> DimensionType:
-        if self.get_table_format_type() != TableFormatType.PIVOTED:
+        if self.get_value_format() != ValueFormat.PIVOTED:
             msg = "Bug: get_pivoted_dimension_type is only supported on a pivoted table"
             raise Exception(msg)
         metadata = self._get_metadata()
         assert isinstance(metadata.table_format, PivotedTableFormatModel)
         return metadata.table_format.pivoted_dimension_type
 
-    def get_table_format_type(self, dataset_id: str | None = None) -> TableFormatType:
+    def get_value_format(self, dataset_id: str | None = None) -> ValueFormat:
         val = self._get_metadata(dataset_id).table_format.format_type
-        if not isinstance(val, TableFormatType):
-            val = TableFormatType(val)
+        if not isinstance(val, ValueFormat):
+            val = ValueFormat(val)
         return val
 
-    def set_table_format_type(self, val: TableFormatType) -> None:
-        if not isinstance(val, TableFormatType):
-            val = TableFormatType(val)
+    def set_value_format(self, val: ValueFormat) -> None:
+        if not isinstance(val, ValueFormat):
+            val = ValueFormat(val)
         self._metadata.table_format.format_type = val
 
     def get_dimension_column_names(
@@ -155,7 +155,7 @@ class QueryContext:
         column_type: ColumnType,
         mapped_time_columns: list[str],
     ) -> None:
-        table_format = UnpivotedTableFormatModel()
+        table_format = StackedTableFormatModel()
         self._dataset_metadata[dataset_id] = DatasetMetadataModel(table_format=table_format)
         base_dimension_names = self.base_dimension_names
         for dim_type in DimensionType:
@@ -180,7 +180,7 @@ class QueryContext:
     def convert_to_pivoted(self) -> str:
         assert isinstance(self.model.result.table_format, PivotedTableFormatModel)
         pivoted_dimension_type = self.model.result.table_format.pivoted_dimension_type
-        self.set_table_format_type(TableFormatType.PIVOTED)
+        self.set_value_format(ValueFormat.PIVOTED)
         columns = self.get_dimension_column_names(pivoted_dimension_type)
         names = self.get_dimension_names(pivoted_dimension_type)
         if len(columns) != 1 or len(names) != 1:

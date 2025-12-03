@@ -1,7 +1,8 @@
 from sqlalchemy import Connection
 
-from dsgrid.config.dataset_config import DataSchemaType, DatasetConfig
-from dsgrid.dataset.dataset_schema_handler_standard import StandardDatasetSchemaHandler
+from dsgrid.config.dataset_config import DatasetConfig
+from dsgrid.dataset.models import TableFormat
+from dsgrid.dataset.dataset_schema_handler_two_table import TwoTableDatasetSchemaHandler
 from dsgrid.dataset.dataset_schema_handler_one_table import OneTableDatasetSchemaHandler
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.registry.dimension_registry_manager import DimensionRegistryManager
@@ -17,9 +18,9 @@ def make_dataset_schema_handler(
     store: DataStoreInterface | None = None,
     mapping_references: list[DimensionMappingReferenceModel] | None = None,
 ):
-    match config.get_data_schema_type():
-        case DataSchemaType.STANDARD:
-            return StandardDatasetSchemaHandler.load(
+    match config.get_table_format():
+        case TableFormat.TWO_TABLE:
+            return TwoTableDatasetSchemaHandler.load(
                 config,
                 conn,
                 dimension_mgr,
@@ -27,7 +28,7 @@ def make_dataset_schema_handler(
                 store=store,
                 mapping_references=mapping_references,
             )
-        case DataSchemaType.ONE_TABLE:
+        case TableFormat.ONE_TABLE:
             return OneTableDatasetSchemaHandler.load(
                 config,
                 conn,
@@ -37,5 +38,5 @@ def make_dataset_schema_handler(
                 mapping_references=mapping_references,
             )
         case _:
-            msg = f"{config.model.table_schema.data_schema.data_schema_type=}"
+            msg = f"Unsupported table format: {config.get_table_format()}"
             raise NotImplementedError(msg)

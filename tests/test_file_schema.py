@@ -1,11 +1,11 @@
-"""Tests for dsgrid.config.file_schemas module."""
+"""Tests for dsgrid.config.file_schema module."""
 
 import json
 from typing import Generator
 
 import pytest
 
-from dsgrid.config.file_schemas import (
+from dsgrid.config.file_schema import (
     Column,
     FileSchema,
     SUPPORTED_TYPES,

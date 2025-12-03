@@ -4,7 +4,7 @@ This directory contains the Rust extension for high-performance pattern analysis
 
 ## What It Does
 
-The Rust extension provides fast analysis of dimension record patterns using the "minimal closed patterns" algorithm. The "minimal closed patterns" algorithm identifies combinations of dimension records for which full cross joins of the dimension types not represented in the combination exist in the full dataset. The patterns are "minimal" in that each row of the original dataset matches exactly one of the output combinations and that list of output combinations is as short as possible. 
+The Rust extension provides fast analysis of dimension record patterns using the "minimal closed patterns" algorithm. The "minimal closed patterns" algorithm identifies combinations of dimension records for which full cross joins of the dimension types not represented in the combination exist in the full dataset. The patterns are "minimal" in that each row of the original dataset matches exactly one of the output combinations and that list of output combinations is as short as possible.
 
 Applying this algorithm to a dataset's set of unexpected missing records helps identify root causes of the missing data.
 
@@ -129,7 +129,7 @@ the Rust code to use u32 instead of u16 (contact maintainer)
 
 ### Overview of `lib.rs`
 
-The Rust extension implements a **minimal closed pattern mining** algorithm optimized for describing combinations of categorical data in a minimal way, by only listing the dimension records necessary to identify regions of the data where full cross-joins are present. 
+The Rust extension implements a **minimal closed pattern mining** algorithm optimized for describing combinations of categorical data in a minimal way, by only listing the dimension records necessary to identify regions of the data where full cross-joins are present.
 
 Applied to a parquet file where each row represents a missing record combination from a dsgrid (or other) dataset, it discovers the smallest set of column-value constraints that explain groups of missing rows.
 

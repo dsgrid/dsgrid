@@ -74,13 +74,11 @@ instructions on how to assign values in this file.
       // The time in this dataset has no time zone. It is based on the local time perceived by the
       // people being modeled. dsgrid will map times to the project's geography time zone.
       use_project_geography_time_zone: true,
-      table_schema: {
-        data_schema: {
-          data_schema_type: "standard",
-          table_format: {
-            format_type: "pivoted",
-            pivoted_dimension_type: "metric",
-          },
+      data_layout: {
+        table_format: "two_table",
+        value_format: {
+          format_type: "pivoted",
+          pivoted_dimension_type: "metric",
         },
         data_file: {
           path: "./load_data.parquet",
@@ -324,7 +322,7 @@ Records file snippet::
    This command assumes that ``dataset.json5`` and ``dimension_mappings.json5`` are in a
    directory called ``base_dir``, and that the data files (``load_data.parquet`` and
    ``load_data_lookup.parquet``) are in paths relative to the config file as specified in
-   the ``table_schema`` section.
+   the ``data_layout`` section.
 
    When running this command dsgrid will perform numerous validations in order to verify dataset
    consistency and that the project requirements are met. It may take up to an hour on an HPC

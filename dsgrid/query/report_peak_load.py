@@ -3,7 +3,7 @@ from pathlib import Path
 
 from dsgrid.common import VALUE_COLUMN
 from dsgrid.data_models import DSGBaseModel
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidQuery
 from dsgrid.query.models import ProjectQueryModel
@@ -29,8 +29,8 @@ class PeakLoadReport(ReportsBase):
     REPORT_FILENAME = "peak_load.parquet"
 
     def check_query(self, query: ProjectQueryModel) -> None:
-        if query.result.table_format.format_type != TableFormatType.UNPIVOTED:
-            msg = "The PeakLoadReport requires the table format type to be unpivoted."
+        if query.result.table_format.format_type != ValueFormat.STACKED:
+            msg = "The PeakLoadReport requires the value format to be stacked."
             raise DSGInvalidQuery(msg)
 
     def generate(

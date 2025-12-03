@@ -27,7 +27,7 @@
     "column_type": "dimension_types",
     "output_format": "parquet",
     "table_format": {
-      format_type: "unpivoted",
+      format_type: "stacked",
     },
     "sort_columns": [],
     "dimension_filters": [],

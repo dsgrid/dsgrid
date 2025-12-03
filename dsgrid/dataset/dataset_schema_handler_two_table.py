@@ -6,7 +6,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset
@@ -29,7 +29,7 @@ from dsgrid.utils.dataset import (
     apply_scaling_factor,
     convert_types_if_necessary,
 )
-from dsgrid.config.file_schemas import read_data_file
+from dsgrid.config.file_schema import read_data_file
 from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 
@@ -37,8 +37,8 @@ from dsgrid.utils.timing import Timer, timer_stats_collector, track_timing
 logger = logging.getLogger(__name__)
 
 
-class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
-    """define interface/required behaviors for STANDARD dataset schema"""
+class TwoTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
+    """Handler for TWO_TABLE dataset format (load_data + load_data_lookup tables)."""
 
     def __init__(self, load_data_df, load_data_lookup, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -58,7 +58,7 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
                 msg = "Cannot load dataset without data file schema or store"
                 raise DSGInvalidDataset(msg)
             if config.lookup_file_schema is None:
-                msg = "STANDARD schema requires lookup_data_file"
+                msg = "TWO_TABLE format requires lookup_data_file"
                 raise DSGInvalidDataset(msg)
             load_data_df = read_data_file(config.data_file_schema)
             load_data_lookup = read_data_file(config.lookup_file_schema)
@@ -180,10 +180,12 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
 
     @track_timing(timer_stats_collector)
     def _check_lookup_data_consistency(self):
-        """Dimension check in load_data_lookup, excludes time:
-        * check that data matches record for each dimension.
-        * check that all data dimension combinations exist. Time is handled separately.
-        * Check for any NULL values in dimension columns.
+        """Dimension check in load_data_lookup, excludes time.
+
+        Checks:
+        - Data matches record for each dimension.
+        - All data dimension combinations exist. Time is handled separately.
+        - No NULL values in dimension columns.
         """
         logger.info("Check lookup data consistency.")
         found_id = False
@@ -222,8 +224,8 @@ class StandardDatasetSchemaHandler(DatasetSchemaHandlerBase):
         """Check load_data dimensions and id series."""
         logger.info("Check dataset internal consistency.")
         assert (
-            self._config.get_table_format_type() == TableFormatType.UNPIVOTED
-        ), self._config.get_table_format_type()
+            self._config.get_value_format() == ValueFormat.STACKED
+        ), self._config.get_value_format()
         self._check_load_data_unpivoted_value_column(self._load_data)
 
         time_dim = self._config.get_time_dimension()

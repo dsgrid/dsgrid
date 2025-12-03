@@ -6,7 +6,7 @@ from dsgrid.config.dataset_config import DatasetConfig
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.config.simple_models import DimensionSimpleModel
 from dsgrid.config.time_dimension_base_config import TimeDimensionBaseConfig
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.query.models import DatasetQueryModel
 from dsgrid.registry.data_store_interface import DataStoreInterface
 from dsgrid.spark.types import (
@@ -16,7 +16,7 @@ from dsgrid.spark.types import (
 from dsgrid.utils.dataset import (
     convert_types_if_necessary,
 )
-from dsgrid.config.file_schemas import read_data_file
+from dsgrid.config.file_schema import read_data_file
 from dsgrid.utils.spark import check_for_nulls
 from dsgrid.utils.timing import timer_stats_collector, track_timing
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
@@ -84,8 +84,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
         if time_dim is not None:
             time_columns = set(time_dim.get_load_data_time_columns())
         assert (
-            self._config.get_table_format_type() == TableFormatType.UNPIVOTED
-        ), self._config.get_table_format_type()
+            self._config.get_value_format() == ValueFormat.STACKED
+        ), self._config.get_value_format()
         self._check_load_data_unpivoted_value_column(self._load_data)
         allowed_columns = DimensionType.get_allowed_dimension_column_names().union(time_columns)
         allowed_columns.add(VALUE_COLUMN)
@@ -109,8 +109,8 @@ class OneTableDatasetSchemaHandler(DatasetSchemaHandlerBase):
     @track_timing(timer_stats_collector)
     def filter_data(self, dimensions: list[DimensionSimpleModel], store: DataStoreInterface):
         assert (
-            self._config.get_table_format_type() == TableFormatType.UNPIVOTED
-        ), self._config.get_table_format_type()
+            self._config.get_value_format() == ValueFormat.STACKED
+        ), self._config.get_value_format()
         load_df = self._load_data
         df_columns = set(load_df.columns)
         stacked_columns = set()

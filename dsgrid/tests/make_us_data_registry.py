@@ -48,34 +48,34 @@ def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
         The dataset ID, used to locate the data files in TEST_DATASET_DIRECTORY.
     """
     data = load_data(config_file)
-    if "table_schema" not in data:
+    if "data_layout" not in data:
         return
 
-    table_schema = data["table_schema"]
+    data_layout = data["data_layout"]
     config_dir = config_file.parent.resolve()
     dataset_data_dir = (TEST_DATASET_DIRECTORY / dataset_id).resolve()
 
-    if "data_file" in table_schema:
-        stem = Path(table_schema["data_file"]["path"]).stem
+    if "data_file" in data_layout:
+        stem = Path(data_layout["data_file"]["path"]).stem
         data_file_path = _find_file_with_stem(dataset_data_dir, stem)
         if data_file_path is None:
             msg = f"Could not find data file with stem '{stem}' in {dataset_data_dir}"
             raise FileNotFoundError(msg)
         relative_path = os.path.relpath(data_file_path, config_dir)
-        table_schema["data_file"]["path"] = relative_path
+        data_layout["data_file"]["path"] = relative_path
 
-    if "lookup_data_file" in table_schema and table_schema["lookup_data_file"] is not None:
-        stem = Path(table_schema["lookup_data_file"]["path"]).stem
+    if "lookup_data_file" in data_layout and data_layout["lookup_data_file"] is not None:
+        stem = Path(data_layout["lookup_data_file"]["path"]).stem
         lookup_file_path = _find_file_with_stem(dataset_data_dir, stem)
         if lookup_file_path is None:
             msg = f"Could not find lookup file with stem '{stem}' in {dataset_data_dir}"
             raise FileNotFoundError(msg)
         relative_path = os.path.relpath(lookup_file_path, config_dir)
-        table_schema["lookup_data_file"]["path"] = relative_path
+        data_layout["lookup_data_file"]["path"] = relative_path
 
-    if "missing_associations" in table_schema and table_schema["missing_associations"] is not None:
+    if "missing_associations" in data_layout and data_layout["missing_associations"] is not None:
         items = []
-        for item in table_schema["missing_associations"]:
+        for item in data_layout["missing_associations"]:
             stem = Path(item).stem
             missing_path = _find_file_with_stem(dataset_data_dir, stem)
             if missing_path is None:
@@ -85,7 +85,7 @@ def update_dataset_config_paths(config_file: Path, dataset_id: str) -> None:
                 raise FileNotFoundError(msg)
             relative_path = os.path.relpath(missing_path, config_dir)
             items.append(relative_path)
-        table_schema["missing_associations"] = items
+        data_layout["missing_associations"] = items
 
     dump_data(data, config_file)
 

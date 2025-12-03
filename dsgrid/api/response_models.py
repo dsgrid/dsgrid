@@ -2,7 +2,7 @@ from dsgrid.data_models import DSGBaseModel
 from dsgrid.config.dataset_config import DatasetConfigModel
 from dsgrid.config.dimensions import DimensionCommonModel, ProjectDimensionModel
 from dsgrid.config.project_config import ProjectConfigModel, ProjectDimensionNamesModel
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.query.models import ReportType
 from .models import AsyncTaskModel
@@ -92,10 +92,10 @@ class ListReportTypesResponse(DSGBaseModel):
     types: list[ReportType]
 
 
-class ListTableFormatTypesResponse(DSGBaseModel):
-    """Defines the response to the list_table_format_types command."""
+class ListValueFormatsResponse(DSGBaseModel):
+    """Defines the response to the list_value_formats command."""
 
-    types: list[TableFormatType]
+    formats: list[ValueFormat]
 
 
 class SparkSubmitProjectQueryResponse(DSGBaseModel):

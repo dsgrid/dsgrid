@@ -28,14 +28,15 @@ from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     InputDatasetType,
+    UserDataLayout,
 )
 from dsgrid.config.dimension_mapping_base import (
     DimensionMappingReferenceModel,
 )
 from dsgrid.config.simple_models import DimensionSimpleModel
-from dsgrid.dataset.models import TableFormatType
+from dsgrid.dataset.models import ValueFormat
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
-from dsgrid.config.file_schemas import read_data_file
+from dsgrid.config.file_schema import read_data_file
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimensionMapping
 from dsgrid.dimension.time import (
@@ -336,7 +337,8 @@ class DatasetSchemaHandlerBase(abc.ABC):
             return
 
         logger.info("Check dataset time consistency.")
-        file_schema = self._config.model.table_schema.data_file
+        assert isinstance(self._config.model.data_layout, UserDataLayout)
+        file_schema = self._config.model.data_layout.data_file
         load_data_df = read_data_file(file_schema)
         chronify_schema = self._get_chronify_schema(load_data_df)
 
@@ -383,7 +385,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
             and x
             in set(df.columns).difference(time_cols).difference(self._config.get_value_columns())
         ]
-        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+        if self._config.get_value_format() == ValueFormat.PIVOTED:
             # We can ignore all pivoted columns but one for time checking.
             # Looking at the rest would be redundant.
             value_column = next(iter(self._config.get_pivoted_dimension_columns()))
@@ -479,7 +481,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
         # TODO: remove ProjectConfig so that dataset queries can use this.
         # Issue #370
         table_handler = make_table_format_handler(
-            self._config.get_table_format_type(),
+            self._config.get_value_format(),
             project_config,
             dataset_id=self.dataset_id,
         )
@@ -596,7 +598,7 @@ class DatasetSchemaHandlerBase(abc.ABC):
 
     def _list_dimension_types_in_load_data(self, df: DataFrame) -> list[DimensionType]:
         dims = [DimensionType(x) for x in DatasetSchemaHandlerBase._list_dimension_columns(df)]
-        if self._config.get_table_format_type() == TableFormatType.PIVOTED:
+        if self._config.get_value_format() == ValueFormat.PIVOTED:
             pivoted_type = self._config.get_pivoted_dimension_type()
             assert pivoted_type is not None
             dims.append(pivoted_type)

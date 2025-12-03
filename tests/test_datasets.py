@@ -105,8 +105,8 @@ def register_dataset(setup_registry):
 
     # Update paths in the config to point to the copied test data
     test_config = load_data(test_config_file)
-    if "table_schema" in test_config and test_config["table_schema"] is not None:
-        ts = test_config["table_schema"]
+    if "data_layout" in test_config and test_config["data_layout"] is not None:
+        ts = test_config["data_layout"]
         if "data_file" in ts:
             ts["data_file"]["path"] = str(dataset_path / "load_data.csv")
         if "lookup_data_file" in ts and ts["lookup_data_file"] is not None:
@@ -176,7 +176,7 @@ def register_dataset(setup_registry):
 def test_invalid_load_data_lookup_column_name(register_dataset):
     config_file, dataset_path, expected_errors = register_dataset
     config = load_json_file(config_file)
-    for column in config["table_schema"]["lookup_data_file"]["columns"]:
+    for column in config["data_layout"]["lookup_data_file"]["columns"]:
         if column["name"] == "subsector":
             column["name"] = "invalid_dimension"
     dump_json_file(config, config_file)

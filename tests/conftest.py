@@ -250,7 +250,7 @@ def _make_project_dir(project, base_dir: Optional[Path] = None):
         for config_file in datasets_dir.rglob("dataset*.json5"):
             try:
                 data = load_data(config_file)
-                if "dataset_id" in data and "table_schema" in data:
+                if "dataset_id" in data and "data_layout" in data:
                     update_dataset_config_paths(config_file, data["dataset_id"])
             except Exception:
                 # Some config files may not have valid paths; skip them

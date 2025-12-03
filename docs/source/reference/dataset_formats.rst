@@ -93,7 +93,7 @@ Example dataset configuration with column data types:
         },
       },
       data_file: {
-        path: "./load_data.csv",
+        path: "load_data.csv",
         columns: [
           {
             name: "timestamp",
@@ -124,7 +124,7 @@ You can also specify types for only the columns that need explicit typing:
 .. code-block:: JavaScript
 
     data_file: {
-      path: "./load_data.csv",
+      path: "load_data.csv",
       columns: [
         {
           name: "geography",
@@ -151,7 +151,7 @@ Example with custom column names:
 .. code-block:: JavaScript
 
     data_file: {
-      path: "./load_data.parquet",
+      path: "load_data.parquet",
       columns: [
         {
           name: "county",           // Actual column name in the file
@@ -173,7 +173,7 @@ You can combine ``dimension_type`` with ``data_type`` when using CSV files:
 .. code-block:: JavaScript
 
     data_file: {
-      path: "./load_data.csv",
+      path: "load_data.csv",
       columns: [
         {
           name: "fips_code",
@@ -284,7 +284,7 @@ schema type. It has the following structure:
         },
       },
       data_file: {
-        path: "./load_data.parquet",
+        path: "load_data.parquet",
         columns: [                     // optional
           {
             name: "column_name",       // actual name in the file
@@ -295,7 +295,7 @@ schema type. It has the following structure:
         ignore_columns: ["col1", "col2"],  // optional, columns to drop
       },
       lookup_data_file: {              // required for "standard" schema
-        path: "./load_data_lookup.parquet",
+        path: "load_data_lookup.parquet",
         columns: [],                   // optional, same structure as data_file
         ignore_columns: [],            // optional, same as data_file
       },
@@ -523,7 +523,7 @@ the ``missing_associations`` field. This field accepts a list of paths to files 
 
     table_schema: {
       data_schema: { ... },
-      data_file: { path: "./load_data.parquet" },
+      data_file: { path: "load_data.parquet" },
       missing_associations: [
         "missing_associations.parquet",
         "additional_missing",
@@ -570,9 +570,7 @@ You can also use a simplified format with only the columns that vary::
 
 Directory Format
 ~~~~~~~~~~~~~~~~
-When using a directory, create separate files for different dimension combinations. File names
-must follow the pattern ``<dimension_type1>__<dimension_type2>.csv`` or
-``<dimension_type1>__<dimension_type2>.parquet`` (note the double underscore).
+When using a directory, create separate files for different dimension combinations.
 
 Example directory structure::
 
@@ -689,7 +687,7 @@ an iterative workflow to help you identify them:
 
        table_schema: {
          data_schema: { ... },
-         data_file: { path: "./load_data.parquet" },
+         data_file: { path: "load_data.parquet" },
          // Option 1: Use the all-inclusive Parquet file
          missing_associations: ["./my_dataset__missing_dimension_record_combinations.parquet"],
 

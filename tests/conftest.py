@@ -74,8 +74,7 @@ def cached_registry():
         result = runner.invoke(
             cli,
             [
-                "registry",
-                "create",
+                "create-registry",
                 conn.url,
                 "--data-path",
                 str(TEST_REGISTRY_DATA_PATH),
@@ -131,8 +130,7 @@ def registry_with_duckdb_store(tmp_path):
     result = runner.invoke(
         cli,
         [
-            "registry",
-            "create",
+            "create-registry",
             url,
             "--data-path",
             str(data_path),

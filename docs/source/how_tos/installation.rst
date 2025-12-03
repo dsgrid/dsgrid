@@ -85,7 +85,7 @@ registry with this CLI command:
 
 .. code-block:: bash
 
-   dsgrid registry create --help
+   dsgrid create-registry --help
 
 Apache Spark
 ============

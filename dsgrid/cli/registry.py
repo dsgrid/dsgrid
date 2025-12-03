@@ -9,14 +9,12 @@ import rich_click as click
 from rich import print
 from semver import VersionInfo
 
-from chronify.utils.path_utils import check_overwrite
-
 from dsgrid.cli.common import (
     get_value_from_context,
     handle_dsgrid_exception,
     path_callback,
 )
-from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY
+from dsgrid.common import REMOTE_REGISTRY
 from dsgrid.dataset.models import TableFormat
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType
@@ -26,7 +24,6 @@ from dsgrid.registry.bulk_register import bulk_register
 from dsgrid.registry.common import (
     DatabaseConnection,
     DatasetRegistryStatus,
-    DataStoreType,
     VersionUpdateType,
 )
 from dsgrid.registry.dataset_config_generator import generate_config_from_dataset
@@ -135,46 +132,6 @@ def list_(registry_manager):
     """List the contents of a registry."""
     print(f"Registry: {registry_manager.path}")
     registry_manager.show()
-
-
-_create_epilog = """
-Examples:\n
-$ dsgrid registry create sqlite:////projects/dsgrid/my_project/registry.db -p /projects/dsgrid/my_project/registry-data\n
-"""
-
-
-@click.command(name="create", epilog=_create_epilog)
-@click.argument("url")
-@click.option(
-    "-p",
-    "--data-path",
-    default=LOCAL_REGISTRY,
-    show_default=True,
-    callback=lambda *x: Path(x[2]),
-    help="Local dsgrid registry data path. Must not contain the registry file listed in URL.",
-)
-@click.option(
-    "-f",
-    "--overwrite",
-    "--force",
-    is_flag=True,
-    default=False,
-    help="Delete registry_path and the database if they already exist.",
-)
-@click.option(
-    "-t",
-    "--data-store-type",
-    type=click.Choice([x.value for x in DataStoreType]),
-    default=DataStoreType.FILESYSTEM.value,
-    show_default=True,
-    help="Type of store to use for the registry data.",
-    callback=lambda *x: DataStoreType(x[2]),
-)
-def create_registry(url: str, data_path: Path, overwrite: bool, data_store_type: DataStoreType):
-    """Create a new registry."""
-    check_overwrite(data_path, overwrite)
-    conn = DatabaseConnection(url=url)
-    RegistryManager.create(conn, data_path, overwrite=overwrite, data_store_type=data_store_type)
 
 
 """
@@ -1919,7 +1876,6 @@ datasets.add_command(generate_dataset_config_from_dataset)
 datasets.add_command(remove_datasets)
 
 registry.add_command(list_)
-registry.add_command(create_registry)
 registry.add_command(dimensions)
 registry.add_command(dimension_mappings)
 registry.add_command(projects)

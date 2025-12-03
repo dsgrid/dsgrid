@@ -28,8 +28,7 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
-            "registry",
-            "create",
+            "create-registry",
             url,
             "-p",
             str(tmpdir),
@@ -83,8 +82,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
-            "registry",
-            "create",
+            "create-registry",
             url,
             "-p",
             str(tmpdir),
@@ -228,8 +226,7 @@ def test_register_dsgrid_projects(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
-            "registry",
-            "create",
+            "create-registry",
             url,
             "-p",
             str(tmpdir),
@@ -274,8 +271,7 @@ def test_bulk_register(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
-            "registry",
-            "create",
+            "create-registry",
             url,
             "-p",
             str(tmp_path),
@@ -336,8 +332,7 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
     result = runner.invoke(
         cli,
         [
-            "registry",
-            "create",
+            "create-registry",
             url,
             "-p",
             str(tmpdir),

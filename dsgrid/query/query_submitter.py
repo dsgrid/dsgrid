@@ -22,7 +22,7 @@ from dsgrid.dataset.dataset_expression_handler import (
     evaluate_expression,
 )
 from dsgrid.utils.scratch_dir_context import ScratchDirContext
-from dsgrid.dataset.models import TableFormatType, PivotedTableFormatModel
+from dsgrid.dataset.models import ValueFormat, PivotedTableFormatModel
 from dsgrid.dataset.dataset_schema_handler_base import DatasetSchemaHandlerBase
 from dsgrid.dataset.table_format_handler_factory import make_table_format_handler
 from dsgrid.dimension.base_models import DimensionCategory, DimensionType
@@ -560,7 +560,7 @@ class ProjectBasedQuerySubmitter(QuerySubmitterBase):
         self, df: DataFrame, context: QueryContext, dataset_id: str | None = None
     ) -> DataFrame:
         handler = make_table_format_handler(
-            TableFormatType.UNPIVOTED, self._project.config, dataset_id=dataset_id
+            ValueFormat.STACKED, self._project.config, dataset_id=dataset_id
         )
         df = handler.process_aggregations(df, context.model.result.aggregations, context)
 

@@ -12,8 +12,8 @@ from dsgrid.config.project_config import DatasetBaseDimensionNamesModel
 from dsgrid.data_models import DSGBaseModel, make_model_config
 from dsgrid.dataset.models import (
     TableFormatModel,
-    UnpivotedTableFormatModel,
-    TableFormatType,
+    StackedTableFormatModel,
+    ValueFormat,
 )
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.dimension_filters import (
@@ -270,9 +270,9 @@ class DatasetMetadataModel(DSGBaseModel):
     # This will be set at the query context level but not per-dataset.
     base_dimension_names: DatasetBaseDimensionNamesModel = DatasetBaseDimensionNamesModel()
 
-    def get_table_format_type(self) -> TableFormatType:
-        """Return the format type of the table."""
-        return TableFormatType(self.table_format.format_type)
+    def get_value_format(self) -> ValueFormat:
+        """Return the value format of the table."""
+        return ValueFormat(self.table_format.format_type)
 
 
 class CacheableQueryBaseModel(DSGBaseModel):
@@ -517,7 +517,7 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
         f"dataset, this must be set to {ColumnType.DIMENSION_TYPES.value}.",
         default=ColumnType.DIMENSION_NAMES,
     )
-    table_format: TableFormatModel = UnpivotedTableFormatModel()
+    table_format: TableFormatModel = StackedTableFormatModel()
     output_format: str = Field(description="Output file format: csv or parquet", default="parquet")
     sort_columns: list[str] = Field(
         description="Sort the results by these dimension names.",
@@ -537,7 +537,7 @@ class QueryResultParamsModel(CacheableQueryBaseModel):
 
     @model_validator(mode="after")
     def check_pivot_dimension_type(self) -> "QueryResultParamsModel":
-        if self.table_format.format_type == TableFormatType.PIVOTED:
+        if self.table_format.format_type == ValueFormat.PIVOTED:
             pivoted_dim_type = self.table_format.pivoted_dimension_type
             for agg in self.aggregations:
                 names = getattr(agg.dimensions, pivoted_dim_type.value)

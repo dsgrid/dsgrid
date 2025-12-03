@@ -13,13 +13,12 @@ from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST
 from dsgrid.config.dataset_config import (
     DatasetConfig,
     DatasetConfigModel,
-    user_schema_to_registry_schema,
+    user_layout_to_registry_layout,
 )
-from dsgrid.config.dataset_config import DataSchemaType
-from dsgrid.config.file_schemas import read_data_file
+from dsgrid.dataset.models import TableFormat, ValueFormat
+from dsgrid.config.file_schema import read_data_file
 from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_handler
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
-from dsgrid.dataset.models import TableFormatType, UnpivotedTableFormatModel
 from dsgrid.dimension.base_models import (
     check_required_dataset_dimensions,
 )
@@ -181,11 +180,11 @@ class DatasetRegistryManager(RegistryManagerBase):
             model = self.db.get_by_version(conn, config_id, version)
 
         config = DatasetConfig(model)
-        if config.model.table_schema is not None:
-            msg = f"Dataset {config_id} loaded from registry has table_schema set; expected None"
+        if config.model.data_layout is not None:
+            msg = f"Dataset {config_id} loaded from registry has data_layout set; expected None"
             raise DSGInvalidDataset(msg)
-        if config.model.registry_schema is None:
-            msg = f"Dataset {config_id} loaded from registry has registry_schema=None; expected a value"
+        if config.model.registry_data_layout is None:
+            msg = f"Dataset {config_id} loaded from registry has registry_data_layout=None; expected a value"
             raise DSGInvalidDataset(msg)
         self._update_dimensions(conn, config)
         self._datasets[key] = config
@@ -330,10 +329,10 @@ class DatasetRegistryManager(RegistryManagerBase):
             self._store.remove_tables(config.model.dataset_id, config.model.version)
             raise
 
-        if config.model.table_schema is not None:
-            registry_schema = user_schema_to_registry_schema(config.model.table_schema)
-            config.model.table_schema = None
-            config.model.registry_schema = registry_schema
+        if config.model.data_layout is not None:
+            registry_layout = user_layout_to_registry_layout(config.model.data_layout)
+            config.model.data_layout = None
+            config.model.registry_data_layout = registry_layout
         self._db.insert(context.connection, config.model, context.registration)
         logger.info(
             "%s Registered dataset %s with version=%s",
@@ -430,12 +429,15 @@ class DatasetRegistryManager(RegistryManagerBase):
             msg = "Cannot read table without data file schema"
             raise DSGInvalidDataset(msg)
 
-        if config.get_table_format_type() == TableFormatType.PIVOTED:
-            logger.info("Convert dataset %s from pivoted to unpivoted.", config.model.dataset_id)
+        if config.get_value_format() == ValueFormat.PIVOTED:
+            logger.info("Convert dataset %s from pivoted to stacked.", config.model.dataset_id)
             needs_unpivot = True
             pivoted_columns = config.get_pivoted_dimension_columns()
             pivoted_dimension_type = config.get_pivoted_dimension_type()
-            config.model.table_schema.data_schema.table_format = UnpivotedTableFormatModel()
+            # Update both fields together to avoid validation errors from the model validator
+            config.model.data_layout = config.model.data_layout.model_copy(
+                update={"value_format": ValueFormat.STACKED, "pivoted_dimension_type": None}
+            )
         else:
             needs_unpivot = False
             pivoted_columns = None
@@ -470,9 +472,9 @@ class DatasetRegistryManager(RegistryManagerBase):
     ) -> None:
         lk_df: DataFrame | None = None
         missing_dfs: dict[str, DataFrame] = {}
-        match config.get_data_schema_type():
-            case DataSchemaType.ONE_TABLE:
-                if not config.has_user_schema:
+        match config.get_table_format():
+            case TableFormat.ONE_TABLE:
+                if not config.has_user_layout:
                     assert (
                         orig_version is not None
                     ), "orig_version must be set if config came from the registry"
@@ -490,8 +492,8 @@ class DatasetRegistryManager(RegistryManagerBase):
                         self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
                     )
 
-            case DataSchemaType.STANDARD:
-                if not config.has_user_schema:
+            case TableFormat.TWO_TABLE:
+                if not config.has_user_layout:
                     assert (
                         orig_version is not None
                     ), "orig_version must be set if config came from the registry"
@@ -515,7 +517,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                         self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
                     )
             case _:
-                msg = f"Unsupported data schema type: {config.get_data_schema_type()}"
+                msg = f"Unsupported table format: {config.get_table_format()}"
                 raise Exception(msg)
 
         self._store.write_table(ld_df, config.model.dataset_id, config.model.version)
@@ -557,9 +559,9 @@ class DatasetRegistryManager(RegistryManagerBase):
     ):
         with RegistrationContext(self.db, log_message, update_type, submitter) as context:
             conn = context.connection
-            # If config has UserDatasetSchema, load with validation; otherwise just load
+            # If config has UserDataLayout, load with validation; otherwise just load
             config = DatasetConfig.load(config_file)
-            if config.has_user_schema:
+            if config.has_user_layout:
                 config = DatasetConfig.load_from_user_path(config_file)
             self._update_dimensions(conn, config)
             self._check_update(conn, config, dataset_id, version)

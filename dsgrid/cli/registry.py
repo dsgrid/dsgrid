@@ -17,7 +17,7 @@ from dsgrid.cli.common import (
     path_callback,
 )
 from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY
-from dsgrid.config.dataset_config import DataSchemaType
+from dsgrid.dataset.models import TableFormat
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.config.common import SUPPORTED_METRIC_TYPES
@@ -834,7 +834,7 @@ $ dsgrid registry projects register-and-submit-dataset \\ \n
     required=True,
     type=click.Path(exists=True),
     callback=path_callback,
-    help="Dataset config file (must include table_schema with data_file paths)",
+    help="Dataset config file (must include data_layout with data_file paths)",
 )
 @click.option(
     "-m",
@@ -910,7 +910,7 @@ def register_and_submit_dataset(
 ):
     """Register a dataset and then submit it to a dsgrid project.
 
-    The dataset config file must include a table_schema with data_file and optional
+    The dataset config file must include a data_layout with data_file and optional
     lookup_data_file paths pointing to the dataset files.
     """
     submitter = getpass.getuser()
@@ -1504,7 +1504,7 @@ def register_dataset(
     must match the data model defined by this documentation:
     https://dsgrid.github.io/dsgrid/reference/data_models/dataset.html#dsgrid.config.dataset_config.DatasetConfigModel
 
-    The config file must include a table_schema with data_file and optional
+    The config file must include a data_layout with data_file and optional
     lookup_data_file paths pointing to the dataset files.
     """
     manager = registry_manager.dataset_manager
@@ -1646,11 +1646,11 @@ $ dsgrid registry datasets generate-config-from-dataset \\ \n
 @click.argument("dataset-path")
 @click.option(
     "-s",
-    "--schema-type",
-    type=click.Choice([x.value for x in DataSchemaType]),
-    default=DataSchemaType.ONE_TABLE.value,
+    "--table-format",
+    type=click.Choice([x.value for x in TableFormat]),
+    default=TableFormat.ONE_TABLE.value,
     show_default=True,
-    callback=lambda *x: DataSchemaType(x[2]),
+    callback=lambda *x: TableFormat(x[2]),
 )
 @click.option(
     "-m",
@@ -1723,7 +1723,7 @@ def generate_dataset_config_from_dataset(
     registry_manager: RegistryManager,
     dataset_id: str,
     dataset_path: Path,
-    schema_type: DataSchemaType,
+    table_format: TableFormat,
     metric_type: str,
     pivoted_dimension_type: DimensionType | None,
     time_type: TimeDimensionType,
@@ -1746,7 +1746,7 @@ def generate_dataset_config_from_dataset(
         registry_manager,
         dataset_id,
         dataset_path,
-        schema_type,
+        table_format,
         metric_type,
         pivoted_dimension_type=pivoted_dimension_type,
         time_type=time_type,

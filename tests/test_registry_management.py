@@ -805,9 +805,9 @@ def test_register_dataset_with_data_base_dir(tmp_registry_db, tmp_path):
         data = load_data(dataset_config_file)
 
         # Change paths to be relative to the data_base_dir
-        data["table_schema"]["data_file"]["path"] = "load_data.csv"
-        data["table_schema"]["lookup_data_file"]["path"] = "load_data_lookup.json"
-        data["table_schema"]["missing_associations"] = ["missing_associations"]
+        data["data_layout"]["data_file"]["path"] = "load_data.csv"
+        data["data_layout"]["lookup_data_file"]["path"] = "load_data_lookup.json"
+        data["data_layout"]["missing_associations"] = ["missing_associations"]
         dump_data(data, modified_config_file)
 
         # Use CLI runner to test the --data-base-dir option
@@ -887,9 +887,9 @@ def test_register_and_submit_dataset_with_data_base_dir(tmp_registry_db, tmp_pat
         data = load_data(dataset_config_file)
 
         # Change paths to be relative to the data_base_dir
-        data["table_schema"]["data_file"]["path"] = "load_data.csv"
-        data["table_schema"]["lookup_data_file"]["path"] = "load_data_lookup.json"
-        data["table_schema"]["missing_associations"] = ["missing_associations"]
+        data["data_layout"]["data_file"]["path"] = "load_data.csv"
+        data["data_layout"]["lookup_data_file"]["path"] = "load_data_lookup.json"
+        data["data_layout"]["missing_associations"] = ["missing_associations"]
         dump_data(data, modified_config_file)
 
         # Use CLI runner to test register-and-submit-dataset with --data-base-dir

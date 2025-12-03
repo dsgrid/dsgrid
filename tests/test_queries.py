@@ -19,7 +19,7 @@ from dsgrid.common import VALUE_COLUMN, BackendEngine
 from dsgrid.cli.dsgrid import cli
 from dsgrid.dataset.models import (
     PivotedTableFormatModel,
-    UnpivotedTableFormatModel,
+    StackedTableFormatModel,
 )
 from dsgrid.dimension.base_models import DimensionType, DimensionCategory
 from dsgrid.dimension.dimension_filters import (
@@ -388,7 +388,7 @@ def test_query_cli_create_validate(tmp_path):
             "pivoted_dimension_type": "metric",
         },
         {
-            "format_type": "unpivoted",
+            "format_type": "stacked",
         },
     ],
 )
@@ -820,7 +820,7 @@ class QueryTestElectricityValues(QueryTestBase):
             ),
             result=QueryResultParamsModel(
                 replace_ids_with_names=True,
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
                 time_zone=self._to_time_zone,
             ),
         )
@@ -964,7 +964,7 @@ class QueryTestElectricityUse(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1056,7 +1056,7 @@ class QueryTestDatasetMappingPlan(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1129,7 +1129,7 @@ class QueryTestElectricityUseFilterResults(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
 
@@ -1219,7 +1219,7 @@ class QueryTestTotalElectricityUseWithFilter(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1287,7 +1287,7 @@ class QueryTestDiurnalElectricityUseByCountyChained(QueryTestBase):
                 ],
                 sort_columns=["county", "hour"],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1429,7 +1429,7 @@ class QueryTestAnnualElectricityUseByState(QueryTestBase):
                 ],
                 sort_columns=["state"],
                 output_format="csv",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model
@@ -1712,7 +1712,7 @@ class QueryTestElectricityValuesCompositeDatasetAgg(QueryTestBase):
                     ),
                 ],
                 output_format="parquet",
-                table_format=UnpivotedTableFormatModel(),
+                table_format=StackedTableFormatModel(),
             ),
         )
         return self._model

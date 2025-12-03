@@ -85,12 +85,10 @@ Example dataset configuration with column data types:
 
 .. code-block:: JavaScript
 
-    table_schema: {
-      data_schema: {
-        data_schema_type: "one_table",
-        table_format: {
-          format_type: "unpivoted",
-        },
+    data_layout: {
+      table_format: "one_table",
+      value_format: {
+        format_type: "stacked",
       },
       data_file: {
         path: "load_data.csv",
@@ -268,20 +266,18 @@ Time-zone-unaware timestamps that will be interpreted as local time should be wr
 timestamps (i.e., 12pm with no time zone should be written as 12pm UTC).
 
 
-Table Schema
-============
-The ``table_schema`` section of a dataset configuration defines the data file locations and
-schema type. It has the following structure:
+Data Layout
+===========
+The ``data_layout`` section of a dataset configuration defines the data file locations and
+table format. It has the following structure:
 
 .. code-block:: JavaScript
 
-    table_schema: {
-      data_schema: {
-        data_schema_type: "standard",  // or "one_table"
-        table_format: {
-          format_type: "pivoted",      // or "unpivoted"
-          pivoted_dimension_type: "metric",  // required if pivoted
-        },
+    data_layout: {
+      table_format: "two_table",       // or "one_table"
+      value_format: {
+        format_type: "pivoted",        // or "stacked"
+        pivoted_dimension_type: "metric",  // required if pivoted
       },
       data_file: {
         path: "load_data.parquet",
@@ -294,7 +290,7 @@ schema type. It has the following structure:
         ],
         ignore_columns: ["col1", "col2"],  // optional, columns to drop
       },
-      lookup_data_file: {              // required for "standard" schema
+      lookup_data_file: {              // required for "two_table" format
         path: "load_data_lookup.parquet",
         columns: [],                   // optional, same structure as data_file
         ignore_columns: [],            // optional, same as data_file
@@ -307,7 +303,8 @@ schema type. It has the following structure:
 
 Fields:
 
-- ``data_schema``: Defines the table structure (schema type and format).
+- ``table_format``: Defines the table structure - ``"two_table"`` or ``"one_table"``.
+- ``value_format``: Defines whether values are pivoted or stacked.
 - ``data_file``: Main data file configuration (required).
 
   - ``path``: Path to the data file. Can be absolute or relative to the config file.
@@ -321,7 +318,7 @@ Fields:
   - ``ignore_columns``: Optional list of column names to drop when reading the file.
     Cannot overlap with columns defined in ``columns``.
 
-- ``lookup_data_file``: Lookup file configuration (required for ``standard`` schema type).
+- ``lookup_data_file``: Lookup file configuration (required for ``two_table`` format).
   Has the same structure as ``data_file``.
 - ``missing_associations``: List of paths to files or directories defining missing dimension
   combinations (optional, see :ref:`missing-associations`). Paths can be absolute or relative
@@ -340,7 +337,7 @@ Both formats support pivoting the record IDs of one dimension as an option.
   pivot the metric dimension in order to avoid many repeated rows of other dimensions. This saves
   storage space but can make queries more complicated. dsgrid handles that complexity on the back
   end, but this point can still apply to users that inspect the raw datasets.
-- ``Unpivoted``: The table has one column per dimension (except time, which might have more than
+- ``Stacked``: The table has one column per dimension (except time, which might have more than
   one column) and a column called ``value`` that contains the data values. This format
   makes queries simpler. It is also good for cases when there is not a sensible dimension to pivot.
 
@@ -379,8 +376,8 @@ All metric data and dimension records are stored in one Parquet file.
 
 .. _two-table-format:
 
-Two Table Format (Standard)
-----------------------------
+Two Table Format
+----------------
 Two Parquet files comprise the dataset:
 
 - ``load_data.parquet``: Metric data, usually with time-series data. This example pivots the metric
@@ -516,13 +513,14 @@ missing associations.
 
 Declaring Missing Associations
 ------------------------------
-Specify missing associations in the ``table_schema`` section of your dataset config using
+Specify missing associations in the ``data_layout`` section of your dataset config using
 the ``missing_associations`` field. This field accepts a list of paths to files or directories:
 
 .. code-block:: JavaScript
 
-    table_schema: {
-      data_schema: { ... },
+    data_layout: {
+      table_format: "one_table",
+      value_format: { format_type: "stacked" },
       data_file: { path: "load_data.parquet" },
       missing_associations: [
         "missing_associations.parquet",
@@ -680,13 +678,14 @@ an iterative workflow to help you identify them:
 
 6. **Re-run registration with missing associations**
 
-   Add the ``missing_associations`` field to your ``table_schema`` pointing to the files or
+   Add the ``missing_associations`` field to your ``data_layout`` pointing to the files or
    directories:
 
    .. code-block:: JavaScript
 
-       table_schema: {
-         data_schema: { ... },
+       data_layout: {
+         table_format: "one_table",
+         value_format: { format_type: "stacked" },
          data_file: { path: "load_data.parquet" },
          // Option 1: Use the all-inclusive Parquet file
          missing_associations: ["./my_dataset__missing_dimension_record_combinations.parquet"],

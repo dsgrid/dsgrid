@@ -14,7 +14,7 @@ from dsgrid.tests.common import (
 )
 from dsgrid.config.simple_models import RegistrySimpleModel
 from dsgrid.dimension.base_models import DimensionType
-from dsgrid.exceptions import DSGInvalidDataset, DSGInvalidDimension
+from dsgrid.exceptions import DSGInvalidDataset
 from dsgrid.registry.common import DatabaseConnection
 from dsgrid.registry.filter_registry_manager import FilterRegistryManager
 from dsgrid.registry.registry_database import RegistryDatabase
@@ -79,7 +79,7 @@ def make_registry_for_aeo(
         dataset_config_file = src_dir / dataset_dir / "dataset.json5"
         # Update the data file path to point to the actual data location
         config = load_json_file(dataset_config_file)
-        config["table_schema"]["data_file"]["path"] = str(data_dir / "load_data.csv")
+        config["data_layout"]["data_file"]["path"] = str(data_dir / "load_data.csv")
         dump_json_file(config, dataset_config_file)
         manager.dataset_manager.register(dataset_config_file, user, log_message)
         logger.info(f"dataset={dataset_name} registered successfully!\n")
@@ -115,7 +115,7 @@ def test_aeo_datasets_registration(make_test_project_dir, make_test_data_dir_mod
             # Spark doesn't allow duplicate columns in CSV files. Maybe previous versions did.
             # It appends the column index to each duplicate column name.
             # DuckDB appends "_1" suffix to the duplicate, and our code catches that as unexpected.
-            with pytest.raises((ValueError, DSGInvalidDataset, DSGInvalidDimension)):
+            with pytest.raises(DSGInvalidDataset):
                 _test_dataset_registration(src_dir, registry_dir, conn, data_dir, dataset)
 
             logger.info("4. End Uses dataset only - missing time ")

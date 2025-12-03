@@ -1,52 +1,51 @@
-from asyncio.log import logger
 from enum import StrEnum
-from typing import Literal, Union
+from typing import Annotated, Literal, Union
 
-from pydantic import Field, model_validator
-from typing_extensions import Annotated
+from pydantic import Field
 
 from dsgrid.data_models import DSGBaseModel
 from dsgrid.dimension.base_models import DimensionType
 
 
-class TableFormatType(StrEnum):
+class ValueFormat(StrEnum):
     """Defines the format of value columns in a dataset."""
 
     PIVOTED = "pivoted"
-    UNPIVOTED = "unpivoted"
+    STACKED = "stacked"
 
 
-class TableFormatModelBase(DSGBaseModel):
-    format_type: TableFormatType
+class TableFormat(StrEnum):
+    """Defines the table structure of a dataset."""
+
+    ONE_TABLE = "one_table"
+    TWO_TABLE = "two_table"
 
 
-class PivotedTableFormatModel(TableFormatModelBase):
-    format_type: Literal[TableFormatType.PIVOTED] = TableFormatType.PIVOTED
+# Keep old name as alias for backward compatibility during migration
+TableFormatType = ValueFormat
+
+
+class PivotedTableFormatModel(DSGBaseModel):
+    """Defines a pivoted table format where one dimension's records are columns."""
+
+    format_type: Literal[ValueFormat.PIVOTED] = ValueFormat.PIVOTED
     pivoted_dimension_type: DimensionType = Field(
         title="pivoted_dimension_type",
-        description="The data dimension whose records are columns (pivoted) that contain "
-        "data values (numeric) in the load_data table.",
+        description="The dimension type whose records are columns that contain data values.",
     )
 
 
-class UnpivotedTableFormatModel(TableFormatModelBase):
-    format_type: Literal[TableFormatType.UNPIVOTED] = TableFormatType.UNPIVOTED
+class StackedTableFormatModel(DSGBaseModel):
+    """Defines a stacked (unpivoted) table format with a single value column."""
 
-    @model_validator(mode="before")
-    @classmethod
-    def handle_legacy(cls, values: dict) -> dict:
-        if "value_column" in values:
-            logger.warning("Removing deprecated value_column field from unpivoted table format.")
-            values.pop("value_column")
+    format_type: Literal[ValueFormat.STACKED] = ValueFormat.STACKED
 
-        return values
+
+# Alias for backward compatibility
+UnpivotedTableFormatModel = StackedTableFormatModel
 
 
 TableFormatModel = Annotated[
-    Union[PivotedTableFormatModel, UnpivotedTableFormatModel],
-    Field(
-        description="Defines the format of the value columns of the result table.",
-        discriminator="format_type",
-        title="table_format",
-    ),
+    Union[PivotedTableFormatModel, StackedTableFormatModel],
+    Field(discriminator="format_type"),
 ]

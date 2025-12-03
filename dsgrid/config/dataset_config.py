@@ -53,6 +53,7 @@ ALLOWED_MISSING_DIMENSION_ASSOCATIONS_FILENAMES = (
     "missing_associations.csv",
     "missing_associations.parquet",
 )
+MISSING_ASSOCIATIONS_DIR_NAME = "missing_associations"
 
 logger = logging.getLogger(__name__)
 

@@ -11,6 +11,7 @@ from sqlalchemy import Connection
 
 from dsgrid.common import SCALING_FACTOR_COLUMN, SYNC_EXCLUDE_LIST
 from dsgrid.config.dataset_config import (
+    MISSING_ASSOCIATIONS_DIR_NAME,
     DatasetConfig,
     ALLOWED_LOAD_DATA_FILENAMES,
     ALLOWED_LOAD_DATA_LOOKUP_FILENAMES,
@@ -22,6 +23,7 @@ from dsgrid.config.dataset_schema_handler_factory import make_dataset_schema_han
 from dsgrid.config.dimensions_config import DimensionsConfig, DimensionsConfigModel
 from dsgrid.dataset.models import TableFormatType, UnpivotedTableFormatModel
 from dsgrid.dimension.base_models import (
+    DimensionType,
     check_required_dataset_dimensions,
 )
 from dsgrid.exceptions import DSGInvalidDataset
@@ -113,7 +115,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
-        missing_dimension_associations: DataFrame | None,
+        missing_dimension_associations: dict[str, DataFrame],
     ) -> None:
         logger.info("Run dataset registration checks.")
         check_required_dataset_dimensions(config.model.dimension_references, "dataset dimensions")
@@ -129,7 +131,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         self,
         conn: Connection,
         config: DatasetConfig,
-        missing_dimension_associations: DataFrame | None,
+        missing_dimension_associations: dict[str, DataFrame],
     ) -> None:
         schema_handler = make_dataset_schema_handler(
             conn,
@@ -319,14 +321,14 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._check_time_consistency(config, context)
         self._write_to_registry(config)
 
-        assoc_df = self._store.read_missing_associations_table(
+        assoc_dfs = self._store.read_missing_associations_tables(
             config.model.dataset_id, config.model.version
         )
         try:
             self._run_checks(
                 context.connection,
                 config,
-                assoc_df,
+                assoc_dfs,
             )
         except Exception:
             self._store.remove_tables(config.model.dataset_id, config.model.version)
@@ -377,25 +379,58 @@ class DatasetRegistryManager(RegistryManagerBase):
         )
         raise DSGInvalidDataset(msg)
 
-    def _read_missing_associations_table_from_user_path(
+    def _read_missing_associations_tables_from_user_path(
         self, dataset_path: Path
-    ) -> DataFrame | None:
+    ) -> dict[str, DataFrame]:
+        """Return all missing association tables keyed by the file path stem.
+        Tables can be all-dimension-types-in-one or split by groups of dimension types.
+        """
+        dfs: dict[str, DataFrame] = {}
         for filename in ALLOWED_MISSING_DIMENSION_ASSOCATIONS_FILENAMES:
             path = dataset_path / filename
             if path.exists():
-                if path.suffix.lower() == ".csv":
-                    df = get_spark_session().createDataFrame(pd.read_csv(path, dtype="string"))
-                else:
-                    df = read_dataframe(path)
-                for field in df.schema.fields:
-                    if field.dataType != StringType():
-                        df = df.withColumn(field.name, F.col(field.name).cast(StringType()))
-                return df
-        return None
+                df = self._read_associations_file(path)
+                dfs[path.stem] = df
+
+        missing_associations_dir = dataset_path / MISSING_ASSOCIATIONS_DIR_NAME
+        if missing_associations_dir.exists():
+            for file_path in missing_associations_dir.iterdir():
+                if file_path.suffix.lower() == ".csv":
+                    dim_types_str = file_path.stem.split("__")
+                    if len(dim_types_str) > 1:
+                        for name in dim_types_str:
+                            # Just validate that this is a valid dimension type.
+                            DimensionType.from_column(name)
+                        df = self._read_associations_file(file_path)
+                        if dim_types_str != list(df.columns):
+                            msg = f"Expected columns {dim_types_str} but found {df.columns}"
+                            raise DSGInvalidDataset(msg)
+                        dfs[file_path.stem] = df
+        return dfs
+
+    @staticmethod
+    def _read_associations_file(path: Path) -> DataFrame:
+        if path.suffix.lower() == ".csv":
+            df = get_spark_session().createDataFrame(pd.read_csv(path, dtype="string"))
+        else:
+            df = read_dataframe(path)
+        for field in df.schema.fields:
+            if field.dataType != StringType():
+                df = df.withColumn(field.name, F.col(field.name).cast(StringType()))
+        return df
 
     def _read_table_from_user_path(
         self, config: DatasetConfig, path: Path
     ) -> tuple[DataFrame, DataFrame | None]:
+        """Read a table from a user-provided path. Split expected-missing rows into a separate
+        DataFrame.
+
+        Returns
+        -------
+        tuple[DataFrame, DataFrame | None]
+            The first DataFrame contains the expected rows, and the second DataFrame contains the
+            missing rows or will be None if there are no missing rows.
+        """
         ld_path: Path | None = None
         for filename in ALLOWED_LOAD_DATA_FILENAMES:
             tmp = path / filename
@@ -445,15 +480,17 @@ class DatasetRegistryManager(RegistryManagerBase):
         orig_version: str | None = None,
     ) -> None:
         lk_df: DataFrame | None = None
-        missing_df: DataFrame | None = None
+        missing_dfs: dict[str, DataFrame] = {}
         match config.get_data_schema_type():
             case DataSchemaType.ONE_TABLE:
                 if config.dataset_path is None:
                     assert (
                         orig_version is not None
                     ), "orig_version must be set if dataset_path is None"
-                    missing_df = self._store.read_missing_associations_table(
-                        config.model.dataset_id, orig_version
+                    missing_dfs.update(
+                        self._store.read_missing_associations_tables(
+                            config.model.dataset_id, orig_version
+                        )
                     )
                     ld_df = self._store.read_table(config.model.dataset_id, orig_version)
                 else:
@@ -461,11 +498,11 @@ class DatasetRegistryManager(RegistryManagerBase):
                     ld_df, missing_df1 = self._read_table_from_user_path(
                         config, config.dataset_path
                     )
-                    missing_df2 = self._read_missing_associations_table_from_user_path(
+                    missing_dfs2 = self._read_missing_associations_tables_from_user_path(
                         config.dataset_path
                     )
-                    missing_df = self._check_duplicate_missing_associations(
-                        missing_df1, missing_df2
+                    missing_dfs.update(
+                        self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
                     )
 
             case DataSchemaType.STANDARD:
@@ -475,7 +512,7 @@ class DatasetRegistryManager(RegistryManagerBase):
                     ), "orig_version must be set if dataset_path is None"
                     lk_df = self._store.read_lookup_table(config.model.dataset_id, orig_version)
                     ld_df = self._store.read_table(config.model.dataset_id, orig_version)
-                    missing_df = self._store.read_missing_associations_table(
+                    missing_dfs = self._store.read_missing_associations_tables(
                         config.model.dataset_id, orig_version
                     )
                 else:
@@ -490,11 +527,11 @@ class DatasetRegistryManager(RegistryManagerBase):
                     lk_df, missing_df1 = self._read_lookup_table_from_user_path(
                         Path(config.dataset_path)
                     )
-                    missing_df2 = self._read_missing_associations_table_from_user_path(
+                    missing_dfs2 = self._read_missing_associations_tables_from_user_path(
                         config.dataset_path
                     )
-                    missing_df = self._check_duplicate_missing_associations(
-                        missing_df1, missing_df2
+                    missing_dfs.update(
+                        self._check_duplicate_missing_associations(missing_df1, missing_dfs2)
                     )
             case _:
                 msg = f"Unsupported data schema type: {config.get_data_schema_type()}"
@@ -503,20 +540,25 @@ class DatasetRegistryManager(RegistryManagerBase):
         self._store.write_table(ld_df, config.model.dataset_id, config.model.version)
         if lk_df is not None:
             self._store.write_lookup_table(lk_df, config.model.dataset_id, config.model.version)
-        if missing_df is not None:
-            self._store.write_missing_associations_table(
-                missing_df, config.model.dataset_id, config.model.version
+        if missing_dfs:
+            self._store.write_missing_associations_tables(
+                missing_dfs, config.model.dataset_id, config.model.version
             )
 
     @staticmethod
     def _check_duplicate_missing_associations(
-        df1: DataFrame | None, df2: DataFrame | None
-    ) -> DataFrame | None:
-        if df1 is not None and df2 is not None:
+        df1: DataFrame | None, dfs2: dict[str, DataFrame]
+    ) -> dict[str, DataFrame]:
+        if df1 is not None and dfs2:
             msg = "A dataset cannot have expected missing rows in the data and "
             "provide a missing_associations file. Provide one or the other."
             raise DSGInvalidDataset(msg)
-        return df1 or df2
+
+        if df1 is not None:
+            return {"missing_associations": df1}
+        elif dfs2:
+            return dfs2
+        return {}
 
     def _copy_dataset_config(self, conn: Connection, config: DatasetConfig) -> DatasetConfig:
         new_config = DatasetConfig(config.model)
@@ -587,7 +629,7 @@ class DatasetRegistryManager(RegistryManagerBase):
         # Note: this method mutates updated_config.
         self._write_to_registry(updated_config, orig_version=cur_config.model.version)
 
-        assoc_df = self._store.read_missing_associations_table(
+        assoc_df = self._store.read_missing_associations_tables(
             updated_config.model.dataset_id, updated_config.model.version
         )
         try:

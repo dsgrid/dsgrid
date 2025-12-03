@@ -112,12 +112,13 @@ def src_tmp_registry_db(tmp_path_factory):
     conn = DatabaseConnection(url=f"sqlite:///{tmp_path}/tmp_reg.db")
     RegistryDatabase.delete(conn)
     registry_dir = tmp_path_factory.mktemp("registry_data")
-    make_test_data_registry(
+    mgr = make_test_data_registry(
         registry_dir,
         project_dir,
         dataset_path=TEST_DATASET_DIRECTORY,
         database_url=conn.url,
     )
+    mgr.dispose()
     yield conn, project_dir
     RegistryDatabase.delete(conn)
 
@@ -167,7 +168,8 @@ def mutable_cached_registry(src_tmp_registry_db, tmp_path) -> tuple[RegistryMana
     shutil.copytree(src_project_dir, tmp_project_dir)
     RegistryManager.copy(src_conn, dst_conn, tmp_path / "mutable_registry_data")
     mgr = RegistryManager.load(dst_conn)
-    return mgr, tmp_project_dir
+    yield mgr, tmp_project_dir
+    mgr.dispose()
 
 
 def _get_latest_commit():

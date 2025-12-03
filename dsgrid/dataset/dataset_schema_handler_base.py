@@ -164,25 +164,27 @@ class DatasetSchemaHandlerBase(abc.ABC):
         self, missing_dimension_associations: DataFrame | None
     ) -> None:
         """Check that a cross-join of dimension records is present, unless explicitly excepted."""
-        context = ScratchDirContext(Path(tempfile.gettempdir()))
-        assoc_by_records = self._make_expected_dimension_association_table_from_records(
-            [x for x in DimensionType if x != DimensionType.TIME], context
-        )
-        assoc_by_data = self._make_actual_dimension_association_table_from_data()
-        if missing_dimension_associations is None:
-            required_assoc = assoc_by_records
-        else:
-            required_assoc = filter_out_expected_missing_associations(
-                assoc_by_records, missing_dimension_associations
+        dsgrid_config = DsgridRuntimeConfig.load()
+        scratch_dir = dsgrid_config.scratch_dir or Path(tempfile.gettempdir())
+        with ScratchDirContext(scratch_dir) as context:
+            assoc_by_records = self._make_expected_dimension_association_table_from_records(
+                [x for x in DimensionType if x != DimensionType.TIME], context
             )
-        cols = sorted(required_assoc.columns)
-        diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
-        cache(diff)
-        try:
-            if not is_dataframe_empty(diff):
-                handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
-        finally:
-            unpersist(diff)
+            assoc_by_data = self._make_actual_dimension_association_table_from_data()
+            if missing_dimension_associations is None:
+                required_assoc = assoc_by_records
+            else:
+                required_assoc = filter_out_expected_missing_associations(
+                    assoc_by_records, missing_dimension_associations
+                )
+            cols = sorted(required_assoc.columns)
+            diff = except_all(required_assoc.select(*cols), assoc_by_data.select(*cols))
+            cache(diff)
+            try:
+                if not is_dataframe_empty(diff):
+                    handle_dimension_association_errors(diff, assoc_by_data, self.dataset_id)
+            finally:
+                unpersist(diff)
 
     def make_mapped_dimension_association_table(
         self, store: DataStoreInterface, context: ScratchDirContext

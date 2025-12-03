@@ -122,6 +122,7 @@ def test_create_derived_dataset_config(tmp_path):
     registry_manager = RegistryManager.load(conn, offline_mode=True)
     dataset_dir.mkdir()
     assert create_derived_dataset_config_from_query(query_output, dataset_dir, registry_manager)
+    registry_manager.dispose()
     assert dataset_config_file.exists()
 
     result = runner.invoke(

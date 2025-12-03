@@ -9,19 +9,26 @@ import rich_click as click
 from rich import print
 from semver import VersionInfo
 
+from chronify.utils.path_utils import check_overwrite
+
 from dsgrid.cli.common import (
     get_value_from_context,
     handle_dsgrid_exception,
     path_callback,
 )
-from dsgrid.common import REMOTE_REGISTRY
+from dsgrid.common import LOCAL_REGISTRY, REMOTE_REGISTRY
 from dsgrid.config.dataset_config import DataSchemaType
 from dsgrid.dimension.base_models import DimensionType
 from dsgrid.dimension.time import TimeDimensionType
 from dsgrid.config.common import SUPPORTED_METRIC_TYPES
 from dsgrid.config.project_config import ProjectConfig
 from dsgrid.registry.bulk_register import bulk_register
-from dsgrid.registry.common import DatabaseConnection, VersionUpdateType
+from dsgrid.registry.common import (
+    DatabaseConnection,
+    DatasetRegistryStatus,
+    DataStoreType,
+    VersionUpdateType,
+)
 from dsgrid.registry.dataset_config_generator import generate_config_from_dataset
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.registry.project_config_generator import generate_project_config
@@ -54,14 +61,14 @@ Click Group Definitions
 
 
 @click.group()
-@click.option(
-    "--remote-path",
-    default=REMOTE_REGISTRY,
-    show_default=True,
-    help="path to dsgrid remote registry",
-)
+# @click.option(
+#     "--remote-path",
+#     default=REMOTE_REGISTRY,
+#     show_default=True,
+#     help="path to dsgrid remote registry",
+# )
 @click.pass_context
-def registry(ctx, remote_path):
+def registry(ctx):
     """Manage a registry."""
     conn = DatabaseConnection(
         url=get_value_from_context(ctx, "url"),
@@ -77,7 +84,7 @@ def registry(ctx, remote_path):
     else:
         ctx.obj = RegistryManager.load(
             conn,
-            remote_path,
+            REMOTE_REGISTRY,
             offline_mode=offline,
             no_prompts=no_prompts,
             scratch_dir=scratch_dir,
@@ -128,6 +135,46 @@ def list_(registry_manager):
     """List the contents of a registry."""
     print(f"Registry: {registry_manager.path}")
     registry_manager.show()
+
+
+_create_epilog = """
+Examples:\n
+$ dsgrid registry create sqlite:////projects/dsgrid/my_project/registry.db -p /projects/dsgrid/my_project/registry-data\n
+"""
+
+
+@click.command(name="create", epilog=_create_epilog)
+@click.argument("url")
+@click.option(
+    "-p",
+    "--data-path",
+    default=LOCAL_REGISTRY,
+    show_default=True,
+    callback=lambda *x: Path(x[2]),
+    help="Local dsgrid registry data path. Must not contain the registry file listed in URL.",
+)
+@click.option(
+    "-f",
+    "--overwrite",
+    "--force",
+    is_flag=True,
+    default=False,
+    help="Delete registry_path and the database if they already exist.",
+)
+@click.option(
+    "-t",
+    "--data-store-type",
+    type=click.Choice([x.value for x in DataStoreType]),
+    default=DataStoreType.FILESYSTEM.value,
+    show_default=True,
+    help="Type of store to use for the registry data.",
+    callback=lambda *x: DataStoreType(x[2]),
+)
+def create_registry(url: str, data_path: Path, overwrite: bool, data_store_type: DataStoreType):
+    """Create a new registry."""
+    check_overwrite(data_path, overwrite)
+    conn = DatabaseConnection(url=url)
+    RegistryManager.create(conn, data_path, overwrite=overwrite, data_store_type=data_store_type)
 
 
 """
@@ -345,6 +392,14 @@ def update_dimension(
     )
     if res[1] != 0:
         ctx.exit(res[1])
+
+
+@click.command(name="remove")
+@click.argument("dimension-id")
+@click.pass_obj
+def remove_dimension(registry_manager: RegistryManager, dimension_id: str):
+    """Remove a dimension from the dsgrid repository."""
+    registry_manager.dimension_manager.remove(dimension_id)
 
 
 """
@@ -589,6 +644,14 @@ def update_dimension_mapping(
         log_message,
         version,
     )
+
+
+@click.command(name="remove")
+@click.argument("dimension-mapping-id")
+@click.pass_obj
+def remove_dimension_mapping(registry_manager: RegistryManager, dimension_mapping_id: str):
+    """Remove a dimension mapping from the dsgrid repository."""
+    registry_manager.dimension_mapping_manager.remove(dimension_mapping_id)
 
 
 """
@@ -1358,6 +1421,14 @@ def generate_project_config_from_ids(
         ctx.exit(res[1])
 
 
+@click.command(name="remove")
+@click.argument("project-id")
+@click.pass_obj
+def remove_project(registry_manager: RegistryManager, project_id: str):
+    """Remove a project from the dsgrid repository."""
+    registry_manager.project_manager.remove(project_id)
+
+
 """
 Dataset Commands
 """
@@ -1689,6 +1760,42 @@ def generate_dataset_config_from_dataset(
         ctx.exit(res[1])
 
 
+@click.command(name="remove")
+@click.argument("dataset-ids", nargs=-1)
+@click.pass_obj
+def remove_datasets(registry_manager: RegistryManager, dataset_ids: list[str]):
+    """Remove one or more datasets from the dsgrid repository."""
+    dataset_mgr = registry_manager.dataset_manager
+    project_mgr = registry_manager.project_manager
+
+    # Ensure that all dataset IDs are valid before removing any of them.
+    for dataset_id in dataset_ids:
+        dataset_mgr.get_by_id(dataset_id)
+
+    for dataset_id in dataset_ids:
+        registry_manager.dataset_manager.remove(dataset_id)
+
+    dataset_ids_set = set(dataset_ids)
+    for project_id in project_mgr.list_ids():
+        config = project_mgr.get_by_id(project_id)
+        removed_dataset_ids = []
+        for dataset in config.iter_datasets():
+            if (
+                dataset.dataset_id in dataset_ids_set
+                and dataset.status == DatasetRegistryStatus.REGISTERED
+            ):
+                dataset.status = DatasetRegistryStatus.UNREGISTERED
+                dataset.mapping_references.clear()
+                removed_dataset_ids.append(dataset.dataset_id)
+        if removed_dataset_ids:
+            ids = ", ".join(removed_dataset_ids)
+            msg = (
+                f"Set status for datasets {ids} to unregistered in project {project_id} "
+                "after removal."
+            )
+            project_mgr.update(config, VersionUpdateType.MAJOR, msg)
+
+
 _bulk_register_epilog = """
 Examples:\n
 $ dsgrid registry bulk-register registration.json5
@@ -1781,12 +1888,14 @@ dimensions.add_command(register_dimensions)
 dimensions.add_command(dump_dimension)
 dimensions.add_command(show_dimension)
 dimensions.add_command(update_dimension)
+dimensions.add_command(remove_dimension)
 
 dimension_mappings.add_command(list_dimension_mappings)
 dimension_mappings.add_command(register_dimension_mappings)
 dimension_mappings.add_command(dump_dimension_mapping)
 dimension_mappings.add_command(show_dimension_mapping)
 dimension_mappings.add_command(update_dimension_mapping)
+dimension_mappings.add_command(remove_dimension_mapping)
 
 projects.add_command(list_projects)
 projects.add_command(register_project)
@@ -1800,17 +1909,20 @@ projects.add_command(add_dataset_requirements)
 projects.add_command(replace_dataset_dimension_requirements)
 projects.add_command(list_project_dimension_names)
 projects.add_command(generate_project_config_from_ids)
+projects.add_command(remove_project)
 
 datasets.add_command(list_datasets)
 datasets.add_command(register_dataset)
 datasets.add_command(dump_dataset)
 datasets.add_command(update_dataset)
 datasets.add_command(generate_dataset_config_from_dataset)
+datasets.add_command(remove_datasets)
 
 registry.add_command(list_)
+registry.add_command(create_registry)
 registry.add_command(dimensions)
 registry.add_command(dimension_mappings)
 registry.add_command(projects)
 registry.add_command(datasets)
 registry.add_command(bulk_register_cli)
-registry.add_command(data_sync)
+# registry.add_command(data_sync)

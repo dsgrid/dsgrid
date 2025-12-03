@@ -4,7 +4,6 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from dsgrid.cli.dsgrid import cli
-from dsgrid.cli.dsgrid_admin import cli as admin_cli
 from dsgrid.config.registration_models import RegistrationModel
 from dsgrid.query.models import ColumnType
 from dsgrid.registry.common import DatabaseConnection
@@ -27,9 +26,10 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     src_dir, tmpdir, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
-            "create-registry",
+            "registry",
+            "create",
             url,
             "-p",
             str(tmpdir),
@@ -43,7 +43,6 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "dimensions",
         "register",
@@ -65,7 +64,6 @@ def test_register_dimensions_and_mappings(tmp_registry_db):
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "dimension-mappings",
         "register",
@@ -83,9 +81,10 @@ def test_register_project_and_dataset(tmp_registry_db):
     src_dir, tmpdir, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
-            "create-registry",
+            "registry",
+            "create",
             url,
             "-p",
             str(tmpdir),
@@ -106,7 +105,6 @@ def test_register_project_and_dataset(tmp_registry_db):
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "projects",
             "register",
@@ -123,7 +121,6 @@ def test_register_project_and_dataset(tmp_registry_db):
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "projects",
         "register-and-submit-dataset",
@@ -140,7 +137,7 @@ def test_register_project_and_dataset(tmp_registry_db):
     result = runner.invoke(cli, cmd)
     assert result.exit_code == 0, result.output
 
-    result = runner.invoke(cli, ["--url", url, "--offline", "registry", "list"])
+    result = runner.invoke(cli, ["--url", url, "registry", "list"])
     assert result.exit_code == 0
     regex_project = re.compile(rf"{project_id}.*1\.1\.0")
     regex_dataset = re.compile(rf"{dataset_id}.*1\.0\.0")
@@ -151,11 +148,10 @@ def test_register_project_and_dataset(tmp_registry_db):
         dim_map_id = manager.dimension_mapping_manager.list_ids()[0]
 
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "projects",
             "remove",
@@ -164,11 +160,10 @@ def test_register_project_and_dataset(tmp_registry_db):
     )
     assert result.exit_code == 0
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "datasets",
             "remove",
@@ -177,11 +172,10 @@ def test_register_project_and_dataset(tmp_registry_db):
     )
     assert result.exit_code == 0
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "dimension-mappings",
             "remove",
@@ -190,11 +184,10 @@ def test_register_project_and_dataset(tmp_registry_db):
     )
     assert result.exit_code == 0
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "dimensions",
             "remove",
@@ -210,7 +203,6 @@ def test_list_project_dimension_names(cached_registry):
     cmd = [
         "--url",
         conn.url,
-        "--offline",
         "registry",
         "projects",
         "list-dimension-names",
@@ -234,9 +226,10 @@ def test_register_dsgrid_projects(tmp_registry_db):
     _, tmpdir, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
-            "create-registry",
+            "registry",
+            "create",
             url,
             "-p",
             str(tmpdir),
@@ -257,7 +250,6 @@ def test_register_dsgrid_projects(tmp_registry_db):
             [
                 "--url",
                 url,
-                "--offline",
                 "registry",
                 "projects",
                 "register",
@@ -280,9 +272,10 @@ def test_bulk_register(tmp_registry_db):
     test_project_dir, tmp_path, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
-            "create-registry",
+            "registry",
+            "create",
             url,
             "-p",
             str(tmp_path),
@@ -341,9 +334,10 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
     _, tmpdir, url = tmp_registry_db
     runner = CliRunner()
     result = runner.invoke(
-        admin_cli,
+        cli,
         [
-            "create-registry",
+            "registry",
+            "create",
             url,
             "-p",
             str(tmpdir),
@@ -367,7 +361,6 @@ def test_register_multiple_metric_dimensions(tmp_registry_db):
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "projects",
         "register",

@@ -332,7 +332,7 @@ every command. That saves several seconds for each iteration.
 
 Be sure to use the `debug` function from the `devtools` package when exploring Pydantic models.
 ```
-ipython -i scripts/registry.py -- --path=$DSGRID_REGISTRY_PATH --offline
+ipython -i scripts/registry.py -- --path=$DSGRID_REGISTRY_PATH
 In [1]: manager.show()
 
 In [2]: dataset = dataset_manager.get_by_id("efs_comstock")
@@ -438,7 +438,6 @@ Here is an example CLI command that will create a query file with default filter
 
 ```
 $ dsgrid query project create \
-    --offline \
     --registry-path=./dsgrid-test-data/filtered_registries/simple_standard_scenarios \
     --filters expression \
     --default-per-dataset-aggregation \
@@ -455,7 +454,6 @@ Submit the query with this command:
 
 ```
 $ dsgrid query project run \
-    --offline \
     --registry-path=./dsgrid-test-data/filtered_registries/simple_standard_scenarios \
     query.json
 ```
@@ -477,7 +475,6 @@ $ spark-submit --master spark://hostname:7077 \
     --conf spark.sql.shuffle.partitions=500 \
     /Users/dthom/miniconda3/envs/dsgrid/bin/dsgrid-cli.py \
     query project run \
-    --offline \
     --registry-path=./dsgrid-test-data/filtered_registries/simple_standard_scenarios \
     query.json
 ```

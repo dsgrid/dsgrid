@@ -9,7 +9,6 @@ from pydantic import ValidationError
 
 from dsgrid.common import BackendEngine
 from dsgrid.cli.dsgrid import cli
-from dsgrid.cli.dsgrid_admin import cli as cli_admin
 from dsgrid.config.input_dataset_requirements import (
     InputDatasetDimensionRequirementsModel,
     InputDatasetDimensionRequirementsListModel,
@@ -296,7 +295,6 @@ fans,x
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "projects",
             "register-subset-dimensions",
@@ -369,7 +367,6 @@ def test_add_supplemental_dimension(mutable_cached_registry, tmp_path):
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "projects",
             "register-supplemental-dimensions",
@@ -425,11 +422,10 @@ def test_remove_dataset(mutable_cached_registry):
     url = f"sqlite:///{project_mgr.db.engine.url.database}"
     runner = CliRunner()
     result = runner.invoke(
-        cli_admin,
+        cli,
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "datasets",
             "remove",
@@ -462,7 +458,6 @@ def test_add_dataset_requirements(mutable_cached_registry, tmp_path):
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "projects",
             "add-dataset-requirements",
@@ -525,7 +520,6 @@ def test_replace_dataset_dimension_requirements(mutable_cached_registry, tmp_pat
         [
             "--url",
             url,
-            "--offline",
             "registry",
             "projects",
             "replace-dataset-dimension-requirements",
@@ -824,7 +818,6 @@ def test_register_dataset_with_data_base_dir(tmp_registry_db, tmp_path):
             [
                 "--url",
                 db_url,
-                "--offline",
                 "registry",
                 "datasets",
                 "register",
@@ -907,7 +900,6 @@ def test_register_and_submit_dataset_with_data_base_dir(tmp_registry_db, tmp_pat
             [
                 "--url",
                 db_url,
-                "--offline",
                 "registry",
                 "projects",
                 "register-and-submit-dataset",

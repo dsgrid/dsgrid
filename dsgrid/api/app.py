@@ -368,7 +368,6 @@ def _submit_project_query(spark_query: SparkSubmitProjectQueryRequest, async_tas
         output_dir = Path(QUERY_OUTPUT_DIR)
         dsgrid_exec = "dsgrid-cli.py"
         base_cmd = (
-            f"--offline "
             f"--url={DSGRID_REGISTRY_DATABASE_URL} "
             f"query project run "
             f"--output={output_dir} --zip-file --overwrite {fp.name}"

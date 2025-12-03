@@ -89,7 +89,6 @@ def test_create_derived_dataset_config(tmp_path):
     query_output_base = tmp_path / "query_output"
     runner = CliRunner()
     cmd = [
-        "--offline",
         "--url",
         conn.url,
         "query",
@@ -129,7 +128,6 @@ def test_create_derived_dataset_config(tmp_path):
     result = runner.invoke(
         cli,
         [
-            "--offline",
             "--url",
             conn.url,
             "query",

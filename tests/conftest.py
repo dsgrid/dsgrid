@@ -9,8 +9,7 @@ from typing import Optional
 import pytest
 from click.testing import CliRunner
 
-from dsgrid.cli.dsgrid import cli as cli
-from dsgrid.cli.dsgrid_admin import cli as cli_admin
+from dsgrid.cli.dsgrid import cli
 from dsgrid.registry.common import DataStoreType, DatabaseConnection
 from dsgrid.registry.registry_manager import RegistryManager
 from dsgrid.spark.functions import (
@@ -73,10 +72,10 @@ def cached_registry():
         TEST_REGISTRY_BASE_PATH.mkdir()
         runner = CliRunner()
         result = runner.invoke(
-            cli_admin,
+            cli,
             [
-                "--offline",
-                "create-registry",
+                "registry",
+                "create",
                 conn.url,
                 "--data-path",
                 str(TEST_REGISTRY_DATA_PATH),
@@ -89,7 +88,6 @@ def cached_registry():
             [
                 "--url",
                 conn.url,
-                "--offline",
                 "registry",
                 "bulk-register",
                 str(TEST_EFS_REGISTRATION_FILE),
@@ -131,10 +129,10 @@ def registry_with_duckdb_store(tmp_path):
     data_path = tmp_path / "registry_data"
     runner = CliRunner()
     result = runner.invoke(
-        cli_admin,
+        cli,
         [
-            "--offline",
-            "create-registry",
+            "registry",
+            "create",
             url,
             "--data-path",
             str(data_path),
@@ -147,7 +145,6 @@ def registry_with_duckdb_store(tmp_path):
     cmd = [
         "--url",
         url,
-        "--offline",
         "registry",
         "bulk-register",
         str(TEST_EFS_REGISTRATION_FILE),

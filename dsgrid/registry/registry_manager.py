@@ -209,7 +209,7 @@ class RegistryManager:
             If set, use load data tables from remote_path. If not set, auto-determine what to do
             based on HPC or AWS EMR environment variables.
         offline_mode : bool
-            Load registry in offline mode; default is False
+            Load registry in offline mode; default is True
         user : str
             username
         no_prompts : bool
